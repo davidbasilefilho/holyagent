@@ -54,6 +54,7 @@ describe("holyagent setup and doctor as commands", () => {
     const second = await cli(flags)
     expect(second.code).toBe(0)
     expect(second.stdout.split("\n").filter((line) => /^[+!~-] /.test(line))).toEqual([
+      "~ scope: user (default)",
       "- ctx7: skipped by flag",
     ])
     expect(second.stdout).toEndWith("no changes\n")

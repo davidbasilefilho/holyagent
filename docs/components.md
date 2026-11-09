@@ -2,27 +2,31 @@
 
 What HolyAgent installs or configures, and why. The installers (`install/wsl-install.sh` for WSL Ubuntu, `install/windows-install.ps1` for native Windows) set up only the prerequisites; `holyagent setup` (run as `/holyagent:setup`) installs and configures the rest. Both skip any step that is already right, so re-running changes nothing that is already set.
 
-| Component        | Installed by                                              | Why                                                                       |
-| ---------------- | --------------------------------------------------------- | ------------------------------------------------------------------------- |
-| mise             | Installers, only with `--dev` (`-Dev`)                    | Version manager and the source of the repository's commands (development) |
-| Node.js LTS      | WSL and Windows installers (apt, winget)                  | ctx7 runs on Node                                                         |
-| Bun              | WSL and Windows installers (Bun's install script)         | Runs the plugin's hooks and CLI; development needs a canary build         |
-| git, gh          | WSL installer (apt), Windows installer (winget)           | Every commit, branch and PR step runs them                                |
-| HolyAgent plugin | Marketplace (`claude plugin install holyagent@holyagent`) | The root agent, specialists, skills, hooks and runtime CLI                |
-| ctx7 and skill   | `holyagent setup`                                         | Current library documentation for the agents                              |
-| Exa connector    | claude.ai connectors (see [Exa](#exa))                    | Web search and page reading for the Search specialists                    |
+| Component                       | Installed by                                                               | Why                                                                       |
+| ------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| mise                            | Installers, only with `--dev` (`-Dev`)                                     | Version manager and the source of the repository's commands (development) |
+| Node.js LTS                     | WSL and Windows installers (apt, winget)                                   | ctx7 runs on Node                                                         |
+| Bun                             | WSL and Windows installers (Bun's install script)                          | Runs the plugin's hooks and CLI; development needs a canary build         |
+| git, gh                         | WSL installer (apt), Windows installer (winget)                            | Every commit, branch and PR step runs them                                |
+| HolyAgent plugin                | Marketplace (`claude plugin install holyagent@holyagent`)                  | The root agent, specialists, skills, hooks and runtime CLI                |
+| ctx7 and skill                  | `holyagent setup`                                                          | Current library documentation for the agents                              |
+| Pi (optional)                   | You, with Pi's installer or npm (see below)                                | The agent host of the Pi integration; needs Node.js 22.19 or newer        |
+| HolyAgent Pi package (optional) | `pi install git:github.com/davidbasilefilho/holyagent@holyagent-<version>` | The root, 18 specialists, skills and extension on Pi                      |
+| Exa connector                   | claude.ai connectors (see [Exa](#exa))                                     | Web search and page reading for the Search specialists                    |
 
 Claude Code itself is a prerequisite that none of these install; Anthropic documents the ways to get it at <https://code.claude.com/docs/en/setup>.
 
 ripgrep and fd ship inside the plugin rather than being installed; see [ripgrep and fd](#ripgrep-and-fd).
 
-Pi is not installed: there is no Pi integration yet ([pi/README.md](pi/README.md)).
+Pi is not installed by these installers. The Pi integration is `packages/integrations/pi`, which builds the HolyAgent Pi package (`packages/integrations/pi/dist`): the 18 specialists as agent files, the skills, an extension that gives each Pi session its role and context, and the bundled CLI behind a wrapper. You install Pi yourself (Node.js 22.19 or newer, then the official installer or `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0`) and the package with `pi install git:github.com/davidbasilefilho/holyagent@holyagent-<version>`, globally or per project; plain `pi` then starts the root ([pi/installation.md](pi/installation.md), [usage.md](usage.md#pi), [pi/README.md](pi/README.md)). The package lists no dependencies; `holyagent setup` installs the Pi packages your `config.json` enables, each at an exact pin ([pi/configuration.md](pi/configuration.md#holyagent-configjson)). T3 Code is the primary interface: the extension keeps only the T3 tools HolyAgent uses and warns when a thread is below Full access, and `holyagent setup` writes T3's settings ([pi/t3-code.md](pi/t3-code.md)).
+
+The plugin installs at user, project or local scope ([usage.md](usage.md#install-scopes)). A user-level `~/.holyagent/config.json` holds your defaults and the project's `.holyagent/config.json` overrides it key by key ([pi/configuration.md](pi/configuration.md#the-user-level-config)).
 
 ## mise, Node, Bun, gh
 
 The WSL installer first installs any missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`) with sudo. Node LTS comes from NodeSource's apt repository, Bun from its official install script into `~/.bun`, and `gh` from GitHub's apt repository. The installer refuses a Node older than 22.13, the floor for ctx7, and puts Bun's global bin directory on `PATH` through a line in `~/.bashrc` (a one-time copy is kept as `~/.bashrc.pre-holyagent`).
 
-The Windows installer (`install/windows-install.ps1`) installs missing `git`, Node LTS and `gh` with `winget`, and Bun from its official install script into `~\.bun`. It refuses a Node older than 22.13 and puts Bun's global bin folder on your user `PATH`.
+The Windows installer (`install/windows-install.ps1`) installs missing `git`, Node LTS and `gh` with `winget`, and Bun from its official install script into `~\.bun`. It refuses a Node older than 22.19, the floor for Pi (ctx7 needs 22.13), and puts Bun's global bin folder on your user `PATH` ([pi/installation.md](pi/installation.md#what-setup-and-doctor-do)).
 
 mise is installed only with the development option (`--dev` for the WSL installer, `-Dev` for the Windows one), because only developing this repository needs it. The WSL installer runs mise's official installer into `~/.local/bin/mise` and activates it in `~/.bashrc`. The Windows installer installs `jdx.mise` with `winget` and activates it in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`). Without the option, neither installer installs or activates mise.
 
@@ -52,17 +56,22 @@ Hosted setup needs a login or API key. With neither, `ctx7 setup --yes` would bl
 
 ## What `holyagent setup` and `holyagent doctor` do
 
-`holyagent setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]` runs two steps, each of which checks its own result first:
+`holyagent setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]` runs four steps, in this order, each of which checks its own result first:
 
 - ctx7: the package and the Context7 skill (above);
-- settings: the missing keys (in the file of `--scope`, the user settings by default) among `attribution`, `includeGitInstructions`, `subagentPromptCacheTtl`, `modelSettings["claude-opus-5-5"]` (`effortLevel` and `autoCompactWindow`), `extraKnownMarketplaces`, `enabledPlugins` and `permissions.deny` are added to `~/.claude/settings.json` (or the file in `CLAUDE_CONFIG_DIR`) for `--scope user`, or to the project's `.claude/settings.json` or `.claude/settings.local.json`, and no value that is already set changes ([usage.md](usage.md#user-settings) lists them).
+- Pi packages: only when Pi is in use (`HOLYAGENT_HOST=pi` or `pi` on `PATH`) and not in a cloud session. For each package the `config.json` enables that neither the global nor the project Pi settings list at its pin, it runs `pi install npm:<name>@<pin>`, and for each package HolyAgent manages (a feature package, `pi-web-kit`, a provider profile package) that the chosen scope's settings list but the config no longer selects, `pi remove npm:<name>`. With `pi.enable` off it removes nothing and says so. `--scope user` works on Pi's global settings and reads your own `~/.holyagent/config.json` only, so the repository you run it in cannot remove a global package; `project` and `local` both work on the project's `.pi/settings.json` with `-l`, in the project directory, which they read for its npm and Pi settings, so run them only in a repository you trust ([pi/installation.md](pi/installation.md#what-setup-and-doctor-do));
+- Pi tool settings: under the same gating as the Pi packages step, it merges the settings `toolSettings(config)` returns into the files the Pi packages read (codemode mode and the computer-use confirmations in Pi's `settings.json`, `subagents.json`, the provider's Moonshot tools file, Billion Context's file), one report line per file. A key is written only where it is unset and differs from the package's own default, and a value you set is never overwritten. `--scope user` writes Pi's global files, `project` and `local` the project's `.pi` folder (Billion Context's setting is user scope only), where a key your global file already sets is left out and a symlinked `.pi` folder or file is refused. A file that is not a JSON object is a failed line and stays untouched ([pi/installation.md](pi/installation.md#what-setup-and-doctor-do));
+- settings: the missing keys (in the file of `--scope`; without it the user settings, or `.claude/settings.local.json` when that file enables `holyagent@holyagent`, sits in a trusted git work tree and is untracked) among `attribution`, `includeGitInstructions`, `subagentPromptCacheTtl`, `modelSettings["claude-opus-5-5"]` (`effortLevel` and `autoCompactWindow`), `extraKnownMarketplaces`, `enabledPlugins` and `permissions.deny` are added to `~/.claude/settings.json` (or the file in `CLAUDE_CONFIG_DIR`) for `--scope user`, or to the project's `.claude/settings.json` or `.claude/settings.local.json`, and no value that is already set changes ([usage.md](usage.md#user-settings) lists them).
 
-In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of yours to install on, so the ctx7 step is skipped and the other still runs. Setup does not register the plugin, which the two `claude plugin` commands do, and it does not check Bun's build.
+In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of yours to install on, so the ctx7 and Pi steps are skipped and the settings step still runs. Setup does not register the plugin, which the two `claude plugin` commands do, it does not install Pi, and it does not check Bun's build. With `--undo` only the settings change: the keys setup recorded adding are removed from the Claude settings and from the Pi tool settings files (each only while its value still equals what setup wrote), and ctx7 and the Pi packages stay installed.
 
 `holyagent doctor [--scope user|project|local] [--fix]` prints one line per check and exits 1 when any fails:
 
 - `bun` is on `PATH`;
 - `ctx7` is on `PATH` (it passes in a cloud session, where setup leaves it out);
 - the user settings have the keys `holyagent setup` writes;
+- the Pi checks, run only when Pi is in use (`HOLYAGENT_HOST=pi` or `pi` on `PATH`; never in a cloud session) and `pi.enable` is on: `pi` is on `PATH` at the pinned version or newer, Node.js is 22.19 or newer, the HolyAgent Pi package is listed in Pi's global settings (for `--scope project` and `local`, the project's `.pi/settings.json` counts too), and every package the config of the chosen `--scope` enables is listed in them at its pin. With `pi.enable` off it prints no Pi line. When Pi is in use, a `~ tool settings <file> lacks <keys>` hint follows for each tool settings file that lacks keys, with `holyagent setup` as the fix. When Pi is not in use, one `~ pi: not in use` line is printed and nothing fails. These checks only report, with the install command as the fix, and `--fix` installs none of them ([pi/installation.md](pi/installation.md#what-setup-and-doctor-do));
 
-`--fix` runs the setup steps behind a failing check and checks again; it never installs Bun. `/holyagent:setup` runs `holyagent setup` from a session, and the session-start hook adds one line suggesting it while `ctx7` or a key is missing ([hooks.md](hooks.md)).
+Without `--scope`, both commands use `user`, or `local` when your `.claude/settings.local.json` enables the plugin, sits in a trusted git work tree and is untracked (an archive that ships its own `.git` omitting the file still counts as untracked); a committed `.claude/settings.json` never selects a scope and only prints a line naming `--scope project` ([usage.md](usage.md#install-scopes)).
+
+`--fix` runs the setup steps behind a failing check and checks again; it never installs Bun, Pi, Node.js or the Pi package. `/holyagent:setup` runs `holyagent setup` from a session, and the session-start hook adds one line suggesting it while `ctx7` or a key is missing ([hooks.md](hooks.md)).

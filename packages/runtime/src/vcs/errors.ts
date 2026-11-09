@@ -122,5 +122,6 @@ export const VCS_HINTS: Readonly<Record<string, string>> = {
   NothingToCommit: "Check the paths; commit only after the files changed.",
   StagedOutsideScope: "Unstage them with `git restore --staged <path>` or name them in the commit.",
   RemoteMismatch: "Set origin to the GitHub repository (`git remote add origin <url>`) and retry.",
-  DetachedHead: "Check out or create a branch with `git switch -c <name>`.",
+  DetachedHead:
+    "Check out a branch: in a cloud session, work in a git worktree (`git worktree add -b <name> <path>`), not the primary checkout; otherwise `git switch -c <name>`.",
 }

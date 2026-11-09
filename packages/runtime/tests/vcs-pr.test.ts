@@ -91,6 +91,39 @@ describe("vcs pr", () => {
     expect(patch?.body).toEqual({ title: "Better title" })
   })
 
+  test("the allowWords of the user file in the call's HOLYAGENT_HOME apply to the title", async () => {
+    const dir = await withOrigin()
+    const home = await scratch()
+    await put(home, {
+      ".holyagent/config.json": JSON.stringify({ vcs: { allowWords: ["subagent"] } }),
+    })
+    const args = ["vcs", "pr", "--update", "7", "--title", "Route to a subagent"]
+    const refused = await vcs(dir, args, prGithub().layer)
+    expect(refused.code).toBe(3)
+    const made = toon(await vcs(dir, args, prGithub().layer, undefined, { HOLYAGENT_HOME: home }))
+    expect(made).toMatchObject({ number: 7, created: false })
+  })
+
+  test("a bad config file in the call's home stops the command and names that file", async () => {
+    const dir = await withOrigin()
+    const home = await scratch()
+    await put(home, { ".holyagent/config.json": '{"nope":1}' })
+    const gh = prGithub()
+    const result = await vcs(
+      dir,
+      ["vcs", "pr", "--update", "7", "--title", "x"],
+      gh.layer,
+      undefined,
+      {
+        HOLYAGENT_HOME: home,
+      },
+    )
+    expect(result.code).toBe(4)
+    expect(result.stderr).toContain("error: ConfigInvalid:")
+    expect(result.stderr).toContain(join(home, ".holyagent", "config.json"))
+    expect(gh.calls).toEqual([])
+  })
+
   test("--update records the head GitHub reports, from any branch or a detached HEAD", async () => {
     const dir = await withOrigin()
     const gh = prGithub()

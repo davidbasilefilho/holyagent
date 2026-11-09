@@ -2,16 +2,20 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { Effect } from "effect"
+
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
-import { embedMateriality, MATERIALITY_FILE, MATERIALITY_MARKER } from "../src/agents.ts"
-import { INSTRUCTIONS_DIRECTORY } from "../src/files.ts"
+import { FAMILIES } from "../../../runtime/src/instructions/families.ts"
 import {
-  DESIGN_CORE_FILE,
   DESIGN_CORE_MARKER,
   DESIGN_SKILLS,
-  generate,
+  embedMateriality,
+  MATERIALITY_MARKER,
   skillBody,
-} from "../src/generate.ts"
+} from "../../../runtime/src/instructions/skills.ts"
+import { MATERIALITY_FILE } from "../src/agents.ts"
+import { INSTRUCTIONS_DIRECTORY } from "../src/files.ts"
+import { DESIGN_CORE_FILE, generate } from "../src/generate.ts"
 import { ROOT } from "./built.ts"
 
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8")
@@ -24,8 +28,18 @@ const INSTRUCTION_FILES = (
 )
   .map((path) => toPosix(`packages/runtime/src/instructions/${path}`))
   .toSorted()
+/** The instruction folder of a family, relative to the repository root. */
+const familyDirectory = (family: string) => `packages/runtime/src/instructions/${family}`
+/** The sources of a family folder, as paths relative to it. */
+const familySources = (family: string) =>
+  INSTRUCTION_FILES.filter((path) => path.startsWith(`${familyDirectory(family)}/`)).map((path) =>
+    path.slice(familyDirectory(family).length + 1),
+  )
 const materiality = read(MATERIALITY_FILE).trim()
-const core = embedMateriality(read(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE).trim()
+const core = Effect.runSync(
+  embedMateriality(read(DESIGN_CORE_FILE), materiality, DESIGN_CORE_FILE),
+).trim()
+const run = Effect.runSync
 const skill = (name: string) =>
   generated.find((file) => file.path.endsWith(`skills/${name}/SKILL.md`))?.content ?? ""
 
@@ -139,11 +153,11 @@ describe("the platform design skills", () => {
 
   test("fail the build when a skill outside the design list holds the core marker", () => {
     const text = `---\nname: other\n---\n${DESIGN_CORE_MARKER}\n`
-    expect(() => skillBody("other/SKILL.md", text, core, "other")).toThrow("DESIGN_SKILLS")
-    expect(skillBody("other/SKILL.md", "---\nname: other\n---\nbody\n", core, "other")).toContain(
-      "body",
-    )
-    expect(skillBody("web-design/SKILL.md", text, core, "web")).toContain("### Spend boldness")
+    expect(() => run(skillBody("other/SKILL.md", text, core, "other"))).toThrow("DESIGN_SKILLS")
+    expect(
+      run(skillBody("other/SKILL.md", "---\nname: other\n---\nbody\n", core, "other")),
+    ).toContain("body")
+    expect(run(skillBody("web-design/SKILL.md", text, core, "web"))).toContain("### Spend boldness")
   })
 
   test("name no framework, library, component kit or API", () => {
@@ -204,17 +218,30 @@ describe("the materiality definition", () => {
         path: file.path,
         marker: file.content.split("\n").includes(MATERIALITY_MARKER),
       }).toEqual({ path: file.path, marker: false })
-    const sources = INSTRUCTION_FILES.filter((path) =>
-      read(path).split("\n").includes(MATERIALITY_MARKER),
-    )
+    for (const family of FAMILIES) {
+      const sources = familySources(family).filter((path) =>
+        read(`${familyDirectory(family)}/${path}`)
+          .split("\n")
+          .includes(MATERIALITY_MARKER),
+      )
+      expect({ family, sources: sources.toSorted() }).toEqual({
+        family,
+        sources: MATERIALITY_SOURCES,
+      })
+    }
     expect(
-      sources.map((path) => path.slice(`${INSTRUCTIONS_DIRECTORY}/`.length)).toSorted(),
-    ).toEqual(MATERIALITY_SOURCES)
+      INSTRUCTION_FILES.filter(
+        (path) =>
+          !FAMILIES.some((family) => path.startsWith(`${familyDirectory(family)}/`)) &&
+          read(path).split("\n").includes(MATERIALITY_MARKER),
+      ),
+    ).toEqual([])
   })
 
   test("is restated by no other instruction source or generated file", () => {
     for (const path of INSTRUCTION_FILES) {
-      if (path === MATERIALITY_FILE) continue
+      if (FAMILIES.some((family) => path === `${familyDirectory(family)}/shared/materiality.md`))
+        continue
       const text = read(path)
       for (const marker of DEFINITION_MARKERS)
         expect({ path, marker, found: text.includes(marker) }).toEqual({
@@ -235,21 +262,21 @@ describe("the materiality definition", () => {
   })
 
   test("embeds nothing into a source without the marker and fails on a second marker", () => {
-    expect(embedMateriality("body\n", "definition", "a")).toBe("body\n")
-    expect(embedMateriality(`one\n${MATERIALITY_MARKER}\ntwo`, " definition \n", "a")).toBe(
+    expect(run(embedMateriality("body\n", "definition", "a"))).toBe("body\n")
+    expect(run(embedMateriality(`one\n${MATERIALITY_MARKER}\ntwo`, " definition \n", "a"))).toBe(
       "one\ndefinition\ntwo",
     )
     expect(() =>
-      embedMateriality(`${MATERIALITY_MARKER}\n${MATERIALITY_MARKER}`, "definition", "a"),
+      run(embedMateriality(`${MATERIALITY_MARKER}\n${MATERIALITY_MARKER}`, "definition", "a")),
     ).toThrow("at most once")
   })
 
   test("matches the marker line after trimming, so a stray space cannot ship it as a comment", () => {
-    expect(embedMateriality(`one\n  ${MATERIALITY_MARKER} \ntwo`, "definition", "a")).toBe(
+    expect(run(embedMateriality(`one\n  ${MATERIALITY_MARKER} \ntwo`, "definition", "a"))).toBe(
       "one\ndefinition\ntwo",
     )
     expect(() =>
-      embedMateriality(`${MATERIALITY_MARKER}\n\t${MATERIALITY_MARKER}  `, "definition", "a"),
+      run(embedMateriality(`${MATERIALITY_MARKER}\n\t${MATERIALITY_MARKER}  `, "definition", "a")),
     ).toThrow("at most once")
   })
 })

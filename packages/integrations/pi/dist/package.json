@@ -1,0 +1,41 @@
+{
+  "name": "holyagent",
+  "version": "0.3.0",
+  "description": "HolyAgent for Pi: its skills, its 18 specialists and an extension, built from the shared holyagent runtime.",
+  "license": "Apache-2.0",
+  "author": "davidbasilefilho",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "files": [
+    "agents",
+    "extensions",
+    "prompts",
+    "scripts",
+    "skills"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "subagents": {
+      "agents": [
+        "./agents"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  }
+}

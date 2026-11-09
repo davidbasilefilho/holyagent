@@ -8,7 +8,7 @@ Rules for working in this repository, each with the reason it exists. The contri
 
 ## Branches and worktrees
 
-- Keep the main checkout on `main` and do other branches in git worktrees, for example `../holyagent-<branch-slug>`. Sessions here load the holyagent plugin from this checkout through the directory marketplace in `.claude/settings.json`, so checking out a branch that moves or deletes the plugin folder breaks the running session: every Bash call blocks and workflows fail.
+- Keep the main checkout on `main` (in a cloud session, the assigned branch, because the session panel shows the primary checkout's diff) and do other branches in git worktrees, for example `../holyagent-<branch-slug>`. Sessions here load the holyagent plugin from this checkout through the directory marketplace in `.claude/settings.json`, so checking out a branch that moves or deletes the plugin folder breaks the running session: every Bash call blocks and workflows fail.
 - `.holyagent/` state lives on its own branch, `holyagent/state`, in one worktree shared by every worktree of the clone, so work branches never carry it and nothing is copied between worktrees. Push `holyagent/state` with plain Git alongside the work branches.
 - Run the gates as `bunx --no-install mise run <task>` (see `docs/development.md`). A missing `mise` on PATH is no reason to skip the gates or run Bun steps by hand. Each worktree needs its own `bun install --frozen-lockfile`, because `node_modules` is not shared between worktrees. `bun install` runs the `prepare` step, which installs the repository's lefthook hooks into the shared `.git/hooks`; that is expected.
 
@@ -40,7 +40,7 @@ This repository's own convention, enforced by CI and rulesets; HolyAgent's instr
 
 ## Dependencies
 
-- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the vendored ripgrep and fd with their recomputed checksums, the mise tools and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Every dependency range in a `package.json` is a caret range at its line boundary, or `workspace:*`.
+- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the vendored ripgrep and fd with their recomputed checksums, the mise tools, the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in the pin table; it moves with `bun.lock` when the updater's `bun update` runs, and a user's own Pi install is theirs. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Every dependency range in a `package.json` is a caret range at its line boundary, or `workspace:*`.
 
 ## The README
 

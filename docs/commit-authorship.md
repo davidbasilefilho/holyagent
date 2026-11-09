@@ -45,7 +45,7 @@ If the cleaned text still contains one of these phrases as whole words, case-ins
 { "vcs": { "allowWords": ["subagent"] } }
 ```
 
-An unknown key inside `vcs` is an error that names the file (an old `api` key is still read and ignored). Reword rather than allow when the phrase talks about the process; the rule exists so the history says what changed and why.
+The `vcs` section is one of the settings that the project's `.holyagent/config.json` and the user-level `~/.holyagent/config.json` share, with the project's winning; a list such as `allowWords` in the project replaces the user's whole list ([pi/configuration.md](pi/configuration.md#the-user-level-config)). An unknown key anywhere in either file is an error that names the key and the file (an old `api` key is still read and ignored). Reword rather than allow when the phrase talks about the process; the rule exists so the history says what changed and why.
 
 ## The `commit-msg` hook
 

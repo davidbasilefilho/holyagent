@@ -1,8 +1,15 @@
+import { Effect } from "effect"
+
 import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
 import {
   PRECEDENCE_FILE,
   ROOT_CORE_FILES,
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import {
+  embedMateriality,
+  MATERIALITY_PATH,
+  stripCitations,
+} from "../../../runtime/src/instructions/skills.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -175,30 +182,10 @@ export const MERGE_READY_SECTION = "merge-ready.md"
 export const CODE_QUALITY_SECTION = "code-quality.md"
 
 /**
- * The one source of the materiality definition (which visual discrepancies are repaired and which
- * stay preference), relative to the repository root. The generator embeds its text wherever a
- * source holds {@link MATERIALITY_MARKER}, so the definition has a single source and each generated
- * file still carries it whole.
+ * The one source of the materiality definition, relative to the repository root: the Claude
+ * family's copy of the runtime's {@link MATERIALITY_PATH}.
  */
-export const MATERIALITY_FILE = `${INSTRUCTIONS_DIRECTORY}/shared/materiality.md`
-
-/** The line of an instruction source that the generator replaces with the materiality definition. */
-export const MATERIALITY_MARKER = "<!-- materiality -->"
-
-/**
- * A source with its {@link MATERIALITY_MARKER} line replaced by the definition. The marker line is
- * matched after trimming. A source without the marker is returned as it is; one with the marker
- * twice is an error, because the definition would ship twice in one file.
- */
-export const embedMateriality = (text: string, materiality: string, source: string): string => {
-  const lines = text.split("\n")
-  const isMarker = (line: string) => line.trim() === MATERIALITY_MARKER
-  const at = lines.findIndex(isMarker)
-  if (at === -1) return text
-  if (lines.findIndex((line, index) => index > at && isMarker(line)) !== -1)
-    throw new Error(`${source} must hold the line ${MATERIALITY_MARKER} at most once`)
-  return [...lines.slice(0, at), materiality.trim(), ...lines.slice(at + 1)].join("\n")
-}
+export const MATERIALITY_FILE = `${INSTRUCTIONS_DIRECTORY}/${MATERIALITY_PATH}`
 
 /** The interface inspection rules, a file of `specialist/` for the roles that inspect renders. */
 export const INSPECTION_SECTION = "interface-inspection.md"
@@ -251,246 +238,12 @@ export const ROLE_SECTIONS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "worker-visual": ["purpose.md", "method.md", DESIGN_SECTION],
 }
 
-/**
- * Where these instructions implement each behavior requirement of `requirements.md`: the section or
- * skill (`skills/<name>/SKILL.md`), as a path under `claude-5.5/`, and a phrase of its text that
- * carries the requirement. A test fails for a requirement without an entry, an entry for no
- * requirement, and a section that no longer holds its phrase, so a requirement cannot go
- * unimplemented unnoticed. A mapping table stands in for tags inside the sections, which would add
- * text to every generated agent.
- */
-export const REQUIREMENT_SECTIONS: Readonly<
-  Record<string, { readonly section: string; readonly phrase: string }>
-> = {
-  "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
-  "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
-  "R-PRECEDENCE": { section: "shared/precedence.md", phrase: "When rules conflict" },
-  "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
-  "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
-  "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
-  "R-ACK": { section: "root/user-messages.md", phrase: "Acknowledge every user message" },
-  "R-NUDGE": { section: "root/user-messages.md", phrase: "one short line at most" },
-  "R-MERGEREVIEW": {
-    section: "root/stack-plan.md",
-    phrase: "gets a review of that head before any push",
-  },
-  "R-NAMED": { section: "root/user-messages.md", phrase: "names an action" },
-  "R-IDEAS": { section: "root/user-messages.md", phrase: "asks for ideas, options or a plan" },
-  "R-FLAG": {
-    section: "root/user-messages.md",
-    phrase: "in your acknowledgment of that message and continue as asked",
-  },
-  "R-DECIDE": {
-    section: "root/task-list.md",
-    phrase: "Every pending decision goes through AskUserQuestion",
-  },
-  "R-REASK": {
-    section: "root/asking.md",
-    phrase: "without choosing an option is not a choice",
-  },
-  "R-AMBIGUOUS": {
-    section: "root/asking.md",
-    phrase: "ask before acting on any remaining ambiguity",
-  },
-  "R-NOBYPASS": {
-    section: "root/identity.md",
-    phrase: "never reach the same result through another tool",
-  },
-  "R-LANG": { section: "root/identity.md", phrase: "in the language of the user's latest message" },
-  "R-NOFILLER": {
-    section: "root/identity.md",
-    phrase: "free of filler sections, redundant summaries and boilerplate",
-  },
-  "R-OUTWARD": { section: "root/identity.md", phrase: "need the user's approval" },
-  "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
-  "R-LEAN": { section: "root/context.md", phrase: "Run no gates, probes or data checks yourself" },
-  "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
-  "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
-  "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
-  "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
-  "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
-  "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
-  "R-WAKE": { section: "root/dispatch.md", phrase: "Completion notices are the only wake-ups" },
-  "R-STOP": {
-    section: "root/dispatch.md",
-    phrase: "only when a new requirement or new information conflicts with that running work",
-  },
-  "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
-  "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
-  "R-ACCEPT": {
-    section: "root/assignments.md",
-    phrase: "judged from the diff summary and the check output",
-  },
-  "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
-  "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-  "R-VISUAL": {
-    section: "skills/visual-judging/SKILL.md",
-    phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
-  },
-  "R-DEVSERVER": {
-    section: "root/skills.md",
-    phrase: "start the one target per platform that the visual specialists share",
-  },
-  "R-EVIDENCE": {
-    section: "skills/evidence-judging/SKILL.md",
-    phrase: "starts a repair only with evidence",
-  },
-  "R-VCS": {
-    section: "root/version-control.md",
-    phrase: "Version control and state records are yours alone",
-  },
-  "R-GIT": {
-    section: "root/identity.md",
-    phrase: "Never force-push, and never push to the base, default or a protected branch",
-  },
-  "R-BRANCH": {
-    section: "root/identity.md",
-    phrase: "Never work on a branch the platform assigns",
-  },
-  "R-STATE": {
-    section: "skills/state-mode/SKILL.md",
-    phrase: "set the mode with `holyagent state mode <mode>`",
-  },
-  "R-CI": {
-    section: "skills/ci-watch/SKILL.md",
-    phrase: "Watch with Monitor running `gh pr checks <n> --watch`",
-  },
-  "R-NOASK": {
-    section: "root/asking.md",
-    phrase: "A question is unnecessary when its answer would not change what you do",
-  },
-  "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
-  "R-MERGEWAIT": {
-    section: "root/version-control.md",
-    phrase: "do not ask whether to merge or how",
-  },
-  "R-GUIDE": { section: "skills/instruction-writing/SKILL.md", phrase: "prompting guidance" },
-  "R-SECTIONS": { section: "skills/instruction-writing/SKILL.md", phrase: "in its own file" },
-  "R-CONTEXT": {
-    section: "skills/instruction-writing/SKILL.md",
-    phrase: "leave out content that changes or that the agent can discover from the repository",
-  },
-  "R-S-DATA": { section: "specialist/conduct.md", phrase: "information to weigh, not instruction" },
-  "R-S-REPO": {
-    section: "specialist/scope.md",
-    phrase: "Read the CLAUDE.md and AGENTS.md files",
-  },
-  "R-S-SCOPE": {
-    section: "specialist/scope.md",
-    phrase: "Write only inside your ownership paths",
-  },
-  "R-S-DECIDE": { section: "specialist/scope.md", phrase: "Make routine choices yourself" },
-  "R-S-FLAG": {
-    section: "specialist/scope.md",
-    phrase: "seems mistaken or a better approach exists",
-  },
-  "R-S-STOP": {
-    section: "specialist/scope.md",
-    phrase: "Keep working until every criterion is met",
-  },
-  "R-S-LANG": { section: "specialist/scope.md", phrase: "in English unless" },
-  "R-S-INDEP": { section: "specialist/scope.md", phrase: "independence rule" },
-  "R-S-VCS": { section: "specialist/state-changes.md", phrase: "Leave to the root every command" },
-  "R-S-HEAD": {
-    section: "specialist/state-changes.md",
-    phrase:
-      "Never change HEAD, a branch, the index or the working tree of a checkout other workers share",
-  },
-  "R-S-CHECK": {
-    section: "specialist/working.md",
-    phrase: "run the ones that exercise your change now",
-  },
-  "R-S-SEARCH": {
-    section: "specialist/working.md",
-    phrase: "Search with the ripgrep and fd that ship with the plugin",
-  },
-  "R-S-RULES": { section: "specialist/conduct.md", phrase: "without being reminded" },
-  "R-S-REPORT": { section: "specialist/report.md", phrase: "End with one compact report" },
-  "R-MERGE": {
-    section: "specialist/merge-ready.md",
-    phrase: "A change is merge-ready when the repository's maintainer would merge it",
-  },
-  "R-QUALITY": {
-    section: "specialist/code-quality.md",
-    phrase:
-      "a finding blocks only when the change also makes existing behavior or performance worse",
-  },
-  "R-EL": { section: "roles/explorer-lookup/method.md", phrase: "Locate with Grep and Glob" },
-  "R-EM": { section: "roles/explorer-map/method.md", phrase: "Cite a path" },
-  "R-ET": { section: "roles/explorer-trace/method.md", phrase: "Begin at the trigger" },
-  "R-LL": { section: "roles/librarian-lookup/method.md", phrase: "Look in the project first" },
-  "R-LR": {
-    section: "roles/librarian-research/method.md",
-    phrase: "Prefer accessible official documentation",
-  },
-  "R-RA": {
-    section: "roles/reviewer-artifact/method.md",
-    phrase: "Give each acceptance criterion a verdict",
-  },
-  "R-RA-CONTEXT": {
-    section: "roles/reviewer-artifact/instruction-text.md",
-    phrase: "an existing file's departure from this is a finding only when the user asked",
-  },
-  "R-RAU": {
-    section: "roles/reviewer-audit/method.md",
-    phrase: "verified, discrepant or unverified",
-  },
-  "R-RC": { section: "roles/reviewer-code/builtin-review.md", phrase: "`/code-review`" },
-  "R-RS": { section: "roles/reviewer-security/findings.md", phrase: "Substantiate each finding" },
-  "R-RT": {
-    section: "roles/reviewer-testing/method.md",
-    phrase: "Map each acceptance criterion",
-  },
-  "R-RV": {
-    section: "roles/reviewer-visual/captures.md",
-    phrase: "Report the inspection as blocked when no captures are supplied",
-  },
-  "R-RV-DESIGN": {
-    section: "roles/reviewer-visual/design.md",
-    phrase: "read that file and judge against its checklist",
-  },
-  "R-INSPECT": {
-    section: "specialist/interface-inspection.md",
-    phrase: "A passing build, snapshot or test does not show what renders",
-  },
-  "R-MATERIAL": {
-    section: "shared/materiality.md",
-    phrase: "A discrepancy is material, and starts a repair whatever its size",
-  },
-  "R-WD": { section: "roles/worker-debugging/phases.md", phrase: "Reproduce" },
-  "R-WI": { section: "roles/worker-implementation/method.md", phrase: "smallest complete change" },
-  "R-WI-TEXT": {
-    section: "roles/worker-implementation/instruction-text.md",
-    phrase: "writing bar",
-  },
-  "R-WI-CONTEXT": {
-    section: "roles/worker-implementation/instruction-text.md",
-    phrase: "change an existing file that departs from this only when the user asks",
-  },
-  "R-WIN": { section: "roles/worker-integration/method.md", phrase: "end to end" },
-  "R-WM": { section: "roles/worker-mechanical/method.md", phrase: "Find every site" },
-  "R-WO": { section: "roles/worker-operations/method.md", phrase: "documented workflow" },
-  "R-WO-DEV": {
-    section: "roles/worker-operations/dev-server.md",
-    phrase: "Report the completed record and whether you started the target or reused it",
-  },
-  "R-WV": { section: "roles/worker-validation/method.md", phrase: "choose the real check" },
-  "R-WVI": {
-    section: "roles/worker-visual/purpose.md",
-    phrase: "The Assignment names the repair round",
-  },
-  "R-WVI-DESIGN": {
-    section: "roles/worker-visual/design.md",
-    phrase: "read that file first, then build and inspect against its checklist and capture list",
-  },
-}
-
 const readSections = async (
   directory: string,
   names: ReadonlyArray<string>,
 ): Promise<ReadonlyArray<string>> =>
   (await Promise.all(names.map((name) => readSource(`${directory}/${name}`)))).map((text) =>
-    text.trim(),
+    stripCitations(text).trim(),
   )
 
 /**
@@ -525,12 +278,19 @@ const firstSentence = (text: string): string => {
   return /^.*?\.(?=\s|$)/.exec(paragraph)?.[0] ?? paragraph
 }
 
-/** What the root reads to pick the specialist: its purpose first, then how it runs. */
-const describe = (route: Route, role: string): string =>
-  `Use for ${route.agent}: ${firstSentence(role)} ${route.mutability === "ReadOnly" ? "Read-only" : "Writes inside its ownership paths"}; independence ${route.independence}; ${route.model}, ${route.effort} effort.`
+/**
+ * What the root reads to pick the specialist: its purpose first, then how it runs. `runtime` is the
+ * host's trailing detail, such as the model and effort where the agent file fixes them.
+ */
+const describe = (route: Route, role: string, runtime: string): string =>
+  `Use for ${route.agent}: ${firstSentence(role)} ${route.mutability === "ReadOnly" ? "Read-only" : "Writes inside its ownership paths"}; independence ${route.independence}${runtime}.`
 
-const frontmatter = (source: string, lines: ReadonlyArray<string>): string =>
-  ["---", `# ${generatedNote(source)}`, ...lines, "---"].join("\n")
+/**
+ * An agent file's head: the generated note for `note`, then `lines`, between the frontmatter
+ * fences.
+ */
+export const frontmatter = (note: string, lines: ReadonlyArray<string>): string =>
+  ["---", `# ${note}`, ...lines, "---"].join("\n")
 
 /** What the specialists of the roles share, read once for all of them. */
 interface Shared {
@@ -539,20 +299,30 @@ interface Shared {
   readonly conditional: Readonly<Record<string, string>>
 }
 
-const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> => {
-  const source = `${INSTRUCTIONS_DIRECTORY}/roles/${route.agent}`
+/**
+ * What a host adds to the specialist prompt the hosts share: where its instructions are and how its
+ * agent files look.
+ */
+export interface SpecialistHost {
+  /** The instruction sources of the host's model family, relative to the repository root. */
+  readonly instructions: string
+  /** The path of a route's agent file, relative to the repository root. */
+  readonly path: (route: Route) => string
+  /** The head of a route's agent file, from the folder `source` of its role and its description. */
+  readonly head: (route: Route, source: string, description: string) => string
+  /** What the description says after the independence, for example the model; empty for none. */
+  readonly runtime: (route: Route) => string
+}
+
+const specialist = async (
+  host: SpecialistHost,
+  route: Route,
+  shared: Shared,
+): Promise<GeneratedFile> => {
+  const source = `${host.instructions}/roles/${route.agent}`
   const sections = ROLE_SECTIONS[route.agent] ?? []
   const [role = "", ...rest] = await readSections(source, sections)
-  const head = frontmatter(source, [
-    `name: ${route.agent}`,
-    `description: ${JSON.stringify(describe(route, role))}`,
-    `model: ${route.model}`,
-    `effort: ${route.effort}`,
-    "background: true",
-    `disallowedTools: ${denylist(builtinsOf(route))}`,
-    "experimental:",
-    "  cacheTtl: 1h",
-  ])
+  const head = host.head(route, source, describe(route, role, host.runtime(route)))
   const body = [
     `You are the ${PLUGIN_NAME} ${route.agent} specialist. Independence: ${route.independence}.`,
     role,
@@ -562,10 +332,31 @@ const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> 
       ({ file }) => shared.conditional[file] ?? "",
     ),
   ].join("\n\n")
-  return {
-    path: `${DIST_DIRECTORY}/agents/${route.agent}.md`,
-    content: `${head}\n\n${body}\n`,
-  }
+  return { path: host.path(route), content: `${head}\n\n${body}\n` }
+}
+
+/**
+ * One agent file for each route, built from the host's instructions: the role sections, the shared
+ * conduct and the conditional sections the role needs, with the maintainers' notes stripped. Every
+ * host's specialist prompt is made here, so a change to it is made once.
+ */
+export const specialistFiles = async (
+  host: SpecialistHost,
+): Promise<ReadonlyArray<GeneratedFile>> => {
+  const directory = `${host.instructions}/specialist`
+  const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
+  const [conduct, texts, materiality] = await Promise.all([
+    readSections(directory, SPECIALIST_SECTIONS),
+    readSections(directory, files),
+    readSource(`${host.instructions}/${MATERIALITY_PATH}`).then(stripCitations),
+  ])
+  const embedded = await Effect.runPromise(
+    Effect.forEach(files, (file, at) =>
+      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
+    ),
+  )
+  const conditional = Object.fromEntries(files.map((file, at) => [file, embedded[at] ?? ""]))
+  return Promise.all(ROUTES.map((route) => specialist(host, route, { conduct, conditional })))
 }
 
 /**
@@ -574,7 +365,7 @@ const specialist = async (route: Route, shared: Shared): Promise<GeneratedFile> 
  */
 const rootAgent = async (): Promise<GeneratedFile> => {
   const source = `${INSTRUCTIONS_DIRECTORY}/root`
-  const head = frontmatter(source, [
+  const head = frontmatter(generatedNote(source), [
     `name: ${PLUGIN_NAME}`,
     `description: ${JSON.stringify(ROOT_DESCRIPTION)}`,
     "model: opus",
@@ -597,27 +388,26 @@ const rootAgent = async (): Promise<GeneratedFile> => {
   }
 }
 
-/** The root agent and one agent for each route, with paths relative to the plugin folder. */
-export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => {
-  const directory = `${INSTRUCTIONS_DIRECTORY}/specialist`
-  const files = CONDITIONAL_SECTIONS.map(({ file }) => file)
-  const [conduct, texts, materiality] = await Promise.all([
-    readSections(directory, SPECIALIST_SECTIONS),
-    readSections(directory, files),
-    readSource(MATERIALITY_FILE),
-  ])
-  const conditional = Object.fromEntries(
-    files.map((file, at) => [
-      file,
-      embedMateriality(texts[at] ?? "", materiality, `${directory}/${file}`),
+/** The specialist prompt's host for the Claude plugin. */
+const CLAUDE_HOST: SpecialistHost = {
+  instructions: INSTRUCTIONS_DIRECTORY,
+  path: (route) => `${DIST_DIRECTORY}/agents/${route.agent}.md`,
+  head: (route, source, description) =>
+    frontmatter(generatedNote(source), [
+      `name: ${route.agent}`,
+      `description: ${JSON.stringify(description)}`,
+      `model: ${route.model}`,
+      `effort: ${route.effort}`,
+      "background: true",
+      `disallowedTools: ${denylist(builtinsOf(route))}`,
+      "experimental:",
+      "  cacheTtl: 1h",
     ]),
-  )
-  const shared: Shared = {
-    conduct,
-    conditional,
-  }
-  return [
-    await rootAgent(),
-    ...(await Promise.all(ROUTES.map((route) => specialist(route, shared)))),
-  ]
+  runtime: (route) => `; ${route.model}, ${route.effort} effort`,
 }
+
+/** The root agent and one agent for each route, with paths relative to the plugin folder. */
+export const agentFiles = async (): Promise<ReadonlyArray<GeneratedFile>> => [
+  await rootAgent(),
+  ...(await specialistFiles(CLAUDE_HOST)),
+]

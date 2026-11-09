@@ -1,13 +1,12 @@
-import { stat } from "node:fs/promises"
-
 import { Effect, Schema } from "effect"
 
+import { hasStateFolder } from "../hooks/state-folder.ts"
 import { ROOT_CORE } from "../instructions/claude-5.5/root-core.ts"
 import historyRules from "../instructions/claude-5.5/shared/history-rules.md" with { type: "text" }
 import stateChanges from "../instructions/claude-5.5/specialist/state-changes.md" with { type: "text" }
 import { setupNotice } from "../setup/check.ts"
 import { claimRulesDelivery, isSessionId, markRulesDelivered } from "../state/delivery.ts"
-import { hasCode, io } from "../state/files.ts"
+import { io } from "../state/files.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { legacyFoldersWithState } from "../state/legacy.ts"
 import { deadlineIn, HOOK_WAIT_MS } from "../state/lock.ts"
@@ -32,6 +31,7 @@ import {
   ROOT_TAKEOVER,
   sessionContext,
 } from "./sessioncontext.ts"
+import { cloudCheckoutNotice } from "./status.ts"
 import { type Call, type Command, Verbatim } from "./types.ts"
 import { workflowRefusal } from "./workflow-check.ts"
 
@@ -74,6 +74,7 @@ const hook = (
   path: ["hook", name],
   usage: `hook ${name}`,
   summary,
+  hosts: ["claude"],
   input: "the host's hook payload as JSON",
   output: "the JSON the host reads, or nothing; exit 1 with a stderr line on failure",
   flags: {},
@@ -94,23 +95,14 @@ const hook = (
 /** The agent types of the root: the plugin's `agent` setting applied, with or without namespace. */
 const ROOT_AGENTS: ReadonlySet<string | undefined> = new Set(["holyagent", "holyagent:holyagent"])
 
-const hasStateFolder = (directory: string) =>
-  io(directory, () => stat(directory)).pipe(
-    Effect.as(true),
-    Effect.catchIf(
-      (error) => hasCode(error.cause, "ENOENT"),
-      () => Effect.succeed(false),
-    ),
-  )
-
 /** The SessionStart sources after which pending notices are lost and the Running rows need a check. */
-const RESUMED: ReadonlySet<string | undefined> = new Set(["resume", "compact"])
+export const RESUMED: ReadonlySet<string | undefined> = new Set(["resume", "compact"])
 
 /**
  * The requirements of the Intent in use, as `intent show` resolves it, for a session that lost
  * them; nothing when no Intent is in use.
  */
-const requirementsOf = (
+export const requirementsOf = (
   directory: string,
 ): Effect.Effect<IntentRequirements | undefined, unknown> =>
   readOpenState(directory).pipe(
@@ -254,14 +246,15 @@ const isMainThread = (payload: typeof Payload.Type): boolean =>
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user, and one line when the primary checkout is on a detached HEAD or on a branch other than the one it started on), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
     (payload, call) => {
       const core = rootCore(payload, call)
       // How the commit author is set matters only where git's committer is the platform's.
       const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined
       return Effect.gen(function* () {
         // Reads files and looks commands up; it installs and writes nothing (`holyagent setup` does).
-        const notice = yield* setupNotice(call.env, call.cwd)
+        const notices = [yield* setupNotice(call.env, call.cwd), yield* cloudCheckoutNotice(call)]
+        const notice = notices.filter((text) => text !== undefined).join("\n\n") || undefined
         if (!(yield* hasStateFolder(call.directory))) {
           const found = yield* legacyFoldersWithState(call.root)
           // Nothing to show or convert: a main thread that lacks the root rules gets them, and an
@@ -470,7 +463,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           .join("\n")
         const phrases = forbiddenPhrases(
           message,
-          (yield* readSettings([stateDirectory(call.root)])).allowWords,
+          (yield* readSettings([stateDirectory(call.root)], call.env)).allowWords,
         )
         if (phrases.length > 0) return yield* new MessageRefused({ phrases })
         if (cleaned !== above.trim() || cleanedBelow !== below.trim())

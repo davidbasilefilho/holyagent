@@ -285,6 +285,35 @@ export const rewriteVendoredTool = (
   return result
 }
 
+/**
+ * The release a Pi package pin moves to: `release`, unless the pin is already above it, which is
+ * kept, because a registry whose `latest` tag points at an older line must not move an exact pin
+ * down. A `release` that is not stable keeps `current`; a `current` that is not stable is
+ * replaced.
+ */
+export const nextPiVersion = (current: string, release: string): string => {
+  const from = parseRelease(current)
+  const to = parseRelease(release)
+  if (to === undefined) return current
+  return from !== undefined && compareReleases(from, to) > 0 ? current : release
+}
+
+/**
+ * The pin table of the Pi packages with their versions set from `versions`, by npm name, keeping
+ * the key order; packages not in the map keep their version.
+ */
+export const withPiPackageVersions = (
+  table: Readonly<Record<string, string>>,
+  versions: ReadonlyMap<string, string>,
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(table).map(([name, version]) => [name, versions.get(name) ?? version]),
+  )
+
+/** The text of `pi-packages.json` for a pin table: two-space JSON and a final newline. */
+export const renderPiPackages = (table: Readonly<Record<string, string>>): string =>
+  `${JSON.stringify(table, null, 2)}\n`
+
 /** The dependency fields of a `package.json` whose values are version ranges by package name. */
 export const DEPENDENCY_FIELDS: ReadonlyArray<string> = [
   "dependencies",
@@ -295,6 +324,24 @@ export const DEPENDENCY_FIELDS: ReadonlyArray<string> = [
   "resolutions",
 ]
 
+/**
+ * The packages Pi supplies to every extension and skill. Pi's package documentation (`packages.md`,
+ * "Declare dependencies") has a package list them in `peerDependencies` with the range `*` and not
+ * bundle them, so that range is the one exception to the caret-range rule, for these names in that
+ * field only.
+ */
+export const PI_HOST_PACKAGES: ReadonlyArray<string> = [
+  "@earendil-works/pi-ai",
+  "@earendil-works/pi-agent-core",
+  "@earendil-works/pi-coding-agent",
+  "@earendil-works/pi-tui",
+  "typebox",
+]
+
+/** Whether a dependency is a Pi host package declared as Pi requires: a peer with the range `*`. */
+export const isPiHostPeer = (field: string, name: string, range: unknown): boolean =>
+  field === "peerDependencies" && range === "*" && PI_HOST_PACKAGES.includes(name)
+
 /** A package dependency read from a manifest. */
 export interface PackageDependency {
   readonly field: string
@@ -304,8 +351,8 @@ export interface PackageDependency {
 
 /**
  * The registry dependencies of a parsed `package.json`, field by field. Workspace references, other
- * protocols (`npm:`, `file:`, git) and nested override tables are not registry ranges the updater
- * can move, so they are left out.
+ * protocols (`npm:`, `file:`, git), nested override tables and the Pi host peers (see
+ * {@link isPiHostPeer}) are not registry ranges the updater can move, so they are left out.
  */
 export const packageDependencies = (
   manifest: Readonly<Record<string, unknown>>,
@@ -314,7 +361,9 @@ export const packageDependencies = (
     const table = manifest[field]
     if (table === null || typeof table !== "object" || Array.isArray(table)) return []
     return Object.entries(table).flatMap(([name, range]) =>
-      typeof range === "string" && !range.includes(":") ? [{ field, name, range }] : [],
+      typeof range === "string" && !range.includes(":") && !isPiHostPeer(field, name, range)
+        ? [{ field, name, range }]
+        : [],
     )
   })
 

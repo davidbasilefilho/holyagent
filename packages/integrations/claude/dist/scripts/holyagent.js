@@ -177,6 +177,9 @@ function isNotUndefined(input) {
 function isNotNullish(input) {
   return input != null;
 }
+function isNever(_) {
+  return false;
+}
 function isUnknown(_) {
   return true;
 }
@@ -1371,7 +1374,9 @@ var Number2 = /* @__PURE__ */ make((self, that) => {
   return self < that ? -1 : 1;
 });
 var mapInput = /* @__PURE__ */ dual(2, (self, f) => make((b1, b2) => self(f(b1), f(b2))));
+var isLessThan = (O) => dual(2, (self, that) => O(self, that) === -1);
 var isGreaterThan = (O) => dual(2, (self, that) => O(self, that) === 1);
+var isLessThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== 1);
 var isGreaterThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== -1);
 
 var none2 = () => none;
@@ -4545,6 +4550,7 @@ var orElseSucceed2 = orElseSucceed;
 var timeoutOption2 = timeoutOption;
 var filter3 = filter2;
 var filterOrFail2 = filterOrFail;
+var match4 = match3;
 var matchEffect3 = matchEffect;
 var provide3 = provide2;
 var provideService2 = provideService;
@@ -5196,6 +5202,32 @@ var Null = class extends ASTNodeImpl {
   }
 };
 var null_ = /* @__PURE__ */ new Null;
+var Undefined = class extends ASTNodeImpl {
+  _tag = "Undefined";
+  getParser() {
+    return fromConst(this, undefined);
+  }
+  toCodecJson() {
+    return replaceEncoding(this, [undefinedToNull]);
+  }
+  getExpected() {
+    return "undefined";
+  }
+};
+var undefinedToNull = /* @__PURE__ */ new Link(null_, /* @__PURE__ */ new Transformation(/* @__PURE__ */ transform(() => {
+  return;
+}), /* @__PURE__ */ transform(() => null)));
+var undefined_2 = /* @__PURE__ */ new Undefined;
+var Never = class extends ASTNodeImpl {
+  _tag = "Never";
+  getParser() {
+    return fromRefinement(this, isNever);
+  }
+  getExpected() {
+    return "never";
+  }
+};
+var never2 = /* @__PURE__ */ new Never;
 var Unknown = class extends ASTNodeImpl {
   _tag = "Unknown";
   getParser() {
@@ -5861,6 +5893,9 @@ function struct(fields, checks, annotations) {
 function getAST(self) {
   return self.ast;
 }
+function tuple(elements, checks = undefined) {
+  return new Arrays(false, elements.map((e) => e.ast), [], undefined, checks);
+}
 function union(members, options, checks) {
   return new Union(members.map(getAST), options, undefined, checks);
 }
@@ -5882,6 +5917,12 @@ function structWithRest(ast, records) {
     checks = combineChecks(checks, record.checks);
   }
   return new Objects(propertySignatures, indexSignatures, undefined, checks);
+}
+function tupleWithRest(ast, rest) {
+  if (ast.encoding) {
+    throw new Error("TupleWithRest does not support encodings");
+  }
+  return new Arrays(ast.isMutable, ast.elements, rest, undefined, ast.checks);
 }
 var toCandidate = /* @__PURE__ */ memoizeIdempotent((ast) => {
   while (true) {
@@ -6498,6 +6539,7 @@ var optionalKey = /* @__PURE__ */ memoizeIdempotent((ast) => {
   return optionalKeyLastLink(replaceContext(ast, context));
 });
 var optionalKeyLastLink = /* @__PURE__ */ applyToLastLink(optionalKey);
+var optional = /* @__PURE__ */ memoize((ast) => optionalKey(new Union([ast, undefined_2])));
 function decodeTo(from, to, transformation) {
   return appendTransformation(from, transformation, to);
 }
@@ -7265,6 +7307,12 @@ var make7 = make6;
 var optionalKey2 = /* @__PURE__ */ lambda((schema) => make7(optionalKey(schema.ast), {
   schema
 }));
+var optional2 = /* @__PURE__ */ lambda((self) => {
+  const schema = UndefinedOr(self);
+  return make7(optional(self.ast), {
+    schema
+  });
+});
 var toEncoded2 = /* @__PURE__ */ lambda((schema) => make7(toEncoded(schema.ast), {
   schema
 }));
@@ -7280,8 +7328,10 @@ function Literal2(literal) {
   });
   return out;
 }
+var Never2 = /* @__PURE__ */ make7(never2);
 var Unknown2 = /* @__PURE__ */ make7(unknown);
 var Null2 = /* @__PURE__ */ make7(null_);
+var Undefined2 = /* @__PURE__ */ make7(undefined_2);
 var String4 = /* @__PURE__ */ make7(string2);
 var Number5 = /* @__PURE__ */ make7(number2);
 var Boolean3 = /* @__PURE__ */ make7(boolean);
@@ -7307,6 +7357,24 @@ function StructWithRest(schema, records) {
   return make7(structWithRest(schema.ast, records.map(getAST)), {
     schema,
     records
+  });
+}
+function makeTuple(ast, elements) {
+  return make7(ast, {
+    elements,
+    mapElements(f, options) {
+      const elements = f(this.elements);
+      return makeTuple(tuple(elements, options?.unsafePreserveChecks ? this.ast.checks : undefined), elements);
+    }
+  });
+}
+function Tuple(elements) {
+  return makeTuple(tuple(elements), elements);
+}
+function TupleWithRest(schema, rest) {
+  return make7(tupleWithRest(schema.ast, rest.map(getAST)), {
+    schema,
+    rest
   });
 }
 var ArraySchema = /* @__PURE__ */ lambda((schema) => make7(new Arrays(false, [], [schema.ast]), {
@@ -7344,6 +7412,7 @@ function Literals(literals) {
   });
 }
 var NullOr = /* @__PURE__ */ lambda((self) => Union2([self, Null2]));
+var UndefinedOr = /* @__PURE__ */ lambda((self) => Union2([self, Undefined2]));
 function decodeTo2(to, transformation) {
   return (from) => {
     return make7(decodeTo(from.ast, to.ast, transformation ? makeTransformation(transformation) : passthrough3()), {
@@ -7431,6 +7500,33 @@ function makeIsGreaterThanOrEqualTo(options) {
     });
   };
 }
+function makeIsBetween(deriveOptions) {
+  const greaterThanOrEqualTo = isGreaterThanOrEqualTo(deriveOptions.order);
+  const greaterThan = isGreaterThan(deriveOptions.order);
+  const lessThanOrEqualTo = isLessThanOrEqualTo(deriveOptions.order);
+  const lessThan = isLessThan(deriveOptions.order);
+  const formatter = deriveOptions.formatter ?? format;
+  return (options, annotations) => {
+    const gte = options.exclusiveMinimum ? greaterThan : greaterThanOrEqualTo;
+    const lte = options.exclusiveMaximum ? lessThan : lessThanOrEqualTo;
+    return makeFilter2((input) => gte(input, options.minimum) && lte(input, options.maximum), {
+      expected: `a value between ${formatter(options.minimum)}${options.exclusiveMinimum ? " (excluded)" : ""} and ${formatter(options.maximum)}${options.exclusiveMaximum ? " (excluded)" : ""}`,
+      arbitraryConstraint: {
+        order: deriveOptions.order,
+        minimum: options.minimum,
+        maximum: options.maximum,
+        ...options.exclusiveMinimum && {
+          exclusiveMinimum: true
+        },
+        ...options.exclusiveMaximum && {
+          exclusiveMaximum: true
+        }
+      },
+      ...deriveOptions.annotate?.(options),
+      ...annotations
+    });
+  };
+}
 function encodeNumberPayload(number) {
   if (!globalThis.Number.isFinite(number)) {
     throw new globalThis.RangeError(`Expected a finite number, got ${format(number)}`);
@@ -7453,6 +7549,36 @@ var isGreaterThanOrEqualTo2 = /* @__PURE__ */ makeIsGreaterThanOrEqualTo({
       runtime: `Schema.isGreaterThanOrEqualTo(${format(minimum)})`
     })
   })
+});
+var isBetween = /* @__PURE__ */ makeIsBetween({
+  order: Number2,
+  annotate: (options) => {
+    const exclusiveMinimum = options.exclusiveMinimum ? true : undefined;
+    const exclusiveMaximum = options.exclusiveMaximum ? true : undefined;
+    const payload = {
+      minimum: encodeNumberPayload(options.minimum),
+      maximum: encodeNumberPayload(options.maximum),
+      ...exclusiveMinimum && {
+        exclusiveMinimum
+      },
+      ...exclusiveMaximum && {
+        exclusiveMaximum
+      }
+    };
+    return {
+      representation: {
+        id: "effect/schema/isBetween",
+        payload
+      },
+      toJsonSchema: () => ({
+        [exclusiveMinimum ? "exclusiveMinimum" : "minimum"]: options.minimum,
+        [exclusiveMaximum ? "exclusiveMaximum" : "maximum"]: options.maximum
+      }),
+      toCode: () => ({
+        runtime: `Schema.isBetween({ minimum: ${format(options.minimum)}, maximum: ${format(options.maximum)}, exclusiveMinimum: ${format(exclusiveMinimum)}, exclusiveMaximum: ${format(exclusiveMaximum)} })`
+      })
+    };
+  }
 });
 function isInt(annotations) {
   return makeFilter2((n) => globalThis.Number.isSafeInteger(n), {
@@ -7648,6 +7774,508 @@ var commitFile = (path, content) => {
   return io(path, () => Bun.write(temporary, content)).pipe(andThen2(io(path, () => rename(temporary, path))), tapError2(() => io(temporary, () => rm(temporary, { force: true })).pipe(ignore2)));
 };
 
+class UnknownRecord extends TaggedError2("UnknownRecord") {
+  get message() {
+    return `Unknown ${this.kind} ${this.id}`;
+  }
+}
+
+class DuplicateRecord extends TaggedError2("DuplicateRecord") {
+  get message() {
+    return `A ${this.kind} with id ${this.id} already exists`;
+  }
+}
+
+class InvalidPath extends TaggedError2("InvalidPath") {
+  get message() {
+    return `Invalid path "${this.path}": ${this.reason}`;
+  }
+}
+
+class InvalidDraft extends TaggedError2("InvalidDraft") {
+}
+
+class MissingOwnership extends TaggedError2("MissingOwnership") {
+  get message() {
+    return `${this.roleTask} writes, so it needs at least one ownership path`;
+  }
+}
+
+class StaleRevision extends TaggedError2("StaleRevision") {
+  get message() {
+    return `Stale intent revision ${this.given}; the live revision is ${this.live}`;
+  }
+}
+
+class IntentClosed extends TaggedError2("IntentClosed") {
+  get message() {
+    return `Intent ${this.intentId} is closed; reopen it first`;
+  }
+}
+
+class IntentHasOpenWork extends TaggedError2("IntentHasOpenWork") {
+  get message() {
+    return `Intent ${this.intentId} has Running (${this.running.join(", ")}) or unaccepted (${this.unaccepted.join(", ")}) Assignments; settle them or give a reason to drop them`;
+  }
+}
+
+class InvalidTransition extends TaggedError2("InvalidTransition") {
+  get message() {
+    return `Cannot ${this.action} ${this.id} while it is ${this.state}`;
+  }
+}
+
+class OwnershipConflict extends TaggedError2("OwnershipConflict") {
+  get message() {
+    return `${this.id} cannot start: ${this.runningId} is Running and owns an overlapping path (${this.path})`;
+  }
+}
+
+class DependencyNotAccepted extends TaggedError2("DependencyNotAccepted") {
+  get message() {
+    return `${this.id} cannot start: dependency ${this.dependency} ${this.reason}`;
+  }
+}
+
+class InsufficientAcceptance extends TaggedError2("InsufficientAcceptance") {
+  get message() {
+    return `Acceptance of ${this.id} rejected: ${this.detail}`;
+  }
+}
+
+class SpecialistMismatch extends TaggedError2("SpecialistMismatch") {
+  get message() {
+    return `Specialist ${this.agentId}: ${this.detail}`;
+  }
+}
+
+class SpecialistNotRecorded extends TaggedError2("SpecialistNotRecorded") {
+  get message() {
+    return `${this.id} has no recorded specialist, so it cannot be closed as Succeeded`;
+  }
+}
+
+var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
+var IntentId = identifier2("intent");
+var AssignmentId = identifier2("assignment");
+var BranchId = identifier2("branch");
+var PullId = identifier2("pull");
+var AgentId = String4.check(isPattern2(/\S/));
+var newId = (kind) => gen2(function* () {
+  const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
+  const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
+  return `${kind}-${time}-${digits.map((digit) => digit.toString(36)).join("")}`;
+});
+
+var decodeInput = (schema, input) => decodeUnknownEffect2(schema, { onExcessProperty: "error" })(input).pipe(mapError2((error) => new InvalidDraft({ message: error.message })));
+
+import { sep } from "path";
+var UNSAFE_CHARACTERS = /[\\:*?"<>|\p{Cc}]/u;
+var pathProblem = (path) => {
+  if (path.startsWith("/"))
+    return "absolute path";
+  if (UNSAFE_CHARACTERS.test(path))
+    return "character that is not portable";
+  for (const segment of path.split("/")) {
+    if (segment === "")
+      return "empty segment";
+    if (segment === "." || segment === "..")
+      return `"${segment}" segment`;
+    if (segment.endsWith(".") || segment.endsWith(" "))
+      return "trailing dot or space";
+  }
+  return;
+};
+var PortablePath = String4.check(makeFilter2((path) => pathProblem(path) ?? undefined));
+var pathsOverlap = (a, b) => {
+  const left = a.toLowerCase();
+  const right = b.toLowerCase();
+  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
+};
+var firstOverlap = (a, b) => a.find((left) => b.some((right) => pathsOverlap(left, right)));
+var toPosix = (path, separator = sep) => separator === "/" ? path : path.replaceAll(separator, "/");
+var fromGitPath = (path, separator = sep) => separator === "/" ? path : path.replaceAll("/", separator);
+
+var Text = String4.check(isPattern2(/\S/));
+var Revision = Int.check(isGreaterThanOrEqualTo2(1));
+var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
+var isInstant = (text) => {
+  const match = INSTANT.exec(text);
+  if (match === null || Number.isNaN(Date.parse(text)))
+    return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  const date = new Date(text);
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
+};
+var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
+var TextList = ArraySchema(Text);
+
+var findIntent = (project, id) => {
+  const found = project.intents.find((intent) => intent.id === id);
+  return found === undefined ? fail5(new UnknownRecord({ kind: "intent", id })) : succeed6(found);
+};
+var findAssignment = (project, id) => {
+  const found = project.assignments.find((assignment) => assignment.id === id);
+  return found === undefined ? fail5(new UnknownRecord({ kind: "assignment", id })) : succeed6(found);
+};
+var requireOpen = (intent) => intent.state === "Open" ? void_3 : fail5(new IntentClosed({ intentId: intent.id }));
+var requireLive = (intent, revision) => revision === intent.revision ? void_3 : fail5(new StaleRevision({ given: revision, live: intent.revision }));
+
+var Role = Literals(["Explorer", "Librarian", "Worker", "Reviewer"]);
+var Task = Literals([
+  "map",
+  "lookup",
+  "trace",
+  "research",
+  "mechanical",
+  "implementation",
+  "integration",
+  "operations",
+  "validation",
+  "debugging",
+  "visual",
+  "code",
+  "testing",
+  "audit",
+  "security",
+  "artifact"
+]);
+var RoleTask = Literals([
+  "Explorer.map",
+  "Explorer.lookup",
+  "Explorer.trace",
+  "Librarian.lookup",
+  "Librarian.research",
+  "Worker.mechanical",
+  "Worker.implementation",
+  "Worker.integration",
+  "Worker.operations",
+  "Worker.validation",
+  "Worker.debugging",
+  "Worker.visual",
+  "Reviewer.visual",
+  "Reviewer.code",
+  "Reviewer.testing",
+  "Reviewer.audit",
+  "Reviewer.security",
+  "Reviewer.artifact"
+]);
+var Model = Literals(["haiku", "sonnet"]);
+var Effort = Literals(["medium", "high", "xhigh"]);
+var Mutability = Literals(["ReadOnly", "ScopedWrite"]);
+var Independence = Literals([
+  "DisjointWrites",
+  "DependenciesTerminal",
+  "IndependentReview"
+]);
+var Capability = Literals(["Search", "Shell", "VisualInspection", "Write"]);
+var spec = (role, task, model, effort, mutability, independence, capabilities = []) => ({ role, task, model, effort, mutability, independence, capabilities });
+var SPECS = {
+  "Explorer.map": spec("Explorer", "map", "haiku", "medium", "ReadOnly", "DisjointWrites"),
+  "Explorer.lookup": spec("Explorer", "lookup", "haiku", "medium", "ReadOnly", "DisjointWrites"),
+  "Explorer.trace": spec("Explorer", "trace", "sonnet", "medium", "ReadOnly", "DependenciesTerminal"),
+  "Librarian.lookup": spec("Librarian", "lookup", "haiku", "medium", "ReadOnly", "DisjointWrites", [
+    "Search"
+  ]),
+  "Librarian.research": spec("Librarian", "research", "sonnet", "medium", "ReadOnly", "DependenciesTerminal", ["Search"]),
+  "Worker.mechanical": spec("Worker", "mechanical", "haiku", "medium", "ScopedWrite", "DisjointWrites", ["Write"]),
+  "Worker.implementation": spec("Worker", "implementation", "sonnet", "high", "ScopedWrite", "DisjointWrites", ["Write"]),
+  "Worker.integration": spec("Worker", "integration", "sonnet", "medium", "ScopedWrite", "DependenciesTerminal", ["Write"]),
+  "Worker.operations": spec("Worker", "operations", "haiku", "medium", "ScopedWrite", "DisjointWrites", ["Shell"]),
+  "Worker.validation": spec("Worker", "validation", "haiku", "medium", "ReadOnly", "DependenciesTerminal", ["Shell"]),
+  "Worker.debugging": spec("Worker", "debugging", "sonnet", "high", "ScopedWrite", "DependenciesTerminal", ["Write"]),
+  "Worker.visual": spec("Worker", "visual", "sonnet", "high", "ScopedWrite", "DisjointWrites", [
+    "Write",
+    "VisualInspection"
+  ]),
+  "Reviewer.visual": spec("Reviewer", "visual", "sonnet", "high", "ReadOnly", "IndependentReview", [
+    "VisualInspection"
+  ]),
+  "Reviewer.code": spec("Reviewer", "code", "sonnet", "high", "ReadOnly", "IndependentReview"),
+  "Reviewer.testing": spec("Reviewer", "testing", "sonnet", "medium", "ReadOnly", "IndependentReview", ["Shell"]),
+  "Reviewer.audit": spec("Reviewer", "audit", "haiku", "high", "ReadOnly", "IndependentReview"),
+  "Reviewer.security": spec("Reviewer", "security", "sonnet", "high", "ReadOnly", "IndependentReview"),
+  "Reviewer.artifact": spec("Reviewer", "artifact", "sonnet", "high", "ReadOnly", "IndependentReview")
+};
+var routeFor = (roleTask) => ({
+  roleTask,
+  agent: `${SPECS[roleTask].role}-${SPECS[roleTask].task}`.toLowerCase(),
+  ...SPECS[roleTask]
+});
+var ROUTES = RoleTask.literals.map(routeFor);
+var isWriter = (roleTask) => SPECS[roleTask].mutability === "ScopedWrite";
+var isReviewer = (roleTask) => SPECS[roleTask].role === "Reviewer";
+
+var Slug = String4.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
+var MAX_LENGTH = 40;
+var READ_LENGTH = 512;
+var slugOf = (text) => {
+  const words = text.slice(0, READ_LENGTH).normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().split(/[^a-z0-9]+/).filter((word) => word !== "");
+  let slug = "";
+  for (const word of words) {
+    const next = slug === "" ? word : `${slug}-${word}`;
+    if (next.length > MAX_LENGTH)
+      break;
+    slug = next;
+  }
+  return slug === "" ? (words[0] ?? "").slice(0, MAX_LENGTH) : slug;
+};
+var recordName = (slug, id) => slug === "" ? id : `${slug}-${id}`;
+
+var Dimension = Literals([
+  "behavior",
+  "regressions",
+  "tests",
+  "scope",
+  "style",
+  "repo-standards"
+]);
+var Criterion = Struct({
+  text: Text,
+  blocking: Boolean3,
+  dimension: Dimension
+});
+var Acceptance = Struct({
+  revision: Revision,
+  carriedFrom: optionalKey2(Revision),
+  rationale: Text,
+  criteria: ArraySchema(Struct({ criterion: Text, support: Text })),
+  evidence: ArraySchema(Struct({ label: Text, support: Text }))
+});
+var Specialist = Struct({
+  agentId: optionalKey2(AgentId),
+  model: Model,
+  effort: Effort,
+  startedAt: Timestamp,
+  finishedAt: optionalKey2(Timestamp),
+  workTree: optionalKey2(Text)
+});
+var AssignmentState = Literals([
+  "Ready",
+  "Running",
+  "Succeeded",
+  "Failed",
+  "Cancelled"
+]);
+var AssignmentDraft = Struct({
+  intentId: IntentId,
+  intentRevision: Revision,
+  roleTask: RoleTask,
+  objective: Text,
+  scope: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  constraints: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  criteria: NonEmptyArray(Criterion),
+  evidence: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  ownershipPaths: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  dependencies: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
+  independentFrom: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
+  followUpOf: optionalKey2(AssignmentId)
+});
+var fields = {
+  id: AssignmentId,
+  intentId: IntentId,
+  intentRevision: Revision,
+  roleTask: RoleTask,
+  slug: Slug,
+  objective: Text,
+  state: AssignmentState,
+  scope: TextList,
+  constraints: TextList,
+  criteria: NonEmptyArray(Criterion),
+  evidence: TextList,
+  ownershipPaths: ArraySchema(PortablePath),
+  dependencies: ArraySchema(AssignmentId),
+  independentFrom: ArraySchema(AssignmentId),
+  followUpOf: optionalKey2(AssignmentId),
+  specialist: optionalKey2(Specialist),
+  result: optionalKey2(Text),
+  acceptance: optionalKey2(Acceptance),
+  createdAt: Timestamp
+};
+var coherenceProblem = (row) => {
+  const { state, specialist, result, acceptance } = row;
+  if (state === "Ready")
+    return specialist || result || acceptance ? "a Ready Assignment has no run yet" : undefined;
+  if (state === "Running")
+    return specialist && !specialist.finishedAt && !result && !acceptance ? undefined : "a Running Assignment has a started specialist and no result";
+  if (!result)
+    return `a ${state} Assignment records its result`;
+  if (acceptance && state !== "Succeeded")
+    return "only a Succeeded Assignment can be accepted";
+  return;
+};
+var Assignment = Struct(fields).check(makeFilter2((row) => coherenceProblem(row)));
+var relatedIds = (assignment) => [
+  ...assignment.dependencies,
+  ...assignment.independentFrom,
+  ...assignment.followUpOf === undefined ? [] : [assignment.followUpOf]
+];
+var Creation = Struct({ id: AssignmentId, now: Timestamp });
+var createAssignment = (project, rawDraft, rawCreation) => gen2(function* () {
+  const draft = yield* decodeInput(AssignmentDraft, rawDraft);
+  const creation = yield* decodeInput(Creation, rawCreation);
+  if (project.assignments.some((row) => row.id === creation.id))
+    return yield* new DuplicateRecord({ kind: "assignment", id: creation.id });
+  const intent = yield* findIntent(project, draft.intentId);
+  yield* requireOpen(intent);
+  yield* requireLive(intent, draft.intentRevision);
+  if (isWriter(draft.roleTask) && draft.ownershipPaths.length === 0)
+    return yield* new MissingOwnership({ roleTask: draft.roleTask });
+  for (const path of draft.ownershipPaths) {
+    const reason = pathProblem(path);
+    if (reason !== undefined)
+      return yield* new InvalidPath({ path, reason });
+  }
+  for (const [what, labels] of [
+    ["criterion", draft.criteria.map((criterion) => criterion.text)],
+    ["evidence label", draft.evidence]
+  ]) {
+    const repeated = labels.find((label, index) => labels.indexOf(label) !== index);
+    if (repeated !== undefined)
+      return yield* new InvalidDraft({ message: `Duplicate ${what}: ${repeated}` });
+  }
+  const siblings = new Set(project.assignments.filter((row) => row.intentId === intent.id).map((row) => row.id));
+  const unknown = relatedIds(draft).find((id) => !siblings.has(id));
+  if (unknown !== undefined)
+    return yield* new UnknownRecord({ kind: "assignment", id: unknown });
+  const assignment = {
+    id: creation.id,
+    intentId: draft.intentId,
+    intentRevision: draft.intentRevision,
+    roleTask: draft.roleTask,
+    slug: slugOf(draft.objective),
+    objective: draft.objective,
+    state: "Ready",
+    scope: draft.scope,
+    constraints: draft.constraints,
+    criteria: draft.criteria,
+    evidence: draft.evidence,
+    ownershipPaths: draft.ownershipPaths,
+    dependencies: draft.dependencies,
+    independentFrom: draft.independentFrom,
+    ...draft.followUpOf === undefined ? {} : { followUpOf: draft.followUpOf },
+    createdAt: creation.now
+  };
+  return { assignment, assignments: [assignment] };
+});
+var Outcome = Literals(["Succeeded", "Failed", "Cancelled"]);
+var settle = (assignment, outcome, result, now) => ({
+  ...assignment,
+  state: outcome,
+  result,
+  ...assignment.specialist === undefined ? {} : { specialist: { ...assignment.specialist, finishedAt: now } }
+});
+
+var DEFAULT_CONFIG = {
+  ttlMinutes: 55,
+  workflowsAvailable: false,
+  host: "claude"
+};
+var WORKFLOW_AGENT_PREFIX = "workflow:";
+var PI_AGENT_PREFIX = "pi:";
+var PI_WORKFLOW_AGENT_PREFIX = "pi-workflow:";
+var isWorkflowAgent = (agentId) => agentId.startsWith(WORKFLOW_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX);
+var independenceSubjects = (assignment) => isReviewer(assignment.roleTask) ? [...assignment.dependencies, ...assignment.independentFrom] : assignment.independentFrom;
+var touched = (entry, id) => entry.assignments.includes(id) || entry.related.includes(id);
+var STAGES = [
+  [
+    "idle specialist of this role task",
+    (entry, c) => !entry.running && entry.roleTask === c.assignment.roleTask
+  ],
+  [
+    "specialist with the same model and effort",
+    (entry, c) => entry.model === c.model && entry.effort === c.effort
+  ],
+  [
+    "specialist inside the cache window",
+    (entry, c) => entry.lastFinishedAt !== undefined && c.now - Date.parse(entry.lastFinishedAt) <= c.ttlMs
+  ],
+  [
+    "independent specialist",
+    (entry, c) => !independenceSubjects(c.assignment).some((id) => touched(entry, id))
+  ]
+];
+var RELEVANCE = [
+  [
+    "follow-up of its own Assignment",
+    (entry, a) => a.followUpOf !== undefined && entry.assignments.includes(a.followUpOf)
+  ],
+  [
+    "overlapping ownership paths",
+    (entry, a) => firstOverlap(a.ownershipPaths, entry.paths) !== undefined
+  ],
+  ["shared related Assignments", (entry, a) => relatedIds(a).some((id) => touched(entry, id))]
+];
+var relevance = (entry, assignment) => RELEVANCE.findIndex(([, relevant]) => relevant(entry, assignment));
+var compareEntries = (assignment) => (a, b) => relevance(a, assignment) - relevance(b, assignment) || Date.parse(b.lastFinishedAt ?? "") - Date.parse(a.lastFinishedAt ?? "") || (a.agentId < b.agentId ? -1 : 1);
+var directiveFor = (assignment, registry, now, config) => {
+  const route = routeFor(assignment.roleTask);
+  const candidate = {
+    assignment,
+    model: route.model,
+    effort: route.effort,
+    now: Date.parse(now),
+    ttlMs: config.ttlMinutes * 60000
+  };
+  let pool = registry.filter((entry) => !isWorkflowAgent(entry.agentId));
+  for (const [name, passes] of STAGES) {
+    pool = pool.filter((entry) => passes(entry, candidate));
+    if (pool.length === 0)
+      return {
+        action: "spawn",
+        agent: route.agent,
+        model: route.model,
+        effort: route.effort,
+        reason: `no ${name}`
+      };
+  }
+  const relevant = pool.filter((entry) => relevance(entry, assignment) >= 0);
+  const best = relevant.toSorted(compareEntries(assignment))[0];
+  if (best === undefined)
+    return {
+      action: "spawn",
+      agent: route.agent,
+      model: route.model,
+      effort: route.effort,
+      reason: "no specialist with relevant context"
+    };
+  return {
+    action: "continue",
+    agentId: best.agentId,
+    reason: RELEVANCE[relevance(best, assignment)]?.[0] ?? "relevant context"
+  };
+};
+
+var AGENT_HOSTS = ["claude", "pi"];
+var CLAUDE_WORDS = {
+  workflowTool: "Workflow",
+  agentTool: "Agent",
+  readTool: "Read",
+  message: "SendMessage",
+  confirmGone: "SendMessage or transcript",
+  askForSupport: "SendMessage the subagent",
+  askAgain: "SendMessage the missing support to the same subagent",
+  workflowAgentPrefix: WORKFLOW_AGENT_PREFIX,
+  journal: "Workflow run's journal",
+  recordNote: "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent"
+};
+var PI_WORDS = {
+  workflowTool: "SubagentWorkflow",
+  agentTool: "Agent",
+  readTool: "read",
+  message: "the Agent tool's resume",
+  confirmGone: "get_subagent_result or transcript",
+  askForSupport: "Resume the subagent with the Agent tool",
+  askAgain: "resume the same subagent with the Agent tool and ask for the missing support",
+  workflowAgentPrefix: PI_WORKFLOW_AGENT_PREFIX,
+  journal: "workflow run's journal",
+  recordNote: "the pi launcher records no agent by hook: the launcher glue or the root records each agent, with the ID the Agent tool returns, including a continued one",
+  reportsNote: "under the pi host the file is a <run id>.workflow.jsonl of @tintinweb/pi-subagents, whose entries are matched to Assignments by the key of their dispatched call, or the root session file, which holds the record of each Assignment recorded as pi:<agent-id>; an entry that failed, has no text or matches no call is listed with the run and its index",
+  agentIdNote: "under the pi host an agent is recorded as pi:<agent-id>, the ID the Agent tool returns (strip pi: to message it), and a workflow's agent as pi-workflow:<run-id>/<id>, with the run ID and the label the script gave the agent (the Assignment id); any other form is refused",
+  launchNote: "under the pi host model is the Pi route table's `<provider>/<id>` and effort its thinking level for the specialist (pi.routes in config.json), as @tintinweb/pi-subagents takes them: pass model as it is, and effort as agent()'s effort or the Agent tool's thinking. With pi.enable off both are left out and the specialist inherits the session's"
+};
+var wordsFor = (host) => host === "pi" ? PI_WORDS : CLAUDE_WORDS;
+
 class GitFailed extends TaggedError2("GitFailed") {
   get message() {
     return `git ${this.args.join(" ")} exited ${this.code}: ${this.output}`;
@@ -7720,7 +8348,7 @@ var VCS_HINTS = {
   NothingToCommit: "Check the paths; commit only after the files changed.",
   StagedOutsideScope: "Unstage them with `git restore --staged <path>` or name them in the commit.",
   RemoteMismatch: "Set origin to the GitHub repository (`git remote add origin <url>`) and retry.",
-  DetachedHead: "Check out or create a branch with `git switch -c <name>`."
+  DetachedHead: "Check out a branch: in a cloud session, work in a git worktree (`git worktree add -b <name> <path>`), not the primary checkout; otherwise `git switch -c <name>`."
 };
 
 class Usage extends TaggedError2("Usage") {
@@ -7781,6 +8409,7 @@ var REFUSED_ERRORS = new Set([
   "StateModeRefused",
   ...VCS_REFUSED_ERRORS
 ]);
+var insufficientAcceptanceHint = (words) => `Nothing was recorded. ${words.askForSupport} for the missing support the message names, then run \`holyagent assignment close <id> --outcome success --accept <rationale>\` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or \`holyagent assignment accept <id> --rationale <text> --report\` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.`;
 var HINTS = {
   StdinMissing: "Give the input as --input '<json>' or pipe it in, for example: echo '...' | holyagent <command>; see --help.",
   NoActiveIntent: "Pick one with `holyagent intent use <id>`, or start one with `holyagent intent create`.",
@@ -7795,7 +8424,6 @@ var HINTS = {
   InvalidTransition: "Check the state with `holyagent assignment show <id>` and use the command that fits it.",
   OwnershipConflict: "Wait for the Running writer to close, or narrow the ownership paths.",
   DependencyNotAccepted: "Close and accept the dependency first (`holyagent assignment accept <id>`), then dispatch.",
-  InsufficientAcceptance: "Nothing was recorded. SendMessage the subagent for the missing support the message names, then run `holyagent assignment close <id> --outcome success --accept <rationale>` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or `holyagent assignment accept <id> --rationale <text> --report` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.",
   SpecialistMismatch: "Record the agent that was actually launched, or dispatch again.",
   SpecialistNotRecorded: "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
   MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
@@ -7807,15 +8435,16 @@ var HINTS = {
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
+  ConfigInvalid: "Fix the field the message names in that config.json (the keys and values are listed in docs/pi/configuration.md), or delete the file to use the defaults.",
   ...VCS_HINTS
 };
-var describeFailure = (error) => {
+var describeFailure = (error, words = CLAUDE_WORDS) => {
   const tag = typeof error === "object" && error !== null && "_tag" in error ? String(error._tag) : "Defect";
   const message = (typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error)).replace(/\s+/g, " ").trim();
   return {
     tag,
     message,
-    hint: error instanceof Usage ? error.hint : HINTS[tag] ?? "Run `holyagent --help` for the commands.",
+    hint: error instanceof Usage ? error.hint : tag === "InsufficientAcceptance" ? insufficientAcceptanceHint(words) : HINTS[tag] ?? "Run `holyagent --help` for the commands.",
     code: USAGE_ERRORS.has(tag) ? EXIT.usage : REFUSED_ERRORS.has(tag) ? EXIT.refused : EXIT.state
   };
 };
@@ -9542,111 +10171,9 @@ function resolveOptions(options) {
     replacer: options?.replacer
   };
 }
-var version = "0.2.2";
+var version = "0.3.0";
 
 import { join } from "path";
-
-var Role = Literals(["Explorer", "Librarian", "Worker", "Reviewer"]);
-var Task = Literals([
-  "map",
-  "lookup",
-  "trace",
-  "research",
-  "mechanical",
-  "implementation",
-  "integration",
-  "operations",
-  "validation",
-  "debugging",
-  "visual",
-  "code",
-  "testing",
-  "audit",
-  "security",
-  "artifact"
-]);
-var RoleTask = Literals([
-  "Explorer.map",
-  "Explorer.lookup",
-  "Explorer.trace",
-  "Librarian.lookup",
-  "Librarian.research",
-  "Worker.mechanical",
-  "Worker.implementation",
-  "Worker.integration",
-  "Worker.operations",
-  "Worker.validation",
-  "Worker.debugging",
-  "Worker.visual",
-  "Reviewer.visual",
-  "Reviewer.code",
-  "Reviewer.testing",
-  "Reviewer.audit",
-  "Reviewer.security",
-  "Reviewer.artifact"
-]);
-var Model = Literals(["haiku", "sonnet"]);
-var Effort = Literals(["medium", "high", "xhigh"]);
-var Mutability = Literals(["ReadOnly", "ScopedWrite"]);
-var Independence = Literals([
-  "DisjointWrites",
-  "DependenciesTerminal",
-  "IndependentReview"
-]);
-var Capability = Literals(["Search", "Shell", "VisualInspection", "Write"]);
-var spec = (role, task, model, effort, mutability, independence, capabilities = []) => ({ role, task, model, effort, mutability, independence, capabilities });
-var SPECS = {
-  "Explorer.map": spec("Explorer", "map", "haiku", "medium", "ReadOnly", "DisjointWrites"),
-  "Explorer.lookup": spec("Explorer", "lookup", "haiku", "medium", "ReadOnly", "DisjointWrites"),
-  "Explorer.trace": spec("Explorer", "trace", "sonnet", "medium", "ReadOnly", "DependenciesTerminal"),
-  "Librarian.lookup": spec("Librarian", "lookup", "haiku", "medium", "ReadOnly", "DisjointWrites", [
-    "Search"
-  ]),
-  "Librarian.research": spec("Librarian", "research", "sonnet", "medium", "ReadOnly", "DependenciesTerminal", ["Search"]),
-  "Worker.mechanical": spec("Worker", "mechanical", "haiku", "medium", "ScopedWrite", "DisjointWrites", ["Write"]),
-  "Worker.implementation": spec("Worker", "implementation", "sonnet", "high", "ScopedWrite", "DisjointWrites", ["Write"]),
-  "Worker.integration": spec("Worker", "integration", "sonnet", "medium", "ScopedWrite", "DependenciesTerminal", ["Write"]),
-  "Worker.operations": spec("Worker", "operations", "haiku", "medium", "ScopedWrite", "DisjointWrites", ["Shell"]),
-  "Worker.validation": spec("Worker", "validation", "haiku", "medium", "ReadOnly", "DependenciesTerminal", ["Shell"]),
-  "Worker.debugging": spec("Worker", "debugging", "sonnet", "high", "ScopedWrite", "DependenciesTerminal", ["Write"]),
-  "Worker.visual": spec("Worker", "visual", "sonnet", "high", "ScopedWrite", "DisjointWrites", [
-    "Write",
-    "VisualInspection"
-  ]),
-  "Reviewer.visual": spec("Reviewer", "visual", "sonnet", "high", "ReadOnly", "IndependentReview", [
-    "VisualInspection"
-  ]),
-  "Reviewer.code": spec("Reviewer", "code", "sonnet", "high", "ReadOnly", "IndependentReview"),
-  "Reviewer.testing": spec("Reviewer", "testing", "sonnet", "medium", "ReadOnly", "IndependentReview", ["Shell"]),
-  "Reviewer.audit": spec("Reviewer", "audit", "haiku", "high", "ReadOnly", "IndependentReview"),
-  "Reviewer.security": spec("Reviewer", "security", "sonnet", "high", "ReadOnly", "IndependentReview"),
-  "Reviewer.artifact": spec("Reviewer", "artifact", "sonnet", "high", "ReadOnly", "IndependentReview")
-};
-var routeFor = (roleTask) => ({
-  roleTask,
-  agent: `${SPECS[roleTask].role}-${SPECS[roleTask].task}`.toLowerCase(),
-  ...SPECS[roleTask]
-});
-var ROUTES = RoleTask.literals.map(routeFor);
-var isWriter = (roleTask) => SPECS[roleTask].mutability === "ScopedWrite";
-var isReviewer = (roleTask) => SPECS[roleTask].role === "Reviewer";
-
-var Slug = String4.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
-var MAX_LENGTH = 40;
-var READ_LENGTH = 512;
-var slugOf = (text) => {
-  const words = text.slice(0, READ_LENGTH).normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().split(/[^a-z0-9]+/).filter((word) => word !== "");
-  let slug = "";
-  for (const word of words) {
-    const next = slug === "" ? word : `${slug}-${word}`;
-    if (next.length > MAX_LENGTH)
-      break;
-    slug = next;
-  }
-  return slug === "" ? (words[0] ?? "").slice(0, MAX_LENGTH) : slug;
-};
-var recordName = (slug, id) => slug === "" ? id : `${slug}-${id}`;
-
 var STATE_DIRECTORY = ".holyagent";
 var CONFIG_FILE = "config.json";
 var TRACKED_STATE_PATHSPEC = [
@@ -9660,297 +10187,6 @@ var assignmentFile = (intentFolderPath, assignment) => join(intentFolderPath, "a
 var branchFile = (intentFolderPath, record) => join(intentFolderPath, "branches", `${record.id}.json`);
 var pullFile = (intentFolderPath, record) => join(intentFolderPath, "pulls", `${record.id}.json`);
 var localFile = (directory, name) => join(directory, "local", name);
-
-var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
-var IntentId = identifier2("intent");
-var AssignmentId = identifier2("assignment");
-var BranchId = identifier2("branch");
-var PullId = identifier2("pull");
-var AgentId = String4.check(isPattern2(/\S/));
-var newId = (kind) => gen2(function* () {
-  const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
-  const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
-  return `${kind}-${time}-${digits.map((digit) => digit.toString(36)).join("")}`;
-});
-
-var Text = String4.check(isPattern2(/\S/));
-var Revision = Int.check(isGreaterThanOrEqualTo2(1));
-var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
-var isInstant = (text) => {
-  const match = INSTANT.exec(text);
-  if (match === null || Number.isNaN(Date.parse(text)))
-    return false;
-  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
-  const date = new Date(text);
-  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
-};
-var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
-var TextList = ArraySchema(Text);
-
-class UnknownRecord extends TaggedError2("UnknownRecord") {
-  get message() {
-    return `Unknown ${this.kind} ${this.id}`;
-  }
-}
-
-class DuplicateRecord extends TaggedError2("DuplicateRecord") {
-  get message() {
-    return `A ${this.kind} with id ${this.id} already exists`;
-  }
-}
-
-class InvalidPath extends TaggedError2("InvalidPath") {
-  get message() {
-    return `Invalid path "${this.path}": ${this.reason}`;
-  }
-}
-
-class InvalidDraft extends TaggedError2("InvalidDraft") {
-}
-
-class MissingOwnership extends TaggedError2("MissingOwnership") {
-  get message() {
-    return `${this.roleTask} writes, so it needs at least one ownership path`;
-  }
-}
-
-class StaleRevision extends TaggedError2("StaleRevision") {
-  get message() {
-    return `Stale intent revision ${this.given}; the live revision is ${this.live}`;
-  }
-}
-
-class IntentClosed extends TaggedError2("IntentClosed") {
-  get message() {
-    return `Intent ${this.intentId} is closed; reopen it first`;
-  }
-}
-
-class IntentHasOpenWork extends TaggedError2("IntentHasOpenWork") {
-  get message() {
-    return `Intent ${this.intentId} has Running (${this.running.join(", ")}) or unaccepted (${this.unaccepted.join(", ")}) Assignments; settle them or give a reason to drop them`;
-  }
-}
-
-class InvalidTransition extends TaggedError2("InvalidTransition") {
-  get message() {
-    return `Cannot ${this.action} ${this.id} while it is ${this.state}`;
-  }
-}
-
-class OwnershipConflict extends TaggedError2("OwnershipConflict") {
-  get message() {
-    return `${this.id} cannot start: ${this.runningId} is Running and owns an overlapping path (${this.path})`;
-  }
-}
-
-class DependencyNotAccepted extends TaggedError2("DependencyNotAccepted") {
-  get message() {
-    return `${this.id} cannot start: dependency ${this.dependency} ${this.reason}`;
-  }
-}
-
-class InsufficientAcceptance extends TaggedError2("InsufficientAcceptance") {
-  get message() {
-    return `Acceptance of ${this.id} rejected: ${this.detail}`;
-  }
-}
-
-class SpecialistMismatch extends TaggedError2("SpecialistMismatch") {
-  get message() {
-    return `Specialist ${this.agentId}: ${this.detail}`;
-  }
-}
-
-class SpecialistNotRecorded extends TaggedError2("SpecialistNotRecorded") {
-  get message() {
-    return `${this.id} has no recorded specialist, so it cannot be closed as Succeeded`;
-  }
-}
-
-var decodeInput = (schema, input) => decodeUnknownEffect2(schema, { onExcessProperty: "error" })(input).pipe(mapError2((error) => new InvalidDraft({ message: error.message })));
-
-import { sep } from "path";
-var UNSAFE_CHARACTERS = /[\\:*?"<>|\p{Cc}]/u;
-var pathProblem = (path) => {
-  if (path.startsWith("/"))
-    return "absolute path";
-  if (UNSAFE_CHARACTERS.test(path))
-    return "character that is not portable";
-  for (const segment of path.split("/")) {
-    if (segment === "")
-      return "empty segment";
-    if (segment === "." || segment === "..")
-      return `"${segment}" segment`;
-    if (segment.endsWith(".") || segment.endsWith(" "))
-      return "trailing dot or space";
-  }
-  return;
-};
-var PortablePath = String4.check(makeFilter2((path) => pathProblem(path) ?? undefined));
-var pathsOverlap = (a, b) => {
-  const left = a.toLowerCase();
-  const right = b.toLowerCase();
-  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`);
-};
-var firstOverlap = (a, b) => a.find((left) => b.some((right) => pathsOverlap(left, right)));
-var toPosix = (path, separator = sep) => separator === "/" ? path : path.replaceAll(separator, "/");
-var fromGitPath = (path, separator = sep) => separator === "/" ? path : path.replaceAll("/", separator);
-
-var findIntent = (project, id) => {
-  const found = project.intents.find((intent) => intent.id === id);
-  return found === undefined ? fail5(new UnknownRecord({ kind: "intent", id })) : succeed6(found);
-};
-var findAssignment = (project, id) => {
-  const found = project.assignments.find((assignment) => assignment.id === id);
-  return found === undefined ? fail5(new UnknownRecord({ kind: "assignment", id })) : succeed6(found);
-};
-var requireOpen = (intent) => intent.state === "Open" ? void_3 : fail5(new IntentClosed({ intentId: intent.id }));
-var requireLive = (intent, revision) => revision === intent.revision ? void_3 : fail5(new StaleRevision({ given: revision, live: intent.revision }));
-
-var Dimension = Literals([
-  "behavior",
-  "regressions",
-  "tests",
-  "scope",
-  "style",
-  "repo-standards"
-]);
-var Criterion = Struct({
-  text: Text,
-  blocking: Boolean3,
-  dimension: Dimension
-});
-var Acceptance = Struct({
-  revision: Revision,
-  carriedFrom: optionalKey2(Revision),
-  rationale: Text,
-  criteria: ArraySchema(Struct({ criterion: Text, support: Text })),
-  evidence: ArraySchema(Struct({ label: Text, support: Text }))
-});
-var Specialist = Struct({
-  agentId: optionalKey2(AgentId),
-  model: Model,
-  effort: Effort,
-  startedAt: Timestamp,
-  finishedAt: optionalKey2(Timestamp),
-  workTree: optionalKey2(Text)
-});
-var AssignmentState = Literals([
-  "Ready",
-  "Running",
-  "Succeeded",
-  "Failed",
-  "Cancelled"
-]);
-var AssignmentDraft = Struct({
-  intentId: IntentId,
-  intentRevision: Revision,
-  roleTask: RoleTask,
-  objective: Text,
-  scope: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
-  constraints: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
-  criteria: NonEmptyArray(Criterion),
-  evidence: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
-  ownershipPaths: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
-  dependencies: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
-  independentFrom: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
-  followUpOf: optionalKey2(AssignmentId)
-});
-var fields = {
-  id: AssignmentId,
-  intentId: IntentId,
-  intentRevision: Revision,
-  roleTask: RoleTask,
-  slug: Slug,
-  objective: Text,
-  state: AssignmentState,
-  scope: TextList,
-  constraints: TextList,
-  criteria: NonEmptyArray(Criterion),
-  evidence: TextList,
-  ownershipPaths: ArraySchema(PortablePath),
-  dependencies: ArraySchema(AssignmentId),
-  independentFrom: ArraySchema(AssignmentId),
-  followUpOf: optionalKey2(AssignmentId),
-  specialist: optionalKey2(Specialist),
-  result: optionalKey2(Text),
-  acceptance: optionalKey2(Acceptance),
-  createdAt: Timestamp
-};
-var coherenceProblem = (row) => {
-  const { state, specialist, result, acceptance } = row;
-  if (state === "Ready")
-    return specialist || result || acceptance ? "a Ready Assignment has no run yet" : undefined;
-  if (state === "Running")
-    return specialist && !specialist.finishedAt && !result && !acceptance ? undefined : "a Running Assignment has a started specialist and no result";
-  if (!result)
-    return `a ${state} Assignment records its result`;
-  if (acceptance && state !== "Succeeded")
-    return "only a Succeeded Assignment can be accepted";
-  return;
-};
-var Assignment = Struct(fields).check(makeFilter2((row) => coherenceProblem(row)));
-var relatedIds = (assignment) => [
-  ...assignment.dependencies,
-  ...assignment.independentFrom,
-  ...assignment.followUpOf === undefined ? [] : [assignment.followUpOf]
-];
-var Creation = Struct({ id: AssignmentId, now: Timestamp });
-var createAssignment = (project, rawDraft, rawCreation) => gen2(function* () {
-  const draft = yield* decodeInput(AssignmentDraft, rawDraft);
-  const creation = yield* decodeInput(Creation, rawCreation);
-  if (project.assignments.some((row) => row.id === creation.id))
-    return yield* new DuplicateRecord({ kind: "assignment", id: creation.id });
-  const intent = yield* findIntent(project, draft.intentId);
-  yield* requireOpen(intent);
-  yield* requireLive(intent, draft.intentRevision);
-  if (isWriter(draft.roleTask) && draft.ownershipPaths.length === 0)
-    return yield* new MissingOwnership({ roleTask: draft.roleTask });
-  for (const path of draft.ownershipPaths) {
-    const reason = pathProblem(path);
-    if (reason !== undefined)
-      return yield* new InvalidPath({ path, reason });
-  }
-  for (const [what, labels] of [
-    ["criterion", draft.criteria.map((criterion) => criterion.text)],
-    ["evidence label", draft.evidence]
-  ]) {
-    const repeated = labels.find((label, index) => labels.indexOf(label) !== index);
-    if (repeated !== undefined)
-      return yield* new InvalidDraft({ message: `Duplicate ${what}: ${repeated}` });
-  }
-  const siblings = new Set(project.assignments.filter((row) => row.intentId === intent.id).map((row) => row.id));
-  const unknown = relatedIds(draft).find((id) => !siblings.has(id));
-  if (unknown !== undefined)
-    return yield* new UnknownRecord({ kind: "assignment", id: unknown });
-  const assignment = {
-    id: creation.id,
-    intentId: draft.intentId,
-    intentRevision: draft.intentRevision,
-    roleTask: draft.roleTask,
-    slug: slugOf(draft.objective),
-    objective: draft.objective,
-    state: "Ready",
-    scope: draft.scope,
-    constraints: draft.constraints,
-    criteria: draft.criteria,
-    evidence: draft.evidence,
-    ownershipPaths: draft.ownershipPaths,
-    dependencies: draft.dependencies,
-    independentFrom: draft.independentFrom,
-    ...draft.followUpOf === undefined ? {} : { followUpOf: draft.followUpOf },
-    createdAt: creation.now
-  };
-  return { assignment, assignments: [assignment] };
-});
-var Outcome = Literals(["Succeeded", "Failed", "Cancelled"]);
-var settle = (assignment, outcome, result, now) => ({
-  ...assignment,
-  state: outcome,
-  result,
-  ...assignment.specialist === undefined ? {} : { specialist: { ...assignment.specialist, finishedAt: now } }
-});
 
 var SpecialistEntry = Struct({
   agentId: AgentId,
@@ -11380,11 +11616,14 @@ var commit = (request) => gen2(function* () {
 
 var SESSION_TRAILER = /^\s*claude-session\s*:/i;
 var GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\b.*\bclaude\s+code\b/iu;
+var PI_GENERATED_FOOTER = /^\s*(?:[^\p{L}\p{N}\s]\s*)*generated\s+with\s+\[?pi(?:[\s-]coding[\s-]agent)?\]?(?:\([^\s)]*\))?[^\p{L}\p{N}]*$/iu;
 var CO_AUTHOR = /^\s*co-authored-by\s*:\s*(.*)$/i;
-var SESSION_LINK = /https?:\/\/claude\.ai\/\S*/gi;
-var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*anthropic\.com\b/i.test(coAuthor);
+var SESSION_LINK = /https?:\/\/claude\.ai\/[^\s)]*/gi;
+var PI_SESSION_LINK = /https?:\/\/(?:[\w-]+\.)*pi\.dev\/session\/[^\s)]*/gi;
+var PI_AGENT_NAME = /^pi[\s-]coding[\s-]agent$/i;
+var namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim());
 var isAttribution = (line) => {
-  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line))
+  if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line) || PI_GENERATED_FOOTER.test(line))
     return true;
   const coAuthor = CO_AUTHOR.exec(line);
   return coAuthor !== null && namesAgent(coAuthor[1] ?? "");
@@ -11404,7 +11643,7 @@ var DEFAULT_PHRASES = [
 ];
 var cleanMessage = (text) => text.split(`
 `).filter((line) => !isAttribution(line)).flatMap((line) => {
-  const stripped = line.replace(SESSION_LINK, "");
+  const stripped = line.replace(SESSION_LINK, "").replace(PI_SESSION_LINK, "");
   return stripped === line ? [line] : stripped.trim() === "" ? [] : [stripped.trimEnd()];
 }).join(`
 `).replace(/\n{3,}/g, `
@@ -11464,13 +11703,520 @@ var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline
 
 import { rm as rm4 } from "fs/promises";
 import { isAbsolute, join as join5, resolve as resolve3 } from "path";
+
+var code_review_default = `---
+description: First-pass code review of a committed range, each finding traced to a realistic failure and labeled
+argument-hint: "[<start>...<head>]"
+---
+
+First pass: code-review.
+
+You are the first pass of a code review. Find defects in the committed range and prove each one. The review is read-only: write no comments and no fixes, and change no file, branch or index.
+
+Range: \${@:-the refs the Assignment below names}. A range is two refs joined by \`...\`, such as \`main...my-branch\`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other, and leave the uncommitted changes of the shared tree out. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve, say which one and stop. A guessed range reviews the wrong code.
+
+Steps:
+
+1. Read the whole diff of the range with \`git diff\`, quoting the ref names for the shell.
+2. Read the code around each change: the callers, the callees and the tests that cover it. A change is judged in its context, not alone.
+3. List candidate defects the change introduces or exposes. Look at wrong results, regressions of existing behavior, unhandled error and failure paths, empty, null and boundary input, ordering and concurrency, leaked resources, broken compatibility of an interface or stored data, and tests that cannot fail.
+4. Trace each candidate to a realistic failure: the input or state, the path through the code, and the wrong result a user or caller sees. Drop a candidate you cannot trace to one.
+5. Label each remaining finding.
+   - blocker: a realistic failure in normal use, data loss, or a break of existing behavior.
+   - optional: a real but unlikely or minor failure.
+
+Your findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one, then reviews on its own and reports. When you run it alone, the list is the result.
+
+List one entry per finding:
+
+- the file, the line and the symbol;
+- the failure, in one or two sentences, as input, path and result;
+- the label;
+- how you know: what you read, or the command you ran and its result.
+
+Example entry:
+
+- \`src/cart.ts:42\`, \`total\`: an empty cart divides by \`items.length\`, so \`checkout\` shows "NaN" as the price. blocker. Read \`total\` and its caller \`checkout\`; \`bun test cart\` with an empty cart fails.
+
+Then list what you checked and found sound, in one line. With no finding, say "No findings" and what the review covered. Leave style, naming and taste out.
+`;
+
+var security_review_default = `---
+description: First-pass security review of a committed range, tracing sources to sinks and labeling validated findings
+argument-hint: "[<start>...<head>]"
+---
+
+First pass: security-review.
+
+You are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.
+
+Range: \${@:-the refs the Assignment below names}. A range is two refs joined by \`...\`, such as \`main...my-branch\`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from \`git diff\` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.
+
+Steps:
+
+1. Read the whole diff, then list the trust boundaries it touches: where data enters (requests, files, environment, arguments, stored data, output of tools and models) and what privilege the code runs with.
+2. For each source, follow the data to every sink it reaches: a shell or process call, a query, a file path, a deserializer, rendered output, an outgoing request, an authentication or authorization decision, a secret store or log, a cryptographic call.
+3. Read each check on the path. A check counts only if it covers this source and this sink.
+4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.
+5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.
+6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.
+
+Your findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.
+
+List one entry per finding:
+
+- the source, the sink and the path between them, with files and lines;
+- the precondition;
+- the impact rating;
+- validated or suspected, with what is missing for a suspicion;
+- the label.
+
+Example entry:
+
+- Source \`GET /files?name=\` in \`src/routes/files.ts:18\`; sink \`readFile\` in \`src/files.ts:31\`; \`name\` is joined to the upload root with no check for \`..\`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers \`name\`. blocker.
+
+Then list what you checked and found sound, in one line. With no finding, say "No findings" and what the review covered.
+`;
+
+var FRONTMATTER = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
+var parseTemplate = (name, text) => {
+  const match = FRONTMATTER.exec(text);
+  return match === null ? { name, head: [], body: text.trim() } : { name, head: (match[1] ?? "").split(`
+`), body: (match[2] ?? "").trim() };
+};
+var CODE_REVIEW = parseTemplate("code-review", code_review_default);
+var SECURITY_REVIEW = parseTemplate("security-review", security_review_default);
+var FIRST_PASS = {
+  "Reviewer.code": CODE_REVIEW,
+  "Reviewer.security": SECURITY_REVIEW
+};
+var ARGUMENTS_DEFAULT = /\$\{@:-([^}]*)\}/g;
+var firstPassPrompt = (roleTask) => FIRST_PASS[roleTask]?.body.replace(ARGUMENTS_DEFAULT, (_match, fallback) => fallback);
+
+import { basename as basename2 } from "path";
+
+var KEY_LENGTH = 32;
+var journalKey = (input) => new Bun.CryptoHasher("sha256").update(JSON.stringify([
+  input.prompt,
+  input.label ?? null,
+  input.model ?? null,
+  input.agentType ?? null,
+  input.effort ?? null,
+  input.isolation ?? null,
+  input.gate ?? null,
+  input.resume ?? null,
+  ...input.schema !== undefined ? [input.schema] : []
+])).digest("hex").slice(0, KEY_LENGTH);
+
+class InvalidPiRecord extends TaggedError2("InvalidPiRecord") {
+  get message() {
+    return `${this.source}: ${this.detail}`;
+  }
+}
+var JournalEntry = Struct({
+  index: Int.check(isGreaterThanOrEqualTo2(0)),
+  key: String4,
+  ok: Boolean3,
+  text: optionalKey2(String4),
+  resumed: optionalKey2(Literal2(true))
+});
+var JournalLine = fromJsonString2(JournalEntry);
+var decodePiJournal = (journal, source) => gen2(function* () {
+  const entries = [];
+  for (const [at, line] of journal.split(/\r?\n/).entries()) {
+    if (line.trim() === "")
+      continue;
+    entries.push(yield* decodeUnknownEffect2(JournalLine)(line, { onExcessProperty: "error" }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a workflow journal entry: ${error.message}`
+    }))));
+  }
+  return entries.toSorted((a, b) => a.index - b.index);
+});
+var nonEmpty = (text) => text !== undefined && text.trim() !== "";
+var matchJournal = (entries, expected) => {
+  const idOf = new Map(expected.map(({ id, key }) => [key, id]));
+  const last = new Map;
+  const unmatched = [];
+  for (const entry of entries) {
+    const id = idOf.get(entry.key);
+    if (id !== undefined)
+      last.set(id, entry);
+    else
+      unmatched.push({
+        index: entry.index,
+        id: undefined,
+        reason: !entry.ok ? "failed" : nonEmpty(entry.text) ? "unmatched" : "empty"
+      });
+  }
+  const reports = [];
+  const notReported = [...unmatched];
+  for (const [id, entry] of last)
+    if (entry.ok && nonEmpty(entry.text))
+      reports.push({ id, index: entry.index, report: entry.text });
+    else
+      notReported.push({ index: entry.index, id, reason: entry.ok ? "empty" : "failed" });
+  return {
+    reports: reports.toSorted((a, b) => a.index - b.index),
+    notReported: notReported.toSorted((a, b) => a.index - b.index)
+  };
+};
+var AGENT_RECORD_ENTRY_TYPE = "subagents:record";
+var AgentRecordData = Struct({
+  id: String4,
+  type: String4,
+  description: String4,
+  status: Literals([
+    "queued",
+    "running",
+    "completed",
+    "steered",
+    "aborted",
+    "stopped",
+    "error"
+  ]),
+  result: optionalKey2(String4),
+  error: optionalKey2(String4),
+  startedAt: Number5,
+  completedAt: optionalKey2(Number5),
+  sessionFile: optionalKey2(String4),
+  handle: optionalKey2(String4),
+  alias: optionalKey2(String4),
+  worktreeLost: optionalKey2(Boolean3)
+});
+var RecordEntry = Struct({
+  type: Literal2("custom"),
+  customType: Literal2(AGENT_RECORD_ENTRY_TYPE),
+  data: AgentRecordData,
+  id: String4,
+  parentId: NullOr(String4),
+  timestamp: String4
+});
+var RecordLine = fromJsonString2(RecordEntry);
+var SessionLine = fromJsonString2(Struct({ type: String4, customType: optionalKey2(String4) }));
+
+class PiRecordMissing extends TaggedError2("PiRecordMissing") {
+  get message() {
+    return `${this.source} holds no ${AGENT_RECORD_ENTRY_TYPE} entry for agent ${this.agentId}: it is still running, was evicted before it was persisted, or belongs to another session`;
+  }
+}
+var agentRecordIn = (session, source, agentId) => gen2(function* () {
+  let found;
+  for (const [at, line] of session.split(/\r?\n/).entries()) {
+    if (!line.includes(AGENT_RECORD_ENTRY_TYPE))
+      continue;
+    const probe = yield* decodeUnknownEffect2(SessionLine)(line).pipe(option2);
+    if (probe._tag === "None" || probe.value.type !== "custom" || probe.value.customType !== AGENT_RECORD_ENTRY_TYPE)
+      continue;
+    const { data } = yield* decodeUnknownEffect2(RecordLine)(line, {
+      onExcessProperty: "error"
+    }).pipe(mapError2((error) => new InvalidPiRecord({
+      source,
+      detail: `line ${at + 1} is not a ${AGENT_RECORD_ENTRY_TYPE} entry: ${error.message}`
+    })));
+    if (data.id === agentId)
+      found = data;
+  }
+  return found ?? (yield* new PiRecordMissing({ source, agentId }));
+});
+var STATUS_OF = {
+  ok: { status: "done", close: "success" },
+  error: { status: "failed", close: "errored" },
+  length: { status: "failed", close: "errored" },
+  empty: { status: "failed", close: "errored" },
+  exit: { status: "failed", close: "errored" },
+  aborted: { status: "failed", close: "errored" },
+  stopped: { status: "interrupted", close: "stopped" }
+};
+var assignmentStatusOf = (outcome) => STATUS_OF[outcome];
+var outcomeOfRecord = (record) => {
+  switch (record.status) {
+    case "completed":
+    case "steered":
+      return nonEmpty(record.result) ? "ok" : "empty";
+    case "error":
+    case "aborted":
+    case "stopped":
+      return record.status;
+    case "queued":
+    case "running":
+      return "exit";
+  }
+};
+var piRecordReport = (session, source, agentId) => agentRecordIn(session, source, agentId).pipe(map4((record) => {
+  const outcome = outcomeOfRecord(record);
+  return {
+    ended: outcome,
+    ...assignmentStatusOf(outcome),
+    report: outcome === "ok" ? record.result : undefined,
+    error: record.error
+  };
+}));
+
+var REPORT_FIELDS = Struct({
+  status: Literals(["done", "partial", "blocked"]),
+  changed_paths: ArraySchema(String4),
+  checks: ArraySchema(Struct({ command: String4, exit: Int })),
+  blockers: ArraySchema(String4),
+  notes: ArraySchema(String4),
+  evidence: ArraySchema(Struct({ key: String4, support: String4 }))
+});
+var JsonReport = StructWithRest(REPORT_FIELDS, [
+  Record(String4, Unknown2)
+]);
+var section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine(line)}`)];
+var KNOWN = new Set(Object.keys(REPORT_FIELDS.fields));
+var extraLines = (report) => Object.entries(report).filter(([name]) => !KNOWN.has(name)).map(([name, value]) => `${name}: ${oneLine(typeof value === "string" ? value : JSON.stringify(value) ?? "")}`);
+var renderJsonReport = (report) => [
+  `status: ${report.status}`,
+  ...section("changed", report.changed_paths),
+  ...section("checks", report.checks.map(({ command, exit }) => `${command} -> exit ${exit}`)),
+  ...section("blockers", report.blockers),
+  ...section("notes", report.notes),
+  ...extraLines(report),
+  ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine(key)}: ${support}`))
+].join(`
+`);
+
+var EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
+var indentOf = (line) => line.length - line.trimStart().length;
+var LIST_MARKER = /^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/;
+var evidenceEntries = (report) => {
+  const lines = report.split(/\r?\n/);
+  const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line));
+  if (heading === -1)
+    return [];
+  const base = indentOf(lines.slice(heading + 1).find((line) => line.trim() !== "") ?? "");
+  const entries = [];
+  let gap = false;
+  for (const line of lines.slice(heading + 1)) {
+    if (line.trim() === "") {
+      gap = true;
+      continue;
+    }
+    const trimmed = line.trim();
+    const text = trimmed.replace(LIST_MARKER, "");
+    const last = entries.length - 1;
+    const above = entries[last];
+    if (indentOf(line) > base && above !== undefined && !gap)
+      entries[last] = {
+        ...above,
+        text: `${above.text}${above.text.endsWith(":") ? " " : "; "}${text}`
+      };
+    else
+      entries.push({ text, list: LIST_MARKER.test(trimmed), gap });
+    gap = false;
+  }
+  return entries;
+};
+var MARKER = /^\[(?:non-)?blocking\]\s*/i;
+var DIMENSION = /\s*\((?:behavior|regressions|tests|scope|style|repo-standards)\)$/i;
+var TRAILING = /[\s.,;:!?*_`]+$/;
+var LEADING = /^(?:[\s*_`>\u2022+-]+|\d+[.)]\s+|\[[ xX]\](?=\s))+/;
+var normalized = (text) => text.replace(LEADING, "").replace(MARKER, "").replace(/\s+/g, " ").replace(TRAILING, "").replace(DIMENSION, "").replace(TRAILING, "").replace(/[-_\s]+/g, " ").toLowerCase();
+var HAS_TEXT = /[\p{L}\p{N}]/u;
+var ownerOf = (entry, known) => {
+  let bare;
+  for (let at = entry.lastIndexOf(":");at > 0; at = entry.lastIndexOf(":", at - 1)) {
+    const keys = known.get(normalized(entry.slice(0, at)));
+    if (keys === undefined)
+      continue;
+    const support = entry.slice(at + 1).trim();
+    if (HAS_TEXT.test(support))
+      return { keys, support };
+    bare ??= keys;
+  }
+  return bare === undefined ? undefined : { keys: bare, support: "" };
+};
+var labelOf = (text) => {
+  const colon = text.indexOf(":");
+  return colon > 0 ? text.slice(0, colon) : text;
+};
+var acceptanceFrom = (assignment, report, rationale, carryForward) => {
+  const keys = [
+    ...new Set([...assignment.criteria.map(({ text }) => text), ...assignment.evidence])
+  ];
+  const known = new Map;
+  const name = (text, key) => known.set(text, (known.get(text) ?? new Set).add(key));
+  for (const key of keys)
+    name(normalized(key), key);
+  const labels = new Map;
+  for (const { text } of assignment.criteria) {
+    const label = normalized(labelOf(text));
+    if (label !== "")
+      labels.set(label, (labels.get(label) ?? new Set).add(text));
+  }
+  for (const [label, texts] of labels)
+    if (texts.size === 1)
+      for (const text of texts)
+        name(label, text);
+  const supports = new Map;
+  const addSupport = (keys, text) => {
+    if (HAS_TEXT.test(text)) {
+      for (const key of keys)
+        if (!supports.has(key))
+          supports.set(key, text);
+    }
+  };
+  let open;
+  const close = () => {
+    if (open !== undefined)
+      addSupport(open.keys, open.lines.join("; "));
+    open = undefined;
+  };
+  for (const entry of evidenceEntries(report)) {
+    const owner = ownerOf(entry.text, known);
+    if (owner === undefined) {
+      if (open !== undefined && entry.list && !entry.gap)
+        open.lines.push(entry.text);
+      else
+        close();
+      continue;
+    }
+    close();
+    open = owner.support === "" ? { keys: owner.keys, lines: [] } : undefined;
+    addSupport(owner.keys, owner.support);
+  }
+  close();
+  const supportFor = (key) => supports.get(key);
+  const criteria = assignment.criteria.map((criterion) => ({
+    criterion,
+    support: supportFor(criterion.text)
+  }));
+  const evidence = assignment.evidence.map((label) => ({ label, support: supportFor(label) }));
+  const missing = [
+    ...criteria.filter(({ criterion, support }) => criterion.blocking && support === undefined).map(({ criterion }) => `criterion "${criterion.text}"`),
+    ...evidence.filter(({ support }) => support === undefined).map(({ label }) => `evidence label "${label}"`)
+  ];
+  if (missing.length > 0)
+    return fail5(new InsufficientAcceptance({
+      id: assignment.id,
+      detail: `the report's evidence: block has no support for ${missing.join(", ")}`
+    }));
+  return succeed6({
+    rationale,
+    criteria: criteria.flatMap(({ criterion, support }) => support === undefined ? [] : [{ criterion: criterion.text, support }]),
+    evidence: evidence.flatMap(({ label, support }) => support === undefined ? [] : [{ label, support }]),
+    ...carryForward ? { carryForward: true } : {}
+  });
+};
+var section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)];
+var PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-z0-9]+)*)\.$/;
+var dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
+`, 1)[0] ?? "")?.[1];
+var renderPrompt = (assignment, agent) => [
+  `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
+  `Objective: ${assignment.objective}`,
+  ...section2("Scope", assignment.scope),
+  ...section2("Constraints", assignment.constraints),
+  ...section2("Ownership paths (write only here)", assignment.ownershipPaths),
+  ...section2("Acceptance criteria", assignment.criteria.map(({ text, blocking, dimension }) => `[${blocking ? "blocking" : "non-blocking"}] ${text} (${dimension})`)),
+  ...section2("Required evidence", assignment.evidence),
+  "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above. A criterion may be named by its text before the first colon."
+].join(`
+`);
+var dispatchPrompt = (assignment, agent, briefPath, words = CLAUDE_WORDS) => [
+  `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
+  `Read the brief at ${briefPath} with the ${words.readTool} tool and follow it as your full task.`
+].join(`
+`);
+var Started = Struct({
+  type: Literal2("started"),
+  key: String4,
+  agentId: String4,
+  label: String4
+});
+var Resulted = Struct({
+  type: Literal2("result"),
+  key: String4,
+  agentId: String4,
+  result: Unknown2
+});
+var Other = Struct({
+  type: String4.check(isPattern2(/^(?!(?:started|result)$)/))
+});
+var JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
+var journalResults = (journal, source) => gen2(function* () {
+  const labels = new Map;
+  const results = [];
+  const lines = journal.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    if (line.trim() === "")
+      continue;
+    const entry = yield* decodeUnknownEffect2(JournalLine2)(line, {
+      onExcessProperty: "ignore"
+    }).pipe(mapError2((error) => new Usage({
+      message: `Line ${index + 1} of the journal ${source} is not a started or result entry: ${error.message}`,
+      hint: "Pass the journal.jsonl of the Workflow run, unedited."
+    })));
+    if ("label" in entry)
+      labels.set(entry.key, entry.label);
+    else if ("result" in entry && entry.result !== null) {
+      const json = yield* decodeUnknownEffect2(JsonReport)(entry.result).pipe(option2);
+      const report = typeof entry.result === "string" ? entry.result : json._tag === "Some" ? renderJsonReport(json.value) : JSON.stringify(entry.result, null, 2) ?? "";
+      if (report.trim() !== "")
+        results.push({ label: labels.get(entry.key), agentId: entry.agentId, report });
+    }
+  }
+  return results;
+});
+var dispatchedCall = (assignment, agent, briefPath, launch) => ({
+  id: assignment.id,
+  key: journalKey({
+    prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
+    label: assignment.id,
+    model: launch.model,
+    agentType: routeFor(assignment.roleTask).agent,
+    effort: launch.effort
+  })
+});
+var refused = (hint) => (error) => new Usage({ message: error.message, hint });
+var piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map4((entries) => {
+  const { reports, notReported } = matchJournal(entries, calls);
+  const run = basename2(source).replace(/\.workflow\.jsonl$/, "");
+  return {
+    reports: reports.map(({ id, report }) => ({ id, report })),
+    notAssignmentIds: notReported.map(({ id, index, reason }) => ({
+      label: id ?? "",
+      agentId: `${run}#${index} ${reason}`
+    }))
+  };
+}));
+var piRecordReports = (session, source, agents) => gen2(function* () {
+  const reports = [];
+  const notAssignmentIds = [];
+  for (const { id, agentId } of agents) {
+    if (agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) {
+      notAssignmentIds.push({ label: id, agentId: `${agentId} not in a session file` });
+      continue;
+    }
+    const found = yield* piRecordReport(session, source, agentId.replace(/^pi:/, "")).pipe(catchTag2("PiRecordMissing", () => succeed6(undefined)));
+    if (found?.report !== undefined)
+      reports.push({ id, report: found.report });
+    else
+      notAssignmentIds.push({ label: id, agentId: `${agentId} ${found?.ended ?? "missing"}` });
+  }
+  return { reports, notAssignmentIds };
+}).pipe(mapError2(refused("Pass the root session file of the Pi session, unedited.")));
+
 var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute(common) ? join5(resolve3(common), "holyagent", name) : localFile(call.directory, name)));
+var pathIn = (call, name, assignmentId) => folderFor(call, name).pipe(map4((folder) => join5(folder, `${assignmentId}.md`)));
 var writeNamed = (call, name, assignmentId, text) => gen2(function* () {
-  const path = join5(yield* folderFor(call, name), `${assignmentId}.md`);
+  const path = yield* pathIn(call, name, assignmentId);
   yield* io(path, () => Bun.write(path, `${text}
 `));
   return path;
 });
+var briefText = (assignment, agent, host) => {
+  const assignmentText = renderPrompt(assignment, agent);
+  const firstPass = host === "pi" ? firstPassPrompt(assignment.roleTask) : undefined;
+  return firstPass === undefined ? assignmentText : `${firstPass}
+
+## Assignment
+
+${assignmentText}`;
+};
+var briefPath = (call, assignmentId) => pathIn(call, "briefs", assignmentId);
 var writeBrief = (call, assignmentId, brief) => writeNamed(call, "briefs", assignmentId, brief);
 var writeReport = (call, assignmentId, report) => writeNamed(call, "reports", assignmentId, report);
 var removeFiles = (call, assignmentIds) => forEach2(["briefs", "reports"], (name) => folderFor(call, name)).pipe(flatMap2((folders) => forEach2(folders.flatMap((folder) => assignmentIds.map((id) => join5(folder, `${id}.md`))), (path) => io(path, () => rm4(path, { force: true })).pipe(as2(undefined), catch_2((error) => succeed6(error.message))))), map4((lines) => lines.filter((line) => line !== undefined)));
@@ -11750,25 +12496,129 @@ var pullRequest = (request) => gen2(function* () {
 });
 
 import { join as join7 } from "path";
+
+class ConfigInvalid extends TaggedError2("ConfigInvalid") {
+  get message() {
+    return `${this.path} is not a valid HolyAgent config: ${this.reason}`;
+  }
+}
+
+var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
   allowWords: optionalKey2(ArraySchema(String4)),
   stateBranch: optionalKey2(String4)
 });
-var File2 = fromJsonString2(Record(String4, Unknown2));
-var readSettings = (directories) => gen2(function* () {
-  for (const directory of directories) {
-    const path = join7(directory, "config.json");
-    const text = yield* readText(path);
-    if (text === undefined)
-      continue;
-    const corrupt = (reason) => new CorruptRecord({ path, reason });
-    const file = yield* decodeUnknownEffect2(File2)(text).pipe(mapError2((error) => corrupt(error.message)));
-    return yield* decodeUnknownEffect2(VcsSettings, { onExcessProperty: "error" })(file["vcs"] ?? {}).pipe(mapError2((error) => corrupt(`vcs: ${error.message}`)));
-  }
-  const defaults = {};
-  return defaults;
+var PiProvider = Literals(["kimi-coding-global"]);
+var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
+var KIMI_ROOT = "k3.1-pro";
+var KIMI_SPECIALIST = "kimi-for-coding";
+var kimi = (model, thinking) => ({ model, thinking });
+var KIMI_ROUTES = {
+  root: kimi(KIMI_ROOT, "high"),
+  "Explorer.map": kimi(KIMI_SPECIALIST, "high"),
+  "Explorer.lookup": kimi(KIMI_SPECIALIST, "high"),
+  "Explorer.trace": kimi(KIMI_SPECIALIST, "high"),
+  "Librarian.lookup": kimi(KIMI_SPECIALIST, "high"),
+  "Librarian.research": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.mechanical": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.implementation": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.integration": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.operations": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.validation": kimi(KIMI_SPECIALIST, "high"),
+  "Worker.debugging": kimi(KIMI_SPECIALIST, "max"),
+  "Worker.visual": kimi(KIMI_ROOT, "low"),
+  "Reviewer.visual": kimi(KIMI_ROOT, "low"),
+  "Reviewer.code": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.testing": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.audit": kimi(KIMI_SPECIALIST, "high"),
+  "Reviewer.security": kimi(KIMI_SPECIALIST, "max"),
+  "Reviewer.artifact": kimi(KIMI_SPECIALIST, "max")
+};
+var route = (key) => defaulted(Struct({
+  model: defaulted(ModelId, KIMI_ROUTES[key].model),
+  thinking: defaulted(Thinking, KIMI_ROUTES[key].thinking)
+}), {});
+var ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [key, route(key)]));
+var WebMode = Literals(["provider", "pi-web-kit", "off"]);
+var CodemodeMode = Literals(["on", "only"]);
+var T3Scope = Literals(["global", "project"]);
+var Enabled = Boolean3;
+var PiSection = defaulted(Struct({
+  enable: defaulted(Enabled, true),
+  provider: defaulted(PiProvider, "kimi-coding-global"),
+  routes: defaulted(Struct(ROUTE_FIELDS), {}),
+  features: defaulted(Struct({
+    web: defaulted(WebMode, "provider"),
+    processes: defaulted(Enabled, true),
+    todo: defaulted(Enabled, true),
+    ask: defaulted(Enabled, true),
+    mcp: defaulted(Enabled, true),
+    computerUse: defaulted(Enabled, true),
+    contextCompression: defaulted(Enabled, true),
+    subagents: defaulted(Enabled, true)
+  }), {}),
+  codemode: defaulted(Struct({
+    mode: defaulted(CodemodeMode, "only"),
+    maxWorkers: defaulted(Int.check(isBetween({ minimum: 1, maximum: 16 })), 4)
+  }), {}),
+  t3: defaulted(Struct({
+    scope: defaulted(T3Scope, "global"),
+    worktrees: defaulted(Enabled, true),
+    deviceAccess: defaulted(Enabled, true)
+  }), {})
+}), {});
+var ClaudeSection = defaulted(Record(String4, Never2), {});
+var Config = Struct({
+  vcs: defaulted(VcsSettings, {}),
+  pi: PiSection,
+  claude: ClaudeSection
 });
+var ConfigFile = toEncoded2(Config);
+var defaultConfig = decodeUnknownEffect2(Config)({});
+
+var HOME_VARIABLE = "HOLYAGENT_HOME";
+var userConfigFile = (env) => join7(firstNonEmpty(env[HOME_VARIABLE]) ?? homeDirectory(env), STATE_DIRECTORY, CONFIG_FILE);
+var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var merge3 = (base, override) => isRecord(base) && isRecord(override) ? {
+  ...base,
+  ...Object.fromEntries(Object.entries(override).map(([key, value]) => [
+    key,
+    Object.hasOwn(base, key) ? merge3(base[key], value) : value
+  ]))
+} : override;
+var FINAL_OFF = [
+  { path: ["pi", "features", "computerUse"], off: false },
+  { path: ["pi", "features", "web"], off: "off" },
+  { path: ["pi", "t3", "deviceAccess"], off: false }
+];
+var valueAt = (value, path) => path.reduce((node, key) => isRecord(node) ? node[key] : undefined, value);
+var setAt = (value, path, leaf) => {
+  const [key, ...rest] = path;
+  return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
+};
+var mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, project));
+var JsonValue = fromJsonString2(Unknown2);
+var withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value;
+var readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map4(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message })))));
+var loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
+  const userPath = userConfigFile(env);
+  const user = yield* readConfigFile(userPath);
+  let project;
+  let projectPath;
+  for (const directory of projectDirectories) {
+    const path = join7(directory, CONFIG_FILE);
+    project = yield* readConfigFile(path);
+    if (project !== undefined) {
+      projectPath = path;
+      break;
+    }
+  }
+  return yield* decodeUnknownEffect2(Config)(mergeFiles(user ?? {}, project ?? {})).pipe(mapError2((error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message })));
+});
+
+var readSettings = (directories, env = process.env) => loadConfig({ projectDirectories: directories, env }).pipe(map4((config) => config.vcs));
 
 var settingsFolders = (call) => [stateDirectory(call.root)];
 var arguments_ = (call, usage, spec, positionals) => readFlags(call.args.positionals, spec, usage).pipe(filterOrFail2((args) => positionals === "any" || args.positionals.length === positionals, (args) => new Usage({
@@ -11799,7 +12649,7 @@ var VCS_COMMANDS = [
           message: messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
           hint: `Usage: holyagent ${COMMIT_USAGE}`
         });
-      const settings = yield* readSettings(settingsFolders(call));
+      const settings = yield* readSettings(settingsFolders(call), call.env);
       const message = yield* prepareMessage(messages, settings.allowWords ?? []);
       const done = yield* commit({
         message,
@@ -11860,7 +12710,7 @@ var VCS_COMMANDS = [
         yield* requiredValue(args, "base", PR_USAGE);
         yield* requiredValue(args, "title", PR_USAGE);
       }
-      const settings = yield* readSettings(settingsFolders(call));
+      const settings = yield* readSettings(settingsFolders(call), call.env);
       return yield* pullRequest({
         state: call,
         root: call.root,
@@ -11874,7 +12724,7 @@ var VCS_COMMANDS = [
   }
 ];
 
-import { resolve as resolve4 } from "path";
+import { basename as basename3, resolve as resolve4 } from "path";
 
 var AcceptanceInput = Struct({
   rationale: Text,
@@ -11944,80 +12794,6 @@ var accept = (project, assignmentId, input) => gen2(function* () {
   const accepted = yield* acceptOn(assignment, intent, input);
   return { assignment: accepted, assignments: [accepted] };
 });
-
-var DEFAULT_CONFIG = { ttlMinutes: 55, workflowsAvailable: false };
-var WORKFLOW_AGENT_PREFIX = "workflow:";
-var isWorkflowAgent = (agentId) => agentId.startsWith(WORKFLOW_AGENT_PREFIX);
-var independenceSubjects = (assignment) => isReviewer(assignment.roleTask) ? [...assignment.dependencies, ...assignment.independentFrom] : assignment.independentFrom;
-var touched = (entry, id) => entry.assignments.includes(id) || entry.related.includes(id);
-var STAGES = [
-  [
-    "idle specialist of this role task",
-    (entry, c) => !entry.running && entry.roleTask === c.assignment.roleTask
-  ],
-  [
-    "specialist with the same model and effort",
-    (entry, c) => entry.model === c.model && entry.effort === c.effort
-  ],
-  [
-    "specialist inside the cache window",
-    (entry, c) => entry.lastFinishedAt !== undefined && c.now - Date.parse(entry.lastFinishedAt) <= c.ttlMs
-  ],
-  [
-    "independent specialist",
-    (entry, c) => !independenceSubjects(c.assignment).some((id) => touched(entry, id))
-  ]
-];
-var RELEVANCE = [
-  [
-    "follow-up of its own Assignment",
-    (entry, a) => a.followUpOf !== undefined && entry.assignments.includes(a.followUpOf)
-  ],
-  [
-    "overlapping ownership paths",
-    (entry, a) => firstOverlap(a.ownershipPaths, entry.paths) !== undefined
-  ],
-  ["shared related Assignments", (entry, a) => relatedIds(a).some((id) => touched(entry, id))]
-];
-var relevance = (entry, assignment) => RELEVANCE.findIndex(([, relevant]) => relevant(entry, assignment));
-var compareEntries = (assignment) => (a, b) => relevance(a, assignment) - relevance(b, assignment) || Date.parse(b.lastFinishedAt ?? "") - Date.parse(a.lastFinishedAt ?? "") || (a.agentId < b.agentId ? -1 : 1);
-var directiveFor = (assignment, registry, now, config) => {
-  const route = routeFor(assignment.roleTask);
-  const candidate = {
-    assignment,
-    model: route.model,
-    effort: route.effort,
-    now: Date.parse(now),
-    ttlMs: config.ttlMinutes * 60000
-  };
-  let pool = registry.filter((entry) => !isWorkflowAgent(entry.agentId));
-  for (const [name, passes] of STAGES) {
-    pool = pool.filter((entry) => passes(entry, candidate));
-    if (pool.length === 0)
-      return {
-        action: "spawn",
-        agent: route.agent,
-        model: route.model,
-        effort: route.effort,
-        reason: `no ${name}`
-      };
-  }
-  const relevant = pool.filter((entry) => relevance(entry, assignment) >= 0);
-  const best = relevant.toSorted(compareEntries(assignment))[0];
-  if (best === undefined)
-    return {
-      action: "spawn",
-      agent: route.agent,
-      model: route.model,
-      effort: route.effort,
-      reason: "no specialist with relevant context"
-    };
-  return {
-    action: "continue",
-    agentId: best.agentId,
-    reason: RELEVANCE[relevance(best, assignment)]?.[0] ?? "relevant context"
-  };
-};
 
 var dispatchBlock = (project, assignment, assumeAccepted = new Set, workTree) => {
   if (assignment.state !== "Ready")
@@ -12166,213 +12942,105 @@ var closeAssignment = (project, registry, assignmentId, input, now) => gen2(func
   };
 });
 
-var REPORT_FIELDS = Struct({
-  status: Literals(["done", "partial", "blocked"]),
-  changed_paths: ArraySchema(String4),
-  checks: ArraySchema(Struct({ command: String4, exit: Int })),
-  blockers: ArraySchema(String4),
-  notes: ArraySchema(String4),
-  evidence: ArraySchema(Struct({ key: String4, support: String4 }))
-});
-var JsonReport = StructWithRest(REPORT_FIELDS, [
-  Record(String4, Unknown2)
-]);
-var section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine(line)}`)];
-var KNOWN = new Set(Object.keys(REPORT_FIELDS.fields));
-var extraLines = (report) => Object.entries(report).filter(([name]) => !KNOWN.has(name)).map(([name, value]) => `${name}: ${oneLine(typeof value === "string" ? value : JSON.stringify(value) ?? "")}`);
-var renderJsonReport = (report) => [
-  `status: ${report.status}`,
-  ...section("changed", report.changed_paths),
-  ...section("checks", report.checks.map(({ command, exit }) => `${command} -> exit ${exit}`)),
-  ...section("blockers", report.blockers),
-  ...section("notes", report.notes),
-  ...extraLines(report),
-  ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine(key)}: ${support}`))
-].join(`
-`);
+import { join as join8 } from "path";
 
-var EVIDENCE_HEADING = /^\s*evidence:\s*$/i;
-var indentOf = (line) => line.length - line.trimStart().length;
-var LIST_MARKER = /^(?:[-*+\u2022]\s+|\d+[.)]\s+|\[[ xX]\]\s+)+/;
-var evidenceEntries = (report) => {
-  const lines = report.split(/\r?\n/);
-  const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line));
-  if (heading === -1)
-    return [];
-  const base = indentOf(lines.slice(heading + 1).find((line) => line.trim() !== "") ?? "");
-  const entries = [];
-  let gap = false;
-  for (const line of lines.slice(heading + 1)) {
-    if (line.trim() === "") {
-      gap = true;
-      continue;
-    }
-    const trimmed = line.trim();
-    const text = trimmed.replace(LIST_MARKER, "");
-    const last = entries.length - 1;
-    const above = entries[last];
-    if (indentOf(line) > base && above !== undefined && !gap)
-      entries[last] = {
-        ...above,
-        text: `${above.text}${above.text.endsWith(":") ? " " : "; "}${text}`
-      };
-    else
-      entries.push({ text, list: LIST_MARKER.test(trimmed), gap });
-    gap = false;
+var pi_packages_default = {
+  "pi-provider-kimi-code": "0.6.13",
+  "@tintinweb/pi-subagents": "0.23.1",
+  "billion-context": "0.1.212",
+  "@juicesharp/rpiv-todo": "2.15.0",
+  "@juicesharp/rpiv-ask-user-question": "2.15.0",
+  "@aliou/pi-processes": "0.13.6",
+  "@amaster.ai/pi-computer-use": "0.1.36",
+  "pi-web-kit": "0.5.0"
+};
+
+var PI_PACKAGE_VERSIONS = pi_packages_default;
+var piPackageSource = (name) => `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`;
+
+var PROVIDERS = {
+  "kimi-coding-global": {
+    id: "kimi-coding",
+    package: "pi-provider-kimi-code",
+    env: { KIMI_CODE_REGION: "global" },
+    loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
+    webTools: ["moonshot_search", "moonshot_fetch"],
+    toolsFile: "~/.pi/providers/kimi-coding/config.json"
   }
-  return entries;
 };
-var MARKER = /^\[(?:non-)?blocking\]\s*/i;
-var DIMENSION = /\s*\((?:behavior|regressions|tests|scope|style|repo-standards)\)$/i;
-var TRAILING = /[\s.,;:!?*_`]+$/;
-var LEADING = /^(?:[\s*_`>\u2022+-]+|\d+[.)]\s+|\[[ xX]\](?=\s))+/;
-var normalized = (text) => text.replace(LEADING, "").replace(MARKER, "").replace(/\s+/g, " ").replace(TRAILING, "").replace(DIMENSION, "").replace(TRAILING, "").replace(/[-_\s]+/g, " ").toLowerCase();
-var HAS_TEXT = /[\p{L}\p{N}]/u;
-var ownerOf = (entry, known) => {
-  let bare;
-  for (let at = entry.lastIndexOf(":");at > 0; at = entry.lastIndexOf(":", at - 1)) {
-    const keys = known.get(normalized(entry.slice(0, at)));
-    if (keys === undefined)
-      continue;
-    const support = entry.slice(at + 1).trim();
-    if (HAS_TEXT.test(support))
-      return { keys, support };
-    bare ??= keys;
-  }
-  return bare === undefined ? undefined : { keys: bare, support: "" };
+var providerProfile = (config) => PROVIDERS[config.pi.provider];
+var routeModel = (config, key) => {
+  const { id } = providerProfile(config);
+  const { model, thinking } = config.pi.routes[key];
+  return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` };
 };
-var labelOf = (text) => {
-  const colon = text.indexOf(":");
-  return colon > 0 ? text.slice(0, colon) : text;
+var ROOT_MODEL_PAIR = ["defaultProvider", "defaultModel"];
+var rootModelSettings = (config) => {
+  const { provider, model, thinking } = routeModel(config, "root");
+  return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking };
 };
-var acceptanceFrom = (assignment, report, rationale, carryForward) => {
-  const keys = [
-    ...new Set([...assignment.criteria.map(({ text }) => text), ...assignment.evidence])
+var subagentModel = ({ provider, model }) => `${provider}/${model}`;
+var WEB_KIT_TOOLS = ["web_search", "web_fetch"];
+var webChoice = (profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" && profile.webTools.length > 0 ? { source: "provider", tools: profile.webTools } : { source: "pi-web-kit", tools: WEB_KIT_TOOLS };
+
+var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
+var HOST_VARIABLE = "HOLYAGENT_HOST";
+var WORKFLOWS_VARIABLE = "HOLYAGENT_WORKFLOWS";
+var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
+var reuseTtl = (env) => {
+  const raw = env[TTL_VARIABLE];
+  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
+    message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
+    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
+  })));
+};
+var given = (raw) => raw === undefined || raw.trim() === "" ? undefined : raw.trim();
+var agentHostOf = (env) => {
+  const value = given(env[HOST_VARIABLE]);
+  return value === undefined ? succeed6("claude") : decodeUnknownEffect2(Literals(AGENT_HOSTS))(value).pipe(mapError2(() => new Usage({
+    message: `${HOST_VARIABLE} must be ${AGENT_HOSTS.join(" or ")}, not "${value}"`,
+    hint: `Unset ${HOST_VARIABLE} for the default of claude.`
+  })));
+};
+var WorkflowsSwitch = Literals(["0", "1"]);
+var WorkflowSettings = Struct({
+  disableWorkflows: optionalKey2(Boolean3),
+  enableWorkflows: optionalKey2(Boolean3)
+});
+var disablesWorkflows = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map4((settings) => settings.disableWorkflows === true || settings.enableWorkflows === false))), orElseSucceed2(() => false));
+var claudeWorkflowsAvailable = (env, root) => {
+  if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
+    return succeed6(false);
+  const files = [
+    join8(claudeConfigDirectory(env), "settings.json"),
+    join8(root, ".claude", "settings.json"),
+    join8(root, ".claude", "settings.local.json")
   ];
-  const known = new Map;
-  const name = (text, key) => known.set(text, (known.get(text) ?? new Set).add(key));
-  for (const key of keys)
-    name(normalized(key), key);
-  const labels = new Map;
-  for (const { text } of assignment.criteria) {
-    const label = normalized(labelOf(text));
-    if (label !== "")
-      labels.set(label, (labels.get(label) ?? new Set).add(text));
-  }
-  for (const [label, texts] of labels)
-    if (texts.size === 1)
-      for (const text of texts)
-        name(label, text);
-  const supports = new Map;
-  const addSupport = (keys, text) => {
-    if (HAS_TEXT.test(text)) {
-      for (const key of keys)
-        if (!supports.has(key))
-          supports.set(key, text);
-    }
-  };
-  let open;
-  const close = () => {
-    if (open !== undefined)
-      addSupport(open.keys, open.lines.join("; "));
-    open = undefined;
-  };
-  for (const entry of evidenceEntries(report)) {
-    const owner = ownerOf(entry.text, known);
-    if (owner === undefined) {
-      if (open !== undefined && entry.list && !entry.gap)
-        open.lines.push(entry.text);
-      else
-        close();
-      continue;
-    }
-    close();
-    open = owner.support === "" ? { keys: owner.keys, lines: [] } : undefined;
-    addSupport(owner.keys, owner.support);
-  }
-  close();
-  const supportFor = (key) => supports.get(key);
-  const criteria = assignment.criteria.map((criterion) => ({
-    criterion,
-    support: supportFor(criterion.text)
-  }));
-  const evidence = assignment.evidence.map((label) => ({ label, support: supportFor(label) }));
-  const missing = [
-    ...criteria.filter(({ criterion, support }) => criterion.blocking && support === undefined).map(({ criterion }) => `criterion "${criterion.text}"`),
-    ...evidence.filter(({ support }) => support === undefined).map(({ label }) => `evidence label "${label}"`)
-  ];
-  if (missing.length > 0)
-    return fail5(new InsufficientAcceptance({
-      id: assignment.id,
-      detail: `the report's evidence: block has no support for ${missing.join(", ")}`
-    }));
-  return succeed6({
-    rationale,
-    criteria: criteria.flatMap(({ criterion, support }) => support === undefined ? [] : [{ criterion: criterion.text, support }]),
-    evidence: evidence.flatMap(({ label, support }) => support === undefined ? [] : [{ label, support }]),
-    ...carryForward ? { carryForward: true } : {}
-  });
+  return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
 };
-var section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)];
-var PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-z0-9]+)*)\.$/;
-var dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
-`, 1)[0] ?? "")?.[1];
-var renderPrompt = (assignment, agent) => [
-  `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
-  `Objective: ${assignment.objective}`,
-  ...section2("Scope", assignment.scope),
-  ...section2("Constraints", assignment.constraints),
-  ...section2("Ownership paths (write only here)", assignment.ownershipPaths),
-  ...section2("Acceptance criteria", assignment.criteria.map(({ text, blocking, dimension }) => `[${blocking ? "blocking" : "non-blocking"}] ${text} (${dimension})`)),
-  ...section2("Required evidence", assignment.evidence),
-  "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above. A criterion may be named by its text before the first colon."
-].join(`
-`);
-var dispatchPrompt = (assignment, agent, briefPath) => [
-  `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
-  `Read the brief at ${briefPath} with the Read tool and follow it as your full task.`
-].join(`
-`);
-var Started = Struct({
-  type: Literal2("started"),
-  key: String4,
-  agentId: String4,
-  label: String4
-});
-var Resulted = Struct({
-  type: Literal2("result"),
-  key: String4,
-  agentId: String4,
-  result: Unknown2
-});
-var Other = Struct({
-  type: String4.check(isPattern2(/^(?!(?:started|result)$)/))
-});
-var JournalLine = fromJsonString2(Union2([Started, Resulted, Other]));
-var journalResults = (journal, source) => gen2(function* () {
-  const labels = new Map;
-  const results = [];
-  const lines = journal.split(/\r?\n/);
-  for (const [index, line] of lines.entries()) {
-    if (line.trim() === "")
-      continue;
-    const entry = yield* decodeUnknownEffect2(JournalLine)(line, {
-      onExcessProperty: "ignore"
-    }).pipe(mapError2((error) => new Usage({
-      message: `Line ${index + 1} of the journal ${source} is not a started or result entry: ${error.message}`,
-      hint: "Pass the journal.jsonl of the Workflow run, unedited."
+var workflowsAvailable = (env, root) => {
+  const setting = given(env[WORKFLOWS_VARIABLE]);
+  if (setting !== undefined)
+    return decodeUnknownEffect2(WorkflowsSwitch)(setting).pipe(map4((value) => value === "1"), mapError2(() => new Usage({
+      message: `${WORKFLOWS_VARIABLE} must be 1 or 0, not "${setting}"`,
+      hint: `Unset ${WORKFLOWS_VARIABLE} to let the host decide.`
     })));
-    if ("label" in entry)
-      labels.set(entry.key, entry.label);
-    else if ("result" in entry && entry.result !== null) {
-      const json = yield* decodeUnknownEffect2(JsonReport)(entry.result).pipe(option2);
-      const report = typeof entry.result === "string" ? entry.result : json._tag === "Some" ? renderJsonReport(json.value) : JSON.stringify(entry.result, null, 2) ?? "";
-      if (report.trim() !== "")
-        results.push({ label: labels.get(entry.key), agentId: entry.agentId, report });
-    }
-  }
-  return results;
-});
+  return agentHostOf(env).pipe(flatMap2((host) => host === "pi" ? succeed6(false) : claudeWorkflowsAvailable(env, root)));
+};
+var loadConfig2 = (env, root) => all2({
+  ttlMinutes: reuseTtl(env),
+  workflowsAvailable: workflowsAvailable(env, root),
+  host: agentHostOf(env)
+}).pipe(map4((config) => config));
+var launchesOf = (env, root, host) => host === "claude" ? succeed6((roleTask) => {
+  const { model, effort } = routeFor(roleTask);
+  return { model, effort };
+}) : loadConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(map4((config) => (roleTask) => {
+  if (!config.pi.enable)
+    return {};
+  const route = routeModel(config, roleTask);
+  return { model: subagentModel(route), effort: route.thinking };
+}));
 
 class WithTrailer {
   fields;
@@ -12426,12 +13094,13 @@ var withPlanned = (snapshot, input, id, now) => completeDraft(snapshot, input).p
   ...snapshot.project,
   assignments: [...snapshot.project.assignments, assignment]
 })));
-var directiveView = (directive) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : {
-  agent: `${PLUGIN_NAMESPACE}:${directive.agent}`,
-  model: directive.model,
-  effort: directive.effort,
+var agentTypeFor = (host, agent) => host === "pi" ? agent : `${PLUGIN_NAMESPACE}:${agent}`;
+var directiveView = (directive, host, launch) => directive.action === "continue" ? { continue: directive.agentId, reason: directive.reason } : present({
+  agent: agentTypeFor(host, directive.agent),
+  model: launch.model,
+  effort: launch.effort,
   reason: directive.reason
-};
+});
 var ExistingRef = Struct({ id: AssignmentId });
 var OutcomeFlag = Literals(["success", "failure", "errored", "interrupted", "stopped"]);
 var OUTCOMES = {
@@ -12441,6 +13110,30 @@ var OUTCOMES = {
   interrupted: "Cancelled",
   stopped: "Cancelled"
 };
+var dispatchOutput = (words) => ({
+  output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool${words.launchNote === undefined ? "" : `. ${words.launchNote}`}`
+});
+var recordHelp = (words) => ({
+  summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
+  notes: [
+    "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
+    words.recordNote,
+    ...words.agentIdNote === undefined ? [] : [words.agentIdNote]
+  ]
+});
+var closeNotes = (words) => [
+  "pass the report through a quoted heredoc so it stays intact",
+  "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
+  `an evidence gap (InsufficientAcceptance) records nothing: ${words.askAgain}, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run \`assignment accept <id> --rationale <text> --report\` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf`,
+  "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object"
+];
+var reportsSummary = (words) => `Write the results of a ${words.journal} to report files named by Assignment id, and list them`;
+var reportsNotes = (words) => [
+  "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
+  "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
+  "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing",
+  ...words.reportsNote === undefined ? [] : [words.reportsNote]
+];
 var RECORD_USAGE = "assignment record <id> (--agent <agentId> | --failed)";
 var CLOSE_USAGE = "assignment close <id> --outcome success|failure|errored|interrupted|stopped [--accept <rationale>] [--report-json]";
 var LIST_USAGE = "assignment list [--state <state>] [--all] [--full]";
@@ -12455,12 +13148,42 @@ var recordLaunch = (update, id, agentId, launchedAs) => update((snapshot) => gen
   return yield* record2(snapshot.project, snapshot.specialists, id, agentId === undefined ? { launched: false } : { launched: true, agentId, model, effort });
 })).pipe(map4(({ assignment }) => assignment));
 var idArgument = (positionals) => positionals[0] ?? "";
-var workflowAgentProblem = (agentId, id) => {
-  if (!isWorkflowAgent(agentId))
-    return;
-  const [run = "", assignment, ...rest] = agentId.slice(WORKFLOW_AGENT_PREFIX.length).split("/");
-  return /^\S+$/.test(run) && assignment === id && rest.length === 0 ? undefined : `A workflow agent is recorded as workflow:<run-id>/${id}`;
+var piAgentProblem = (id) => `Under the pi host an agent is recorded as ${PI_AGENT_PREFIX}<agent-id>, or as ${PI_WORKFLOW_AGENT_PREFIX}<run-id>/${id} for a workflow's agent`;
+var agentIdProblem = (agentId, id, host) => {
+  const workflowPrefix = [WORKFLOW_AGENT_PREFIX, PI_WORKFLOW_AGENT_PREFIX].find((prefix) => agentId.startsWith(prefix));
+  if (workflowPrefix !== undefined) {
+    if (host === "pi" && workflowPrefix === WORKFLOW_AGENT_PREFIX)
+      return piAgentProblem(id);
+    const [run = "", assignment, ...rest] = agentId.slice(workflowPrefix.length).split("/");
+    return /^\S+$/.test(run) && assignment === id && rest.length === 0 ? undefined : `A workflow agent is recorded as ${workflowPrefix}<run-id>/${id}`;
+  }
+  if (agentId.startsWith(PI_AGENT_PREFIX))
+    return /^\S+$/.test(agentId.slice(PI_AGENT_PREFIX.length)) ? undefined : `A pi agent is recorded as ${PI_AGENT_PREFIX}<agent-id>`;
+  return host === "pi" ? piAgentProblem(id) : undefined;
 };
+var claudeReports = (journal, source) => gen2(function* () {
+  const results = yield* journalResults(journal, source);
+  const byId = new Map;
+  const notAssignmentIds = [];
+  for (const { label, agentId, report } of results) {
+    if (label !== undefined && is2(AssignmentId)(label))
+      byId.set(label, report);
+    else
+      notAssignmentIds.push({ label: label ?? "", agentId });
+  }
+  return { reports: [...byId].map(([id, report]) => ({ id, report })), notAssignmentIds };
+});
+var piReports = (call, source, text) => gen2(function* () {
+  const { project } = yield* readState(call.directory);
+  if (!basename3(source).endsWith(".workflow.jsonl"))
+    return yield* piRecordReports(text, source, project.assignments.flatMap(({ id, specialist }) => {
+      const agentId = specialist?.agentId;
+      return agentId !== undefined && (agentId.startsWith(PI_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) ? [{ id, agentId }] : [];
+    }));
+  const launchOf = yield* launchesOf(call.env, call.root, "pi");
+  const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map4((path) => dispatchedCall(assignment, agentTypeFor("pi", routeFor(assignment.roleTask).agent), path, launchOf(assignment.roleTask)))));
+  return yield* piJournalReports(text, source, calls);
+});
 var ASSIGNMENT_COMMANDS = [
   {
     path: ["assignment", "create"],
@@ -12483,7 +13206,8 @@ var ASSIGNMENT_COMMANDS = [
     usage: "assignment dispatch [--input <json>]",
     summary: "Start an Assignment and say how to run it: spawn an agent or continue a warm one. A new draft is created and started in one step",
     input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
-    output: "TOON fields (id, state, agent/model/effort or continue, reason), then a line `prompt:` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the Agent tool only when the Workflow tool is disabled or unavailable, and by SendMessage only for a warm continuation. The brief itself is never printed: the specialist reads it with the Read tool",
+    ...dispatchOutput(CLAUDE_WORDS),
+    forHost: dispatchOutput,
     notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
     flags: { input: "string" },
     positionals: 0,
@@ -12493,34 +13217,35 @@ var ASSIGNMENT_COMMANDS = [
         message: `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`
       }) : error));
       const settings = yield* config;
+      const launchOf = yield* launchesOf(call.env, call.root, settings.host);
       const newAssignmentId = yield* newId("assignment");
       const now = yield* nowIso;
       const started = yield* update((snapshot) => gen2(function* () {
         const id = "id" in request ? request.id : newAssignmentId;
         const project = "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now);
         const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
-        const agent = `${PLUGIN_NAMESPACE}:${routeFor(dispatched.assignment.roleTask).agent}`;
-        const path = yield* writeBrief(call, dispatched.assignment.id, renderPrompt(dispatched.assignment, agent));
-        return { ...dispatched, prompt: dispatchPrompt(dispatched.assignment, agent, path) };
+        const agent = agentTypeFor(settings.host, routeFor(dispatched.assignment.roleTask).agent);
+        const path = yield* writeBrief(call, dispatched.assignment.id, briefText(dispatched.assignment, agent, settings.host));
+        return {
+          ...dispatched,
+          prompt: dispatchPrompt(dispatched.assignment, agent, path, wordsFor(settings.host))
+        };
       }));
       return new WithTrailer({
         id: started.assignment.id,
         state: started.assignment.state,
-        ...directiveView(started.directive)
+        ...directiveView(started.directive, settings.host, launchOf(started.assignment.roleTask))
       }, "prompt", started.prompt);
     })
   },
   {
     path: ["assignment", "record"],
     usage: RECORD_USAGE,
-    summary: "Record the launch of a dispatched Assignment (a workflow's agent as workflow:<run-id>/<id>), or roll it back when the launch failed",
-    notes: [
-      "the agent id is in the Agent result, or is the continued agent's; --failed returns the Assignment to Ready",
-      "a hook records an agent spawned from a dispatch prompt and says so in its note; record it yourself when the note says it did not, or for a continued agent"
-    ],
+    ...recordHelp(CLAUDE_WORDS),
+    forHost: recordHelp,
     flags: { agent: "string", failed: "boolean" },
     positionals: 1,
-    run: ({ update, args }) => gen2(function* () {
+    run: ({ update, args, env }) => gen2(function* () {
       const id = idArgument(args.positionals);
       const agentId = stringFlag(args, "agent");
       if (agentId !== undefined === booleanFlag(args, "failed"))
@@ -12528,7 +13253,8 @@ var ASSIGNMENT_COMMANDS = [
           message: "Give exactly one of --agent and --failed",
           hint: `Usage: holyagent ${RECORD_USAGE}`
         });
-      const problem = agentId === undefined ? undefined : workflowAgentProblem(agentId, id);
+      const host = yield* agentHostOf(env);
+      const problem = agentId === undefined ? undefined : agentIdProblem(agentId, id, host);
       if (problem !== undefined)
         return yield* new Usage({ message: problem, hint: `Usage: holyagent ${RECORD_USAGE}` });
       const assignment = yield* recordLaunch(update, id, agentId);
@@ -12544,12 +13270,8 @@ var ASSIGNMENT_COMMANDS = [
     usage: CLOSE_USAGE,
     summary: "Finish an Assignment with the specialist's report on stdin; --accept also accepts it from the report's evidence block",
     input: "the specialist's report as raw text. Required for success; optional for the other outcomes, which store the outcome name when it is empty. With --accept it ends with `evidence:` and one `<criterion or evidence label>: <support>` line per blocking criterion and required label. With --report-json it is a JSON report object returned by an agent() that was given a schema ({status: done|partial|blocked, changed_paths, checks: [{command, exit}], blockers, notes, evidence: [{key, support}]}), which is stored as the text of such a report (fields beyond these are kept in it)",
-    notes: [
-      "pass the report through a quoted heredoc so it stays intact",
-      "--accept applies to success only and reads the last `evidence:` block: one `<criterion text or evidence label>: <support>` line per blocking criterion and per required label. The text before the colon matches the criterion, or its label (the criterion's text before its first colon, unless two criteria share it), ignoring case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`; a support may continue on indented lines below its entry. Evidence for a different criterion matches nothing. Accept only support you judge true",
-      "an evidence gap (InsufficientAcceptance) records nothing: SendMessage the missing support to the same subagent, then close again with the corrected report, or when the Assignment is already Succeeded and not accepted, close it as success again or run `assignment accept <id> --rationale <text> --report` with the corrected report on stdin; a workflow agent cannot be messaged, so draft a follow-up with followUpOf",
-      "outcomes: success; failure (the work failed); errored (the agent died or returned no report); interrupted (its agent is gone after a resume or compaction); stopped (you stopped it). A report from an inline workflow script is the specialist's own text: pass it verbatim on stdin, with --report-json only for a JSON report object"
-    ],
+    notes: closeNotes(CLAUDE_WORDS),
+    forHost: (words) => ({ notes: closeNotes(words) }),
     flags: { outcome: "string", accept: "string", "report-json": "boolean" },
     positionals: 1,
     run: (call) => gen2(function* () {
@@ -12616,30 +13338,19 @@ var ASSIGNMENT_COMMANDS = [
   {
     path: ["assignment", "reports"],
     usage: REPORTS_USAGE,
-    summary: "Write the results of a Workflow run's journal to report files named by Assignment id, and list them",
+    summary: reportsSummary(CLAUDE_WORDS),
+    forHost: (words) => ({ summary: reportsSummary(words), notes: reportsNotes(words) }),
     output: "TOON: `reports` rows of id, path and words, one per Assignment id, and `notAssignmentIds` rows of label and agentId for results whose label is not an Assignment id (not written)",
-    notes: [
-      "the journal is the run's journal.jsonl: `started` entries (key, agentId, label) and `result` entries (key, agentId, result) joined by key; label each agent() with its Assignment id so its report lands in <id>.md",
-      "reports go to holyagent/reports in the git common directory (local/reports of the state folder outside git), beside the briefs; a repeated label keeps its last result; closing the Intent removes the brief and report files of its Assignments. Read a report there, or close from it: `assignment close <id> --outcome success --accept <rationale> < <report-file>`",
-      "a journal line that is not JSON, or a started or result entry without its fields, refuses the whole journal and writes nothing"
-    ],
+    notes: reportsNotes(CLAUDE_WORDS),
     flags: {},
     positionals: 1,
     state: "peek",
     run: (call) => gen2(function* () {
       const source = resolve4(call.cwd, idArgument(call.args.positionals));
-      const journal = yield* io(source, () => Bun.file(source).text());
-      const results = yield* journalResults(journal, source);
-      const byId = new Map;
-      const strays = [];
-      for (const { label, agentId, report } of results) {
-        if (label !== undefined && is2(AssignmentId)(label))
-          byId.set(label, { report });
-        else
-          strays.push({ label: label ?? "", agentId });
-      }
-      const reports = yield* forEach2([...byId], ([id, { report }]) => writeReport(call, id, report).pipe(map4((path) => ({ id, path, words: wordCount(report) }))));
-      return { reports, notAssignmentIds: strays };
+      const text = yield* io(source, () => Bun.file(source).text());
+      const found = (yield* call.config).host === "pi" ? yield* piReports(call, source, text) : yield* claudeReports(text, source);
+      const reports = yield* forEach2(found.reports, ({ id, report }) => writeReport(call, id, report).pipe(map4((path) => ({ id, path, words: wordCount(report) }))));
+      return { reports, notAssignmentIds: found.notAssignmentIds };
     })
   },
   {
@@ -12670,6 +13381,7 @@ var ASSIGNMENT_COMMANDS = [
 ];
 
 import { stat as stat2 } from "fs/promises";
+var hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 
 var delegating_default = "## Delegating\n\nEdits, runs, checks, reviews, research and investigation go to specialists. Read only what a decision needs; your Bash is for the holyagent CLI, Git and `gh`. If a `holyagent:*` agent type does not resolve, stop and report it; general-purpose agents are no stand-in. If the user forbids subagents, work to the same criteria and name each waived review.\n";
 
@@ -12683,8 +13395,8 @@ You own the user relationship, material decisions, acceptance, version control a
 
 - Write artifacts (PRs, commits, docs, instruction text) in English by default unless the target repository's convention says otherwise. Write the task list and text to the user in the language of the user's latest message.
 - Keep written deliverables (PR text, the final report) free of filler sections, redundant summaries and boilerplate.
-- Never force-push, and never push to the base, default or a protected branch without the user's approval. The base is the branch the conventions or the user name as the work's target, else the default branch.
-- Never work on a branch the platform assigns: a cloud session starts on one the platform created, such as \`claude/<name>\`, whose name carries no meaning; a branch the user named as the work branch is not one. Before the first commit, check \`git branch --show-current\`; on an assigned branch, first create the conventional branch (\`git switch -c <name> <start>\`, both set by the stack plan) and commit and push only there. If that push is refused, stop that line, report the blocker and ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away.
+- Never force-push, and never push to the base, default or a protected branch without the user's approval. The base is the branch the conventions or the user name as the work's target, else the default branch. Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.
+- Never work on a branch the platform assigns: a cloud session starts on one the platform created, such as \`claude/<name>\`, whose name carries no meaning; a branch the user named as the work branch is not one. Before the first commit, check \`git branch --show-current\`; on an assigned branch, first create the conventional branch in a worktree (\`git worktree add -b <name> <path> <start>\`, per the plan) and commit and push only there. If that push is refused, stop that line, report the blocker and ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away.
 - After a denial, stop that line of work, report a blocker and continue other work; never reach the same result through another tool (Monitor, scripts).
 - Commit only with \`holyagent vcs commit\`; use plain Git and \`gh\` for branches, pushes, merges and CI.
 - Reply on threads only when the request or repository workflow authorizes it.
@@ -12715,105 +13427,14 @@ var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
-import { lstat as lstat3, realpath as realpath3 } from "fs/promises";
-import { dirname as dirname3, isAbsolute as isAbsolute2, join as join9, relative as relative4, resolve as resolve5, sep as sep6 } from "path";
+import { lstat as lstat3, realpath as realpath4 } from "fs/promises";
+import { dirname as dirname4, isAbsolute as isAbsolute2, join as join12, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
-import { delimiter, join as join8 } from "path";
-var {$: $3 } = globalThis.Bun;
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-};
-var pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join8(options.home, ".bun");
-  const bunBin = join8(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-};
-var findCommand = (env, command, options) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-  return fromNullishOr(Bun.which(command, {
-    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
-  }));
-};
-var EMPTY_BUNFIG = join8(import.meta.dir, "empty-bunfig.toml");
-
-class Shell extends Service()("holyagent/Shell") {
-  static live = (env) => {
-    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-    return succeed5(Shell, Shell.of({
-      which: (command, options) => sync2(() => findCommand(env, command, options)),
-      run: (command, args, options) => tryPromise2({
-        try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
-          exitCode: result.exitCode,
-          stdout: result.stdout.toString(),
-          stderr: result.stderr.toString()
-        })),
-        catch: (error) => String(error)
-      }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-    }));
-  };
-}
-
-var SCOPES = ["user", "project", "local"];
-var within = (parent, child) => {
-  const path = relative4(parent, child);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
-};
-var real = (path) => tryPromise2(() => realpath3(path)).pipe(orElseSucceed2(() => {
-  return;
-}));
-var present2 = (path) => tryPromise2(() => lstat3(path)).pipe(as2(true), orElseSucceed2(() => false));
-var isSymlink = (path) => tryPromise2({
-  try: () => lstat3(path),
-  catch: (cause) => cause
-}).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
-var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
-  if (scope === "user")
-    return { file: userFiles(env).settings };
-  const shell = yield* Shell;
-  const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
-  const line = top.stdout.trim();
-  const named = top.exitCode === 0 && line !== "" ? resolve5(line) : undefined;
-  const realTop = named === undefined ? undefined : yield* real(named);
-  const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join9(named, ".git")));
-  const root = trusted ? named : cwd;
-  const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-  const folder = join9(root, ".claude");
-  const file = join9(folder, scope === "project" ? "settings.json" : "settings.local.json");
-  for (const path of [folder, file]) {
-    if (yield* isSymlink(path)) {
-      return yield* new SetupFailure({
-        message: `${path} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real ${path === folder ? "folder" : "file"} and run again`
-      });
-    }
-  }
-  return { file, ...notice === undefined ? {} : { notice } };
-});
-var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
-  const roots = [resolve5(cwd)];
-  for (let folder = resolve5(cwd);; folder = dirname3(folder)) {
-    if (yield* present2(join9(folder, ".git"))) {
-      if (folder !== roots[0])
-        roots.push(folder);
-      break;
-    }
-    if (dirname3(folder) === folder)
-      break;
-  }
-  return roots.flatMap((root) => [
-    join9(root, ".claude", "settings.json"),
-    join9(root, ".claude", "settings.local.json")
-  ]);
-});
-
-import { chmod, mkdir as mkdir3, realpath as realpath4, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename2, dirname as dirname4, join as join10 } from "path";
+import { chmod, mkdir as mkdir3, realpath as realpath3, rename as rename4, rm as rm5, writeFile } from "fs/promises";
+import { basename as basename4, dirname as dirname3, join as join9 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -12829,24 +13450,36 @@ var isJsonObject2 = (value) => typeof value === "object" && value !== null && !A
 var fileExists2 = (path) => tryPromise2(() => Bun.file(path).exists()).pipe(orElseSucceed2(() => false));
 var readJsonObject = (path) => readJsonObjectSnapshot(path).pipe(map4((snapshot) => snapshot.value));
 var readJsonObjectSnapshot = (path) => gen2(function* () {
-  if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists()))) {
-    return { value: empty3, text: undefined };
-  }
-  const text = yield* fileOperation(path, "read", () => Bun.file(path).text());
-  if (text.trim() === "")
+  const text = yield* readJsonText(path);
+  if (text === undefined)
     return { value: empty3, text };
-  const value = yield* decodeUnknownEffect2(JsonObjectText)(text, strict2).pipe(mapError2((error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` })));
-  return { value, text };
+  return { value: yield* decodeJsonObject(path, text), text };
+});
+var readJsonText = (path) => gen2(function* () {
+  if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists())))
+    return;
+  return yield* fileOperation(path, "read", () => Bun.file(path).text());
+});
+var decodeJsonObject = (path, text) => text.trim() === "" ? succeed6(empty3) : decodeUnknownEffect2(JsonObjectText)(text, strict2).pipe(mapError2((error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` })));
+var removeFileIfUnchanged = (path, unchangedSince) => gen2(function* () {
+  const text = yield* readJsonText(path);
+  if (text === undefined)
+    return unchangedSince === undefined;
+  if (text !== unchangedSince)
+    return false;
+  yield* fileOperation(path, "remove", () => rm5(path, { force: true }));
+  return true;
 });
 var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2);
+var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince);
 var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
   const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists());
-  const target = exists ? yield* fileOperation(path, "write", () => realpath4(path)) : path;
+  const target = exists ? yield* fileOperation(path, "write", () => realpath3(path)) : path;
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join10(dirname4(target), `.${basename2(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname4(target), "write", () => mkdir3(dirname4(target), { recursive: true }));
+  const temporary = join9(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname3(target), "write", () => mkdir3(dirname3(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
@@ -12896,7 +13529,7 @@ var applyDefaults = (existing, defaults) => {
   return { merged, entries: [...entries.values()] };
 };
 
-import { join as join11, resolve as resolve6 } from "path";
+import { join as join10, resolve as resolve5 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String4),
   value: Unknown2
@@ -12904,8 +13537,8 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join11(userFiles(env).claudeDir, "holyagent", "setup-records.json");
-var keyOf = (file) => resolve6(file);
+var recordPath = (env) => join10(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var keyOf = (file) => resolve5(file);
 var load = (env) => gen2(function* () {
   const path = recordPath(env);
   const raw = yield* readJsonObject(path);
@@ -12948,7 +13581,7 @@ var clearRecorded = fn2("clearRecorded")(function* (env, file) {
 });
 
 var added = (text) => `+ ${text}`;
-var present3 = (text) => `= ${text}`;
+var present2 = (text) => `= ${text}`;
 var skipped = (text) => `- ${text}`;
 var hint = (text) => `~ ${text}`;
 var failed2 = (what, result) => {
@@ -12957,6 +13590,8 @@ var failed2 = (what, result) => {
   return `! ${what}: failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`;
 };
 var show = (value) => JSON.stringify(value) ?? String(value);
+var pass = (name, detail) => `ok   ${name}: ${detail}`;
+var fail6 = (name, detail) => `FAIL ${name}: ${detail}`;
 
 var MARKETPLACE = { name: "holyagent", repo: "davidbasilefilho/holyagent" };
 var PLUGIN_ID = `${MARKETPLACE.name}@${MARKETPLACE.name}`;
@@ -13009,7 +13644,7 @@ var mergeUserSettings = fn2("mergeUserSettings")(function* (options) {
   return [file, ...entries.map(describe2), summary];
 });
 var without = (node, key) => Object.fromEntries(Object.entries(node).filter(([name]) => name !== key));
-var valueAt = (node, path) => {
+var valueAt2 = (node, path) => {
   let current = node;
   for (const key of path) {
     if (!isJsonObject2(current))
@@ -13076,7 +13711,7 @@ var undoUserSettings = fn2("undoUserSettings")(function* (options) {
   const removals = [];
   for (const { path, value } of plan) {
     if (value === undefined) {
-      const existing = valueAt(result, path);
+      const existing = valueAt2(result, path);
       removals.push(existing === undefined ? { path: path.join("."), status: "absent", value: undefined, wanted: undefined } : { path: path.join("."), status: "unrecorded", value: existing, wanted: undefined });
       continue;
     }
@@ -13097,6 +13732,191 @@ var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
   const existing = yield* readJsonObject(file);
   return applyDefaults(existing, defaultsFor(existing, "1h")).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
 });
+
+import { delimiter, join as join11 } from "path";
+var {$: $3 } = globalThis.Bun;
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+};
+var pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join11(options.home, ".bun");
+  const bunBin = join11(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+};
+var findCommand = (env, command, options) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+  return fromNullishOr(Bun.which(command, {
+    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
+  }));
+};
+var EMPTY_BUNFIG = join11(import.meta.dir, "empty-bunfig.toml");
+
+class Shell extends Service()("holyagent/Shell") {
+  static live = (env) => {
+    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+    return succeed5(Shell, Shell.of({
+      which: (command, options) => sync2(() => findCommand(env, command, options)),
+      run: (command, args, options) => tryPromise2({
+        try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+          exitCode: result.exitCode,
+          stdout: result.stdout.toString(),
+          stderr: result.stderr.toString()
+        })),
+        catch: (error) => String(error)
+      }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+    }));
+  };
+}
+
+var SCOPES = ["user", "project", "local"];
+var within = (parent, child) => {
+  const path = relative4(parent, child);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
+};
+var real = (path) => tryPromise2(() => realpath4(path)).pipe(orElseSucceed2(() => {
+  return;
+}));
+var present3 = (path) => tryPromise2(() => lstat3(path)).pipe(as2(true), orElseSucceed2(() => false));
+var identity2 = (path) => tryPromise2(() => lstat3(path, { bigint: true })).pipe(map4((stats) => `${stats.dev}:${stats.ino}`), orElseSucceed2(() => {
+  return;
+}));
+var isSymlink = (path) => tryPromise2({
+  try: () => lstat3(path),
+  catch: (cause) => cause
+}).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
+var claudeFolder = fn2("claudeFolder")(function* (cwd) {
+  const shell = yield* Shell;
+  const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
+  const line = top.stdout.trim();
+  const named = top.exitCode === 0 && line !== "" ? resolve6(line) : undefined;
+  const realTop = named === undefined ? undefined : yield* real(named);
+  const realCwd = yield* real(cwd);
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present3(join12(named, ".git")));
+  const root = trusted ? named : cwd;
+  const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
+  return { folder: join12(root, ".claude"), root, trusted, notice };
+});
+var fileName = (scope) => scope === "project" ? "settings.json" : "settings.local.json";
+var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
+  if (scope === "user")
+    return { file: userFiles(env).settings };
+  const { folder, notice } = yield* claudeFolder(cwd);
+  const file = join12(folder, fileName(scope));
+  for (const path of [folder, file]) {
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real ${path === folder ? "folder" : "file"} and run again`
+      });
+    }
+  }
+  return { file, ...notice === undefined ? {} : { notice } };
+});
+var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
+  const roots = [resolve6(cwd)];
+  for (let folder = resolve6(cwd);; folder = dirname4(folder)) {
+    if (yield* present3(join12(folder, ".git"))) {
+      if (folder !== roots[0])
+        roots.push(folder);
+      break;
+    }
+    if (dirname4(folder) === folder)
+      break;
+  }
+  return roots.flatMap((root) => [
+    join12(root, ".claude", "settings.json"),
+    join12(root, ".claude", "settings.local.json")
+  ]);
+});
+var enablement = fn2("enablement")(function* (folder, file) {
+  if ((yield* isSymlink(folder)) || (yield* isSymlink(file)))
+    return "symlink";
+  const plugins = (yield* readJsonObject(file))["enabledPlugins"];
+  const value = isJsonObject2(plugins) ? plugins[PLUGIN_ID] : undefined;
+  return value === true ? "enabled" : value === false ? "disabled" : "unset";
+});
+var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) {
+  const shell = yield* Shell;
+  const name = relative4(root, file).split(sep6).join("/");
+  const folderName = relative4(root, folder).split(sep6).join("/");
+  const listed = yield* shell.run("git", ["ls-files", "--cached", "-z"], { cwd: root });
+  if (listed.exitCode !== 0)
+    return "git could not say whether it tracks it";
+  const everything = listed.stdout.split("\x00").filter((entry) => entry !== "");
+  const lowerFolder = folderName.toLowerCase();
+  const tracked = everything.filter((entry) => {
+    const lower = entry.toLowerCase();
+    return lower === lowerFolder || lower.startsWith(`${lowerFolder}/`);
+  });
+  const entries = tracked.map((entry) => entry.toLowerCase());
+  if (entries.includes(name.toLowerCase()))
+    return "git tracks it";
+  if (entries.includes(lowerFolder))
+    return `git tracks ${folderName} itself`;
+  const own = yield* identity2(file);
+  if (own !== undefined) {
+    for (const entry of tracked) {
+      if ((yield* identity2(join12(root, entry))) === own)
+        return "git tracks it";
+    }
+  }
+  const home = yield* identity2(folder);
+  if (home !== undefined) {
+    const seen = new Set;
+    for (const entry of everything) {
+      const component = entry.split("/")[0] ?? entry;
+      if (component === folderName || seen.has(component))
+        continue;
+      seen.add(component);
+      if ((yield* identity2(join12(root, component))) === home)
+        return `git tracks ${component} as ${folderName}`;
+    }
+  }
+  const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd: folder });
+  const named = top.stdout.trim();
+  if (top.exitCode !== 0 || named === "")
+    return "git could not say whether it tracks it";
+  const [there, here] = [yield* real(named), yield* real(root)];
+  return there !== undefined && there === here ? undefined : `${folderName} is inside another git repository`;
+});
+var installedScope = fn2("installedScope")(function* (cwd) {
+  const { folder, root, trusted } = yield* claudeFolder(cwd);
+  const local = join12(folder, fileName("local"));
+  const project = join12(folder, fileName("project"));
+  const notices = [];
+  const found = yield* enablement(folder, local);
+  if (found === "enabled") {
+    const reason = trusted ? yield* repositoryControl(root, folder, local) : "the folder is not a trusted git work tree";
+    if (reason === undefined) {
+      return { scope: "local", source: "inferred", file: local };
+    }
+    notices.push(`${local} enables HolyAgent but ${reason}, so it is not taken for your own uncommitted file; using user; --scope local targets it`);
+  }
+  if (found === "disabled") {
+    notices.push(`${PLUGIN_ID} is set to false in ${local}, so HolyAgent is disabled for this project; using user`);
+  } else {
+    if (found === "symlink")
+      notices.push(`${local} is a symlink and was not read; using user`);
+    const shared = yield* enablement(folder, project).pipe(orElseSucceed2(() => "unset"));
+    if (shared === "enabled") {
+      notices.push(`the repository enables HolyAgent in ${project}; --scope project targets it`);
+    }
+  }
+  return { scope: "user", source: "default", notices };
+});
+var scopeNotices = (resolved) => resolved.source === "default" ? resolved.notices : [];
+var describeScope = (resolved) => {
+  switch (resolved.source) {
+    case "flag":
+      return `${resolved.scope} (from --scope)`;
+    case "inferred":
+      return `${resolved.scope} (inferred: ${PLUGIN_ID} is enabled in ${resolved.file})`;
+    case "default":
+      return "user (default)";
+  }
+};
 
 var setupNotice = (env, cwd) => {
   if (inCloudSession(env))
@@ -13120,11 +13940,11 @@ var setupNotice = (env, cwd) => {
 
 import { lstat as lstat4, mkdir as mkdir4, open as open3 } from "fs/promises";
 import { tmpdir, userInfo } from "os";
-import { join as join12 } from "path";
+import { join as join13 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join12(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join12(markers(), sessionId);
+var markers = () => join13(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join13(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
@@ -13137,7 +13957,7 @@ var create2 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId
 var markRulesDelivered = (sessionId) => create2(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create2;
 
-import { join as join13 } from "path";
+import { join as join14 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -13293,7 +14113,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join13(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join14(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -13414,13 +14234,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join13(root, folderName);
+  const legacy = join14(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join13(legacy, "intents", folder);
+    const base = join14(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -13428,7 +14248,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join13(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join14(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -13439,10 +14259,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join13(base, path), to: join13(target, path) });
+      state.notes.push({ from: join14(base, path), to: join14(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join13(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join14(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -13544,13 +14364,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join13(root, folderName);
+  const legacy = join14(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join13(legacy, folder);
+    const base = join14(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -13564,7 +14384,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join13(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join14(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -13575,10 +14395,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join13(base, path), to: join13(target, path) });
+      state.notes.push({ from: join14(base, path), to: join14(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join13(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join14(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -13823,6 +14643,7 @@ var continuations = (rows, beside, registry, now, config) => parallelSet(rows.fi
 var recommend = (project, registry, now, config, workTree) => {
   const ready = project.assignments.filter((row) => row.state === "Ready");
   const dispatchable = ready.filter((row) => dispatchBlock(project, row, undefined, workTree) === undefined && awaited(project, row).length === 0);
+  const words = wordsFor(config.host);
   if (config.workflowsAvailable) {
     const spawns = (row) => directiveFor(row, registry, now, config).action === "spawn";
     const pool = {
@@ -13846,7 +14667,7 @@ var recommend = (project, registry, now, config, workTree) => {
           assignmentIds,
           fallback,
           continues,
-          reason: continues.length === 0 ? reason : `${reason}; the Assignments in continues go by SendMessage to their warm specialists`
+          reason: continues.length === 0 ? reason : `${reason}; the Assignments in continues go by ${words.message} to their warm specialists`
         };
       }
     }
@@ -13861,14 +14682,14 @@ var recommend = (project, registry, now, config, workTree) => {
       action: "continue",
       assignmentIds: continues.map((row) => row.assignmentId),
       continues,
-      reason: "each continues a warm specialist by SendMessage"
+      reason: `each continues a warm specialist by ${words.message}`
     };
   }
   if (chosen.length > 1)
     return {
       action: "subagent",
       assignmentIds,
-      reason: "the Workflow tool is disabled or unavailable"
+      reason: `the ${words.workflowTool} tool is disabled or unavailable`
     };
   const [first] = chosen;
   if (first === undefined)
@@ -13881,6 +14702,51 @@ var recommend = (project, registry, now, config, workTree) => {
     reason: directive.reason
   } : { action: "subagent", assignmentIds, reason: directive.reason };
 };
+
+var REFLOG_MOVE = /^checkout: moving from (\S+) to (\S+)$/;
+var SAFE_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
+var safeBranch = (name) => SAFE_BRANCH.test(name) ? gitMaybe(["check-ref-format", "--branch", name]).pipe(map4((out) => out === name)) : succeed6(false);
+var startBranch = gen2(function* () {
+  const log = (yield* gitMaybe(["reflog", "show", "--format=%gs", "HEAD"])) ?? "";
+  const moves = log.split(`
+`).map((line) => REFLOG_MOVE.exec(line)).filter((move) => move !== null).reverse();
+  for (const move of moves)
+    for (const name of [move[2], move[1]])
+      if (name !== undefined && (yield* gitMaybe(["show-ref", "--verify", "--quiet", `refs/heads/${name}`])) !== undefined)
+        return name;
+  return;
+});
+var returnBranch = (start) => gen2(function* () {
+  if (start !== undefined && (yield* safeBranch(start)))
+    return start;
+  const remote = (yield* gitMaybe([
+    "symbolic-ref",
+    "--short",
+    "-q",
+    "refs/remotes/origin/HEAD"
+  ]))?.replace(/^origin\//, "");
+  return remote !== undefined && (yield* safeBranch(remote)) ? remote : "main";
+});
+var cloudCheckoutNotice = (call) => inCloudSession(call.env) ? gen2(function* () {
+  const dirs = (yield* gitMaybe([
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-dir",
+    "--git-common-dir"
+  ]))?.split(`
+`);
+  if (dirs?.length !== 2 || dirs[0] !== dirs[1])
+    return;
+  const current = (yield* gitMaybe(["symbolic-ref", "-q", "HEAD"]))?.replace(/^refs\/heads\//, "");
+  const start = yield* startBranch;
+  if (current !== undefined && (start === undefined || current === start))
+    return;
+  const branch = yield* returnBranch(start);
+  if (current === branch)
+    return;
+  const moved = current === undefined ? "is on a detached HEAD" : "moved off the branch it started on";
+  return `The primary checkout of this cloud session ${moved}, so the session panel shows its diff against the assigned branch as a stray change and offers a PR for it. Return it with \`git switch ${branch}\`, and do work and review checkouts in a git worktree.`;
+}).pipe(provide3(call.vcs)) : succeed6(undefined);
 
 var statusFrom = (snapshot) => {
   const open = byId(snapshot.project.intents.filter((intent) => intent.state === "Open"));
@@ -13909,7 +14775,7 @@ var statusFrom = (snapshot) => {
   };
 };
 var statusOf = (directory) => readOpenState(directory).pipe(map4(statusFrom));
-var reconcileFrom = ({ project }) => {
+var reconcileFrom = ({ project }, words) => {
   const running = byId(project.assignments.filter((row) => row.state === "Running"));
   return {
     running: running.map((row) => ({
@@ -13919,25 +14785,27 @@ var reconcileFrom = ({ project }) => {
       startedAt: row.specialist?.startedAt ?? null
     })),
     ...present({
-      next: running.length === 0 ? undefined : "close as interrupted only an agent confirmed gone (SendMessage or transcript; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted"
+      next: running.length === 0 ? undefined : `close as interrupted only an agent confirmed gone (${words.confirmGone}; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted`
     })
   };
 };
-var reconcileOf = (directory) => readOpenState(directory).pipe(map4(reconcileFrom));
-var resumeOf = (directory) => readOpenState(directory).pipe(map4((snapshot) => ({
+var reconcileOf = (directory, words) => readOpenState(directory).pipe(map4((snapshot) => reconcileFrom(snapshot, words)));
+var resumeOf = (directory, words = CLAUDE_WORDS) => readOpenState(directory).pipe(map4((snapshot) => ({
   status: statusFrom(snapshot),
-  reconcile: reconcileFrom(snapshot)
+  reconcile: reconcileFrom(snapshot, words)
 })));
-var PLAN_NOTES = [
+var planNotes = (words) => [
   "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
-  "`continues` lists Ready work that continues a warm specialist, by SendMessage beside the workflow. `fallback` is the same work as direct subagents, for a session where the Workflow tool is disabled or unavailable: its writers launch together, and the `afterwards` reviews launch once the writers they depend on are terminal"
+  ...words.launchNote === undefined ? [] : [words.launchNote],
+  `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`
 ];
 var OVERVIEW_COMMANDS = [
   {
     path: ["plan"],
     usage: "plan",
     summary: "Say how to run the Ready Assignments of the Intent in use: a workflow first (with the direct subagents as its fallback), else subagents or a warm agent",
-    notes: PLAN_NOTES,
+    notes: planNotes(CLAUDE_WORDS),
+    forHost: (words) => ({ notes: planNotes(words) }),
     flags: {},
     positionals: 0,
     run: ({ directory, config, root }) => gen2(function* () {
@@ -13962,7 +14830,7 @@ var OVERVIEW_COMMANDS = [
         parallel: recommendation.assignmentIds.length > 1 ? true : undefined,
         fallback: recommendation.action === "workflow" ? present({
           action: "subagent",
-          when: "only if the Workflow tool is disabled or unavailable",
+          when: `only if the ${wordsFor(settings.host).workflowTool} tool is disabled or unavailable`,
           assignments: recommendation.fallback.assignmentIds,
           parallel: recommendation.fallback.assignmentIds.length > 1 ? true : undefined,
           afterwards: recommendation.fallback.afterwards
@@ -13974,10 +14842,14 @@ var OVERVIEW_COMMANDS = [
   {
     path: ["status"],
     usage: "status",
-    summary: "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents",
+    summary: "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents; in a claude.ai cloud session whose primary checkout is on a detached HEAD or on a branch other than the one it started on, a `notice` that says so",
     flags: {},
     positionals: 0,
-    run: ({ directory }) => statusOf(directory)
+    run: (call) => gen2(function* () {
+      const status = yield* statusOf(call.directory);
+      const notice = yield* cloudCheckoutNotice(call);
+      return notice === undefined ? status : { ...status, notice };
+    })
   },
   {
     path: ["reconcile"],
@@ -13985,7 +14857,7 @@ var OVERVIEW_COMMANDS = [
     summary: "List the Running Assignments with their agent ids, to confirm after a resume",
     flags: {},
     positionals: 0,
-    run: ({ directory }) => reconcileOf(directory)
+    run: ({ directory, env }) => agentHostOf(env).pipe(flatMap2((host) => reconcileOf(directory, wordsFor(host))))
   }
 ];
 
@@ -13998,7 +14870,7 @@ var session_reminder_default = `Rules most often missed that the core root rules
 - When the user names an action, do it or verify it as worded, without asking again.
 `;
 
-var CONTEXT_BUDGET = 9300;
+var CONTEXT_BUDGET = 9400;
 var SESSION_REMINDER = session_reminder_default.trim();
 var ROOT_TAKEOVER = "The default, user-facing agent of this session is the holyagent root, whatever agent it started as: read `${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting, and run all work through an Intent and Assignments dispatched to the holyagent specialists, never implementing in the main thread.";
 var CLOUD_IDENTITY = session_cloud_identity_default.trim();
@@ -19748,7 +20620,8 @@ var AGENT_OPTIONS = new Set([
   "label",
   "phase"
 ]);
-var SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE}:${route.agent}`));
+var PLUGIN_NAMESPACE2 = "holyagent";
+var CLAUDE_SPECIALISTS = new Set(ROUTES.map((route) => `${PLUGIN_NAMESPACE2}:${route.agent}`));
 var UNARY = new Set(["!", "-", "+", "~", "typeof", "void"]);
 var newBinding = () => ({
   unsafe: false,
@@ -19951,15 +20824,205 @@ var occurrencesIn = (node, scope, into, depth = 0) => {
       occurrencesIn(value, scope, into, depth + 1);
   return into;
 };
-var inspect = (script) => {
+var META_DECLARATION = /(^|[\r\n])[ \t]*export[ \t\r\n]+const[ \t\r\n]+meta[ \t\r\n]*=/g;
+var scanObjectLiteral = (source, open) => {
+  let depth = 0;
+  let i = open;
+  let sawInterpolation = false;
+  let mode = "code";
+  const templateStack = [];
+  while (i < source.length) {
+    const c = source[i];
+    const next = source[i + 1];
+    if (mode === "line-comment") {
+      if (c === `
+`)
+        mode = "code";
+      i++;
+      continue;
+    }
+    if (mode === "block-comment") {
+      if (c === "*" && next === "/") {
+        mode = "code";
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (mode === "single" || mode === "double" || mode === "regex") {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (mode === "single" && c === "'")
+        mode = "code";
+      else if (mode === "double" && c === '"')
+        mode = "code";
+      else if (mode === "regex" && c === "/")
+        mode = "code";
+      else if (c === `
+` && mode !== "double")
+        mode = "code";
+      i++;
+      continue;
+    }
+    if (mode === "template") {
+      if (c === "\\") {
+        i += 2;
+        continue;
+      }
+      if (c === "`") {
+        mode = "code";
+        i++;
+        continue;
+      }
+      if (c === "$" && next === "{") {
+        sawInterpolation = true;
+        templateStack.push(depth);
+        depth++;
+        mode = "code";
+        i += 2;
+        continue;
+      }
+      i++;
+      continue;
+    }
+    if (c === "/" && next === "/") {
+      mode = "line-comment";
+      i += 2;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      mode = "block-comment";
+      i += 2;
+      continue;
+    }
+    if (c === "'") {
+      mode = "single";
+      i++;
+      continue;
+    }
+    if (c === '"') {
+      mode = "double";
+      i++;
+      continue;
+    }
+    if (c === "`") {
+      mode = "template";
+      i++;
+      continue;
+    }
+    if (c === "/" && isRegexPosition(source, i)) {
+      mode = "regex";
+      i++;
+      continue;
+    }
+    if (c === "{") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === "}") {
+      depth--;
+      i++;
+      if (templateStack.length > 0 && depth === templateStack[templateStack.length - 1]) {
+        templateStack.pop();
+        mode = "template";
+        continue;
+      }
+      if (depth === 0)
+        return { end: i, sawInterpolation };
+      continue;
+    }
+    i++;
+  }
+  return { end: -1, sawInterpolation };
+};
+var isRegexPosition = (source, i) => {
+  let j = i - 1;
+  while (j >= 0 && /\s/.test(source[j] ?? ""))
+    j--;
+  if (j < 0)
+    return true;
+  return !/[\w$)\]]/.test(source[j] ?? "");
+};
+var literalOnly = (node, depth) => {
+  if (node === undefined || depth > MAX_DEPTH)
+    return false;
+  if (node.type === "Literal")
+    return !("regex" in node) && !("bigint" in node);
+  if (node.type === "ArrayExpression")
+    return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1));
+  if (node.type !== "ObjectExpression")
+    return false;
+  return nodesAt(node, "properties").every((property) => {
+    const key = nodeAt(property ?? { type: "" }, "key");
+    const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
+    return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
+  });
+};
+var WRAPPER_OPEN = "(async () => {";
+var WRAPPER_PRELUDE = "const Date = void 0;";
+var metaFragment = (script) => {
+  const matches = [...script.matchAll(META_DECLARATION)];
+  const found = matches[0];
+  if (found === undefined)
+    return {
+      refusal: "has no line that reads as `export const meta =`, which the package requires"
+    };
+  if (matches.length > 1)
+    return { refusal: "has more than one line that reads as `export const meta =`" };
+  const open = script.indexOf("{", (found.index ?? 0) + found[0].length);
+  if (open === -1)
+    return { refusal: "gives `export const meta` no object literal" };
+  const { end, sawInterpolation } = scanObjectLiteral(script, open);
+  if (end === -1)
+    return { refusal: "has a `meta` object literal that is never closed" };
+  if (sawInterpolation)
+    return { refusal: "uses template interpolation in `meta`" };
+  const fragment = script.slice(open, end);
+  const wrapped = parse2(`(${fragment})`, { ecmaVersion: "latest", sourceType: "script" });
+  const statement = wrapped.body[0];
+  const value = statement === undefined ? undefined : nodeAt(statement, "expression");
+  if (value === undefined || wrapped.body.length !== 1 || statement?.type !== "ExpressionStatement" || value.type !== "ObjectExpression" || startOf(value) !== 1 || endOf(value) !== fragment.length + 1 || !literalOnly(value, 1))
+    return { refusal: "has a `meta` that is not an object literal of plain literals" };
+  return { at: found.index ?? 0, value };
+};
+var workerProgram = (script) => {
+  const meta = metaFragment(script);
+  if ("refusal" in meta)
+    return meta;
+  const exportAt = script.indexOf("export", meta.at);
+  const body = `${script.slice(0, exportAt)}${" ".repeat(6)}${script.slice(exportAt + 6)}`;
+  const prefix = `${WRAPPER_OPEN}${WRAPPER_PRELUDE}
+`;
+  const source = `${prefix}${body}
+})()`;
+  const program = parse2(source, { ecmaVersion: "latest", sourceType: "script" });
+  const call = nodeAt(program.body[0], "expression");
+  const arrow = call === undefined ? undefined : nodeAt(call, "callee");
+  const block = arrow === undefined ? undefined : nodeAt(arrow, "body");
+  const statements = block === undefined ? [] : nodesAt(block, "body");
+  const prelude = statements[0];
+  if (program.body.length !== 1 || call?.type !== "CallExpression" || nodesAt(call, "arguments").length !== 0 || arrow?.type !== "ArrowFunctionExpression" || arrow["async"] !== true || block?.type !== "BlockStatement" || endOf(block) !== source.length - 3 || prelude?.type !== "VariableDeclaration" || startOf(prelude) !== WRAPPER_OPEN.length || endOf(prelude) !== prefix.length - 1)
+    return { refusal: "closes the wrapper the package puts around a script" };
+  return { program: { type: "Program", body: statements.slice(1) } };
+};
+var inspect = (script, specialists, classic) => {
   if (script.length > MAX_WORKFLOW_SCRIPT)
     return "the script is too large";
-  const program = parse2(script, {
-    ecmaVersion: "latest",
-    sourceType: "module",
-    allowAwaitOutsideFunction: true,
-    allowReturnOutsideFunction: true
-  });
+  const parsed = classic ? workerProgram(script) : {
+    program: parse2(script, {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      allowAwaitOutsideFunction: true,
+      allowReturnOutsideFunction: true
+    })
+  };
+  if ("refusal" in parsed)
+    return parsed.refusal;
+  const { program } = parsed;
   let refusal;
   const refuse = (why) => {
     refusal ??= why;
@@ -20228,7 +21291,7 @@ var inspect = (script) => {
       const value = nodeAt(property, "value");
       if (name !== "agentType")
         expression(value, scope, depth + 1);
-      else if (value?.type === "Literal" && typeof value["value"] === "string" && SPECIALISTS.has(value["value"]))
+      else if (value?.type === "Literal" && typeof value["value"] === "string" && specialists.has(value["value"]))
         named += 1;
       else
         return refuse("starts an agent that is not a holyagent specialist by a literal agentType");
@@ -20485,6 +21548,8 @@ var inspect = (script) => {
       case "VariableDeclaration":
         return variableDeclaration(node, scope, depth);
       case "FunctionDeclaration": {
+        if (classic && !scope.isFunction)
+          refuse("declares a function inside a block");
         const name = nameOf(nodeAt(node, "id")) ?? "";
         declare(scope, name, "unsafe");
         scope.names.get(name)?.functions.add(node);
@@ -20595,21 +21660,6 @@ var inspect = (script) => {
         return refuse(`uses ${node.type}`);
     }
   }
-  const literalOnly = (node, depth) => {
-    if (node === undefined || depth > MAX_DEPTH)
-      return false;
-    if (node.type === "Literal")
-      return !("regex" in node) && !("bigint" in node);
-    if (node.type === "ArrayExpression")
-      return nodesAt(node, "elements").every((item) => literalOnly(item, depth + 1));
-    if (node.type !== "ObjectExpression")
-      return false;
-    return nodesAt(node, "properties").every((property) => {
-      const key = nodeAt(property ?? { type: "" }, "key");
-      const name = key?.type === "Literal" && typeof key["value"] === "string" ? key["value"] : nameOf(key);
-      return property?.type === "Property" && property["computed"] === false && property["kind"] === "init" && property["method"] !== true && name !== undefined && !DENIED_NAMES.has(name) && literalOnly(nodeAt(property, "value"), depth + 1);
-    });
-  };
   function analyse() {
     const keyOf = (name, scope) => binding(scope, name) ?? (name === "args" ? "args" : undefined);
     const dynamic = new Set;
@@ -21109,8 +22159,8 @@ var inspect = (script) => {
     refuse("starts no agent");
   return refusal;
 };
-var workflowRefusal = (script) => try_2({
-  try: () => inspect(script),
+var workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS, host = "claude") => try_2({
+  try: () => inspect(script, specialists, host === "pi"),
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed6(reason)));
 
@@ -21133,6 +22183,7 @@ var hook = (name, summary, run, stateless) => ({
   path: ["hook", name],
   usage: `hook ${name}`,
   summary,
+  hosts: ["claude"],
   input: "the host's hook payload as JSON",
   output: "the JSON the host reads, or nothing; exit 1 with a stderr line on failure",
   flags: {},
@@ -21142,7 +22193,6 @@ var hook = (name, summary, run, stateless) => ({
 `, 1))))
 });
 var ROOT_AGENTS = new Set(["holyagent", "holyagent:holyagent"]);
-var hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var RESUMED = new Set(["resume", "compact"]);
 var requirementsOf = (directory) => readOpenState(directory).pipe(flatMap2(resolveIntent), map4(({ id, revision, requirements }) => ({ id, revision, requirements })), catchTag2("NoActiveIntent", () => succeed6(undefined)));
 var SAFE_ID = /^[\w.:-]{1,80}$/;
@@ -21181,11 +22231,14 @@ var rootCore = (payload, call) => ROOT_AGENTS.has(payload.agent_type) ? undefine
 `).replaceAll("${CLAUDE_PLUGIN_ROOT}", () => call.env.CLAUDE_PLUGIN_ROOT ?? "${CLAUDE_PLUGIN_ROOT}");
 var isMainThread = (payload) => payload.agent_id === undefined && !isSpecialist(payload.agent_type);
 var HOOK_COMMANDS = [
-  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
+  hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user, and one line when the primary checkout is on a detached HEAD or on a branch other than the one it started on), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
     const core = rootCore(payload, call);
     const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
     return gen2(function* () {
-      const notice = yield* setupNotice(call.env, call.cwd);
+      const notices = [yield* setupNotice(call.env, call.cwd), yield* cloudCheckoutNotice(call)];
+      const notice = notices.filter((text) => text !== undefined).join(`
+
+`) || undefined;
       if (!(yield* hasStateFolder(call.directory))) {
         const found = yield* legacyFoldersWithState(call.root);
         if (found.length === 0) {
@@ -21296,7 +22349,7 @@ var HOOK_COMMANDS = [
       const message = cleaned.split(`
 `).filter((line) => !line.startsWith(comment)).join(`
 `);
-      const phrases = forbiddenPhrases(message, (yield* readSettings([stateDirectory(call.root)])).allowWords);
+      const phrases = forbiddenPhrases(message, (yield* readSettings([stateDirectory(call.root)], call.env)).allowWords);
       if (phrases.length > 0)
         return yield* new MessageRefused({ phrases });
       if (cleaned !== above.trim() || cleanedBelow !== below.trim())
@@ -21317,7 +22370,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join14, relative as relative5 } from "path";
+import { join as join15, relative as relative5 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -21406,7 +22459,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join14(root, name));
+    const text = yield* readText(join15(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -21480,13 +22533,874 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join15 } from "path";
+import { join as join16 } from "path";
+
+var FEATURE_PACKAGES = {
+  subagents: "@tintinweb/pi-subagents",
+  contextCompression: "billion-context",
+  todo: "@juicesharp/rpiv-todo",
+  ask: "@juicesharp/rpiv-ask-user-question",
+  processes: "@aliou/pi-processes",
+  computerUse: "@amaster.ai/pi-computer-use"
+};
+var WEB_KIT_PACKAGE = "pi-web-kit";
+var piPackages = (config, profile = providerProfile(config)) => {
+  const { enable, features } = config.pi;
+  if (!enable)
+    return [];
+  const names = [
+    profile.package,
+    ...Object.keys(FEATURE_PACKAGES).filter((feature) => features[feature]).map((feature) => FEATURE_PACKAGES[feature]),
+    ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
+  ];
+  return names.map((name) => piPackageSource(name));
+};
+
+var PI_HOST_VERSION = "1.5.0";
+var PI_MINIMUM_NODE = "22.19.0";
+var PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`;
+var NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`;
+var PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`;
+var PACKAGE_COMMAND = `pi install git:github.com/davidbasilefilho/holyagent@holyagent-${version}`;
+var packageFix = (scope) => scope === "user" ? `install it with \`${PACKAGE_COMMAND}\`` : `install it with \`${PACKAGE_COMMAND}\` (add -l for this project only)`;
+var VERSION = /(\d+)\.(\d+)\.(\d+)/;
+var releaseIn = (text) => {
+  const [, major, minor, patch] = VERSION.exec(text) ?? [];
+  return major === undefined || minor === undefined || patch === undefined ? undefined : [Number(major), Number(minor), Number(patch)];
+};
+var compareReleases = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+var PINNED_PI = releaseIn(PI_HOST_VERSION) ?? [0, 0, 0];
+var MINIMUM_NODE = releaseIn(PI_MINIMUM_NODE) ?? [0, 0, 0];
+var checkVersioned = (env, name, command, texts) => gen2(function* () {
+  const shell = yield* Shell;
+  const found = yield* shell.which(command);
+  if (isNone2(found))
+    return fail6(name, `not found on PATH; ${texts.fix}`);
+  const result = yield* shell.run(command, ["--version"], { cwd: homeDirectory(env) });
+  const output = `${result.stdout}
+${result.stderr}`;
+  const release = result.exitCode === 0 ? releaseIn(output) : undefined;
+  if (release === undefined)
+    return fail6(name, `${found.value} did not report a version for --version (exit ${result.exitCode}); ${texts.fix}`);
+  const shown = release.join(".");
+  const verdict = texts.judge(release, shown, found.value);
+  return verdict.ok ? pass(name, verdict.detail) : fail6(name, verdict.detail);
+});
+var checkPi = (env) => checkVersioned(env, "pi", "pi", {
+  fix: PI_FIX,
+  judge: (release, shown, path) => compareReleases(release, PINNED_PI) < 0 ? {
+    ok: false,
+    detail: `${shown} at ${path} is older than ${PI_HOST_VERSION}, the release HolyAgent is built against; ${PI_FIX}`
+  } : {
+    ok: true,
+    detail: compareReleases(release, PINNED_PI) === 0 ? `${shown} (${path})` : `${shown} (${path}; newer than the ${PI_HOST_VERSION} HolyAgent is built against)`
+  }
+});
+var checkNode = (env) => checkVersioned(env, "node", "node", {
+  fix: NODE_FIX,
+  judge: (release, shown, path) => compareReleases(release, MINIMUM_NODE) < 0 ? {
+    ok: false,
+    detail: `${shown} at ${path} is older than ${PI_MINIMUM_NODE}, which Pi needs; ${NODE_FIX}`
+  } : { ok: true, detail: `${shown} (${path})` }
+});
+var Open = Record(String4, Unknown2);
+var PackageEntry = Union2([
+  String4,
+  StructWithRest(Struct({ source: String4 }), [Open])
+]);
+var PiSettings = StructWithRest(Struct({ packages: optionalKey2(ArraySchema(PackageEntry)) }), [Open]);
+var GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i;
+var sourceName = (source) => {
+  const bare = source.startsWith("npm:") ? source.slice("npm:".length) : source;
+  if (source.startsWith("npm:") && bare.startsWith("@"))
+    return;
+  const path = GIT_LEAD.test(bare) ? bare.replace(GIT_LEAD, "").split("@")[0] ?? "" : bare;
+  const last = path.split(/[/\\:]/).filter(Boolean).at(-1) ?? "";
+  return (last.split("@")[0] ?? "").replace(/\.git$/, "");
+};
+var isHolyagentSource = (source) => {
+  const normal = source.replaceAll("\\", "/").replace(/\/+$/, "");
+  return sourceName(source) === "holyagent" || normal.endsWith("/packages/integrations/pi/dist");
+};
+var piAgentDirectory = (env) => {
+  const home = homeDirectory(env);
+  const set = firstNonEmpty(env["PI_CODING_AGENT_DIR"]);
+  if (set === undefined)
+    return join16(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join16(home, set.slice(2)) : set;
+};
+var piSettingsSources = (file) => gen2(function* () {
+  const exists = yield* fileOperation(file, "read", () => Bun.file(file).exists());
+  if (!exists)
+    return [];
+  const text = yield* fileOperation(file, "read", () => Bun.file(file).text());
+  if (text.trim() === "")
+    return [];
+  const settings = yield* decodeUnknownEffect2(fromJsonString2(PiSettings))(text, {
+    onExcessProperty: "error"
+  }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
+  return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
+});
+var piSettingsFiles = (env, cwd) => [join16(piAgentDirectory(env), "settings.json"), join16(cwd, ".pi", "settings.json")];
+var piPresenceFiles = (env, cwd, scope) => {
+  const [globalFile, projectFile] = piSettingsFiles(env, cwd);
+  return scope === "user" ? [globalFile] : [globalFile, projectFile];
+};
+var parseNpmSource = (source) => {
+  if (!source.startsWith("npm:"))
+    return;
+  const spec = source.slice("npm:".length);
+  const at = spec.indexOf("@", 1);
+  return at < 0 ? { name: spec, version: undefined } : { name: spec.slice(0, at), version: spec.slice(at + 1) };
+};
+var listsAtPin = (listed, wanted) => {
+  const want = parseNpmSource(wanted);
+  return listed.some((source) => {
+    const found = parseNpmSource(source);
+    return found !== undefined && found.name === want?.name && found.version === want.version;
+  });
+};
+var piInUse = (env) => gen2(function* () {
+  if (firstNonEmpty(env["HOLYAGENT_HOST"]) === "pi")
+    return true;
+  return isSome2(yield* (yield* Shell).which("pi"));
+});
+var loadPiConfig = (env, cwd, scope) => loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(mapError2((error) => new SetupFailure({ message: error.message })));
+var checkPackage = (env, cwd, scope) => gen2(function* () {
+  const files = piPresenceFiles(env, cwd, scope);
+  const outcomes = yield* forEach2(files, (file) => piSettingsSources(file).pipe(map4((sources) => ({
+    file,
+    listed: sources.some(isHolyagentSource),
+    problem: undefined
+  })), catchTag2("SetupFailure", (error) => succeed6({ file, listed: false, problem: error.message }))));
+  const found = outcomes.find((outcome) => outcome.listed);
+  if (found !== undefined)
+    return pass("pi package", `listed in ${found.file}`);
+  const problems = outcomes.flatMap((outcome) => outcome.problem === undefined ? [] : [outcome.problem]);
+  return fail6("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${packageFix(scope)}` : `not in the packages of ${files.join(" or ")}; ${packageFix(scope)}`);
+});
+var checkFeatures = (env, cwd, scope, config) => gen2(function* () {
+  const files = piPresenceFiles(env, cwd, scope);
+  const listed = (yield* forEach2(files, (file) => piSettingsSources(file).pipe(orElseSucceed2(() => [])))).flat();
+  const wanted = piPackages(config);
+  const missing = wanted.filter((source) => !listsAtPin(listed, source));
+  if (missing.length === 0)
+    return [pass("pi features", `${wanted.length} enabled packages listed at their pins`)];
+  return missing.map((source) => fail6(`pi feature ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; install it with \`pi install ${source}\`${scope === "user" ? "" : " (add -l for this project only)"}, or re-run \`holyagent setup\``));
+});
+var piChecks = (env, cwd, scope) => gen2(function* () {
+  if (!(yield* piInUse(env)))
+    return [
+      hint("pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped")
+    ];
+  return yield* loadPiConfig(env, cwd, scope).pipe(matchEffect3({
+    onFailure: (error) => succeed6([fail6("pi config", error.message)]),
+    onSuccess: (config) => config.pi.enable ? all2([
+      checkPi(env),
+      checkNode(env),
+      checkPackage(env, cwd, scope),
+      checkFeatures(env, cwd, scope, config)
+    ]).pipe(map4(([pi, node, pkg, features]) => [pi, node, pkg, ...features])) : succeed6([])
+  }));
+});
+
+import { join as join17, relative as relative6, resolve as resolve7, sep as sep7 } from "path";
+
+var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
+var T3_PREFIX = "mcp__t3*code__";
+var T3_VISUAL_TOOLS = [
+  `${T3_PREFIX}preview_*`,
+  `${T3_PREFIX}t3_preview_*`,
+  `${T3_PREFIX}html_render`,
+  `${T3_PREFIX}html_preview`,
+  `${T3_PREFIX}device_*`
+];
+var T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
+var T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
+var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
+var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
+var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
+var SUBAGENTS_ONLY_SPECIALISTS = {
+  disableDefaultAgents: true,
+  fallbackSubagent: "none"
+};
+var toolSettings = (config, profile = providerProfile(config)) => {
+  const { enable, features } = config.pi;
+  if (!enable)
+    return [];
+  const web = webChoice(profile, features.web);
+  return [
+    { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
+    ...web.source === "provider" ? [
+      {
+        file: profile.toolsFile,
+        content: {
+          tools: Object.fromEntries(web.tools.map((tool) => [tool, { enabled: true }]))
+        }
+      }
+    ] : [],
+    ...features.subagents ? [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }] : [],
+    ...features.contextCompression ? [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }] : [],
+    ...features.computerUse ? [
+      {
+        file: PI_SETTINGS_FILE,
+        content: {
+          "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false }
+        }
+      }
+    ] : []
+  ];
+};
+
+var PACKAGE_DEFAULTS = new Map([
+  [
+    PI_SETTINGS_FILE,
+    {
+      codemode: { mode: "on" },
+      defaultThinkingLevel: "medium",
+      "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true }
+    }
+  ],
+  [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
+  ...Object.values(PROVIDERS).map((profile) => [
+    profile.toolsFile,
+    { tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])) }
+  ])
+]);
+var valueAt3 = (node, path) => path.reduce((current, key) => isJsonObject2(current) ? current[key] : undefined, node);
+var leaves = (content, prefix = []) => Object.entries(content).flatMap(([key, child]) => isJsonObject2(child) ? leaves(child, [...prefix, key]) : [{ path: [...prefix, key], value: child }]);
+var KNOWN_FILES = [
+  PI_SETTINGS_FILE,
+  SUBAGENTS_SETTINGS_FILE,
+  BILLION_CONTEXT_FILE,
+  ...Object.values(PROVIDERS).map((profile) => profile.toolsFile)
+];
+var AGENT_PREFIX = "~/.pi/agent/";
+var PI_PREFIX = "~/.pi/";
+var locate2 = (env, cwd, scope, logical) => {
+  const project = scope !== "user";
+  const home = homeDirectory(env);
+  if (logical === BILLION_CONTEXT_FILE) {
+    if (project)
+      return;
+    const explicit = firstNonEmpty(env["BILI_CONFIG_FILE"]);
+    if (explicit !== undefined)
+      return resolve7(cwd, explicit);
+    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join17(home, ".config");
+    return join17(base, "billion-context", "billion-context.json");
+  }
+  if (logical.startsWith(AGENT_PREFIX)) {
+    const name = logical.slice(AGENT_PREFIX.length);
+    return project ? join17(cwd, ".pi", name) : join17(piAgentDirectory(env), name);
+  }
+  if (logical.startsWith(PI_PREFIX)) {
+    const name = logical.slice(PI_PREFIX.length);
+    return project ? join17(cwd, ".pi", name) : join17(home, ".pi", name);
+  }
+  return project || !logical.startsWith("~/") ? undefined : join17(home, logical.slice(2));
+};
+var keyName = ({ path }) => path.join(".");
+var inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf));
+var routeLeaves = (config) => leaves(rootModelSettings(config));
+var planFor = (env, cwd, scope, config) => {
+  const byFile = new Map;
+  for (const patch of toolSettings(config)) {
+    byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
+  }
+  const route = routeLeaves(config);
+  byFile.set(PI_SETTINGS_FILE, [...byFile.get(PI_SETTINGS_FILE) ?? [], ...route]);
+  const targets = [];
+  const unplaced = [];
+  for (const [logical, all] of byFile) {
+    const file = locate2(env, cwd, scope, logical);
+    if (file === undefined) {
+      unplaced.push(logical);
+      continue;
+    }
+    targets.push({
+      file,
+      global: scope === "user" ? undefined : locate2(env, cwd, "user", logical),
+      all,
+      route: logical === PI_SETTINGS_FILE ? route : [],
+      defaults: PACKAGE_DEFAULTS.get(logical)
+    });
+  }
+  return { targets, unplaced };
+};
+var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
+  const global = target.global === undefined ? undefined : yield* readJsonObject(target.global);
+  const existing = yield* readJsonObject(target.file);
+  const setIn = (content, key) => content !== undefined && applyDefaults(content, [key]).entries[0]?.status !== "added";
+  const setGlobally = (key) => setIn(global, key);
+  const isDefault = ({ path, value }) => target.defaults !== undefined && equals(valueAt3(target.defaults, path), value);
+  const pairHeld = target.all.some((key) => inPair(key) && (setIn(existing, key) || setGlobally(key)));
+  const leftWithPair = (key) => pairHeld && inPair(key) && !setIn(existing, key) && !setGlobally(key);
+  const free = target.all.filter((key) => !setGlobally(key) && !leftWithPair(key));
+  return {
+    file: target.file,
+    existing,
+    keys: free.filter((key) => !isDefault(key)),
+    atDefault: free.filter(isDefault).map(keyName),
+    atGlobal: target.all.filter(setGlobally).map(keyName),
+    atPair: target.all.filter(leftWithPair).map(keyName)
+  };
+});
+var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
+  if (scope === "user")
+    return;
+  const parts = relative6(cwd, file).split(sep7);
+  for (let depth = 1;depth <= parts.length; depth++) {
+    const path = join17(cwd, ...parts.slice(0, depth));
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
+      });
+    }
+  }
+});
+var planAt = (env, cwd, scope) => loadPiConfig(env, cwd, scope).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config) : undefined), orElseSucceed2(() => {
+  return;
+}));
+var label = "tool settings";
+var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned) {
+  const { dryRun } = options;
+  const { file } = planned;
+  yield* refuseLinks(options.cwd, options.scope, file, "write");
+  const target = yield* resolveTarget(planned);
+  const { merged, entries } = applyDefaults(target.existing, target.keys);
+  const added = entries.filter((entry) => entry.status === "added");
+  const kept = entries.filter((entry) => entry.status === "kept");
+  const present = entries.filter((entry) => entry.status === "present");
+  if (added.length > 0 && !dryRun) {
+    const names = new Set(added.map((entry) => entry.path));
+    yield* readRecorded(env, file);
+    yield* writeJsonObject(file, merged);
+    yield* addRecorded(env, file, target.keys.filter(({ path }) => names.has(path.join(".")))).pipe(mapError2((error) => new SetupFailure({
+      message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`
+    })));
+  }
+  const parts = [
+    ...added.length === 0 ? [] : [
+      `${dryRun ? "would add" : "added"} ${added.map((entry) => `${entry.path} ${show(entry.value)}`).join(", ")}`
+    ],
+    ...present.length === 0 ? [] : [`already set: ${present.map((entry) => entry.path).join(", ")}`],
+    ...kept.map((entry) => `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`),
+    ...target.atGlobal.length === 0 ? [] : [`left out, set in your global file: ${target.atGlobal.join(", ")}`],
+    ...target.atPair.length === 0 ? [] : [
+      `left out, the other of ${ROOT_MODEL_PAIR.join(" and ")} is yours: ${target.atPair.join(", ")}`
+    ],
+    ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`]
+  ];
+  const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
+  return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
+});
+var installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
+  const plan = yield* planAt(env, options.cwd, options.scope);
+  if (plan === undefined)
+    return [];
+  const lines = [];
+  for (const target of plan.targets) {
+    lines.push(yield* mergeTarget(env, options, target).pipe(catchTag2("SetupFailure", (error) => succeed6(`! ${label}: ${error.message}`))));
+  }
+  for (const logical of plan.unplaced) {
+    lines.push(skipped(`${label} ${logical}: has no file at ${options.scope} scope; run \`holyagent setup\` at user scope`));
+  }
+  return lines;
+});
+var undoPiToolSettings = fn2("undoPiToolSettings")(function* (env, options) {
+  const lines = [];
+  const files = new Set(KNOWN_FILES.flatMap((logical) => locate2(env, options.cwd, options.scope, logical) ?? []));
+  for (const file of files) {
+    lines.push(...yield* gen2(function* () {
+      const recorded = yield* readRecorded(env, file);
+      if (recorded.length === 0)
+        return [];
+      yield* refuseLinks(options.cwd, options.scope, file, "edit");
+      let result = yield* readJsonObject(file);
+      const removed = [];
+      const kept = [];
+      const pairChanged = recorded.some((leaf) => inPair(leaf) && valueAt3(result, leaf.path) !== undefined && !equals(valueAt3(result, leaf.path), leaf.value));
+      for (const leaf of recorded) {
+        const { path, value } = leaf;
+        if (pairChanged && inPair(leaf)) {
+          const current = valueAt3(result, path);
+          if (current !== undefined)
+            kept.push(`${path.join(".")} ${show(current)} (setup wrote ${show(value)}${equals(current, value) ? "; kept with its changed pair" : ""})`);
+          continue;
+        }
+        const [next, removal] = take(result, path, 0, value);
+        result = next;
+        if (removal.status === "removed")
+          removed.push(`${removal.path} ${show(removal.value)}`);
+        if (removal.status === "kept")
+          kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`);
+      }
+      if (!options.dryRun) {
+        if (removed.length > 0)
+          yield* writeJsonObject(file, result);
+        yield* clearRecorded(env, file);
+      }
+      const parts = [
+        ...removed.length === 0 ? [] : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`],
+        ...kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]
+      ];
+      const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "=";
+      return [
+        `${mark} ${label} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+      ];
+    }).pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))));
+  }
+  return lines;
+});
+var fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``;
+var routeLine = fn2("checkRootModel")(function* (planned, existing) {
+  if (planned.route.length === 0)
+    return [];
+  const global = planned.global === undefined ? undefined : yield* readJsonObject(planned.global);
+  const states = planned.route.map((leaf) => {
+    const { path, value } = leaf;
+    const current = valueAt3(existing, path) ?? valueAt3(global, path);
+    const atDefault = planned.defaults !== undefined && equals(valueAt3(planned.defaults, path), value);
+    return {
+      key: keyName(leaf),
+      pair: inPair(leaf),
+      wanted: value,
+      current,
+      status: current === undefined ? atDefault ? "set" : "unset" : equals(current, value) ? "set" : "overridden"
+    };
+  });
+  const pairHeld = states.some((state) => state.pair && state.current !== undefined);
+  const yours = states.filter((state) => state.status === "overridden").map((state) => `${state.key} ${show(state.current)} is yours (the route sets ${show(state.wanted)})`);
+  const alone = states.filter((state) => pairHeld && state.pair && state.status === "unset").map((state) => `${state.key} is unset, so Pi picks it (the route sets ${show(state.wanted)})`);
+  if (yours.length + alone.length > 0) {
+    return [
+      hint(`root model ${planned.file}: ${[...yours, ...alone].join(", ")}${yours.length > 0 ? "; Pi follows yours" : ""}`)
+    ];
+  }
+  if (states.some((state) => state.status === "unset"))
+    return [];
+  const [provider, model, thinking] = planned.route.map(({ value }) => String(value));
+  return [
+    pass("root model", `${provider}/${model}:${thinking} set in Pi's settings (${planned.file})`)
+  ];
+});
+var checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
+  if (!(yield* piInUse(env)))
+    return [];
+  const plan = yield* planAt(env, cwd, scope);
+  if (plan === undefined)
+    return [];
+  const lines = [];
+  for (const planned of plan.targets) {
+    lines.push(...yield* gen2(function* () {
+      yield* refuseLinks(cwd, scope, planned.file, "write");
+      const target = yield* resolveTarget(planned);
+      const missing = applyDefaults(target.existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
+      return [
+        ...missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)],
+        ...yield* routeLine(planned, target.existing)
+      ];
+    }).pipe(catchTag2("SetupFailure", (error) => succeed6([
+      hint(`${label}: ${error.message}; fix the file, then ${fixFor(scope)}`)
+    ]))));
+  }
+  return lines;
+});
+
+import { join as join19 } from "path";
+
+var MANAGED_NAMES = new Set([
+  ...Object.values(FEATURE_PACKAGES),
+  WEB_KIT_PACKAGE,
+  ...Object.values(PROVIDERS).map((profile) => profile.package)
+]);
+var staleManagedNames = (listed, wanted, managed = MANAGED_NAMES) => {
+  const wantedNames = new Set(wanted.map((source) => parseNpmSource(source)?.name));
+  return [
+    ...new Set(listed.flatMap((source) => {
+      const name = parseNpmSource(source)?.name;
+      return name !== undefined && managed.has(name) && !wantedNames.has(name) ? [name] : [];
+    }))
+  ];
+};
+var installPiPackages = fn2("installPiPackages")(function* (env, options) {
+  const shell = yield* Shell;
+  const config = yield* loadPiConfig(env, options.cwd, options.scope);
+  if (!config.pi.enable)
+    return [skipped("pi packages: pi.enable is off in the HolyAgent config")];
+  const projectLevel = options.scope !== "user";
+  const [globalFile, projectFile] = piSettingsFiles(env, options.cwd);
+  const file = projectLevel ? projectFile : globalFile;
+  const listed = yield* piSettingsSources(file);
+  const counted = piPresenceFiles(env, options.cwd, options.scope).filter((other) => other !== file);
+  const elsewhere = yield* forEach2(counted, (other) => piSettingsSources(other).pipe(map4((sources) => ({ file: other, sources })), orElseSucceed2(() => ({ file: other, sources: [] }))));
+  const listedIn = (source) => listsAtPin(listed, source) ? file : elsewhere.find((other) => listsAtPin(other.sources, source))?.file;
+  const wanted = piPackages(config);
+  const installs = wanted.filter((source) => listedIn(source) === undefined);
+  const removals = staleManagedNames(listed, wanted);
+  const lines = wanted.flatMap((source) => {
+    const where = listedIn(source);
+    return where === undefined ? [] : [present2(`pi ${source}: already listed in ${where}`)];
+  });
+  if (installs.length === 0 && removals.length === 0)
+    return lines;
+  if (isNone2(yield* shell.which("pi"))) {
+    return [
+      ...lines,
+      `! pi packages: pi not found on PATH, so the changes to ${file} cannot run; install Pi (\`holyagent doctor\` names the command), then re-run`
+    ];
+  }
+  const cwd = projectLevel ? options.cwd : homeDirectory(env);
+  const withScope = (args) => projectLevel ? [...args, "-l"] : args;
+  for (const source of installs) {
+    const args = withScope(["install", source]);
+    const command = `pi ${args.join(" ")}`;
+    if (options.dryRun) {
+      lines.push(added(`pi ${source}: would install with ${command}`));
+      continue;
+    }
+    const result = yield* shell.run("pi", args, { cwd });
+    lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
+  }
+  for (const name of removals) {
+    const args = withScope(["remove", `npm:${name}`]);
+    const command = `pi ${args.join(" ")}`;
+    if (options.dryRun) {
+      lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`));
+      continue;
+    }
+    const result = yield* shell.run("pi", args, { cwd });
+    lines.push(result.exitCode === 0 ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`) : failed2(command, result));
+  }
+  return lines;
+});
+
+import { stat as stat3 } from "fs/promises";
+import { join as join18 } from "path";
+var T3_STORAGE_CLEANUP = {
+  logsAfterDays: 30,
+  browserArtifactsAfterDays: 14,
+  worktreeSettledAfterDays: 14
+};
+var T3_WRITING_INSTRUCTIONS = "Write as the author, in the first person or a neutral voice, about what the change does and why. " + "Keep AI agents, assistants, sessions and tools out of commit messages and pull request text, and " + "add no attribution trailers (no Co-authored-by or Generated-by lines).";
+var T3_BRANCH_INSTRUCTIONS = "Name each branch by the repository's own branch naming convention, as its AGENTS.md, CONTRIBUTING " + "guide or existing branch names show it. When the repository states none, use a short, lowercase, " + "hyphenated name under the `t3/` prefix.";
+var label2 = "t3 settings";
+var restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false));
+var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
+  message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
+}))));
+var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join18(homeDirectory(env), ".t3");
+var t3SettingsFile = (env) => join18(t3Home(env), "userdata", "settings.json");
+var isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map4((info) => info.isDirectory()), orElseSucceed2(() => false));
+var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
+  const home = homeDirectory(env);
+  if (platform === "darwin") {
+    const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
+    const simulator = join18(developer, "Platforms", "iPhoneSimulator.platform");
+    if (yield* isDirectory2(simulator))
+      return `Xcode (${developer})`;
+  }
+  const sdkFolders = [
+    firstNonEmpty(env["ANDROID_HOME"]),
+    firstNonEmpty(env["ANDROID_SDK_ROOT"]),
+    platform === "darwin" ? join18(home, "Library", "Android", "sdk") : platform === "win32" ? join18(firstNonEmpty(env["LOCALAPPDATA"]) ?? join18(home, "AppData", "Local"), "Android", "Sdk") : join18(home, "Android", "Sdk")
+  ];
+  for (const folder of sdkFolders) {
+    if (folder !== undefined && (yield* isDirectory2(folder)))
+      return `the Android SDK (${folder})`;
+  }
+  return;
+});
+var BALANCED = {
+  pauseWhenHostLocked: true,
+  pauseWhenHostLowPower: true,
+  pauseWhenClientLowPower: true,
+  pauseWhenOnBattery: false
+};
+var units = (devices, worktrees) => [
+  {
+    name: "Pi provider",
+    choice: "pi",
+    keys: [
+      { path: ["providerInstances", "pi", "driver"], value: "pi", default: undefined },
+      { path: ["providerInstances", "pi", "enabled"], value: true, default: undefined }
+    ],
+    refuse: (existing) => {
+      const instance = isJsonObject2(existing["providerInstances"]) ? existing["providerInstances"]["pi"] : undefined;
+      if (!isJsonObject2(instance))
+        return;
+      if (instance["driver"] !== undefined && instance["driver"] !== "pi")
+        return "providerInstances.pi is another driver's instance";
+      const config = instance["config"];
+      return isJsonObject2(config) && config["enabled"] === false ? "providerInstances.pi.config.enabled is false" : undefined;
+    }
+  },
+  ...devices ? [
+    {
+      name: "device access",
+      choice: "deviceAccess",
+      keys: [
+        { path: ["enableDeviceSupport"], value: true, default: false },
+        { path: ["enableAgentDeviceAccess"], value: true, default: false }
+      ]
+    }
+  ] : [],
+  ...worktrees ? [
+    {
+      name: "worktrees",
+      choice: "worktrees",
+      keys: [{ path: ["defaultThreadEnvMode"], value: "worktree", default: null }]
+    }
+  ] : [],
+  {
+    name: "background activity",
+    whole: "backgroundActivity",
+    keys: [
+      { path: ["backgroundActivity", "schemaVersion"], value: 1, default: undefined },
+      { path: ["backgroundActivity", "profile"], value: "custom", default: "balanced" },
+      { path: ["backgroundActivity", "baseProfile"], value: "balanced", default: undefined },
+      ...[
+        "pauseWhenHostLocked",
+        "pauseWhenHostLowPower",
+        "pauseWhenClientLowPower",
+        "pauseWhenOnBattery"
+      ].map((name) => ({
+        path: ["backgroundActivity", "overrides", name],
+        value: false,
+        default: BALANCED[name]
+      }))
+    ]
+  },
+  {
+    name: "source control writing",
+    whole: "sourceControlWritingStyle",
+    keys: [
+      {
+        path: ["sourceControlWritingStyle", "mode"],
+        value: "conventional_commits",
+        default: "repo_conventions"
+      },
+      {
+        path: ["sourceControlWritingStyle", "customInstructions"],
+        value: T3_WRITING_INSTRUCTIONS,
+        default: ""
+      }
+    ]
+  },
+  {
+    name: "threads and git",
+    keys: [
+      { path: ["removeAgentCreditsOnMerge"], value: true, default: false },
+      { path: ["autoResumeLimitedThreads"], value: true, default: false },
+      { path: ["snoozeLimitedThreads"], value: true, default: false },
+      { path: ["defaultAutoPull"], value: true, default: false }
+    ]
+  },
+  {
+    name: "branch naming",
+    keys: [
+      { path: ["branchNamingMode"], value: "custom", default: "static" },
+      { path: ["branchNameInstructions"], value: T3_BRANCH_INSTRUCTIONS, default: "" }
+    ]
+  },
+  {
+    name: "storage cleanup",
+    keys: [
+      { path: ["storageCleanup", "worktreeOnMerge"], value: true, default: false },
+      ...Object.entries(T3_STORAGE_CLEANUP).map(([name, days]) => ({
+        path: ["storageCleanup", name],
+        value: days,
+        default: null
+      }))
+    ]
+  }
+];
+var unitOutcome = (existing, unit, recorded) => {
+  if (unit.whole !== undefined && existing[unit.whole] !== undefined && recorded.some(({ path }) => path[0] === unit.whole))
+    return { status: "own" };
+  const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
+  return reason !== undefined ? { status: "left", reason } : { status: "keys", keys: unit.keys.filter((key) => !equals(key.value, key.default)) };
+};
+var wantedKeys = (existing, all, recorded = []) => {
+  const keys = [];
+  const left = [];
+  const own = [];
+  for (const unit of all) {
+    const outcome = unitOutcome(existing, unit, recorded);
+    if (outcome.status === "own")
+      own.push(unit.name);
+    else if (outcome.status === "left")
+      left.push(`${unit.name} (${outcome.reason})`);
+    else
+      keys.push(...outcome.keys);
+  }
+  return { keys, left, own };
+};
+var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
+  const config = yield* loadPiConfig(env, cwd, "user").pipe(orElseSucceed2(() => {
+    return;
+  }));
+  if (config === undefined || !config.pi.enable)
+    return;
+  const home = t3Home(env);
+  if (!(yield* isDirectory2(home)))
+    return {
+      line: skipped(`${label2}: T3 Code is not installed (no ${home}); nothing written`)
+    };
+  if (config.pi.t3.scope === "project")
+    return {
+      line: skipped(`${label2}: pi.t3.scope is "project", whose per-project overrides setup does not write yet; nothing written`)
+    };
+  const host = config.pi.t3.deviceAccess ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
+  const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess;
+  const deviceNote = wantsDevices && host === undefined ? "device access left out: no Xcode or Android SDK found" : undefined;
+  return {
+    target: {
+      file: t3SettingsFile(env),
+      units: units(wantsDevices && host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
+      deviceNote,
+      device: host,
+      worktreesAllowed: config.pi.t3.worktrees
+    }
+  };
+});
+var writeVerified = fn2("t3SettingsWriteVerified")(function* (file, value, before, options) {
+  const write = options.write ?? writeSettings;
+  const restore = options.restore ?? restoreSettings;
+  yield* write(file, value, before.text);
+  const back = yield* readJsonText(file).pipe(flatMap2((text) => decodeJsonObject(file, text ?? "").pipe(match4({
+    onFailure: (error) => ({ text, error: error.message }),
+    onSuccess: (decoded) => ({ text, decoded })
+  }))), catch_2((error) => succeed6({ text: undefined, error: error.message })));
+  if ("decoded" in back && JSON.stringify(back.decoded) === JSON.stringify(value))
+    return;
+  const problem = "error" in back ? `does not decode afterwards: ${back.error}` : "differs from what was written";
+  const restored = yield* restore(file, before.text === undefined ? undefined : before.value, back.text).pipe(orElseSucceed2(() => false));
+  return yield* new SetupFailure({
+    message: `${file} ${problem}; ${restored ? "its previous content was put back" : "it changed again, so it was left as it is"}. Close T3 Code and run setup again`
+  });
+});
+var names = (paths) => paths.map((entry) => entry.path).join(", ");
+var installT3Settings = fn2("installT3Settings")(function* (env, cwd, options) {
+  const decided = yield* decide(env, cwd, options);
+  if (decided === undefined)
+    return [];
+  if ("line" in decided)
+    return [decided.line];
+  const { file, units: wanted, deviceNote } = decided.target;
+  const before = yield* readJsonObjectSnapshot(file);
+  const recorded = yield* readRecorded(env, file).pipe(orElseSucceed2(() => []));
+  const { keys, left, own } = wantedKeys(before.value, wanted, recorded);
+  const { merged, entries } = applyDefaults(before.value, keys);
+  const added = entries.filter((entry) => entry.status === "added");
+  const present = entries.filter((entry) => entry.status === "present");
+  const kept = entries.filter((entry) => entry.status === "kept");
+  if (added.length > 0 && !options.dryRun) {
+    const written = new Set(added.map((entry) => entry.path));
+    yield* readRecorded(env, file);
+    yield* writeVerified(file, merged, before, options);
+    yield* addRecorded(env, file, keys.filter(({ path }) => written.has(path.join("."))).map(({ path, value }) => ({ path, value }))).pipe(mapError2((error) => new SetupFailure({
+      message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`
+    })));
+  }
+  const parts = [
+    ...added.length === 0 ? [] : [
+      `${options.dryRun ? "would add" : "added"} ${added.map((entry) => `${entry.path} ${show(entry.value)}`).join(", ")}`
+    ],
+    ...present.length === 0 ? [] : [`already set: ${names(present)}`],
+    ...kept.map((entry) => `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`),
+    ...own.length === 0 ? [] : [`already written: ${own.join(", ")}`],
+    ...left.length === 0 ? [] : [`left out: ${left.join(", ")}`],
+    ...deviceNote === undefined ? [] : [deviceNote]
+  ];
+  const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
+  return [
+    `${mark} ${label2} ${file}: ${parts.join("; ")}${added.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+  ];
+});
+var previewT3Settings = fn2("previewT3Settings")(function* (env, cwd, options) {
+  const decided = yield* decide(env, cwd, options);
+  if (decided === undefined)
+    return;
+  if ("line" in decided)
+    return { line: decided.line };
+  const { file, units: wanted, device, worktreesAllowed } = decided.target;
+  const before = yield* readJsonObjectSnapshot(file);
+  const recorded = yield* readRecorded(env, file).pipe(orElseSucceed2(() => []));
+  const units = wanted.map((unit) => {
+    const outcome = unitOutcome(before.value, unit, recorded);
+    const base = { name: unit.name, ...unit.choice === undefined ? {} : { choice: unit.choice } };
+    if (outcome.status === "own")
+      return { ...base, added: [], present: [], kept: [], own: true };
+    if (outcome.status === "left")
+      return { ...base, added: [], present: [], kept: [], left: outcome.reason };
+    const { entries } = applyDefaults(before.value, outcome.keys);
+    return {
+      ...base,
+      added: entries.filter((entry) => entry.status === "added").map((entry) => `${entry.path} ${show(entry.value)}`),
+      present: entries.filter((entry) => entry.status === "present").map((entry) => entry.path),
+      kept: entries.filter((entry) => entry.status === "kept").map((entry) => `${entry.path} ${show(entry.value)}`)
+    };
+  });
+  return { file, device, worktreesAllowed, units };
+});
+var undoT3Settings = fn2("undoT3Settings")(function* (env, options) {
+  const file = t3SettingsFile(env);
+  const recorded = yield* readRecorded(env, file);
+  if (recorded.length === 0)
+    return [];
+  const before = yield* readJsonObjectSnapshot(file);
+  let result = before.value;
+  const removed = [];
+  const kept = [];
+  for (const { path, value } of recorded) {
+    const [next, removal] = take(result, path, 0, value);
+    result = next;
+    if (removal.status === "removed")
+      removed.push(`${removal.path} ${show(removal.value)}`);
+    if (removal.status === "kept")
+      kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`);
+  }
+  if (!options.dryRun) {
+    if (removed.length > 0)
+      yield* writeVerified(file, result, before, options);
+    yield* clearRecorded(env, file);
+  }
+  const parts = [
+    ...removed.length === 0 ? [] : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`],
+    ...kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]
+  ];
+  const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "=";
+  return [
+    `${mark} ${label2} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
+  ];
+});
+var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
+  if (!(yield* piInUse(env)))
+    return [];
+  const decided = yield* decide(env, cwd, options);
+  if (decided === undefined || "line" in decided)
+    return [];
+  const { file, units: wanted } = decided.target;
+  return yield* gen2(function* () {
+    const { value } = yield* readJsonObjectSnapshot(file);
+    const { keys } = wantedKeys(value, wanted);
+    const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added");
+    return [
+      missing.length === 0 ? pass(label2, `${file} holds the settings HolyAgent writes`) : hint(`${label2} ${file} lacks ${names(missing)}; run \`holyagent setup\``)
+    ];
+  }).pipe(catchTag2("SetupFailure", (error) => succeed6([
+    hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
+  ])));
+});
+
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on";
 var neutralDirectory = (env) => homeDirectory(env);
 var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
   const shell = yield* Shell;
   if (isSome2(yield* shell.which(command, { includeBunBin: true }))) {
-    return { usable: true, lines: [present3(`${command}: already installed`)] };
+    return { usable: true, lines: [present2(`${command}: already installed`)] };
   }
   if (dryRun) {
     return {
@@ -21511,9 +23425,9 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join15(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join15(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join19(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join19(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
-    return [...global.lines, present3("ctx7 skill: already installed")];
+    return [...global.lines, present2("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
   const setupArgs = ["setup", "--cli", "--claude", "--yes"];
   const args = apiKey !== undefined ? [...setupArgs, "--api-key", apiKey] : (yield* fileExists2(files.ctx7Credentials)) ? setupArgs : undefined;
@@ -21541,16 +23455,27 @@ var setup = fn2("setup")(function* (env, options) {
     const lines = yield* run(target.file);
     return target.notice === undefined ? lines : [hint(`${label}: ${target.notice}`), ...lines];
   }));
+  const piOptions = { scope, cwd: options.cwd ?? process.cwd(), dryRun: options.dryRun };
   if (options.undo === true) {
     const lines = [
       hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-      ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))
+      ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
+      ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions)),
+      ...scope === "user" ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun })) : []
     ];
     return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
   }
   const cloud = inCloudSession(env);
+  const piUsed = !cloud && (yield* piInUse(env));
   const lines = [
     ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
+    ...piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
+    ...piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
+    ...piUsed && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+      dryRun: options.dryRun,
+      ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
+      ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
+    })) : [],
     ...yield* onSettings((file) => mergeUserSettings({
       env,
       file,
@@ -21562,8 +23487,6 @@ var setup = fn2("setup")(function* (env, options) {
 });
 
 var FIX = "run /holyagent:setup, or `holyagent doctor --fix`";
-var pass = (name, detail) => `ok   ${name}: ${detail}`;
-var fail6 = (name, detail) => `FAIL ${name}: ${detail}`;
 var checkBun = gen2(function* () {
   const shell = yield* Shell;
   const found = yield* shell.which("bun");
@@ -21579,19 +23502,25 @@ var checkCommand = (env, command) => gen2(function* () {
   const anywhere = yield* shell.which(command, { includeBunBin: true });
   return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail6(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
 });
-var fixFor = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
-var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail6("settings", `${file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
+var fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
+var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail6("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
 var checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]);
 var doctor = fn2("doctor")(function* (env, options) {
   const scope = options.scope ?? "user";
-  const located = yield* settingsFile(env, scope, options.cwd ?? process.cwd()).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+  const cwd = options.cwd ?? process.cwd();
+  const pi = inCloudSession(env) ? [] : [
+    ...yield* piChecks(env, cwd, scope),
+    ...yield* checkPiToolSettings(env, cwd, scope),
+    ...scope === "user" ? yield* checkT3Settings(env, cwd) : []
+  ];
+  const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
   if (located instanceof SetupFailure) {
     const lines = yield* all2([
       checkBun,
       checkCommand(env, "ctx7"),
       succeed6(fail6("settings", located.message))
     ]);
-    return { lines, ok: false };
+    return { lines: [...lines, ...pi], ok: false };
   }
   const { file, notice } = located;
   const noted = (lines) => notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines];
@@ -21600,16 +23529,1494 @@ var doctor = fn2("doctor")(function* (env, options) {
   const fixes = options.fix && !inCloudSession(env) ? [...failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []] : [];
   const settingsFixes = options.fix && failing("settings") ? yield* asStep(`${scope} settings`, mergeUserSettings({ env, file, subagentCacheTtl: "1h", dryRun: false })) : [];
   const ran = [...fixes, ...settingsFixes];
-  const lines = noted(ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)]);
+  const lines = noted([
+    ...ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)],
+    ...pi
+  ]);
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
 });
 
+import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
+import { userInfo as userInfo2 } from "os";
+import { basename as basename5, dirname as dirname5, join as join20, posix, win32 } from "path";
+import { pathToFileURL } from "url";
+
+var TUI_BUNDLE = "setup-tui.js";
+
+var TUI_MANIFEST_NAME = "holyagent-setup-tui";
+var Dependencies = optional2(Record(String4, String4));
+var Entry = TupleWithRest(Tuple([
+  String4,
+  String4,
+  Struct({
+    dependencies: Dependencies,
+    optionalDependencies: Dependencies,
+    peerDependencies: Dependencies
+  })
+]), [Unknown2]);
+var Lock = Struct({
+  lockfileVersion: Number5,
+  configVersion: optional2(Number5),
+  packages: Record(String4, Unknown2)
+});
+
+var TUI_PACKAGES = {
+  "@opentui/core": "0.8.3",
+  "@opentui/solid": "0.8.3",
+  "solid-js": "1.9.18"
+};
+var TUI_LOCK = `{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "holyagent-setup-tui",
+      "dependencies": {
+        "@opentui/core": "0.8.3",
+        "@opentui/solid": "0.8.3",
+        "solid-js": "1.9.18"
+      }
+    }
+  },
+  "packages": {
+    "@babel/code-frame": [
+      "@babel/code-frame@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "js-tokens": "^4.0.0",
+          "picocolors": "^1.1.1"
+        }
+      },
+      "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="
+    ],
+    "@babel/compat-data": [
+      "@babel/compat-data@7.29.7",
+      "",
+      {},
+      "sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg=="
+    ],
+    "@babel/core": [
+      "@babel/core@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.7",
+          "@babel/helper-compilation-targets": "^7.29.7",
+          "@babel/helper-module-transforms": "^7.29.7",
+          "@babel/helpers": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/template": "^7.29.7",
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7",
+          "@jridgewell/remapping": "^2.3.5",
+          "convert-source-map": "^2.0.0",
+          "debug": "^4.1.0",
+          "gensync": "^1.0.0-beta.2",
+          "json5": "^2.2.3",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
+    ],
+    "@babel/generator": [
+      "@babel/generator@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/parser": "^7.29.13",
+          "@babel/types": "^7.29.11",
+          "@jridgewell/gen-mapping": "^0.3.12",
+          "@jridgewell/trace-mapping": "^0.3.28",
+          "jsesc": "^3.0.2"
+        }
+      },
+      "sha512-T5FRo+RzVHvGjWOuF1Ljc44b+NXAOazodHkGUHp4I3zCkQ4/sNVJm56h1S278LMR0bY5xBhztGziSbli8zObIw=="
+    ],
+    "@babel/helper-annotate-as-pure": [
+      "@babel/helper-annotate-as-pure@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-OoK6239jHPuSQOoS0kfTVKn0b/rVTk0seKq4Gd2UMLtmOVLjDC0ki3e+c90Trqv2gMfvJFqkiljrr568+qddiw=="
+    ],
+    "@babel/helper-compilation-targets": [
+      "@babel/helper-compilation-targets@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/compat-data": "^7.29.7",
+          "@babel/helper-validator-option": "^7.29.7",
+          "browserslist": "^4.24.0",
+          "lru-cache": "^5.1.1",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-8WxJ4/Vmes3ghacj8VOJy3NW8eyHiFY/4thU/LSBuBE470+igjR/j1ZTNn8fV5VdNrLx6iXUwig526UdOvfP0w=="
+    ],
+    "@babel/helper-create-class-features-plugin": [
+      "@babel/helper-create-class-features-plugin@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/helper-replace-supers": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.13",
+          "semver": "^6.3.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-fo8/Fr44/DMV71FQjk/HA0Npmu3bo5DFoWTCW1dhUR8Vx3NFfAVeEy0TbcBpt4e+hd2QhdmWgmspHo/9iWj8RA=="
+    ],
+    "@babel/helper-globals": [
+      "@babel/helper-globals@7.29.7",
+      "",
+      {},
+      "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
+    ],
+    "@babel/helper-member-expression-to-functions": [
+      "@babel/helper-member-expression-to-functions@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-j+7JYmk1JYDtACIGj0QJqqWZjoUpMoEikQGADMaHgCMCSDqd2+P32rfcibUNrGOMWrlzK1WJBdxrB3JJQZwWtg=="
+    ],
+    "@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
+    ],
+    "@babel/helper-module-transforms": [
+      "@babel/helper-module-transforms@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "^7.29.7",
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "@babel/traverse": "^7.29.13"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-/U96wOz+SCoZ7Da/8kjDGltcNY280JPQcRNPK0Hk3PTbdpaiBDQImtC6JsbVwb1HGMr3usZQU2WsWVjhYNmRzw=="
+    ],
+    "@babel/helper-optimise-call-expression": [
+      "@babel/helper-optimise-call-expression@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-+kmGVjcT9RGYzoDwdwEqEvGgKe3BYq+O1iGzjFubaNgZHwYHP6lsF2Yghf4kEuv9BV7tYDZ913aBW9am6YKong=="
+    ],
+    "@babel/helper-plugin-utils": [
+      "@babel/helper-plugin-utils@7.29.7",
+      "",
+      {},
+      "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="
+    ],
+    "@babel/helper-replace-supers": [
+      "@babel/helper-replace-supers@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/traverse": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-atfGXWSeCiF4DnKZIfmJfQRkSw9b9gNNXR1kqKjbhG4pGYCOnkp8OcTB8E3NXjBu8NpheSnOeNKz8KT7UNFTmQ=="
+    ],
+    "@babel/helper-skip-transparent-expression-wrappers": [
+      "@babel/helper-skip-transparent-expression-wrappers@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.13",
+          "@babel/types": "^7.29.11"
+        }
+      },
+      "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
+    ],
+    "@babel/helper-string-parser": [
+      "@babel/helper-string-parser@7.29.13",
+      "",
+      {},
+      "sha512-fWegr+WsEsiMVW4KUNdIIzzMTZSzNiqhy0//6+2MRi2d5NFNsL/AYwBQW8eBnRbTBVRnDVzjaJEUqKaCWjMMdQ=="
+    ],
+    "@babel/helper-validator-identifier": [
+      "@babel/helper-validator-identifier@7.29.7",
+      "",
+      {},
+      "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
+    ],
+    "@babel/helper-validator-option": [
+      "@babel/helper-validator-option@7.29.7",
+      "",
+      {},
+      "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
+    ],
+    "@babel/helpers": [
+      "@babel/helpers@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.11"
+        }
+      },
+      "sha512-laoRpD/kO/iA4CDlgJbixHekg7oPvWALK0PQyK3Ob2I2njZRvVAD77RfWCIImtqWCq6KijoBoZK7bp/HlTWASQ=="
+    ],
+    "@babel/parser": [
+      "@babel/parser@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.11"
+        },
+        "bin": "./bin/babel-parser.js"
+      },
+      "sha512-fJM50YYjlTiBhgdkGmC1tBpv+FMAyo4annf2X6Aks+0yRlaiVkYW/3f07xAfVVkYIoZ9fFZp+mEThUFnuybhkQ=="
+    ],
+    "@babel/plugin-syntax-jsx": [
+      "@babel/plugin-syntax-jsx@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A=="
+    ],
+    "@babel/plugin-syntax-typescript": [
+      "@babel/plugin-syntax-typescript@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
+    ],
+    "@babel/plugin-transform-modules-commonjs": [
+      "@babel/plugin-transform-modules-commonjs@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-transforms": "^7.29.7",
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-j0vCldybPC5b5dwCQOJ21uKtHzt7hxLygJTg9eF1ScfaikEDNfzn94XoW5Fi+seBR0nCyL23xaBFFkq7dTM8XQ=="
+    ],
+    "@babel/plugin-transform-typescript": [
+      "@babel/plugin-transform-typescript@7.29.9",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-create-class-features-plugin": "^7.29.7",
+          "@babel/helper-plugin-utils": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.7",
+          "@babel/plugin-syntax-typescript": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-FFwIwzU+7SCOuxxV4YtJql6T9981ZVTm+FHO5GhVsRqCTdy0WwrEZh3l42ARpXruJUDGOptdduHW6Zr7pNPLNg=="
+    ],
+    "@babel/preset-typescript": [
+      "@babel/preset-typescript@7.27.1",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.27.1",
+          "@babel/helper-validator-option": "^7.27.1",
+          "@babel/plugin-syntax-jsx": "^7.27.1",
+          "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+          "@babel/plugin-transform-typescript": "^7.27.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ=="
+    ],
+    "@babel/template": [
+      "@babel/template@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
+    ],
+    "@babel/traverse": [
+      "@babel/traverse@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.13",
+          "@babel/helper-globals": "^7.29.7",
+          "@babel/parser": "^7.29.13",
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.11",
+          "debug": "^4.3.1"
+        }
+      },
+      "sha512-0ve0xMlFA73dgY1oyJRY6RoW+/bncdcOQqg6jjYcVfXBK90OdLXjm9R6lmRetdZVrPjXkKIoMVBqYFPjcAlZ4Q=="
+    ],
+    "@babel/types": [
+      "@babel/types@7.29.11",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-string-parser": "^7.29.11",
+          "@babel/helper-validator-identifier": "^7.29.7"
+        }
+      },
+      "sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ=="
+    ],
+    "@jridgewell/gen-mapping": [
+      "@jridgewell/gen-mapping@0.3.13",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/sourcemap-codec": "^1.5.0",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
+    ],
+    "@jridgewell/remapping": [
+      "@jridgewell/remapping@2.3.5",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/gen-mapping": "^0.3.5",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
+    ],
+    "@jridgewell/resolve-uri": [
+      "@jridgewell/resolve-uri@3.1.2",
+      "",
+      {},
+      "sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw=="
+    ],
+    "@jridgewell/sourcemap-codec": [
+      "@jridgewell/sourcemap-codec@1.6.0",
+      "",
+      {},
+      "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
+    ],
+    "@jridgewell/trace-mapping": [
+      "@jridgewell/trace-mapping@0.3.31",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/resolve-uri": "^3.1.0",
+          "@jridgewell/sourcemap-codec": "^1.4.14"
+        }
+      },
+      "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
+    ],
+    "@opentui/core": [
+      "@opentui/core@0.8.3",
+      "",
+      {
+        "dependencies": {
+          "bun-ffi-structs": "0.3.1",
+          "diff": "9.0.0",
+          "marked": "17.0.1",
+          "string-width": "7.2.0"
+        },
+        "optionalDependencies": {
+          "@opentui/core-darwin-arm64": "0.8.3",
+          "@opentui/core-darwin-x64": "0.8.3",
+          "@opentui/core-linux-arm64": "0.8.3",
+          "@opentui/core-linux-arm64-musl": "0.8.3",
+          "@opentui/core-linux-x64": "0.8.3",
+          "@opentui/core-linux-x64-musl": "0.8.3",
+          "@opentui/core-win32-arm64": "0.8.3",
+          "@opentui/core-win32-x64": "0.8.3"
+        },
+        "peerDependencies": {
+          "web-tree-sitter": "0.25.10"
+        }
+      },
+      "sha512-6Ng2jyiZZhGUTNbF8wXmjztihdGdx7uZq8O5bBgG/2XaCANw/BJgSxYb/nVFtorzShE9JcjszRhzh8XNxQ3yuA=="
+    ],
+    "@opentui/core-darwin-arm64": [
+      "@opentui/core-darwin-arm64@0.8.3",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "arm64"
+      },
+      "sha512-9YaOiVlld+J/POWW0TnUe9kX5+/9B0iEszdTAfgHFqSkVz4ndnYnFJTCC9fnwLrS+WOCked+7M9sS2DXiPpFQw=="
+    ],
+    "@opentui/core-darwin-x64": [
+      "@opentui/core-darwin-x64@0.8.3",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "x64"
+      },
+      "sha512-rHW+b4mnUgdy7cs1jxFOQqd/C0n+sumjJaNVKIPKvk+EuVr+HM2pIdhFvOThnKWTyp2GlNZtIJNKCaAf+QxvkA=="
+    ],
+    "@opentui/core-linux-arm64": [
+      "@opentui/core-linux-arm64@0.8.3",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64"
+      },
+      "sha512-1GeV1UZqzMTfOUKuymGUhCHD5XTJC4w2eA+zPDs/jBVgv2NqPL7sofoBHLzkyhlxZpuptQR+vVPs4sW4T+7YVg=="
+    ],
+    "@opentui/core-linux-arm64-musl": [
+      "@opentui/core-linux-arm64-musl@0.8.3",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64",
+        "libc": "musl"
+      },
+      "sha512-U2IbCGI7sjUZoO8h8UizREHRDWk0u/bOAmJ0L46xB3uyMWKfNU9f8x5jQF4v6apMMmb56/TPl/PUoVR1sQg15A=="
+    ],
+    "@opentui/core-linux-x64": [
+      "@opentui/core-linux-x64@0.8.3",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64"
+      },
+      "sha512-DIhEmsACFqucaqSMYZqQKXi10WmGuO0TpmqEz9hScqktcRlNAPpsB5qmO6qCEyXxTIbfaVxxlABcq1Xn3eB0aQ=="
+    ],
+    "@opentui/core-linux-x64-musl": [
+      "@opentui/core-linux-x64-musl@0.8.3",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64",
+        "libc": "musl"
+      },
+      "sha512-MJoGBVxNtmaQSu8rvzHrJKjS0Fd/ER/Sf9NKD+ep8nPanlffJPhRbX0cT0gvkKhK3G2Od+RXUr/tlUqy0U69ow=="
+    ],
+    "@opentui/core-win32-arm64": [
+      "@opentui/core-win32-arm64@0.8.3",
+      "",
+      {
+        "os": "win32",
+        "cpu": "arm64"
+      },
+      "sha512-g0R4PrOI93z7KaWXFw/PdA6DGWDcaK9aH88ECmnsI9At1KZoEb+Jik137qEz7bGWKGOXtn+JaHsne3vipB3vwQ=="
+    ],
+    "@opentui/core-win32-x64": [
+      "@opentui/core-win32-x64@0.8.3",
+      "",
+      {
+        "os": "win32",
+        "cpu": "x64"
+      },
+      "sha512-yjpxLUXeBc1eMW3pr4Fl9tpNuA7a4JdcGNVved9zFD3HZ07mM2YVfreLJeDn4n61jXUJKM8XtXVWBZM8RHF4gg=="
+    ],
+    "@opentui/solid": [
+      "@opentui/solid@0.8.3",
+      "",
+      {
+        "dependencies": {
+          "@babel/core": "7.29.7",
+          "@babel/preset-typescript": "7.27.1",
+          "@opentui/core": "0.8.3",
+          "babel-plugin-module-resolver": "5.0.2",
+          "babel-preset-solid": "1.9.16",
+          "entities": "7.0.1",
+          "s-js": "^0.4.9"
+        },
+        "peerDependencies": {
+          "solid-js": "^1.9.12"
+        }
+      },
+      "sha512-bhilJzWY4/Mh/7xxJa6FDOXeGbThCr7IjA1Vbr+OVTkzidmJzgATInwemnrepcPefAm0117AoQlHgc8jlP3lXQ=="
+    ],
+    "ansi-regex": [
+      "ansi-regex@6.6.0",
+      "",
+      {},
+      "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
+    ],
+    "babel-plugin-jsx-dom-expressions": [
+      "babel-plugin-jsx-dom-expressions@0.40.11",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "7.18.6",
+          "@babel/plugin-syntax-jsx": "^7.18.6",
+          "@babel/types": "^7.20.7",
+          "html-entities": "2.3.3",
+          "parse5": "^7.1.2"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.20.12"
+        }
+      },
+      "sha512-k7TkOv7uVYnrq/bYyVvG5cWOC9IObAGfmyW3aMkG8l2sq2qt/5THkUBja69PMLEGGi8G+fXB2Fh7eS4OwZRBoQ=="
+    ],
+    "babel-plugin-module-resolver": [
+      "babel-plugin-module-resolver@5.0.2",
+      "",
+      {
+        "dependencies": {
+          "find-babel-config": "^2.1.1",
+          "glob": "^9.3.3",
+          "pkg-up": "^3.1.0",
+          "reselect": "^4.1.7",
+          "resolve": "^1.22.8"
+        }
+      },
+      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
+    ],
+    "babel-preset-solid": [
+      "babel-preset-solid@1.9.16",
+      "",
+      {
+        "dependencies": {
+          "babel-plugin-jsx-dom-expressions": "^0.40.11"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0",
+          "solid-js": "^1.9.16"
+        },
+        "optionalPeers": [
+          "solid-js"
+        ]
+      },
+      "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
+    ],
+    "baseline-browser-mapping": [
+      "baseline-browser-mapping@2.11.35",
+      "",
+      {
+        "bin": {
+          "baseline-browser-mapping": "dist/cli.cjs"
+        }
+      },
+      "sha512-GNk8KX52CHqeNKGk8+7tZnQab/2k1t/BgrUHPKNdijzpEhF1saPQZHVKb6m5loSAxB39gyrTYw34Qf9CQ3u1qQ=="
+    ],
+    "browserslist": [
+      "browserslist@4.29.5",
+      "",
+      {
+        "dependencies": {
+          "baseline-browser-mapping": "^2.11.33",
+          "caniuse-lite": "^1.0.30001819",
+          "electron-to-chromium": "^1.5.464",
+          "node-releases": "^2.0.60",
+          "update-browserslist-db": "^1.3.4"
+        },
+        "bin": {
+          "browserslist": "cli.js"
+        }
+      },
+      "sha512-khTmKu5NGYTotqcYo8Bew2k4RAE9PuXRSFRXG2lQBrCEQHyeQ/vX6gKMxfokwywBsLiXZMnHsmWMG1pnO8J7uQ=="
+    ],
+    "bun-ffi-structs": [
+      "bun-ffi-structs@0.3.1",
+      "",
+      {
+        "peerDependencies": {
+          "typescript": "^5"
+        }
+      },
+      "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
+    ],
+    "caniuse-lite": [
+      "caniuse-lite@1.0.30001823",
+      "",
+      {},
+      "sha512-TQ5s/djDjNk1axreUW+4rULH+BmdCMLiJkhaXnO5wqivG7tITkSUj4ItIdzqdZHKaXcHAV8dhH3JxOM7/7bwqw=="
+    ],
+    "convert-source-map": [
+      "convert-source-map@2.0.0",
+      "",
+      {},
+      "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
+    ],
+    "csstype": [
+      "csstype@3.2.3",
+      "",
+      {},
+      "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="
+    ],
+    "debug": [
+      "debug@4.4.3",
+      "",
+      {
+        "dependencies": {
+          "ms": "^2.1.3"
+        },
+        "peerDependencies": {
+          "supports-color": "*"
+        },
+        "optionalPeers": [
+          "supports-color"
+        ]
+      },
+      "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="
+    ],
+    "diff": [
+      "diff@9.0.0",
+      "",
+      {},
+      "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
+    ],
+    "electron-to-chromium": [
+      "electron-to-chromium@1.5.478",
+      "",
+      {},
+      "sha512-pftG+ma5Lm8O6/p45bhYT6StBN5ziQymaRzmCZwFl8DwWHKPPD93FdOmP1aqftcepolQYvrcyTLa17kE8Yf+jg=="
+    ],
+    "emoji-regex": [
+      "emoji-regex@10.6.0",
+      "",
+      {},
+      "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="
+    ],
+    "entities": [
+      "entities@7.0.1",
+      "",
+      {},
+      "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
+    ],
+    "es-errors": [
+      "es-errors@1.3.0",
+      "",
+      {},
+      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
+    ],
+    "escalade": [
+      "escalade@3.2.0",
+      "",
+      {},
+      "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
+    ],
+    "find-babel-config": [
+      "find-babel-config@2.1.2",
+      "",
+      {
+        "dependencies": {
+          "json5": "^2.2.3"
+        }
+      },
+      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
+    ],
+    "fs.realpath": [
+      "fs.realpath@1.0.0",
+      "",
+      {},
+      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
+    ],
+    "function-bind": [
+      "function-bind@1.1.2",
+      "",
+      {},
+      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
+    ],
+    "gensync": [
+      "gensync@1.0.0-beta.2",
+      "",
+      {},
+      "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="
+    ],
+    "get-east-asian-width": [
+      "get-east-asian-width@1.6.0",
+      "",
+      {},
+      "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
+    ],
+    "glob": [
+      "glob@9.3.5",
+      "",
+      {
+        "dependencies": {
+          "fs.realpath": "^1.0.0",
+          "minimatch": "^8.0.2",
+          "minipass": "^4.2.4",
+          "path-scurry": "^1.6.1"
+        }
+      },
+      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
+    ],
+    "hasown": [
+      "hasown@2.0.4",
+      "",
+      {
+        "dependencies": {
+          "function-bind": "^1.1.2"
+        }
+      },
+      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
+    ],
+    "is-core-module": [
+      "is-core-module@2.18.0",
+      "",
+      {
+        "dependencies": {
+          "hasown": "^2.0.4"
+        }
+      },
+      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
+    ],
+    "js-tokens": [
+      "js-tokens@4.0.0",
+      "",
+      {},
+      "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="
+    ],
+    "jsesc": [
+      "jsesc@3.1.0",
+      "",
+      {
+        "bin": {
+          "jsesc": "bin/jsesc"
+        }
+      },
+      "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="
+    ],
+    "json5": [
+      "json5@2.2.3",
+      "",
+      {
+        "bin": {
+          "json5": "lib/cli.js"
+        }
+      },
+      "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
+    ],
+    "marked": [
+      "marked@17.0.1",
+      "",
+      {
+        "bin": {
+          "marked": "bin/marked.js"
+        }
+      },
+      "sha512-boeBdiS0ghpWcSwoNm/jJBwdpFaMnZWRzjA6SkUMYb40SVaN1x7mmfGKp0jvexGcx+7y2La5zRZsYFZI6Qpypg=="
+    ],
+    "minipass": [
+      "minipass@4.2.8",
+      "",
+      {},
+      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
+    ],
+    "ms": [
+      "ms@2.1.3",
+      "",
+      {},
+      "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
+    ],
+    "node-releases": [
+      "node-releases@2.0.63",
+      "",
+      {},
+      "sha512-6li2QanLsAXpIH2R6j77MzRyvOyrvdTqlKtO4CgBdHGNvN99ZZfyxszHc5o5+IZBWD5u6Hzwg83JoGXmqZNG9Q=="
+    ],
+    "p-try": [
+      "p-try@2.2.0",
+      "",
+      {},
+      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
+    ],
+    "parse5": [
+      "parse5@7.3.0",
+      "",
+      {
+        "dependencies": {
+          "entities": "^6.0.0"
+        }
+      },
+      "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
+    ],
+    "path-parse": [
+      "path-parse@1.0.7",
+      "",
+      {},
+      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
+    ],
+    "path-scurry": [
+      "path-scurry@1.11.1",
+      "",
+      {
+        "dependencies": {
+          "lru-cache": "^10.2.0",
+          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
+        }
+      },
+      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
+    ],
+    "picocolors": [
+      "picocolors@1.1.1",
+      "",
+      {},
+      "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
+    ],
+    "pkg-up": [
+      "pkg-up@3.1.0",
+      "",
+      {
+        "dependencies": {
+          "find-up": "^3.0.0"
+        }
+      },
+      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
+    ],
+    "reselect": [
+      "reselect@4.1.8",
+      "",
+      {},
+      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
+    ],
+    "resolve": [
+      "resolve@1.22.14",
+      "",
+      {
+        "dependencies": {
+          "es-errors": "^1.3.0",
+          "is-core-module": "^2.18.0",
+          "path-parse": "^1.0.7",
+          "supports-preserve-symlinks-flag": "^1.0.0"
+        },
+        "bin": {
+          "resolve": "bin/resolve"
+        }
+      },
+      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
+    ],
+    "s-js": [
+      "s-js@0.4.9",
+      "",
+      {},
+      "sha512-RtpOm+cM6O0sHg6IA70wH+UC3FZcND+rccBZpBAHzlUgNO2Bm5BN+FnM8+OBxzXdwpKWFwX11JGF0MFRkhSoIQ=="
+    ],
+    "seroval": [
+      "seroval@1.6.12",
+      "",
+      {},
+      "sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg=="
+    ],
+    "seroval-plugins": [
+      "seroval-plugins@1.6.12",
+      "",
+      {
+        "peerDependencies": {
+          "seroval": "^1.0"
+        }
+      },
+      "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
+    ],
+    "solid-js": [
+      "solid-js@1.9.18",
+      "",
+      {
+        "dependencies": {
+          "csstype": "^3.1.0",
+          "seroval": "~1.6.11",
+          "seroval-plugins": "~1.6.8"
+        }
+      },
+      "sha512-CHGO5YFk6Y9m/1YSxVtKnXfrW7JD3Tmof8HmR4z6TmCPsS8efo8LnzIR8CQh3cUvffqYm6DWyBFfk8dQw1CNQQ=="
+    ],
+    "string-width": [
+      "string-width@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "emoji-regex": "^10.3.0",
+          "get-east-asian-width": "^1.0.0",
+          "strip-ansi": "^7.1.0"
+        }
+      },
+      "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="
+    ],
+    "strip-ansi": [
+      "strip-ansi@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "ansi-regex": "^6.2.2"
+        }
+      },
+      "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
+    ],
+    "supports-preserve-symlinks-flag": [
+      "supports-preserve-symlinks-flag@1.0.0",
+      "",
+      {},
+      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
+    ],
+    "update-browserslist-db": [
+      "update-browserslist-db@1.3.4",
+      "",
+      {
+        "dependencies": {
+          "escalade": "^3.2.0",
+          "picocolors": "^1.1.1"
+        },
+        "peerDependencies": {
+          "browserslist": ">= 4.21.0"
+        },
+        "bin": {
+          "update-browserslist-db": "cli.js"
+        }
+      },
+      "sha512-t8wonIOdQyOjtPd2VktlBu6QjTVTks6v8bSi7kd0r2Vll8TK1JYDZtRRdbmCHOAMphkZgrzK+L+vXK4pyZ8t4A=="
+    ],
+    "web-tree-sitter": [
+      "web-tree-sitter@0.25.10",
+      "",
+      {
+        "peerDependencies": {
+          "@types/emscripten": "^1.40.0"
+        },
+        "optionalPeers": [
+          "@types/emscripten"
+        ]
+      },
+      "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="
+    ],
+    "yallist": [
+      "yallist@3.1.1",
+      "",
+      {},
+      "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="
+    ],
+    "@babel/core/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-compilation-targets/lru-cache": [
+      "lru-cache@5.1.1",
+      "",
+      {
+        "dependencies": {
+          "yallist": "^3.0.2"
+        }
+      },
+      "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="
+    ],
+    "@babel/helper-compilation-targets/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-create-class-features-plugin/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "babel-plugin-jsx-dom-expressions/@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.18.6",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.18.6"
+        }
+      },
+      "sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA=="
+    ],
+    "babel-plugin-jsx-dom-expressions/html-entities": [
+      "html-entities@2.3.3",
+      "",
+      {},
+      "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
+    ],
+    "bun-ffi-structs/typescript": [
+      "typescript@5.9.3",
+      "",
+      {
+        "bin": {
+          "tsc": "bin/tsc",
+          "tsserver": "bin/tsserver"
+        }
+      },
+      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    ],
+    "glob/minimatch": [
+      "minimatch@8.0.7",
+      "",
+      {
+        "dependencies": {
+          "brace-expansion": "^2.0.1"
+        }
+      },
+      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
+    ],
+    "parse5/entities": [
+      "entities@6.0.1",
+      "",
+      {},
+      "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
+    ],
+    "path-scurry/lru-cache": [
+      "lru-cache@10.4.3",
+      "",
+      {},
+      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
+    ],
+    "path-scurry/minipass": [
+      "minipass@7.1.3",
+      "",
+      {},
+      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
+    ],
+    "pkg-up/find-up": [
+      "find-up@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "locate-path": "^3.0.0"
+        }
+      },
+      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
+    ],
+    "glob/minimatch/brace-expansion": [
+      "brace-expansion@2.1.7",
+      "",
+      {
+        "dependencies": {
+          "balanced-match": "^1.0.0"
+        }
+      },
+      "sha512-uZbew1NqdmPDTMJ8ah1y+b+9QEJrfkXFk3RcTQw3X0jW/xRUvFKsg1CfQdSYGdTbXZWExtU3J3ccxtnfw1Fi0g=="
+    ],
+    "pkg-up/find-up/locate-path": [
+      "locate-path@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-locate": "^3.0.0",
+          "path-exists": "^3.0.0"
+        }
+      },
+      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
+    ],
+    "glob/minimatch/brace-expansion/balanced-match": [
+      "balanced-match@1.0.2",
+      "",
+      {},
+      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate": [
+      "p-locate@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-limit": "^2.0.0"
+        }
+      },
+      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
+    ],
+    "pkg-up/find-up/locate-path/path-exists": [
+      "path-exists@3.0.0",
+      "",
+      {},
+      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate/p-limit": [
+      "p-limit@2.3.0",
+      "",
+      {
+        "dependencies": {
+          "p-try": "^2.0.0"
+        }
+      },
+      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
+    ]
+  }
+}
+`;
+
+class TuiUnavailable extends TaggedError2("TuiUnavailable") {
+  get message() {
+    return this.reason;
+  }
+}
+var pathModule = (platform) => platform === "win32" ? win32 : posix;
+var cacheHome = (env, platform = process.platform) => {
+  const home = homeDirectory(env);
+  const { join } = pathModule(platform);
+  if (platform === "win32")
+    return firstNonEmpty(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
+  const xdg = firstNonEmpty(env["XDG_CACHE_HOME"]);
+  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
+};
+var guardedFolders = (env, platform) => {
+  const { join } = pathModule(platform);
+  const holyagent = join(cacheHome(env, platform), "holyagent");
+  return [holyagent, join(holyagent, "setup-tui")];
+};
+var lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8);
+var tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
+  ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
+  lockHash(lock)
+].join("_"));
+var INSTALLED_MARKER = ".holyagent-installed";
+var markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
+`;
+var FORMAT_CHARACTERS = /\p{Cf}/gu;
+var plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
+  const code = character.codePointAt(0) ?? 0;
+  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
+}).join("");
+var oneLine2 = (text) => plain(text.trim().split(`
+`)[0] ?? "").trim();
+var failureLine = (text) => {
+  const lines = text.split(`
+`).map((line) => plain(line).trim()).filter((line) => line !== "");
+  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
+};
+var unavailable = (what, cause) => new TuiUnavailable({
+  reason: plain(`${what}: ${oneLine2(cause instanceof Error ? cause.message : String(cause))}`)
+});
+var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
+  const manifest = `${JSON.stringify({ name: TUI_MANIFEST_NAME, private: true, dependencies: packages }, undefined, 2)}
+`;
+  for (const [file, text] of [
+    ["package.json", manifest],
+    ["bun.lock", lock]
+  ])
+    yield* tryPromise2({
+      try: () => Bun.write(join20(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join20(directory, file)}`, cause)
+    });
+  const shell = yield* Shell;
+  const result = yield* shell.run("bun", [
+    "--no-env-file",
+    `--config=${EMPTY_BUNFIG}`,
+    "install",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ], { cwd: directory });
+  if (result.exitCode !== 0)
+    return yield* new TuiUnavailable({
+      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
+    });
+});
+var importFile = (path) => tryPromise2({
+  try: () => import(pathToFileURL(path).href),
+  catch: (cause) => unavailable(`cannot import ${path}`, cause)
+});
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join20(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+  return;
+}));
+var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join20(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+  return;
+}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
+var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
+var fileSystem = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) });
+var STICKY = 512;
+var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined;
+var privateFolder = (folder, uid, create, home) => gen2(function* () {
+  if (create)
+    yield* fileSystem(`cannot create ${folder}`, () => mkdir5(folder, { recursive: true, mode: 448 }));
+  const found = yield* tryPromise2({
+    try: () => lstat5(folder),
+    catch: (cause) => cause
+  }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
+  if (found === undefined || uid === undefined)
+    return;
+  const refuse = (why) => new TuiUnavailable({
+    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
+  });
+  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat4(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
+  if (target.isSymbolicLink() || !target.isDirectory())
+    return yield* refuse("is not a plain directory");
+  if (target.uid !== uid)
+    return yield* refuse("belongs to another user");
+  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
+    return;
+  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
+    return;
+  return yield* refuse("can be written by others");
+});
+var namesPrivateGroup = (groupFile, gid, userName) => {
+  const entries = groupFile.split(`
+`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
+  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
+};
+var privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
+  const name = userName ?? (yield* try_2(() => userInfo2().username));
+  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
+  return namesPrivateGroup(text, gid, name);
+}).pipe(orElseSucceed2(() => false));
+var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm6(temporary, { force: true })));
+var remove = (path) => promise2(() => rm6(path, { recursive: true, force: true }));
+var promote = (temporary, directory, packages, lock) => gen2(function* () {
+  for (let attempt = 0;attempt < 3; attempt += 1) {
+    const moved = yield* exit2(fileSystem(`cannot move ${temporary}`, () => rename5(temporary, directory)));
+    if (moved._tag === "Success")
+      return;
+    if (yield* installed(directory, packages, lock))
+      return;
+    yield* remove(directory);
+  }
+  return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
+});
+var STALE_AFTER_MS = 60 * 60 * 1000;
+var newestChange = (path) => gen2(function* () {
+  const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join20(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join20(path, "node_modules"))];
+  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
+  return Math.max(...times);
+});
+var sweepStale = (directory, uid) => gen2(function* () {
+  const parent = dirname5(directory);
+  const prefix = `.${basename5(directory)}-`;
+  const cutoff = Date.now() - STALE_AFTER_MS;
+  const names = yield* tryPromise2(() => readdir2(parent));
+  yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
+    const path = join20(parent, name);
+    const found = yield* tryPromise2(() => lstat5(path));
+    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
+      yield* remove(path);
+  }).pipe(ignore2));
+}).pipe(ignore2);
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join20(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+  yield* install(temporary, packages, lock);
+  if (!(yield* hasPackages(temporary, packages)))
+    return yield* new TuiUnavailable({
+      reason: `the install finished but ${directory} does not hold the expected package versions`
+    });
+  yield* writeFresh(join20(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* promote(temporary, directory, packages, lock);
+}), remove);
+var loadSetupTui = (env, options = {}) => gen2(function* () {
+  const packages = options.packages ?? TUI_PACKAGES;
+  const lock = options.lock ?? TUI_LOCK;
+  const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
+  const source = options.bundle ?? join20(import.meta.dir, TUI_BUNDLE);
+  const install = options.install ?? bunInstall;
+  const importModule = options.importModule ?? importFile;
+  const uid = options.uid ?? process.getuid?.();
+  const text = yield* tryPromise2({
+    try: () => Bun.file(source).text(),
+    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
+  });
+  if (options.directory === undefined)
+    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname5(directory)])
+    yield* privateFolder(folder, uid, true);
+  yield* privateFolder(directory, uid, false);
+  if (!(yield* installed(directory, packages, lock))) {
+    if (options.notify !== undefined)
+      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
+`);
+    yield* installAtomically(directory, packages, lock, install, uid);
+  }
+  const target = join20(directory, TUI_BUNDLE);
+  yield* writeFresh(target, text);
+  yield* importModule(join20(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  const loaded = yield* importModule(target);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
+  return loaded;
+});
+
+var AppliedSchema = Struct({
+  ok: Boolean3,
+  lines: ArraySchema(String4)
+});
+var TuiOutcomeSchema = Union2([
+  Struct({ _tag: Literal2("Applied"), applied: AppliedSchema }),
+  Struct({ _tag: Literal2("Cancelled") }),
+  Struct({ _tag: Literal2("Interrupted") })
+]);
+
+var DEFAULT_CHOICES = { worktrees: true, deviceAccess: true };
+var set = (value) => value !== undefined && value !== "";
+var tuiFallbackReason = (options) => {
+  const { env, terminal } = options;
+  if (options.noTui)
+    return "--no-tui was passed";
+  if (options.choiceFlag)
+    return "a choice flag was passed, so it applies directly";
+  if (terminal === undefined || !terminal.stdin || !terminal.stdout)
+    return "stdin or stdout is not a terminal";
+  if (set(env["CI"]) && env["CI"] !== "false")
+    return "CI is set";
+  if (env["TERM"] === "dumb")
+    return "TERM is dumb";
+  return;
+};
+var t3Offer = fn2("t3Offer")(function* (env, cwd, options) {
+  if (options.undo || options.scope !== "user" || inCloudSession(env))
+    return;
+  if (!(yield* piInUse(env)))
+    return;
+  const preview = yield* previewT3Settings(env, cwd, DEFAULT_CHOICES).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
+  return preview === undefined || "line" in preview ? undefined : preview;
+});
+var offerOf = (preview) => ({
+  device: preview.device,
+  worktrees: preview.worktreesAllowed
+});
+var capitalized = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+var lineOf = (unit) => {
+  const name = capitalized(unit.name);
+  if (unit.own === true)
+    return { mark: "=", name, detail: "already written by setup" };
+  if (unit.left !== undefined)
+    return { mark: "~", name, detail: `left out: ${unit.left}` };
+  const kept = unit.kept.length === 0 ? [] : [`kept ${unit.kept.join(", ")} (yours wins)`];
+  const added = unit.added.length <= 2 ? unit.added.join(", ") : `${unit.added.length} keys, starting with ${(unit.added[0] ?? "").split(" ")[0]}`;
+  if (unit.added.length > 0)
+    return { mark: "+", name, detail: [added, ...kept].join("; ") };
+  if (kept.length > 0)
+    return { mark: "~", name, detail: kept.join("; ") };
+  return { mark: "=", name, detail: "already set" };
+};
+var choiceLine = (name, unit) => unit === undefined ? { mark: "-", name, detail: "off; nothing written" } : lineOf({ ...unit, name });
+var reviewOf = (preview, choices) => {
+  const unit = (choice) => preview.units.find((u) => u.choice === choice);
+  const pi = unit("pi");
+  return {
+    file: preview.file,
+    choices: [
+      ...pi === undefined ? [] : [lineOf({ ...pi, name: "Pi provider" })],
+      ...preview.device === undefined ? [] : [
+        choiceLine("Agent device access", choices.deviceAccess ? unit("deviceAccess") : undefined)
+      ],
+      ...preview.worktreesAllowed ? [
+        choiceLine("New threads in worktrees", choices.worktrees ? unit("worktrees") : undefined)
+      ] : []
+    ],
+    always: preview.units.filter((u) => u.choice === undefined).map(lineOf)
+  };
+};
+var fallback = (reason) => ({
+  kind: "line",
+  notes: [hint(`t3 tui: ${plain(reason)}; using the line-based setup`)]
+});
+var decodeOutcome = decodeUnknownEffect2(TuiOutcomeSchema, { onExcessProperty: "error" });
+var runInteractive = fn2("runInteractive")(function* (options) {
+  const preview = yield* t3Offer(options.env, options.cwd, options);
+  if (preview === undefined)
+    return { kind: "line", notes: [] };
+  const reason = tuiFallbackReason(options);
+  if (reason !== undefined)
+    return fallback(reason);
+  const load = options.load ?? ((env, notify) => loadSetupTui(env, { notify }));
+  const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
+  if (loaded instanceof TuiUnavailable)
+    return fallback(`unavailable (${loaded.reason})`);
+  const input = {
+    env: options.env,
+    offer: offerOf(preview),
+    initial: DEFAULT_CHOICES,
+    dryRun: options.dryRun,
+    review: (choices) => runPromise2(previewT3Settings(options.env, options.cwd, choices).pipe(flatMap2((next) => next === undefined || ("line" in next) ? fail5(new Error("the T3 settings step has nothing to do any more")) : succeed6(reviewOf(next, choices))))),
+    apply: (choices, signal) => runPromise2(options.apply(choices), { signal })
+  };
+  return yield* tryPromise2({
+    try: () => loaded.runSetupTui(input),
+    catch: (cause) => cause
+  }).pipe(flatMap2(decodeOutcome), map4((outcome) => {
+    if (outcome._tag === "Applied") {
+      const applied = outcome.applied;
+      return { kind: "done", report: { lines: applied.lines, ok: applied.ok } };
+    }
+    return {
+      kind: "done",
+      report: outcome._tag === "Cancelled" ? { lines: [hint("setup cancelled; nothing was written")], ok: false } : {
+        lines: [
+          "! setup was interrupted while applying; run holyagent setup again to finish"
+        ],
+        ok: false
+      }
+    };
+  }), catch_2((cause) => succeed6(fallback(`failed to start (${oneLine3(cause)})`))));
+});
+var oneLine3 = (cause) => (cause instanceof Error ? cause.message : String(cause)).trim().split(`
+`)[0] ?? "";
+
 var CacheTtlFlag = Literals(CACHE_TTLS);
+var SwitchFlag = Literals(["on", "off"]);
 var ScopeFlag = Literals(SCOPES);
 var printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
 `, "", report.ok ? 0 : 1);
-var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]";
+var resolveScope = fn2("resolveScope")(function* (flag, usage, cwd) {
+  if (flag === undefined)
+    return yield* installedScope(cwd);
+  const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
+  return { scope, source: "flag" };
+});
+var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--worktrees on|off] [--device-access on|off] [--no-tui]";
+var switchFlag = fn2("switchFlag")(function* (args, name) {
+  const value = stringFlag(args, name);
+  if (value === undefined)
+    return;
+  return (yield* choiceFlag(SwitchFlag, name, value, SETUP_USAGE)) === "on";
+});
 var DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]";
 var SETUP_COMMANDS = [
   {
@@ -21619,50 +25026,109 @@ var SETUP_COMMANDS = [
     output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
       "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
+      "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
       "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-      "--scope picks the file like Claude Code's scopes: user (default) is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+      "--scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+      "without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
       "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
-      "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 stays installed; honors --dry-run",
-      "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"
+      "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
+      "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+      "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
+      "in a terminal, when the T3 part has work (Pi in use, scope user, T3 Code installed), setup shows an interactive screen for the two choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
+      "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps"
     ],
     flags: {
       scope: "string",
       undo: "boolean",
       "dry-run": "boolean",
       "subagent-cache-ttl": "string",
-      "skip-ctx7": "boolean"
+      "skip-ctx7": "boolean",
+      worktrees: "string",
+      "device-access": "string",
+      "no-tui": "boolean"
     },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd }) => gen2(function* () {
-      const scope = yield* choiceFlag(ScopeFlag, "scope", stringFlag(args, "scope") ?? "user", SETUP_USAGE);
+    run: ({ args, env, cwd, emit, terminal, setupTui }) => gen2(function* () {
+      const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+      if (resolved instanceof SetupFailure) {
+        return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
+      }
       const subagentCacheTtl = yield* choiceFlag(CacheTtlFlag, "subagent-cache-ttl", stringFlag(args, "subagent-cache-ttl") ?? "1h", SETUP_USAGE);
-      const report = yield* setup(env, {
-        scope,
-        undo: booleanFlag(args, "undo"),
+      const flagged = {
+        worktrees: yield* switchFlag(args, "worktrees"),
+        deviceAccess: yield* switchFlag(args, "device-access")
+      };
+      const apply = (choices, notes = []) => gen2(function* () {
+        const report = yield* setup(env, {
+          scope: resolved.scope,
+          undo: booleanFlag(args, "undo"),
+          cwd,
+          subagentCacheTtl,
+          dryRun: booleanFlag(args, "dry-run"),
+          skipCtx7: booleanFlag(args, "skip-ctx7"),
+          ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
+          ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }
+        });
+        return {
+          ...report,
+          lines: [
+            hint(`scope: ${describeScope(resolved)}`),
+            ...scopeNotices(resolved).map((notice) => hint(`scope: ${notice}`)),
+            ...notes,
+            ...report.lines
+          ]
+        };
+      }).pipe(provide3(Shell.live(env)));
+      const interactive = yield* runInteractive({
+        env,
         cwd,
-        subagentCacheTtl,
+        scope: resolved.scope,
+        undo: booleanFlag(args, "undo"),
         dryRun: booleanFlag(args, "dry-run"),
-        skipCtx7: booleanFlag(args, "skip-ctx7")
+        terminal,
+        noTui: booleanFlag(args, "no-tui"),
+        choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined,
+        ...setupTui === undefined ? {} : { load: setupTui },
+        notify: emit,
+        apply: (choices) => apply(choices)
       });
-      return printed(report);
+      if (interactive.kind === "done")
+        return printed(interactive.report);
+      return printed(yield* apply(flagged, interactive.notes));
     }).pipe(provide3(Shell.live(env)))
   },
   {
     path: ["doctor"],
     usage: DOCTOR_USAGE,
-    summary: "Check bun, ctx7 and the settings of a scope; exit 1 when a check fails",
+    summary: "Check bun, ctx7 and the settings of a scope, and, when Pi is in use, pi, node and the Pi packages the config enables; exit 1 when a check fails",
     output: "one line per check, `ok   <name>: \u2026` or `FAIL <name>: \u2026`; exit 1 when any check failed",
     notes: [
-      "--scope picks the settings file to check, as for setup (user by default); --fix then merges into that file",
-      "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun"
+      "--scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
+      "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
+      "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages"
     ],
     flags: { scope: "string", fix: "boolean" },
     stateless: true,
     positionals: 0,
     run: ({ args, env, cwd }) => gen2(function* () {
-      const scope = yield* choiceFlag(ScopeFlag, "scope", stringFlag(args, "scope") ?? "user", DOCTOR_USAGE);
-      return printed(yield* doctor(env, { fix: booleanFlag(args, "fix"), scope, cwd }));
+      const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+      if (resolved instanceof SetupFailure) {
+        return printed({ lines: [fail6("scope", resolved.message)], ok: false });
+      }
+      const report = yield* doctor(env, {
+        fix: booleanFlag(args, "fix"),
+        scope: resolved.scope,
+        cwd
+      });
+      return printed({
+        ...report,
+        lines: [
+          pass("scope", describeScope(resolved)),
+          ...scopeNotices(resolved).map((notice) => hint(`scope: ${notice}`)),
+          ...report.lines
+        ]
+      });
     }).pipe(provide3(Shell.live(env)))
   }
 ];
@@ -21695,14 +25161,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join16 } from "path";
+import { join as join21 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join16(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join21(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -21719,7 +25185,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join16(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join21(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
@@ -21770,46 +25236,25 @@ var COMMANDS = [
   ...HOOK_COMMANDS
 ];
 
-import { join as join17 } from "path";
-var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES";
-var Minutes = NumberFromString.check(isFinite2(), isGreaterThanOrEqualTo2(0));
-var reuseTtl = (env) => {
-  const raw = env[TTL_VARIABLE];
-  return raw === undefined || raw.trim() === "" ? succeed6(DEFAULT_CONFIG.ttlMinutes) : decodeUnknownEffect2(Minutes)(raw.trim()).pipe(mapError2(() => new Usage({
-    message: `${TTL_VARIABLE} must be a number of minutes, not "${raw}"`,
-    hint: `Unset ${TTL_VARIABLE} for the default of ${DEFAULT_CONFIG.ttlMinutes}.`
-  })));
-};
-var WorkflowSettings = Struct({
-  disableWorkflows: optionalKey2(Boolean3),
-  enableWorkflows: optionalKey2(Boolean3)
-});
-var disablesWorkflows = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map4((settings) => settings.disableWorkflows === true || settings.enableWorkflows === false))), orElseSucceed2(() => false));
-var workflowsAvailable = (env, root) => {
-  if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
-    return succeed6(false);
-  const files = [
-    join17(claudeConfigDirectory(env), "settings.json"),
-    join17(root, ".claude", "settings.json"),
-    join17(root, ".claude", "settings.local.json")
-  ];
-  return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
-};
-var loadConfig = (env, root) => all2({ ttlMinutes: reuseTtl(env), workflowsAvailable: workflowsAvailable(env, root) }).pipe(map4((config) => config));
-
-var help = (command) => [
-  `${command.usage}  ${command.summary}`,
-  ...command.input === undefined ? [] : [
-    `${INPUT_FLAG in command.flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${command.input}`
-  ],
-  ...command.output === undefined ? [] : [`stdout: ${command.output}`],
-  ...(command.notes ?? []).map((note) => `note: ${note}`)
-].join(`
+var forWords = (command, words) => command.forHost === undefined ? command : { ...command, ...command.forHost(words) };
+var help = (command, words) => {
+  const { usage, summary, input, output, notes, flags } = forWords(command, words);
+  return [
+    `${usage}  ${summary}`,
+    ...input === undefined ? [] : [`${INPUT_FLAG in flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${input}`],
+    ...output === undefined ? [] : [`stdout: ${output}`],
+    ...(notes ?? []).map((note) => `note: ${note}`)
+  ].join(`
 `);
-var topHelp = () => [
+};
+var listed = (host) => COMMANDS.filter((command) => command.hosts === undefined || command.hosts.includes(host));
+var topHelp = (host, words) => [
   "holyagent <command> [args]; JSON inline as `--input '<json>'` or on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
   "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
-  ...COMMANDS.map((command) => `${command.usage}  ${command.summary}`),
+  ...listed(host).map((command) => {
+    const { usage, summary } = forWords(command, words);
+    return `${usage}  ${summary}`;
+  }),
   "help [command] or <command> --help shows a command's input shape, stdout and rules"
 ].join(`
 `);
@@ -21823,41 +25268,56 @@ var callFor = (args, host, emit, command) => gen2(function* () {
     root,
     directory,
     update: (transition) => updateState(directory, transition, host.env, undefined, resolved),
-    config: loadConfig(host.env, root),
+    config: loadConfig2(host.env, root),
     text: readReport(host),
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
     tools: host.tools ?? BUNDLED_TOOLS,
+    terminal: host.terminal,
+    setupTui: host.setupTui,
     input: (schema) => readInput(host, schema, inline),
     inputBy: (pick) => readInputBy(host, pick, inline)
   };
 });
+var hostForText = (env) => agentHostOf(env).pipe(orElseSucceed2(() => "claude"));
 var asFlag = (argv) => argv[0] === "help" ? argv.length === 1 ? ["--help"] : [...argv.slice(1), "--help"] : argv;
 var execute = (given, host) => gen2(function* () {
   const argv = asFlag(given);
   const [first] = argv;
-  if (first === undefined || first === "--help" || first === "-h")
-    return { stdout: `${topHelp()}
+  if (first === undefined || first === "--help" || first === "-h") {
+    const agent = yield* hostForText(host.env);
+    return { stdout: `${topHelp(agent, wordsFor(agent))}
 `, stderr: "", code: 0 };
+  }
   if (first === "--version")
     return { stdout: `${version}
 `, stderr: "", code: 0 };
   const command = COMMANDS.find((candidate) => candidate.path.every((word, index) => argv[index] === word));
   if (command === undefined) {
     const group = COMMANDS.filter((candidate) => candidate.path[0] === first);
-    if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h")))
-      return { stdout: `${group.map(help).join(`
+    if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h"))) {
+      const agent = yield* hostForText(host.env);
+      const words = wordsFor(agent);
+      const shown = listed(agent).filter((candidate) => group.includes(candidate));
+      return {
+        stdout: `${shown.map((entry) => help(entry, words)).join(`
 `)}
-`, stderr: "", code: 0 };
+`,
+        stderr: "",
+        code: 0
+      };
+    }
     return yield* new Usage({
       message: `Unknown command ${argv.slice(0, 2).join(" ")}`,
       hint: group.length > 0 ? `Run \`holyagent ${first} --help\` for its commands.` : "Run `holyagent --help` for the commands."
     });
   }
   const rest = argv.slice(command.path.length);
-  if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h")))
-    return { stdout: `${help(command)}
+  if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h"))) {
+    const agent = yield* hostForText(host.env);
+    return { stdout: `${help(command, wordsFor(agent))}
 `, stderr: "", code: 0 };
+  }
   const args = command.raw === true ? { positionals: rest, flags: {} } : yield* parseArgs(rest, command.flags, command.usage);
   const count = args.positionals.length;
   if (command.raw !== true && count !== command.positionals && !(command.optional && count === command.positionals - 1))
@@ -21880,13 +25340,13 @@ ${output.text}
 `;
   return { stdout, stderr: "", code: 0 };
 });
-var failed3 = (error) => {
-  const { tag, message, hint, code } = describeFailure(error);
+var failed3 = (error, env) => hostForText(env).pipe(map4((agent) => {
+  const { tag, message, hint, code } = describeFailure(error, wordsFor(agent));
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
-};
-var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => succeed6(failed3(error))), catchCause2((cause) => succeed6(failed3({ _tag: "Defect", message: pretty(cause) }))));
+}));
+var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => failed3(error, host.env)), catchCause2((cause) => failed3({ _tag: "Defect", message: pretty(cause) }, host.env)));
 
 var stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ reason: "stdin is a terminal" })) : tryPromise2({
   try: () => Bun.stdin.text(),
@@ -21904,5 +25364,6 @@ await runPromise2(run2(Bun.argv.slice(2), {
   cwd: process.cwd(),
   env: process.env,
   stdin,
-  emit: (text) => write(process.stdout, text)
+  emit: (text) => write(process.stdout, text),
+  terminal: { stdin: Boolean(process.stdin.isTTY), stdout: Boolean(process.stdout.isTTY) }
 }).pipe(tap2((result) => write(process.stdout, result.stdout).pipe(andThen2(write(process.stderr, result.stderr)), andThen2(sync2(() => void (process.exitCode = result.code)))))));

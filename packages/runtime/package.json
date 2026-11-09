@@ -1,11 +1,14 @@
 {
   "name": "@holyagent/runtime",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "The holyagent runtime shared by every harness: the domain, the state, the vcs commands, the instruction text and the command line.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "instructions:scaffold": "mise run instructions:scaffold"
   },
   "dependencies": {
     "@toon-format/toon": "^4.0.0",

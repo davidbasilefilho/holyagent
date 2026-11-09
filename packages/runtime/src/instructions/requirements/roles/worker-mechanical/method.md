@@ -1,0 +1,1 @@
+- R-WM: Apply a specified transformation at every covered site and confirm by search that none remains and no other site changed.

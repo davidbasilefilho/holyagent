@@ -8,7 +8,7 @@ description: Use when you write or review model-facing text other than a brief: 
 The tag after each rule names its page: S55 Sonnet 5.5, O55 Opus 5.5, H55 Haiku 5.5, S5 Sonnet 5, O5 Opus 5, BP prompting best practices. A rule marked "by inference" comes from a page written for an earlier model. A rule tagged with an author comes from the cited study.
 
 - Write model-facing text in US English, terse and direct.
-- Write each model's instruction set from `requirements.md`, the model-agnostic behavior requirements, and cover every line; change a behavior there first, then in the sets.
+- Write each model's instruction set from the `requirements/` tree, the model-agnostic behavior requirements, and the family's `guide.md`, and cover every id; change a behavior in the requirements first, then in the sets.
 - Keep each prompt section in its own file, so a change touches one section and the assembled order stays fixed.
 - Give the full task, intent and constraints with the reason beside each rule, so the reader can apply it beyond the example. Say what to do rather than what to avoid, and scope each broad rule. (S5 by inference; BP)
 - Write calmly in imperative verbs, with no capital-letter emphasis or "if in doubt" defaults, which push models to overreach. Give a concrete threshold instead of "important" or "minor". (emphasis: BP, Opus 4.5 and 4.6, by inference; thresholds: S5 and O5, by inference)

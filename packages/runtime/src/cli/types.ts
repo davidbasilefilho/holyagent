@@ -2,6 +2,12 @@ import type { Effect, Layer, Schema } from "effect"
 
 import type { ExecutionConfig } from "../domain/directive.ts"
 import type { InvalidDraft } from "../domain/errors.ts"
+import type { AgentHost, HostWords } from "../domain/host.ts"
+import type { Env } from "../setup/environment.ts"
+import type { Shell } from "../setup/shell.ts"
+import type { TuiUnavailable } from "../setup/tui/load.ts"
+import type { Terminal } from "../setup/tui/session.ts"
+import type { SetupTuiModule } from "../setup/tui/types.ts"
 import type { Snapshot, StateChange, updateState } from "../state/store.ts"
 import type { Ensure } from "../state/tree.ts"
 import type { Git } from "../vcs/git.ts"
@@ -44,6 +50,12 @@ export class Streamed {
   constructor(readonly code: number) {}
 }
 
+/** Loads the setup interface, printing a notice through `notify` before a first install. */
+export type SetupTuiLoader = (
+  env: Env,
+  notify: (text: string) => Effect.Effect<void>,
+) => Effect.Effect<SetupTuiModule, TuiUnavailable, Shell>
+
 /** What the CLI needs from the process it runs in; tests supply their own. */
 export interface Host {
   readonly cwd: string
@@ -59,6 +71,13 @@ export interface Host {
    * absent.
    */
   readonly tools?: string
+  /**
+   * Whether stdin and stdout are terminals, which decides whether `setup` may show its interface;
+   * neither is when absent, so a test or a pipe gets the line-based setup.
+   */
+  readonly terminal?: Terminal
+  /** Loads the setup interface for `setup`; the real loader when absent. A seam for tests. */
+  readonly setupTui?: SetupTuiLoader
 }
 
 /** Everything a command may use while it runs. */
@@ -92,6 +111,10 @@ export interface Call {
   readonly vcs: Layer.Layer<Git | GitHub>
   /** The folder of the bundled search tools, with one subfolder for each target. */
   readonly tools: string
+  /** Whether stdin and stdout are terminals; see {@link Host.terminal}. */
+  readonly terminal: Terminal | undefined
+  /** Loads the setup interface; see {@link Host.setupTui}. */
+  readonly setupTui: SetupTuiLoader | undefined
   /**
    * Reads the JSON payload, from the inline `--input` flag when the command has it and it was
    * given, else from stdin, and decodes it strictly; unknown fields are refused. With the flag,
@@ -121,6 +144,15 @@ export interface Command {
   readonly output?: string
   /** Further help lines, for what the model must know to use the command without a manual. */
   readonly notes?: ReadonlyArray<string>
+  /**
+   * The help text that names a host's tools, for that host's `words`; the fields above hold the
+   * Claude form. A command whose help names none leaves it out.
+   */
+  readonly forHost?: (
+    words: HostWords,
+  ) => Partial<Pick<Command, "summary" | "input" | "output" | "notes">>
+  /** The hosts whose help lists the command; every host when absent. It still runs under any. */
+  readonly hosts?: ReadonlyArray<AgentHost>
   readonly flags: FlagSpec
   /** True when the command needs neither the state root nor git, so no git runs before it. */
   readonly stateless?: true

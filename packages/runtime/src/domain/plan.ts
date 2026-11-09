@@ -1,12 +1,13 @@
 import type { Assignment } from "./assignment.ts"
 import { directiveFor, type ExecutionConfig } from "./directive.ts"
+import { wordsFor } from "./host.ts"
 import { firstOverlap } from "./paths.ts"
 import type { Project } from "./project.ts"
 import { dispatchBlock } from "./readiness.ts"
 import { isReviewer, isWriter } from "./route.ts"
 import type { Registry } from "./specialists.ts"
 
-/** An Assignment that continues a warm specialist, which only SendMessage can reach. */
+/** An Assignment that continues a warm specialist, which only a message can reach. */
 export interface Continuation {
   readonly assignmentId: string
   readonly agentId: string
@@ -22,15 +23,15 @@ export type Recommendation =
        */
       readonly assignmentIds: ReadonlyArray<string>
       /**
-       * The same work as direct subagents, for a session where the Workflow tool is disabled or
-       * unavailable: the Assignments to launch together, and for writer and review pairs the
+       * The same work as direct subagents, for a session where the host's workflow tool is disabled
+       * or unavailable: the Assignments to launch together, and for writer and review pairs the
        * reviews to launch once those have closed.
        */
       readonly fallback: {
         readonly assignmentIds: ReadonlyArray<string>
         readonly afterwards: ReadonlyArray<string>
       }
-      /** Ready work beside the workflow that continues a warm specialist, by SendMessage. */
+      /** Ready work beside the workflow that continues a warm specialist, by a message. */
       readonly continues: ReadonlyArray<Continuation>
       readonly reason: string
     }
@@ -180,6 +181,7 @@ export const recommend = (
       dispatchBlock(project, row, undefined, workTree) === undefined &&
       awaited(project, row).length === 0,
   )
+  const words = wordsFor(config.host)
   if (config.workflowsAvailable) {
     // A workflow's agents are new and cannot be messaged, so work that would continue a warm
     // specialist stays out; the warm context is worth more than the workflow.
@@ -218,7 +220,7 @@ export const recommend = (
           reason:
             continues.length === 0
               ? reason
-              : `${reason}; the Assignments in continues go by SendMessage to their warm specialists`,
+              : `${reason}; the Assignments in continues go by ${words.message} to their warm specialists`,
         }
       }
     }
@@ -233,14 +235,14 @@ export const recommend = (
       action: "continue",
       assignmentIds: continues.map((row) => row.assignmentId),
       continues,
-      reason: "each continues a warm specialist by SendMessage",
+      reason: `each continues a warm specialist by ${words.message}`,
     }
   }
   if (chosen.length > 1)
     return {
       action: "subagent",
       assignmentIds,
-      reason: "the Workflow tool is disabled or unavailable",
+      reason: `the ${words.workflowTool} tool is disabled or unavailable`,
     }
   const [first] = chosen
   if (first === undefined) return undefined

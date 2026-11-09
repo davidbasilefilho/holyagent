@@ -2,6 +2,7 @@ import { encode } from "@toon-format/toon"
 import { Cause, Effect } from "effect"
 
 import { version } from "../../../../package.json" with { type: "json" }
+import { type AgentHost, type HostWords, wordsFor } from "../domain/host.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { WorkTree } from "../state/local.ts"
 import { updateState } from "../state/store.ts"
@@ -9,7 +10,7 @@ import { resolveState } from "../state/tree.ts"
 import { vcsLive } from "../vcs/live.ts"
 import { INPUT_FLAG, parseArgs, stringFlag } from "./args.ts"
 import { COMMANDS } from "./commands.ts"
-import { loadConfig } from "./config.ts"
+import { agentHostOf, loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport } from "./context.ts"
 import { describeFailure, Usage } from "./errors.ts"
 import { BUNDLED_TOOLS } from "./tools.ts"
@@ -22,23 +23,34 @@ export interface Result {
   readonly code: number
 }
 
-const help = (command: Command): string =>
-  [
-    `${command.usage}  ${command.summary}`,
-    ...(command.input === undefined
-      ? []
-      : [
-          `${INPUT_FLAG in command.flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${command.input}`,
-        ]),
-    ...(command.output === undefined ? [] : [`stdout: ${command.output}`]),
-    ...(command.notes ?? []).map((note) => `note: ${note}`),
-  ].join("\n")
+/** The command with the help text of a host's `words`. */
+const forWords = (command: Command, words: HostWords): Command =>
+  command.forHost === undefined ? command : { ...command, ...command.forHost(words) }
 
-const topHelp = (): string =>
+const help = (command: Command, words: HostWords): string => {
+  const { usage, summary, input, output, notes, flags } = forWords(command, words)
+  return [
+    `${usage}  ${summary}`,
+    ...(input === undefined
+      ? []
+      : [`${INPUT_FLAG in flags ? "input (--input '<json>' or stdin)" : "stdin"}: ${input}`]),
+    ...(output === undefined ? [] : [`stdout: ${output}`]),
+    ...(notes ?? []).map((note) => `note: ${note}`),
+  ].join("\n")
+}
+
+/** The commands a host's help lists: those that name no hosts, or name this one. */
+const listed = (host: AgentHost): ReadonlyArray<Command> =>
+  COMMANDS.filter((command) => command.hosts === undefined || command.hosts.includes(host))
+
+const topHelp = (host: AgentHost, words: HostWords): string =>
   [
     "holyagent <command> [args]; JSON inline as `--input '<json>'` or on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
     "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
-    ...COMMANDS.map((command) => `${command.usage}  ${command.summary}`),
+    ...listed(host).map((command) => {
+      const { usage, summary } = forWords(command, words)
+      return `${usage}  ${summary}`
+    }),
     "help [command] or <command> --help shows a command's input shape, stdout and rules",
   ].join("\n")
 
@@ -70,10 +82,17 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
       emit,
       vcs: host.vcs ?? vcsLive(root, host.env),
       tools: host.tools ?? BUNDLED_TOOLS,
+      terminal: host.terminal,
+      setupTui: host.setupTui,
       input: (schema) => readInput(host, schema, inline),
       inputBy: (pick) => readInputBy(host, pick, inline),
     } satisfies Call
   })
+
+// A host setting that cannot be read is no reason to lose the failure being reported or the help
+// being asked for: Claude's words stand in for it. Commands that load the config still refuse it.
+const hostForText = (env: Host["env"]) =>
+  agentHostOf(env).pipe(Effect.orElseSucceed((): AgentHost => "claude"))
 
 /**
  * `help` is `--help` as a word: alone it is the top help, and `help assignment close` is that
@@ -86,16 +105,29 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
   Effect.gen(function* () {
     const argv = asFlag(given)
     const [first] = argv
-    if (first === undefined || first === "--help" || first === "-h")
-      return { stdout: `${topHelp()}\n`, stderr: "", code: 0 }
+    if (first === undefined || first === "--help" || first === "-h") {
+      const agent = yield* hostForText(host.env)
+      return { stdout: `${topHelp(agent, wordsFor(agent))}\n`, stderr: "", code: 0 }
+    }
     if (first === "--version") return { stdout: `${version}\n`, stderr: "", code: 0 }
     const command = COMMANDS.find((candidate) =>
       candidate.path.every((word, index) => argv[index] === word),
     )
     if (command === undefined) {
       const group = COMMANDS.filter((candidate) => candidate.path[0] === first)
-      if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h")))
-        return { stdout: `${group.map(help).join("\n")}\n`, stderr: "", code: 0 }
+      if (
+        group.length > 0 &&
+        (argv.length === 1 || argv.includes("--help") || argv.includes("-h"))
+      ) {
+        const agent = yield* hostForText(host.env)
+        const words = wordsFor(agent)
+        const shown = listed(agent).filter((candidate) => group.includes(candidate))
+        return {
+          stdout: `${shown.map((entry) => help(entry, words)).join("\n")}\n`,
+          stderr: "",
+          code: 0,
+        }
+      }
       return yield* new Usage({
         message: `Unknown command ${argv.slice(0, 2).join(" ")}`,
         hint:
@@ -105,8 +137,10 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
       })
     }
     const rest = argv.slice(command.path.length)
-    if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h")))
-      return { stdout: `${help(command)}\n`, stderr: "", code: 0 }
+    if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h"))) {
+      const agent = yield* hostForText(host.env)
+      return { stdout: `${help(command, wordsFor(agent))}\n`, stderr: "", code: 0 }
+    }
     const args =
       command.raw === true
         ? { positionals: rest, flags: {} }
@@ -136,10 +170,13 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
     return { stdout, stderr: "", code: 0 }
   })
 
-const failed = (error: unknown): Result => {
-  const { tag, message, hint, code } = describeFailure(error)
-  return { stdout: "", stderr: `error: ${tag}: ${message}\nhint: ${hint}\n`, code }
-}
+const failed = (error: unknown, env: Host["env"]) =>
+  hostForText(env).pipe(
+    Effect.map((agent): Result => {
+      const { tag, message, hint, code } = describeFailure(error, wordsFor(agent))
+      return { stdout: "", stderr: `error: ${tag}: ${message}\nhint: ${hint}\n`, code }
+    }),
+  )
 
 /**
  * Runs one command line and returns what to print and the exit code; it never fails. A failure
@@ -148,8 +185,8 @@ const failed = (error: unknown): Result => {
  */
 export const run = (argv: ReadonlyArray<string>, host: Host): Effect.Effect<Result> =>
   execute(argv, host).pipe(
-    Effect.catch((error) => Effect.succeed(failed(error))),
+    Effect.catch((error) => failed(error, host.env)),
     Effect.catchCause((cause) =>
-      Effect.succeed(failed({ _tag: "Defect", message: Cause.pretty(cause) })),
+      failed({ _tag: "Defect", message: Cause.pretty(cause) }, host.env),
     ),
   )

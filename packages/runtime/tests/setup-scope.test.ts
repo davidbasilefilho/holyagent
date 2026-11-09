@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, readdir, realpath, stat, symlink, writeFile } from "node:fs/promises"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import * as filesystem from "node:fs/promises"
+import { link, mkdir, readdir, realpath, stat, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { $ } from "bun"
@@ -8,7 +9,7 @@ import { Effect } from "effect"
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
 import { doctor } from "../src/setup/doctor.ts"
-import type { Scope } from "../src/setup/scope.ts"
+import { installedScope, type Scope, scopeNotices } from "../src/setup/scope.ts"
 import { setup } from "../src/setup/steps.ts"
 import { fakeShell, scratch } from "./setup-fixture.ts"
 
@@ -553,5 +554,539 @@ describe("--scope as a command flag", () => {
     const result = await cli(["setup", "--skip-ctx7"], home)
     expect(result.code).toBe(0)
     expect(await exists(userFile())).toBe(true)
+  })
+})
+
+describe("the default scope is user unless the local settings enable the plugin", () => {
+  const enabled = { enabledPlugins: { "holyagent@holyagent": true } }
+  const disabled = { enabledPlugins: { "holyagent@holyagent": false } }
+  const files = () => ({ local: localFile(), project: projectFile(), user: userFile() })
+  const DEFAULT = "~ scope: user (default)"
+  /** The repository is a real one, so the project and local files sit in its top-level. */
+  const initRepo = async () => {
+    await $`git init -q ${repo()}`.quiet()
+    const top = await realpath(repo())
+    return {
+      local: join(top, ".claude", "settings.local.json"),
+      project: join(top, ".claude", "settings.json"),
+      user: userFile(),
+    }
+  }
+
+  /** Adds an index entry named `path` holding `content`, without touching the work tree. */
+  const trackEntry = async (path: string, content: string) => {
+    const source = join(home, "blob.json")
+    await writeFile(source, content)
+    const object = (await $`git -C ${repo()} hash-object -w ${source}`.text()).trim()
+    await $`git -C ${repo()} update-index --add --cacheinfo ${`100644,${object},${path}`}`.quiet()
+  }
+
+  test.each([
+    [["local"]],
+    [["local", "project"]],
+    [["local", "user"]],
+    [["local", "project", "user"]],
+  ] as const)("setup uses local when the plugin is enabled in %p", async (where) => {
+    const target = await initRepo()
+    for (const scope of where) await write(files()[scope], enabled)
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    expect(result.stdout.split("\n")[0]).toBe(
+      `~ scope: local (inferred: holyagent@holyagent is enabled in ${target.local})`,
+    )
+    expect(result.stdout).not.toContain("--scope project targets it")
+    expect(await readJson(target.local)).toMatchObject({ includeGitInstructions: false })
+    if (!where.some((name) => name === "project")) expect(await exists(target.project)).toBe(false)
+    if (!where.some((name) => name === "user")) expect(await exists(target.user)).toBe(false)
+  })
+
+  test.each([
+    ["nowhere", {}],
+    ["the user settings only", { user: enabled }],
+    [
+      "another plugin, or not true, in the local file",
+      { local: { enabledPlugins: { "other@holyagent": true } } },
+    ],
+  ] as const)(
+    "setup uses user, with no extra line, when the plugin is enabled in %s",
+    async (_name, where) => {
+      const target = await initRepo()
+      for (const [scope, value] of Object.entries(where)) {
+        await write(files()[scope as keyof ReturnType<typeof files>], value)
+      }
+      const result = await cli(["setup", "--skip-ctx7"], nested())
+      expect(result.code).toBe(0)
+      const lines = result.stdout.split("\n")
+      expect(lines[0]).toBe(DEFAULT)
+      expect(lines[1]).not.toStartWith("~ scope:")
+      expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+      expect(await exists(target.project)).toBe(false)
+      expect(await readJson(target.local).catch(() => ({}))).not.toHaveProperty(
+        "includeGitInstructions",
+      )
+    },
+  )
+
+  test("a committed project file that enables the plugin leaves the scope at user and names itself", async () => {
+    const target = await initRepo()
+    await write(files().project, enabled)
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: the repository enables HolyAgent in ${target.project}; --scope project targets it`,
+    )
+    expect(await readJson(target.project)).toEqual(enabled)
+    expect(await exists(target.local)).toBe(false)
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+
+    const doctored = await cli(["doctor"], nested())
+    expect(doctored.stdout.split("\n").slice(0, 2)).toEqual([
+      "ok   scope: user (default)",
+      `~ scope: the repository enables HolyAgent in ${target.project}; --scope project targets it`,
+    ])
+    expect(doctored.stdout).toContain(`ok   settings: ${target.user}`)
+  })
+
+  test("a tracked local file that enables the plugin leaves the scope at user and names itself", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    await $`git -C ${repo()} add -f .claude/settings.local.json`.quiet()
+    const notice = `~ scope: ${target.local} enables HolyAgent but git tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(notice)
+    expect(await readJson(target.local)).toEqual(enabled)
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+
+    const doctored = await cli(["doctor"], nested())
+    expect(doctored.stdout.split("\n").slice(0, 2)).toEqual(["ok   scope: user (default)", notice])
+  })
+
+  test("a folder that is not a git work tree never infers local", async () => {
+    // No repository: the scope looks in the working directory, where nothing says the file is the user's.
+    const file = join(nested(), ".claude", "settings.local.json")
+    await write(file, enabled)
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${file} enables HolyAgent but the folder is not a trusted git work tree, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+    expect(await readJson(file)).toEqual(enabled)
+    expect(await readJson(userFile())).toMatchObject({ includeGitInstructions: false })
+  })
+
+  test("a git top-level that cannot be trusted never infers local", async () => {
+    const elsewhere = join(home, "elsewhere")
+    await mkdir(elsewhere, { recursive: true })
+    const file = join(nested(), ".claude", "settings.local.json")
+    await write(file, enabled)
+    const resolved = await Effect.runPromise(
+      installedScope(nested()).pipe(
+        Effect.provide(
+          fakeShell({
+            commands: [],
+            respond: (line) =>
+              line === "git rev-parse --show-toplevel" ? { stdout: `${elsewhere}\n` } : undefined,
+          }).layer,
+        ),
+      ),
+    )
+    expect(resolved).toMatchObject({ scope: "user", source: "default" })
+    expect(scopeNotices(resolved)).toContain(
+      `${file} enables HolyAgent but the folder is not a trusted git work tree, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+  })
+
+  test("a git that cannot answer is treated as tracking the file", async () => {
+    const file = join(repo(), ".claude", "settings.local.json")
+    await write(file, enabled)
+    const resolved = await Effect.runPromise(
+      installedScope(nested()).pipe(
+        Effect.provide(
+          fakeShell({
+            commands: [],
+            respond: (line) =>
+              line === "git rev-parse --show-toplevel"
+                ? { stdout: `${repo()}\n` }
+                : line.startsWith("git ls-files")
+                  ? { exitCode: 128 }
+                  : undefined,
+          }).layer,
+        ),
+      ),
+    )
+    expect(resolved).toMatchObject({ scope: "user", source: "default" })
+    expect(scopeNotices(resolved)).toEqual([
+      `${file} enables HolyAgent but git could not say whether it tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    ])
+  })
+
+  test("a .claude index entry of its own never infers local", async () => {
+    // A gitlink lists as the folder itself; the file's own pathspec would print nothing.
+    const file = join(repo(), ".claude", "settings.local.json")
+    await write(file, enabled)
+    const resolved = await Effect.runPromise(
+      installedScope(nested()).pipe(
+        Effect.provide(
+          fakeShell({
+            commands: [],
+            respond: (line) =>
+              line === "git rev-parse --show-toplevel"
+                ? { stdout: `${repo()}\n` }
+                : line.startsWith("git ls-files")
+                  ? { stdout: ".claude\0" }
+                  : undefined,
+          }).layer,
+        ),
+      ),
+    )
+    expect(scopeNotices(resolved)).toEqual([
+      `${file} enables HolyAgent but git tracks .claude itself, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    ])
+  })
+
+  test("a .claude committed as a submodule never infers local", async () => {
+    const target = await initRepo()
+    const identity = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
+    const inner = join(home, "inner")
+    await mkdir(inner, { recursive: true })
+    await $`git init -q ${inner}`.quiet()
+    await write(join(inner, "settings.local.json"), enabled)
+    await $`git -C ${inner} add .`.quiet()
+    await $`git -C ${inner} ${identity} commit -q -m inner`.quiet()
+    await $`git -C ${repo()} -c protocol.file.allow=always submodule add -q ${inner} .claude`.quiet()
+    // The superproject has no entry for the file itself, only the gitlink.
+    expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
+      "",
+    )
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${target.local} enables HolyAgent but git tracks .claude itself, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+  })
+
+  test("a .claude inside another git repository never infers local", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    // Untracked in the outer repository: the nested repository's files are not in its index.
+    await $`git init -q ${join(repo(), ".claude")}`.quiet()
+    expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
+      "",
+    )
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${target.local} enables HolyAgent but .claude is inside another git repository, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+  })
+
+  test("a tracked local file of another letter case never infers local", async () => {
+    const target = await initRepo()
+    // The literal name is untracked; where the file system ignores case it is the same file. The
+    // index entry is written directly: `git add` of a path in another case than the file's own
+    // adds nothing on Windows (it exists there, so git does not complain) and would track nothing.
+    await write(files().local, enabled)
+    await trackEntry(".claude/Settings.Local.json", JSON.stringify(enabled))
+    expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
+      "",
+    )
+    expect(
+      await $`git -C ${repo()} ls-files --cached -- ${":(icase,literal).claude/settings.local.json"}`.text(),
+    ).toBe(".claude/Settings.Local.json\n")
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${target.local} enables HolyAgent but git tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+  })
+
+  test("a tracked entry that is the same file as the local file never infers local", async () => {
+    const target = await initRepo()
+    // A hard link reproduces what a folding file system does: another name for the same inode.
+    await write(files().local, enabled)
+    await link(files().local, join(repo(), ".claude", "alias.json"))
+    await $`git -C ${repo()} add -f .claude/alias.json`.quiet()
+    expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
+      "",
+    )
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${target.local} enables HolyAgent but git tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+  })
+
+  test("a tracked top-level entry that is the .claude folder by identity never infers local", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    // Git lists `CLAUDE~1` apart from `.claude`, so no pathspec for the folder finds it. The entry
+    // goes into the index directly, so no `CLAUDE~1` is created on disk: Windows resolves that 8.3
+    // short name to the `.claude` folder and would overwrite the local file. Git for Windows accepts
+    // this path where a trailing-dot name is refused by core.protectNTFS.
+    await trackEntry("CLAUDE~1/settings.local.json", "{}")
+    expect(await $`git -C ${repo()} ls-files --cached -- ${":(icase,literal).claude"}`.text()).toBe(
+      "",
+    )
+    expect(await $`git -C ${repo()} ls-files --cached`.text()).toBe(
+      "CLAUDE~1/settings.local.json\n",
+    )
+    // A folding file system (an 8.3 short name on Windows, a trailing dot, an HFS+ ignorable code
+    // point) answers for the tracked name with the identity of the .claude folder. Linux cannot
+    // fold names and cannot hard-link folders, so the test makes lstat answer that way.
+    const original = filesystem.lstat
+    const folded = join(await realpath(repo()), "CLAUDE~1")
+    const spy = spyOn(filesystem, "lstat").mockImplementation(((
+      ...args: Parameters<typeof filesystem.lstat>
+    ) =>
+      original(
+        args[0] === folded ? join(dirname(folded), ".claude") : args[0],
+        args[1],
+      )) as typeof filesystem.lstat)
+    try {
+      const result = await cli(["setup", "--skip-ctx7"], nested())
+      expect(result.code).toBe(0)
+      const lines = result.stdout.split("\n")
+      expect(lines[0]).toBe(DEFAULT)
+      expect(lines[1]).toBe(
+        `~ scope: ${target.local} enables HolyAgent but git tracks CLAUDE~1 as .claude, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+      )
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  test("tracked top-level entries that are other folders leave an untracked local file inferring local", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    await write(join(repo(), "src", "index.ts"), {})
+    await write(join(repo(), "README.md"), {})
+    await $`git -C ${repo()} add -f src/index.ts README.md`.quiet()
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.stdout.split("\n")[0]).toBe(
+      `~ scope: local (inferred: holyagent@holyagent is enabled in ${target.local})`,
+    )
+  })
+
+  test("a tracked project file next to an untracked local file still infers local", async () => {
+    const target = await initRepo()
+    await write(files().project, {})
+    await $`git -C ${repo()} add -f .claude/settings.json`.quiet()
+    await write(files().local, enabled)
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.stdout.split("\n")[0]).toBe(
+      `~ scope: local (inferred: holyagent@holyagent is enabled in ${target.local})`,
+    )
+  })
+
+  test("an explicit false in the local file stops the search and uses user, saying so", async () => {
+    const target = await initRepo()
+    await write(files().local, disabled)
+    await write(files().project, enabled)
+    await write(files().user, enabled)
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: holyagent@holyagent is set to false in ${target.local}, so HolyAgent is disabled for this project; using user`,
+    )
+    expect(result.stdout).not.toContain("--scope project targets it")
+    expect(await readJson(target.local)).toEqual(disabled)
+    expect(await readJson(target.project)).toEqual(enabled)
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+
+    const doctored = await cli(["doctor"], nested())
+    expect(doctored.stdout.split("\n")[0]).toBe("ok   scope: user (default)")
+    expect(doctored.stdout.split("\n")[1]).toBe(lines[1])
+  })
+
+  test("--undo works on the inferred local scope", async () => {
+    const target = await initRepo()
+    await write(files().local, {})
+    await cli(["setup", "--scope", "local", "--skip-ctx7"], nested())
+    const undone = await cli(["setup", "--undo"], nested())
+    expect(undone.code).toBe(0)
+    expect(undone.stdout.split("\n")[0]).toContain("scope: local (inferred:")
+    expect(undone.stdout).toContain(target.local)
+    expect(await readJson(target.local)).toEqual({})
+  })
+
+  test("an explicit --scope overrides the inferred one, in setup and in doctor", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    const result = await cli(["setup", "--scope", "user", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    expect(result.stdout.split("\n")[0]).toBe("~ scope: user (from --scope)")
+    expect(await exists(target.user)).toBe(true)
+    expect(await readJson(target.local)).toEqual(enabled)
+
+    const doctored = await cli(["doctor", "--scope", "project"], nested())
+    expect(doctored.stdout.split("\n")[0]).toBe("ok   scope: project (from --scope)")
+    expect(doctored.stdout).toContain(target.project)
+  })
+
+  test("--scope project targets the committed file, with no notice about it", async () => {
+    const target = await initRepo()
+    await write(files().project, enabled)
+    const result = await cli(["setup", "--scope", "project", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe("~ scope: project (from --scope)")
+    expect(lines[1]).not.toStartWith("~ scope:")
+    expect(await readJson(target.project)).toMatchObject({ includeGitInstructions: false })
+    expect(await exists(target.user)).toBe(false)
+  })
+
+  test("doctor checks the settings of the inferred local scope and names it", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    const result = await cli(["doctor"], nested())
+    expect(result.stdout.split("\n")[0]).toBe(
+      `ok   scope: local (inferred: holyagent@holyagent is enabled in ${target.local})`,
+    )
+    expect(result.stdout).toContain(`FAIL settings: ${target.local} lacks`)
+  })
+
+  test("a local settings file that does not decode is an error naming it", async () => {
+    const target = await initRepo()
+    await mkdir(dirname(target.local), { recursive: true })
+    await writeFile(target.local, "{ not json")
+    const setupResult = await cli(["setup", "--skip-ctx7"], nested())
+    expect(setupResult.code).toBe(1)
+    expect(setupResult.stdout).toStartWith(`! scope: ${target.local} is not a JSON object`)
+    const doctorResult = await cli(["doctor"], nested())
+    expect(doctorResult.code).toBe(1)
+    expect(doctorResult.stdout).toStartWith(`FAIL scope: ${target.local} is not a JSON object`)
+    expect(await Bun.file(target.local).text()).toBe("{ not json")
+  })
+
+  test("a project file that does not decode cannot fail a bare run, and the user file is the settings step's to report", async () => {
+    const target = await initRepo()
+    await mkdir(dirname(target.project), { recursive: true })
+    await writeFile(target.project, "{ not json")
+    const bare = await cli(["setup", "--skip-ctx7"], nested())
+    expect(bare.code).toBe(0)
+    expect(bare.stdout.split("\n")[0]).toBe(DEFAULT)
+    expect(await Bun.file(target.project).text()).toBe("{ not json")
+
+    await writeFile(target.user, "{ not json")
+    const broken = await cli(["setup", "--skip-ctx7"], nested())
+    expect(broken.code).toBe(1)
+    expect(broken.stdout.split("\n")[0]).toBe(DEFAULT)
+    expect(broken.stdout).toContain("! user settings: ")
+    expect(await Bun.file(target.user).text()).toBe("{ not json")
+  })
+
+  describe.skipIf(process.platform === "win32")("symlinks", () => {
+    test("a bare run with a symlinked .claude folder installs for the user and says the folder was not read", async () => {
+      const target = await initRepo()
+      const linked = join(home, "linked")
+      await write(join(linked, "settings.local.json"), enabled)
+      await write(join(linked, "settings.json"), enabled)
+      await symlink(linked, join(repo(), ".claude"))
+      const result = await cli(["setup", "--skip-ctx7"], nested())
+      expect(result.code).toBe(0)
+      const lines = result.stdout.split("\n")
+      expect(lines[0]).toBe(DEFAULT)
+      expect(lines[1]).toBe(`~ scope: ${target.local} is a symlink and was not read; using user`)
+      expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+      expect(await readJson(join(linked, "settings.local.json"))).toEqual(enabled)
+
+      const doctored = await cli(["doctor"], nested())
+      expect(doctored.stdout.split("\n")[0]).toBe("ok   scope: user (default)")
+      expect(doctored.stdout).not.toContain("is a symlink; refusing")
+    })
+
+    test("a symlinked local file is not followed, and writing through it is still refused", async () => {
+      const target = await initRepo()
+      const victim = join(home, "victim.json")
+      await write(victim, enabled)
+      await mkdir(dirname(target.local), { recursive: true })
+      await symlink(victim, target.local)
+      const bare = await cli(["setup", "--skip-ctx7"], nested())
+      expect(bare.code).toBe(0)
+      expect(bare.stdout.split("\n")[0]).toBe(DEFAULT)
+      expect(await exists(target.user)).toBe(true)
+
+      const named = await cli(["setup", "--scope", "local", "--skip-ctx7"], nested())
+      expect(named.code).toBe(1)
+      expect(named.stdout).toContain("is a symlink; refusing to write through it")
+      expect(await readJson(victim)).toEqual(enabled)
+    })
+
+    test("a symlinked .claude folder is still refused for the scope that writes into it", async () => {
+      await initRepo()
+      const linked = join(home, "linked")
+      await mkdir(linked, { recursive: true })
+      await symlink(linked, join(repo(), ".claude"))
+      for (const scope of ["project", "local"]) {
+        const result = await cli(["setup", "--scope", scope, "--skip-ctx7"], nested())
+        expect(result.code).toBe(1)
+        expect(result.stdout).toContain("is a symlink; refusing to write through it")
+      }
+      expect(await readdir(linked)).toEqual([])
+    })
+  })
+
+  describe.skipIf(process.platform === "win32")("the Pi packages follow the same scope", () => {
+    /** A `pi` on PATH, so the dry run reaches the install lines; it is never run. */
+    const withPi = async () => {
+      const bin = join(home, "bin")
+      await mkdir(bin, { recursive: true })
+      await writeFile(join(bin, "pi"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+      return { HOLYAGENT_HOST: "pi", PATH: `${bin}:${process.env.PATH}` }
+    }
+    const piLines = async (extra: Record<string, string | undefined>) => {
+      const result = await Effect.runPromise(
+        run(["setup", "--dry-run", "--skip-ctx7"], {
+          cwd: nested(),
+          env: { HOME: home, CLAUDE_CONFIG_DIR: join(home, "claude"), ...extra },
+          stdin: Effect.fail(new StdinMissing({ reason: "no stdin in this test" })),
+        }),
+      )
+      return result.stdout.split("\n").filter((line) => line.includes("would install with pi "))
+    }
+
+    test("local scope installs with -l when the local file enables the plugin", async () => {
+      await initRepo()
+      await write(files().local, enabled)
+      const lines = await piLines(await withPi())
+      expect(lines.length).toBeGreaterThan(0)
+      for (const line of lines) expect(line).toEndWith(" -l")
+    })
+
+    test("a tracked local file leaves the Pi packages global", async () => {
+      await initRepo()
+      await write(files().local, enabled)
+      await $`git -C ${repo()} add -f .claude/settings.local.json`.quiet()
+      const lines = await piLines(await withPi())
+      expect(lines.length).toBeGreaterThan(0)
+      for (const line of lines) expect(line).not.toEndWith(" -l")
+    })
+
+    test("a committed project file leaves the Pi packages global", async () => {
+      await initRepo()
+      await write(files().project, enabled)
+      const lines = await piLines(await withPi())
+      expect(lines.length).toBeGreaterThan(0)
+      for (const line of lines) expect(line).not.toEndWith(" -l")
+    })
   })
 })

@@ -123,13 +123,15 @@ jobs:
         run: |
           mise run build
           # Porcelain output lists modified, deleted and untracked files; these are the paths
-          # packages/integrations/claude/build.ts generates (its GENERATED_PATHS).
+          # packages/integrations/claude/build.ts and packages/integrations/pi/build.ts generate
+          # (their GENERATED_PATHS).
           status="$(git status --porcelain --ignored -- \
             .claude-plugin/marketplace.json \
-            packages/integrations/claude/dist)"
+            packages/integrations/claude/dist \
+            packages/integrations/pi/dist)"
           if [ -n "$status" ]; then
             echo "$status"
-            echo "::error::The generated plugin is stale. Run 'mise run build' and commit the files it writes."
+            echo "::error::The generated plugin or Pi package is stale. Run 'mise run build' and commit the files it writes."
             exit 1
           fi
 

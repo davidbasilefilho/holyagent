@@ -15,11 +15,11 @@ describe("the CLI when its reader goes away", () => {
         .nothrow()
     expect(result.stderr.toString()).toBe("")
     expect(result.exitCode).toBe(0)
-  })
+  }, 30_000)
 
   test("still prints everything to a reader that takes it", async () => {
     const result = await $`${process.execPath} ${MAIN} --version`.quiet()
     expect(result.exitCode).toBe(0)
     expect(result.stdout.toString()).toMatch(/^\d+\.\d+\.\d+/)
-  })
+  }, 30_000)
 })

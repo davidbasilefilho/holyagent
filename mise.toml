@@ -59,9 +59,13 @@ description = "Download, verify and extract the pinned ripgrep and fd into the p
 run = "bun scripts/vendor.ts"
 
 [tasks.build]
-description = "Generate the Claude plugin from the instructions, the route table and the runtime"
+description = "Generate the Claude plugin and the Pi package from the instructions, the route table and the runtime"
 depends = ["vendor"]
-run = "bun packages/integrations/claude/build.ts"
+run = ["bun packages/integrations/claude/build.ts", "bun packages/integrations/pi/build.ts"]
+
+[tasks."instructions:scaffold"]
+description = "Copy the instructions' requirements tree into every supported model family as empty files; adds missing paths and never overwrites"
+run = "bun packages/runtime/scripts/instructions-scaffold.ts"
 
 [tasks.verify]
 description = "Run every read-only gate: check, lint, fmt:check and test"

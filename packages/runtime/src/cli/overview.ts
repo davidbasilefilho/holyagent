@@ -1,10 +1,13 @@
 import { Effect } from "effect"
 
+import { CLAUDE_WORDS, type HostWords, wordsFor } from "../domain/host.ts"
 import { recommend } from "../domain/plan.ts"
 import { workTreeKey } from "../state/local.ts"
 import { readOpenState, type Snapshot } from "../state/store.ts"
+import { agentHostOf } from "./config.ts"
 import { nowIso } from "./context.ts"
 import { intentInUse, resolveIntent } from "./intent.ts"
+import { cloudCheckoutNotice } from "./status.ts"
 import type { Command } from "./types.ts"
 import { assignmentRow, byId, oneLine, present } from "./views.ts"
 
@@ -52,7 +55,7 @@ const statusFrom = (snapshot: Snapshot) => {
  */
 export const statusOf = (directory: string) => readOpenState(directory).pipe(Effect.map(statusFrom))
 
-const reconcileFrom = ({ project }: Snapshot) => {
+const reconcileFrom = ({ project }: Snapshot, words: HostWords) => {
   const running = byId(project.assignments.filter((row) => row.state === "Running"))
   return {
     running: running.map((row) => ({
@@ -65,7 +68,7 @@ const reconcileFrom = ({ project }: Snapshot) => {
       next:
         running.length === 0
           ? undefined
-          : "close as interrupted only an agent confirmed gone (SendMessage or transcript; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted",
+          : `close as interrupted only an agent confirmed gone (${words.confirmGone}; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted`,
     }),
   }
 }
@@ -74,14 +77,18 @@ const reconcileFrom = ({ project }: Snapshot) => {
  * The Running Assignments with their agent ids, and what to do with a lost one, as `reconcile`
  * prints them.
  */
-const reconcileOf = (directory: string) => readOpenState(directory).pipe(Effect.map(reconcileFrom))
+const reconcileOf = (directory: string, words: HostWords) =>
+  readOpenState(directory).pipe(Effect.map((snapshot) => reconcileFrom(snapshot, words)))
 
-/** The status and the reconcile result from one read of the state, for a session that resumes. */
-export const resumeOf = (directory: string) =>
+/**
+ * The status and the reconcile result from one read of the state, for a session that resumes. With
+ * the `words` of a host the reconcile result names that host's tools (Claude's by default).
+ */
+export const resumeOf = (directory: string, words: HostWords = CLAUDE_WORDS) =>
   readOpenState(directory).pipe(
     Effect.map((snapshot) => ({
       status: statusFrom(snapshot),
-      reconcile: reconcileFrom(snapshot),
+      reconcile: reconcileFrom(snapshot, words),
     })),
   )
 
@@ -89,9 +96,10 @@ export const resumeOf = (directory: string) =>
  * What the output of `plan` means, for the `plan` help. The root workflow and dispatch text own how
  * to write, run, record and close a workflow; these notes name only what the command prints.
  */
-const PLAN_NOTES: ReadonlyArray<string> = [
+const planNotes = (words: HostWords): ReadonlyArray<string> => [
   "`workflow` first: `assignments` are the ids in run order, a writer followed by the review of its work; `assignment dispatch` each for its agent, model, effort and prompt, then write the inline script as the root workflow text says. A single Assignment is a one-entry workflow",
-  "`continues` lists Ready work that continues a warm specialist, by SendMessage beside the workflow. `fallback` is the same work as direct subagents, for a session where the Workflow tool is disabled or unavailable: its writers launch together, and the `afterwards` reviews launch once the writers they depend on are terminal",
+  ...(words.launchNote === undefined ? [] : [words.launchNote]),
+  `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`,
 ]
 
 /** The `plan`, `status` and `reconcile` commands. */
@@ -101,7 +109,8 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     usage: "plan",
     summary:
       "Say how to run the Ready Assignments of the Intent in use: a workflow first (with the direct subagents as its fallback), else subagents or a warm agent",
-    notes: PLAN_NOTES,
+    notes: planNotes(CLAUDE_WORDS),
+    forHost: (words) => ({ notes: planNotes(words) }),
     flags: {},
     positionals: 0,
     run: ({ directory, config, root }) =>
@@ -143,7 +152,7 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
             recommendation.action === "workflow"
               ? present({
                   action: "subagent",
-                  when: "only if the Workflow tool is disabled or unavailable",
+                  when: `only if the ${wordsFor(settings.host).workflowTool} tool is disabled or unavailable`,
                   assignments: recommendation.fallback.assignmentIds,
                   parallel: recommendation.fallback.assignmentIds.length > 1 ? true : undefined,
                   afterwards: recommendation.fallback.afterwards,
@@ -157,10 +166,15 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     path: ["status"],
     usage: "status",
     summary:
-      "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents",
+      "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents; in a claude.ai cloud session whose primary checkout is on a detached HEAD or on a branch other than the one it started on, a `notice` that says so",
     flags: {},
     positionals: 0,
-    run: ({ directory }) => statusOf(directory),
+    run: (call) =>
+      Effect.gen(function* () {
+        const status = yield* statusOf(call.directory)
+        const notice = yield* cloudCheckoutNotice(call)
+        return notice === undefined ? status : { ...status, notice }
+      }),
   },
   {
     path: ["reconcile"],
@@ -168,6 +182,8 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     summary: "List the Running Assignments with their agent ids, to confirm after a resume",
     flags: {},
     positionals: 0,
-    run: ({ directory }) => reconcileOf(directory),
+    // Reads the host alone, not the whole config: a bad TTL or workflows setting must not refuse it.
+    run: ({ directory, env }) =>
+      agentHostOf(env).pipe(Effect.flatMap((host) => reconcileOf(directory, wordsFor(host)))),
   },
 ]

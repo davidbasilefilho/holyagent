@@ -1,0 +1,2 @@
+- R-INSPECT: Roles that inspect renders (Worker.visual and Reviewer.visual) carry the interface inspection rules as fixed text: inspect what renders, from the target record the Assignment names and with no target of their own (blocked without one), what makes a discrepancy material (R-MATERIAL), where to look, and staying on the page under test.
+- See: R-MATERIAL

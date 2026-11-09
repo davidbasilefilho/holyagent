@@ -4,11 +4,11 @@ HolyAgent turns your coding agent into a root that plans work as Intents and Ass
 
 You state what you want. The root writes it down as an Intent, splits it into bounded Assignments, dispatches each to the specialist that fits (implementation, review, validation, research, visual work and more), and accepts nothing without a check run on the current head. It speaks to you only for a decision, a blocker and the final report, apart from a brief acknowledgment of each of your messages.
 
-HolyAgent ships today as a Claude Code plugin. The shared runtime underneath is built so other harnesses can follow.
+HolyAgent ships as a Claude Code plugin and as a [Pi package](docs/usage.md#pi), which you use first in T3 Code. The shared runtime underneath is built so other harnesses can follow.
 
 ## How do I install it?
 
-You need Claude Code at or above the minimum in [docs/requirements.md](docs/requirements.md#claude-code-version), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later), `git` and an authenticated `gh`. On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code, and install mise only when you pass `--dev` or `-Dev` ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
+You need Claude Code at or above the minimum in [docs/requirements.md](docs/requirements.md#claude-code-version), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later, 22.19 or later on Windows; the optional Pi integration needs 22.19 or later on every OS, see [docs/pi/installation.md](docs/pi/installation.md)), `git` and an authenticated `gh`. On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code, and install mise only when you pass `--dev` or `-Dev` ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
 
 ```sh
 claude plugin marketplace add davidbasilefilho/holyagent
@@ -16,6 +16,10 @@ claude plugin install holyagent@holyagent
 ```
 
 Restart Claude Code afterwards. The root runs on Opus; [docs/usage.md](docs/usage.md#run-the-root-on-sonnet) shows how to run it on Sonnet instead. Web search needs the Exa connector, which you connect once at [claude.ai/customize/connectors](https://claude.ai/customize/connectors) (see [docs/components.md](docs/components.md#exa)); HolyAgent supports only claude.ai account login. On the first launch, run `/holyagent:setup` once to install ctx7 and to configure Claude Code. The same steps as slash commands, the details and `holyagent doctor` are in [docs/usage.md](docs/usage.md#install), and the status of the other environments (T3 Code, claude.ai) is in [docs/requirements.md](docs/requirements.md#supported-environments).
+
+Those commands install for your user; project and local scope, which a team can share, are in [docs/usage.md](docs/usage.md#install-scopes).
+
+On Pi, [T3 Code](docs/pi/t3-code.md) is the primary interface and the plain `pi` terminal works too; the install, in both scopes, is in [docs/usage.md](docs/usage.md#pi). With T3 Code installed, `holyagent setup` shows a screen for the T3 settings it writes, with `--worktrees`, `--device-access` and `--no-tui` flags ([docs/usage.md](docs/usage.md#the-t3-code-setup-screen)).
 
 ## Why HolyAgent?
 

@@ -3,9 +3,13 @@ import { isAbsolute, join, resolve } from "node:path"
 
 import { Effect } from "effect"
 
+import type { Assignment } from "../domain/assignment.ts"
+import type { AgentHost } from "../domain/host.ts"
+import { firstPassPrompt } from "../prompts/index.ts"
 import { io } from "../state/files.ts"
 import { localFile } from "../state/layout.ts"
 import { gitMaybe } from "../vcs/git.ts"
+import { renderPrompt } from "./report.ts"
 import type { Call } from "./types.ts"
 
 /**
@@ -23,16 +27,38 @@ const folderFor = (call: Call, name: string) =>
     ),
   )
 
+const pathIn = (call: Call, name: string, assignmentId: string) =>
+  folderFor(call, name).pipe(Effect.map((folder) => join(folder, `${assignmentId}.md`)))
+
 /**
  * Writes `text` to `<id>.md` in the named folder and returns the absolute path; a repeat replaces
  * it.
  */
 const writeNamed = (call: Call, name: string, assignmentId: string, text: string) =>
   Effect.gen(function* () {
-    const path = join(yield* folderFor(call, name), `${assignmentId}.md`)
+    const path = yield* pathIn(call, name, assignmentId)
     yield* io(path, () => Bun.write(path, `${text}\n`))
     return path
   })
+
+/**
+ * The text of an Assignment's brief file for a host. On Pi, the brief of `Reviewer.code` and
+ * `Reviewer.security` starts with that review's first-pass prompt and then holds the Assignment,
+ * which the prompt takes its range from: the brief is the task the dispatch prompt tells the
+ * specialist to follow, so this is the start of the task. Every other brief, and every brief on
+ * Claude (whose reviewers run the built-in reviews), is the Assignment alone ({@link
+ * renderPrompt}).
+ */
+export const briefText = (assignment: Assignment, agent: string, host: AgentHost): string => {
+  const assignmentText = renderPrompt(assignment, agent)
+  const firstPass = host === "pi" ? firstPassPrompt(assignment.roleTask) : undefined
+  return firstPass === undefined
+    ? assignmentText
+    : `${firstPass}\n\n## Assignment\n\n${assignmentText}`
+}
+
+/** The absolute path of the brief file of an Assignment, where {@link writeBrief} writes it. */
+export const briefPath = (call: Call, assignmentId: string) => pathIn(call, "briefs", assignmentId)
 
 /**
  * Writes the brief of an Assignment to its file and returns the absolute path, for the dispatch

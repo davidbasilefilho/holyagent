@@ -1,0 +1,1 @@
+- R-WIN: Wire a named boundary from both sides' contracts and prove it with a check that crosses the seam.

@@ -1,0 +1,50 @@
+---
+name: dev-server
+description: Use when visual work needs a running, capturable render target: a web app or a static build over a URL, a terminal UI, a desktop app, or an Android or iOS app. Has Worker.operations detect the platform, start one target the visual specialists share and record how to reach, capture, vary and stop it, or report it blocked in this environment.
+---
+
+# Render targets
+
+Visual specialists that each start their own app collide on ports, sockets and emulators and waste minutes on startup, so one target per platform serves the whole piece of visual work. Detect the platform, never assume it. Every tool named below is an interchangeable example: use what the project and the machine provide. T3 Code's browser, preview and device tools belong to the visual specialists, and exist only when T3 Code's tools are enabled.
+
+## Detect
+
+Have Worker.operations find the platform and stack from the project (manifests, build files, the documented run command) and record the signal it used. A project with several platforms gets one target each.
+
+## Target record
+
+Keep one record per target in the task list under the visual work, so a resume or compaction still finds it. Put the record, not a bare URL, in the criteria of every Worker.visual and Reviewer.visual Assignment for the work. It holds:
+
+- the id, the platform, and the detected stack with its signal;
+- the working directory, the start command with its environment, the readiness probe and the address (URL, session, display or device);
+- the capture command and its output folder;
+- the supported variants, each with its set and reset commands and current value;
+- the owner and process group, the stop command, and what stopping cleans up.
+
+Give every socket, session, display, device and port a name unique to this work, so parallel targets never collide.
+
+## Start and share
+
+1. Check the task list for a target for this work. If one is there, run its readiness probe and reuse it; start a second only after the first is confirmed gone.
+2. Dispatch Worker.operations to start the target in the background per the record and wait for the probe. It reads this file with `read`, so put the record and this file's absolute path in its brief: the record carries the values, and this file's "Target record" section is the only list of its fields. Its report carries the completed record and says whether it started the target or reused one. Record that in the task list.
+3. Tell every visual specialist, as a constraint, to use that target and start none of its own. Worker.visual and Worker.operations produce the captures; Reviewer.visual has no shell, judges those captures (or for web inspects the URL through T3 Code's browser tools, when enabled) and lists the captures it judged from.
+4. A specialist that finds the target down, or no record in its criteria, reports the inspection as blocked; have Worker.operations restart it.
+
+## Platforms
+
+Flags change between versions, so verify each against the installed one before relying on it.
+
+- Web: the documented dev command, or for a static or single-file build a static file server over its output folder, answering at a URL. A headless browser varies the viewport, color scheme, reduced motion and forced colors, and takes screenshots.
+- Terminal UI: run it in a terminal multiplexer session at a fixed size and send keys. Capture text frames with and without escape sequences, and render image frames through a scripted terminal recorder. Vary the environment for color tiers, `NO_COLOR` and locale.
+- Linux desktop: run under a virtual X display or a headless Wayland compositor, with screenshots and synthetic input. Rendering is software-only, so an app that needs the GPU fails. Theme and scale variables are toolkit-specific, so read them from the detected toolkit.
+- Android: an SDK emulator, fast only with KVM, so check acceleration first. A debug bridge sets the night mode, font scale and display size variants and takes screenshots.
+- iOS: the Simulator, which runs on macOS with Xcode only. Its control tool sets appearance, content size and increased contrast, and takes screenshots.
+- macOS and Windows desktop: only on a machine with an interactive desktop session; macOS also needs the Screen Recording permission.
+
+## Environment and blocked targets
+
+A headless Linux machine or container fully supports web and terminal UI, supports Linux desktop with software rendering, supports Android only with KVM, and cannot run iOS, macOS or Windows targets. When a target cannot run, Worker.operations reports it blocked with the reason and what would unblock it (an interactive desktop session, KVM, a device). You then judge from the closest honest substitute, if any, and say so in the report: a web build of a native app is not the native render.
+
+## Stop
+
+Only the owner stops a target. When the visual work ends (the review accepted, or the work abandoned), dispatch Worker.operations to stop it, naming the record. It stops the recorded process group only when it started it for this work, confirms the port, socket, session or device is released and reports; a target someone else started, which the start report marks as reused, stays running. Record that the target is stopped.
