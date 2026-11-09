@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9s9fmw-apeq",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-fff-integration-adds-no",
+  "objective": "Confirm the fff integration adds no supply-chain, settings-file or path-exposure defect.",
+  "state": "Running",
+  "scope": [
+    "Commit e2cacd11 on release/0.3.1/feat/fff in /home/user/holyagent-0.3.1-fff (range e6f334c7..e2cacd11); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9rpdzt-cwur.md",
+    "Requirement: @ff-labs/pi-fff 0.11.0 at an exact pin in override mode, so its tools replace Pi find and grep and Pi prompt guidance stays consistent; a capability with headless and normal forms, switchable and modular; the Claude plugin keeps bundled ripgrep and fd.",
+    "Open points from the writer to judge: whether the root's exclusion of fff's grep, find and multi_grep holds if pi-fff registers its tools after HolyAgent's session start; whether specialists get fff's tools under the names their agent files list; whether every model family's instruction text (kimi-k3.1 and gpt-6) is consistent with fff's tools; that a supported host whose binding failed to install is not detected; whether a user-level off should be final."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes. Run commands only in /home/user/holyagent-0.3.1-fff and pass the explicit range e6f334c7..e2cacd11 to any review command.",
+    "Read the installed package (node_modules/@ff-labs/pi-fff, after `bun install --frozen-lockfile` if missing) to check what the integration assumes about it.",
+    "Testing is unit tests and fixtures only: never start pi or make live model requests.",
+    "Report in under 400 words; start each evidence line with the exact criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "The package is pinned exactly and setup installs only that version",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup's write and revert of pi-fff.json touch only what HolyAgent recorded, at user scope, behind the existing link refusal",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "fff's tools expose no files outside what Pi's own find and grep could reach",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9rpdzt-cwur"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T21:38:29.864Z"
+  },
+  "createdAt": "2026-11-09T21:38:29.864Z"
+}
