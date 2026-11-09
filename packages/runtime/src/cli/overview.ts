@@ -166,7 +166,7 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     path: ["status"],
     usage: "status",
     summary:
-      "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents; in a claude.ai cloud session whose primary checkout is on a detached HEAD, a `notice` that says so",
+      "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents; in a claude.ai cloud session whose primary checkout is on a detached HEAD or on a branch other than the one it started on, a `notice` that says so",
     flags: {},
     positionals: 0,
     run: (call) =>
