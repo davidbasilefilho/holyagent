@@ -1,0 +1,11 @@
+{"holyagentFixture":{"package":"@earendil-works/pi-coding-agent","piVersion":"1.5.0","name":"t3-ui-dialogs","source":"rpc-mode","description":"Synthesized: the six extension_ui_request methods T3 Code renders (select, confirm, input, editor, notify, setStatus) and T3's extension_ui_response to each dialog; notify and setStatus take no response.","synthesized":true,"sources":["T3 Code main on 2026-11-09 (latest release v0.1.7): packages/provider-pi/src/server/mcpInjection.ts (buildPiRpcLaunch)","T3 Code main: docs/user/providers-pi.md and the Pi adapter's handleExtensionUiRequest (select, confirm, input, editor and notify are rendered, setStatus is shown near the composer, everything else is ignored)","Pi 1.5.0: dist/modes/rpc/rpc-types.d.ts, dist/modes/rpc/rpc-mode.js, dist/core/agent-session.d.ts"]}}
+{"type":"extension_ui_request","id":"ui-select","method":"select","title":"Pick a model","options":["k3.1-pro","k3.1-flash"],"timeout":30000}
+{"type":"extension_ui_response","id":"ui-select","value":"k3.1-pro"}
+{"type":"extension_ui_request","id":"ui-confirm","method":"confirm","title":"Allow the write?","message":"The specialist wants to write README.md.","timeout":30000}
+{"type":"extension_ui_response","id":"ui-confirm","confirmed":true}
+{"type":"extension_ui_request","id":"ui-input","method":"input","title":"Branch name","placeholder":"release/0.3.0/feat/x"}
+{"type":"extension_ui_response","id":"ui-input","value":"release/0.3.0/feat/t3"}
+{"type":"extension_ui_request","id":"ui-editor","method":"editor","title":"Edit the Intent","prefill":"Objective: "}
+{"type":"extension_ui_response","id":"ui-editor","cancelled":true}
+{"type":"extension_ui_request","id":"ui-notify","method":"notify","message":"holyagent: provider not ready","notifyType":"warning"}
+{"type":"extension_ui_request","id":"ui-status","method":"setStatus","statusKey":"holyagent","statusText":"1 running"}
