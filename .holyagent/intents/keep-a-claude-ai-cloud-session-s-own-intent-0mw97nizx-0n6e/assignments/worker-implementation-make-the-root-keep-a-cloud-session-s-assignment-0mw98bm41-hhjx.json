@@ -1,0 +1,91 @@
+{
+  "id": "assignment-0mw98bm41-hhjx",
+  "intentId": "intent-0mw97nizx-0n6e",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-root-keep-a-cloud-session-s",
+  "objective": "Make the root keep a cloud session's primary checkout on its platform-assigned branch, warn when it has moved, and document the session panel's branch.",
+  "state": "Running",
+  "scope": [
+    "Work only in the worktree /home/user/holyagent-0.3.0-cloudbranch (branch release/0.3.0/fix/cloud-session-branch). Read AGENTS.md and .claude/CLAUDE.md there first, and the requirements skill at /home/user/holyagent-0.3.0-cloudbranch/.claude/skills/requirements/SKILL.md, because the root rules are a requirements tree translated per model family (claude-5.5 and kimi-k3.1) with a coverage table.",
+    "Why: in a claude.ai cloud session the session panel shows the platform-assigned branch (for example claude/<name>) and the primary checkout's diff with a Create PR button. HolyAgent never works on that branch and uses worktrees, but the primary checkout was left on a detached HEAD 31 commits ahead of main, so the panel showed +54,746 lines and offered a bogus PR. The platform sets the branch label at session start and no session tool renames it.",
+    "1. Requirement: add to the root rules (requirements tree, both families, coverage) that in a cloud session the root leaves the primary checkout on the assigned branch at its start commit: no commits, no checkouts of other branches or commits there; all work and any checkout of a commit for review happen in a git worktree. Put it beside the existing rule on platform-assigned branches (rg 'platform assigns' under packages/runtime/src/instructions) and give the reason (the panel shows that checkout). Keep it short; the existing rule's wording stays unless the new sentence must join it.",
+    "2. Notice: the session-start context (packages/runtime/src/cli/sessioncontext.ts and hook.ts) and holyagent status add one line when the session is a claude.ai cloud session (detect it the way the existing cloud-identity notice does) and the primary checkout (the main worktree, not a linked worktree) is on a detached HEAD, saying the panel will show a stray diff and how to return (git switch <branch the checkout started on, else the default branch>). Hooks only add context; block nothing. Use the Bun Shell for git.",
+    "3. Docs: in docs/usage.md (cloud section, or where cloud sessions are described) explain the panel: its branch and Create PR button belong to the assigned branch, which HolyAgent leaves at the base, so the button stays unused and the diff stays empty; the PRs HolyAgent opens appear in the panel's list; the label cannot be renamed from a session. In AGENTS.md, extend 'Keep the main checkout on main' to say that in a cloud session that is the assigned branch, which starts at main. Record the decision in docs/decisions.md in its existing format."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; long logs go to a file in the scratchpad above."
+  ],
+  "criteria": [
+    {
+      "text": "The root rules in both families state that a cloud session's primary checkout stays on the assigned branch at its start commit, with work and commit checkouts in worktrees, and the coverage table covers the new requirement id",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Session start and holyagent status add one notice when a cloud session's primary checkout is on a detached HEAD, and nothing otherwise",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests fail without the change: the notice appears for a detached primary checkout in a cloud session and not for a branch checkout, a linked worktree or a local session",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/usage.md explains the session panel's branch, its Create PR button, where HolyAgent's PRs appear and that the label cannot be renamed; AGENTS.md and docs/decisions.md are updated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No change beyond the three items",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "gates",
+    "tests"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/src/cli/sessioncontext.ts",
+    "packages/runtime/src/cli/hook.ts",
+    "packages/runtime/src/cli/status.ts",
+    "packages/runtime/src/hooks",
+    "packages/runtime/tests/sessioncontext.test.ts",
+    "packages/runtime/tests/cloud-checkout.test.ts",
+    "packages/integrations/claude/tests/hooks.test.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/claude/dist/agents",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/agents",
+    "packages/integrations/pi/dist/extensions",
+    "packages/integrations/pi/dist/prompts",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "docs/usage.md",
+    "docs/decisions.md",
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:20:19.249Z"
+  },
+  "createdAt": "2026-11-09T12:20:19.249Z"
+}
