@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-apply-patch-file-layer",
   "objective": "Confirm the apply_patch file-layer repair (link-loop cap, mode restore, link delete then add) keeps every write, delete and restore inside the project root.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit d5604d4 on release/0.3.1/feat/codex-provider in /home/user/holyagent-0.3.1-codex (range 956092de..d5604d4); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-filelayer-commit.diff",
     "Previous findings this commit repairs: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os3gn-w3sc.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os3rf-7qip.md; repair report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9pye41-curp.md",
@@ -51,7 +51,37 @@
     "agentId": "workflow:wf_8accb238-25b/assignment-0mw9q5a59-ow99",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T20:39:16.893Z"
+    "startedAt": "2026-11-09T20:39:16.893Z",
+    "finishedAt": "2026-11-09T20:48:28.925Z"
+  },
+  "result": "result: The repair closes the prior findings and adds no path escape. I could not execute anything, because this role has no Bash tool, so the verdict comes from reading the diff and worktree sources.\n\nBuilt-in `/security-review`: it failed on `git diff --name-only origin/HEAD...` with `unknown revision origin/HEAD` and covered nothing. I reviewed 956092de..d5604d4 from the diff file and `/home/user/holyagent-0.3.1-codex/packages/runtime/src/pi/codex/apply-patch.ts`. I did not run any tests, including against the old code.\n\nblockers: none\n\nfindings:\n1. Not a vulnerability, low severity, non-blocking: after Delete of link `L` and Add of `L`, a later Update or `Move to` naming `L` resolves through `locate(L)`.\n   - `locate(L)` follows the still-present on-disk link to its old target `T` (`apply-patch.ts:470`, `476`).\n   - The Update therefore reads and rewrites `T`, not the new regular file staged at `L`.\n   - Containment holds: `locate` runs `inside` on the resolved path, and a target outside the root fails with `PatchPathError`.\n   - It is a correctness defect, a surprising edit of `T` inside the project that needs a patch that deletes, re-adds and then updates one link path. A fix would check `planned.get(locateEntry(path))` before following the link.\n2. Optional: `chmod` in restore follows links. The restore keys come from `locate`/`locateEntry` and are never links when `before.kind` is `file`. The patch creates no links, and restore runs newest-first on distinct keys, so I found no way to reach it.\n3. No test covers finding 1.\n\nChecked and sound:\n- Add stages the link entry only when this patch already deleted it (`planned.get(entry) === null`). Otherwise it uses `locate`, which is resolved and then `inside`-checked.\n- `writeAll` unlinks any key whose `before` is a link before writing, so a write never follows a link.\n- The restore of a link deletes the name, which is an unlink and never follows, then calls `symlink` at an in-project key.\n- `realPath` counts hand-followed links across the whole call, capped at 40, so total work is bounded.\n- A kernel ELOOP, EACCES or any non-ENOENT/ENOTDIR/EINVAL `readlink` error fails closed.\n- Lexical `..` collapse can only move a key, and the write goes to the checked key.\n\nevidence:\nEach previous blocking security finding is closed by the repair, traced source to sink: the dangling-link bypass was closed in 956092de and is untouched. `locate` returns the resolved path and `inside` checks it (`apply-patch.ts:408-412`). Writes use that key. The repair's link-loop cap, mode restore and link-then-add change add no new sink.\nNo new path escape outside the project root via symlinks, link chains, dangling links, moves or deletes: Add, Update and Move go through `locate` and Delete goes through `locateEntry`, both checked with `inside` (`apply-patch.ts:416-422`, `458-482`). Finding 1 stays inside the root.\nRollback cannot write or delete outside the project root: every `written` key came from `locate` or `locateEntry` (`apply-patch.ts:486-496`). The link restore is delete then `symlink` at that key. The file restore is `Bun.write` then `chmod` at a key that was a regular file.\nTests cover each closed finding and fail without the repair: by reading, the ELOOP test would hang on the old code, the mode test fails on `0600` without `chmod`, and the delete-then-add tests fail on the old code. Old Add keyed the outside target and threw `PatchPathError`. The Update-after-delete case has no test, and none of this was executed.\nfindings: one non-blocking, non-security finding (Update-after-delete resolves to the link's old target), plus the optional `chmod` note and the missing-test note.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "No path escape; prior findings closed; one low non-security edge stays as a reported note.",
+    "criteria": [
+      {
+        "criterion": "Each previous blocking security finding is closed by the repair, traced source to sink",
+        "support": "the dangling-link bypass was closed in 956092de and is untouched. `locate` returns the resolved path and `inside` checks it (`apply-patch.ts:408-412`). Writes use that key. The repair's link-loop cap, mode restore and link-then-add change add no new sink."
+      },
+      {
+        "criterion": "No new path escape outside the project root via symlinks, link chains, dangling links, moves or deletes",
+        "support": "Add, Update and Move go through `locate` and Delete goes through `locateEntry`, both checked with `inside` (`apply-patch.ts:416-422`, `458-482`). Finding 1 stays inside the root."
+      },
+      {
+        "criterion": "Rollback cannot write or delete outside the project root",
+        "support": "every `written` key came from `locate` or `locateEntry` (`apply-patch.ts:486-496`). The link restore is delete then `symlink` at that key. The file restore is `Bun.write` then `chmod` at a key that was a regular file."
+      },
+      {
+        "criterion": "Tests cover each closed finding and fail without the repair",
+        "support": "by reading, the ELOOP test would hang on the old code, the mode test fails on `0600` without `chmod`, and the delete-then-add tests fail on the old code. Old Add keyed the outside target and threw `PatchPathError`. The Update-after-delete case has no test, and none of this was executed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "one non-blocking, non-security finding (Update-after-delete resolves to the link's old target), plus the optional `chmod` note and the missing-test note."
+      }
+    ]
   },
   "createdAt": "2026-11-09T20:39:16.893Z"
 }
