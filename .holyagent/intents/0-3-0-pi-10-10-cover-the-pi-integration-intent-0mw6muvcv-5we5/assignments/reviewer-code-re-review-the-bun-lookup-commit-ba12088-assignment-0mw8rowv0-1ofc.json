@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-bun-lookup-commit-ba12088",
   "objective": "Re-review the Bun lookup commit ba12088 (range b511fe3..ba12088 in /home/user/holyagent-0.3.0-win) against the four follow-ups it closes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Follow-ups: a bun.cmd that cmd.exe refuses for a project path should give way to the next candidate; a cached Bun that is gone should be looked up again once; relative PATH entries should not be searched; a POSIX candidate without the executable bit should be skipped.",
     "The worker made the retry fire when a command fails or exits non-zero and the cached Bun no longer exists, and reruns the command once. Judge whether a command can run twice with effect (a state-changing holyagent call whose first attempt did start), and whether concurrency is handled. Review `git diff b511fe3..ba12088` and run `bunx --no-install mise run verify` there."
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_0e5343d1-96b/assignment-0mw8rowv0-1ofc",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:34:46.236Z"
+    "startedAt": "2026-11-09T04:34:46.236Z",
+    "finishedAt": "2026-11-09T04:40:06.570Z"
+  },
+  "result": "result: ba12088 is merge-ready. All four follow-ups are closed, `bunx --no-install mise run verify` passes, and I found no blockers.\n\nchanged: none (read-only review)\n\nchecks:\n- `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.0-win` -> exit 0. Type-check, lint and format are clean; 2380 pass, 0 fail. Full log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- Built-in `/code-review medium b511fe3...ba12088` ran. Its five findings are classified below.\n\nblockers: none\n\nfollow-ups:\n- A `bun.cmd` that cmd.exe refuses is passed over for the next candidate: closed. `findBun` takes a `refusal` callback, and the `holyagent` helper drops a cached Bun when `launchOf(bun, argv)` is not ok. The final message names each refusal. It is tested.\n- A cached Bun that is gone is looked up again once: closed. The `looked` flag limits it to one retry, and it is tested.\n- Relative PATH entries are not searched: closed. The `ABSOLUTE_FOLDER` filter does this, and it is tested.\n- A POSIX candidate without the executable bit is skipped: closed. It is tested.\n\nfindings (all non-blocking):\n1. `packages/integrations/pi/src/extension.ts:884` (retry can run a command twice).\n   - The retry fires on a non-zero exit or `killed` result when `gone()` is true, so a command can run twice if Bun is deleted after it started.\n   - Scenario: `reconcile` (line 1065) starts, Bun is uninstalled on POSIX mid-run, and the command exits non-zero or times out. `gone()` is then true and `reconcile` reruns once.\n   - The window is very narrow. On Windows a running `bun.exe` is locked. A normal upgrade renames over the path, so the file never looks gone.\n   - ENOENT and cmd.exe \"not recognized\" never started, so retrying them is safe.\n   - Optional: restrict the retry to failures that look like a start failure, or confirm `reconcile` is idempotent.\n2. `extension.ts:884` (concurrency).\n   - The shared `bun` variable is only read once per attempt, and each attempt captures its own `program`. Concurrent calls can at worst do an extra lookup when `again` clears a path another call just refreshed. That is harmless.\n   - No test covers concurrent retries.\n3. `extension.ts:658` (cached Bun stuck after losing its executable bit). Reviewer claim confirmed. If the cached Bun loses its executable bit or becomes a directory, the call fails with EACCES, `gone()` stays false, and the failure persists until restart. This is an edge case and the same stickiness existed before the commit.\n4. `extension.ts:638` (rooted but driveless Windows PATH entry). Reviewer claim confirmed. A rooted but driveless Windows entry such as `\\tools\\bin`, or an MSYS-style `/c/...` entry, is now skipped. That is a narrower lookup than the wrapper script. It is unlikely, and the refusal of relative entries is the requested behavior.\n5. `extension.ts:645` (miss message when a refused `bun.cmd` is followed by a missing `bun.exe`). Rejected. The message says \"Bun was found but cannot be started\" and names the candidate and why, which is accurate.\n6. `extension.ts:590` (`hasExecutableBit` second stat). Rejected as a defect. It runs once per candidate on a cold lookup only, so the cost is negligible. The two stats could disagree only in a negligible race.\n7. `extension.ts:875` (retry on non-zero exit while Bun is briefly absent). Folded into finding 1. It is the same issue and not a separate defect.\n\nverdict: merge-ready.\n\nevidence:\n- Every blocking finding names path:line and a concrete failure scenario: there are no blocking findings. Each non-blocking finding above carries path:line and a scenario.\n- The review states for each previous finding whether it is closed, and whether the range is merge-ready: the four follow-ups are all closed (see follow-ups), and the range is merge-ready (see verdict).\n- findings: items 1-7 above.\n- verdict: merge-ready. `mise run verify` exit 0, 2380 pass and 0 fail. The log is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n\nI read the retry and concurrency behavior and did not run it under a real Bun removal.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Merge-ready; verify exit 0; follow-ups closed",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding names path:line and a concrete failure scenario",
+        "support": "there are no blocking findings. Each non-blocking finding above carries path:line and a scenario."
+      },
+      {
+        "criterion": "The review states for each previous finding whether it is closed, and whether the range is merge-ready",
+        "support": "the four follow-ups are all closed (see follow-ups), and the range is merge-ready (see verdict)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1-7 above."
+      },
+      {
+        "label": "verdict",
+        "support": "merge-ready. `mise run verify` exit 0, 2380 pass and 0 fail. The log is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:34:46.236Z"
 }
