@@ -11,6 +11,7 @@ import { fromGitPath, toPosix } from "../src/domain/paths.ts"
 import { deadlineIn, withFileLock } from "../src/state/lock.ts"
 import { loadProject } from "../src/state/store.ts"
 import { commitState, fetchRemoteBranch, killGroup, releaseGroup } from "../src/state/tree.ts"
+import { PROCESS_TIMEOUT_MS } from "./fixtures.ts"
 import {
   cleanup,
   fakeGitHub,
@@ -24,13 +25,32 @@ import {
   vcs,
 } from "./vcs-fixtures.ts"
 
-afterEach(cleanup)
-
 // Every test runs a dozen or more git processes, and process creation on Windows is slow enough
 // (2 to 5 seconds a test on the CI runner) to pass Bun's 5 second default; a slow test there is not
 // a hung one. Linux and macOS keep the default.
 if (process.platform === "win32") setDefaultTimeout(60_000)
 afterAll(() => setDefaultTimeout(5_000))
+
+/**
+ * Removing the scratch directories of the large-tree test (3000 files in the work tree and again in
+ * the state worktree) took longer than Bun's 5 second hook default on the Windows runner. Bun reads
+ * a hook's default when the hook is registered, so the hook below is registered after the default
+ * is raised and also carries its own limit; this one fires first and names what was too slow.
+ */
+const removeScratch = () => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const tooSlow = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(`removing the scratch directories took longer than ${PROCESS_TIMEOUT_MS} ms`),
+        ),
+      PROCESS_TIMEOUT_MS,
+    )
+  })
+  return Promise.race([cleanup(), tooSlow]).finally(() => clearTimeout(timer))
+}
+afterEach(removeScratch, PROCESS_TIMEOUT_MS + 5_000)
 
 const OWNER = { name: "Octo", email: "42+octo@users.noreply.github.com" }
 const STATE = "holyagent/state"
