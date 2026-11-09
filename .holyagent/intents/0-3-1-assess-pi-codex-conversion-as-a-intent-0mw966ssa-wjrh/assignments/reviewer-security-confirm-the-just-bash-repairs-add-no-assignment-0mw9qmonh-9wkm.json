@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-just-bash-repairs-add-no",
   "objective": "Confirm the just-bash repairs add no command-injection, path or privilege defect in host passthrough, path-given programs, the null device or the guardrail revert.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The just-bash work: commits fd3d876 (repair) and 618be49 (/dev/null fix) on top of 971b9ea0, plus a merge of the Codex provider branch (d5604d4) whose generated dist was rebuilt. Review 971b9ea0 (first just-bash commit) through the merge commit d149c9c at the head of release/0.3.1/feat/just-bash in /home/user/holyagent-0.3.1-bash; the Codex commits are reviewed separately (PR davidbasilefilho/holyagent#105), so judge only how the merge combines them.",
     "Diffs: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-0.3.1-bash-fix.diff (fd3d876) and /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-devnull.diff (618be49). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odug6-6vgw.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odupl-x2zg.md (security); writer reports /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os41y-etgw.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9q5dw2-a16f.md",
@@ -52,7 +52,37 @@
     "agentId": "workflow:wf_cc8a8611-7a1/assignment-0mw9qmonh-9wkm",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T20:52:48.845Z"
+    "startedAt": "2026-11-09T20:52:48.845Z",
+    "finishedAt": "2026-11-09T20:58:15.074Z"
+  },
+  "result": "result: no blocking findings. The two earlier security findings that mattered are closed, and the repairs and the merge add no injection, path or privilege defect that I found. The built-in `/security-review` could not run: its preprocessing, `git diff origin/HEAD...`, failed because this clone has no `origin/HEAD`. I have no shell, so I reviewed by reading the worktree source and diffs and ran nothing. The range was 971b9ea0..d149c9c in `/home/user/holyagent-0.3.1-bash`, and I found no conflict markers. The `dist` check was by grep only: it holds no machine paths and does carry `holyagent-run` and `context_management`.\n\n**Previous findings**\n**Closed:**\n  - `.cmd`/`.bat` arguments: `hostLaunch` (`shell.ts:263`) now sends `.cmd` and `.bat` files through `cmdExeArguments`.\n  - Extra search folders: they now pass the same rooted filter as `PATH` (`hosts.ts:85-88`).\n  - `cmd.ts`: `cmdExeArguments` has a single definition, and the rules are unchanged from the extension's old copy.\n**Still non-blocking, as before:**\n  - Guardrails off removes the bash timeout, output cap and repeat breaker.\n  - `ReadWriteFs` is rooted at `/`, which Pi's own bash already allowed.\n\n**Suspicions, all non-blocking**\n1. `withNullDevice` (`devices.ts`) answers only 8 calls on `/dev/null`: write, append, read, exists and stat. Other calls such as `rm`, `mv`, `chmod` and `ln` still reach the host's real `/dev/null`. As root, `rm /dev/null` or `mv x /dev/null` could break the host. This is not new, because the same calls worked before and host passthrough allows them anyway. I did not run it. A fix would be to route every `/dev/null` operation to a no-op or an error.\n2. `withProgramLaunch` triggers on the sequence exists, stat, readFile of the same path. `[ -e p ] && [ -x p ] && cat p` on a native executable would print the trampoline text instead of the binary. It only returns text and runs nothing else, so it is an integrity quirk, not an escalation.\n3. Windows `cmd.exe` quoting relies on Bun quoting like libuv (quote only for a space, tab or quote). I did not verify this, and Windows is covered by unit tests of the pure parts only.\n4. Inside the shell, a model can `export PATH=bin:$PATH` and run a project-planted native program. That is ordinary bash semantics and the model could run it anyway. Inherited relative `PATH` entries are dropped at start and when the state is saved.\n\n**Judgement on the skipped Windows `/dev/null` tests:** the `/dev/null` interception is pure virtual-path logic (`posix.normalize`) with no host path involved, so skipping the tests on Windows leaves no security gap. They are skipped mainly because they spawn host programs.\n\nevidence:\nEach previous security finding is closed or still correctly non-blocking: the `.cmd`/`.bat` finding is closed via `shell.ts:263-274` (`hostLaunch` calls `cmdExeArguments`), and the extra-folders finding via `hosts.ts:85-88`. The guardrails and `ReadWriteFs` items stay non-blocking.\nPath-given program execution and PATH carry-over cannot run something other than what the command names, and Windows .cmd and .bat arguments cannot inject commands: `programs.ts:80` single-quotes the trampoline path and escapes `'`. The trampoline names the same host path that `programKind` classified. `exit.ts:72` restricts local-variable names to `[A-Za-z_][A-Za-z0-9_]*`, so no script injection. `machinePath` and `pathFolders` keep rooted entries only. `cmd.ts:26-40` refuses `\" % ^ !`, control characters, and `&|<>()` in unquoted words, and the line starts with `call` so `cmd.exe` strips no quote. Windows was not run.\nThe guardrail revert touches only the settings HolyAgent recorded, in the files it recorded: `pi-settings.ts:334-376` reverts a key only when the record names it with the value setup wrote (`Equal.equals`), and user-set or changed values are kept (`settings.ts:181`). It runs at user scope only, behind `refuseLinks`, and the record sits outside the project (`record.ts:30`). `REVERTABLE` holds only the `revertWhenOff` patch.\nThe null device cannot expose or overwrite host files: `devices.ts:36-49` answers write, read, exists and stat on `/dev/null` in memory and writes nothing to the host. Suspicion 1 above is the only gap.\nfindings: no blockers, and the four non-blocking suspicions are listed above.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "No blockers; previous findings closed; build unchanged and verify 3000 pass at d149c9c; optional items go to the final repair round.",
+    "criteria": [
+      {
+        "criterion": "Each previous security finding is closed or still correctly non-blocking",
+        "support": "the `.cmd`/`.bat` finding is closed via `shell.ts:263-274` (`hostLaunch` calls `cmdExeArguments`), and the extra-folders finding via `hosts.ts:85-88`. The guardrails and `ReadWriteFs` items stay non-blocking."
+      },
+      {
+        "criterion": "Path-given program execution and PATH carry-over cannot run something other than what the command names, and Windows .cmd and .bat arguments cannot inject commands",
+        "support": "`programs.ts:80` single-quotes the trampoline path and escapes `'`. The trampoline names the same host path that `programKind` classified. `exit.ts:72` restricts local-variable names to `[A-Za-z_][A-Za-z0-9_]*`, so no script injection. `machinePath` and `pathFolders` keep rooted entries only. `cmd.ts:26-40` refuses `\" % ^ !`, control characters, and `&|<>()` in unquoted words, and the line starts with `call` so `cmd.exe` strips no quote. Windows was not run."
+      },
+      {
+        "criterion": "The guardrail revert touches only the settings HolyAgent recorded, in the files it recorded",
+        "support": "`pi-settings.ts:334-376` reverts a key only when the record names it with the value setup wrote (`Equal.equals`), and user-set or changed values are kept (`settings.ts:181`). It runs at user scope only, behind `refuseLinks`, and the record sits outside the project (`record.ts:30`). `REVERTABLE` holds only the `revertWhenOff` patch."
+      },
+      {
+        "criterion": "The null device cannot expose or overwrite host files",
+        "support": "`devices.ts:36-49` answers write, read, exists and stat on `/dev/null` in memory and writes nothing to the host. Suspicion 1 above is the only gap."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers, and the four non-blocking suspicions are listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T20:52:48.845Z"
 }
