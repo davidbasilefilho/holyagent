@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "remove-the-duplicated-win32-cachehome",
   "objective": "Remove the duplicated win32 cacheHome assertion in packages/runtime/tests/setup-tui-load.test.ts.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-tui, branch release/0.3.0/feat/setup-tui (head cc1623e).",
     "Line 117 asserts cacheHome({ HOME: 'C:\\\\Users\\\\a' }, 'win32') with the same input and expectation as line 113. Delete the one at line 117 (the copy inside the newer test), keeping the newer test's other assertions."
@@ -47,7 +47,33 @@
     "agentId": "workflow:wf_c1892b84-b12/assignment-0mw9by8zd-up0n",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T14:01:54.169Z"
+    "startedAt": "2026-11-09T14:01:54.169Z",
+    "finishedAt": "2026-11-09T14:05:19.408Z"
+  },
+  "result": "result: Removed the duplicate win32 `cacheHome({ HOME: \"C:\\\\Users\\\\a\" })` assertion at line 117 (inside \"joins with the separator…\"). Line 113 kept; all other assertions unchanged. Build leaves no unexplained changes.\n\nchanged: packages/runtime/tests/setup-tui-load.test.ts\n\nchecks:\n`bun install --frozen-lockfile` → 0 (no changes)\n`bunx --no-install mise run build` → 0 (39 + 37 files built; only the test file in git status)\n`bunx --no-install mise run verify` → 0 (type-check: 241 files clean; lint: 242 clean; fmt:check: 563 formatted; tests: 2703 pass, 0 fail, 87 files)\n\nblockers: none\nquestions: none\nnotes: Line 113 and line 117 were identical; the removed copy was the one in the newer test, as the Assignment specified.\n\nevidence:\nThe duplicated assertion is gone and every other assertion stays: `git diff` shows one deleted line (117) and no other change; verify exit 0 with 2703 passing tests.\nOnly setup-tui-load.test.ts changes and mise run verify exits 0: `git status --short` shows only that path after build; verify exit 0.\nchecks-run: build exit 0; verify exit 0 (2703 pass, 0 fail); logs at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and verify.log\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/setup-tui-load-dedupe.diff\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "diff is exactly the one duplicate line the code review named; verify exit 0 with 2703 pass",
+    "criteria": [
+      {
+        "criterion": "The duplicated assertion is gone and every other assertion stays",
+        "support": "`git diff` shows one deleted line (117) and no other change; verify exit 0 with 2703 passing tests."
+      },
+      {
+        "criterion": "Only setup-tui-load.test.ts changes and mise run verify exits 0",
+        "support": "`git status --short` shows only that path after build; verify exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build exit 0; verify exit 0 (2703 pass, 0 fail); logs at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and verify.log"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/setup-tui-load-dedupe.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T14:01:54.169Z"
 }
