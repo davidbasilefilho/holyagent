@@ -1,9 +1,16 @@
 import solidPlugin from "@opentui/solid/bun-plugin"
 
 import type { T3Preview } from "../src/setup/t3-settings.ts"
-import { reviewOf } from "../src/setup/tui/session.ts"
+import { capabilityReview, reviewOf } from "../src/setup/tui/session.ts"
 import type { Background } from "../src/setup/tui/theme.ts"
-import type { Applied, Choices, Review, TuiInput, TuiOutcome } from "../src/setup/tui/types.ts"
+import type {
+  Applied,
+  CapabilityOffer,
+  Choices,
+  Review,
+  TuiInput,
+  TuiOutcome,
+} from "../src/setup/tui/types.ts"
 
 // The interface's JSX needs the Solid transform, which `bun test` does not apply on its own: load
 // the plugin, then import the sources, so the tests need no bunfig preload.
@@ -81,12 +88,18 @@ export interface Mount {
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly device?: string | undefined
   readonly worktrees?: boolean
+  /** Whether the T3 rows are offered; true when absent. */
+  readonly t3?: boolean
+  /** The capability rows, all switched on at the start; none when absent. */
+  readonly capabilities?: ReadonlyArray<CapabilityOffer>
   readonly dryRun?: boolean
   /** The terminal background the palette is picked for; dark when absent. */
   readonly background?: Background
   readonly review?: (choices: Choices) => Promise<Review>
   readonly apply?: (choices: Choices, signal: AbortSignal) => Promise<Applied>
 }
+
+const NORMAL = { form: "normal", source: "default", reason: "no form was asked for" } as const
 
 /** One mounted interface on the headless renderer, with the calls it made. */
 export const mount = async (options: Mount) => {
@@ -97,16 +110,31 @@ export const mount = async (options: Mount) => {
   const input: TuiInput = {
     env: options.env ?? { TERM: "xterm-256color" },
     offer: {
+      t3: options.t3 ?? true,
       device:
         "device" in options ? options.device : "Xcode (/Applications/Xcode.app/Contents/Developer)",
       worktrees: options.worktrees ?? true,
+      capabilities: options.capabilities ?? [],
+      form: "normal (detected: a graphical session is available)",
     },
-    initial: { worktrees: true, deviceAccess: true },
+    initial: {
+      worktrees: true,
+      deviceAccess: true,
+      capabilities: Object.fromEntries(
+        (options.capabilities ?? []).map((capability) => [capability.feature, true]),
+      ),
+    },
     dryRun: options.dryRun ?? false,
     review: (choices) => {
       reviews.push(choices)
       return options.review === undefined
-        ? Promise.resolve(reviewOf(PREVIEW, choices))
+        ? Promise.resolve(
+            reviewOf(
+              options.t3 === false ? undefined : PREVIEW,
+              choices,
+              capabilityReview(input.initial.capabilities, choices.capabilities, NORMAL),
+            ),
+          )
         : options.review(choices)
     },
     apply: (choices, signal) => {

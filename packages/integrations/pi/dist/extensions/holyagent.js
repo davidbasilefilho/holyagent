@@ -13995,6 +13995,142 @@ var workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS, host = "claude"
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed5(reason)));
 
+var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
+var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
+var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
+var SUBAGENTS_ONLY_SPECIALISTS = {
+  disableDefaultAgents: true,
+  fallbackSubagent: "none"
+};
+var T3_PREFIX = "mcp__t3*code__";
+var T3_VISUAL_TOOLS = [
+  `${T3_PREFIX}preview_*`,
+  `${T3_PREFIX}t3_preview_*`,
+  `${T3_PREFIX}html_render`,
+  `${T3_PREFIX}html_preview`,
+  `${T3_PREFIX}device_*`
+];
+var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var sameForm = (packages) => ({
+  headless: { packages, mcpServers: [] },
+  normal: { packages, mcpServers: [] }
+});
+var CAPABILITIES = [
+  {
+    name: "subagents",
+    feature: "subagents",
+    description: "Runs the 18 specialists as subagents (@tintinweb/pi-subagents)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@tintinweb/pi-subagents"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "context-compression",
+    feature: "contextCompression",
+    description: "Compresses the context of long sessions (Billion Context)",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["billion-context"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "todo",
+    feature: "todo",
+    description: "Gives the root a todo list tool (@juicesharp/rpiv-todo)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@juicesharp/rpiv-todo"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "ask",
+    feature: "ask",
+    description: "Lets the root ask the user a question mid-run (@juicesharp/rpiv-ask-user-question)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@juicesharp/rpiv-ask-user-question"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "processes",
+    feature: "processes",
+    description: "Gives the root tools for background processes (@aliou/pi-processes)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@aliou/pi-processes"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "mcp",
+    feature: "mcp",
+    description: "Pi's built-in MCP extension, which brings T3 Code's browser, render and device tools",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS },
+    settings: [],
+    health: ["needs"]
+  },
+  {
+    name: "computer-use",
+    feature: "computerUse",
+    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [{ kind: "display" }],
+    forms: {
+      headless: { unavailable: "it drives a graphical session and this machine has none" },
+      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
+    },
+    settings: [
+      {
+        file: PI_SETTINGS_FILE,
+        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+      }
+    ],
+    tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
+    health: ["needs", "packages"]
+  }
+];
+var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
+var formContent = (capability, form) => {
+  const entry = capability.forms[form];
+  return "unavailable" in entry ? undefined : entry;
+};
+var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
+  const [first] = formContent(capability, "normal")?.packages ?? [];
+  return first === undefined ? [] : [[capability.feature, first]];
+}));
+var unavailableIn = (capability, form) => {
+  const entry = capability.forms[form];
+  return "unavailable" in entry ? entry.unavailable : undefined;
+};
+var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined));
+
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed5(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
@@ -14037,19 +14173,15 @@ var WebMode = Literals(["provider", "pi-web-kit", "off"]);
 var CodemodeMode = Literals(["on", "only"]);
 var T3Scope = Literals(["global", "project"]);
 var Enabled = Boolean3;
+var capabilitySwitch = (on) => defaulted(Enabled, on);
+var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
 var PiSection = defaulted(Struct({
   enable: defaulted(Enabled, true),
   provider: defaulted(PiProvider, "kimi-coding-global"),
   routes: defaulted(Struct(ROUTE_FIELDS), {}),
   features: defaulted(Struct({
     web: defaulted(WebMode, "provider"),
-    processes: defaulted(Enabled, true),
-    todo: defaulted(Enabled, true),
-    ask: defaulted(Enabled, true),
-    mcp: defaulted(Enabled, true),
-    computerUse: defaulted(Enabled, true),
-    contextCompression: defaulted(Enabled, true),
-    subagents: defaulted(Enabled, true)
+    ...CAPABILITY_FIELDS
   }), {}),
   codemode: defaulted(Struct({
     mode: defaulted(CodemodeMode, "only"),
@@ -16465,19 +16597,10 @@ var CODEMODE_TOOL = "codemode";
 var CODEMODE_MAX_WORKERS_ENV = "PI_CODEMODE_MAX_WORKERS";
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
-var T3_PREFIX = "mcp__t3*code__";
-var T3_VISUAL_TOOLS = [
-  `${T3_PREFIX}preview_*`,
-  `${T3_PREFIX}t3_preview_*`,
-  `${T3_PREFIX}html_render`,
-  `${T3_PREFIX}html_preview`,
-  `${T3_PREFIX}device_*`
-];
 var T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
 var T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
 var isDeactivatedT3Tool = (name) => T3_TOOL.test(name) && !T3_VISUAL.some((pattern) => pattern.test(name));
 var deactivatedT3Tools = (registered) => registered.filter(isDeactivatedT3Tool);
-var COMPUTER_USE_TOOLS = ["computer_use_*"];
 var build = (tools, excludeTools, noMcp, maxWorkers) => ({
   tools,
   excludeTools,
@@ -16493,13 +16616,14 @@ var build = (tools, excludeTools, noMcp, maxWorkers) => ({
 var has = (capabilities, capability) => capabilities.includes(capability);
 var toolArgs = (config, key, profile = providerProfile(config)) => {
   const { features } = config.pi;
+  const enabled = enabledCapabilities(features);
   const noMcp = !features.mcp;
   const { maxWorkers } = config.pi.codemode;
   if (key === "root") {
     const excluded = [
       "write",
       "edit",
-      ...features.computerUse ? COMPUTER_USE_TOOLS : [],
+      ...enabled.flatMap((capability) => capability.tools.rootExclude),
       ...webChoice(profile, features.web).tools
     ];
     return build([CODEMODE_ENTRY], excluded, noMcp, maxWorkers);
@@ -16510,10 +16634,7 @@ var toolArgs = (config, key, profile = providerProfile(config)) => {
     ...has(capabilities, "Write") ? WRITE_TOOLS : [],
     ...has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : [],
     ...has(capabilities, "Search") ? webChoice(profile, features.web).tools : [],
-    ...has(capabilities, "VisualInspection") ? [
-      ...features.mcp ? T3_VISUAL_TOOLS : [],
-      ...features.computerUse ? COMPUTER_USE_TOOLS : []
-    ] : []
+    ...has(capabilities, "VisualInspection") ? enabled.flatMap((capability) => capability.tools.visual) : []
   ];
   const unique = [...new Set(tools)];
   return build([...unique, CODEMODE_TOOL], WRITE_TOOLS.filter((tool) => !unique.includes(tool)), noMcp, maxWorkers);

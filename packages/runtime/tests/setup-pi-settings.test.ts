@@ -93,7 +93,7 @@ const runDoctor = (
 ) =>
   Effect.runPromise(
     doctor(
-      { HOME: home, ...extra.env },
+      { HOME: home, DISPLAY: ":0", ...extra.env },
       { fix: false, cwd: project, scope: extra.scope ?? "user" },
     ).pipe(Effect.provide(shell.layer)),
   )

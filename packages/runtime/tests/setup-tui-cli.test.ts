@@ -7,6 +7,7 @@ import { Effect } from "effect"
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
 import type { SetupTuiLoader } from "../src/cli/types.ts"
+import { CAPABILITIES } from "../src/config/capabilities.ts"
 import { TuiUnavailable } from "../src/setup/tui/load.ts"
 import type { Choices, Review, SetupTuiModule, TuiInput } from "../src/setup/tui/types.ts"
 import { scratch } from "./setup-fixture.ts"
@@ -27,6 +28,9 @@ beforeEach(async () => {
 afterEach(() => remove())
 
 const TERMINAL = { stdin: true, stdout: true }
+
+/** Every capability on, as the config defaults leave them. */
+const ALL_ON = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, true]))
 
 /** A machine with T3 Code, and an Android SDK unless `sdk` is false. */
 const machine = async (options: { sdk?: boolean; t3?: boolean } = {}) => {
@@ -171,13 +175,18 @@ describe("setup without the interface", () => {
     },
   )
 
-  test("says nothing about the interface where the T3 part has no work", async () => {
+  test("says nothing about the interface where Pi is not in use, and for an undo", async () => {
     await machine({ t3: false })
     const shown = interface_(() => Promise.reject(new Error("must not run")))
-    const result = await cli([], { terminal: TERMINAL, setupTui: shown.loader })
+    const result = await cli([], {
+      env: { HOLYAGENT_HOST: "claude" },
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+    })
     expect(shown.loaded()).toBe(0)
     expect(result.stdout).not.toContain("t3 tui")
     const undone = await cli(["--undo"], { terminal: TERMINAL, setupTui: shown.loader })
+    expect(shown.loaded()).toBe(0)
     expect(undone.stdout).not.toContain("t3 tui")
   })
 })
@@ -189,14 +198,21 @@ describe("setup with the interface", () => {
     let review: Review | undefined
     const shown = interface_(async (input) => {
       seen = input
-      const choices: Choices = { worktrees: false, deviceAccess: true }
+      const choices: Choices = { worktrees: false, deviceAccess: true, capabilities: ALL_ON }
       review = await input.review(choices)
       const applied = await input.apply(choices, new AbortController().signal)
       return { _tag: "Applied", applied }
     })
     const result = await cli([], { terminal: TERMINAL, setupTui: shown.loader })
-    expect(seen?.offer).toEqual({ device: `the Android SDK (${androidSdk})`, worktrees: true })
-    expect(seen?.initial).toEqual({ worktrees: true, deviceAccess: true })
+    expect(seen?.offer).toMatchObject({
+      t3: true,
+      device: `the Android SDK (${androidSdk})`,
+      worktrees: true,
+    })
+    expect(seen?.offer.capabilities.map((capability) => capability.name)).toEqual(
+      CAPABILITIES.map((capability) => capability.name),
+    )
+    expect(seen?.initial).toEqual({ worktrees: true, deviceAccess: true, capabilities: ALL_ON })
     expect(seen?.dryRun).toBe(false)
     expect(review?.file).toBe(t3File())
     expect(review?.choices.map((line) => [line.mark, line.name])).toEqual([
@@ -219,6 +235,48 @@ describe("setup with the interface", () => {
     expect(t3Line(result.stdout)).toContain("added")
     expect(result.stdout).not.toContain("t3 tui")
     expect(result.stdout.startsWith("~ scope: user (default)\n")).toBe(true)
+  })
+
+  test("opens for the capability rows alone where the T3 part has no work, and writes the switch the person made", async () => {
+    await machine({ t3: false })
+    let seen: TuiInput | undefined
+    const shown = interface_(async (input) => {
+      seen = input
+      const choices: Choices = {
+        ...input.initial,
+        capabilities: { ...input.initial.capabilities, todo: false },
+      }
+      const review = await input.review(choices)
+      expect(review.file).toBeUndefined()
+      expect(review.capabilities?.find((line) => line.name === "todo")?.mark).toBe("-")
+      const applied = await input.apply(choices, new AbortController().signal)
+      return { _tag: "Applied", applied }
+    })
+    const result = await cli([], { terminal: TERMINAL, setupTui: shown.loader })
+    expect(seen?.offer.t3).toBe(false)
+    expect(seen?.offer.capabilities.map((offer) => offer.name)).toEqual(
+      CAPABILITIES.map((capability) => capability.name),
+    )
+    expect(seen?.initial.capabilities).toEqual(ALL_ON)
+    // Only the switch the person changed is written; the untouched rows keep their defaults out of the file.
+    expect(await Bun.file(join(home, ".holyagent", "config.json")).json()).toEqual({
+      pi: { features: { todo: false } },
+    })
+    expect(result.stdout).toContain("- capability todo: turned off")
+    expect(result.stdout).not.toContain("t3 tui")
+  })
+
+  test("a capability flag applies directly and keeps the interface out", async () => {
+    await machine()
+    const shown = interface_(() => Promise.reject(new Error("must not run")))
+    const result = await cli(["--todo", "off"], { terminal: TERMINAL, setupTui: shown.loader })
+    expect(shown.loaded()).toBe(0)
+    expect(tuiLine(result.stdout)).toBe(
+      "~ t3 tui: a choice flag was passed, so it applies directly; using the line-based setup",
+    )
+    expect(await Bun.file(join(home, ".holyagent", "config.json")).json()).toEqual({
+      pi: { features: { todo: false } },
+    })
   })
 
   test("offers no device row on a machine without Xcode or an Android SDK", async () => {
@@ -258,7 +316,7 @@ describe("setup with the interface", () => {
     const shown = interface_(async (input) => ({
       _tag: "Applied",
       applied: await input.apply(
-        { worktrees: true, deviceAccess: true },
+        { worktrees: true, deviceAccess: true, capabilities: ALL_ON },
         new AbortController().signal,
       ),
     }))
@@ -276,7 +334,7 @@ describe("setup with the interface", () => {
       return {
         _tag: "Applied",
         applied: await input.apply(
-          { worktrees: true, deviceAccess: true },
+          { worktrees: true, deviceAccess: true, capabilities: ALL_ON },
           new AbortController().signal,
         ),
       }

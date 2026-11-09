@@ -5,11 +5,18 @@ import { dirname, join } from "node:path"
 import { Effect } from "effect"
 
 import { version } from "../../../package.json" with { type: "json" }
+import {
+  CAPABILITIES,
+  type CapabilityDefinition,
+  FEATURE_PACKAGES,
+} from "../src/config/capabilities.ts"
 import { piPackages } from "../src/config/packages.ts"
-import { PI_PACKAGE_VERSIONS } from "../src/config/pi-packages.ts"
+import { PI_PACKAGE_VERSIONS, piPackageSource } from "../src/config/pi-packages.ts"
 import { defaultConfig } from "../src/config/schema.ts"
 import { doctor } from "../src/setup/doctor.ts"
+import { chooseForm } from "../src/setup/form.ts"
 import {
+  checkCapability,
   isHolyagentSource,
   PI_HOST_VERSION,
   PI_MINIMUM_NODE,
@@ -46,7 +53,20 @@ const globalSettings = () => join(home, ".pi", "agent", "settings.json")
 const projectSettings = () => join(project, ".pi", "settings.json")
 /** The packages of a Pi that has HolyAgent and every package the default config enables. */
 const FULL = () => ({ packages: [SOURCE, ...DEFAULT_SOURCES] })
-const FEATURES_OK = `ok   pi features: ${DEFAULT_SOURCES.length} enabled packages listed at their pins`
+/** The line for the provider package, the one package no capability owns. */
+const BASE_OK = "ok   pi base packages: 1 packages listed at their pins"
+const FORM_OK = "ok   pi form: normal"
+/** The line of each capability in the default config when its package is listed (the normal form). */
+const CAPABILITY_LINES_OK = [
+  "ok   pi capability subagents: normal form, root, 1 package listed at its pin",
+  "ok   pi capability context-compression: normal form, both, 1 package listed at its pin",
+  "ok   pi capability todo: normal form, root, 1 package listed at its pin",
+  "ok   pi capability ask: normal form, root, 1 package listed at its pin",
+  "ok   pi capability processes: normal form, root, 1 package listed at its pin",
+  "ok   pi capability mcp: normal form, both, nothing to install",
+  "ok   pi capability computer-use: normal form, specialists, 1 package listed at its pin",
+]
+const PI_LINES_OK = [BASE_OK, FORM_OK, ...CAPABILITY_LINES_OK]
 const IN_USE = { HOLYAGENT_HOST: "pi" }
 /** The user's own HolyAgent config, which a user-scope setup and doctor decide from. */
 const setConfig = (config: unknown) => write(join(home, ".holyagent", "config.json"), config)
@@ -75,7 +95,7 @@ const check = (
 ) =>
   Effect.runPromise(
     doctor(
-      { HOME: home, ...extra.env },
+      { HOME: home, DISPLAY: ":0", ...extra.env },
       { fix: extra.fix ?? false, cwd: project, scope: extra.scope ?? "user" },
     ).pipe(Effect.provide(shell.layer)),
   )
@@ -101,7 +121,7 @@ describe("holyagent doctor, Pi checks", () => {
       `ok   pi: ${PI_HOST_VERSION} (/fake/bin/pi)`,
       "ok   node: 22.19.0 (/fake/bin/node)",
       `ok   pi package: listed in ${globalSettings()}`,
-      FEATURES_OK,
+      ...PI_LINES_OK,
     ])
     expect(shell.lines()).toEqual(["pi --version", "node --version"])
   })
@@ -115,10 +135,14 @@ describe("holyagent doctor, Pi checks", () => {
         `FAIL pi: not found on PATH; install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`,
         `FAIL node: not found on PATH; install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`,
         `FAIL pi package: not in the packages of ${globalSettings()}; install it with \`pi install ${SOURCE}\``,
-        ...DEFAULT_SOURCES.map(
-          (source) =>
-            `FAIL pi feature ${source.slice("npm:".length, source.lastIndexOf("@"))}: not listed at ${source} in the packages of ${globalSettings()}; install it with \`pi install ${source}\`, or re-run \`holyagent setup\``,
-        ),
+        `FAIL pi base package pi-provider-kimi-code: not listed at ${DEFAULT_SOURCES[0]} in the packages of ${globalSettings()}; install it with \`pi install ${DEFAULT_SOURCES[0]}\`, or re-run \`holyagent setup\``,
+        FORM_OK,
+        ...CAPABILITIES.map((capability) => {
+          if (capability.name === "mcp")
+            return "ok   pi capability mcp: normal form, both, nothing to install"
+          const source = piPackageSource(FEATURE_PACKAGES[capability.feature])
+          return `FAIL pi capability ${capability.name}: ${source} is not listed in the packages of ${globalSettings()}; install it with \`pi install ${source}\`, or re-run \`holyagent setup\``
+        }),
       ])
       expect(shell.calls).toEqual([])
     }
@@ -180,7 +204,11 @@ describe("holyagent doctor, Pi checks", () => {
       expect(lineNamed(report, "pi package")).toBe(
         `ok   pi package: listed in ${projectSettings()}`,
       )
-      expect(lineNamed(report, "pi features")).toBe(FEATURES_OK)
+      expect(lineNamed(report, "pi base packages")).toBe(BASE_OK)
+      expect(report.lines.filter((line) => /^ok {3}pi (form|capability)/.test(line))).toEqual([
+        FORM_OK,
+        ...CAPABILITY_LINES_OK,
+      ])
     }
   })
 
@@ -191,7 +219,9 @@ describe("holyagent doctor, Pi checks", () => {
     expect(piLines(user)[2]).toBe(
       `FAIL pi package: not in the packages of ${globalSettings()}; install it with \`pi install ${SOURCE}\``,
     )
-    expect(piLines(user).slice(3)).toHaveLength(DEFAULT_SOURCES.length)
+    expect(piLines(user).filter((line) => line.startsWith("FAIL pi "))).toHaveLength(
+      DEFAULT_SOURCES.length + 1,
+    )
     expect(piLines(user).slice(3).join("\n")).not.toContain(projectSettings())
     for (const scope of ["project", "local"] as const)
       expect(lineNamed(await check(shellWith(), { scope }), "pi package")).toBe(
@@ -278,11 +308,13 @@ describe("holyagent doctor, Pi checks", () => {
     await write(globalSettings(), { packages: [SOURCE, kept] })
     const report = await check(shellWith())
     expect(report.ok).toBe(false)
-    const features = piLines(report).slice(3)
-    expect(features).toHaveLength(rest.length)
-    for (const [index, source] of rest.entries())
-      expect(features[index]).toContain(`\`pi install ${source}\``)
-    expect(features.every((line) => line.startsWith("FAIL pi feature "))).toBe(true)
+    const failing = piLines(report).filter((line) => line.startsWith("FAIL pi "))
+    expect(failing).toHaveLength(rest.length)
+    for (const [index, source] of rest.entries()) {
+      expect(failing[index]).toContain(`\`pi install ${source}\``)
+      expect(failing[index]).toStartWith("FAIL pi capability ")
+    }
+    expect(piLines(report)[3]).toBe(BASE_OK)
   })
 
   test("a package listed at another version is missing, and one in the project's settings counts at project scope only", async () => {
@@ -291,14 +323,14 @@ describe("holyagent doctor, Pi checks", () => {
       packages: [SOURCE, ...others, first?.replace(/@[^@]+$/, "@0.0.1")],
     })
     await write(projectSettings(), { packages: [{ source: first, skills: [] }] })
-    expect(lineNamed(await check(shellWith(), { scope: "project" }), "pi features")).toBe(
-      FEATURES_OK,
+    expect(lineNamed(await check(shellWith(), { scope: "project" }), "pi base packages")).toBe(
+      BASE_OK,
     )
     expect(piLines(await check(shellWith()))[3]).toContain(`\`pi install ${first}\``)
 
     await write(projectSettings(), { packages: [] })
     const report = await check(shellWith())
-    expect(piLines(report)).toHaveLength(4)
+    expect(piLines(report).filter((line) => line.startsWith("FAIL pi "))).toHaveLength(1)
     expect(piLines(report)[3]).toContain(`\`pi install ${first}\``)
   })
 
@@ -315,43 +347,45 @@ describe("holyagent doctor, Pi checks", () => {
     expect(wanted.some((source) => source.startsWith("npm:pi-web-kit@"))).toBe(true)
     await write(globalSettings(), { packages: [SOURCE, ...wanted] })
     const report = await check(shellWith())
-    expect(piLines(report)[3]).toBe(
-      `ok   pi features: ${wanted.length} enabled packages listed at their pins`,
-    )
+    // The provider and the web kit are no capability's, so they are the base packages.
+    expect(piLines(report)[3]).toBe("ok   pi base packages: 2 packages listed at their pins")
+    expect(lineNamed(report, "pi capability computer-use")).toBeUndefined()
+    expect(report.ok).toBe(true)
 
     await write(globalSettings(), { packages: [SOURCE, ...DEFAULT_SOURCES] })
-    const missing = piLines(await check(shellWith())).slice(3)
+    const missing = piLines(await check(shellWith())).filter((line) => line.startsWith("FAIL pi "))
     expect(missing).toHaveLength(1)
-    expect(missing[0]).toStartWith("FAIL pi feature pi-web-kit: ")
+    expect(missing[0]).toStartWith("FAIL pi base package pi-web-kit: ")
   })
 
   test("a user-scope doctor expects what the user's config selects, not what the repository's config does", async () => {
     await setProjectConfig({ pi: { features: { todo: false, computerUse: false } } })
     await write(globalSettings(), FULL())
     const user = await check(shellWith())
-    expect(piLines(user)[3]).toBe(FEATURES_OK)
+    expect(piLines(user).slice(3)).toEqual(PI_LINES_OK)
 
     const off = DEFAULT_SOURCES.filter((source) => !source.includes("rpiv-todo"))
     await write(globalSettings(), { packages: [SOURCE, ...off] })
-    const missing = piLines(await check(shellWith())).slice(3)
-    expect(missing.map((line) => line.split(":")[0])).toEqual([
-      "FAIL pi feature @juicesharp/rpiv-todo",
-    ])
+    const missing = piLines(await check(shellWith())).filter((line) => line.startsWith("FAIL pi "))
+    expect(missing.map((line) => line.split(":")[0])).toEqual(["FAIL pi capability todo"])
     // The project's config does decide a project-scope doctor: with the todo feature off, the
     // package list without it is complete, where the user's config would call it missing.
     await write(projectSettings(), { packages: [SOURCE, ...off] })
     const project = await check(shellWith(), { scope: "project" })
-    expect(lineNamed(project, "pi features")).toBe(
-      `ok   pi features: ${off.length - 1} enabled packages listed at their pins`,
-    )
+    expect(lineNamed(project, "pi base packages")).toBe(BASE_OK)
+    expect(lineNamed(project, "pi capability todo")).toBeUndefined()
+    expect(lineNamed(project, "pi capability computer-use")).toBeUndefined()
+    expect(project.lines.filter((line) => line.startsWith("FAIL pi "))).toEqual([])
 
     await setProjectConfig({ pi: { enable: false } })
-    expect(piLines(await check(shellWith())).length).toBe(4)
+    expect(piLines(await check(shellWith())).length).toBe(3 + PI_LINES_OK.length)
     // With pi.enable off in the project's config, project and local scope print no Pi line at all.
     for (const scope of ["project", "local"] as const) {
       const report = await check(shellWith(), { scope })
       expect(report.lines.filter((line) => /^\S+\s+pi( |:)/.test(line))).toEqual([])
-      expect(report.lines.some((line) => /pi (package|feature)|node:/.test(line))).toBe(false)
+      expect(
+        report.lines.some((line) => /pi (package|base|capability|form)|node:/.test(line)),
+      ).toBe(false)
     }
   })
 
@@ -360,6 +394,136 @@ describe("holyagent doctor, Pi checks", () => {
     const report = await check(shell, { env: { CLAUDE_CODE_REMOTE: "true", ...IN_USE } })
     expect(report.lines.filter((line) => /^(ok {3}|FAIL )(pi|node)/.test(line))).toEqual([])
     expect(shell.calls).toEqual([])
+  })
+})
+
+describe("holyagent doctor, capabilities", () => {
+  const doctorIn = (
+    form: "headless" | "normal" | undefined,
+    env: Record<string, string> = {},
+    shell = shellWith(),
+  ) =>
+    Effect.runPromise(
+      doctor(
+        { HOME: home, ...env },
+        {
+          fix: false,
+          cwd: project,
+          scope: "user",
+          ...(form === undefined ? {} : { form: chooseForm(env, form, "linux") }),
+        },
+      ).pipe(Effect.provide(shell.layer)),
+    )
+
+  test("reports the form first, with how it was chosen, then one line per enabled capability", async () => {
+    await write(globalSettings(), FULL())
+    const report = await doctorIn("normal", { DISPLAY: ":0" })
+    expect(piLines(report).slice(3)).toEqual([
+      BASE_OK,
+      "ok   pi form: normal (set by --form normal)",
+      ...CAPABILITY_LINES_OK,
+    ])
+  })
+
+  test("a capability the form does not offer is a note that fails nothing, and its package is not required", async () => {
+    await write(globalSettings(), {
+      packages: [SOURCE, ...DEFAULT_SOURCES.filter((source) => !source.includes("computer-use"))],
+    })
+    const report = await doctorIn("headless")
+    expect(report.ok).toBe(true)
+    expect(piLines(report).slice(3)).toEqual([
+      BASE_OK,
+      "ok   pi form: headless (set by --form headless)",
+      ...CAPABILITY_LINES_OK.slice(0, -1).map((line) =>
+        line.replace("normal form", "headless form"),
+      ),
+      "~ pi capability computer-use: not offered in the headless form (it drives a graphical session and this machine has none); nothing is expected of it",
+    ])
+  })
+
+  test("a capability the config turns off has no line, and one that is on names the package it lacks", async () => {
+    await setConfig({ pi: { features: { todo: false, ask: false } } })
+    await write(globalSettings(), {
+      packages: [SOURCE, ...DEFAULT_SOURCES.filter((source) => !source.includes("processes"))],
+    })
+    const report = await doctorIn("normal", { DISPLAY: ":0" })
+    const names = piLines(report)
+      .filter((line) => line.includes("pi capability"))
+      .map((line) => line.split(":")[0])
+    expect(names).toEqual([
+      "ok   pi capability subagents",
+      "ok   pi capability context-compression",
+      "FAIL pi capability processes",
+      "ok   pi capability mcp",
+      "ok   pi capability computer-use",
+    ])
+    expect(report.ok).toBe(false)
+  })
+
+  test.skipIf(process.platform === "darwin" || process.platform === "win32")(
+    "a form named on a machine that cannot hold it fails the capability's system need",
+    async () => {
+      await write(globalSettings(), FULL())
+      const report = await doctorIn("normal")
+      expect(report.ok).toBe(false)
+      expect(lineNamed(report, "pi capability computer-use")).toBe(
+        "FAIL pi capability computer-use: needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)",
+      )
+    },
+  )
+
+  describe("the health probes of one entry", () => {
+    const ENTRY: CapabilityDefinition = {
+      name: "made-up",
+      feature: "madeUp",
+      description: "For the tests",
+      skills: [],
+      applicability: "both",
+      defaultOn: true,
+      needs: [
+        { kind: "command", command: "madeup", fix: "install madeup with your package manager" },
+      ],
+      forms: {
+        headless: { packages: [], mcpServers: [] },
+        normal: { packages: ["pi-web-kit"], mcpServers: [] },
+      },
+      tools: { rootExclude: [], visual: [] },
+      settings: [],
+      health: ["needs", "packages"],
+    }
+    const probe = (
+      definition: CapabilityDefinition,
+      form: "headless" | "normal",
+      listed: ReadonlyArray<string>,
+      commands: ReadonlyArray<string>,
+    ) =>
+      Effect.runPromise(
+        checkCapability({ HOME: home }, "user", definition, form, listed, [
+          "/pi/settings.json",
+        ]).pipe(Effect.provide(fakeShell({ commands }).layer)),
+      )
+
+    test("a missing command and a missing package are named together, with the way to fix each", async () => {
+      expect(await probe(ENTRY, "normal", [], [])).toBe(
+        "FAIL pi capability made-up: needs madeup on PATH; install madeup with your package manager; npm:pi-web-kit@0.5.0 is not listed in the packages of /pi/settings.json; install it with `pi install npm:pi-web-kit@0.5.0`, or re-run `holyagent setup`",
+      )
+    })
+
+    test("a present command and a listed package are healthy, and the form decides what is expected", async () => {
+      expect(await probe(ENTRY, "normal", ["npm:pi-web-kit@0.5.0"], ["madeup"])).toBe(
+        "ok   pi capability made-up: normal form, both, 1 package listed at its pin",
+      )
+      expect(await probe(ENTRY, "headless", [], ["madeup"])).toBe(
+        "ok   pi capability made-up: headless form, both, nothing to install",
+      )
+    })
+
+    test("a probe the entry does not list is not run", async () => {
+      const quiet = { ...ENTRY, health: [] } satisfies CapabilityDefinition
+      expect(await probe(quiet, "normal", [], [])).toBe(
+        "ok   pi capability made-up: normal form, both, 1 package, not checked",
+      )
+    })
   })
 })
 
@@ -593,7 +757,7 @@ describe("holyagent setup, Pi packages", () => {
       expect(piCommands(shell)).toEqual([])
       expect(piStep(report)).toHaveLength(DEFAULT_SOURCES.length)
       expect(piStep(report).at(0)).toBe(`= pi ${first}: already listed in ${projectSettings()}`)
-      expect(lineNamed(await check(shellWith(), { scope }), "pi features")).toBe(FEATURES_OK)
+      expect(lineNamed(await check(shellWith(), { scope }), "pi base packages")).toBe(BASE_OK)
     }
 
     // A stale pin does not count, and the global file is ignored when it is not valid.

@@ -70,7 +70,7 @@ describe("the setup interface, review and apply", () => {
   test("Enter reviews the current choices: what each switch changes and what is always applied", async () => {
     const screen = await shown({ width: 80, height: 40 })
     await screen.keys("down", " ", "enter")
-    expect(screen.reviews).toEqual([{ worktrees: true, deviceAccess: false }])
+    expect(screen.reviews).toEqual([{ worktrees: true, deviceAccess: false, capabilities: {} }])
     const text = screen.lines().join("\n")
     expect(text).toContain("REVIEW")
     expect(text).toContain("/home/user/.t3/userdata/settings.json")
@@ -86,7 +86,7 @@ describe("the setup interface, review and apply", () => {
   test("confirming applies the choices once and shows the result; closing reports it", async () => {
     const screen = await shown({ width: 80, height: 24 })
     await screen.keys("down", "down", " ", "enter", "enter")
-    expect(screen.applies).toEqual([{ worktrees: false, deviceAccess: true }])
+    expect(screen.applies).toEqual([{ worktrees: false, deviceAccess: true, capabilities: {} }])
     const text = screen.lines().join("\n")
     expect(text).toContain("RESULT")
     expect(text).toContain("Setup finished.")

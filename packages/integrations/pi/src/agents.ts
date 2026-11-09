@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 
-import { FEATURE_PACKAGES, WEB_KIT_PACKAGE } from "../../../runtime/src/config/packages.ts"
+import { FEATURE_PACKAGES } from "../../../runtime/src/config/capabilities.ts"
+import { WEB_KIT_PACKAGE } from "../../../runtime/src/config/packages.ts"
 import { type Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import type { Route } from "../../../runtime/src/domain/route.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"

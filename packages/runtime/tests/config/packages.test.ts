@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
-import { FEATURE_PACKAGES, piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
+import { FEATURE_PACKAGES } from "../../src/config/capabilities.ts"
+import { piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
 import {
   PI_PACKAGE_VERSIONS,
   type PiPackageName,

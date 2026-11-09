@@ -12503,6 +12503,147 @@ class ConfigInvalid extends TaggedError2("ConfigInvalid") {
   }
 }
 
+var CAPABILITY_FORMS = ["headless", "normal"];
+var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
+var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
+var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
+var SUBAGENTS_ONLY_SPECIALISTS = {
+  disableDefaultAgents: true,
+  fallbackSubagent: "none"
+};
+var T3_PREFIX = "mcp__t3*code__";
+var T3_VISUAL_TOOLS = [
+  `${T3_PREFIX}preview_*`,
+  `${T3_PREFIX}t3_preview_*`,
+  `${T3_PREFIX}html_render`,
+  `${T3_PREFIX}html_preview`,
+  `${T3_PREFIX}device_*`
+];
+var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var sameForm = (packages) => ({
+  headless: { packages, mcpServers: [] },
+  normal: { packages, mcpServers: [] }
+});
+var CAPABILITIES = [
+  {
+    name: "subagents",
+    feature: "subagents",
+    description: "Runs the 18 specialists as subagents (@tintinweb/pi-subagents)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@tintinweb/pi-subagents"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "context-compression",
+    feature: "contextCompression",
+    description: "Compresses the context of long sessions (Billion Context)",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["billion-context"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "todo",
+    feature: "todo",
+    description: "Gives the root a todo list tool (@juicesharp/rpiv-todo)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@juicesharp/rpiv-todo"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "ask",
+    feature: "ask",
+    description: "Lets the root ask the user a question mid-run (@juicesharp/rpiv-ask-user-question)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@juicesharp/rpiv-ask-user-question"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "processes",
+    feature: "processes",
+    description: "Gives the root tools for background processes (@aliou/pi-processes)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@aliou/pi-processes"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "mcp",
+    feature: "mcp",
+    description: "Pi's built-in MCP extension, which brings T3 Code's browser, render and device tools",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS },
+    settings: [],
+    health: ["needs"]
+  },
+  {
+    name: "computer-use",
+    feature: "computerUse",
+    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [{ kind: "display" }],
+    forms: {
+      headless: { unavailable: "it drives a graphical session and this machine has none" },
+      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
+    },
+    settings: [
+      {
+        file: PI_SETTINGS_FILE,
+        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+      }
+    ],
+    tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
+    health: ["needs", "packages"]
+  }
+];
+var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
+var formContent = (capability, form) => {
+  const entry = capability.forms[form];
+  return "unavailable" in entry ? undefined : entry;
+};
+var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
+  const [first] = formContent(capability, "normal")?.packages ?? [];
+  return first === undefined ? [] : [[capability.feature, first]];
+}));
+var unavailableIn = (capability, form) => {
+  const entry = capability.forms[form];
+  return "unavailable" in entry ? entry.unavailable : undefined;
+};
+var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined));
+var capabilityPackages = (features, form, definitions = CAPABILITIES) => enabledCapabilities(features, { form, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []);
+var managedCapabilityPackages = (definitions = CAPABILITIES) => [
+  ...new Set(definitions.flatMap((capability) => CAPABILITY_FORMS.flatMap((form) => formContent(capability, form)?.packages ?? [])))
+];
+
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
@@ -12545,19 +12686,15 @@ var WebMode = Literals(["provider", "pi-web-kit", "off"]);
 var CodemodeMode = Literals(["on", "only"]);
 var T3Scope = Literals(["global", "project"]);
 var Enabled = Boolean3;
+var capabilitySwitch = (on) => defaulted(Enabled, on);
+var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
 var PiSection = defaulted(Struct({
   enable: defaulted(Enabled, true),
   provider: defaulted(PiProvider, "kimi-coding-global"),
   routes: defaulted(Struct(ROUTE_FIELDS), {}),
   features: defaulted(Struct({
     web: defaulted(WebMode, "provider"),
-    processes: defaulted(Enabled, true),
-    todo: defaulted(Enabled, true),
-    ask: defaulted(Enabled, true),
-    mcp: defaulted(Enabled, true),
-    computerUse: defaulted(Enabled, true),
-    contextCompression: defaulted(Enabled, true),
-    subagents: defaulted(Enabled, true)
+    ...CAPABILITY_FIELDS
   }), {}),
   codemode: defaulted(Struct({
     mode: defaulted(CodemodeMode, "only"),
@@ -22533,24 +22670,36 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
+var FORM_CHOICES = CAPABILITY_FORMS;
+var DEFAULT_FORM_CHOICE = {
+  form: "normal",
+  source: "default",
+  reason: "no form was asked for"
+};
+var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
+var detectForm = (env, platform = process.platform) => {
+  if (inCloudSession(env))
+    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
+  const ci = env["CI"];
+  if (ci !== undefined && ci !== "" && ci !== "false")
+    return { form: "headless", source: "detected", reason: "CI is set" };
+  if (!hasDisplay(env, platform))
+    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
+  return { form: "normal", source: "detected", reason: "a graphical session is available" };
+};
+var chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` };
+var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
+
 import { join as join16 } from "path";
 
-var FEATURE_PACKAGES = {
-  subagents: "@tintinweb/pi-subagents",
-  contextCompression: "billion-context",
-  todo: "@juicesharp/rpiv-todo",
-  ask: "@juicesharp/rpiv-ask-user-question",
-  processes: "@aliou/pi-processes",
-  computerUse: "@amaster.ai/pi-computer-use"
-};
 var WEB_KIT_PACKAGE = "pi-web-kit";
-var piPackages = (config, profile = providerProfile(config)) => {
+var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES) => {
   const { enable, features } = config.pi;
   if (!enable)
     return [];
   const names = [
     profile.package,
-    ...Object.keys(FEATURE_PACKAGES).filter((feature) => features[feature]).map((feature) => FEATURE_PACKAGES[feature]),
+    ...capabilityPackages(features, form, definitions),
     ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
   ];
   return names.map((name) => piPackageSource(name));
@@ -22665,7 +22814,10 @@ var piInUse = (env) => gen2(function* () {
     return true;
   return isSome2(yield* (yield* Shell).which("pi"));
 });
-var loadPiConfig = (env, cwd, scope) => loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(mapError2((error) => new SetupFailure({ message: error.message })));
+var loadPiConfig = (env, cwd, scope, choices = {}) => loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(map4((config) => ({
+  ...config,
+  pi: { ...config.pi, features: { ...config.pi.features, ...choices } }
+})), mapError2((error) => new SetupFailure({ message: error.message })));
 var checkPackage = (env, cwd, scope) => gen2(function* () {
   const files = piPresenceFiles(env, cwd, scope);
   const outcomes = yield* forEach2(files, (file) => piSettingsSources(file).pipe(map4((sources) => ({
@@ -22679,28 +22831,74 @@ var checkPackage = (env, cwd, scope) => gen2(function* () {
   const problems = outcomes.flatMap((outcome) => outcome.problem === undefined ? [] : [outcome.problem]);
   return fail6("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${packageFix(scope)}` : `not in the packages of ${files.join(" or ")}; ${packageFix(scope)}`);
 });
-var checkFeatures = (env, cwd, scope, config) => gen2(function* () {
-  const files = piPresenceFiles(env, cwd, scope);
-  const listed = (yield* forEach2(files, (file) => piSettingsSources(file).pipe(orElseSucceed2(() => [])))).flat();
-  const wanted = piPackages(config);
+var listedSources = (files) => forEach2(files, (file) => piSettingsSources(file).pipe(orElseSucceed2(() => []))).pipe(map4((lists) => lists.flat()));
+var installFix = (source, scope) => `install it with \`pi install ${source}\`${scope === "user" ? "" : " (add -l for this project only)"}, or re-run \`holyagent setup\``;
+var checkBasePackages = (files, scope, config, listed) => {
+  const wanted = piPackages(config, undefined, "normal", []);
   const missing = wanted.filter((source) => !listsAtPin(listed, source));
   if (missing.length === 0)
-    return [pass("pi features", `${wanted.length} enabled packages listed at their pins`)];
-  return missing.map((source) => fail6(`pi feature ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; install it with \`pi install ${source}\`${scope === "user" ? "" : " (add -l for this project only)"}, or re-run \`holyagent setup\``));
+    return [pass("pi base packages", `${wanted.length} packages listed at their pins`)];
+  return missing.map((source) => fail6(`pi base package ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`));
+};
+var unmetNeed = (env, need) => gen2(function* () {
+  if (need.kind === "display")
+    return hasDisplay(env) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
+  const found = yield* (yield* Shell).which(need.command);
+  return isSome2(found) ? undefined : `needs ${need.command} on PATH; ${need.fix}`;
 });
-var piChecks = (env, cwd, scope) => gen2(function* () {
+var checkCapability = (env, scope, capability, form, listed, files) => gen2(function* () {
+  const name = `pi capability ${capability.name}`;
+  const reason = unavailableIn(capability, form);
+  if (reason !== undefined)
+    return hint(`${name}: not offered in the ${form} form (${reason}); nothing is expected of it`);
+  const content = formContent(capability, form);
+  const problems = [];
+  if (capability.health.includes("needs")) {
+    for (const need of capability.needs) {
+      const unmet = yield* unmetNeed(env, need);
+      if (unmet !== undefined)
+        problems.push(unmet);
+    }
+  }
+  const sources = (content?.packages ?? []).map((package_) => piPackageSource(package_));
+  if (capability.health.includes("packages")) {
+    for (const source of sources.filter((wanted) => !listsAtPin(listed, wanted)))
+      problems.push(`${source} is not listed in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`);
+  }
+  if (problems.length > 0)
+    return fail6(name, problems.join("; "));
+  const count = sources.length === 1 ? "1 package" : `${sources.length} packages`;
+  const what = sources.length === 0 ? "nothing to install" : capability.health.includes("packages") ? `${count} listed at ${sources.length === 1 ? "its pin" : "their pins"}` : `${count}, not checked`;
+  return pass(name, `${form} form, ${capability.applicability}, ${what}`);
+});
+var checkCapabilities = (env, cwd, scope, config, choice, listed) => gen2(function* () {
+  const files = piPresenceFiles(env, cwd, scope);
+  const lines = yield* forEach2(enabledCapabilities(config.pi.features), (capability) => checkCapability(env, scope, capability, choice.form, listed, files));
+  return [pass("pi form", describeForm(choice)), ...lines];
+});
+var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [
       hint("pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped")
     ];
   return yield* loadPiConfig(env, cwd, scope).pipe(matchEffect3({
     onFailure: (error) => succeed6([fail6("pi config", error.message)]),
-    onSuccess: (config) => config.pi.enable ? all2([
-      checkPi(env),
-      checkNode(env),
-      checkPackage(env, cwd, scope),
-      checkFeatures(env, cwd, scope, config)
-    ]).pipe(map4(([pi, node, pkg, features]) => [pi, node, pkg, ...features])) : succeed6([])
+    onSuccess: (config) => config.pi.enable ? gen2(function* () {
+      const files = piPresenceFiles(env, cwd, scope);
+      const listed = yield* listedSources(files);
+      const [pi, node, pkg] = yield* all2([
+        checkPi(env),
+        checkNode(env),
+        checkPackage(env, cwd, scope)
+      ]);
+      return [
+        pi,
+        node,
+        pkg,
+        ...checkBasePackages(files, scope, config, listed),
+        ...yield* checkCapabilities(env, cwd, scope, config, choice, listed)
+      ];
+    }) : succeed6([])
   }));
 });
 
@@ -22708,24 +22906,9 @@ import { join as join17, relative as relative6, resolve as resolve7, sep as sep7
 
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
-var T3_PREFIX = "mcp__t3*code__";
-var T3_VISUAL_TOOLS = [
-  `${T3_PREFIX}preview_*`,
-  `${T3_PREFIX}t3_preview_*`,
-  `${T3_PREFIX}html_render`,
-  `${T3_PREFIX}html_preview`,
-  `${T3_PREFIX}device_*`
-];
 var T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
 var T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
-var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
-var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
-var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
-var SUBAGENTS_ONLY_SPECIALISTS = {
-  disableDefaultAgents: true,
-  fallbackSubagent: "none"
-};
-var toolSettings = (config, profile = providerProfile(config)) => {
+var toolSettings = (config, profile = providerProfile(config), form = "normal") => {
   const { enable, features } = config.pi;
   if (!enable)
     return [];
@@ -22740,16 +22923,7 @@ var toolSettings = (config, profile = providerProfile(config)) => {
         }
       }
     ] : [],
-    ...features.subagents ? [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }] : [],
-    ...features.contextCompression ? [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }] : [],
-    ...features.computerUse ? [
-      {
-        file: PI_SETTINGS_FILE,
-        content: {
-          "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false }
-        }
-      }
-    ] : []
+    ...enabledCapabilities(features, { form }).flatMap((capability) => capability.settings)
   ];
 };
 
@@ -22803,9 +22977,9 @@ var locate2 = (env, cwd, scope, logical) => {
 var keyName = ({ path }) => path.join(".");
 var inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf));
 var routeLeaves = (config) => leaves(rootModelSettings(config));
-var planFor = (env, cwd, scope, config) => {
+var planFor = (env, cwd, scope, config, form) => {
   const byFile = new Map;
-  for (const patch of toolSettings(config)) {
+  for (const patch of toolSettings(config, undefined, form)) {
     byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
   }
   const route = routeLeaves(config);
@@ -22859,7 +23033,7 @@ var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action)
     }
   }
 });
-var planAt = (env, cwd, scope) => loadPiConfig(env, cwd, scope).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config) : undefined), orElseSucceed2(() => {
+var planAt = (env, cwd, scope, form, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
   return;
 }));
 var label = "tool settings";
@@ -22896,7 +23070,7 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
   return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
 });
 var installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
-  const plan = yield* planAt(env, options.cwd, options.scope);
+  const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices);
   if (plan === undefined)
     return [];
   const lines = [];
@@ -22985,10 +23159,10 @@ var routeLine = fn2("checkRootModel")(function* (planned, existing) {
     pass("root model", `${provider}/${model}:${thinking} set in Pi's settings (${planned.file})`)
   ];
 });
-var checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
+var checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [];
-  const plan = yield* planAt(env, cwd, scope);
+  const plan = yield* planAt(env, cwd, scope, form);
   if (plan === undefined)
     return [];
   const lines = [];
@@ -23008,10 +23182,56 @@ var checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
   return lines;
 });
 
-import { join as join19 } from "path";
+import { join as join20 } from "path";
+
+import { join as join18 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join18(stateDirectory(cwd), CONFIG_FILE);
+var objectAt = (parent, key, file, path) => {
+  const value = parent[key];
+  if (value === undefined)
+    return succeed6({});
+  return isJsonObject2(value) ? succeed6(value) : fail5(new SetupFailure({ message: `${file}: ${path} is not an object` }));
+};
+var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, options) {
+  const chosen = CAPABILITIES.flatMap((capability) => {
+    const value = options.choices[capability.feature];
+    return value === undefined ? [] : [{ capability, value }];
+  });
+  if (chosen.length === 0)
+    return [];
+  const current = (yield* loadPiConfig(env, options.cwd, options.scope)).pi.features;
+  const changed = chosen.filter(({ capability, value }) => current[capability.feature] !== value);
+  const word = (value) => value ? "on" : "off";
+  const lines = chosen.filter(({ capability, value }) => current[capability.feature] === value).map(({ capability, value }) => present2(`capability ${capability.name}: already ${word(value)}`));
+  if (changed.length === 0)
+    return lines;
+  const file = capabilityConfigFile(env, options.cwd, options.scope);
+  if (!options.dryRun) {
+    const existing = yield* readJsonObject(file);
+    const pi = yield* objectAt(existing, "pi", file, "pi");
+    const features = yield* objectAt(pi, "features", file, "pi.features");
+    yield* writeJsonObject(file, {
+      ...existing,
+      pi: {
+        ...pi,
+        features: {
+          ...features,
+          ...Object.fromEntries(changed.map(({ capability, value }) => [capability.feature, value]))
+        }
+      }
+    });
+  }
+  return [
+    ...lines,
+    ...changed.map(({ capability, value }) => {
+      const text = `capability ${capability.name}: ${options.dryRun ? "would turn" : "turned"} ${word(value)} (pi.features.${capability.feature} in ${file})`;
+      return value ? added(text) : skipped(text);
+    })
+  ];
+});
 
 var MANAGED_NAMES = new Set([
-  ...Object.values(FEATURE_PACKAGES),
+  ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
   ...Object.values(PROVIDERS).map((profile) => profile.package)
 ]);
@@ -23026,7 +23246,7 @@ var staleManagedNames = (listed, wanted, managed = MANAGED_NAMES) => {
 };
 var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   const shell = yield* Shell;
-  const config = yield* loadPiConfig(env, options.cwd, options.scope);
+  const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices);
   if (!config.pi.enable)
     return [skipped("pi packages: pi.enable is off in the HolyAgent config")];
   const projectLevel = options.scope !== "user";
@@ -23036,7 +23256,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   const counted = piPresenceFiles(env, options.cwd, options.scope).filter((other) => other !== file);
   const elsewhere = yield* forEach2(counted, (other) => piSettingsSources(other).pipe(map4((sources) => ({ file: other, sources })), orElseSucceed2(() => ({ file: other, sources: [] }))));
   const listedIn = (source) => listsAtPin(listed, source) ? file : elsewhere.find((other) => listsAtPin(other.sources, source))?.file;
-  const wanted = piPackages(config);
+  const wanted = piPackages(config, undefined, options.form);
   const installs = wanted.filter((source) => listedIn(source) === undefined);
   const removals = staleManagedNames(listed, wanted);
   const lines = wanted.flatMap((source) => {
@@ -23077,7 +23297,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
 });
 
 import { stat as stat3 } from "fs/promises";
-import { join as join18 } from "path";
+import { join as join19 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
   browserArtifactsAfterDays: 14,
@@ -23090,21 +23310,21 @@ var restoreSettings = (path, previous, unchangedSince) => previous === undefined
 var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
-var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join18(homeDirectory(env), ".t3");
-var t3SettingsFile = (env) => join18(t3Home(env), "userdata", "settings.json");
+var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join19(homeDirectory(env), ".t3");
+var t3SettingsFile = (env) => join19(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory(env);
   if (platform === "darwin") {
     const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-    const simulator = join18(developer, "Platforms", "iPhoneSimulator.platform");
+    const simulator = join19(developer, "Platforms", "iPhoneSimulator.platform");
     if (yield* isDirectory2(simulator))
       return `Xcode (${developer})`;
   }
   const sdkFolders = [
     firstNonEmpty(env["ANDROID_HOME"]),
     firstNonEmpty(env["ANDROID_SDK_ROOT"]),
-    platform === "darwin" ? join18(home, "Library", "Android", "sdk") : platform === "win32" ? join18(firstNonEmpty(env["LOCALAPPDATA"]) ?? join18(home, "AppData", "Local"), "Android", "Sdk") : join18(home, "Android", "Sdk")
+    platform === "darwin" ? join19(home, "Library", "Android", "sdk") : platform === "win32" ? join19(firstNonEmpty(env["LOCALAPPDATA"]) ?? join19(home, "AppData", "Local"), "Android", "Sdk") : join19(home, "Android", "Sdk")
   ];
   for (const folder of sdkFolders) {
     if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -23425,7 +23645,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join19(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join19(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join20(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join20(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present2("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -23455,7 +23675,15 @@ var setup = fn2("setup")(function* (env, options) {
     const lines = yield* run(target.file);
     return target.notice === undefined ? lines : [hint(`${label}: ${target.notice}`), ...lines];
   }));
-  const piOptions = { scope, cwd: options.cwd ?? process.cwd(), dryRun: options.dryRun };
+  const choices = options.capabilities ?? {};
+  const form = options.form ?? DEFAULT_FORM_CHOICE;
+  const piOptions = {
+    scope,
+    cwd: options.cwd ?? process.cwd(),
+    dryRun: options.dryRun,
+    form: form.form,
+    choices
+  };
   if (options.undo === true) {
     const lines = [
       hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
@@ -23469,6 +23697,13 @@ var setup = fn2("setup")(function* (env, options) {
   const piUsed = !cloud && (yield* piInUse(env));
   const lines = [
     ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
+    ...piUsed ? [hint(`form: ${describeForm(form)}`)] : [],
+    ...piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
+      scope,
+      cwd: piOptions.cwd,
+      dryRun: options.dryRun,
+      choices
+    })) : Object.keys(choices).length > 0 ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")] : [],
     ...piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
     ...piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
     ...piUsed && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
@@ -23508,9 +23743,10 @@ var checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), ch
 var doctor = fn2("doctor")(function* (env, options) {
   const scope = options.scope ?? "user";
   const cwd = options.cwd ?? process.cwd();
+  const form = options.form ?? DEFAULT_FORM_CHOICE;
   const pi = inCloudSession(env) ? [] : [
-    ...yield* piChecks(env, cwd, scope),
-    ...yield* checkPiToolSettings(env, cwd, scope),
+    ...yield* piChecks(env, cwd, scope, form),
+    ...yield* checkPiToolSettings(env, cwd, scope, form.form),
     ...scope === "user" ? yield* checkT3Settings(env, cwd) : []
   ];
   const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
@@ -23538,7 +23774,7 @@ var doctor = fn2("doctor")(function* (env, options) {
 
 import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join20, posix, win32 } from "path";
+import { basename as basename5, dirname as dirname5, join as join21, posix, win32 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -24743,8 +24979,8 @@ var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join20(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join20(directory, file)}`, cause)
+      try: () => Bun.write(join21(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join21(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -24763,11 +24999,11 @@ var importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
 });
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join20(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join21(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
 }));
 var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join20(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join21(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
 var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
@@ -24823,8 +25059,8 @@ var promote = (temporary, directory, packages, lock) => gen2(function* () {
 var STALE_AFTER_MS = 60 * 60 * 1000;
 var newestChange = (path) => gen2(function* () {
   const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join20(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join20(path, "node_modules"))];
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join21(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join21(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 });
@@ -24834,26 +25070,26 @@ var sweepStale = (directory, uid) => gen2(function* () {
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir2(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join20(parent, name);
+    const path = join21(parent, name);
     const found = yield* tryPromise2(() => lstat5(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
 }).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join20(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join21(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join20(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join21(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove);
 var loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join20(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join21(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -24872,9 +25108,9 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join20(directory, TUI_BUNDLE);
+  const target = join21(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join20(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join21(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -24891,7 +25127,7 @@ var TuiOutcomeSchema = Union2([
   Struct({ _tag: Literal2("Interrupted") })
 ]);
 
-var DEFAULT_CHOICES = { worktrees: true, deviceAccess: true };
+var DEFAULT_CHOICES = { worktrees: true, deviceAccess: true, capabilities: {} };
 var set = (value) => value !== undefined && value !== "";
 var tuiFallbackReason = (options) => {
   const { env, terminal } = options;
@@ -24915,9 +25151,43 @@ var t3Offer = fn2("t3Offer")(function* (env, cwd, options) {
   const preview = yield* previewT3Settings(env, cwd, DEFAULT_CHOICES).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
   return preview === undefined || "line" in preview ? undefined : preview;
 });
-var offerOf = (preview) => ({
-  device: preview.device,
-  worktrees: preview.worktreesAllowed
+var capabilityOffers = (form, definitions = CAPABILITIES) => definitions.map((capability) => ({
+  feature: capability.feature,
+  name: capability.name,
+  description: capability.description,
+  unavailable: unavailableIn(capability, form.form)
+}));
+var offerOf = (preview, capabilities, form) => ({
+  t3: preview !== undefined,
+  device: preview?.device,
+  worktrees: preview?.worktreesAllowed ?? false,
+  capabilities,
+  form: describeForm(form)
+});
+var featureSwitches = (features, definitions = CAPABILITIES) => Object.fromEntries(definitions.map((capability) => [
+  capability.feature,
+  features[capability.feature] === true
+]));
+var changedSwitches = (initial, chosen) => Object.fromEntries(CAPABILITIES.flatMap((capability) => {
+  const value = chosen[capability.feature];
+  return value === undefined || value === initial[capability.feature] ? [] : [[capability.feature, value]];
+}));
+var capabilityReview = (initial, chosen, form, definitions = CAPABILITIES) => definitions.map((capability) => {
+  const was = initial[capability.feature] === true;
+  const now = chosen[capability.feature] === true;
+  const reason = unavailableIn(capability, form.form);
+  const packages = formContent(capability, form.form)?.packages ?? [];
+  const names = packages.length === 0 ? "no package" : packages.join(", ");
+  const name = capability.name;
+  if (reason !== undefined)
+    return {
+      mark: "~",
+      name,
+      detail: `${now ? "on" : "off"} in the config; not offered in the ${form.form} form (${reason})`
+    };
+  if (now === was)
+    return { mark: "=", name, detail: now ? `stays on (${names})` : "stays off" };
+  return now ? { mark: "+", name, detail: `turned on (${names})` } : { mark: "-", name, detail: `turned off (${names} removed)` };
 });
 var capitalized = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 var lineOf = (unit) => {
@@ -24935,11 +25205,14 @@ var lineOf = (unit) => {
   return { mark: "=", name, detail: "already set" };
 };
 var choiceLine = (name, unit) => unit === undefined ? { mark: "-", name, detail: "off; nothing written" } : lineOf({ ...unit, name });
-var reviewOf = (preview, choices) => {
+var reviewOf = (preview, choices, capabilities = []) => {
+  if (preview === undefined)
+    return { file: undefined, capabilities, choices: [], always: [] };
   const unit = (choice) => preview.units.find((u) => u.choice === choice);
   const pi = unit("pi");
   return {
     file: preview.file,
+    capabilities,
     choices: [
       ...pi === undefined ? [] : [lineOf({ ...pi, name: "Pi provider" })],
       ...preview.device === undefined ? [] : [
@@ -24958,9 +25231,14 @@ var fallback = (reason) => ({
 });
 var decodeOutcome = decodeUnknownEffect2(TuiOutcomeSchema, { onExcessProperty: "error" });
 var runInteractive = fn2("runInteractive")(function* (options) {
+  const line = { kind: "line", notes: [] };
+  if (options.undo || inCloudSession(options.env) || !(yield* piInUse(options.env)))
+    return line;
   const preview = yield* t3Offer(options.env, options.cwd, options);
-  if (preview === undefined)
-    return { kind: "line", notes: [] };
+  const features = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(map4((config) => config.pi.enable ? featureSwitches(config.pi.features) : undefined), catchTag2("SetupFailure", () => succeed6(undefined)));
+  const offers = features === undefined ? [] : capabilityOffers(options.form);
+  if (preview === undefined && offers.length === 0)
+    return line;
   const reason = tuiFallbackReason(options);
   if (reason !== undefined)
     return fallback(reason);
@@ -24968,13 +25246,19 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
   if (loaded instanceof TuiUnavailable)
     return fallback(`unavailable (${loaded.reason})`);
+  const initialSwitches = features === undefined ? {} : features;
   const input = {
     env: options.env,
-    offer: offerOf(preview),
-    initial: DEFAULT_CHOICES,
+    offer: offerOf(preview, offers, options.form),
+    initial: { ...DEFAULT_CHOICES, capabilities: initialSwitches },
     dryRun: options.dryRun,
-    review: (choices) => runPromise2(previewT3Settings(options.env, options.cwd, choices).pipe(flatMap2((next) => next === undefined || ("line" in next) ? fail5(new Error("the T3 settings step has nothing to do any more")) : succeed6(reviewOf(next, choices))))),
-    apply: (choices, signal) => runPromise2(options.apply(choices), { signal })
+    review: (choices) => runPromise2(gen2(function* () {
+      const next = preview === undefined ? undefined : yield* previewT3Settings(options.env, options.cwd, choices);
+      if (preview !== undefined && (next === undefined || ("line" in next)))
+        return yield* fail5(new Error("the T3 settings step has nothing to do any more"));
+      return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));
+    })),
+    apply: (choices, signal) => runPromise2(options.apply(choices, changedSwitches(initialSwitches, choices.capabilities)), { signal })
   };
   return yield* tryPromise2({
     try: () => loaded.runSetupTui(input),
@@ -25001,6 +25285,8 @@ var oneLine3 = (cause) => (cause instanceof Error ? cause.message : String(cause
 var CacheTtlFlag = Literals(CACHE_TTLS);
 var SwitchFlag = Literals(["on", "off"]);
 var ScopeFlag = Literals(SCOPES);
+var FormFlag = Literals(FORM_CHOICES);
+var CAPABILITY_FLAGS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.name, "string"]));
 var printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
 `, "", report.ok ? 0 : 1);
@@ -25010,14 +25296,24 @@ var resolveScope = fn2("resolveScope")(function* (flag, usage, cwd) {
   const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
   return { scope, source: "flag" };
 });
-var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--worktrees on|off] [--device-access on|off] [--no-tui]";
+var SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]";
+var CAPABILITY_NAMES = CAPABILITIES.map((capability) => capability.name).join(", ");
 var switchFlag = fn2("switchFlag")(function* (args, name) {
   const value = stringFlag(args, name);
   if (value === undefined)
     return;
   return (yield* choiceFlag(SwitchFlag, name, value, SETUP_USAGE)) === "on";
 });
-var DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]";
+var capabilitySwitches = fn2("capabilitySwitches")(function* (args) {
+  const entries = yield* forEach2(CAPABILITIES, (capability) => switchFlag(args, capability.name).pipe(map4((value) => value === undefined ? [] : [[capability.feature, value]])));
+  const choices = Object.fromEntries(entries.flat());
+  return choices;
+});
+var formOf = fn2("formOf")(function* (args, env, usage) {
+  const flag = stringFlag(args, "form");
+  return chooseForm(env, flag === undefined ? undefined : yield* choiceFlag(FormFlag, "form", flag, usage));
+});
+var DOCTOR_USAGE = "doctor [--scope user|project|local] [--form headless|normal] [--fix]";
 var SETUP_COMMANDS = [
   {
     path: ["setup"],
@@ -25033,9 +25329,11 @@ var SETUP_COMMANDS = [
       "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
       "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
       "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+      `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
+      "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
-      "in a terminal, when the T3 part has work (Pi in use, scope user, T3 Code installed), setup shows an interactive screen for the two choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
-      "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps"
+      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
+      "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps"
     ],
     flags: {
       scope: "string",
@@ -25045,7 +25343,9 @@ var SETUP_COMMANDS = [
       "skip-ctx7": "boolean",
       worktrees: "string",
       "device-access": "string",
-      "no-tui": "boolean"
+      "no-tui": "boolean",
+      form: "string",
+      ...CAPABILITY_FLAGS
     },
     stateless: true,
     positionals: 0,
@@ -25059,7 +25359,14 @@ var SETUP_COMMANDS = [
         worktrees: yield* switchFlag(args, "worktrees"),
         deviceAccess: yield* switchFlag(args, "device-access")
       };
-      const apply = (choices, notes = []) => gen2(function* () {
+      const capabilities = yield* capabilitySwitches(args);
+      const form = yield* formOf(args, env, SETUP_USAGE);
+      if (booleanFlag(args, "undo") && (Object.keys(capabilities).length > 0 || stringFlag(args, "form") !== undefined))
+        return yield* new Usage({
+          message: "--undo takes no capability flag and no --form",
+          hint: `Usage: holyagent ${SETUP_USAGE}`
+        });
+      const apply = (choices, chosen, notes = []) => gen2(function* () {
         const report = yield* setup(env, {
           scope: resolved.scope,
           undo: booleanFlag(args, "undo"),
@@ -25068,7 +25375,9 @@ var SETUP_COMMANDS = [
           dryRun: booleanFlag(args, "dry-run"),
           skipCtx7: booleanFlag(args, "skip-ctx7"),
           ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
-          ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }
+          ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess },
+          capabilities: chosen,
+          form
         });
         return {
           ...report,
@@ -25088,14 +25397,15 @@ var SETUP_COMMANDS = [
         dryRun: booleanFlag(args, "dry-run"),
         terminal,
         noTui: booleanFlag(args, "no-tui"),
-        choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined,
+        choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined || Object.keys(capabilities).length > 0,
+        form,
         ...setupTui === undefined ? {} : { load: setupTui },
         notify: emit,
-        apply: (choices) => apply(choices)
+        apply: (choices, chosen) => apply(choices, chosen)
       });
       if (interactive.kind === "done")
         return printed(interactive.report);
-      return printed(yield* apply(flagged, interactive.notes));
+      return printed(yield* apply(flagged, capabilities, interactive.notes));
     }).pipe(provide3(Shell.live(env)))
   },
   {
@@ -25106,9 +25416,10 @@ var SETUP_COMMANDS = [
     notes: [
       "--scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
       "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
+      "the Pi checks include `ok   pi form:` (headless or normal, detected from the machine as setup does, or named by --form) and one `pi capability <name>` line for each capability the config turns on: `ok` with its form and what applies, `FAIL` naming an unmet system need or a package not listed at its pin, or a `~` line when the form does not offer it (computer-use on a headless machine), which fails nothing; the provider and web kit packages are the `pi base packages` line",
       "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages"
     ],
-    flags: { scope: "string", fix: "boolean" },
+    flags: { scope: "string", fix: "boolean", form: "string" },
     stateless: true,
     positionals: 0,
     run: ({ args, env, cwd }) => gen2(function* () {
@@ -25116,10 +25427,12 @@ var SETUP_COMMANDS = [
       if (resolved instanceof SetupFailure) {
         return printed({ lines: [fail6("scope", resolved.message)], ok: false });
       }
+      const form = yield* formOf(args, env, DOCTOR_USAGE);
       const report = yield* doctor(env, {
         fix: booleanFlag(args, "fix"),
         scope: resolved.scope,
-        cwd
+        cwd,
+        form
       });
       return printed({
         ...report,
@@ -25161,14 +25474,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join21 } from "path";
+import { join as join22 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join21(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join22(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -25185,7 +25498,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join21(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join22(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))

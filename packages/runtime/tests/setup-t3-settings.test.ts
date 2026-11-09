@@ -65,6 +65,7 @@ const machine = async (options: { t3?: boolean; sdk?: boolean } = {}) => {
 
 const env = (extra: Record<string, string> = {}) => ({
   HOME: home,
+  DISPLAY: ":0",
   HOLYAGENT_HOST: "pi",
   T3CODE_HOME: t3Home,
   ANDROID_HOME: androidSdk,

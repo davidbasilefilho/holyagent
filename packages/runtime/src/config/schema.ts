@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 
 import type { RoleTask } from "../domain/route.ts"
+import { CAPABILITIES, type CapabilityFeature } from "./capabilities.ts"
 
 /**
  * An optional key whose absence decodes to the default. The key stays optional on the encoded side,
@@ -149,6 +150,16 @@ export type T3Scope = typeof T3Scope.Type
 
 const Enabled = Schema.Boolean
 
+const capabilitySwitch = (on: boolean) => defaulted(Enabled, on)
+
+/**
+ * The switch of each optional capability in `pi.features`, each with the default its registry entry
+ * names (see `CAPABILITIES`): a capability added there is a key here.
+ */
+const CAPABILITY_FIELDS = Object.fromEntries(
+  CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]),
+) as { readonly [F in CapabilityFeature]: ReturnType<typeof capabilitySwitch> }
+
 /** The `pi` section: read only by the Pi integration. */
 const PiSection = defaulted(
   Schema.Struct({
@@ -158,13 +169,7 @@ const PiSection = defaulted(
     features: defaulted(
       Schema.Struct({
         web: defaulted(WebMode, "provider"),
-        processes: defaulted(Enabled, true),
-        todo: defaulted(Enabled, true),
-        ask: defaulted(Enabled, true),
-        mcp: defaulted(Enabled, true),
-        computerUse: defaulted(Enabled, true),
-        contextCompression: defaulted(Enabled, true),
-        subagents: defaulted(Enabled, true),
+        ...CAPABILITY_FIELDS,
       }),
       {},
     ),
