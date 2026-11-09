@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mw9mgiy9-d5km",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-codex-provider-s-review",
+  "objective": "Repair the Codex provider's review findings: web tools for Codex specialists, the same-path move that deletes a file, and the non-blocking apply_patch, Luna Reserve and context_management notes.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-codex, branch release/0.3.1/feat/codex-provider (HEAD 9d54902). Reviews with file:line: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7qzk-l2pa.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7r8p-90gx.md (security). Read both.",
+    "Blocking: (1) the gpt-6 agent files are generated from the Kimi config, so Codex Librarian and other web-using specialists list Kimi's moonshot tools and no pi-web-kit web_search/web_fetch; generate per provider or map web entries per provider, with a test that a Codex Librarian lists the pi-web-kit tools. (2) apply_patch: an Update File whose Move to equals its own path deletes the file; treat it as a plain update, with a test.",
+    "Non-blocking, fix too: make apply_patch writes all-or-nothing (roll back earlier writes on a later failure) or reword the tool description so it does not overclaim; prefer the rollback; check the real path of each target's parent stays inside the project so a symlink cannot carry a patch outside it; set redirect: \"error\" on the Luna Reserve usage request; only trigger Luna Reserve from message_end when the turn's provider is Codex; clear reserve on session_start; clamp the effort of rewritten reserve requests to what the reserve model accepts (per the research; if unknown, say so and keep high as the ceiling); surface a failed apply_patch activation instead of ignoring it; give context_management its own switch (pi.features.contextManagement, Codex only, default on, still sent only while Billion Context is off) so it can be turned off on its own, as a registry entry like Luna Reserve; prefer Bun APIs over node:fs where the file I/O allows."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Codex specialists that use the web get the pi-web-kit web tools, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A same-path move updates the file instead of deleting it, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The non-blocking notes are fixed, each with a test where it changes behavior",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/pi",
+    "packages/integrations/claude/dist",
+    "docs/pi",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9krmo8-3qir",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T18:56:03.057Z"
+  },
+  "createdAt": "2026-11-09T18:56:03.057Z"
+}
