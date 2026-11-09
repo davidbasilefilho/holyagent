@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mw9j5jte-1hoq",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-capability-registry-s-non",
+  "objective": "Repair the capability registry's non-blocking review findings: the user lock bypass, the write-error ordering, CI detection, repeated config loads, the symlink-following config write and the scripted-run fallback line.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-cap, branch release/0.3.1/feat/capabilities (one commit over 5d2bed8). Reviews with file:line: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it65a-t41v.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it6e8-jp52.md (security); read both.",
+    "Fix: (1) a capability flag at project or local scope that the user config locks off is refused with a message naming the user setting, instead of installing the package while the merged config stays off; (2) when writing capability choices fails, setup stops before the package and settings steps, so packages never change without the config being saved; (3) CI counts only when set to a truthy value (not 0, false, no, off, or empty); (4) load the config and probe Pi once per interactive run and pass them down; (5) refuse to write .holyagent/config.json through a symlink at project and local scope, reusing the refuseLinks check pi-settings.ts uses for .pi writes, with a test; (6) a scripted run with Pi in use and no T3 work prints no setup-screen fallback line.",
+    "Keep: the skills and mcpServers fields (later 0.3.1 capabilities fill them; say so in the field JSDoc), headless removal of the computer-use package (stated behavior), and name-based removal (predates this change). Add a note on the capability rows to docs/pi/t3-code.md's setup-screen section."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the six fixes is made and has a test that fails without it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No other behavior changes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/src/config",
+    "packages/runtime/src/cli",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist",
+    "docs/pi"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9hx5gc-m6us",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:23:32.115Z"
+  },
+  "createdAt": "2026-11-09T17:23:32.115Z"
+}
