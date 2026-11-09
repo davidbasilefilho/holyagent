@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9it6e8-jp52",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-capability-registry-change",
+  "objective": "Assess the capability registry change for security issues in how setup chooses, installs, removes and configures Pi packages and MCP servers.",
+  "state": "Running",
+  "scope": [
+    "Diff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/capabilities.diff (worktree /home/user/holyagent-0.3.1-cap, branch release/0.3.1/feat/capabilities). Sources to trace: CLI flags (--<capability> on|off, --form), the user and project .holyagent config (pi.features), environment used for headless detection; sinks: package install and removal, settings and MCP server entries written to Pi's settings, config writes.",
+    "Check that a project-level config cannot make setup install or run packages or MCP servers beyond the pinned registry entries, that removal cannot touch packages HolyAgent did not add, that pins come only from config/pi-packages.json, and that untrusted values never reach a shell command unescaped."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 400 words; substantiate each finding with a source-to-sink path, file and line, and mark it blocking or non-blocking."
+  ],
+  "criteria": [
+    {
+      "text": "No path lets config, flags or environment install, remove or run anything beyond the pinned registry entries",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9hx5gc-m6us"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:13:54.848Z"
+  },
+  "createdAt": "2026-11-09T17:13:54.848Z"
+}
