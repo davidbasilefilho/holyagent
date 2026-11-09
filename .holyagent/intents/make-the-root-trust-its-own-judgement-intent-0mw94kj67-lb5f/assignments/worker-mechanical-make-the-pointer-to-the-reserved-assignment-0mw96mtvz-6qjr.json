@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-the-pointer-to-the-reserved",
   "objective": "Make the pointer to the reserved-approval list name only the section that holds it.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-judge. In packages/runtime/src/instructions/claude-5.5/root/asking.md and kimi-k3.1/root/asking.md, the sentence pointing to where reserved approvals are listed says \"Identity and Version control list them\" (or close wording). Only the identity rules hold the list; Version control just points to them. Change it to name the identity rules alone (for example \"the identity rules list them\"), in the wording style of each file, and leave everything else unchanged. Then rebuild."
   ],
@@ -47,7 +47,33 @@
     "agentId": "workflow:wf_db881af1-85b/assignment-0mw96mtvz-6qjr",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T11:33:03.311Z"
+    "startedAt": "2026-11-09T11:33:03.311Z",
+    "finishedAt": "2026-11-09T11:38:14.634Z"
+  },
+  "result": "result: Both family `asking.md` files now say \"the identity rules list them\" instead of \"Identity and Version control list them\". The rebuild regenerated the matching lines in the Claude agent and Pi extension dist files. Verify passes.\nchanged: packages/runtime/src/instructions/claude-5.5/root/asking.md, packages/runtime/src/instructions/kimi-k3.1/root/asking.md, packages/integrations/claude/dist/agents/holyagent.md, packages/integrations/pi/dist/extensions/holyagent.js\nchecks:\n- bun install --frozen-lockfile -> 0 (no changes)\n- bunx --no-install mise run build -> 0 (built 38 Claude and 36 Pi files; git status shows only the 4 paths above)\n- bunx --no-install mise run verify -> 0 (type-check: no errors in 215 files; tests: 2471 pass, 0 fail, 79 files; log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log)\nblockers: none\nquestions: none\nnotes: Claude asking.md line 7 and Kimi line 19 say \"Version control sets the method\". That is a different claim, not the reserved-list pointer, so I left it.\nevidence:\nBoth family files name only the identity rules as holding the list (behavior): both asking.md files line 6 / line 15 now read \"(the identity rules list them: merging ...)\"; the diff shows the one-line change per file.\nmise run build leaves no unexplained changes and mise run verify exits 0 (tests): build then verify exit 0; 2471 pass, 0 fail.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/worker-mechanical-reserved-approval.diff\nverify: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log, exit 0\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "One-line pointer change in both files confirmed in the diff; build and verify exit 0",
+    "criteria": [
+      {
+        "criterion": "Both family files name only the identity rules as holding the list",
+        "support": "both asking.md files line 6 / line 15 now read \"(the identity rules list them: merging ...)\"; the diff shows the one-line change per file."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build then verify exit 0; 2471 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/worker-mechanical-reserved-approval.diff"
+      },
+      {
+        "label": "verify",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log, exit 0"
+      }
+    ]
   },
   "createdAt": "2026-11-09T11:33:03.311Z"
 }
