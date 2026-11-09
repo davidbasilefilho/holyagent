@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw8shc4n-xdx2",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-commit-1a50522-against-the",
+  "objective": "Re-assess commit 1a50522 against the previous finding that a committed folder whose name folds onto .claude (trailing dot or space, HFS+ ignorable code point, Windows 8.3 short name) escaped the .claude pathspec and let a bare setup infer local scope.",
+  "state": "Running",
+  "scope": [
+    "The repair diff (3869116..1a50522) is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/folder-review.diff (diff-file); read packages/runtime/src/setup/scope.ts and the new tests in packages/runtime/tests/setup-scope.test.ts in full in /home/user/holyagent-0.3.0-scope.",
+    "Previous finding: scope.ts listed the index only under :(icase,literal).claude, so ls-files never returned an aliasing folder. The repair lists the whole index once, keeps the .claude-prefix checks, and compares each distinct top-level component other than the literal .claude with the .claude folder by lstat dev and ino.",
+    "Check whether the skip of the literal .claude component, the lowercase prefix filter, nested aliases (a folder deeper than the top level cannot alias .claude, which sits at the root), and the cost of listing the whole index leave or open anything."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Substantiate each finding with a source-to-sink trace and path:line; mark it blocking only when it is reachable from repository-controlled input.",
+    "Report in under 300 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has a source-to-sink trace with path:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the previous finding is closed and whether the range should hold the push",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8savyv-n704"
+  ],
+  "followUpOf": "assignment-0mw8s8hov-9jat",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:56:52.391Z"
+  },
+  "createdAt": "2026-11-09T04:56:52.391Z"
+}
