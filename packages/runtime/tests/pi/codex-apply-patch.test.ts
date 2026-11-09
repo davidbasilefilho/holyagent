@@ -77,13 +77,17 @@ const memory = (
           ? { kind: "link", target }
           : text === undefined
             ? undefined
-            : { kind: "file", bytes: new TextEncoder().encode(text) },
+            : { kind: "file", bytes: new TextEncoder().encode(text), mode: 0o644 },
       )
     },
+    kind: (path) =>
+      Effect.succeed(present.has(path) ? "link" : store.has(path) ? "file" : undefined),
     restore: (path, saved) =>
       Effect.sync(() => {
-        if (saved.kind === "link") present.set(path, saved.target)
-        else store.set(path, new TextDecoder().decode(saved.bytes))
+        if (saved.kind === "link") {
+          store.delete(path)
+          present.set(path, saved.target)
+        } else store.set(path, new TextDecoder().decode(saved.bytes))
         log.push(`write ${path}`)
       }),
   }
@@ -318,7 +322,9 @@ describe("applyPatch", () => {
     expect((await fails(patch("*** Update File: missing.txt", "@@", "-a", "+b"), fs))._tag).toBe(
       "PatchFileError",
     )
-    expect((await fails(patch("*** Delete File: missing.txt"), fs))._tag).toBe("PatchFileError")
+    const missingDelete = await fails(patch("*** Delete File: missing.txt"), fs)
+    expect(missingDelete).toMatchObject({ _tag: "PatchFileError", path: "missing.txt" })
+    expect(missingDelete.message).toContain("delete")
     expect((await fails("not a patch", fs))._tag).toBe("PatchSyntaxError")
   })
 
@@ -472,6 +478,40 @@ describe("applyPatch", () => {
     expect((await fails(patch("*** Add File: out.txt", "+x"), through.fs))._tag).toBe(
       "PatchPathError",
     )
+  })
+
+  test("deleting a link and adding its path in one patch makes a regular file there and leaves the target", async () => {
+    const outside = resolve("/elsewhere/victim.txt")
+    const { fs, store, present, log } = memory(
+      {},
+      { links: { "out.txt": outside }, fileLinks: ["out.txt"] },
+    )
+    await run(patch("*** Delete File: out.txt", "*** Add File: out.txt", "+new"), fs)
+    expect(present.has(at("out.txt"))).toBe(false)
+    expect(store.get(at("out.txt"))).toBe("new\n")
+    expect(store.has(outside)).toBe(false)
+    expect(log).toEqual([`remove ${at("out.txt")}`, `write ${at("out.txt")}`])
+
+    // A failure later in the patch puts the link back where the file now is.
+    const undone = memory(
+      { "c.txt": "keep\n" },
+      { links: { "out.txt": outside }, fileLinks: ["out.txt"], failing: ["c.txt"] },
+    )
+    const error = await fails(
+      patch(
+        "*** Delete File: out.txt",
+        "*** Add File: out.txt",
+        "+new",
+        "*** Update File: c.txt",
+        "@@",
+        "-keep",
+        "+changed",
+      ),
+      undone.fs,
+    )
+    expect(error).toMatchObject({ _tag: "PatchFileError", reason: "disk full" })
+    expect(undone.present.get(at("out.txt"))).toBe(outside)
+    expect(undone.store.has(at("out.txt"))).toBe(false)
   })
 
   test("a write that fails puts back the files already written, so the patch is whole or not at all", async () => {

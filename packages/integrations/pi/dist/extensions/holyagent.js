@@ -16595,25 +16595,24 @@ var applyPatch = (text, cwd, fs) => gen2(function* () {
   const locateEntry = (path) => gen2(function* () {
     const file = yield* lexical(path);
     const entry = yield* fs.real(dirname(file)).pipe(flatMap2((folder) => inside(path, join2(folder, basename(file)))));
-    const saved = yield* fs.snapshot(entry);
-    return saved?.kind === "link" ? entry : yield* locate(path);
+    return (yield* fs.kind(entry)) === "link" ? entry : yield* locate(path);
   });
   const planned = new Map;
-  const load = (file, path) => gen2(function* () {
+  const need = (file, path, reason, fromPlan, disk) => gen2(function* () {
     const known = planned.get(file);
-    return known !== undefined ? known : (yield* fs.read(file)) ?? null;
-  }).pipe(flatMap2((content) => content === null ? fail5(new PatchFileError({ path, reason: "Failed to read file to update" })) : succeed5(content)));
-  const exists = (file, path) => gen2(function* () {
-    const known = planned.get(file);
-    return known !== undefined ? known !== null : (yield* fs.snapshot(file)) !== undefined;
-  }).pipe(flatMap2((found) => found ? void_3 : fail5(new PatchFileError({ path, reason: "Failed to read file to update" }))));
+    const found = known === undefined ? yield* disk : known === null ? undefined : fromPlan(known);
+    return found === undefined ? yield* new PatchFileError({ path, reason }) : found;
+  });
+  const load = (file, path) => need(file, path, "Failed to read file to update", (content) => content, fs.read(file));
+  const exists = (file, path) => need(file, path, "Failed to delete file: it does not exist", () => true, fs.kind(file).pipe(map4((kind) => kind === undefined ? undefined : true)));
   const stage = (file, content) => {
     planned.set(file, content);
   };
   const changes = [];
   for (const operation of operations) {
     if (operation.kind === "add") {
-      stage(yield* locate(operation.path), operation.text);
+      const entry = yield* locateEntry(operation.path);
+      stage(planned.get(entry) === null ? entry : yield* locate(operation.path), operation.text);
       changes.push({ status: "A", path: operation.path });
     } else if (operation.kind === "delete") {
       const entry = yield* locateEntry(operation.path);
@@ -16637,7 +16636,10 @@ var applyPatch = (text, cwd, fs) => gen2(function* () {
       if (content === null && before === undefined)
         continue;
       written.push({ file, before });
-      yield* content === null ? fs.remove(file) : fs.write(file, content);
+      if (content === null || before?.kind === "link")
+        yield* fs.remove(file);
+      if (content !== null)
+        yield* fs.write(file, content);
     }
   });
   const restore = suspend2(() => forEach2(written.toReversed(), ({ file, before }) => (before === undefined ? fs.snapshot(file).pipe(flatMap2((now) => now === undefined ? void_3 : fs.remove(file))) : fs.restore(file, before)).pipe(as2([]), catch_2(() => succeed5([file])))).pipe(map4((failed) => failed.flat())));
@@ -17378,7 +17380,7 @@ var bunFlags = (bunfig) => [
   `--config=${bunfig}`
 ];
 
-import { readlink, realpath, symlink } from "node:fs/promises";
+import { chmod, lstat, readlink, realpath, symlink } from "node:fs/promises";
 import { basename as basename2, dirname as dirname2, join as join3, resolve as resolve4 } from "node:path";
 import { Type } from "typebox";
 
@@ -17506,21 +17508,45 @@ var codexSettings = (config) => {
 };
 var fileFailure = (path) => (cause) => new PatchFileError({ path, reason: cause instanceof Error ? cause.message : String(cause) });
 var isMissing = (error) => /ENOENT|ENOTDIR/.test(error.reason);
-var realPath = (path) => tryPromise2({ try: () => realpath(path), catch: fileFailure(path) }).pipe(catch_2((error) => isMissing(error) ? tryPromise2({ try: () => readlink(path), catch: fileFailure(path) }).pipe(matchEffect2({
-  onFailure: () => realPath(dirname2(path)).pipe(map4((parent) => join3(parent, basename2(path)))),
-  onSuccess: (target) => realPath(dirname2(path)).pipe(flatMap2((parent) => realPath(resolve4(parent, target))))
-})) : fail5(error)));
-var snapshotOf = (path) => tryPromise2({ try: () => readlink(path), catch: fileFailure(path) }).pipe(map4((target) => ({ kind: "link", target })), catch_2(() => tryPromise2({ try: () => Bun.file(path).bytes(), catch: fileFailure(path) }).pipe(map4((bytes) => ({ kind: "file", bytes })), catch_2((error) => isMissing(error) ? succeed5(undefined) : fail5(error)))));
+var isNoLink = (error) => isMissing(error) || /EINVAL/.test(error.reason);
+var MAX_LINKS = 40;
+var linkTarget = (path) => tryPromise2({ try: () => readlink(path), catch: fileFailure(path) });
+var realPath = (path) => suspend2(() => {
+  let followed = 0;
+  const resolveLinks = (current) => tryPromise2({ try: () => realpath(current), catch: fileFailure(current) }).pipe(catch_2((error) => isMissing(error) ? linkTarget(current).pipe(matchEffect2({
+    onFailure: (failure) => isNoLink(failure) ? resolveLinks(dirname2(current)).pipe(map4((parent) => join3(parent, basename2(current)))) : fail5(failure),
+    onSuccess: (target) => ++followed > MAX_LINKS ? fail5(new PatchFileError({
+      path,
+      reason: `ELOOP: too many levels of symbolic links, resolving ${path}`
+    })) : resolveLinks(dirname2(current)).pipe(flatMap2((parent) => resolveLinks(resolve4(parent, target))))
+  })) : fail5(error)));
+  return resolveLinks(path);
+});
+var statsOf = (path) => tryPromise2({ try: () => lstat(path), catch: fileFailure(path) }).pipe(catch_2((error) => isMissing(error) ? succeed5(undefined) : fail5(error)));
+var kindOf = (path) => statsOf(path).pipe(map4((stats) => stats === undefined ? undefined : stats.isSymbolicLink() ? "link" : "file"));
+var snapshotOf = (path) => gen2(function* () {
+  const stats = yield* statsOf(path);
+  if (stats === undefined)
+    return;
+  if (stats.isSymbolicLink())
+    return { kind: "link", target: yield* linkTarget(path) };
+  const bytes = yield* tryPromise2({
+    try: () => Bun.file(path).bytes(),
+    catch: fileFailure(path)
+  });
+  return { kind: "file", bytes, mode: stats.mode & 4095 };
+});
 var nodePatchFs = {
   read: (path) => tryPromise2({ try: () => Bun.file(path).text(), catch: fileFailure(path) }).pipe(catch_2((error) => isMissing(error) ? succeed5(undefined) : fail5(error))),
   write: (path, text) => tryPromise2({ try: () => Bun.write(path, text), catch: fileFailure(path) }).pipe(asVoid2),
   remove: (path) => tryPromise2({ try: () => Bun.file(path).delete(), catch: fileFailure(path) }),
   real: realPath,
+  kind: kindOf,
   snapshot: snapshotOf,
-  restore: (path, saved) => saved.kind === "link" ? tryPromise2({ try: () => symlink(saved.target, path), catch: fileFailure(path) }) : tryPromise2({
+  restore: (path, saved) => saved.kind === "link" ? tryPromise2({ try: () => Bun.file(path).delete(), catch: fileFailure(path) }).pipe(catch_2((error) => isMissing(error) ? void_3 : fail5(error)), andThen2(tryPromise2({ try: () => symlink(saved.target, path), catch: fileFailure(path) }))) : tryPromise2({
     try: () => Bun.write(path, saved.bytes),
     catch: fileFailure(path)
-  }).pipe(asVoid2)
+  }).pipe(andThen2(tryPromise2({ try: () => chmod(path, saved.mode), catch: fileFailure(path) })))
 };
 var turnProvider = (message) => ("provider" in message) && typeof message.provider === "string" ? message.provider : undefined;
 var asReserveFailure = () => new UsageStatusUnavailable({ reason: "no credentials" });

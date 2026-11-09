@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { lstat, mkdir, mkdtemp, readFile, readlink, symlink, writeFile } from "node:fs/promises"
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readlink,
+  symlink,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -312,6 +321,91 @@ describe("the apply_patch tool", () => {
         ).rejects.toThrow()
         expect(new Uint8Array(await readFile(join(folder, "raw.bin")))).toEqual(bytes)
         expect(await readlink(join(folder, "to-victim"))).toBe(join(outside, "victim.txt"))
+      })
+    })
+
+    test("links that lead back to each other through a missing folder fail the patch instead of hanging", async () => {
+      await inFolders(async (folder) => {
+        // The kernel reports both as missing (`nosuch` is not there) while `..` flips between them.
+        await symlink("nosuch/../l2", join(folder, "m1"))
+        await symlink("nosuch/../m1", join(folder, "l2"))
+        await expect(attempt(folder, patch("*** Add File: m1", "+x"))).rejects.toThrow("ELOOP")
+        await expect(
+          attempt(folder, patch("*** Update File: l2", "@@", "-a", "+b")),
+        ).rejects.toThrow("ELOOP")
+      })
+    })
+
+    test("a write that fails puts back the mode of a deleted file and of an overwritten one", async () => {
+      await inFolders(async (folder) => {
+        await writeFile(join(folder, "secret.txt"), "s\n")
+        await chmod(join(folder, "secret.txt"), 0o600)
+        await writeFile(join(folder, "run.sh"), "echo\n")
+        await chmod(join(folder, "run.sh"), 0o755)
+        await mkdir(join(folder, "dir"))
+        await expect(
+          attempt(
+            folder,
+            patch(
+              "*** Delete File: secret.txt",
+              "*** Add File: run.sh",
+              "+changed",
+              // A folder cannot be written as a file.
+              "*** Add File: dir",
+              "+x",
+            ),
+          ),
+        ).rejects.toThrow()
+        expect(await readFile(join(folder, "secret.txt"), "utf8")).toBe("s\n")
+        expect(await readFile(join(folder, "run.sh"), "utf8")).toBe("echo\n")
+        expect((await lstat(join(folder, "secret.txt"))).mode & 0o7777).toBe(0o600)
+        expect((await lstat(join(folder, "run.sh"))).mode & 0o7777).toBe(0o755)
+      })
+    })
+
+    test("deleting a link and adding its path makes a regular file there and leaves the target", async () => {
+      await inFolders(async (folder, outside) => {
+        await writeFile(join(outside, "victim.txt"), "safe\n")
+        await symlink(join(outside, "victim.txt"), join(folder, "to-victim"))
+        await attempt(
+          folder,
+          patch("*** Delete File: to-victim", "*** Add File: to-victim", "+new"),
+        )
+        expect((await lstat(join(folder, "to-victim"))).isSymbolicLink()).toBe(false)
+        expect(await readFile(join(folder, "to-victim"), "utf8")).toBe("new\n")
+        expect(await readFile(join(outside, "victim.txt"), "utf8")).toBe("safe\n")
+      })
+    })
+
+    test("a failed patch puts a link back that a file replaced in the same patch", async () => {
+      await inFolders(async (folder, outside) => {
+        await writeFile(join(outside, "victim.txt"), "safe\n")
+        await symlink(join(outside, "victim.txt"), join(folder, "to-victim"))
+        await mkdir(join(folder, "dir"))
+        await expect(
+          attempt(
+            folder,
+            patch(
+              "*** Delete File: to-victim",
+              "*** Add File: to-victim",
+              "+new",
+              "*** Add File: dir",
+              "+x",
+            ),
+          ),
+        ).rejects.toThrow()
+        expect(await readlink(join(folder, "to-victim"))).toBe(join(outside, "victim.txt"))
+        expect(await readFile(join(outside, "victim.txt"), "utf8")).toBe("safe\n")
+      })
+    })
+
+    test("Bun.file(path).delete() on a symbolic link removes the link and leaves its target", async () => {
+      await inFolders(async (folder) => {
+        await writeFile(join(folder, "target.txt"), "kept\n")
+        await symlink(join(folder, "target.txt"), join(folder, "link"))
+        await Bun.file(join(folder, "link")).delete()
+        await expect(lstat(join(folder, "link"))).rejects.toThrow()
+        expect(await readFile(join(folder, "target.txt"), "utf8")).toBe("kept\n")
       })
     })
 

@@ -1,5 +1,6 @@
-// Bun has no `realpath` or `readlink`, so those two stay on node:fs; the file reads and writes use Bun.
-import { readlink, realpath, symlink } from "node:fs/promises"
+// Bun has no `realpath`, `readlink`, `lstat`, `chmod` or `symlink`, so those stay on node:fs; the
+// file reads, writes and deletes use Bun.
+import { chmod, lstat, readlink, realpath, symlink } from "node:fs/promises"
 import { basename, dirname, join, resolve } from "node:path"
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
@@ -78,42 +79,83 @@ const fileFailure = (path: string) => (cause: unknown) =>
 
 const isMissing = (error: PatchFileError): boolean => /ENOENT|ENOTDIR/.test(error.reason)
 
+// What `readlink` answers for a path that is no link: nothing there, or something else there.
+const isNoLink = (error: PatchFileError): boolean => isMissing(error) || /EINVAL/.test(error.reason)
+
+// The links one resolution may follow, as many as the kernel allows a single lookup.
+const MAX_LINKS = 40
+
+const linkTarget = (path: string) =>
+  Effect.tryPromise({ try: () => readlink(path), catch: fileFailure(path) })
+
 // The path with its links resolved. A path that is not there yet is its nearest existing ancestor,
 // resolved, and the rest. A link whose target is missing still decides where a write lands, so it
 // is followed by hand: its target is read against the folder the link really sits in (the
 // resolved parent, not the written one, since `..` climbs from where a link is), and the result
-// is resolved in turn, which follows a chain of links one by one.
+// is resolved in turn, which follows a chain of links one by one. The kernel reports links that
+// lead back to each other through a missing folder (`m -> nosuch/../l`, `l -> nosuch/../m`) as
+// missing, so the hand-followed links are counted, and more than `MAX_LINKS` fail the lookup.
 const realPath = (path: string): Effect.Effect<string, PatchFileError> =>
-  Effect.tryPromise({ try: () => realpath(path), catch: fileFailure(path) }).pipe(
-    Effect.catch((error) =>
-      isMissing(error)
-        ? Effect.tryPromise({ try: () => readlink(path), catch: fileFailure(path) }).pipe(
-            Effect.matchEffect({
-              onFailure: () =>
-                realPath(dirname(path)).pipe(Effect.map((parent) => join(parent, basename(path)))),
-              onSuccess: (target) =>
-                realPath(dirname(path)).pipe(
-                  Effect.flatMap((parent) => realPath(resolve(parent, target))),
-                ),
-            }),
-          )
-        : Effect.fail(error),
+  Effect.suspend(() => {
+    let followed = 0
+    const resolveLinks = (current: string): Effect.Effect<string, PatchFileError> =>
+      Effect.tryPromise({ try: () => realpath(current), catch: fileFailure(current) }).pipe(
+        Effect.catch((error) =>
+          isMissing(error)
+            ? linkTarget(current).pipe(
+                Effect.matchEffect({
+                  onFailure: (failure) =>
+                    isNoLink(failure)
+                      ? resolveLinks(dirname(current)).pipe(
+                          Effect.map((parent) => join(parent, basename(current))),
+                        )
+                      : Effect.fail(failure),
+                  onSuccess: (target) =>
+                    ++followed > MAX_LINKS
+                      ? Effect.fail(
+                          new PatchFileError({
+                            path,
+                            reason: `ELOOP: too many levels of symbolic links, resolving ${path}`,
+                          }),
+                        )
+                      : resolveLinks(dirname(current)).pipe(
+                          Effect.flatMap((parent) => resolveLinks(resolve(parent, target))),
+                        ),
+                }),
+              )
+            : Effect.fail(error),
+        ),
+      )
+    return resolveLinks(path)
+  })
+
+// The stats of what sits at the path itself, a final link not followed, or `undefined` for nothing.
+const statsOf = (path: string) =>
+  Effect.tryPromise({ try: () => lstat(path), catch: fileFailure(path) }).pipe(
+    Effect.catch((error) => (isMissing(error) ? Effect.succeed(undefined) : Effect.fail(error))),
+  )
+
+// Whether a link or something else sits at the path itself, without reading it.
+const kindOf = (path: string): Effect.Effect<"link" | "file" | undefined, PatchFileError> =>
+  statsOf(path).pipe(
+    Effect.map((stats) =>
+      stats === undefined ? undefined : stats.isSymbolicLink() ? "link" : "file",
     ),
   )
 
-// What sits at the path itself: a link with its target, else the file's exact bytes, else nothing.
+// What sits at the path itself: a link with its target, else the file's exact bytes and mode, else
+// nothing. Only a link is passed to `readlink`, so its failures are real failures.
 const snapshotOf = (path: string): Effect.Effect<Snapshot | undefined, PatchFileError> =>
-  Effect.tryPromise({ try: () => readlink(path), catch: fileFailure(path) }).pipe(
-    Effect.map((target): Snapshot => ({ kind: "link", target })),
-    Effect.catch(() =>
-      Effect.tryPromise({ try: () => Bun.file(path).bytes(), catch: fileFailure(path) }).pipe(
-        Effect.map((bytes): Snapshot => ({ kind: "file", bytes })),
-        Effect.catch((error) =>
-          isMissing(error) ? Effect.succeed(undefined) : Effect.fail(error),
-        ),
-      ),
-    ),
-  )
+  Effect.gen(function* () {
+    const stats = yield* statsOf(path)
+    if (stats === undefined) return undefined
+    if (stats.isSymbolicLink()) return { kind: "link", target: yield* linkTarget(path) }
+    const bytes = yield* Effect.tryPromise({
+      try: () => Bun.file(path).bytes(),
+      catch: fileFailure(path),
+    })
+    return { kind: "file", bytes, mode: stats.mode & 0o7777 }
+  })
 
 /** The patch's file system over the disk, through Bun's file API: what the tool runs on. */
 export const nodePatchFs: PatchFs = {
@@ -130,14 +172,26 @@ export const nodePatchFs: PatchFs = {
   remove: (path) =>
     Effect.tryPromise({ try: () => Bun.file(path).delete(), catch: fileFailure(path) }),
   real: realPath,
+  kind: kindOf,
   snapshot: snapshotOf,
   restore: (path, saved) =>
     saved.kind === "link"
-      ? Effect.tryPromise({ try: () => symlink(saved.target, path), catch: fileFailure(path) })
+      ? // A file written over the link's name goes first, since `symlink` refuses a name in use.
+        Effect.tryPromise({ try: () => Bun.file(path).delete(), catch: fileFailure(path) }).pipe(
+          Effect.catch((error) => (isMissing(error) ? Effect.void : Effect.fail(error))),
+          Effect.andThen(
+            Effect.tryPromise({ try: () => symlink(saved.target, path), catch: fileFailure(path) }),
+          ),
+        )
       : Effect.tryPromise({
           try: () => Bun.write(path, saved.bytes),
           catch: fileFailure(path),
-        }).pipe(Effect.asVoid),
+        }).pipe(
+          // `Bun.write` makes a deleted file with the default mode, so the mode is set back.
+          Effect.andThen(
+            Effect.tryPromise({ try: () => chmod(path, saved.mode), catch: fileFailure(path) }),
+          ),
+        ),
 }
 
 /** What the Codex module needs from the extension that hosts it. */

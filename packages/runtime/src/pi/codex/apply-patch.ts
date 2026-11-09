@@ -74,19 +74,19 @@ export class PatchFileError extends Data.TaggedError("PatchFileError")<{
 export type PatchError = PatchSyntaxError | PatchPathError | PatchContextError | PatchFileError
 
 /**
- * What sits at a path itself, a final symbolic link not followed: a file with its exact bytes, or a
- * link with the target it holds. A write that fails is put back from it.
+ * What sits at a path itself, a final symbolic link not followed: a file with its exact bytes and
+ * permission bits, or a link with the target it holds. A write that fails is put back from it.
  */
 export type Snapshot =
-  | { readonly kind: "file"; readonly bytes: Uint8Array }
+  | { readonly kind: "file"; readonly bytes: Uint8Array; readonly mode: number }
   | { readonly kind: "link"; readonly target: string }
 
 /**
  * The file system a patch is applied to, with absolute paths. `read` answers `undefined` for a file
  * that does not exist; `write` creates the folders above the file; `remove` deletes the file, or
- * only the link when the path is one; `real` resolves symbolic links; `snapshot` and `restore` save
- * and put back what sits at a path. The extension supplies one over the disk, a test an in-memory
- * one.
+ * only the link when the path is one; `real` resolves symbolic links; `kind` tells what sits at a
+ * path without reading it; `snapshot` and `restore` save and put back what sits at a path. The
+ * extension supplies one over the disk, a test an in-memory one.
  */
 export interface PatchFs {
   /**
@@ -101,6 +101,11 @@ export interface PatchFs {
   readonly write: (path: string, text: string) => Effect.Effect<void, PatchFileError>
   /** Deletes a file; for a symbolic link, the link and not its target. */
   readonly remove: (path: string) => Effect.Effect<void, PatchFileError>
+  /**
+   * Whether a link, or anything else (a file), sits at the path itself, or `undefined` when nothing
+   * does; a final link is not followed and no content is read.
+   */
+  readonly kind: (path: string) => Effect.Effect<"link" | "file" | undefined, PatchFileError>
   /** What sits at the path itself, or `undefined` when nothing does; a final link is not followed. */
   readonly snapshot: (path: string) => Effect.Effect<Snapshot | undefined, PatchFileError>
   /** Puts back what `snapshot` saved at the path, byte for byte, a link as a link. */
@@ -414,35 +419,36 @@ export const applyPatch = (
         const entry = yield* fs
           .real(dirname(file))
           .pipe(Effect.flatMap((folder) => inside(path, join(folder, basename(file)))))
-        const saved = yield* fs.snapshot(entry)
-        return saved?.kind === "link" ? entry : yield* locate(path)
+        return (yield* fs.kind(entry)) === "link" ? entry : yield* locate(path)
       })
     // The planned content of each touched file by resolved path, in the order first touched: its
     // text, or `null` once deleted.
     const planned = new Map<string, string | null>()
+    // What a file the patch needs holds: its planned state, else what `disk` finds there
+    // (`undefined` for nothing). A file that is gone, planned or on disk, fails with `reason`.
+    const need = <A>(
+      file: string,
+      path: string,
+      reason: string,
+      fromPlan: (content: string) => A,
+      disk: Effect.Effect<A | undefined, PatchFileError>,
+    ) =>
+      Effect.gen(function* () {
+        const known = planned.get(file)
+        const found =
+          known === undefined ? yield* disk : known === null ? undefined : fromPlan(known)
+        return found === undefined ? yield* new PatchFileError({ path, reason }) : found
+      })
     const load = (file: string, path: string) =>
-      Effect.gen(function* () {
-        const known = planned.get(file)
-        return known !== undefined ? known : ((yield* fs.read(file)) ?? null)
-      }).pipe(
-        Effect.flatMap((content) =>
-          content === null
-            ? Effect.fail(new PatchFileError({ path, reason: "Failed to read file to update" }))
-            : Effect.succeed(content),
-        ),
-      )
-    // Whether a delete finds the file: planned and not yet deleted, or on disk (a link counts,
-    // dangling or not). Nothing is read, so a link's target is never opened.
+      need(file, path, "Failed to read file to update", (content) => content, fs.read(file))
+    // A delete finds a link, dangling or not, and never opens its target.
     const exists = (file: string, path: string) =>
-      Effect.gen(function* () {
-        const known = planned.get(file)
-        return known !== undefined ? known !== null : (yield* fs.snapshot(file)) !== undefined
-      }).pipe(
-        Effect.flatMap((found) =>
-          found
-            ? Effect.void
-            : Effect.fail(new PatchFileError({ path, reason: "Failed to read file to update" })),
-        ),
+      need(
+        file,
+        path,
+        "Failed to delete file: it does not exist",
+        () => true,
+        fs.kind(file).pipe(Effect.map((kind) => (kind === undefined ? undefined : true))),
       )
     const stage = (file: string, content: string | null) => {
       planned.set(file, content)
@@ -450,7 +456,10 @@ export const applyPatch = (
     const changes: Array<PatchResult["changes"][number]> = []
     for (const operation of operations) {
       if (operation.kind === "add") {
-        stage(yield* locate(operation.path), operation.text)
+        // Adding where this patch deleted a link makes a regular file at the link's own path, not a
+        // write to what the link led to.
+        const entry = yield* locateEntry(operation.path)
+        stage(planned.get(entry) === null ? entry : yield* locate(operation.path), operation.text)
         changes.push({ status: "A", path: operation.path })
       } else if (operation.kind === "delete") {
         const entry = yield* locateEntry(operation.path)
@@ -481,7 +490,9 @@ export const applyPatch = (
         if (content === null && before === undefined) continue
         // Recorded before the attempt: a write that fails halfway may have left the file changed.
         written.push({ file, before })
-        yield* content === null ? fs.remove(file) : fs.write(file, content)
+        // A link at the path is unlinked first, since a write would follow it to its target.
+        if (content === null || before?.kind === "link") yield* fs.remove(file)
+        if (content !== null) yield* fs.write(file, content)
       }
     })
     // Puts the written files back, newest first; answers the files it could not put back.
