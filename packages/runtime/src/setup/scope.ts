@@ -37,6 +37,16 @@ const present = (path: string) =>
   )
 
 /**
+ * The device and inode of the entry at `path`, read without following a symlink, or undefined when
+ * it cannot be inspected (missing, say). Two paths with the same identity are the same file.
+ */
+const identity = (path: string) =>
+  Effect.tryPromise(() => lstat(path, { bigint: true })).pipe(
+    Effect.map((stats) => `${stats.dev}:${stats.ino}`),
+    Effect.orElseSucceed(() => undefined),
+  )
+
+/**
  * Whether the entry at `path` is itself a symlink; a missing entry is not. Fails with SetupFailure
  * when the entry cannot be inspected.
  */
@@ -178,7 +188,9 @@ const enablement = Effect.fn("enablement")(function* (folder: string, file: stri
  * repository can commit `.claude` as a submodule (a gitlink entry, whose checkout holds the file
  * while `git ls-files` for the file prints nothing) and, on a case-insensitive file system, a
  * tracked `Settings.Local.json` is read as the file though the literal name misses it. The pathspec
- * ignores case and the names are compared without it.
+ * ignores case and the names are compared without it. Folding beyond letter case (Unicode
+ * equivalents, ignorable code points, a trailing dot or space on Windows) is caught by identity: a
+ * tracked entry that exists on disk with the device and inode of the file is the file.
  *
  * Known limit: an archive that ships its own `.git` with an index that omits the file still counts
  * as untracked, since the index is all git has to say. Pass `--scope` to choose a scope then.
@@ -197,9 +209,16 @@ const repositoryControl = Effect.fn("repositoryControl")(function* (
     { cwd: root },
   )
   if (listed.exitCode !== 0) return "git could not say whether it tracks it"
-  const entries = listed.stdout.split("\0").map((entry) => entry.toLowerCase())
+  const tracked = listed.stdout.split("\0").filter((entry) => entry !== "")
+  const entries = tracked.map((entry) => entry.toLowerCase())
   if (entries.includes(name.toLowerCase())) return "git tracks it"
   if (entries.includes(folderName.toLowerCase())) return `git tracks ${folderName} itself`
+  const own = yield* identity(file)
+  if (own !== undefined) {
+    for (const entry of tracked) {
+      if ((yield* identity(join(root, entry))) === own) return "git tracks it"
+    }
+  }
   const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd: folder })
   const named = top.stdout.trim()
   if (top.exitCode !== 0 || named === "") return "git could not say whether it tracks it"
@@ -213,17 +232,18 @@ const repositoryControl = Effect.fn("repositoryControl")(function* (
  * The scope `setup` and `doctor` use without `--scope`. Only the user's own uncommitted
  * `.claude/settings.local.json` moves it off `user`: when that file sets the plugin to `true`, the
  * folder is a git work tree that `claudeFolder` trusts, and the file is untracked (see
- * `repositoryControl`: no index entry for the file or `.claude`, in any letter case, and `.claude`
- * is no other repository), the scope is `local`. An enabled file in a folder that is not a trusted
- * git work tree (a source archive, say) or that git tracks might have come with a cloned
- * repository, so the scope stays `user` and a notice names the file and `--scope local`. An archive
- * that ships its own `.git` with an index that omits the file still counts as untracked. An
- * explicit `false` there means the plugin is disabled for this project, so the search stops and
- * `user` is used with a notice saying so. A committed `.claude/settings.json` that enables the
- * plugin never selects a scope, because a cloned repository must not choose where setup writes or
- * which registry a Pi install reads; the notice names the file and `--scope project`. A symlinked
- * `local` or `project` file is not read, with a notice for `local`. A `local` file that is not a
- * JSON object fails with SetupFailure naming it; a bad `project` file is ignored.
+ * `repositoryControl`: no index entry for the file or `.claude`, in any letter case, none that is
+ * the same file by device and inode, and `.claude` is no other repository), the scope is `local`.
+ * An enabled file in a folder that is not a trusted git work tree (a source archive, say) or that
+ * git tracks might have come with a cloned repository, so the scope stays `user` and a notice names
+ * the file and `--scope local`. An archive that ships its own `.git` with an index that omits the
+ * file still counts as untracked. An explicit `false` there means the plugin is disabled for this
+ * project, so the search stops and `user` is used with a notice saying so. A committed
+ * `.claude/settings.json` that enables the plugin never selects a scope, because a cloned
+ * repository must not choose where setup writes or which registry a Pi install reads; the notice
+ * names the file and `--scope project`. A symlinked `local` or `project` file is not read, with a
+ * notice for `local`. A `local` file that is not a JSON object fails with SetupFailure naming it; a
+ * bad `project` file is ignored.
  */
 export const installedScope = Effect.fn("installedScope")(function* (cwd: string) {
   const { folder, root, trusted } = yield* claudeFolder(cwd)

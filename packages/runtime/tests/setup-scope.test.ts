@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, readdir, realpath, stat, symlink, writeFile } from "node:fs/promises"
+import { link, mkdir, readdir, realpath, stat, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { $ } from "bun"
@@ -790,6 +790,24 @@ describe("the default scope is user unless the local settings enable the plugin"
     await write(files().local, enabled)
     await write(join(repo(), ".claude", "Settings.Local.json"), enabled)
     await $`git -C ${repo()} add -f .claude/Settings.Local.json`.quiet()
+    expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
+      "",
+    )
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${target.local} enables HolyAgent but git tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+  })
+
+  test("a tracked entry that is the same file as the local file never infers local", async () => {
+    const target = await initRepo()
+    // A hard link reproduces what a folding file system does: another name for the same inode.
+    await write(files().local, enabled)
+    await link(files().local, join(repo(), ".claude", "alias.json"))
+    await $`git -C ${repo()} add -f .claude/alias.json`.quiet()
     expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
       "",
     )

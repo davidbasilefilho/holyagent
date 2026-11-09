@@ -15917,7 +15917,9 @@ var SCOPES, within = (parent, child) => {
   return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
 }, real = (path) => tryPromise2(() => realpath4(path)).pipe(orElseSucceed2(() => {
   return;
-})), present3 = (path) => tryPromise2(() => lstat3(path)).pipe(as2(true), orElseSucceed2(() => false)), isSymlink = (path) => tryPromise2({
+})), present3 = (path) => tryPromise2(() => lstat3(path)).pipe(as2(true), orElseSucceed2(() => false)), identity2 = (path) => tryPromise2(() => lstat3(path, { bigint: true })).pipe(map5((stats) => `${stats.dev}:${stats.ino}`), orElseSucceed2(() => {
+  return;
+})), isSymlink = (path) => tryPromise2({
   try: () => lstat3(path),
   catch: (cause) => cause
 }).pipe(map5((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` })))), claudeFolder, fileName = (scope) => scope === "project" ? "settings.json" : "settings.local.json", settingsFile, projectSettingsFiles, enablement, repositoryControl, installedScope, scopeNotices = (resolved) => resolved.source === "default" ? resolved.notices : [], describeScope = (resolved) => {
@@ -15994,11 +15996,19 @@ var init_scope = __esm(() => {
     const listed = yield* shell.run("git", ["ls-files", "--cached", "-z", "--", `:(icase,literal)${folderName}`], { cwd: root });
     if (listed.exitCode !== 0)
       return "git could not say whether it tracks it";
-    const entries = listed.stdout.split("\x00").map((entry) => entry.toLowerCase());
+    const tracked = listed.stdout.split("\x00").filter((entry) => entry !== "");
+    const entries = tracked.map((entry) => entry.toLowerCase());
     if (entries.includes(name.toLowerCase()))
       return "git tracks it";
     if (entries.includes(folderName.toLowerCase()))
       return `git tracks ${folderName} itself`;
+    const own = yield* identity2(file);
+    if (own !== undefined) {
+      for (const entry of tracked) {
+        if ((yield* identity2(join12(root, entry))) === own)
+          return "git tracks it";
+      }
+    }
     const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd: folder });
     const named = top.stdout.trim();
     if (top.exitCode !== 0 || named === "")
