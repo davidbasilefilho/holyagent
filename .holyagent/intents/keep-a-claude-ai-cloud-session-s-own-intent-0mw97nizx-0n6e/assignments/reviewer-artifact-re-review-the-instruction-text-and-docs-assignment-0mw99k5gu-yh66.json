@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-instruction-text-and-docs",
   "objective": "Re-review the instruction text and docs of the cloud-session checkout repair.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0vv-klze.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v14z-rjm5.md (artifact) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v1e0-v4vz.md (security); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw999emo-eac9.md. Review only the repair commit 323dfb1 in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r1.diff) and say whether each earlier finding is closed.",
     "Instruction text follows /home/user/holyagent-0.3.0-cloudbranch/.claude/skills/requirements/SKILL.md and the family guides."
@@ -38,7 +38,29 @@
     "agentId": "workflow:wf_349d5eb8-b1f/assignment-0mw99k5gu-yh66",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:54:57.198Z"
+    "startedAt": "2026-11-09T12:54:57.198Z",
+    "finishedAt": "2026-11-09T13:00:53.824Z"
+  },
+  "result": "result: All six earlier artifact findings are closed. One runtime hint still points at `git switch -c` and is non-blocking. I had no shell, so I read the diff and grepped the tree. I did not re-run the tests, so I rely on the repair report for the exit-0 results.\n\n**Findings status (assignment-0mw98v14z-rjm5)**\n1. Contradiction (blocking): closed.\n   - `requirements/root/identity.md` R-BRANCH now says \"creating it (in a cloud session in a worktree, R-CLOUD-CHECKOUT)\".\n   - `claude-5.5/root/identity.md:10` and `kimi-k3.1/root/identity.md:27` now give `git worktree add -b <name> <path> <start>`.\n   - Both `version-control.md` files scope `git switch -c` to \"outside a cloud session (inside one, the next bullet)\". The next bullet owns the worktree command.\n   - `sessioncontext.test.ts:96` and `plugin.test.ts:896` still expect \"first create the conventional branch\", which the new wording keeps.\n2. Unsourced panel-list claim, `docs/usage.md:268`: closed. The claim stays but now carries \"observed on 2026-11-09\" with what was seen. It is first-hand rather than externally sourced, and I accept that.\n3. \"31 commits\" and \"+54,746\", `docs/decisions.md:67`: closed. Both figures are now marked as observed in this repository's own cloud session on 2026-11-09.\n4. `AGENTS.md:11`: closed. It now gives the reason (the session panel shows the primary checkout's diff) and no longer says \"starts at `main`\".\n5. `docs/hooks.md` stale: closed. A new bullet covers `cloudCheckoutNotice`. The `hook.ts` and `overview.ts` summaries were updated to match.\n6. Notice gap on a named branch: closed. It now also fires on \"another named branch than it started on\", with tests. One limit remains. `git switch -c` on a clone that already sat on the assigned branch stays silent. The repair report states this limit, but `docs/` does not.\n\n**Family agreement:** the two families agree in meaning. Only the wording differs: \"per the plan\" in claude-5.5 versus \"name and start set by the stack plan\" in kimi, which the repair report ties to the root core budget.\n\n**Non-blocking, open**\n`packages/runtime/src/vcs/errors.ts:125`: the `DetachedHead` error hint says \"Check out or create a branch with `git switch -c <name>`\". It is a runtime hint, not instruction text, and it fires only when committing on a detached HEAD, which the rule already forbids in a cloud primary checkout. In a cloud session it would steer the root toward the forbidden move. Consider a worktree wording, or leave it.\n`docs/hooks.md:35` says the notice \"runs four read-only git commands\". The code runs `rev-parse`, `symbolic-ref`, `reflog`, `show-ref` (once per candidate name), a second `symbolic-ref` for `origin/HEAD`, and `check-ref-format`. Say \"read-only git commands\" or give the real count.\n\nevidence:\nEach earlier artifact finding is closed, or reported open with file and line: met. Findings 1 to 6 are closed (`identity.md` ×3, `version-control.md` ×2, `docs/usage.md:268`, `docs/decisions.md:67`, `AGENTS.md:11`, `docs/hooks.md:35`). Two non-blocking residuals are listed above.\nNo instruction left tells a cloud session to create a branch in its primary checkout, and the two families agree in meaning: met. A grep for `switch -c` and `checkout -b` over non-test, non-dist files returns only the two `version-control.md` \"outside a cloud session\" lines, the `errors.ts:125` hint and a code comment. The worktree wording in both families is identical in meaning.\nfindings: items 1 to 6 above, plus the `errors.ts:125` and `docs/hooks.md:35` notes.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Re-review closes every earlier finding with file lines; leftovers are optional",
+    "criteria": [
+      {
+        "criterion": "Each earlier artifact finding is closed, or reported open with file and line",
+        "support": "met. Findings 1 to 6 are closed (`identity.md` ×3, `version-control.md` ×2, `docs/usage.md:268`, `docs/decisions.md:67`, `AGENTS.md:11`, `docs/hooks.md:35`). Two non-blocking residuals are listed above."
+      },
+      {
+        "criterion": "No instruction left tells a cloud session to create a branch in its primary checkout, and the two families agree in meaning",
+        "support": "met. A grep for `switch -c` and `checkout -b` over non-test, non-dist files returns only the two `version-control.md` \"outside a cloud session\" lines, the `errors.ts:125` hint and a code comment. The worktree wording in both families is identical in meaning."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1 to 6 above, plus the `errors.ts:125` and `docs/hooks.md:35` notes."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:54:57.198Z"
 }
