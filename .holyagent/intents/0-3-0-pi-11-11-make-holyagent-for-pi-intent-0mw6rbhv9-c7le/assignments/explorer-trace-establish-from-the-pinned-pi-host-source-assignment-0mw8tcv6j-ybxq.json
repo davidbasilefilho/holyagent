@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "establish-from-the-pinned-pi-host-source",
   "objective": "Establish from the pinned Pi host source and the HolyAgent Pi extension what the extension can observe and control for the remaining 0.3.0 Pi work: running under T3 Code in RPC mode, the permission mode, tool activation, project trust for specialists, and the root model route.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Pi host source: /home/user/holyagent-0.3.0-scope/node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0/node_modules/@earendil-works/pi-coding-agent (version 1.5.0; read dist and its .d.ts, docs and examples if present). HolyAgent code: /home/user/holyagent-0.3.0-scope (packages/integrations/pi/src/extension.ts, launcher and workflow tool files under packages/integrations/pi/src, packages/runtime/src/pi/tools.ts, packages/runtime/src/domain/route.ts). Plan doc: docs/pi/t3-code.md in that worktree.",
     "Answer each question with path:line in the Pi source and, where relevant, the HolyAgent call site that would change:",
@@ -40,7 +40,9 @@
   "specialist": {
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-09T05:21:23.419Z"
+    "startedAt": "2026-11-09T05:21:23.419Z",
+    "finishedAt": "2026-11-09T05:21:35.910Z"
   },
+  "result": "stopped",
   "createdAt": "2026-11-09T05:21:23.419Z"
 }
