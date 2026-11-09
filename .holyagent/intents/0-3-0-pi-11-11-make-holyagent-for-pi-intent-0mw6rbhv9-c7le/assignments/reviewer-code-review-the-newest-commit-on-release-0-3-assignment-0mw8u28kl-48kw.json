@@ -46,5 +46,30 @@
     "finishedAt": "2026-11-09T10:32:53.674Z"
   },
   "result": "result: No blockers. Every listed requirement is met. `mise run verify` passes (2492 tests); `bun test` on the pi and runtime pi tests passes (461 tests).\n\nblockers: none\n\n**findings** (all optional)\n1. `packages/integrations/pi/src/extension.ts:1283`: `t3Root` is set before `applyRootTools` runs, so it stays true if `setActiveTools` throws. The next turn's drift correction and the gate then act on a start that never applied. The effect is benign: the extra stripping and refusing is what the root wants anyway. It is untested, since the error path has no T3 case.\n2. `packages/runtime/src/pi/tools.ts:73`: `isDeactivatedT3Tool` compiles up to six RegExps per call through `toolMatches`. It now runs on every `tool_call` for a T3 root and for each registered tool at `before_agent_start` and `session_tree`. This is small and optional.\n3. The `t3*code` wildcard in `T3_PREFIX` also matches look-alike server names. Pre-existing convention.\n4. `extension.ts:1384`: the drift handler depends on the first `before_agent_start` handler awaiting the start's collection. Pi runs the handlers in registration order and the first one awaits `pending`, so it holds today, and the `tool_call` gate backs it up. I could not run T3's bridge, so I could not check where its own `before_agent_start` re-add falls relative to ours. `model_select` drift is corrected at the next `before_agent_start`.\n5. The comment in `t3.ts` says the gate also covers a `codemode` script's calls. I only read it and did not verify that those calls go through `tool_call`.\n\n**verdict:** merge-ready.\n\n**Requirements**\nFilter keeps `html_render`, `html_preview`, `preview_*`, `t3_preview_*` and `device_*` in both spellings and removes all other T3 tools: met (`tools.ts:73`, tests with the `something_new` and `html_render_all` cases).\nSet once at start, restored on `before_agent_start` and `session_tree` only after drift, byte-stable otherwise: met. `holdT3ToolsOff` writes only when drifted tools are present, and the test asserts no `setActiveTools` call when nothing drifted.\n`tool_call` block, also for tools registered later or reached through `tool_search`: met, by name and independent of the active set.\nWarning below Full access: met. One notice plus `setStatus` for `approval-required` and `auto-accept-edits`, delivered once. An unset mode is not below Full access, as in the bridge (research report line 17); under T3 with an unset mode, `T3_MCP_URL` still marks the session as T3.\nNo change outside T3, including a T3 variable in tui mode or an empty value: met, tested.\nNo `custom`, `setWidget`, `setFooter`, `setHeader`, `setTitle` or theme calls: met. The recording-proxy test sees only `setStatus`.\nExisting root selection: met. T3 names go into `excludeTools` as exact names, so Windows `powershell` and the existing exclusions are untouched. `taken.excluded` is separate, so `refuseExcludedTool` is unaffected.\nChild sessions: met. Their collection returns no tools, so `t3Root` stays false and they keep their tools and get no warning (tested).\n`pi.test.ts` handler list: matches, with one extra `before_agent_start` and a `session_tree` handler.\n\nevidence:\nfindings: five optional items above; none blocking.\nverdict: merge-ready; `bunx --no-install mise run verify` exited 0 (type-check, lint, format and 2492 tests passed). `bun test packages/integrations/pi packages/runtime/tests/pi` gave 461 pass, 0 fail.\nEvery blocking finding has path:line and a failure scenario: none to report.\nThe review states whether each listed requirement is met: the requirement list above gives each one, all met.\n",
+  "acceptance": {
+    "revision": 12,
+    "carriedFrom": 11,
+    "rationale": "The revision-12 change (T3 git settings global rule, rpiv facts) does not touch the reviewed T3 host or fixtures work.",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has path:line and a failure scenario",
+        "support": "none to report."
+      },
+      {
+        "criterion": "The review states whether each listed requirement is met",
+        "support": "the requirement list above gives each one, all met."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "five optional items above; none blocking."
+      },
+      {
+        "label": "verdict",
+        "support": "merge-ready; `bunx --no-install mise run verify` exited 0 (type-check, lint, format and 2492 tests passed). `bun test packages/integrations/pi packages/runtime/tests/pi` gave 461 pass, 0 fail."
+      }
+    ]
+  },
   "createdAt": "2026-11-09T05:41:07.174Z"
 }
