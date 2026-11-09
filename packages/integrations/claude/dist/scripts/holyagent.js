@@ -22915,6 +22915,7 @@ var T3_STORAGE_CLEANUP = {
   worktreeSettledAfterDays: 14
 };
 var T3_WRITING_INSTRUCTIONS = "Write as the author, in the first person or a neutral voice, about what the change does and why. " + "Keep AI agents, assistants, sessions and tools out of commit messages and pull request text, and " + "add no attribution trailers (no Co-authored-by or Generated-by lines).";
+var T3_BRANCH_INSTRUCTIONS = "Name each branch by the repository's own branch naming convention, as its AGENTS.md, CONTRIBUTING " + "guide or existing branch names show it. When the repository states none, use a short, lowercase, " + "hyphenated name under the `t3/` prefix.";
 var label2 = "t3 settings";
 var restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false));
 var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
@@ -23022,6 +23023,13 @@ var units = (devices, worktrees) => [
       { path: ["autoResumeLimitedThreads"], value: true, default: false },
       { path: ["snoozeLimitedThreads"], value: true, default: false },
       { path: ["defaultAutoPull"], value: true, default: false }
+    ]
+  },
+  {
+    name: "branch naming",
+    keys: [
+      { path: ["branchNamingMode"], value: "custom", default: "static" },
+      { path: ["branchNameInstructions"], value: T3_BRANCH_INSTRUCTIONS, default: "" }
     ]
   },
   {
