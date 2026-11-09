@@ -28,6 +28,7 @@ import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { providerEnv, routedModels } from "../../../runtime/src/pi/provider.ts"
 import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
 import { toolArgs } from "../../../runtime/src/pi/tools.ts"
+import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import {
   AGENT_TOOL,
   applyEnvironment,
@@ -816,59 +817,71 @@ describe("with the built package and a real project", () => {
 
   const real = async (cwd: string, home: string) => (await run(realExec(home), { cwd })).delivered
 
-  test("a project with an Intent gets its status; one without a .holyagent folder gets nothing", async () => {
-    const { root, home, done } = await project()
-    expect((await real(root, home))?.message).toBeUndefined()
-    const created = Bun.spawn(
-      [
-        "bun",
-        ...RUNTIME,
-        "intent",
-        "create",
-        "--input",
-        JSON.stringify({ objective: "Real objective" }),
-      ],
-      {
-        cwd: root,
-        env: { ...process.env, HOLYAGENT_HOME: home },
-        stdout: "ignore",
-        stderr: "pipe",
-      },
-    )
-    expect(await created.exited).toBe(0)
-    const delivered = await real(root, home)
-    expect(delivered?.message?.content).toContain("Real objective")
-    expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
-    await done()
-  }, 30_000)
+  test(
+    "a project with an Intent gets its status; one without a .holyagent folder gets nothing",
+    async () => {
+      const { root, home, done } = await project()
+      expect((await real(root, home))?.message).toBeUndefined()
+      const created = Bun.spawn(
+        [
+          "bun",
+          ...RUNTIME,
+          "intent",
+          "create",
+          "--input",
+          JSON.stringify({ objective: "Real objective" }),
+        ],
+        {
+          cwd: root,
+          env: { ...process.env, HOLYAGENT_HOME: home },
+          stdout: "ignore",
+          stderr: "pipe",
+        },
+      )
+      expect(await created.exited).toBe(0)
+      const delivered = await real(root, home)
+      expect(delivered?.message?.content).toContain("Real objective")
+      expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("a bad .holyagent/config.json is reported with the field it names", async () => {
-    const { root, home, done } = await project()
-    await mkdir(join(root, ".holyagent"), { recursive: true })
-    await Bun.write(
-      join(root, ".holyagent", "config.json"),
-      JSON.stringify({ pi: { enabel: true } }),
-    )
-    const delivered = await real(root, home)
-    expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
-    expect(delivered?.message?.content).toContain("config.json")
-    expect(delivered?.message?.content).toContain("enabel")
-    await done()
-  }, 30_000)
+  test(
+    "a bad .holyagent/config.json is reported with the field it names",
+    async () => {
+      const { root, home, done } = await project()
+      await mkdir(join(root, ".holyagent"), { recursive: true })
+      await Bun.write(
+        join(root, ".holyagent", "config.json"),
+        JSON.stringify({ pi: { enabel: true } }),
+      )
+      const delivered = await real(root, home)
+      expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
+      expect(delivered?.message?.content).toContain("config.json")
+      expect(delivered?.message?.content).toContain("enabel")
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("pi.enable false in the project's config adds nothing", async () => {
-    const { root, home, done } = await project()
-    await mkdir(join(root, ".holyagent"), { recursive: true })
-    await Bun.write(
-      join(root, ".holyagent", "config.json"),
-      JSON.stringify({ pi: { enable: false } }),
-    )
-    // Nothing is added, but the root keeps its prompt: only the user's own config lifts it.
-    const delivered = await real(root, home)
-    expect(delivered?.message).toBeUndefined()
-    expect(delivered?.systemPrompt).toContain("the system prompt")
-    await done()
-  }, 30_000)
+  test(
+    "pi.enable false in the project's config adds nothing",
+    async () => {
+      const { root, home, done } = await project()
+      await mkdir(join(root, ".holyagent"), { recursive: true })
+      await Bun.write(
+        join(root, ".holyagent", "config.json"),
+        JSON.stringify({ pi: { enable: false } }),
+      )
+      // Nothing is added, but the root keeps its prompt: only the user's own config lifts it.
+      const delivered = await real(root, home)
+      expect(delivered?.message).toBeUndefined()
+      expect(delivered?.systemPrompt).toContain("the system prompt")
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 })
 
 /**
@@ -1401,51 +1414,67 @@ describe("with the built package and a project that is not a git repository", ()
   const real = async (cwd: string, home: string, flag?: string) =>
     (await run(realExec(home), { cwd, ...(flag === undefined ? {} : { flag }) })).delivered
 
-  test("a project with a .holyagent folder gets its status", async () => {
-    const { root, home, done } = await plain()
-    expect((await real(root, home))?.message).toBeUndefined()
-    await createIntent(root, home)
-    const delivered = await real(root, home)
-    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
-    expect(delivered?.message?.content).toContain("Plain objective")
-    expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
-    await done()
-  }, 30_000)
+  test(
+    "a project with a .holyagent folder gets its status",
+    async () => {
+      const { root, home, done } = await plain()
+      expect((await real(root, home))?.message).toBeUndefined()
+      await createIntent(root, home)
+      const delivered = await real(root, home)
+      expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+      expect(delivered?.message?.content).toContain("Plain objective")
+      expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("a session role gets the core and the status", async () => {
-    const { root, home, done } = await plain()
-    await createIntent(root, home)
-    const delivered = await real(root, home, "session")
-    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
-    expect(delivered?.message?.content).toContain("You are the root")
-    expect(delivered?.message?.content).toContain("Plain objective")
-    await done()
-  }, 30_000)
+  test(
+    "a session role gets the core and the status",
+    async () => {
+      const { root, home, done } = await plain()
+      await createIntent(root, home)
+      const delivered = await real(root, home, "session")
+      expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+      expect(delivered?.message?.content).toContain("You are the root")
+      expect(delivered?.message?.content).toContain("Plain objective")
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("a session role without a .holyagent folder still gets the core", async () => {
-    const { root, home, done } = await plain()
-    const delivered = await real(root, home, "session")
-    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
-    expect(delivered?.message?.content).toContain("You are the root")
-    expect(delivered?.message?.content).not.toContain("holyagent status:")
-    await done()
-  }, 30_000)
+  test(
+    "a session role without a .holyagent folder still gets the core",
+    async () => {
+      const { root, home, done } = await plain()
+      const delivered = await real(root, home, "session")
+      expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+      expect(delivered?.message?.content).toContain("You are the root")
+      expect(delivered?.message?.content).not.toContain("holyagent status:")
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("the bundled CLI fails as a state error for a project folder that does not exist", async () => {
-    const child = Bun.spawn(
-      [
-        "bun",
-        ...RUNTIME,
-        PI_PROJECT_FLAG,
-        join(tmpdir(), "holyagent-pi-no-such-project"),
-        "status",
-      ],
-      { cwd: PACKAGE_ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore" },
-    )
-    const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-    expect(code).toBe(4)
-    expect(stderr).toContain("error: StateIo")
-  }, 30_000)
+  test(
+    "the bundled CLI fails as a state error for a project folder that does not exist",
+    async () => {
+      const child = Bun.spawn(
+        [
+          "bun",
+          ...RUNTIME,
+          PI_PROJECT_FLAG,
+          join(tmpdir(), "holyagent-pi-no-such-project"),
+          "status",
+        ],
+        { cwd: PACKAGE_ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore" },
+      )
+      const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+      expect(code).toBe(4)
+      expect(stderr).toContain("error: StateIo")
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 })
 
 describe("finding Bun", () => {

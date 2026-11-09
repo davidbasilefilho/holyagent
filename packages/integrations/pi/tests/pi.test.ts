@@ -16,6 +16,7 @@ import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import { FAMILIES } from "../../../runtime/src/instructions/families.ts"
 import { instructionsDirectory, stripCitations } from "../../../runtime/src/instructions/skills.ts"
 import { toolArgs } from "../../../runtime/src/pi/tools.ts"
+import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import { CONDITIONAL_SECTIONS } from "../../claude/src/agents.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
@@ -259,7 +260,7 @@ describe("the runtime scripts", () => {
       expect((await call("status")).stdout).toBe("intents: []\n")
       await rm(root, { recursive: true, force: true })
     },
-    30_000,
+    PROCESS_TIMEOUT_MS,
   )
 })
 

@@ -20,10 +20,20 @@ import { configResult, enterProject } from "../../../runtime/src/hooks/pi-entry.
 import { PI_PROJECT_FLAG, projectOf } from "../../../runtime/src/hooks/pi-project.ts"
 import { ROOT_CORE_FILES } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { instructionsDirectory, stripCitations } from "../../../runtime/src/instructions/skills.ts"
+import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import { REPOSITORY } from "../src/files.ts"
 
 const kimi = (file: string) =>
   readFileSync(join(REPOSITORY, instructionsDirectory("kimi-k3.1"), "root", file), "utf8")
+
+/**
+ * The time a spawned entry gets to end by itself: the test runs two in a row, so each gets 45% of
+ * the test's timeout and a stalled one is reported before the test itself times out.
+ */
+const CHILD_DEADLINE_MS = Math.floor(PROCESS_TIMEOUT_MS * 0.45)
+
+/** The time the pipes of an ended entry get to close, when a process it started holds them open. */
+const PIPE_GRACE_MS = 2_000
 
 const status = { intents: [{ id: "intent-a", revision: 1, objective: "Ship the thing" }] }
 
@@ -177,40 +187,57 @@ describe("the project flag of the runtime bundle", () => {
 
   // The entry enters the project and hands the CLI the arguments after the flag through `Bun.argv`,
   // before `cli/main.ts` reads them as it is imported.
-  test("the entry runs the CLI command after the flag, in the folder the flag names", async () => {
-    const root = await mkdtemp(join(tmpdir(), "holyagent-pi-entry-"))
-    const entry = join(REPOSITORY, "packages", "runtime", "src", "hooks", "pi-entry.ts")
-    const spawn = async (...args: ReadonlyArray<string>) => {
-      const child = Bun.spawn(["bun", "--no-env-file", entry, ...args], {
-        cwd: tmpdir(),
-        env: { ...process.env, HOLYAGENT_HOME: join(root, "home") },
-        stdout: "pipe",
-        stderr: "pipe",
-        stdin: "ignore",
-      })
-      const [stdout, stderr, code] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
-      return { stdout, stderr, code }
-    }
-    try {
-      const created = await spawn(
-        PI_PROJECT_FLAG,
-        root,
-        "intent",
-        "create",
-        "--input",
-        JSON.stringify({ objective: "Entry objective" }),
-      )
-      expect({ code: created.code, stderr: created.stderr }).toEqual({ code: 0, stderr: "" })
-      // The process started in another folder, so the intent is in the project only if it was entered.
-      const status = await spawn(PI_PROJECT_FLAG, root, "status")
-      expect(status.code).toBe(0)
-      expect(status.stdout).toContain("Entry objective")
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  }, 30_000)
+  test(
+    "the entry runs the CLI command after the flag, in the folder the flag names",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "holyagent-pi-entry-"))
+      const entry = join(REPOSITORY, "packages", "runtime", "src", "hooks", "pi-entry.ts")
+      // A child that has not ended by itself well inside the test's timeout is killed and reported with
+      // what it printed and how it ended, so a stalled run says where it stalled (the child alive,
+      // or the child gone and a pipe held open) and not only that the test timed out.
+      const spawn = async (...args: ReadonlyArray<string>) => {
+        const child = Bun.spawn(["bun", "--no-env-file", entry, ...args], {
+          cwd: tmpdir(),
+          env: { ...process.env, HOLYAGENT_HOME: join(root, "home") },
+          stdout: "pipe",
+          stderr: "pipe",
+          stdin: "ignore",
+          timeout: CHILD_DEADLINE_MS,
+        })
+        const text = (stream: ReadableStream<Uint8Array>) =>
+          Promise.race([
+            new Response(stream).text(),
+            child.exited.then(() => Bun.sleep(PIPE_GRACE_MS)).then(() => "<pipe open after exit>"),
+          ])
+        const [stdout, stderr, code] = await Promise.all([
+          text(child.stdout),
+          text(child.stderr),
+          child.exited,
+        ])
+        if (child.signalCode !== null)
+          throw new Error(
+            `the entry (${args.join(" ")}) was still running after ${CHILD_DEADLINE_MS} ms: ${JSON.stringify({ stdout, stderr })}`,
+          )
+        return { stdout, stderr, code }
+      }
+      try {
+        const created = await spawn(
+          PI_PROJECT_FLAG,
+          root,
+          "intent",
+          "create",
+          "--input",
+          JSON.stringify({ objective: "Entry objective" }),
+        )
+        expect({ code: created.code, stderr: created.stderr }).toEqual({ code: 0, stderr: "" })
+        // The process started in another folder, so the intent is in the project only if it was entered.
+        const status = await spawn(PI_PROJECT_FLAG, root, "status")
+        expect(status.code).toBe(0)
+        expect(status.stdout).toContain("Entry objective")
+      } finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 })
