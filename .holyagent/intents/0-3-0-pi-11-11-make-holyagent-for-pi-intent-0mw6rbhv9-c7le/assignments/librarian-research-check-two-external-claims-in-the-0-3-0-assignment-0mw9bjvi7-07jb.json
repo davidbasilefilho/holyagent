@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw9bjvi7-07jb",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Librarian.research",
+  "slug": "check-two-external-claims-in-the-0-3-0",
+  "objective": "Check two external claims in the 0.3.0 docs against their upstream sources and say for each whether it holds, with the source line.",
+  "state": "Running",
+  "scope": [
+    "Claim A, the todo panel (docs/pi in /home/user/holyagent-0.3.0-docs; search the docs for setWidget and rpiv-todo): @juicesharp/rpiv-todo draws its live panel through Pi's ctx.ui.setWidget, and that panel does not show under T3 Code while the todo tool still works. Check the package source at the version HolyAgent pins (find the pin in packages/integrations/pi/src of the same worktree) on npm or GitHub, and check from T3 Code's Pi provider source (pingdotgg/t3code) whether T3 renders Pi widgets.",
+    "Claim B, docs/pi/t3-code.md:168 'What the generator reads': T3 appends custom instructions to its thread-naming prompt with the first message and images, starts Pi for text generation with --no-tools and --no-extensions and without --no-context-files, so only AGENTS.md and CLAUDE.md reach it. Sources named there: ThreadLaunchService.ts, textGenerationPrompts.ts and the Pi provider's textGeneration.ts in pingdotgg/t3code on main."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no git writes.",
+    "Separate sourced facts from inference, and give the URL and line for each fact.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Claim A is confirmed or refuted from the pinned rpiv-todo source and T3's Pi provider source",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Claim B is confirmed or refuted from the named t3code files",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "claim-a",
+    "claim-b"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T13:50:43.519Z"
+  },
+  "createdAt": "2026-11-09T13:50:43.519Z"
+}
