@@ -89849,8 +89849,9 @@ var resolve5 = (fs, path) => {
   const name = posix3.basename(bare);
   return trailing || name === "" || name === "." || name === ".." ? real(fs, bare) : map4(real(fs, posix3.dirname(bare)), (parent) => posix3.join(parent, name));
 };
+var followed = (fs, path) => tryPromise2({ try: () => fs.realpath(path), catch: (error) => error }).pipe(map4((resolved) => posix3.resolve("/", resolved)), catch_2(() => resolve5(fs, path)));
 var holdsDevice = (path) => path === "/" || path === posix3.dirname(NULL_DEVICE);
-var classify = (fs, path) => typeof path !== "string" || !path.startsWith("/") ? succeed5("elsewhere") : map4(resolve5(fs, path), (resolved) => resolved === NULL_DEVICE ? path.length > 1 && path.endsWith("/") ? "notdir" : "device" : holdsDevice(resolved) ? "ancestor" : "elsewhere");
+var classify = (fs, path, follow = false) => typeof path !== "string" || !path.startsWith("/") ? succeed5("elsewhere") : map4(follow ? followed(fs, path) : resolve5(fs, path), (resolved) => resolved === NULL_DEVICE ? path.length > 1 && path.endsWith("/") ? "notdir" : "device" : holdsDevice(resolved) ? "ancestor" : "elsewhere");
 var answer = (value) => runPromise2(succeed5(value));
 var refuse = (code, reason, call, path) => runPromise2(fail5(new NullDeviceRefused({ message: `${code}: ${reason}, ${call} '${path}'` })));
 var denied = (call, path) => refuse("EPERM", "operation not permitted", call, path);
@@ -89872,6 +89873,17 @@ var ON_PATH = new Map(Object.entries({
   readdir: (path) => refuse("ENOTDIR", "not a directory", "scandir", path),
   readlink: (path) => refuse("EINVAL", "invalid argument", "readlink", path)
 }));
+var FOLLOWS = new Set([
+  "writeFile",
+  "appendFile",
+  "chmod",
+  "utimes",
+  "readFile",
+  "readFileBytes",
+  "readFileBuffer",
+  "exists",
+  "stat"
+]);
 var ON_PAIR = new Map(Object.entries({
   mv: (_fs, { first, second, from, to }) => from === "device" || from === "ancestor" ? () => denied("mv", String(first)) : to === "device" ? () => denied("mv", String(second)) : undefined,
   cp: (fs, { first, second, to, from }) => to === "device" && typeof first === "string" ? () => fs.stat(first).then((source) => source.isDirectory ? refuse("EISDIR", "illegal operation on a directory", "cp", first) : undefined) : from === "device" && typeof second === "string" ? () => fs.writeFile(second, "") : undefined,
@@ -89884,7 +89896,7 @@ var decide = (fs, name, args) => {
   if (onPair !== undefined)
     return map4(all2([classify(fs, first), classify(fs, second)]), ([from, to]) => from === "notdir" || to === "notdir" ? () => notDirectory(name, String(from === "notdir" ? first : second)) : onPair(fs, { first, second, from, to }));
   const onPath = ON_PATH.get(name);
-  return map4(classify(fs, first), (spot) => spot === "notdir" ? () => notDirectory(name, String(first)) : spot === "ancestor" && name === "rm" ? () => denied("rm", String(first)) : spot === "device" && onPath !== undefined ? () => onPath(String(first)) : undefined);
+  return map4(classify(fs, first, FOLLOWS.has(name)), (spot) => spot === "notdir" ? () => notDirectory(name, String(first)) : spot === "ancestor" && name === "rm" ? () => denied("rm", String(first)) : spot === "device" && onPath !== undefined ? () => onPath(String(first)) : undefined);
 };
 var withNullDevice = (fs) => new Proxy(fs, {
   get: (target, name) => {

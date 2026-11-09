@@ -49,15 +49,25 @@ const resolve = (fs: IFileSystem, path: string): Effect.Effect<string> => {
     : Effect.map(real(fs, posix.dirname(bare)), (parent) => posix.join(parent, name))
 }
 
+// The real path of `path` with a link at its end followed, for the calls the inner file system
+// follows (`chmod`, `utimes`, reads and writes), which would otherwise reach the host's device
+// through a link the shell made. Where the walk fails (a missing leaf) the unfollowed path stands.
+const followed = (fs: IFileSystem, path: string): Effect.Effect<string> =>
+  Effect.tryPromise({ try: () => fs.realpath(path), catch: (error) => error }).pipe(
+    Effect.map((resolved) => posix.resolve("/", resolved)),
+    Effect.catch(() => resolve(fs, path)),
+  )
+
 // Whether the real path is the device or a folder that holds it, which removing or moving takes along.
 const holdsDevice = (path: string): boolean => path === "/" || path === posix.dirname(NULL_DEVICE)
 
 // Where `path` leads, however it is spelled or reached: `/dev//null`, a link to `/dev` and
 // `/proc/self/root/dev/null` all end at the device. A relative path is the inner file system's.
-const classify = (fs: IFileSystem, path: unknown): Effect.Effect<Spot> =>
+// A link at the end is followed only when `follow` is set, as for the calls that follow it.
+const classify = (fs: IFileSystem, path: unknown, follow = false): Effect.Effect<Spot> =>
   typeof path !== "string" || !path.startsWith("/")
     ? Effect.succeed("elsewhere")
-    : Effect.map(resolve(fs, path), (resolved): Spot =>
+    : Effect.map(follow ? followed(fs, path) : resolve(fs, path), (resolved): Spot =>
         resolved === NULL_DEVICE
           ? path.length > 1 && path.endsWith("/")
             ? "notdir"
@@ -101,6 +111,21 @@ const ON_PATH: ReadonlyMap<string, (path: string) => Promise<unknown>> = new Map
     readlink: (path) => refuse("EINVAL", "invalid argument", "readlink", path),
   }),
 )
+
+// The calls on one path that the inner file system carries out on the end of a link: a link to the
+// device made by the shell (`ln -s ../dev/null n`) must not reach the host's device through them.
+// `rm`, `mkdir`, `readlink` and `lstat` act on the link itself, so they are not here.
+const FOLLOWS: ReadonlySet<string> = new Set([
+  "writeFile",
+  "appendFile",
+  "chmod",
+  "utimes",
+  "readFile",
+  "readFileBytes",
+  "readFileBuffer",
+  "exists",
+  "stat",
+])
 
 // The two paths of a call and where each leads.
 interface Pair {
@@ -169,7 +194,7 @@ const decide = (
           : onPair(fs, { first, second, from, to }),
     )
   const onPath = ON_PATH.get(name)
-  return Effect.map(classify(fs, first), (spot): Step | undefined =>
+  return Effect.map(classify(fs, first, FOLLOWS.has(name)), (spot): Step | undefined =>
     spot === "notdir"
       ? () => notDirectory(name, String(first))
       : spot === "ancestor" && name === "rm"
@@ -191,8 +216,9 @@ const decide = (
  * give, and so is removing or moving `/dev` or a folder that holds it; `/dev/null/` gives
  * `ENOTDIR`. A path counts as the device by its real path in the inner file system (the real parent
  * plus the name, so a link in the path, `/proc/self/root/dev/null` and a missing leaf resolve
- * alike), not by its spelling. Other paths pass through, a link to the device that something else
- * made included.
+ * alike), not by its spelling; a call that follows a link at the end (`chmod`, `utimes`, reads and
+ * writes) counts the full real path, so a link to the device is the device for it, while `rm`, `mv`
+ * and `ln` act on the link itself. Other paths pass through.
  */
 export const withNullDevice = (fs: IFileSystem): IFileSystem =>
   new Proxy(fs, {

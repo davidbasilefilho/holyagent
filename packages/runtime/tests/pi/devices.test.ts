@@ -36,6 +36,10 @@ const onDisk = (fs: InMemoryFs): InMemoryFs =>
         return (path: string) =>
           // `ReadWriteFs` answers without the root's slash: `dev/null` for `/dev/null`.
           walk(target, path).then((resolved) => (resolved === "/" ? resolved : resolved.slice(1)))
+      // `InMemoryFs.chmod` stops at a link, as `ReadWriteFs` (the disk's `chmod`) does not.
+      if (name === "chmod")
+        return (path: string, mode: number) =>
+          walk(target, path).then((resolved) => target.chmod(resolved, mode))
       if (typeof member !== "function") return member
       const bound: unknown = member.bind(target)
       return bound
@@ -51,6 +55,8 @@ beforeEach(async () => {
   await inner.symlink("/dev", "/tmp/d")
   await inner.symlink("/tmp/d", "/tmp/d2")
   await inner.symlink("/dev/null", "/tmp/n")
+  await inner.symlink("../dev/null", "/tmp/rel")
+  await inner.symlink("/tmp/n", "/tmp/chain")
   await inner.mkdir("/proc/self", { recursive: true })
   await inner.symlink("/", "/proc/self/root")
   fs = withNullDevice(onDisk(inner))
@@ -133,6 +139,35 @@ describe("a path that leads to the device is the device, however it is reached",
     await fs.rm("/work/w")
     expect(await inner.readFile("/work/y")).toBe("y")
     expect(await inner.exists("/work/w")).toBe(false)
+  })
+})
+
+describe("a link to the device that the shell made is the device for the calls that follow it", () => {
+  const links = ["/tmp/n", "/tmp/rel", "/tmp/chain"]
+  const stamp = new Date(86_400_000)
+
+  test.each(links)("chmod and utimes through %s never reach the device", async (link) => {
+    const before = await inner.stat("/dev/null")
+    await fs.chmod(link, 0o000)
+    await fs.utimes(link, stamp, stamp)
+    const after = await inner.stat("/dev/null")
+    expect(after.mode).toBe(before.mode)
+    expect(after.mtime).toEqual(before.mtime)
+    await deviceKept()
+  })
+
+  test.each(links)("writes and reads through %s act on the null device", async (link) => {
+    await fs.writeFile(link, "dropped")
+    await fs.appendFile(link, "dropped")
+    expect(await fs.readFile(link)).toBe("")
+    expect((await fs.stat(link)).size).toBe(0)
+    await deviceKept()
+  })
+
+  test("a link to another file is still followed by the inner file system", async () => {
+    await inner.symlink("/work/x", "/tmp/to-x")
+    await fs.chmod("/tmp/to-x", 0o600)
+    expect((await inner.stat("/work/x")).mode & 0o777).toBe(0o600)
   })
 })
 
