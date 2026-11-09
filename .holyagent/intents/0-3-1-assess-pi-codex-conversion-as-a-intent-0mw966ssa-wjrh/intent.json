@@ -8,9 +8,11 @@
     "Testing rules carried from 0.3.0: never run pi or make live model requests; read sources only.",
     "Maintainer (verbatim, 2026-11-09): \"didn't we agree on using just-bash as the bash tool backend\", \"we should also support the just-bash's ts/js capabilities (ts as first option, js as fallback)\". No earlier record of that choice was found in the original request, the repository, its issues or the Intents.",
     "Decided (maintainer, 2026-11-09, after research showed just-bash 3.6.0 is a simulated shell that cannot run host executables): \"use just-bash and allow the executables on PATH and other relevant places (cross-platform)\". The Pi bash tool runs on just-bash (through Pi 1.5.0 BashOperations); commands it does not implement resolve to real executables on PATH and other relevant locations, on Linux, macOS and Windows, so git, bun, bunx, mise, gh, node and the holyagent CLI keep working; just-bash TypeScript execution is offered first and JavaScript is the fallback.",
-    "Codex provider finding: @howaboua/pi-codex-conversion tools.applyPatchOnly keeps Pi read, bash, edit and write plus apply_patch, but turns off its native V2 compaction and Codex prompt while its own Codex provider stays registered (assignment-0mw96dgh6-ud60)."
+    "Codex provider finding: @howaboua/pi-codex-conversion tools.applyPatchOnly keeps Pi read, bash, edit and write plus apply_patch, but turns off its native V2 compaction and Codex prompt while its own Codex provider stays registered (assignment-0mw96dgh6-ud60).",
+    "Decided (maintainer, verbatim, 2026-11-09): \"about the shadowed commands, prefer them instead of the ones in PATH\". Where just-bash implements a command itself (rg, grep, sed, find, tar, diff, awk, jq, ls, xargs and the rest), its built-in runs, and the host executable of the same name is not registered; only commands just-bash lacks pass through to the host.",
+    "Maintainer (verbatim, 2026-11-09): \"and also, we have the fff integration right? as well as billion context?\". Billion Context is installed at its pin (0.1.212) while pi.features.contextCompression is on; no fff integration exists in the repository. Research what fff is and how it would integrate with Pi and HolyAgent, and how Billion Context interacts with the Codex provider native compaction, before the 0.3.1 plan is final."
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-11-09T11:20:35.387Z"
 }
