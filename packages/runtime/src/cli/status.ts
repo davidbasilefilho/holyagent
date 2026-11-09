@@ -6,6 +6,9 @@ import type { Call } from "./types.ts"
 
 const REFLOG_MOVE = /^checkout: moving from (\S+) to (\S+)$/
 
+/** A full object id, as the reflog names a detached HEAD it moves away from. */
+const FULL_ID = /^[0-9a-f]{40}([0-9a-f]{24})?$/
+
 /** What may reach the notice, the model's context: a plain name with no shell or markup characters. */
 const SAFE_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/
 
@@ -19,7 +22,9 @@ const safeBranch = (name: string) =>
  * The local branch the checkout started on: the oldest move of the HEAD reflog (`checkout: moving
  * from <source> to <destination>`) whose destination is an existing branch, as when the platform
  * clones and runs `checkout -b <assigned>`, else whose source is one, as when a clone that already
- * sat on the assigned branch was detached. Undefined when the reflog names none.
+ * sat on the assigned branch was detached. A first move out of a detached HEAD at a full commit id
+ * is the clone settling on the default branch, so when the next move leaves that branch, the
+ * platform's checkout of the assigned branch is the start. Undefined when the reflog names none.
  */
 const startBranch = Effect.gen(function* () {
   const log = (yield* gitMaybe(["reflog", "show", "--format=%gs", "HEAD"])) ?? ""
@@ -28,7 +33,15 @@ const startBranch = Effect.gen(function* () {
     .map((line) => REFLOG_MOVE.exec(line))
     .filter((move) => move !== null)
     .reverse()
-  for (const move of moves)
+  const [first, second] = moves
+  const setup =
+    first !== undefined &&
+    second !== undefined &&
+    FULL_ID.test(first[1] ?? "") &&
+    second[1] === first[2]
+      ? moves.slice(1)
+      : moves
+  for (const move of setup)
     for (const name of [move[2], move[1]])
       if (
         name !== undefined &&
