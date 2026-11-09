@@ -7,16 +7,17 @@ import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works
 import { Effect, Schema } from "effect"
 
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
-import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { assignmentStatusOf, type PiOutcome } from "../../../runtime/src/pi/journal.ts"
 import { routedModels } from "../../../runtime/src/pi/provider.ts"
 import {
+  type BunSearch,
   CONTEXT_MESSAGE,
   createExtension,
   CUT_OFF_REPORT,
   EMPTY_REPORT,
   failedFinalMessage,
+  runtimeArgs,
 } from "../src/extension.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import {
@@ -101,7 +102,15 @@ describe("the recorded Pi version", () => {
 // ---- the extension, on a stub of Pi's API ------------------------------------------------------
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
-const WRAPPER = toPosix(join(PACKAGE_ROOT, "scripts", "holyagent"))
+// What the extension starts Bun with: the bundled CLI, never the `sh` wrapper.
+const RUNTIME = runtimeArgs(PACKAGE_ROOT)
+// A machine with Bun on its PATH: the program the extension starts is the full path it found.
+const BUN = "/stub/bin/bun"
+const BUN_SEARCH: BunSearch = {
+  env: { PATH: "/stub/bin" },
+  exists: (path) => path === BUN,
+  executable: () => true,
+}
 const DEFAULTS = await Effect.runPromise(defaultConfig)
 const CATALOG = [
   "provider     model   context  max-out  thinking  images",
@@ -120,8 +129,9 @@ const start = (directory: string, sessionName?: string) => {
   const answer = (command: string, args: ReadonlyArray<string>): Partial<ExecResult> => {
     if (command === "git") return { stdout: "/work/project\n" }
     if (command === "pi") return args[0] === "auth" ? { code: 0 } : { stdout: `${CATALOG}\n` }
-    if (command !== "sh" || args[0] !== WRAPPER || args[1] !== PI_PROJECT_FLAG) return { code: 2 }
-    const [subcommand = ""] = args.slice(3)
+    if (command !== BUN || args[0] !== "--no-env-file" || args[RUNTIME.length] !== PI_PROJECT_FLAG)
+      return { code: 2 }
+    const [subcommand = ""] = args.slice(RUNTIME.length + 2)
     ran.push(subcommand)
     switch (subcommand) {
       case "config":
@@ -175,7 +185,9 @@ const start = (directory: string, sessionName?: string) => {
       },
     },
   ) as unknown as ExtensionContext
-  createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api as unknown as ExtensionAPI)
+  createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(
+    api as unknown as ExtensionAPI,
+  )
   /** Delivers a fixture event to the handlers registered for its type; the results are returned. */
   const deliver = async (event: Record<string, unknown>): Promise<Array<unknown>> => {
     const results: Array<unknown> = []
