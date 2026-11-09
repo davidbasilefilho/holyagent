@@ -1,0 +1,15 @@
+{
+  "id": "intent-0mw94kj67-lb5f",
+  "slug": "make-the-root-trust-its-own-judgement",
+  "objective": "Make the root trust its own judgement and ask the user only as a fallback, so it stops asking questions it could settle itself.",
+  "requirements": [
+    "Maintainer (verbatim, 2026-11-09): \"btw this must be an instruction requirement and you should do this in this session\", \"the agent is supposed to trust its judgement and fallback to asking the user\", \"you are asking too many questions you could answer yourself\".",
+    "Trigger: the root asked how setup should handle T3 Code git settings after research had already shown that only one option was safe and mergeable; the recommended option was what it would have chosen anyway.",
+    "A root requirement under packages/runtime/src/instructions/requirements/root states that the root decides by its own judgement whenever the request, the repository, research or a specialist can settle the choice, including choosing between options once research has narrowed them, and asks the user only as a fallback: when the choice is genuinely theirs (taste, priorities, scope, risk they must own, approvals the rules reserve) and the evidence leaves it open; a question whose recommended option it would take anyway is not asked, it acts and records the choice as a default the user can revisit.",
+    "Each model family instruction set (claude-5.5, kimi-k3.1) carries the requirement, translated per family guide, with the coverage table updated, following the requirements skill; mise run build and mise run verify pass.",
+    "Release model: one release/0.3.0/feat/<change> branch and PR into release/0.3.0/integration; merge once reviewed and green."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-09T10:35:16.880Z"
+}
