@@ -82,5 +82,49 @@
     "finishedAt": "2026-11-09T13:10:08.711Z"
   },
   "result": "result: Hint tone raised to #7e87b2 (4.88:1 on dark) and light-terminal support added (OSC 11 / COLORFGBG detection, dark default, light palette). Both gates exit 0.\n\nchanged:\npackages/runtime/src/setup/tui/theme.ts\npackages/runtime/src/setup/tui/app.tsx\npackages/runtime/src/setup/tui/entry.tsx\npackages/runtime/src/setup/tui/background.ts (new)\npackages/runtime/tests/setup-tui-theme.test.ts (new)\npackages/runtime/tests/setup-tui-entry.test.ts\npackages/runtime/tests/setup-tui-harness.ts\nscripts/capture-setup-tui.ts\npackages/integrations/{claude,pi}/dist/scripts/setup-tui.js (rebuilt; holyagent.js unchanged)\n\nchecks:\n`bunx --no-install mise run build` -> exit 0. The only changes after it are the two setup-tui.js files.\n`bunx --no-install mise run verify` -> exit 0. Type-check and lint clean; 2692 pass, 0 fail. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify-visual.log.\nReal pty check (not a gate) of the built bundle with a scripted OSC 11 reply:\n  - Light reply gives the light palette.\n  - Dark reply gives the dark palette.\n  - No reply gives dark after the timeout.\n  - `COLORFGBG=0;15` gives light with no query.\n\nDetection (`detectBackground`):\n`COLORFGBG` wins when it names a background (7 or 15 is light).\nOtherwise OpenTUI's OSC 11 reply is awaited for 300 ms, with a second Effect timeout at 350 ms.\nSilence, failure or NO_COLOR gives dark, and NO_COLOR skips the query.\nThe first frame waits for the result.\n\nblockers: none\nquestions: none\nnotes:\nThe 16-colour tier has no code of its own in the TUI. I changed nothing there, so I added no 16-colour capture or test.\nThe pty-* frames are the old ones, copied back unchanged. They predate the new hint colour.\nOptional: a stale `COLORFGBG` (for example inside tmux) overrides the terminal's real answer.\n\nevidence:\nEvery text tone used for content clears 4.5:1 on the dark default background, with the ratios stated: all ten tones are asserted in `setup-tui-theme.test.ts` against `#1a1b26` and black. Ratios on `#1a1b26` are in the contrast line below.\nA light terminal background is detected by a bounded query with a dark default, and the light palette's text tones each clear 4.5:1 on it, with tests for detection and its timeout: `background.ts` and `setup-tui-theme.test.ts`. The tests cover COLORFGBG parsing, light and dark answers, null, a never-settling query (dark within 500 ms), a rejected query, no query under COLORFGBG or NO_COLOR, and a silent real renderer. Light ratios are in the contrast line below.\nLight-background captures exist for initial, review, apply-success, apply-failure and review-failed at 80x24 and 40x20: ten new files `light-{initial,review,apply-success,apply-failure,review-failed}-{80x24,40x20}.txt` in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/. The directory was re-run, so all 139 scene frames are re-saved; the 6 pty-* frames were copied back.\nNO_COLOR, the 16-colour tier and the ASCII locale still render as before: the existing no-color and ascii-locale tests pass unchanged. New light-background tests show NO_COLOR draws no colour and a C locale draws ASCII only. The 16-colour tier was not exercised.\nmise run build leaves no unexplained changes and mise run verify exits 0: build exit 0, verify exit 0 (2692 pass, 0 fail).\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/setup-tui-contrast.diff\ngates: build exit 0; verify exit 0, 2692 pass, 0 fail.\ncaptures: the ten light-* files above, in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/. The span listings in them give each tone's hex.\ncontrast: the second figure for each light tone is the ratio on white.\nDark, on `#1a1b26`:\n  - heading #7aa2f7 6.79\n  - option and focus #7dcfff 9.96\n  - argument and disabled #a9b1d6 8.10\n  - enabled #9ece6a 9.35\n  - success #73daca 10.26\n  - warning #e0af68 8.55\n  - error #f7768e 6.46\n  - hint #7e87b2 4.88 (was #737aa2 at 4.10)\nLight, on `#e1e2e7` / `#ffffff`:\n  - heading #2a5bbd 4.88 / 6.31\n  - option and focus #00647f 5.19 / 6.71\n  - argument and disabled #33478a 6.74 / 8.72\n  - enabled #3d6228 5.45 / 7.06\n  - success #2a6a5f 4.88 / 6.32\n  - warning #7c5410 5.18 / 6.70\n  - error #b5223f 4.97 / 6.43\n  - hint #565f89 4.78 / 6.19\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Independent code, security and visual reviews of 0130a8b..e195b25 close every blocking finding; my final pass on the final dark and light captures passes",
+    "criteria": [
+      {
+        "criterion": "Every text tone used for content clears 4.5:1 on the dark default background, with the ratios stated",
+        "support": "all ten tones are asserted in `setup-tui-theme.test.ts` against `#1a1b26` and black. Ratios on `#1a1b26` are in the contrast line below."
+      },
+      {
+        "criterion": "A light terminal background is detected by a bounded query with a dark default, and the light palette's text tones each clear 4.5:1 on it, with tests for detection and its timeout",
+        "support": "`background.ts` and `setup-tui-theme.test.ts`. The tests cover COLORFGBG parsing, light and dark answers, null, a never-settling query (dark within 500 ms), a rejected query, no query under COLORFGBG or NO_COLOR, and a silent real renderer. Light ratios are in the contrast line below."
+      },
+      {
+        "criterion": "Light-background captures exist for initial, review, apply-success, apply-failure and review-failed at 80x24 and 40x20",
+        "support": "ten new files `light-{initial,review,apply-success,apply-failure,review-failed}-{80x24,40x20}.txt` in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/. The directory was re-run, so all 139 scene frames are re-saved; the 6 pty-* frames were copied back."
+      },
+      {
+        "criterion": "NO_COLOR, the 16-colour tier and the ASCII locale still render as before",
+        "support": "the existing no-color and ascii-locale tests pass unchanged. New light-background tests show NO_COLOR draws no colour and a C locale draws ASCII only. The 16-colour tier was not exercised."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0, verify exit 0 (2692 pass, 0 fail)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/setup-tui-contrast.diff"
+      },
+      {
+        "label": "gates",
+        "support": "build exit 0; verify exit 0, 2692 pass, 0 fail."
+      },
+      {
+        "label": "captures",
+        "support": "the ten light-* files above, in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/. The span listings in them give each tone's hex."
+      },
+      {
+        "label": "contrast",
+        "support": "the second figure for each light tone is the ratio on white."
+      }
+    ]
+  },
   "createdAt": "2026-11-09T13:01:32.591Z"
 }
