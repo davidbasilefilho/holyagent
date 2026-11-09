@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw9tj1o6-e56c",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-fff-repair-closes-the-root",
+  "objective": "Confirm the fff repair closes the root-exclusion and symlink findings without regressions.",
+  "state": "Running",
+  "scope": [
+    "Commit 3f1c135b on release/0.3.1/feat/fff in /home/user/holyagent-0.3.1-fff; diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-fix-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9svyiy-qjsm.md",
+    "Findings it repairs: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fck-0tru.md (root exclusion of fff's own tool names) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fmw-apeq.md finding 1 (followSymlinks)."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes. Run commands only in /home/user/holyagent-0.3.1-fff.",
+    "Report in under 300 words; start each evidence line with the exact criterion text, a colon and the support inline.",
+    "Run `bunx --no-install mise run build` (tree must stay unchanged) and `bunx --no-install mise run verify`; report command, exit code and counts."
+  ],
+  "criteria": [
+    {
+      "text": "The root cannot list or call any of the six fff tool names in any pi-fff mode, and specialists keep their fff tools",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "followSymlinks false is written, recorded, kept when the file has its own value and reverted only when unchanged, matching pi-fff 0.11.0's schema",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at 3f1c135b",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9svyiy-qjsm"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T22:13:57.942Z"
+  },
+  "createdAt": "2026-11-09T22:13:57.942Z"
+}
