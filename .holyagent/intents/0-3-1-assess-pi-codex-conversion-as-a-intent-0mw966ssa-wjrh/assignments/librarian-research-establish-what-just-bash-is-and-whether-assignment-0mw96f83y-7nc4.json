@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mw96f83y-7nc4",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-what-just-bash-is-and-whether",
+  "objective": "Establish what just-bash is and whether it can serve as the backend of the Pi bash tool for HolyAgent's root and specialists, including next to the Codex provider's apply_patch.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"didn't we agree on using just-bash as the bash tool backend\". No record of that choice exists in the repository, the Intents or this session, so the facts are needed before it is decided.",
+    "From authoritative sources (npm registry entry for just-bash, its repository and README, latest version, date, license): what it is (a bash interpreter in TypeScript? a sandbox? a virtual or overlay filesystem?), and whether it can run real executables on the host such as git, bun, bunx, mise, gh and node, run them with the real working tree and environment, stream long-running output, handle timeouts and background processes, and run on Windows, macOS and Linux.",
+    "How it would plug into Pi 1.5.0: does Pi's bash tool take a pluggable backend or operations object (read the pinned host in /home/user/holyagent-0.3.0-t3host/node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0+8980da4117b98cd5/node_modules/@earendil-works/pi-coding-agent, e.g. its bash tool definition and any BashOperations type), and does any existing Pi package wire just-bash in. Check HolyAgent's own Pi tool setup in packages/runtime/src/pi and packages/integrations/pi/src (worktree /home/user/holyagent-0.3.0-t3branch) for what bash currently is.",
+    "What HolyAgent's work needs from the shell: specialists run `bunx --no-install mise run build` and `mise run verify`, git, and the holyagent CLI through Bun. State plainly whether just-bash can run those, and what would break if it cannot."
+  ],
+  "constraints": [
+    "Read-only: change no files, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi, install or execute just-bash, or make a live model request.",
+    "Separate sourced facts (URL or path:line, version, date fetched) from inference.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "What just-bash is and whether it runs real host executables is stated from its own source or docs",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Whether Pi 1.5.0's bash tool accepts a pluggable backend, and what HolyAgent's bash is today, is stated with path:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Whether HolyAgent's build, verify, git and CLI runs would work on it is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "just-bash",
+    "pi-backend",
+    "fit"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:27:08.495Z"
+  },
+  "createdAt": "2026-11-09T11:27:08.495Z"
+}
