@@ -1,12 +1,28 @@
 import { type PiPackageName, piPackageSource } from "../config/pi-packages.ts"
 import type { Config, PiProvider, RouteKey, Thinking } from "../config/schema.ts"
+import type { PiFamily } from "../instructions/families.ts"
+import { APPLY_PATCH_TOOL } from "./codex/apply-patch.ts"
+import { CODEX_PROVIDER_ID } from "./codex/routes.ts"
 
 /** What the integration knows about one model provider: the only place a provider is named. */
 export interface ProviderProfile {
   /** The provider id in Pi's catalog, the `<provider>` of `--model <provider>/<id>`. */
   readonly id: string
-  /** The Pi package that supplies the provider; selecting the provider loads it, at its pin. */
-  readonly package: PiPackageName
+  /**
+   * The Pi package that supplies the provider; selecting the provider loads it, at its pin. Absent
+   * for a provider Pi ships itself (Codex), which loads no package.
+   */
+  readonly package?: PiPackageName
+  /**
+   * The model family whose instruction text the root and the specialists run on under this provider
+   * (a folder of `instructions/`).
+   */
+  readonly family: PiFamily
+  /**
+   * The tools a specialist with the Write capability has beyond Pi's `write`, `edit` and `bash`
+   * (Codex's `apply_patch`); the root, which writes no files, never has them.
+   */
+  readonly writeTools: ReadonlyArray<string>
   /** The variables the launcher sets on every Pi process, so the provider reaches its region. */
   readonly env: Readonly<Record<string, string>>
   /** What the user does to make the provider ready when Pi reports it has no credentials. */
@@ -18,25 +34,38 @@ export interface ProviderProfile {
   readonly webTools: ReadonlyArray<string>
   /**
    * The provider extension's own settings file, where those web tools are switched on (they are off
-   * until a setting enables them), as a path under the user's home.
+   * until a setting enables them), as a path under the user's home. Absent with no web tools.
    */
-  readonly toolsFile: string
+  readonly toolsFile?: string
 }
 
 /**
  * The provider profiles, one per value of `pi.provider`. Kimi for Coding (global) is Pi's built-in
  * `kimi-coding` provider with `pi-provider-kimi-code` on top, at the exact release
  * `pi-packages.json` pins, and `KIMI_CODE_REGION=global`, which sends requests to Moonshot's
- * overseas host.
+ * overseas host. Codex is Pi's built-in `openai-codex` provider (ChatGPT sign-in) with nothing on
+ * top: it needs no package, its models are in Pi's catalog, and what HolyAgent adds (`apply_patch`,
+ * `context_management`, Luna Reserve) is the extension's `pi/codex` module. The GPT-6 instruction
+ * family runs under it, and its web tools come from `pi-web-kit`, since the provider has none.
  */
 export const PROVIDERS: Readonly<Record<PiProvider, ProviderProfile>> = {
   "kimi-coding-global": {
     id: "kimi-coding",
     package: "pi-provider-kimi-code",
+    family: "kimi-k3.1",
+    writeTools: [],
     env: { KIMI_CODE_REGION: "global" },
     loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
     webTools: ["moonshot_search", "moonshot_fetch"],
     toolsFile: "~/.pi/providers/kimi-coding/config.json",
+  },
+  "openai-codex": {
+    id: CODEX_PROVIDER_ID,
+    family: "gpt-6",
+    writeTools: [APPLY_PATCH_TOOL],
+    env: {},
+    loginFix: "Run /login openai-codex in Pi and sign in with the ChatGPT account that has Codex",
+    webTools: [],
   },
 }
 
@@ -59,7 +88,7 @@ export const providerProfile = (config: Config): ProviderProfile => PROVIDERS[co
 
 /**
  * Turns a route-table row into the Pi model and thinking level to launch, with the provider the
- * config selects. Kimi Code takes the route table's `low`, `high` and `max` as they are.
+ * config selects. The provider takes the route table's reasoning levels as they are.
  */
 export const routeModel = (config: Config, key: RouteKey): ModelRoute => {
   const { id } = providerProfile(config)
@@ -100,9 +129,14 @@ export const routedModels = (config: Config): ReadonlyArray<ModelRoute> =>
 export const providerEnv = (config: Config): Readonly<Record<string, string>> =>
   providerProfile(config).env
 
-/** The Pi package source of the selected provider's extension, with its pinned release. */
-export const providerSource = (config: Config): string =>
-  piPackageSource(providerProfile(config).package)
+/**
+ * The Pi package source of the selected provider's extension, with its pinned release, or
+ * `undefined` for a provider that loads no package (Codex).
+ */
+export const providerSource = (config: Config): string | undefined => {
+  const { package: name } = providerProfile(config)
+  return name === undefined ? undefined : piPackageSource(name)
+}
 
 /** Where a session's web tools come from, as `pi.features.web` and the provider decide. */
 export type WebChoice =

@@ -433,8 +433,9 @@ const checkCapabilities = (
 ) =>
   Effect.gen(function* () {
     const files = piPresenceFiles(env, cwd, scope)
-    const lines = yield* Effect.forEach(enabledCapabilities(config.pi.features), (capability) =>
-      checkCapability(env, scope, capability, choice.form, listed, files),
+    const lines = yield* Effect.forEach(
+      enabledCapabilities(config.pi.features, { provider: config.pi.provider }),
+      (capability) => checkCapability(env, scope, capability, choice.form, listed, files),
     )
     return [pass("pi form", describeForm(choice)), ...lines]
   })

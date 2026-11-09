@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect"
+import { Effect, Schema, SchemaGetter } from "effect"
 
 import type { RoleTask } from "../domain/route.ts"
+import { CODEX_ROUTES } from "../pi/codex/routes.ts"
 import { CAPABILITIES, type CapabilityFeature } from "./capabilities.ts"
 
 /**
@@ -28,11 +29,12 @@ export const VcsSettings = Schema.Struct({
 export type VcsSettings = typeof VcsSettings.Type
 
 /**
- * The model providers the `pi` section can select. Kimi for Coding (global) is the only one in
- * 0.3.0: Pi's built-in `kimi-coding` with `pi-provider-kimi-code` on top and `KIMI_CODE_REGION` set
- * to `global`.
+ * The model providers the `pi` section can select. `kimi-coding-global`, the default, is Pi's
+ * built-in `kimi-coding` with `pi-provider-kimi-code` on top and `KIMI_CODE_REGION` set to
+ * `global`. `openai-codex` is HolyAgent's Codex provider: Pi's built-in ChatGPT-subscription
+ * provider of that name, with no package on top (see `pi/codex/`).
  */
-export const PiProvider = Schema.Literals(["kimi-coding-global"])
+export const PiProvider = Schema.Literals(["kimi-coding-global", "openai-codex"])
 /** One model provider of the `pi` section. */
 export type PiProvider = typeof PiProvider.Type
 
@@ -112,11 +114,26 @@ export const KIMI_ROUTES: Readonly<Record<RouteKey, RouteChoice>> = {
   "Reviewer.artifact": kimi(KIMI_SPECIALIST, "max"),
 }
 
-const route = (key: RouteKey) =>
+/**
+ * The default route table of each provider: what a config that sets no route resolves to, and the
+ * rows a partial `pi.routes` keeps for the keys it leaves out.
+ */
+export const PROVIDER_ROUTES: Readonly<
+  Record<PiProvider, Readonly<Record<RouteKey, RouteChoice>>>
+> = {
+  "kimi-coding-global": KIMI_ROUTES,
+  "openai-codex": CODEX_ROUTES,
+}
+
+/**
+ * One route-table row as a config file writes it: either key may be left out, and the selected
+ * provider's table fills it (see `PiSection`), since the default depends on `pi.provider`.
+ */
+const route = () =>
   defaulted(
     Schema.Struct({
-      model: defaulted(ModelId, KIMI_ROUTES[key].model),
-      thinking: defaulted(Thinking, KIMI_ROUTES[key].thinking),
+      model: Schema.optionalKey(ModelId),
+      thinking: Schema.optionalKey(Thinking),
     }),
     {},
   )
@@ -125,9 +142,9 @@ const route = (key: RouteKey) =>
  * One schema per route-table row, made from the keys of {@link KIMI_ROUTES}, so the list of rows
  * exists once. The cast only restores the per-key shape that `Object.fromEntries` widens.
  */
-const ROUTE_FIELDS = Object.fromEntries(
-  Object.keys(KIMI_ROUTES).map((key) => [key, route(key as RouteKey)]),
-) as { readonly [Key in RouteKey]: ReturnType<typeof route> }
+const ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [key, route()])) as {
+  readonly [Key in RouteKey]: ReturnType<typeof route>
+}
 
 /**
  * How a session reaches the web: `provider` uses the provider extension's own tools (Kimi's
@@ -160,35 +177,84 @@ const CAPABILITY_FIELDS = Object.fromEntries(
   CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]),
 ) as { readonly [F in CapabilityFeature]: ReturnType<typeof capabilitySwitch> }
 
-/** The `pi` section: read only by the Pi integration. */
-const PiSection = defaulted(
+const PI_FIELDS = {
+  enable: defaulted(Enabled, true),
+  provider: defaulted(PiProvider, "kimi-coding-global"),
+  routes: defaulted(Schema.Struct(ROUTE_FIELDS), {}),
+  features: defaulted(
+    Schema.Struct({
+      web: defaulted(WebMode, "provider"),
+      ...CAPABILITY_FIELDS,
+    }),
+    {},
+  ),
+  codemode: defaulted(
+    Schema.Struct({
+      mode: defaulted(CodemodeMode, "only"),
+      maxWorkers: defaulted(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 16 })), 4),
+    }),
+    {},
+  ),
+  t3: defaulted(
+    Schema.Struct({
+      scope: defaulted(T3Scope, "global"),
+      worktrees: defaulted(Enabled, true),
+      deviceAccess: defaulted(Enabled, true),
+    }),
+    {},
+  ),
+}
+
+/** The `pi` section as a file writes it: route rows may still lack a model or a thinking level. */
+const PiAsWritten = Schema.Struct(PI_FIELDS)
+
+/** The `pi` section with every route row complete, which is what the program reads. */
+const PiResolved = Schema.toType(
   Schema.Struct({
-    enable: defaulted(Enabled, true),
-    provider: defaulted(PiProvider, "kimi-coding-global"),
-    routes: defaulted(Schema.Struct(ROUTE_FIELDS), {}),
-    features: defaulted(
-      Schema.Struct({
-        web: defaulted(WebMode, "provider"),
-        ...CAPABILITY_FIELDS,
-      }),
-      {},
-    ),
-    codemode: defaulted(
-      Schema.Struct({
-        mode: defaulted(CodemodeMode, "only"),
-        maxWorkers: defaulted(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 16 })), 4),
-      }),
-      {},
-    ),
-    t3: defaulted(
-      Schema.Struct({
-        scope: defaulted(T3Scope, "global"),
-        worktrees: defaulted(Enabled, true),
-        deviceAccess: defaulted(Enabled, true),
-      }),
-      {},
+    ...PI_FIELDS,
+    routes: Schema.Struct(
+      Object.fromEntries(
+        Object.keys(KIMI_ROUTES).map((key) => [
+          key,
+          Schema.Struct({ model: Schema.String, thinking: Thinking }),
+        ]),
+      ) as {
+        readonly [Key in RouteKey]: Schema.Struct<{
+          model: Schema.String
+          thinking: typeof Thinking
+        }>
+      },
     ),
   }),
+)
+
+/**
+ * Fills each route row's missing model and thinking level from the default table of the selected
+ * provider, so a file that selects `openai-codex` and sets no route gets the Codex rows, and one
+ * that overrides a single key keeps the provider's value for the other.
+ */
+const withProviderRoutes = (pi: typeof PiAsWritten.Type): typeof PiResolved.Encoded => {
+  const defaults = PROVIDER_ROUTES[pi.provider]
+  const routes = Object.fromEntries(
+    (Object.keys(defaults) as Array<RouteKey>).map((key) => [
+      key,
+      {
+        model: pi.routes[key].model ?? defaults[key].model,
+        thinking: pi.routes[key].thinking ?? defaults[key].thinking,
+      },
+    ]),
+  ) as typeof PiResolved.Encoded.routes
+  return { ...pi, routes }
+}
+
+/** The `pi` section: read only by the Pi integration. */
+const PiSection = defaulted(
+  PiAsWritten.pipe(
+    Schema.decodeTo(PiResolved, {
+      decode: SchemaGetter.transform(withProviderRoutes),
+      encode: SchemaGetter.transform((pi) => pi),
+    }),
+  ),
   {},
 )
 

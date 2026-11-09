@@ -32,9 +32,10 @@ import {
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
 import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
+import { APPLY_PATCH_TOOL } from "../../../runtime/src/pi/codex/apply-patch.ts"
 import { providerEnv } from "../../../runtime/src/pi/provider.ts"
 import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
-import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
+import { PI_ROOT_PROMPT, PI_ROOT_PROMPTS } from "../../../runtime/src/pi/root-prompt.ts"
 import {
   deactivatedT3Tools,
   POWERSHELL_ENTRY,
@@ -45,6 +46,8 @@ import {
 } from "../../../runtime/src/pi/tools.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
 import { bunFlags } from "./bun-flags.ts"
+import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
+import { familyAgentPrompt, familySkillPaths } from "./families.ts"
 import { SPECIALIST_NAMES } from "./specialists.ts"
 import {
   belowFullAccess,
@@ -427,6 +430,11 @@ interface Collected {
    * to the root and to every child, since the provider is used by both.
    */
   readonly providerEnvironment?: Readonly<Record<string, string>>
+  /**
+   * The Codex provider's settings, present with `environment` when the config selects Codex; every
+   * session reads them, since the root and the specialists both run on its models.
+   */
+  readonly codex?: CodexSettings
   /** True for the root once the config is read and `pi.enable` is on: it gets the root prompt. */
   readonly rootPrompt?: true
   /** The root's tool selection, present for the root once the config is read and `pi.enable` is on. */
@@ -465,6 +473,8 @@ interface Held {
    * the start's, so it runs once.
    */
   started: boolean
+  /** The Codex provider's settings once the config is read, or undefined for another provider. */
+  codex: CodexSettings | undefined
   /** Stops the provider checks of the session. */
   probe: AbortController | undefined
   /** True when the session runs under T3 Code (see {@link isT3Session}). */
@@ -510,9 +520,11 @@ const settingsFor = (
   bound: ReadonlyArray<Config> = [],
 ): Collected => {
   const rootArgs = toolArgs(config, "root")
+  const codex = codexSettings(config)
   return {
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
+    ...(codex === undefined ? {} : { codex }),
     ...(role === "root"
       ? {
           rootPrompt: true,
@@ -1254,6 +1266,20 @@ export const createExtension =
       return notice(T3_ACCESS_NOTICE)
     }
 
+    // A specialist the Codex config gives `apply_patch` (the ones with Write; the module registers
+    // the tool inactive) has it added to its active tools, beside what the package's agent file
+    // gave it. The root never does, since it writes no files. A specialist has no notice channel,
+    // so a failure leaves it with `write` and `edit`, which still change files.
+    const activateApplyPatch = (codex: CodexSettings): void => {
+      const agent = childAgent(pi.getSessionName())
+      if (agent === undefined || !codex.applyPatchAgents.includes(agent)) return
+      Effect.runSync(
+        Effect.try(() =>
+          pi.setActiveTools([...new Set([...pi.getActiveTools(), APPLY_PATCH_TOOL])]),
+        ).pipe(Effect.ignore),
+      )
+    }
+
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
     // reads it, and a session that ended has nothing to be told. The root's tools and provider
     // checks belong to a session's start, so they run once, from the first collection that ends:
@@ -1281,8 +1307,10 @@ export const createExtension =
         else if (result?.enabled === false) taken.excluded = []
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)
+        if (result !== undefined) taken.codex = result.codex
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
+          if (result?.codex !== undefined) activateApplyPatch(result.codex)
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
           if (result?.tools !== undefined) {
             const notApplied = applyRootTools(result.tools, taken.t3)
@@ -1318,6 +1346,7 @@ export const createExtension =
         t3: isT3Session(ctx, env),
         t3Gate: false,
         t3Root: false,
+        codex: undefined,
         probe: undefined,
         readiness: undefined,
         setupNotice: undefined,
@@ -1350,9 +1379,6 @@ export const createExtension =
         | undefined => {
         const child = isChild()
         if (!child) applyEnvironment(env, hostEnvironment(pi.getActiveTools()), false)
-        const filled = child
-          ? fillPackageRoot(event.systemPrompt, packageRoot, platformPath)
-          : undefined
         const taken = held
         const pending = taken?.pending
         if (taken !== undefined) taken.pending = undefined
@@ -1361,11 +1387,30 @@ export const createExtension =
         ): BeforeAgentStartEventResult | undefined => {
           if (!child && collected?.environment !== undefined)
             applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true)
+          // The Codex provider runs the GPT-6 family: the root's prompt is that family's, a
+          // specialist's own prompt is swapped for it, and the skills Pi lists are its copies.
+          const family = taken?.codex?.family
+          const own = child
+            ? family === undefined
+              ? event.systemPrompt
+              : familyAgentPrompt(
+                  event.systemPrompt,
+                  childAgent(pi.getSessionName()) ?? "",
+                  family,
+                  packageRoot,
+                )
+            : undefined
+          const filled =
+            own === undefined ? undefined : fillPackageRoot(own, packageRoot, platformPath)
           const rooted =
             !child && taken?.rootPrompt === true
-              ? `${fillPackageRoot(PI_ROOT_PROMPT, packageRoot, platformPath)}\n\n${event.systemPrompt}`
+              ? `${fillPackageRoot(family === undefined ? PI_ROOT_PROMPT : PI_ROOT_PROMPTS[family], packageRoot, platformPath)}\n\n${event.systemPrompt}`
               : undefined
-          const prompt = rooted ?? filled
+          const composed = rooted ?? filled
+          const prompt =
+            composed === undefined || family === undefined
+              ? composed
+              : familySkillPaths(composed, family, packageRoot, platformPath)
           const override =
             prompt === undefined || prompt === event.systemPrompt ? {} : { systemPrompt: prompt }
           const message = collected?.delivery
@@ -1429,6 +1474,16 @@ export const createExtension =
     // then: it settles only after every child has exited or its stop grace (STOP_GRACE_MS, 2 s,
     // the graceMs option) has passed.
     pi.on("session_shutdown", () => release())
+
+    // Last, so the handlers above keep their places in each event's order, and the module's own
+    // handlers see the state they leave. The Codex provider's module is inert while the config
+    // selects another provider.
+    registerCodex(pi, {
+      settings: () => held?.codex,
+      notify: (text) => {
+        if (held !== undefined) held.setupNotice = joinNotices(held.setupNotice, notice(text))
+      },
+    })
   }
 
 /**

@@ -43,7 +43,9 @@ const BUILTINS: ReadonlySet<string> = new Set([...READ_TOOLS, ...WRITE_TOOLS, ..
 export const agentTools = (config: Config, route: Route): ReadonlyArray<string> => {
   const profile = providerProfile(config)
   const web = webChoice(profile, config.pi.features.web)
-  const webExtension = extensionName(web.source === "provider" ? profile.package : WEB_KIT_PACKAGE)
+  const webExtension = extensionName(
+    web.source === "provider" && profile.package !== undefined ? profile.package : WEB_KIT_PACKAGE,
+  )
   const entries = toolArgs(config, route.roleTask, profile).tools.map((tool) => {
     if (BUILTINS.has(tool) || tool.startsWith("mcp__")) return tool
     if (tool === CODEMODE_TOOL) return "ext:builtin:codemode"
@@ -61,15 +63,19 @@ export const agentTools = (config: Config, route: Route): ReadonlyArray<string> 
  * by the Claude generator's `specialistFiles` (the role sections, the shared conduct and the
  * conditional sections the role needs, with the maintainers' notes stripped). The tools come from
  * the default config (see {@link agentTools}), the same ones the root passes the specialist's route.
+ * The files go to `folder` of the package, `agents/` by default; the other families' copies go
+ * below `families/` (see `familyAgents`), where the extension finds the prompt of the family a
+ * provider runs.
  */
 export const agentFiles = async (
   family: Family = PI_FAMILY,
   config?: Config,
+  folder: string = AGENTS_FOLDER,
 ): Promise<ReadonlyArray<GeneratedFile>> => {
   const resolved = config ?? (await Effect.runPromise(defaultConfig))
   return specialistFiles({
     instructions: instructionsDirectory(family),
-    path: (route) => `${DIST_DIRECTORY}/${AGENTS_FOLDER}/${route.agent}.md`,
+    path: (route) => `${DIST_DIRECTORY}/${folder}/${route.agent}.md`,
     // No `model:` or `thinking:`: the package ranks an agent file above the call's parameters on its
     // `Agent` path, and the route values are per user, so the root passes them on each call.
     // `prompt_mode: replace` makes the body the child's whole prompt: the child inherits neither the

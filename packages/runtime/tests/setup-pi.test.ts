@@ -137,10 +137,13 @@ describe("holyagent doctor, Pi checks", () => {
         `FAIL pi package: not in the packages of ${globalSettings()}; install it with \`pi install ${SOURCE}\``,
         `FAIL pi base package pi-provider-kimi-code: not listed at ${DEFAULT_SOURCES[0]} in the packages of ${globalSettings()}; install it with \`pi install ${DEFAULT_SOURCES[0]}\`, or re-run \`holyagent setup\``,
         FORM_OK,
-        ...CAPABILITIES.map((capability) => {
+        // The default provider is Kimi, so a capability of the Codex provider is not listed.
+        ...CAPABILITIES.filter((capability) => !("provider" in capability)).map((capability) => {
           if (capability.name === "mcp")
             return "ok   pi capability mcp: normal form, both, nothing to install"
-          const source = piPackageSource(FEATURE_PACKAGES[capability.feature])
+          const source = piPackageSource(
+            FEATURE_PACKAGES[capability.feature as keyof typeof FEATURE_PACKAGES],
+          )
           return `FAIL pi capability ${capability.name}: ${source} is not listed in the packages of ${globalSettings()}; install it with \`pi install ${source}\`, or re-run \`holyagent setup\``
         }),
       ])

@@ -25,7 +25,9 @@ import { Shell } from "./shell.ts"
 const MANAGED_NAMES: ReadonlySet<string> = new Set<string>([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
-  ...Object.values(PROVIDERS).map((profile) => profile.package),
+  ...Object.values(PROVIDERS).flatMap((profile) =>
+    profile.package === undefined ? [] : [profile.package],
+  ),
 ])
 
 /**

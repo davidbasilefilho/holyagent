@@ -11,6 +11,7 @@
   "files": [
     "agents",
     "extensions",
+    "families",
     "prompts",
     "scripts",
     "skills"

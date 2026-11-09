@@ -8536,7 +8536,7 @@ function isNonEmpty(annotations) {
 function fromJsonString2(schema, options) {
   return JsonString.pipe(decodeTo2(schema, fromJsonString(options)));
 }
-var SchemaError, is2, encodeEffect, make9, optionalKey2, optional2, toEncoded2, Never2, Unknown2, Null2, Undefined2, String6, Number6, Boolean3, Symbol3, BigInt6, ArraySchema, NonEmptyArray, NullOr, UndefinedOr, makeFilter2, Finite, isFinite2, isGreaterThanOrEqualTo2, isBetween2, Int, NonEmptyString, RegExp3, URLString, URL2, JsonString, File, URLSearchParams2, NumberFromString, Base64String, Uint8Array2, arbitraryMinimumDateTimestamp = -8640000000000000, arbitraryMaximumDateTimestamp = 8640000000000000, arbitraryMinimumZonedDateTimeTimestamp, arbitraryMaximumZonedDateTimeTimestamp, arbitraryMinimumTimeZoneOffset, arbitraryMaximumTimeZoneOffset, Json2, JsonObject;
+var SchemaError, is2, encodeEffect, make9, optionalKey2, optional2, toType2, toEncoded2, Never2, Unknown2, Null2, Undefined2, String6, Number6, Boolean3, Symbol3, BigInt6, ArraySchema, NonEmptyArray, NullOr, UndefinedOr, makeFilter2, Finite, isFinite2, isGreaterThanOrEqualTo2, isBetween2, Int, NonEmptyString, RegExp3, URLString, URL2, JsonString, File, URLSearchParams2, NumberFromString, Base64String, Uint8Array2, arbitraryMinimumDateTimestamp = -8640000000000000, arbitraryMaximumDateTimestamp = 8640000000000000, arbitraryMinimumZonedDateTimeTimestamp, arbitraryMaximumZonedDateTimeTimestamp, arbitraryMinimumTimeZoneOffset, arbitraryMaximumTimeZoneOffset, Json2, JsonObject;
 var init_Schema = __esm(() => {
   init_Cause();
   init_Data();
@@ -8599,6 +8599,9 @@ var init_Schema = __esm(() => {
       schema
     });
   });
+  toType2 = /* @__PURE__ */ lambda((schema) => make9(toType(schema.ast), {
+    schema
+  }));
   toEncoded2 = /* @__PURE__ */ lambda((schema) => make9(toEncoded(schema.ast), {
     schema
   }));
@@ -10609,6 +10612,31 @@ var init_errors5 = __esm(() => {
   };
 });
 
+var CODEX_PROVIDER_ID = "openai-codex", SOL = "gpt-6.1-sol", TERRA = "gpt-6.1-terra", LUNA = "gpt-6-luna", choice = (model, thinking) => ({ model, thinking }), CODEX_ROUTES;
+var init_routes = __esm(() => {
+  CODEX_ROUTES = {
+    root: choice(SOL, "high"),
+    "Explorer.map": choice(LUNA, "low"),
+    "Explorer.lookup": choice(LUNA, "low"),
+    "Explorer.trace": choice(TERRA, "medium"),
+    "Librarian.lookup": choice(LUNA, "low"),
+    "Librarian.research": choice(TERRA, "medium"),
+    "Worker.mechanical": choice(LUNA, "medium"),
+    "Worker.implementation": choice(TERRA, "high"),
+    "Worker.integration": choice(TERRA, "medium"),
+    "Worker.operations": choice(LUNA, "medium"),
+    "Worker.validation": choice(LUNA, "low"),
+    "Worker.debugging": choice(TERRA, "xhigh"),
+    "Worker.visual": choice(TERRA, "high"),
+    "Reviewer.visual": choice(TERRA, "high"),
+    "Reviewer.code": choice(TERRA, "high"),
+    "Reviewer.testing": choice(TERRA, "medium"),
+    "Reviewer.audit": choice(LUNA, "high"),
+    "Reviewer.security": choice(TERRA, "xhigh"),
+    "Reviewer.artifact": choice(TERRA, "medium")
+  };
+});
+
 var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, T3_PREFIX = "mcp__t3*code__", T3_VISUAL_TOOLS, COMPUTER_USE_TOOLS, sameForm = (packages) => ({
   headless: { packages, mcpServers: [] },
   normal: { packages, mcpServers: [] }
@@ -10618,7 +10646,7 @@ var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-
 }, FEATURE_PACKAGES, unavailableIn = (capability, form) => {
   const entry = capability.forms[form];
   return "unavailable" in entry ? entry.unavailable : undefined;
-}, enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined)), capabilityPackages = (features, form, definitions = CAPABILITIES) => enabledCapabilities(features, { form, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []), managedCapabilityPackages = (definitions = CAPABILITIES) => [
+}, enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider)), capabilityPackages = (features, form, definitions = CAPABILITIES) => enabledCapabilities(features, { form, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []), managedCapabilityPackages = (definitions = CAPABILITIES) => [
   ...new Set(definitions.flatMap((capability) => CAPABILITY_FORMS.flatMap((form) => formContent(capability, form)?.packages ?? [])))
 ];
 var init_capabilities = __esm(() => {
@@ -10734,6 +10762,20 @@ var init_capabilities = __esm(() => {
       ],
       tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
       health: ["needs", "packages"]
+    },
+    {
+      name: "luna-reserve",
+      feature: "lunaReserve",
+      description: "Falls back to Codex's Luna Reserve allowance when the usage limit is reached (Codex provider only)",
+      provider: "openai-codex",
+      skills: [],
+      applicability: "both",
+      defaultOn: true,
+      needs: [],
+      forms: sameForm([]),
+      tools: { rootExclude: [], visual: [] },
+      settings: [],
+      health: ["needs"]
     }
   ];
   FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
@@ -10743,19 +10785,30 @@ var init_capabilities = __esm(() => {
   }));
 });
 
-var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value))), VcsSettings, PiProvider, Thinking, ModelId, KIMI_ROOT = "k3.1-pro", KIMI_SPECIALIST = "kimi-for-coding", kimi = (model, thinking) => ({ model, thinking }), KIMI_ROUTES, route = (key) => defaulted(Struct({
-  model: defaulted(ModelId, KIMI_ROUTES[key].model),
-  thinking: defaulted(Thinking, KIMI_ROUTES[key].thinking)
-}), {}), ROUTE_FIELDS, WebMode, CodemodeMode, T3Scope, Enabled, capabilitySwitch = (on) => defaulted(Enabled, on), CAPABILITY_FIELDS, PiSection, ClaudeSection, Config, ConfigFile, defaultConfig;
+var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value))), VcsSettings, PiProvider, Thinking, ModelId, KIMI_ROOT = "k3.1-pro", KIMI_SPECIALIST = "kimi-for-coding", kimi = (model, thinking) => ({ model, thinking }), KIMI_ROUTES, PROVIDER_ROUTES, route = () => defaulted(Struct({
+  model: optionalKey2(ModelId),
+  thinking: optionalKey2(Thinking)
+}), {}), ROUTE_FIELDS, WebMode, CodemodeMode, T3Scope, Enabled, capabilitySwitch = (on) => defaulted(Enabled, on), CAPABILITY_FIELDS, PI_FIELDS, PiAsWritten, PiResolved, withProviderRoutes = (pi) => {
+  const defaults = PROVIDER_ROUTES[pi.provider];
+  const routes = Object.fromEntries(Object.keys(defaults).map((key) => [
+    key,
+    {
+      model: pi.routes[key].model ?? defaults[key].model,
+      thinking: pi.routes[key].thinking ?? defaults[key].thinking
+    }
+  ]));
+  return { ...pi, routes };
+}, PiSection, ClaudeSection, Config, ConfigFile, defaultConfig;
 var init_schema = __esm(() => {
   init_dist();
+  init_routes();
   init_capabilities();
   VcsSettings = Struct({
     api: optionalKey2(Boolean3),
     allowWords: optionalKey2(ArraySchema(String6)),
     stateBranch: optionalKey2(String6)
   });
-  PiProvider = Literals(["kimi-coding-global"]);
+  PiProvider = Literals(["kimi-coding-global", "openai-codex"]);
   Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
   ModelId = String6.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
   KIMI_ROUTES = {
@@ -10779,13 +10832,17 @@ var init_schema = __esm(() => {
     "Reviewer.security": kimi(KIMI_SPECIALIST, "max"),
     "Reviewer.artifact": kimi(KIMI_SPECIALIST, "max")
   };
-  ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [key, route(key)]));
+  PROVIDER_ROUTES = {
+    "kimi-coding-global": KIMI_ROUTES,
+    "openai-codex": CODEX_ROUTES
+  };
+  ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [key, route()]));
   WebMode = Literals(["provider", "pi-web-kit", "off"]);
   CodemodeMode = Literals(["on", "only"]);
   T3Scope = Literals(["global", "project"]);
   Enabled = Boolean3;
   CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
-  PiSection = defaulted(Struct({
+  PI_FIELDS = {
     enable: defaulted(Enabled, true),
     provider: defaulted(PiProvider, "kimi-coding-global"),
     routes: defaulted(Struct(ROUTE_FIELDS), {}),
@@ -10802,7 +10859,19 @@ var init_schema = __esm(() => {
       worktrees: defaulted(Enabled, true),
       deviceAccess: defaulted(Enabled, true)
     }), {})
-  }), {});
+  };
+  PiAsWritten = Struct(PI_FIELDS);
+  PiResolved = toType2(Struct({
+    ...PI_FIELDS,
+    routes: Struct(Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [
+      key,
+      Struct({ model: String6, thinking: Thinking })
+    ])))
+  }));
+  PiSection = defaulted(PiAsWritten.pipe(decodeTo2(PiResolved, {
+    decode: transform(withProviderRoutes),
+    encode: transform((pi) => pi)
+  })), {});
   ClaudeSection = defaulted(Record(String6, Never2), {});
   Config = Struct({
     vcs: defaulted(VcsSettings, {}),
@@ -15238,6 +15307,31 @@ var init_pi_packages2 = __esm(() => {
   PI_PACKAGE_VERSIONS = pi_packages_default;
 });
 
+var APPLY_PATCH_TOOL = "apply_patch", PatchSyntaxError, PatchPathError, PatchContextError, PatchFileError;
+var init_apply_patch = __esm(() => {
+  init_dist();
+  PatchSyntaxError = class PatchSyntaxError extends TaggedError2("PatchSyntaxError") {
+    get message() {
+      return this.line === undefined ? `Invalid patch: ${this.reason}` : `Invalid patch at line ${this.line}: ${this.reason}`;
+    }
+  };
+  PatchPathError = class PatchPathError extends TaggedError2("PatchPathError") {
+    get message() {
+      return `Invalid patch: ${this.path} is not a path below the working directory; file references must be relative`;
+    }
+  };
+  PatchContextError = class PatchContextError extends TaggedError2("PatchContextError") {
+    get message() {
+      return `${this.reason} in ${this.path}`;
+    }
+  };
+  PatchFileError = class PatchFileError extends TaggedError2("PatchFileError") {
+    get message() {
+      return `${this.path}: ${this.reason}`;
+    }
+  };
+});
+
 var PROVIDERS, providerProfile = (config) => PROVIDERS[config.pi.provider], routeModel = (config, key) => {
   const { id } = providerProfile(config);
   const { model, thinking } = config.pi.routes[key];
@@ -15248,14 +15342,26 @@ var PROVIDERS, providerProfile = (config) => PROVIDERS[config.pi.provider], rout
 }, subagentModel = ({ provider, model }) => `${provider}/${model}`, WEB_KIT_TOOLS, webChoice = (profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" && profile.webTools.length > 0 ? { source: "provider", tools: profile.webTools } : { source: "pi-web-kit", tools: WEB_KIT_TOOLS };
 var init_provider = __esm(() => {
   init_pi_packages2();
+  init_apply_patch();
+  init_routes();
   PROVIDERS = {
     "kimi-coding-global": {
       id: "kimi-coding",
       package: "pi-provider-kimi-code",
+      family: "kimi-k3.1",
+      writeTools: [],
       env: { KIMI_CODE_REGION: "global" },
       loginFix: "Run /login kimi-coding in Pi, or set KIMI_API_KEY",
       webTools: ["moonshot_search", "moonshot_fetch"],
       toolsFile: "~/.pi/providers/kimi-coding/config.json"
+    },
+    "openai-codex": {
+      id: CODEX_PROVIDER_ID,
+      family: "gpt-6",
+      writeTools: [APPLY_PATCH_TOOL],
+      env: {},
+      loginFix: "Run /login openai-codex in Pi and sign in with the ChatGPT account that has Codex",
+      webTools: []
     }
   };
   ROOT_MODEL_PAIR = ["defaultProvider", "defaultModel"];
@@ -24809,7 +24915,7 @@ var WEB_KIT_PACKAGE = "pi-web-kit", piPackages = (config, profile = providerProf
   if (!enable)
     return [];
   const names = [
-    profile.package,
+    ...profile.package === undefined ? [] : [profile.package],
     ...capabilityPackages(features, form, definitions),
     ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
   ];
@@ -24952,7 +25058,7 @@ ${result.stderr}`;
   return pass(name, `${form} form, ${capability.applicability}, ${what}`);
 }), checkCapabilities = (env, cwd, scope, config, choice, listed) => gen2(function* () {
   const files = piPresenceFiles(env, cwd, scope);
-  const lines = yield* forEach2(enabledCapabilities(config.pi.features), (capability) => checkCapability(env, scope, capability, choice.form, listed, files));
+  const lines = yield* forEach2(enabledCapabilities(config.pi.features, { provider: config.pi.provider }), (capability) => checkCapability(env, scope, capability, choice.form, listed, files));
   return [pass("pi form", describeForm(choice)), ...lines];
 }), piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function* () {
   if (!(yield* piInUse(env)))
@@ -25015,7 +25121,7 @@ var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), pattern
   const web = webChoice(profile, features.web);
   return [
     { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
-    ...web.source === "provider" ? [
+    ...web.source === "provider" && profile.toolsFile !== undefined ? [
       {
         file: profile.toolsFile,
         content: {
@@ -25023,7 +25129,7 @@ var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), pattern
         }
       }
     ] : [],
-    ...enabledCapabilities(features, { form }).flatMap((capability) => capability.settings)
+    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings)
   ];
 };
 var init_tools = __esm(() => {
@@ -25125,16 +25231,20 @@ var init_pi_settings = __esm(() => {
       }
     ],
     [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-    ...Object.values(PROVIDERS).map((profile) => [
-      profile.toolsFile,
-      { tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])) }
+    ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [
+      [
+        profile.toolsFile,
+        {
+          tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }]))
+        }
+      ]
     ])
   ]);
   KNOWN_FILES = [
     PI_SETTINGS_FILE,
     SUBAGENTS_SETTINGS_FILE,
     BILLION_CONTEXT_FILE,
-    ...Object.values(PROVIDERS).map((profile) => profile.toolsFile)
+    ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [profile.toolsFile])
   ];
   resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
     const global = target.global === undefined ? undefined : yield* readJsonObject(target.global);
@@ -25367,7 +25477,7 @@ var init_pi_install = __esm(() => {
   MANAGED_NAMES = new Set([
     ...managedCapabilityPackages(),
     WEB_KIT_PACKAGE,
-    ...Object.values(PROVIDERS).map((profile) => profile.package)
+    ...Object.values(PROVIDERS).flatMap((profile) => profile.package === undefined ? [] : [profile.package])
   ]);
   installPiPackages = fn2("installPiPackages")(function* (env, options) {
     const shell = yield* Shell;

@@ -11,13 +11,13 @@ import type {
   ToolRendererResolver,
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import { PLUGIN_NAMESPACE } from "../../../runtime/src/cli/assignment.ts"
 import { HOST_VARIABLE, WORKFLOWS_VARIABLE } from "../../../runtime/src/cli/config.ts"
 import { CONTEXT_BUDGET, SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
 import { CLAUDE_SPECIALISTS } from "../../../runtime/src/cli/workflow-check.ts"
-import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
   PI_ROOT_CORE,
@@ -26,7 +26,7 @@ import {
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { providerEnv, routedModels } from "../../../runtime/src/pi/provider.ts"
-import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
+import { PI_ROOT_PROMPT, PI_ROOT_PROMPTS } from "../../../runtime/src/pi/root-prompt.ts"
 import { toolArgs } from "../../../runtime/src/pi/tools.ts"
 import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import {
@@ -62,6 +62,7 @@ import {
   workflowRenderers,
   WORKFLOWS_ENV,
 } from "../src/extension.ts"
+import { familyAgentPrompt, promptBody } from "../src/families.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import { SPECIALIST_NAMES } from "../src/specialists.ts"
 import { removeTemporary } from "./temp-folder.ts"
@@ -199,6 +200,8 @@ const fakeApi = (
   const touched: Array<string> = []
   let failedOnce = false
   const renderers: Array<ToolRendererResolver> = []
+  // The tools the extension registered (only `apply_patch`, inactive).
+  const tools: Array<{ readonly name: string }> = []
   // The commands started and not yet settled: a process that is still running.
   const running = { count: 0 }
   const api = {
@@ -206,6 +209,7 @@ const fakeApi = (
       void flags.set(name, options),
     getFlag: (name: string) => value ?? flags.get(name)?.default,
     registerToolRenderer: (resolver: ToolRendererResolver) => void renderers.push(resolver),
+    registerTool: (tool: { readonly name: string }) => void tools.push(tool),
     getSessionName: () => session.name,
     getActiveTools: () => [...active],
     getAllTools: () => (session.allTools ?? active).map((name) => ({ name })),
@@ -268,6 +272,7 @@ const fakeApi = (
     flags,
     handlers,
     renderers,
+    tools,
     calls,
     sent,
     toolSets,
@@ -385,13 +390,17 @@ describe("the factory", () => {
     expect(api.flags.get(ROLE_FLAG)).toMatchObject({ type: "string", default: "root" })
     expect([...api.handlers.keys()].toSorted()).toEqual([
       "before_agent_start",
+      "before_provider_request",
       "message_end",
+      "provider_stream_event",
       "session_compact",
       "session_shutdown",
       "session_start",
       "session_tree",
       "tool_call",
     ])
+    // The Codex module's one tool is registered inactive, so no other provider has it.
+    expect(api.tools.map((tool) => tool.name)).toEqual(["apply_patch"])
     expect(api.calls).toEqual([])
     expect(api.sent).toEqual([])
     expect(timers).toEqual([])
@@ -3562,6 +3571,127 @@ describe("under T3 Code", () => {
     // Not custom, setWidget, setFooter, setHeader, setTitle or the theme: RPC drops or no-ops them.
     expect([...accessed]).toEqual(["setStatus"])
     expect(calls.map(({ method }) => method)).toEqual(["setStatus"])
+    expect(api.touched).toEqual([])
+  })
+})
+
+const CODEX = await Effect.runPromise(
+  Schema.decodeUnknownEffect(Config)({ pi: { provider: "openai-codex" } }),
+)
+
+describe("under the Codex provider", () => {
+  const codexConfig = (directory = "/missing") =>
+    healthy(directory, { config: { stdout: `${JSON.stringify(CODEX)}\n` } })
+  const CODEX_CATALOG = [
+    "provider     model   context  max-out  thinking  images",
+    ...routedModels(CODEX).map(
+      ({ provider, model }) => `${provider}  ${model}  500K  128K  yes  yes`,
+    ),
+  ].join("\n")
+  const codexPi: PiProbe = (args) =>
+    args[0] === "auth" ? { code: 0 } : { code: 0, stdout: `${CODEX_CATALOG}\n` }
+  const PI_PROMPT = "Pi's own prompt, with AGENTS.md and the skills"
+  const body = (path: string) => promptBody(readFileSync(join(PACKAGE_ROOT, path), "utf8"))
+
+  test("the root's prompt is the GPT-6 family's, in front of Pi's own", async () => {
+    const { delivered } = await run(codexConfig(), { systemPrompt: PI_PROMPT, pi: codexPi })
+    expect(delivered?.systemPrompt).toBe(
+      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6"], PACKAGE_ROOT)}\n\n${PI_PROMPT}`,
+    )
+    expect(PI_ROOT_PROMPTS["gpt-6"]).not.toBe(PI_ROOT_PROMPT)
+    expect(delivered?.systemPrompt).not.toContain(fillPackageRoot(PI_ROOT_PROMPT, PACKAGE_ROOT))
+  })
+
+  test("a specialist's own prompt is swapped for the family's, and what Pi adds around it stays", async () => {
+    const agent = "worker-implementation"
+    const own = body(`agents/${agent}.md`)
+    const gpt = body(`families/gpt-6/agents/${agent}.md`)
+    expect(gpt).not.toBe(own)
+    const { delivered } = await run(codexConfig(), {
+      sessionName: `${agent}#a1b2c3d4`,
+      systemPrompt: `${own}\n\nPi appended this`,
+      pi: codexPi,
+    })
+    expect(delivered?.systemPrompt).toBe(
+      `${fillPackageRoot(gpt, PACKAGE_ROOT)}\n\nPi appended this`,
+    )
+  })
+
+  test("every specialist has a GPT-6 prompt the swap finds", () => {
+    for (const agent of SPECIALIST_NAMES) {
+      const own = body(`agents/${agent}.md`)
+      const gpt = body(`families/gpt-6/agents/${agent}.md`)
+      expect(gpt, agent).not.toBe("")
+      expect(gpt, agent).not.toBe(own)
+      expect(familyAgentPrompt(own, agent, "gpt-6", PACKAGE_ROOT), agent).toBe(gpt)
+    }
+  })
+
+  test("the skills Pi lists are the family's copies", async () => {
+    const listed = (folder: string) =>
+      `<skill><location>${join(PACKAGE_ROOT, folder, "ci-watch", "SKILL.md")}</location></skill>`
+    const { delivered } = await run(codexConfig(), {
+      systemPrompt: `${PI_PROMPT}\n${listed("skills")}`,
+      pi: codexPi,
+    })
+    expect(delivered?.systemPrompt).toContain(listed("families/gpt-6/skills"))
+    expect(delivered?.systemPrompt).not.toContain(listed("skills"))
+    const kimi = await run(healthy("/missing"), {
+      systemPrompt: `${PI_PROMPT}\n${listed("skills")}`,
+    })
+    expect(kimi.delivered?.systemPrompt).toContain(listed("skills"))
+  })
+
+  test("a specialist that writes gets apply_patch beside the tools it has; the others and the root do not", async () => {
+    const tools = ["read", "write", "edit", "bash", "apply_patch"]
+    for (const [name, expected] of [
+      ["worker-implementation", ["read", "write", "bash", "apply_patch"]],
+      ["worker-debugging", ["read", "write", "bash", "apply_patch"]],
+      ["worker-visual", ["read", "write", "bash", "apply_patch"]],
+      ["explorer-map", undefined],
+      ["reviewer-code", undefined],
+      ["worker-operations", undefined],
+    ] as const) {
+      const { api } = await run(codexConfig(), {
+        sessionName: `${name}#a1b2c3d4`,
+        activeTools: ["read", "write", "bash"],
+        allTools: tools,
+        startOnly: true,
+        pi: codexPi,
+      })
+      expect(api.toolSets.at(-1), name).toEqual(expected)
+    }
+    const root = await run(codexConfig(), {
+      activeTools: ["read", "bash", "write", "edit"],
+      allTools: tools,
+      startOnly: true,
+      pi: codexPi,
+    })
+    for (const set of root.api.toolSets) expect(set).not.toContain("apply_patch")
+    expect(root.api.toolSets.at(-1)).not.toContain("write")
+  })
+
+  test("under the Kimi provider no specialist gets apply_patch and no prompt is swapped", async () => {
+    const own = body("agents/worker-implementation.md")
+    const { api, delivered } = await run(healthy("/missing"), {
+      sessionName: "worker-implementation#a1b2c3d4",
+      activeTools: ["read", "write", "bash"],
+      allTools: ["read", "write", "bash", "apply_patch"],
+      systemPrompt: own,
+    })
+    expect(api.toolSets).toEqual([])
+    expect(delivered?.systemPrompt).toBe(fillPackageRoot(own, PACKAGE_ROOT))
+  })
+
+  test("a failed activation of apply_patch leaves the specialist running with its own tools", async () => {
+    const { api } = await run(codexConfig(), {
+      sessionName: "worker-implementation#a1b2c3d4",
+      activeTools: ["read"],
+      toolsFail: new Error("no tools"),
+      startOnly: true,
+      pi: codexPi,
+    })
+    expect(api.toolSets).toEqual([])
     expect(api.touched).toEqual([])
   })
 })

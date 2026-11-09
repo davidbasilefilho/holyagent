@@ -22,6 +22,14 @@ import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentTools } from "../src/agents.ts"
 import { runtimeArgs } from "../src/extension.ts"
+import {
+  DEFAULT_PI_FAMILY,
+  EXTRA_PI_FAMILIES,
+  FAMILIES_FOLDER,
+  familyAgents,
+  familySkills,
+  promptBody,
+} from "../src/families.ts"
 import { DIST_DIRECTORY, PACKAGE_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import {
   bundleExtension,
@@ -295,6 +303,45 @@ describe("the skills", () => {
   })
 })
 
+describe("the other families the package carries", () => {
+  const folder = (path: string) =>
+    generated.filter((file) => file.path.startsWith(`${DIST_DIRECTORY}/${path}/`))
+  const names = (files: ReadonlyArray<{ readonly path: string }>) =>
+    files.map((file) => file.path.split("/").at(-1) ?? "").toSorted()
+  const expectedAgents = SPECIALIST_NAMES.map((name) => `${name}.md`).toSorted()
+
+  test("the package's own agents and skills stay the default family's; the others sit below families/", () => {
+    expect(EXTRA_PI_FAMILIES).toEqual(["gpt-6"])
+    expect(PI_FAMILY).toBe(DEFAULT_PI_FAMILY)
+    expect(PACKAGE_FILES).toContain(FAMILIES_FOLDER)
+    expect(names(folder("agents"))).toEqual(expectedAgents)
+  })
+
+  test("each extra family has one prompt per specialist and the family's skills, one for one", async () => {
+    for (const family of EXTRA_PI_FAMILIES) {
+      expect(names(folder(familyAgents(family)))).toEqual(expectedAgents)
+      const source = `${instructionsDirectory(family)}/skills/`
+      expect(
+        folder(familySkills(family)).map((file) =>
+          file.path.slice(`${DIST_DIRECTORY}/${familySkills(family)}/`.length),
+        ),
+      ).toEqual((await filesBelow(source)).map((path) => path.slice(source.length)))
+    }
+  })
+
+  test("a family's prompt is written from that family's sources, not copied from the default's", () => {
+    for (const name of SPECIALIST_NAMES) {
+      const own = generated.find((file) => file.path === `${DIST_DIRECTORY}/agents/${name}.md`)
+      const gpt = generated.find(
+        (file) => file.path === `${DIST_DIRECTORY}/${familyAgents("gpt-6")}/${name}.md`,
+      )
+      expect(gpt?.content, name).toContain(`instructions/gpt-6/roles/${name}`)
+      expect(own?.content, name).toContain(`instructions/kimi-k3.1/roles/${name}`)
+      expect(promptBody(gpt?.content ?? ""), name).not.toBe(promptBody(own?.content ?? ""))
+    }
+  })
+})
+
 describe("the specialists", () => {
   const files = generated.filter((file) => file.path.startsWith(`${DIST_DIRECTORY}/agents/`))
   const parsed = (file: { readonly content: string }) => {
@@ -431,6 +478,7 @@ describe("the extension", () => {
         registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
         on: (event: string) => void used.push(`on ${event}`),
         registerToolRenderer: () => void used.push("registerToolRenderer"),
+        registerTool: (tool: { name: string }) => void used.push(`registerTool ${tool.name}`),
       }
       expect(typeof loaded.default).toBe("function")
       expect(loaded.default(api)).toBeUndefined()
@@ -439,13 +487,21 @@ describe("the extension", () => {
         "on before_agent_start",
         "on before_agent_start",
         "on before_agent_start",
+        "on before_agent_start",
+        "on before_provider_request",
         "on message_end",
+        "on message_end",
+        "on provider_stream_event",
+        "on session_compact",
         "on session_compact",
         "on session_shutdown",
         "on session_start",
+        "on session_start",
+        "on session_tree",
         "on session_tree",
         "on tool_call",
         "registerFlag holyagent-role",
+        "registerTool apply_patch",
         "registerToolRenderer",
       ])
     } finally {

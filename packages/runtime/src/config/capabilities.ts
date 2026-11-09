@@ -1,4 +1,5 @@
 import type { PiPackageName } from "./pi-packages.ts"
+import type { PiProvider } from "./schema.ts"
 
 /**
  * The two forms a capability takes: `headless` on a machine with no graphical session (a server,
@@ -86,6 +87,12 @@ export interface CapabilityDefinition {
   readonly applicability: "root" | "specialists" | "both"
   /** Whether it is on when the config does not say. */
   readonly defaultOn: boolean
+  /**
+   * The only `pi.provider` it applies to; absent for a capability that works with every provider.
+   * Its switch stays in `pi.features` whatever the provider, but under another provider it loads
+   * nothing and doctor does not list it.
+   */
+  readonly provider?: PiProvider
   /** What it needs of the system. */
   readonly needs: ReadonlyArray<SystemNeed>
   /** What it installs on a headless machine, or why it is not offered there. */
@@ -278,6 +285,23 @@ export const CAPABILITIES = [
     tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
     health: ["needs", "packages"],
   },
+  {
+    // Part of the Codex provider (`pi/codex/luna-reserve.ts`): it has no package, no tool and no
+    // setting, only the extension's behavior, so it exists only under `openai-codex`.
+    name: "luna-reserve",
+    feature: "lunaReserve",
+    description:
+      "Falls back to Codex's Luna Reserve allowance when the usage limit is reached (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs"],
+  },
 ] as const satisfies ReadonlyArray<CapabilityDefinition>
 
 /** One registry entry as written. */
@@ -333,19 +357,24 @@ export const unavailableIn = (
 
 /**
  * The capabilities a `pi.features` object switches on, in registry order. With a `form`, only those
- * the form offers; without one, all that are on.
+ * the form offers; with a `provider`, only those that apply to it (one with no `provider` of its
+ * own applies to every provider); without either, all that are on.
  */
 export const enabledCapabilities = (
   features: Readonly<Record<string, unknown>>,
   options: {
     readonly form?: CapabilityForm
+    readonly provider?: PiProvider
     readonly definitions?: ReadonlyArray<CapabilityDefinition>
   } = {},
 ): ReadonlyArray<CapabilityDefinition> =>
-  (options.definitions ?? CAPABILITIES).filter(
+  (options.definitions ?? (CAPABILITIES as ReadonlyArray<CapabilityDefinition>)).filter(
     (capability) =>
       features[capability.feature] === true &&
-      (options.form === undefined || unavailableIn(capability, options.form) === undefined),
+      (options.form === undefined || unavailableIn(capability, options.form) === undefined) &&
+      (options.provider === undefined ||
+        capability.provider === undefined ||
+        capability.provider === options.provider),
   )
 
 /** The package names of the capabilities `features` switches on and `form` offers, in order. */

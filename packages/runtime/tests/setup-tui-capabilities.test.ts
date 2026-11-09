@@ -76,6 +76,8 @@ describe("the setup interface, capability rows", () => {
       t3: false,
       capabilities: capabilityOffers(HEADLESS),
     })
+    // The focus wraps up from the first row to the last (luna-reserve), then to computer-use.
+    await screen.keys("k")
     await screen.keys("k")
     expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("computer-use")
     expect(screen.lines().join(" ").replace(/\s+/g, " ")).toContain("Not offered in this form")
@@ -107,6 +109,7 @@ describe("the capability helpers of the setup session", () => {
       computerUse: false,
       contextCompression: true,
       subagents: true,
+      lunaReserve: true,
     })
     expect(initial["computerUse"]).toBe(false)
     expect(changedSwitches(initial, initial)).toEqual({})
