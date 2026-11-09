@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-new-gpt-6-instruction-family",
   "objective": "Review the new GPT-6 instruction family (guide, a translation of every requirements file, and the spacing rules) on release/0.3.1/feat/gpt-6-instructions for correctness, completeness and faithful translation.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Files in /home/user/holyagent-0.3.1-gpt6: packages/runtime/src/instructions/gpt-6/ (guide.md and 90 mirrored files), families.ts, coverage.ts, tests/instructions.test.ts, docs/development.md. Diffs: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6.diff (the family) and /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6-spacing.diff (the spacing rules). Compare against the requirements tree packages/runtime/src/instructions/requirements and the closest precedent packages/runtime/src/instructions/kimi-k3.1.",
     "Research the guide must cite: /home/user/holyagent/.git/holyagent/reports/assignment-0mw97j4zi-5mk4.md. Check that each guide point is supported by its cited source and that inferences are marked.",
@@ -46,7 +46,33 @@
     "agentId": "workflow:wf_86c3c820-448/assignment-0mw9it5vj-3462",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:13:54.176Z"
+    "startedAt": "2026-11-09T17:13:54.176Z",
+    "finishedAt": "2026-11-09T17:22:56.643Z"
+  },
+  "result": "result: 3 blocking gaps, 3 non-blocking. I could not run the tests because I had no shell.\n\n**Blocking**\n1. `gpt-6/root/workflows.md:6,9`: the workflow script returns every report in the workflow result. R-WORKFLOW says it returns only `{ done: [ids] }`, that `assignment reports` writes each report to a file, and that agentType is `holyagent:<agent>`. All three are dropped. `root/context.md:7` and `root/dispatch.md:9` also drop R-LEAN's \"close each Assignment from its report file\" and R-REPORT's \"from its report file\". The text was copied from kimi-k3.1, where reports-in-result is justified by Pi's different journal shape. No guide point justifies it for GPT-6. Reports then pass through the root's context, which R-LEAN forbids.\n2. `gpt-6/guide.md:73` (O26) misdescribes its only source, `images/2.png`.\n   - The card's text starts at x=470, the same x as the card's left edge, so the card has zero left padding. This is the clearest defect and O26 omits it.\n   - The card's right edge touches a vertical divider, and it sits flush against the rule above.\n   - The card bottom ends at the section edge, but the rule below is about 36px away. \"No gap … and rule below\" is half wrong.\n   - Both columns show a single left edge, so \"a column with two left edges\" is not visible.\n   - The em dash at the start of \"—tracked\" is visible.\n3. The spacing rules are not consistent across `design-core/core.md:16`, `worker-visual/method.md:3`, `reviewer-visual/captures.md:7` and `visual-judging/SKILL.md:23`.\n   - The worker \"names each place, repairs it, captures again\". The root accepts \"only when measurements name no place\". A worker report that lists the repaired places would block acceptance. The wording should be \"places that still touch\".\n   - The reviewer has no shell and is told to \"measure\" with no means. The worker is given pixel distances or computed styles; the reviewer is told only that \"an overall impression is no measurement\". That invites an invented number.\n   - \"Pixel distances\" does not fit TUI frames.\n\n**Non-blocking**\n`core.md:71`: \"dash … closing punctuation\" is imprecise. \"Rewrap or reword\" names no mechanism, such as a joiner or `text-wrap`. The rule also bans a legitimate leading attribution dash.\n`guide.md:58`: O23 cites the sections \"Writing style\" and \"Technical communication\", but the research report gives only \"MJ\" for the commentary/final channels. O22 cites no section. O2's \"keep one step list only where order decides\" is the author's inference and is not marked as one.\n`coverage.ts` and the tests: no requirement id or test carries the spacing rules, so one of the four files could silently drop them.\n\n**Checked and met**\nEvery `coverage.ts` phrase for gpt-6 appears in its named file (checked by reading).\nAll root, specialist and shared files were read against their requirements.\nRole files were read against their requirements, except `worker-visual/purpose.md`, `reviewer-visual/purpose.md` and `reviewer-visual/design.md`, which were read only against R-WVI, R-RV and R-RV-DESIGN and the visual-judging skill.\nI read `visual-judging`, `instruction-writing`, `ci-watch`, `evidence-judging`, `state-mode`, `user-busy`, `dev-server` and `tui-design` in full.\nI did not read the web-, mobile- and desktop-design skills in full; I only grepped them for spacing text.\nA grep for host names and emphatic wording in gpt-6 found only `claude/<name>` and the guide's own citations.\n`identity.md:21` (\"Reply on threads…\") appears in the other two families as well.\nGuide points O1, O3 to O21, O24 and O25 match the research report.\n\nevidence:\nEvery GPT-6 file faithfully carries its requirements file's requirements: gap. Read in full, most files matched; `gpt-6/root/workflows.md:6,9`, `root/context.md:7` and `root/dispatch.md:9` depart from R-WORKFLOW, R-LEAN and R-REPORT. Tests not run.\nGuide points are supported by their cited sources: gap. O26 does not match `images/2.png` (`guide.md:73`). The other points match `/home/user/holyagent/.git/holyagent/reports/assignment-0mw97j4zi-5mk4.md`, with the non-blocking citation notes above.\nSpacing rules and the capture check are clear, actionable and consistent: gap. See finding 3 (`core.md:16`, `worker-visual/method.md:3`, `reviewer-visual/captures.md:7`, `visual-judging/SKILL.md:23`).\nfindings: the three blocking and three non-blocking findings above.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Three blocking findings with file and line, checked against the requirements and screenshot; repair follows.",
+    "criteria": [
+      {
+        "criterion": "Every GPT-6 file faithfully carries its requirements file's requirements",
+        "support": "gap. Read in full, most files matched; `gpt-6/root/workflows.md:6,9`, `root/context.md:7` and `root/dispatch.md:9` depart from R-WORKFLOW, R-LEAN and R-REPORT. Tests not run."
+      },
+      {
+        "criterion": "Guide points are supported by their cited sources",
+        "support": "gap. O26 does not match `images/2.png` (`guide.md:73`). The other points match `/home/user/holyagent/.git/holyagent/reports/assignment-0mw97j4zi-5mk4.md`, with the non-blocking citation notes above."
+      },
+      {
+        "criterion": "Spacing rules and the capture check are clear, actionable and consistent",
+        "support": "gap. See finding 3 (`core.md:16`, `worker-visual/method.md:3`, `reviewer-visual/captures.md:7`, `visual-judging/SKILL.md:23`)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the three blocking and three non-blocking findings above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:13:54.176Z"
 }
