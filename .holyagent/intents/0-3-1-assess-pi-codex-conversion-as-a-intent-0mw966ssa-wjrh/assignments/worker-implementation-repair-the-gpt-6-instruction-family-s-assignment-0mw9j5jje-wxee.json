@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-gpt-6-instruction-family-s",
   "objective": "Repair the GPT-6 instruction family's review findings: the workflow-report text, the O26 description of the screenshot, and the consistency of the spacing rules and capture check, plus the non-blocking citation and coverage notes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-gpt6, branch release/0.3.1/feat/gpt-6-instructions (two commits over 5d2bed8). The review with file:line for each finding is /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it5vj-3462.md; read it in full.",
     "Finding 1 (workflow reports, gpt-6/root/workflows.md:6,9, root/context.md:7, root/dispatch.md:9): the text was copied from kimi-k3.1, which says reports come back in the workflow result because of Pi's journal shape. GPT-6 will run on the same Pi host (the 0.3.1 Codex provider is a Pi provider), so first establish what the Pi host actually does: read packages/integrations/pi/src (the workflow tool and the launcher) and how kimi-k3.1/guide.md or its files justify the departure. If the Pi host returns reports in the workflow result, keep the Pi-specific text and add the justification and citation the Kimi family uses, so the departure from R-WORKFLOW, R-LEAN and R-REPORT is explicit; otherwise follow R-WORKFLOW ({ done: [ids] }, assignment reports, close from the report file, agentType holyagent:<agent>). Say in the report which it was and why.",
@@ -68,7 +68,45 @@
     "agentId": "workflow:wf_135ca081-bda/assignment-0mw9j5jje-wxee",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:23:31.754Z"
+    "startedAt": "2026-11-09T17:23:31.754Z",
+    "finishedAt": "2026-11-09T17:33:51.022Z"
+  },
+  "result": "result: Findings 1, 2 and 3 and the dash, citation and O2 notes are fixed. The coverage-table item is not done: it needs a new requirement id outside my ownership. Build and verify both exit 0.\n\n**Workflow reports (finding 1):** The Pi host does return reports through the journal, so I followed R-WORKFLOW, not the Kimi text.\n`docs/pi/orchestration.md:34` and `packages/runtime/src/cli/report.ts:384` show `assignment reports` reads Pi's `<run id>.workflow.jsonl`, matching entries by the key of the dispatched call.\n`docs/pi/orchestration.md:30` gives `pi-workflow:<run-id>/<id>` as the Pi agent id. I did not copy the Pi-specific wording into GPT-6.\nThe Kimi family's \"another journal shape\" claim predates that support.\n`workflows.md` now returns only `{ done: [ids] }`, reads reports with `assignment reports`, and closes from the files. The example script collects the done ids.\nThe record text defers to `holyagent help assignment` for the host's agent-id form. `agentType` stays \"as printed\", since Pi prints it without the `holyagent:` prefix.\n`context.md` (R-LEAN) and `dispatch.md` (R-REPORT) now say close from the report file.\n\n**O26 (finding 2):** O26 now describes the screenshot as it shows. The card text starts at the card's own left edge, and the card is flush against the rule above and the divider at its right. Its bottom is on the section edge, and an em dash starts a wrapped line. The two-left-edges claim is gone.\n\n**Spacing (finding 3):** The worker measures, repairs, recaptures and names the places that still touch, or says none remain. Acceptance blocks only on those places. The reviewer compares the captures and the worker's recorded measurements, names contact or missing padding by location and invents no numbers. Pixels or computed styles apply to web, mobile and desktop; character cells apply to terminal frames.\n\n**Non-blocking:** The dash rule names a non-breaking join or text-wrap control, or rewording, and allows a deliberate leading dash. O23 drops the section names, since the research report gives none. O22 notes the same. O2's inference is marked as one.\n\n**Not done:** `coverage.ts` is unchanged. `tests/requirements.test.ts` fails any key that is not a requirement id, and no requirement carries the spacing rules. Covering them needs a new requirement id, such as `R-SPACING`, in `requirements/design-core/core.md`, plus entries in all families. That is outside the gpt-6 table and my ownership paths, so it is yours to decide.\n\nblockers: none\nquestions: add an `R-SPACING` requirement and entries for all families?\nnotes: I made the edits to `workflows.md` with a one-off Python script instead of Edit. The diff is unaffected.\n\nchecks:\n`bunx --no-install mise run build` -> exit 0; the tree has only the 8 source changes.\n`bunx --no-install mise run verify` -> exit 0; 2711 pass, 0 fail; type-check, lint and format check clean.\n\nchanged (all under `/home/user/holyagent-0.3.1-gpt6/packages/runtime/src/instructions/gpt-6/`): `guide.md`, `design-core/core.md`, `roles/worker-visual/method.md`, `roles/reviewer-visual/captures.md`, `skills/visual-judging/SKILL.md`, `root/workflows.md`, `root/context.md`, `root/dispatch.md`.\n\nevidence:\nThe workflow-report text either follows R-WORKFLOW or states the Pi host's departure with its justification, matching what the Pi host does: follows R-WORKFLOW. See `root/workflows.md` and the Pi docs and `report.ts` cited above.\nO26 describes the screenshot exactly: `guide.md` O26, checked against `images/2.png`.\nSpacing rules and the capture check are consistent across the four files, give the reviewer a real means, and fit terminal frames: `core.md:16`, `method.md:3`, `captures.md:7` and `SKILL.md:23` each carry the changed text.\nmise run build and mise run verify exit 0: both exit 0, 2711 pass, 0 fail.\nchecks-run: the two commands above.\nchanged-paths: listed above.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6-repair.diff`\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Three blocking findings repaired with file references; workflow text now follows R-WORKFLOW per Pi report support; coverage entry declined as out of scope; build and verify exit 0.",
+    "criteria": [
+      {
+        "criterion": "The workflow-report text either follows R-WORKFLOW or states the Pi host's departure with its justification, matching what the Pi host does",
+        "support": "follows R-WORKFLOW. See `root/workflows.md` and the Pi docs and `report.ts` cited above."
+      },
+      {
+        "criterion": "O26 describes the screenshot exactly",
+        "support": "`guide.md` O26, checked against `images/2.png`."
+      },
+      {
+        "criterion": "Spacing rules and the capture check are consistent across the four files, give the reviewer a real means, and fit terminal frames",
+        "support": "`core.md:16`, `method.md:3`, `captures.md:7` and `SKILL.md:23` each carry the changed text."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "both exit 0, 2711 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the two commands above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6-repair.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:23:31.754Z"
 }
