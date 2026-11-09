@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw98v14z-rjm5",
+  "intentId": "intent-0mw97nizx-0n6e",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-text-and-docs-of",
+  "objective": "Review the instruction text and docs of the cloud-session checkout change.",
+  "state": "Running",
+  "scope": [
+    "The change is commit 2dedb01 on release/0.3.0/fix/cloud-session-branch in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as the file /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r0.diff). Its goal: in a claude.ai cloud session the session panel shows the primary checkout's branch and diff with a Create PR button, so the root keeps the primary checkout on the platform-assigned branch at its start and works in worktrees; session start and holyagent status add a notice when that checkout is detached; docs explain the panel and that the label cannot be renamed. The writer's report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bm41-hhjx.md.",
+    "Judge also: the existing Branches rule in root identity.md and version-control.md still says to start each branch with git switch -c <name> <start>, which moves the primary checkout in a cloud session and contradicts the new rule; say whether that must change and how, given the root core's character budget (sessioncontext.test.ts has about 75 characters of slack).",
+    "Instruction text follows the requirements skill at /home/user/holyagent-0.3.0-cloudbranch/.claude/skills/requirements/SKILL.md and the family guides in packages/runtime/src/instructions/<family>/guide.md; docs follow AGENTS.md (README sections fixed, detail in docs/)."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "R-CLOUD-CHECKOUT is stated once in the requirements tree, translated faithfully per family guide, and covered in coverage.ts",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "docs/usage.md, docs/decisions.md and AGENTS.md state the panel behaviour accurately and consistently with the rule",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The git switch -c contradiction is judged with a recommended wording",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw98bm41-hhjx"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:35:25.188Z"
+  },
+  "createdAt": "2026-11-09T12:35:25.188Z"
+}
