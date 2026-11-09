@@ -1,0 +1,99 @@
+{
+  "id": "assignment-0mw9hx5gc-m6us",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "add-a-capability-registry-to-the-pi",
+  "objective": "Add a capability registry to the Pi integration: each optional capability is one declarative entry that drives pi.features, the packages it installs, setup flags and TUI toggles, and doctor health, in a headless and a normal form.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-cap, branch release/0.3.1/feat/capabilities (cut from release/0.3.1/integration at 0.3.1).",
+    "Maintainer requirements (verbatim): \"everything should be modular and easily upgradeable btw\" and \"btw we shall support both headless use and normal use, that's the point of capabilities, to modularly support systems\". The model is holycodex v0.16.12's capability registry, mostly default-on; setup and doctor detect the system (display, OS, installed tools) to pick the form.",
+    "Read first: the capability research /home/user/holyagent/.git/holyagent/reports/assignment-0mw97bk3l-ykkf.md, and the seam map /home/user/holyagent/.git/holyagent/reports/assignment-0mw9hak7s-avpt.md (capability registry seams: config/schema.ts pi.features ~L158-170; config/packages.ts FEATURE_PACKAGES ~L10 and piPackages ~L32; pi/tools.ts toolArgs ~L151 and toolSettings ~L287; setup/pi-check.ts, setup/pi-install.ts, cli/setup.ts).",
+    "Registry entry fields: name, description, the Pi packages (exact pins from config/pi-packages.json) and optional MCP servers it adds, the skills it carries, applicability (root, specialists, or both), default on or off, system needs (what doctor checks), a headless form and a normal form (which may differ in packages or be unavailable), and a doctor health check. Keep the registry a data module so a later PR adds a capability by adding one entry.",
+    "Move the capabilities that exist today (what FEATURE_PACKAGES and pi.features cover now) onto the registry with unchanged behavior and defaults. Do not add the new 0.3.1 capabilities (just-bash, fff, browse, screen, Codex, auto-review): later PRs add them as entries.",
+    "Setup: a flag per capability (enable/disable) and a TUI toggle row per capability in the existing setup TUI, plus headless/normal detection with an override flag. Doctor: report each enabled capability's health and the detected form.",
+    "Pins stay in config/pi-packages.json moved by scripts/update-dependencies.ts (PI_PACKAGE_PINS); the registry references them and does not duplicate versions.",
+    "Update docs/pi, docs/usage.md and docs/components.md where they describe pi.features, setup flags or doctor output so they match; name any other doc that needs a change in the report instead of editing it."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Keep existing config files valid: a pi.features value written by 0.3.0 still decodes and means the same.",
+    "Report in under 400 words; list the registry entries, the new setup flags, and any behavior that changed."
+  ],
+  "criteria": [
+    {
+      "text": "A capability registry data module defines every existing optional capability with the listed fields, and pi.features, package selection, tool settings, setup and doctor read from it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Headless and normal forms are detected by setup and doctor, with an override flag, and each capability's form is applied",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup has a flag and a TUI toggle per capability; doctor reports each enabled capability's health and form",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Existing defaults and 0.3.0 config files behave unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests cover registry-driven selection, form detection, setup flags and doctor output, each failing without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No new 0.3.1 capability entries and no version duplicated outside config/pi-packages.json",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Docs match the new flags and doctor output",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/config",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/pi",
+    "packages/runtime/src/cli",
+    "packages/runtime/tests",
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "docs/pi",
+    "docs/usage.md",
+    "docs/components.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T16:49:00.636Z"
+  },
+  "createdAt": "2026-11-09T16:49:00.636Z"
+}
