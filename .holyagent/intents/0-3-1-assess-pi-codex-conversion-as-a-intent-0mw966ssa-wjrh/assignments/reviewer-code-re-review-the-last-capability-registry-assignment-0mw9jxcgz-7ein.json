@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9jxcgz-7ein",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-last-capability-registry",
+  "objective": "Re-review the last capability registry repair commit (HEAD) on release/0.3.1/feat/capabilities in /home/user/holyagent-0.3.1-cap.",
+  "state": "Running",
+  "scope": [
+    "Run git -C /home/user/holyagent-0.3.1-cap show HEAD. It answers non-blocking notes 1-4 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw9jjlrq-eaae.md: the symlink check now runs on dry runs before the dryRun branch, setup/tui/theme.ts uses the truthy CI rule (inCi) and docs/usage.md says so, the skip line names the capabilities whose choice was not saved, and a JSDoc link is on one line.",
+    "Check those four and that no other behavior changed, in particular that the symlink check still runs before any write on real runs and the .pi writes are unaffected. Run mise run verify in that worktree."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 200 words; mark findings blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The repair fixes the four notes without new defects",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9jrkrg-ve74"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:45:08.963Z"
+  },
+  "createdAt": "2026-11-09T17:45:08.963Z"
+}
