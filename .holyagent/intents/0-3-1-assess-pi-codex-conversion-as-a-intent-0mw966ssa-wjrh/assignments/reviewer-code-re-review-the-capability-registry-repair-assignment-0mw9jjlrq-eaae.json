@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-capability-registry-repair",
   "objective": "Re-review the capability registry repair commit (HEAD) on release/0.3.1/feat/capabilities in /home/user/holyagent-0.3.1-cap.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Run git -C /home/user/holyagent-0.3.1-cap show HEAD (the repair only). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it65a-t41v.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it6e8-jp52.md (security). The writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9j5jte-1hoq.md.",
     "Check the six fixes: user lock refusal for project/local capability flags; a failed capability config write stops the Pi steps; CI only when truthy; one config load and Pi probe per interactive run; refuseLinks on the .holyagent/config.json write at project and local scope (moved to setup/scope.ts); no fallback line in scripted runs without T3 work. Check each test fails without its fix, no other behavior changed, and the moved refuseLinks behaves as before for the .pi writes. Run mise run verify in that worktree."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_2c01d32c-031/assignment-0mw9jjlrq-eaae",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:34:27.830Z"
+    "startedAt": "2026-11-09T17:34:27.830Z",
+    "finishedAt": "2026-11-09T17:40:22.535Z"
+  },
+  "result": "result: No blockers. All six fixes are present and each has a test. `mise run verify` passes on a38a5eea. Everything below is non-blocking.\n\nchanged: none (read-only review).\n\nchecks:\n`bunx --no-install mise run verify` in /home/user/holyagent-0.3.1-cap -> exit 0. Type-check and lint clean, 2787 pass / 0 fail.\nI did not re-run the test reversions. I read each new test against its fix, and each asserts behavior the base lacks. I rely on the writer's account that each failed when its fix was reverted.\n\nBuilt-in `/code-review`:\nWith `HEAD~1...HEAD` it read the main checkout and returned unrelated design-core findings, all rejected as out of range.\nWith `c001260b...a38a5eea` it returned 7 findings, classified below.\n\nNon-blocking findings:\n1. /home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/capabilities.ts:92-94 — the symlink check on the config write runs only when `!dryRun`. The lock check runs on dry runs, and the `.pi` writes check symlinks on dry runs too (`pi-settings.ts:256`). A dry run against a symlinked `.holyagent/config.json` reports \"would turn on\" and succeeds, and the real run then fails. Moving the `refuseLinks` call above the `if` fixes it. Optional.\n2. /home/user/holyagent-0.3.1-cap/docs/usage.md:182 and /home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/tui/theme.ts:74 — both still say or test \"CI other than false\". `inCi` now treats `0`, `no` and `off` as unset, so `CI=0` starts the setup screen but strips its colour. The writer already noted both as outside its paths. Optional; `theme.ts` could reuse `inCi`.\n3. /home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/steps.ts:219-228 and `capabilities.ts` — a locked-on refusal fails the whole capability step, so a valid choice in the same run is not saved. The skip line does not say which capability was the problem. The non-interactive `setup()` path re-loads the config in several steps and reads the user config again in `refuseLockedOn`; `T3SettingsOptions.config` is used only by the interactive path. Optional, and a performance note only.\n4. /home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/capabilities.ts:66 — the JSDoc `{@link refuseLinks}` is split across two lines. Cosmetic.\n\nThe six fixes:\n**User lock:** `userLocksOff` reuses `FINAL_OFF`. The refusal covers `project` and `local` scope, only for a turn-on, and a turn-off or user scope still works. The test covers refusal, nothing installed, nothing written, and the allowed cases.\n**Failed write stops the Pi steps:** `piSteps` is false when any capability line starts with `! `, and a skip line is printed. The Claude settings merge and ctx7 still run, as the writer said.\n**CI truthy:** `inCi` is shared by `detectForm` and `tuiFallbackReason`. Tests cover both with a value matrix.\n**One load and probe per interactive run:** the config and `piUsed` are passed into `t3Offer` and the review preview. `t3Offer` only runs at user scope, so the scope of the config is the same as before. The test asserts one probe and that the review uses the loaded config.\n**`refuseLinks` on the config write:** the function body moved to `scope.ts` unchanged. The `.pi` call sites at `pi-settings.ts:256`, `376` and `507` behave as before, and type-check and tests pass. The new test covers a symlinked file and a symlinked folder.\n**No fallback line without T3 work:** `preview === undefined ? line : fallback(reason)`. The tests cover no terminal, `--no-tui` and a choice flag.\n\nNo other behavior changed. The JSDoc and docs edits are consistent with the code.\n\nevidence:\nThe repair makes the six fixes without new defects or other behavior changes: `git diff c001260b a38a5eea`, `bunx --no-install mise run verify` -> exit 0 (2787 pass, 0 fail), and non-blocking findings 1-4 above.\nfindings: non-blocking items 1-4 above; no blockers.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Six fixes verified, verify exit 0 (2787 pass); four non-blocking notes.",
+    "criteria": [
+      {
+        "criterion": "The repair makes the six fixes without new defects or other behavior changes",
+        "support": "`git diff c001260b a38a5eea`, `bunx --no-install mise run verify` -> exit 0 (2787 pass, 0 fail), and non-blocking findings 1-4 above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "non-blocking items 1-4 above; no blockers."
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:34:27.830Z"
 }
