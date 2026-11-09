@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-contract-test-repair",
   "objective": "Re-review the contract-test repair commit 2c595f2 (range 0e2dc03..2c595f2 in /home/user/holyagent-0.3.0-contract) against the findings it repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous findings: docs/development.md overstated the test ('feeds each file through the real consumers', fixtures 'recorded', every renamed or retyped field caught although the Pick on before_agent_start and session_compact covers only picked fields); record.ts's package walk-up had no stop at the root; FixtureHeaderLine repeated FixtureHeader; one assertion proved nothing.",
     "Review only `git diff 0e2dc03..2c595f2` and judge whether each is closed and the text now matches what the test does."
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_b4b9cb9e-480/assignment-0mw8qq1il-6xsg",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:07:39.309Z"
+    "startedAt": "2026-11-09T04:07:39.309Z",
+    "finishedAt": "2026-11-09T04:17:36.143Z"
+  },
+  "result": "result: The four previous findings are closed, and the range is merge-ready. One doc line is inaccurate (non-blocking, one-line fix).\n\nThe built-in `/code-review` ran through the Skill tool on `0e2dc03..2c595f2` and it was the real built-in. I read each of its five findings against the code; my verdicts are below.\n\n**Previous findings**\n1. **Doc overstatement: closed.**\n   - `docs/development.md` now says the fixtures are \"not recorded from a Pi run\" and are built from Pi's types with `satisfies`.\n   - It states that the `Pick` on `before_agent_start` and `session_compact` covers only the picked fields.\n   - It says the JSON streams use a reader local to the test, because the real reader lives in `@tintinweb/pi-subagents`.\n   - It says the `extension_ui_request` messages are pinned by type and field shape, because the extension has no UI consumer yet. That matches `contract.test.ts:429-450`.\n   - The header comments in `contract.test.ts` and `record.ts` match the doc.\n   - One part of the doc is still wrong; see finding A.\n2. **Package walk-up without a stop: closed.**\n   - `record.ts:443-452` now stops when `dirname(directory) === directory` and throws `no package.json above <entry>`.\n   - I did not run a failure case. I read it, and it terminates.\n3. **`FixtureHeaderLine` repeated `FixtureHeader`: closed.**\n   - `FixtureHeader` is now one Schema in `record.ts`, and its type is derived from it.\n   - `contract.test.ts:39` reuses it as `Schema.Struct({ holyagentFixture: FixtureHeader })`.\n   - The duplication is gone, and the decode with `onExcessProperty: \"error\"` is unchanged.\n4. **One assertion proved nothing: closed.**\n   - The unused `installed` read and the `expect(installed).toMatch(/^\\d+…/)` line are removed from the hand-edit test.\n   - The staleness test still compares `installedPiVersion()` against each fixture header.\n   - Nothing else checks that the version is a real semver. I judge that optional, not blocking.\n\n**Findings**\n- **A. Non-blocking: wrong doc attribution** (`docs/development.md:104`, bullet \"The `extension-events` fixture runs through … the outcome helpers (`failedFinalMessage`, `assignmentStatusOf`)\").\n  - `assignmentStatusOf` is called only in the `json-run-*` cases (`contract.test.ts:369`).\n  - Of the two helpers, the `extension-events` tests reach only `failedFinalMessage`, and only inside the extension's `message_end` handler (`contract.test.ts:261`).\n  - Failure scenario: a reader concludes the Assignment-status mapping is covered by the extension events. A rename in that mapping would not fail those tests.\n  - Suggested fix: say the `extension-events` fixture runs through the extension's handlers, and that the JSON streams are read through `failedFinalMessage` and `assignmentStatusOf`.\n- **B. Non-blocking: stale \"recorded\" wording** (`contract.test.ts:63-69, 71, 72`).\n  - The failure message says \"was recorded for … re-record the fixtures\", and the describe titles say \"recorded\". This is loosely consistent with the `RERECORD_COMMAND` name and the \"Re-recording\" doc heading, so only the sentence \"Nothing is recorded from Pi\" is slightly at odds. This is naming taste.\n- **C. Non-blocking: untagged error** (`record.ts:447`).\n  - It throws `new Error(...)` in an async test helper. The Effect and tagged-error rule targets runtime and CLI source. I judge it acceptable in a test fixture file.\n- **D. Rejected:** the `/code-review` finding that the JSON-run tests exercise only a local reader is now documented openly in the doc. It is the stated limitation, not a defect.\n\n**Checks run**\n- `bun test packages/integrations/pi/tests/contract.test.ts`: exit 0, 20 pass, 0 fail, 114 expect() calls.\n- Not run: `mise run verify` (type-check, lint, format).\n- Read only, not run: the walk-up error path.\n\n**Verdict:** merge-ready. Fixing A before merge is advisable and trivial.\n\nevidence:\nEvery blocking finding names path:line and a concrete failure scenario: there are no blocking findings; non-blocking A (`docs/development.md:104`) carries a failure scenario.\nThe review states for each previous finding whether it is closed, and whether the range is merge-ready: all four closed (doc at `docs/development.md:102-108`, walk-up at `record.ts:443-452`, header Schema at `contract.test.ts:39`, assertion removal at `contract.test.ts:88-98`); merge-ready.\nfindings: A (non-blocking, `docs/development.md:104`), B (non-blocking, `contract.test.ts:63`), C (non-blocking, `record.ts:447`), D (rejected). Details are above in this report; no separate file was written.\nverdict: merge-ready; the contract test passes (`bun test` exit 0, 20 pass, 0 fail) and `mise run verify` was not run.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "All four findings closed; one doc attribution nit left",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding names path:line and a concrete failure scenario",
+        "support": "there are no blocking findings; non-blocking A (`docs/development.md:104`) carries a failure scenario."
+      },
+      {
+        "criterion": "The review states for each previous finding whether it is closed, and whether the range is merge-ready",
+        "support": "all four closed (doc at `docs/development.md:102-108`, walk-up at `record.ts:443-452`, header Schema at `contract.test.ts:39`, assertion removal at `contract.test.ts:88-98`); merge-ready."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "A (non-blocking, `docs/development.md:104`), B (non-blocking, `contract.test.ts:63`), C (non-blocking, `record.ts:447`), D (rejected). Details are above in this report; no separate file was written."
+      },
+      {
+        "label": "verdict",
+        "support": "merge-ready; the contract test passes (`bun test` exit 0, 20 pass, 0 fail) and `mise run verify` was not run."
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:07:39.309Z"
 }
