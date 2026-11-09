@@ -61,5 +61,37 @@
     "finishedAt": "2026-11-09T16:17:37.451Z"
   },
   "result": "result: Fixed `startBranch` for the platform's real clone shape. The new regression test fails on the base code and passes with the fix. `build` and `verify` both exit 0.\n\nOne discrepancy with the brief: the clone-onto-`main` then `checkout -b claude/x` reflog already passed on the base code. The real reflog has an extra move, HEAD@{16} `checkout: moving from <40-hex sha> to main`, between the clone entry and `main -> claude/...`. The base code took that move's destination, `main`. So the fix and the test target that shape.\n\nThe fix is in `packages/runtime/src/cli/status.ts`. A first reflog move whose source is a full commit id (the clone's detached start) is treated as the clone settling on its default branch, and is skipped when the next move leaves that branch (`second[1] === first[2]`). The start branch is then the next move's destination. Clones without that shape take the old path. The `safeBranch` allowlist, `check-ref-format` validation and the no-notice-when-already-on-the-start-branch behavior are unchanged.\n\nThe new test builds that shape (clone entry, `from <sha> to main`, `from main to claude/x`) and checks it with a reflog assertion. It asserts three things:\nNo notice while on `claude/x`.\nA notice naming `claude/x`, not `main`, after switching to `release/0.3.0/fix/work`.\nThe same for a detached HEAD.\n\nIt is one test with those three assertions, not three separate tests.\n\nchanged:\n/home/user/holyagent-0.3.1-cloudstart/packages/runtime/src/cli/status.ts\n/home/user/holyagent-0.3.1-cloudstart/packages/runtime/tests/cloud-checkout.test.ts\n/home/user/holyagent-0.3.1-cloudstart/packages/integrations/claude/dist/scripts/holyagent.js\n/home/user/holyagent-0.3.1-cloudstart/packages/integrations/pi/dist/scripts/holyagent.js\n\nchecks:\n`bun test packages/runtime/tests/cloud-checkout.test.ts` with the fix -> 11 pass, 0 fail.\nSame command with `status.ts` at base -> the new test fails, 10 pass, 1 fail.\n`bunx --no-install mise run build` -> exit 0. The only generated changes are the two `dist/scripts/holyagent.js` files.\n`bunx --no-install mise run verify` -> exit 0. Type-check has no errors in 241 files, lint has no problems in 242 files, and tests are 2704 pass, 0 fail across 87 files.\n\nblockers: none\n\nquestions: none\n\nnotes:\nThe fixture uses `git update-ref --no-deref` to detach the clone at a full commit id, so the first move reads `from <sha> to main`.\nI edited `status.ts` through a short Python script rather than the Edit tool. The result is in the diff.\nFurther improvement, not done: a user's own first moves (detached, then `main`, then a branch) in a cloud session would also match the skip rule. This only affects what the notice names.\n\nevidence:\nThe start branch is the branch the platform switched to after the clone, and a clone with no such checkout behaves as before: `status.ts` `startBranch`; the other 10 tests in `cloud-checkout.test.ts` still pass, including the clone-without-sha, tag and hostile-name cases.\nNew tests cover the clone-then-switch reflog and fail without the fix: the \"takes the start branch from the platform's checkout after the clone\" test in `cloud-checkout.test.ts`; it fails with `status.ts` at base (10 pass, 1 fail) and passes with the fix (11 pass).\nmise run build and mise run verify exit 0: build exit 0; verify exit 0 with 2704 pass, 0 fail.\nchecks-run: the four commands under checks above.\nchanged-paths: the four paths listed under changed.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-start-branch.diff\n",
+  "acceptance": {
+    "revision": 18,
+    "rationale": "independent review accepted f56c8ec with no blockers; build and verify exit 0",
+    "criteria": [
+      {
+        "criterion": "The start branch is the branch the platform switched to after the clone, and a clone with no such checkout behaves as before",
+        "support": "`status.ts` `startBranch`; the other 10 tests in `cloud-checkout.test.ts` still pass, including the clone-without-sha, tag and hostile-name cases."
+      },
+      {
+        "criterion": "New tests cover the clone-then-switch reflog and fail without the fix",
+        "support": "the \"takes the start branch from the platform's checkout after the clone\" test in `cloud-checkout.test.ts`; it fails with `status.ts` at base (10 pass, 1 fail) and passes with the fix (11 pass)."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 with 2704 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the four commands under checks above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the four paths listed under changed."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-start-branch.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-09T16:12:45.268Z"
 }
