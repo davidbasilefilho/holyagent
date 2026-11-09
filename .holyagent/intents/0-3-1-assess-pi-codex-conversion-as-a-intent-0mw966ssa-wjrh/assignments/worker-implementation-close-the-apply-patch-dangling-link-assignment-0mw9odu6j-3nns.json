@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mw9odu6j-3nns",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-apply-patch-dangling-link",
+  "objective": "Close the apply_patch dangling-link containment bypass and the remaining Codex provider review notes.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-codex, branch release/0.3.1/feat/codex-provider (HEAD ce16cb6). Reviews with file:line: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9n3p0w-cjii.md (security, blocking) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9n3orm-ne0p.md (code, non-blocking 1-5 and 7).",
+    "Blocking: realPath in packages/integrations/pi/src/codex.ts:83-96 resolves a dangling link's target against the unresolved parent; resolve the real path of the parent first and the target against it, recursively for chains, so a dangling link inside a symlinked folder cannot pass the check; tests for the examples in the security review.",
+    "Non-blocking, fix too: key planned writes by the resolved real path so a case-only move or a symlink alias is the same file (apply-patch.ts:394,428); keep the original bytes for rollback so non-UTF-8 files restore exactly (:435); allow Delete File on an in-project symlink whose target is outside (it unlinks the link only) (:378); on session_start clear the reserve only for a new session, and on reload, resume or fork keep it or tell the model it was left (codex.ts:179); gate before_agent_start's usage check on the Codex provider (codex.ts:239); restore a deleted symlink as a symlink on rollback if cheap, else say so.",
+    "Leave agents.ts web entries as they are (the code review judged the leak minor)."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "A dangling relative link inside a symlinked folder cannot carry a patch outside the project, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The non-blocking notes are fixed, each with a test where it changes behavior",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/codex.ts",
+    "packages/runtime/src/pi/codex",
+    "packages/runtime/tests/pi",
+    "packages/integrations/pi/tests/codex.test.ts",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9mgiy9-d5km",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T19:49:56.876Z"
+  },
+  "createdAt": "2026-11-09T19:49:56.876Z"
+}
