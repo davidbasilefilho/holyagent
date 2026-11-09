@@ -1,0 +1,93 @@
+{
+  "id": "assignment-0mw9588qp-wtzk",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.visual",
+  "slug": "give-the-t3-code-part-of-holyagent-setup",
+  "objective": "Give the T3 Code part of `holyagent setup` an interactive OpenTUI Solid TUI in the holycodex style, with a flag for each choice and a line-based fallback, packaged as the Intent's default says.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-tui (branch release/0.3.0/feat/setup-tui, cut from the T3 settings work). The T3 writer is packages/runtime/src/setup/t3-settings.ts: its `worktrees` and `deviceAccess` switches (\"a later setup choice\", true when absent) and `deviceHost` are what the TUI and flags set; the CLI is packages/runtime/src/cli/setup.ts; bundling is packages/runtime/src/bundle.ts and packages/integrations/{claude,pi}/src/generate.ts.",
+    "Requirements, from the Intent (binding): the T3 part of setup is a TUI with a flag for each choice. Rows: the Pi provider (providerInstances.pi) is always on while pi.enable is true (default true), so it shows as fixed, not toggleable; agent device access (enableDeviceSupport and enableAgentDeviceAccess) appears only where Xcode or the Android SDK is present (deviceHost) and starts selected; new threads in worktrees (defaultThreadEnvMode) starts selected. Pi as the default model is not offered. The keys setup always applies (continueThreadsAfterServerUpdate, autoResumeLimitedThreads, worktree cleanup on merge, newWorktreesStartFromOrigin, the branch rule, full-access and browser access restore) get no row; the review screen lists them with what will change.",
+    "Style (binding, Intent requirement 30): no tuiparts; current @opentui/solid 0.8.x with its own elements (box, text, select, input); checkboxes and rows built in the holycodex v0.16.12 style: Tokyo Night tokens from holycodex packages/cli/src/help.ts TERMINAL_THEME (heading #7aa2f7, option #7dcfff, argument #a9b1d6, focus #7dcfff bold, enabled #9ece6a, disabled #a9b1d6, success #73daca, warning #e0af68, error #f7768e, hint #737aa2), its colour policy (NO_COLOR, TERM=dumb, FORCE_COLOR, CI, TTY), title 'HolyAgent  ·  setup', a key hint line, uppercase section headings, '❯ ' focus marker, '[x]'/'[ ]' checkboxes, a hint line for the focused row, and holycodex's keys (up/down or j/k, space toggles, Enter reviews, Esc or Ctrl-C cancels). More style detail is in the research report /home/user/holyagent/.git/holyagent/reports/assignment-0mw6zi93r-m1x2.md (read it; do not write under .git).",
+    "Packaging (binding, Intent default): OpenTUI's native renderer cannot be bundled into the platform-neutral holyagent.js, and neither the Claude plugin nor the Pi package ships node_modules (facts and paths in /home/user/holyagent/.git/holyagent/reports/assignment-0mw94x3k2-3wq5.md). So the TUI is its own bundle, built at HolyAgent build time with the @opentui/solid Bun plugin and with @opentui/* and solid-js external. On first interactive use setup installs those packages, at the exact versions the build resolved from bun.lock (embedded by the build, so `mise run deps:update` keeps them current with no second pin table), into a HolyAgent-owned per-user cache (XDG_CACHE_HOME or ~/.cache on Linux and macOS, LOCALAPPDATA on Windows) with the Bun Shell, then imports the TUI from there. It falls back to the existing line-based flow, with one line saying why, when stdin or stdout is not a TTY, CI is set, TERM is dumb, --no-tui is passed, any choice flag is given, or the install or import fails (offline). Add @opentui/solid, @opentui/core and solid-js as caret-range devDependencies at their line boundary with bun.lock, as scripts/dependency-ranges.test.ts expects; pin solid-js at 1.9.16 or later.",
+    "Flags: one per choice (worktrees and device access, on or off) plus --no-tui, named in the existing CLI style, documented in the setup usage and notes and in docs/pi/t3-code.md. Flags skip the TUI and apply directly.",
+    "Render target: OpenTUI's headless test renderer (`testRender` from @opentui/solid under bun:test, no TTY needed) is the render target here; no dev server is needed. Write a capture script or test helper that saves each frame as text (captureCharFrame) plus a colour-span listing, to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/<state>-<cols>x<rows>.txt. Capture at 80x24, 40x20 and 120x40: initial, focus on each row, a row toggled off, no device host (row absent), Pi provider fixed row, review screen, cancel, apply success, apply failure, and NO_COLOR."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Read /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/tui-design/SKILL.md first and build and inspect against its checklist and capture list; repair material discrepancies until your own inspection is clean.",
+    "Never perform the real network install in tests: inject the install and import steps and test both their success and failure paths.",
+    "Report in under 400 words; list every capture path."
+  ],
+  "criteria": [
+    {
+      "text": "Read the tui-design skill and built and inspected the TUI against its checklist and capture list",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Interactive TUI shows the required rows with the required defaults, the fixed Pi provider row, Enter reviews, confirm applies, Esc or Ctrl-C cancels writing nothing",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A flag for each choice and --no-tui skip the TUI and apply directly, documented in usage, notes and docs/pi/t3-code.md",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Style matches Intent requirement 30 (tokens, colour policy, title, hints, headings, focus marker, checkboxes, keys)",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Packaging follows the Intent default: separate TUI bundle, exact versions from bun.lock embedded by the build, per-user cache install, and every fallback path tested",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Headless tests cover keys, toggles, cancel, review, apply success and failure, NO_COLOR and narrow width",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Captures saved for every listed state and size",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "captures",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude",
+    "packages/integrations/pi",
+    "package.json",
+    "bun.lock",
+    "docs/pi",
+    "scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T10:53:43.105Z"
+  },
+  "createdAt": "2026-11-09T10:53:43.105Z"
+}
