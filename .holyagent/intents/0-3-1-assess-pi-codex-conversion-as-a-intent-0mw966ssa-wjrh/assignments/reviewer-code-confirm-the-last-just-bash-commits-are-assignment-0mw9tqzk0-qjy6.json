@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "confirm-the-last-just-bash-commits-are",
   "objective": "Confirm the last just-bash commits are correct, regression-free and will pass Windows CI.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Range e6f334c7..1b9dee14 on release/0.3.1/feat/just-bash in /home/user/holyagent-0.3.1-bash (PR davidbasilefilho/holyagent#106): the real-path /dev/null guard (4e042337), the Windows which-test fix and Git folders, and the chmod/utimes end-link fix (1b9dee14). Source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/jb-final.diff",
     "Writer reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fxs-z71a.md, /home/user/holyagent/.git/holyagent/reports/assignment-0mw9svxyv-rmqq.md, /home/user/holyagent/.git/holyagent/reports/assignment-0mw9tj1do-0ets.md; earlier security reviews /home/user/holyagent/.git/holyagent/reports/assignment-0mw9svy8g-lb52.md",
@@ -48,7 +48,33 @@
     "agentId": "workflow:wf_741675ca-371/assignment-0mw9tqzk0-qjy6",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T22:20:08.448Z"
+    "startedAt": "2026-11-09T22:20:08.448Z",
+    "finishedAt": "2026-11-09T22:24:58.922Z"
+  },
+  "result": "result: Not blocking. The three commits are correct on Linux, the new tests fail on the base, and both gates pass. I could not run the Windows which test.\nchanged: none (read-only; scratch copy of e6f334c7 under the scratchpad)\nchecks:\n- `bunx --no-install mise run build` -> exit 0, `git status --short` empty before and after.\n- `bunx --no-install mise run verify` -> exit 0 at 1b9dee14. Type-check had no errors in 282 files, lint had no problems in 283 files, and the format check passed 696 files. Tests: 3065 pass, 0 fail, 102 files. The working tree was clean afterwards.\n- Base check: I ran the new `devices.test.ts` against e6f334c7's `devices.ts`. About 40 tests fail there, covering aliases, links, `/dev` removal, cp from a missing or folder source, and ENOTDIR. All pass on the head.\n- The Git-folder test needs `ProgramW6432` and the per-user `Programs\\Git\\cmd` folder, which the base lacks.\n\nblockers: none\n\nnotes (all optional; the built-in `/code-review` ran as itself, and I read the code behind each of its findings):\n- Performance: each guarded call now makes 1 to 3 extra `realpath` calls, including `MountableFs` routing on Windows. A lexical prefilter cannot catch links, so I would measure before changing it.\n- The guard is check-then-act, so two concurrent calls could race. It is best effort and tests cannot pin it.\n- `/dev/null/.` and `/dev/null/..` do not get ENOTDIR. This is a cosmetic edge; the guard still never reaches the host device.\n- `cp -r dir /dev/null` returns EISDIR where real cp errors differently. Edge case.\n- `followed` duplicates `real`'s `tryPromise` and map logic and could be built from it.\n- `ProgramFiles(x86)` is not searched, and `ProgramW6432` duplicates `ProgramFiles` on 64-bit hosts. The test asserts the duplicate is collapsed, so there is no extra scan.\n- No test pins the new order of `withNullDevice` below `withProgramLaunch`. The comment in `shell.ts` explains why, and the bash-shell tests pass.\n- Relative paths are classified as elsewhere. Interpreter calls use absolute paths, so I did not treat this as a defect.\n\nevidence:\nThe device guard, the which test and the Git search folders behave as claimed, with tests that fail without them: `devices.test.ts` run on the e6f334c7 source gives about 40 `(fail)` lines and passes on the head. The which test uses `HOST.toLowerCase()`, the bun that sits in the call's PATH. The Windows log (win-106b.txt:3389-3403) shows only `/usr/bin/git` was missing, and `cat` was found. I could not run Windows here, so the `/usr/bin/bun` result there is read, not run.\nNo regression in the just-bash shell or host passthrough, and no test is weakened or skipped on Windows: `verify` runs 3065 pass, 0 fail. No `skip` or Windows exclusions were added. The one loosening is the passthrough mock in bash-shell.test.ts, where `realpath` and `stat` calls are filtered out of the `seen` list. It still asserts that `writeFile /tmp/copy` is the only call that goes through.\nGates: mise run build leaves the tree unchanged and mise run verify exits 0 at 1b9dee14: build exit 0 with a clean `git status`; verify exit 0 with 3065 pass and 0 fail. Logs are at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rv-build.txt and rv-verify.txt.\nfindings: no blockers, 8 optional notes above.\n",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "No blockers; new tests red on the base; build unchanged, verify 3065 pass at 1b9dee1.",
+    "criteria": [
+      {
+        "criterion": "The device guard, the which test and the Git search folders behave as claimed, with tests that fail without them",
+        "support": "`devices.test.ts` run on the e6f334c7 source gives about 40 `(fail)` lines and passes on the head. The which test uses `HOST.toLowerCase()`, the bun that sits in the call's PATH. The Windows log (win-106b.txt:3389-3403) shows only `/usr/bin/git` was missing, and `cat` was found. I could not run Windows here, so the `/usr/bin/bun` result there is read, not run."
+      },
+      {
+        "criterion": "No regression in the just-bash shell or host passthrough, and no test is weakened or skipped on Windows",
+        "support": "`verify` runs 3065 pass, 0 fail. No `skip` or Windows exclusions were added. The one loosening is the passthrough mock in bash-shell.test.ts, where `realpath` and `stat` calls are filtered out of the `seen` list. It still asserts that `writeFile /tmp/copy` is the only call that goes through."
+      },
+      {
+        "criterion": "Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at 1b9dee14",
+        "support": "build exit 0 with a clean `git status`; verify exit 0 with 3065 pass and 0 fail. Logs are at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rv-build.txt and rv-verify.txt."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers, 8 optional notes above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T22:20:08.448Z"
 }
