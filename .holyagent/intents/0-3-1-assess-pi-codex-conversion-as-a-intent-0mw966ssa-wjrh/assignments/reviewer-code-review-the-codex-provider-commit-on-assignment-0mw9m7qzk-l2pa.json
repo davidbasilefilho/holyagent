@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-codex-provider-commit-on",
   "objective": "Review the Codex provider commit on release/0.3.1/feat/codex-provider against the merge-ready bar and the approved Codex requirements.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-codex; range git diff bb412cc..HEAD (one commit, 9d54902). The writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9krmo8-3qir.md. Research it drew on: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9679bz-h35s.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw96dgh6-ud60.md.",
     "Requirements, verbatim:",
@@ -50,7 +50,33 @@
     "agentId": "workflow:wf_2628034d-c94/assignment-0mw9m7qzk-l2pa",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T18:49:13.568Z"
+    "startedAt": "2026-11-09T18:49:13.568Z",
+    "finishedAt": "2026-11-09T18:55:36.781Z"
+  },
+  "result": "result: 2 blockers. The route table matches the approved one, and `mise run verify` passes, but Codex specialists lose their web tools and `apply_patch` can delete a file.\n\n**Built-in /code-review:** I ran it on `bb412cc...9d54902` and it loaded as the built-in. It returned 10 findings, classified below.\n\n**Blocking**\n1. `packages/integrations/pi/src/agents.ts:54`. The `gpt-6` agent files are generated from the default Kimi config. `dist/families/gpt-6/agents/librarian-research.md:6` and `librarian-lookup.md` list `ext:pi-provider-kimi-code/moonshot_search` and `moonshot_fetch`. Codex loads no Kimi extension, and `webChoice` picks `pi-web-kit`, so no agent file lists `web_search` or `web_fetch`.\n   - The package treats an `ext:` entry as an explicit allowlist, so Librarian and the other Search specialists end up with no web tools under Codex. I read the code and did not run it.\n   - No test covers this, and the `codex-provider.test.ts` web test only checks `webChoice`.\n   - Fix: build the family agent files from a Codex config, or map web entries per provider. Add a test that a Codex Librarian lists `ext:pi-web-kit/web_search`.\n2. `packages/runtime/src/pi/codex/apply-patch.ts:400`. An Update File whose `Move to` equals its own path stages the new text and then stages `null` for the same key. The file is deleted and the summary reports `M`. I confirmed this by reading. No test covers it. Fix: treat a same-path move as a plain update, with a test.\n\n**Non-blocking**\n`apply-patch.ts:408`. The write phase is not atomic, so a mid-write failure leaves a partial patch. The tool description at line 26 promises \"whole or not at all\", which overclaims. Reword it or add a rollback.\n`apply-patch.ts:381`. The path guard is lexical, so a symlink inside the project can still point outside it. Pi's own `write` and `edit` have no guard at all, so this is acceptable.\n`codex.ts:197` and `luna-reserve.ts:31`. `reserve` is not cleared on `session_start`. The usage-limit regex also matches a transient `rate_limit_exceeded`, though the banner check still gates the switch.\n`codex.ts` (`toReserve`). Every request is rewritten to `gpt-reserve`, including Sol and Terra requests at `xhigh`, and the effort is not clamped.\n`context-management.ts:117`. The checkpoint check compares only the count and the last covered item, a heuristic that could replay a stale compaction item.\n`extension.ts:1269`. `apply_patch` is activated once and any failure is ignored silently.\n`codex.ts:82`. This code uses `node:fs/promises` and async closures. Lint passes and it sits at the Pi boundary, so it is a Bun-preference nit.\n`schema.ts:252`. The `pi` section encodes as the identity, so resolved route rows would be written back as explicit values on a re-encode. I could not confirm that any config-write path does this, so it is a note only.\nAuto-review is not in this commit; the writer defers it to a later PR. Context management has no switch of its own, only Billion Context off. Both bear on the \"own module, can be turned off on its own\" requirement.\n\n**Judged points**\n**Route table:** all 19 rows match the approved table, and the tests assert each row.\n**context_management gating:** it is sent only for Codex while Billion Context is off. The compaction item is replayed and dropped on `session_start`, `session_compact` and `session_tree`.\n**Luna Reserve:** a wrong usage endpoint or banner fails safe, because the reserve never opens. A wrong `gpt-reserve` model id would leave the session on a failing model, because a failed status check keeps the reserve. This is acceptable only because both values are flagged as unverified.\n**Kimi:** it is unchanged. `KIMI_ROUTES` is untouched, the default provider is Kimi, and all existing suites pass.\n**Setup screen:** the Luna Reserve row shows under Kimi too. The description says \"Codex provider only\", so I accept it.\n\nevidence:\nThe Codex provider meets the requirements and the approved route table: `packages/runtime/src/pi/codex/routes.ts` matches the approved table and `codex-provider.test.ts` asserts it, but blockers 1 and 2 above fail the behavior bar.\nKimi and existing defaults behave unchanged: `KIMI_ROUTES` untouched, default provider still `kimi-coding-global`, existing Kimi suites pass.\nTests cover the change and fail without it: the new test files cover routes, apply_patch, gating and reserve, but nothing covers the Codex agent-file web tools or a same-path move, so the tests are incomplete for blockers 1 and 2.\nfindings: listed above. `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.1-codex` exited 0 with 2876 pass, 0 fail; log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Two blocking findings with file and line (Codex agent files lack web tools; same-path move deletes); route table verified; verify exit 0.",
+    "criteria": [
+      {
+        "criterion": "The Codex provider meets the requirements and the approved route table",
+        "support": "`packages/runtime/src/pi/codex/routes.ts` matches the approved table and `codex-provider.test.ts` asserts it, but blockers 1 and 2 above fail the behavior bar."
+      },
+      {
+        "criterion": "Kimi and existing defaults behave unchanged",
+        "support": "`KIMI_ROUTES` untouched, default provider still `kimi-coding-global`, existing Kimi suites pass."
+      },
+      {
+        "criterion": "Tests cover the change and fail without it",
+        "support": "the new test files cover routes, apply_patch, gating and reserve, but nothing covers the Codex agent-file web tools or a same-path move, so the tests are incomplete for blockers 1 and 2."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "listed above. `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.1-codex` exited 0 with 2876 pass, 0 fail; log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      }
+    ]
   },
   "createdAt": "2026-11-09T18:49:13.568Z"
 }
