@@ -1,0 +1,94 @@
+{
+  "id": "assignment-0mw9os41y-etgw",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-just-bash-pi-bash-backend-so",
+  "objective": "Repair the just-bash Pi bash backend so programs given by path run on the host and turning the capability off reverts the Billion guardrail settings, and close the review's non-blocking notes.",
+  "state": "Ready",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-bash, branch release/0.3.1/feat/just-bash at 971b9ea0",
+    "Code review findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odug6-6vgw.md; security review findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odupl-x2zg.md; original writer report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9n3pas-ln21.md",
+    "Requirements: just-bash built-ins win over host executables of the same name; commands just-bash lacks pass through to real executables on PATH and other relevant places on Linux, macOS and Windows; TypeScript first, JavaScript fallback; Billion Context bash guardrails off (BILI_GUARDRAIL_BASH_TIMEOUT=0, MAX_OUTPUT_BYTES=0, REPETITION=0)."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Leave packages/integrations/pi/src/codex.ts and packages/runtime/src/pi/codex/ untouched; another branch owns them.",
+    "Report in under 400 words; start each evidence line with the criterion text, a colon and the support inline; put long logs in a file in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "Programs given by path (./prog, node_modules/.bin/tsc, a relative or absolute path, a directory added to an exported PATH within the session) run on the host, with tests (shell.ts around line 357)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Turning the just-bash capability off reverts the Billion guardrail settings it wrote, using the recorded undo, without touching settings it did not write, with tests (capabilities.ts around line 355)",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "exit keeps the session cwd and env consistent (shell.ts around line 411), with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Host passthrough keeps stdout and stderr in their emitted order where the tool combines them (shell.ts around line 394), with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Concurrent bash calls do not overwrite each other's shared state (bash.ts around line 178), with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Windows .cmd and .bat passthrough quotes arguments with the existing cmdExeArguments rules (shell.ts around line 232), with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The ROOTED filter applies to the extra search folders (hosts.ts lines 53-79), with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/README.md lists pi/shell.md, and docs/development.md mentions the generated dist/scripts/just-bash.js",
+      "blocking": false,
+      "dimension": "scope"
+    },
+    {
+      "text": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi/bash",
+    "packages/integrations/pi/src/bash.ts",
+    "packages/runtime/src/config/capabilities.ts",
+    "packages/runtime/src/setup",
+    "packages/runtime/tests",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "docs/README.md",
+    "docs/development.md",
+    "docs/pi/shell.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9n3pas-ln21",
+  "createdAt": "2026-11-09T20:01:02.854Z"
+}
