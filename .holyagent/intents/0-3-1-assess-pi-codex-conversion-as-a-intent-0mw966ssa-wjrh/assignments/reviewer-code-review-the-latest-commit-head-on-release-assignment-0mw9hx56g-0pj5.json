@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw9hx56g-0pj5",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-latest-commit-head-on-release",
+  "objective": "Review the latest commit (HEAD) on release/0.3.1/test/windows-temp-cleanup in /home/user/holyagent-0.3.1-rmfix, which routes the Pi tests' temporary-folder removal through a helper that retries while Windows holds the folder.",
+  "state": "Running",
+  "scope": [
+    "Run git -C /home/user/holyagent-0.3.1-rmfix show HEAD. Cause: on the Windows CI runner, extension.test.ts failed in cleanup with EBUSY on rm of a temp folder that a child process had used as its cwd.",
+    "Check that the helper retries only on EBUSY, EPERM and ENOTEMPTY, gives up with the real error within a bounded time, keeps force semantics for a missing folder, that every former rm site now uses it with the same path, that no assertion changed, and that its tests would fail without the retry. Weigh whether rm's own maxRetries/retryDelay would be simpler in Bun (several packages/runtime/tests files already use maxRetries: 5)."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 300 words; mark each finding blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "Cleanup retries on the Windows lock errors, is bounded, and changes no assertion",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The helper's tests fail without the retry",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9hqw2u-ckd0"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T16:49:00.280Z"
+  },
+  "createdAt": "2026-11-09T16:49:00.280Z"
+}
