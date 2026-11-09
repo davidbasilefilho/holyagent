@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "run-the-pi-bash-tool-on-just-bash-with",
   "objective": "Run the Pi bash tool on just-bash with host passthrough for commands just-bash lacks, TypeScript-first JavaScript-fallback execution, and Billion Context's bash guardrails turned off, as its own module and capability.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-bash, branch release/0.3.1/feat/just-bash (stacked on release/0.3.1/feat/codex-provider at ce16cb6; the capability registry is in packages/runtime/src/config/capabilities.ts).",
     "Binding requirements, verbatim:",
@@ -96,7 +96,57 @@
     "agentId": "workflow:wf_df1675da-d7d/assignment-0mw9n3pas-ln21",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T19:14:04.372Z"
+    "startedAt": "2026-11-09T19:14:04.372Z",
+    "finishedAt": "2026-11-09T19:49:27.721Z"
+  },
+  "result": "result: The Pi `bash` tool now runs on just-bash 3.6.0 as the `just-bash` capability. `mise run build` exited 0 and `mise run verify` exited 0 (2953 pass, 0 fail, 101 files; check, lint and fmt clean). No Pi session was started and nothing ran on Windows or macOS.\n\nchanged (all under the ownership paths, except `docs/README.md` which needs a link):\n`packages/runtime/src/pi/bash/*`: new module with the guardrails, settings, protocol, state, paths, hosts, typescript, shell, entry and bundle files.\n`packages/integrations/pi/src/bash.ts`: the tool registration and the operations Pi calls.\n`packages/integrations/pi/src/extension.ts`, `generate.ts`; `packages/runtime/src/config/capabilities.ts`; `packages/runtime/src/pi/tools.ts`.\n`scripts/dependency-pins.ts` and `update-dependencies.ts`; `packages/runtime/package.json`, `bun.lock`.\nGenerated: `packages/integrations/pi/dist/scripts/just-bash.js` is new (4.3 MB); the other `dist` files regenerated.\nDocs: new `docs/pi/shell.md`; edits to `docs/pi/README.md`, `docs/pi/configuration.md` and `docs/usage.md`.\nTests: new `bash-shell.test.ts`, `bash-capability.test.ts` and `integrations/pi/tests/bash.test.ts`; existing tests updated for the new key.\n\nchecks:\n`bunx --no-install mise run build` -> 0; a second build gives byte-identical output.\n`bunx --no-install mise run verify` -> 0; 2953 pass, 0 fail.\n`bun scripts/update-dependencies.ts --dry-run` lists `just-bash 3.6.0 -> 3.6.0 [current]`.\nRan Pi's `BashOperations` against the built `dist/scripts/just-bash.js`: `git`, `bun` and `js-exec` TypeScript all ran.\n\nblockers: none\n\nquestions:\n`docs/README.md` indexes the docs pages and needs a row for `pi/shell.md`; it is outside my ownership.\n`docs/development.md` lists the generated scripts and should name `just-bash.js`; also outside my ownership.\n\nnotes:\n**Capability entry:**\n  - `just-bash`, feature `pi.features.justBash`, default on, for every provider and both roles.\n  - Needs Bun on PATH (doctor reports it), no package, same headless and normal form.\n  - Setup flag is `--just-bash on|off`.\n  - Off means the extension never registers its `bash` tool, so Pi's own tool is untouched.\n**Pin:** exact `3.6.0` in `packages/runtime/package.json`, moved by `mise run deps:update` through a new `EXACT_PACKAGES` list in `dependency-pins.ts`; `dependency-ranges.test.ts` refuses a range for it.\n**Differs from the spike:**\n  - A Bun process per call, not a Bun Worker, because Pi runs on Node. Cancel and timeout kill the process tree.\n  - The guardrail settings go in the file as well as the env. Billion Context reads its env when its extension loads, which can precede ours, so setup also writes `guardrails.*` to its file (only while Billion Context is on, via a new `whileOn` on the settings patch).\n  - `node` and `sqlite3` give way to a host program of the same name; `node` is only a refusal stub, and `sqlite3` needs a worker file the bundle lacks.\n  - `exit` still loses the call's cwd and env; just-bash has no way to read the state first.\n  - Variables a call sets persist whether exported or not.\n**Bundle:** `sql.js` is stubbed and `node-liblzma` and `@mongodb-js/zstd` are left external, so the file has no machine paths. The `rg` built-in rejects `--version`.\n**Tests:** the new tests cover host passthrough, built-in precedence, abort and timeout (including the child process tree), TypeScript and JavaScript fallback, and the guardrail env. They need `bun` as the test runner's executable name. The Windows path mapping is tested only on its pure parts.\n**Unverified on Windows:** `.cmd` shim spawning from Bun, drive mounts and `taskkill`. Registering the tool after session start rests on Pi's documentation.\n\nevidence:\nThe Pi bash tool runs on just-bash; just-bash built-ins win; commands it lacks run the host executable on Linux, macOS and Windows: `packages/runtime/tests/pi/bash-shell.test.ts` (precedence plan, `host-cat`, `bun` passthrough, pipes, binary output, Windows folders and PATHEXT as pure tests) and `packages/integrations/pi/tests/bash.test.ts`; `mise run verify` exit 0. No Windows or macOS run.\nTypeScript execution is offered first with JavaScript as the fallback: `typeScriptFirst` in `packages/runtime/src/pi/bash/typescript.ts`; tests for inline, stdin and `.ts` file, plus `function f(a,a)` falling back to JavaScript, in `bash-shell.test.ts`.\nBillion Context's bash guardrails are off through its environment settings: `BILLION_CONTEXT_GUARDRAILS_OFF` in `guardrails.ts`, put into `toolArgs(...).env` and set by the extension; `bash-capability.test.ts` and `extension.test.ts` (\"the bash tool on just-bash\").\nIt is a capability entry that can be turned off on its own, and turning it off restores Pi's own bash: `just-bash` entry in `capabilities.ts`; `bash.test.ts` (\"the bash module\", \"while the capability is off\") and `extension.test.ts` (off config registers no `bash` tool and sets no guardrail env).\njust-bash sits at an exact pin moved by mise run deps:update: `\"just-bash\": \"3.6.0\"` in `packages/runtime/package.json`; `EXACT_PACKAGES` in `scripts/dependency-pins.ts`; dry-run line above.\nTests cover passthrough, built-in precedence, cancellation and timeout, TS/JS execution and the guardrail env, each failing without the change: the new test files above; with the module absent they cannot run, and the guardrail-env tests fail against the base `toolArgs`. I did not run them against a reverted tree.\nmise run build and mise run verify exit 0: `scratchpad/build.log` and `scratchpad/verify.log` under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/`; exit 0 both, 2953 pass, 0 fail.\nchecks-run: the build, verify and updater dry-run results above.\nchanged-paths: the changed list above; `git status` shows 26 modified and 7 new entries, and the generated changes are `dist` only.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/just-bash-change.diff`\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "All criteria evidenced by named tests; build and verify exit 0 (2953 pass); exact pin via updater; Windows/macOS unverified, flagged for CI.",
+    "criteria": [
+      {
+        "criterion": "The Pi bash tool runs on just-bash; just-bash built-ins win; commands it lacks run the host executable on Linux, macOS and Windows",
+        "support": "`packages/runtime/tests/pi/bash-shell.test.ts` (precedence plan, `host-cat`, `bun` passthrough, pipes, binary output, Windows folders and PATHEXT as pure tests) and `packages/integrations/pi/tests/bash.test.ts`; `mise run verify` exit 0. No Windows or macOS run."
+      },
+      {
+        "criterion": "TypeScript execution is offered first with JavaScript as the fallback",
+        "support": "`typeScriptFirst` in `packages/runtime/src/pi/bash/typescript.ts`; tests for inline, stdin and `.ts` file, plus `function f(a,a)` falling back to JavaScript, in `bash-shell.test.ts`."
+      },
+      {
+        "criterion": "Billion Context's bash guardrails are off through its environment settings",
+        "support": "`BILLION_CONTEXT_GUARDRAILS_OFF` in `guardrails.ts`, put into `toolArgs(...).env` and set by the extension; `bash-capability.test.ts` and `extension.test.ts` (\"the bash tool on just-bash\")."
+      },
+      {
+        "criterion": "It is a capability entry that can be turned off on its own, and turning it off restores Pi's own bash",
+        "support": "`just-bash` entry in `capabilities.ts`; `bash.test.ts` (\"the bash module\", \"while the capability is off\") and `extension.test.ts` (off config registers no `bash` tool and sets no guardrail env)."
+      },
+      {
+        "criterion": "just-bash sits at an exact pin moved by mise run deps:update",
+        "support": "`\"just-bash\": \"3.6.0\"` in `packages/runtime/package.json`; `EXACT_PACKAGES` in `scripts/dependency-pins.ts`; dry-run line above."
+      },
+      {
+        "criterion": "Tests cover passthrough, built-in precedence, cancellation and timeout, TS/JS execution and the guardrail env, each failing without the change",
+        "support": "the new test files above; with the module absent they cannot run, and the guardrail-env tests fail against the base `toolArgs`. I did not run them against a reverted tree."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "`scratchpad/build.log` and `scratchpad/verify.log` under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/`; exit 0 both, 2953 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the build, verify and updater dry-run results above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the changed list above; `git status` shows 26 modified and 7 new entries, and the generated changes are `dist` only."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/just-bash-change.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T19:14:04.372Z"
 }
