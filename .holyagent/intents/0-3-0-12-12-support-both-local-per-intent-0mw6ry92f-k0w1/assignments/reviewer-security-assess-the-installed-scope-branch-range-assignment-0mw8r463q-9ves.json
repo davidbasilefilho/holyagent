@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw8r463q-9ves",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-the-installed-scope-branch-range",
+  "objective": "Assess the installed-scope branch (range 172bdf9..1991d0c) for whether a cloned repository can still steer where holyagent setup writes or where a Pi install runs.",
+  "state": "Running",
+  "scope": [
+    "The committed diff is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/c-scope2.diff (diff-file); read the touched files in full in /home/user/holyagent-0.3.0-scope.",
+    "Threat: a repository the user cloned controls its committed files, including .claude/settings.json, .holyagent/config.json, .npmrc, and could ship a .claude/settings.local.json too (it is normally gitignored, but a repository can commit one, or a symlink). Trace whether any committed file, symlink or malformed file can make a bare setup or doctor run at project or local scope, run pi install -l in the repository, or read the repository's config as the user's; and whether the decision (only the user's own uncommitted local file moves the scope) holds when settings.local.json is tracked by git."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Substantiate each finding with a source-to-sink trace and path:line; mark it blocking only when it is reachable and introduced by this range.",
+    "Report in under 500 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has a source-to-sink trace with path:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the range introduces a vulnerability that should hold the push",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8qq14e-no4k"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:18:38.438Z"
+  },
+  "createdAt": "2026-11-09T04:18:38.438Z"
+}
