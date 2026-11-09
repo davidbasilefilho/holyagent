@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-apply-patch-containment",
   "objective": "Confirm the apply_patch containment repair closes the dangling-link and alias bypasses and introduces no new path-escape or rollback vulnerability.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit 956092de on release/0.3.1/feat/codex-provider in the worktree /home/user/holyagent-0.3.1-codex (range ce16cb67..956092de); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-containment-commit.diff",
     "Files: packages/integrations/pi/src/codex.ts, packages/runtime/src/pi/codex/apply-patch.ts, their tests, and the generated dist/extensions/holyagent.js",
@@ -51,7 +51,37 @@
     "agentId": "workflow:wf_36f1f10f-8f1/assignment-0mw9os3gn-w3sc",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T20:01:17.162Z"
+    "startedAt": "2026-11-09T20:01:17.162Z",
+    "finishedAt": "2026-11-09T20:32:21.678Z"
+  },
+  "result": "result: The previous blocking finding (dangling-link bypass) is closed and I found no new blocker. I could not run anything: this role has no Bash, so I read the code and diff and ran no tests.\n\nchanged: none\n\nchecks:\n- Built-in `/security-review` could not run. It failed on `git diff origin/HEAD...` with `unknown revision origin/HEAD`, so it covered nothing. I reviewed the range ce16cb67..956092de by reading the diff and the worktree sources.\n- No tests, lint or type-check ran. I could not execute the new tests; the \"fails without the repair\" judgement below comes from reading them.\n\nblockers: none\n\nnotes (non-blocking):\n1. Suspicion, from reading: `realPath` in `codex.ts:86-102` can recurse forever on crafted links, a hang and not an escape. Example: `m1 -> nosuch/../l2` and `l2 -> nosuch/../m1`. The kernel returns ENOENT because `nosuch` is missing. `resolve` flattens `..` lexically, so the code keeps flipping between `m1` and `l2`. A repository that commits such links could stall the tool call. The old code had the same recursion. A visited-set or depth cap would fix it.\n2. Rollback restores a deleted file with `Bun.write`, so its mode (a 0600 file or an executable bit) is not kept. This is an integrity issue only.\n3. The delete tests rely on `Bun.file(p).delete()` unlinking a symlink without following it. I believe it does, but I could not run it.\n\nSound:\n- The write destination is now the checked string, so a lexical-versus-kernel `..` mismatch cannot send a write outside.\n  - `locate` returns the resolved `real` path, and `planned` and `fs.write` use it. Before, it returned `file` and the write followed the link.\n  - A dangling target like `s/../z`, with `s` linking out, is resolved lexically to `<real project>/z`. The write lands there, inside the project, not through the link.\n  - A resolved non-existent path has no link in its remainder, because each recursion level reads the link first.\n- Delete and move-removal use `locateEntry`. It resolves only the parent folder, so an in-project name that is a link is unlinked alone. Its target is never opened.\n- Rollback keys are always checked paths inside the project. Restoring a link calls `symlink(target, path)` at an in-project path. Restoring a file writes to a path that was a regular file.\n\nevidence:\nEach previous blocking security finding is closed by the repair, traced source to sink: The old path was patch `a/l` → `realPath` resolving `../x` against the unresolved `proj/a` → `proj/x` passes the check → `Bun.write` follows `a` and `l` out. `codex.ts:94-97` now resolves against `realPath(dirname)`, so the target is `outside/x` and is rejected. Link chains and the alias-project variant resolve the same way. Writes use the checked path (`apply-patch.ts:403-407,453`).\nNo new path escape outside the project root via symlinks, link chains, dangling links, moves or deletes: `apply-patch.ts:403-419,453-471`. Add and update go through `locate` (resolved, then `inside`). Delete and move-removal go through `locateEntry`, which checks the real parent. The only remaining finding is the hang in note 1, which is not an escape.\nRollback cannot write or delete outside the project root: `apply-patch.ts:476-500`. Every `written` key came from `locate` or `locateEntry`, so it is inside `realCwd`. `restore` writes only at those keys.\nTests cover each closed finding and fail without the repair: `packages/integrations/pi/tests/codex.test.ts` (dangling link in a linked folder plus chain, alias project, link delete, byte-and-link rollback) and `packages/runtime/tests/pi/codex-apply-patch.test.ts` (resolved-path keying, link unlink and restore). By reading, each fails on the old code: the old `resolve(dirname, target)` passed the dangling cases; the old `read`-based rollback altered non-UTF-8 bytes and restored links as files; the old delete refused out-of-project links. Not executed. There is no test for the loop in note 1.\nfindings: no blocking findings. Non-blocking: the recursion hang (note 1), the lost file mode on rollback (note 2), the unverified `Bun.file().delete()` behavior on symlinks (note 3). The reserve and `before_agent_start` changes are sound: `session_start` clears the reserve only for `reason === \"new\"`, and the backend check now runs only for a Codex provider (`codex.ts:274`), which also closes the previous note on that hook.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "No blocking security finding; the dangling-link bypass is traced closed; three non-blocking notes go to the final repair round.",
+    "criteria": [
+      {
+        "criterion": "Each previous blocking security finding is closed by the repair, traced source to sink",
+        "support": "The old path was patch `a/l` → `realPath` resolving `../x` against the unresolved `proj/a` → `proj/x` passes the check → `Bun.write` follows `a` and `l` out. `codex.ts:94-97` now resolves against `realPath(dirname)`, so the target is `outside/x` and is rejected. Link chains and the alias-project variant resolve the same way. Writes use the checked path (`apply-patch.ts:403-407,453`)."
+      },
+      {
+        "criterion": "No new path escape outside the project root via symlinks, link chains, dangling links, moves or deletes",
+        "support": "`apply-patch.ts:403-419,453-471`. Add and update go through `locate` (resolved, then `inside`). Delete and move-removal go through `locateEntry`, which checks the real parent. The only remaining finding is the hang in note 1, which is not an escape."
+      },
+      {
+        "criterion": "Rollback cannot write or delete outside the project root",
+        "support": "`apply-patch.ts:476-500`. Every `written` key came from `locate` or `locateEntry`, so it is inside `realCwd`. `restore` writes only at those keys."
+      },
+      {
+        "criterion": "Tests cover each closed finding and fail without the repair",
+        "support": "`packages/integrations/pi/tests/codex.test.ts` (dangling link in a linked folder plus chain, alias project, link delete, byte-and-link rollback) and `packages/runtime/tests/pi/codex-apply-patch.test.ts` (resolved-path keying, link unlink and restore). By reading, each fails on the old code: the old `resolve(dirname, target)` passed the dangling cases; the old `read`-based rollback altered non-UTF-8 bytes and restored links as files; the old delete refused out-of-project links. Not executed. There is no test for the loop in note 1."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blocking findings. Non-blocking: the recursion hang (note 1), the lost file mode on rollback (note 2), the unverified `Bun.file().delete()` behavior on symlinks (note 3). The reserve and `before_agent_start` changes are sound: `session_start` clears the reserve only for `reason === \"new\"`, and the backend check now runs only for a Codex provider (`codex.ts:274`), which also closes the previous note on that hook."
+      }
+    ]
   },
   "createdAt": "2026-11-09T20:01:02.087Z"
 }
