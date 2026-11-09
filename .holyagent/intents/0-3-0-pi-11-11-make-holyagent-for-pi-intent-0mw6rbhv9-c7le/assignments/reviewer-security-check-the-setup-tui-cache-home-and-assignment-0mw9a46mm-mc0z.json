@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "check-the-setup-tui-cache-home-and",
   "objective": "Check the setup TUI cache-home and background-query commits for security issues.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review commits fa398da (cache home, sweep, plain) and e195b25 (contrast, light background) on release/0.3.0/feat/setup-tui in /home/user/holyagent-0.3.0-tui: git diff e1beb56 HEAD, also as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r3.diff without generated output. Writer reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k4tp-3tef.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw99smjz-askh.md.",
     "Trace: the private-group acceptance (can another user gain write to the cache path through a group the code accepts), symlink resolution of the cache home (TOCTOU, links into another user's folder), and the OSC 11 reply parsing (terminal-supplied bytes: bounds, injection into output, a hostile reply)."
@@ -34,7 +34,25 @@
     "agentId": "workflow:wf_b07fc68f-377/assignment-0mw9a46mm-mc0z",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T13:10:31.822Z"
+    "startedAt": "2026-11-09T13:10:31.822Z",
+    "finishedAt": "2026-11-09T13:16:26.291Z"
+  },
+  "result": "result: no blocker. The built-in `/security-review` failed to run, so everything below comes from reading the code. There are three low-severity suspicions and no validated vulnerability.\n\nBuilt-in coverage: the Skill call failed with `git diff origin/HEAD...` (\"unknown revision\", since `origin/HEAD` is not set). I reviewed `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r3.diff` and the full sources in `/home/user/holyagent-0.3.0-tui`. I had no shell, so I ran no tests.\n\nblockers: none\n\nnotes (suspicions, not validated):\n1. Private-group acceptance, `load.ts:255-271,311`. The check reads only the member list in `/etc/group`. It does not see accounts whose primary gid in `/etc/passwd` equals that gid. A user created with `useradd -g alice` has write access to a 0775 cache home that the code treats as private. That needs an admin to give two accounts one gid. Members supplied through LDAP or sssd are also invisible. A fully missing entry fails closed, but a stale local entry can still pass. This is a new relaxation compared with the old \"refuse any group write\". Suggested hardening: also reject when any `/etc/passwd` entry other than the user has that gid. Alternatively, drop group-write acceptance and require the user to run chmod.\n2. Symlinked cache home, `load.ts:301-306`.\n   - Only the final target is checked. The `stat` follows the whole chain, and the `uid` and mode checks apply to the target, so a link into another user's folder is refused (`belongs to another user`).\n   - The ancestors of the link and of the target are not checked, and later uses (`mkdir`, `lstat` of `holyagent`, `writeFresh`, the preload and bundle `import`) resolve the path again. Someone who can write a non-sticky parent of the link can retarget it after the check. For a plain directory they could already rename it away, so this is only marginally easier and not a new class. It needs write access to the user's own home or `XDG_CACHE_HOME` parent.\n   - A link whose target is a user-owned directory sitting inside another user's non-sticky folder is also swappable by that other user. This is contrived.\n3. `newestChange`, `load.ts:314-316`, `Math.max(...times)`. A temporary folder with more than roughly 65k direct entries throws a `RangeError`. `Effect.ignore` does not catch a defect, so the sweep could crash the loader. It is not attacker-reachable, because the folder must be user-owned and under the 0700 cache folder. It is a robustness issue only.\n\nChecked and sound:\nOSC 11 reply parsing is in OpenTUI, `chunk-bun-psdzwx7h.js:20857-20876`. The regex is anchored, accepts only hex digits, and has no nested quantifiers, so it runs in linear time. No terminal-supplied byte reaches output.\n`background.ts` maps the result to the literal `\"light\"` or `\"dark\"` with strict equality. A hostile reply can only choose between two constant palettes. The wait is bounded at 300 ms plus 50 ms, and late replies are consumed by OpenTUI's `handled` path.\n`backgroundFromColorfgbg` accepts only `\\d{1,3}` at the end and returns one of two values. The input is the user's own environment.\nGroup write with `0o002` set is refused. The sticky-bit acceptance is unchanged.\nA dangling link is refused.\n`uid` is compared against the target, not the link.\n`userInfo()` reads the passwd database, not the environment.\nA duplicate-gid entry in `/etc/group` must satisfy `.every`, so it fails closed.\n`sweepStale` and `newestChange` use `lstat`. Only directories owned by the user are removed, and symlinks are not treated as directories.\n`plain()` now also strips U+2028 and U+2029. The C1, bidi and `Cf` handling is unchanged.\n\nevidence:\nNo new vulnerability in the cache-home acceptance, symlink resolution or terminal reply parsing, or each is reported with file and line: no validated vulnerability. Suspicions are reported at `/home/user/holyagent-0.3.0-tui/packages/runtime/src/setup/tui/load.ts` lines 255-271, 301-306 and 314-316. The OSC and COLORFGBG paths (`background.ts:71-86`, `theme.ts:445-452`) carry no injection, and the OpenTUI parser regex is at `chunk-bun-psdzwx7h.js:20857`.\nfindings: see notes 1 to 3. None is a blocker, and the built-in `/security-review` did not run.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Final review evidence: tests 171 pass, pty OSC 11 run, contrast table, captures listed; no blockers",
+    "criteria": [
+      {
+        "criterion": "No new vulnerability in the cache-home acceptance, symlink resolution or terminal reply parsing, or each is reported with file and line",
+        "support": "no validated vulnerability. Suspicions are reported at `/home/user/holyagent-0.3.0-tui/packages/runtime/src/setup/tui/load.ts` lines 255-271, 301-306 and 314-316. The OSC and COLORFGBG paths (`background.ts:71-86`, `theme.ts:445-452`) carry no injection, and the OpenTUI parser regex is at `chunk-bun-psdzwx7h.js:20857`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see notes 1 to 3. None is a blocker, and the built-in `/security-review` did not run."
+      }
+    ]
   },
   "createdAt": "2026-11-09T13:10:31.822Z"
 }
