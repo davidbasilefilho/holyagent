@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mw9it6no-e9pm",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "widen-the-pi-tests-temporary-folder",
+  "objective": "Widen the Pi tests' temporary-folder removal retry budget and tighten its test bound, the two non-blocking review findings on the Windows cleanup fix.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-rmfix, branch release/0.3.1/test/windows-temp-cleanup; the helper is packages/integrations/pi/tests/temp-folder.ts, its test temp-folder.test.ts (git show HEAD).",
+    "Finding 1: the retry budget is about 0.9 s (10 attempts x 100 ms); a slow Windows runner can hold a folder longer. Raise it to a few seconds total (for example 20 attempts with a delay that grows, capped), keeping it bounded and keeping the injectable remover and delay so tests stay fast.",
+    "Finding 2: temp-folder.test.ts L33 asserts calls < 50, which would not catch a wrong attempt count. Assert the exact number of attempts before giving up, from the helper's exported constant."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Report in under 200 words."
+  ],
+  "criteria": [
+    {
+      "text": "The retry budget totals a few seconds and stays bounded",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The test asserts the exact attempt count",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9hqw2u-ckd0",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:13:55.188Z"
+  },
+  "createdAt": "2026-11-09T17:13:55.188Z"
+}
