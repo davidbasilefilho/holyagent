@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "identify-opencode-browse-and-how",
   "objective": "Identify 'opencode browse' and how HolyAgent can integrate it into Pi beside computer use and T3's in-app browser, as one screen capability.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Maintainer (verbatim): \"it would need to cover computer use, browser use (via opencode browse, 0.3.1 should integrate it), and in-app browser\".",
     "opencode browse: find it from authoritative sources (npm, GitHub, opencode docs at opencode.ai, sst/opencode or anomalyco/opencode repositories, pi.dev packages): what it is (an opencode tool, plugin or a standalone CLI or MCP server), how it drives a browser (Playwright, CDP, its own Chromium), what tools or commands it exposes (navigate, click, type, screenshot, read DOM or accessibility tree), install method, platforms, license, latest version and date, and whether it can run outside opencode (as a CLI, library or MCP server Pi could call, or an existing Pi package wrapping it).",
@@ -41,7 +41,34 @@
     "agentId": "workflow:wf_1a0a99a8-86f/assignment-0mw9791e9-vhdm",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-09T11:50:19.473Z"
+    "startedAt": "2026-11-09T11:50:19.473Z",
+    "finishedAt": "2026-11-09T11:51:50.626Z"
+  },
+  "result": "result: \"opencode browse\" is `@opencode/browse` (repo `anomalyco/browse`), an MCP server (stdio) plus a Chromium extension. Pi can call it through its native MCP support, but it needs a paired, extension-equipped Chromium.\n\n**opencode-browse (sourced, fetched 2026-11-09)**\n- Source: https://github.com/anomalyco/browse (README on `dev`), https://opencode.ai/product/browse and https://www.npmjs.com/package/@opencode/browse.\n- License is MIT. Latest npm version is 0.0.15, published about 19 hours before fetch. The repo was created 2026-10-27, so it is young and fast-moving, and no pin is stable yet.\n- Architecture: the agent talks to `browse mcp` over stdio. That calls a local relay on `127.0.0.1:19988`, which presents a CDP endpoint. The extension drives the user's real browser through `chrome.debugger`.\n- `execute` runs Playwright code, using Patchright with a restricted realm. It is not a security boundary.\n- Tools: `execute` (with `page`, `snapshot()`, `handoff()`), `session_new/list/use/reset/delete/adopt/allowlist`, `network` (HAR), `recording`, `flight_recorder`, `secrets_*`, `tabs_cleanup`, `settings`, `status`. There are no separate click or type tools.\n- Install: `npx @opencode/browse install`, `npm i -g @opencode/browse && browse install`, or `curl -fsSL https://opencode.ai/browse/install | bash` (a binary from `anoma.ly`). Node 22.19+ is needed for npx. The installer auto-updates and `browse install` rewrites agent configs.\n- Its README lists Pi as a supported agent: `~/.pi/agent/mcp.json`, `{\"mcpServers\":{\"browse\":{\"command\":\"browse\",\"args\":[\"mcp\"]}}}`. The generic stdio entry is the same.\n- Pi MCP: https://pi.dev/docs/latest/mcp says Pi has a native MCP client (stdio and streamable HTTP, `pi mcp add`). Tools are named `mcp__<server>__<tool>`. `pi.registerMcpServer()` registers servers from an extension (per `pi-mcp-extension` docs on pi.dev).\n- I found no Pi package wrapping `@opencode/browse`. Third-party `opencode-browser` plugins exist, but they are different projects.\n- It can run outside opencode. The README says it works with any MCP client and has a CLI (`browse --help`).\n- Limits: it needs a Chromium with the extension installed and paired, so it is not a headless library. Pairing runs through the Chrome Web Store, or a load-unpacked dev build (`npx @opencode/browse@dev install`, then `browse pair`). A relay on another machine is possible through `browse set hostname`.\n- Linux headless support is not documented. The README names no Linux or cloud caveat.\n\n**/opt/pw-browsers/chromium (inference)**\n- It is probably unusable as-is. It is a Playwright build with no extension and no paired state, and no source says browse can launch or drive an arbitrary Chromium.\n- It would work only if the extension is loaded unpacked into it (needs a display or new-headless) and paired. That is untested, and I did not run anything.\n\n**fit (sourced facts, then inference)**\n- `pi-computer-use` 0.1.36 (https://pi.dev/packages/@amaster.ai/pi-computer-use) wraps Cua Driver 0.37.0 for macOS, Linux and Windows. It has 62 tools: native input, an accessibility tree, screenshots, recording, and \"browser tools\". That last group overlaps with browse.\n- The T3 tools are `mcp__t3-code__*` preview and HTML render tools. They are injected by T3 and expose no DOM driving (per report assignment-0mw8tdgpq-hfsl, which did not list the T3 tools).\n- Recommended split (inference):\n  - `pi-computer-use` serves desktop apps and anything outside a browser.\n  - browse serves web pages in a real browser, where the user's logins, a human handoff, HAR or recording, or Playwright matter.\n  - The T3 tools serve the page the user sees in T3: render and preview only, not automation.\n- Overlaps: browsers can be driven by `pi-computer-use`'s browser group and by browse. Prefer browse for page content, because the extension gives a stable session model, handoff and allowlists. Use `pi-computer-use` only for native browser chrome such as dialogs.\n- Surfacing browse's lower-level tools or docs wholesale would collide with `computer_use_*` and `mcp__browse__*`, so a single screen capability would have to route between them.\n- Under T3 Supervised mode, every extension tool triggers an `Allow X?` confirm.\n\nNot read: the `SKILL.md` in the browse repo, the Linux cloud behavior, the Chrome Web Store listing's Linux support, and the `pi-computer-use` browser group's tool names.\n\nevidence:\nopencode-browse: https://github.com/anomalyco/browse README (tools table, install, Pi config line), https://www.npmjs.com/package/@opencode/browse (0.0.15), https://pi.dev/docs/latest/mcp; fetched 2026-11-09.\nfit: https://pi.dev/packages/@amaster.ai/pi-computer-use, /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tdgpq-hfsl.md and the browse README; the role split is inference.\nopencode browse is identified with sources, its tools and how Pi could call it stated: see opencode-browse above; Pi calls it as the stdio MCP server `browse mcp` through `~/.pi/agent/mcp.json` or `pi.registerMcpServer()`.\nHow it, pi-computer-use and the T3 in-app browser divide the work is stated: see fit above.\n",
+  "acceptance": {
+    "revision": 13,
+    "carriedFrom": 11,
+    "rationale": "opencode browse identified with sources and Pi MCP path; division of work stated as inference",
+    "criteria": [
+      {
+        "criterion": "opencode browse is identified with sources, its tools and how Pi could call it stated",
+        "support": "see opencode-browse above; Pi calls it as the stdio MCP server `browse mcp` through `~/.pi/agent/mcp.json` or `pi.registerMcpServer()`."
+      },
+      {
+        "criterion": "How it, pi-computer-use and the T3 in-app browser divide the work is stated",
+        "support": "see fit above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "opencode-browse",
+        "support": "https://github.com/anomalyco/browse README (tools table, install, Pi config line), https://www.npmjs.com/package/@opencode/browse (0.0.15), https://pi.dev/docs/latest/mcp; fetched 2026-11-09."
+      },
+      {
+        "label": "fit",
+        "support": "https://pi.dev/packages/@amaster.ai/pi-computer-use, /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tdgpq-hfsl.md and the browse README; the role split is inference."
+      }
+    ]
   },
   "createdAt": "2026-11-09T11:50:19.473Z"
 }
