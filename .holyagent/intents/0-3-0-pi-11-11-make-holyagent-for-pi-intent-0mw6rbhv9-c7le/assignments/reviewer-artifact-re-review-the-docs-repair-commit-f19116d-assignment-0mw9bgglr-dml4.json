@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-docs-repair-commit-f19116d",
   "objective": "Re-review the docs repair commit f19116d in /home/user/holyagent-0.3.0-docs and say whether it closes the earlier review's findings without adding new false claims.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "The repair diff only: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/docs-rereview.diff (commit f19116d on release/0.3.0/docs/t3-first-pi-docs, worktree /home/user/holyagent-0.3.0-docs).",
     "The earlier findings to check are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9b33ys-yoxq.md; read it first.",
@@ -44,5 +44,10 @@
   "independentFrom": [
     "assignment-0mw9b607a-daok"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:48:29.326Z"
+  },
   "createdAt": "2026-11-09T13:48:04.239Z"
 }
