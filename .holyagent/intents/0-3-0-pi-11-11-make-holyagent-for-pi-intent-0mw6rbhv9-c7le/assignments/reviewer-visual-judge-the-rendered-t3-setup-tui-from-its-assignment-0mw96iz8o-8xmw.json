@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mw96iz8o-8xmw",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.visual",
+  "slug": "judge-the-rendered-t3-setup-tui-from-its",
+  "objective": "Judge the rendered T3 setup TUI from its captures against the tui-design checklist and the Intent's style and row requirements.",
+  "state": "Running",
+  "scope": [
+    "Captures: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/ (105 files named <state>-<cols>x<rows>.txt, text frames plus colour-span listings, at 80x24, 40x20 and 120x40, plus pty-{256,truecolor,16,nocolor,ascii}-80x24.txt and help-setup.txt). Capture script: /home/user/holyagent-0.3.0-tui/scripts/capture-setup-tui.ts. Source: /home/user/holyagent-0.3.0-tui/packages/runtime/src/setup/tui/.",
+    "Style (Intent requirement 30): no tuiparts; @opentui/solid 0.8.x; holycodex v0.16.12 Tokyo Night tokens (heading #7aa2f7, option #7dcfff, argument #a9b1d6, focus #7dcfff bold, enabled #9ece6a, disabled #a9b1d6, success #73daca, warning #e0af68, error #f7768e, hint #737aa2), colour policy (NO_COLOR, TERM=dumb, FORCE_COLOR, CI, TTY), title 'HolyAgent  ·  setup', a key hint line, uppercase section headings, '❯ ' focus marker, '[x]'/'[ ]' checkboxes, a hint line for the focused row, keys up/down or j/k, space toggles, Enter reviews, Esc or Ctrl-C cancels. Rows: Pi provider fixed on while pi.enable; agent device access only where deviceHost and starts selected; new threads in worktrees starts selected; the always-applied keys get no row and are listed on the review screen.",
+    "The writer noted: no '?' help key (the hint line serves), contrast on a light background not judged, OpenTUI picks the colour tier itself, under NO_COLOR filler spaces still carry a white foreground, cancel exits 1."
+  ],
+  "constraints": [
+    "Read /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/tui-design/SKILL.md first and judge against its checklist and capture list.",
+    "Read-only.",
+    "Mark a finding material per legibility (clipped, overlapping, wrapped text), hierarchy, narrow-width behaviour at 40x20, state correctness, accessibility (NO_COLOR, ASCII locale), interaction correctness, or a departure from the stated style; pure preference is listed apart as optional.",
+    "List the final capture paths you relied on for each state and size.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "Read the tui-design skill and judged every listed state and size against its checklist",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each material finding names the capture, what is wrong and why it is material",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "observations",
+    "findings",
+    "captures"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9588qp-wtzk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T11:30:03.624Z"
+  },
+  "createdAt": "2026-11-09T11:30:03.624Z"
+}
