@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mw8t536r-96bv",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Worker.debugging",
+  "slug": "make-the-two-scope-tests-that-fail-on",
+  "objective": "Make the two scope tests that fail on the windows-latest CI job of PR #89 pass there without weakening them, and fix the product code if the case-variant failure shows that a tracked case-variant of .claude/settings.local.json still infers local scope on Windows.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-scope, branch release/0.3.0/feat/installed-scope-default at 2cb86f8 (not yet pushed; the CI run was on b9a3717, which has the same scope code).",
+    "CI log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-89.log; the case-variant failure context is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-89-case.txt. The other Pi failures in that log come from the base branch and are already fixed at 2cb86f8; ignore them.",
+    "Failure 1, setup-scope.test.ts around line 780-800, \"a tracked local file of another letter case never infers local\": on Windows a bare setup printed \"scope: local (inferred ...settings.local.json)\" where the test expects \"scope: user (default)\". Find why the case-insensitive name check and the device-and-inode check in packages/runtime/src/setup/scope.ts (repositoryControl, about lines 195-240) both miss it on Windows: for example the test may write two names that NTFS folds into one file so git tracks a name that differs from what the file system reports, git ls-files output may differ (quoting, core.ignorecase, core.precomposeunicode), lstat ino may be unreliable, or the path joining may mix separators. If the product code misses a tracked case variant on Windows, that is a security defect of this PR (a committed file steering scope): fix the code and keep the test; if only the test setup is wrong for Windows, fix the setup so it still proves the same thing there.",
+    "Failure 2, around line 824-829, \"a tracked top-level entry that is the .claude folder by identity never infers local\": the test writes .claude./settings.local.json, which Windows folds onto .claude (so it overwrote the real local file with {}), and git add then fails with exit 128. Rebuild the setup so it works on every platform without creating .claude. on disk: for example add the index entry with git hash-object -w and git update-index --add --cacheinfo, and keep the lstat stub that answers .claude. with the stats of .claude."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path.",
+    "Never skip, disable or loosen a test to get green (no skipIf on win32, no weakened assertion): the Windows job is the only native-Windows proof, and Windows is the platform where name folding is real.",
+    "You cannot run Windows here. Reason from the CI log and from how Git for Windows behaves (core.ignorecase true by default on NTFS, core.protectNTFS refusing trailing dots and spaces, Win32 path APIs stripping a trailing dot or space), and simulate what you can on Linux (git -c core.ignorecase=true, stubbing lstat or process.platform). State plainly which conclusions are unverified on Windows."
+  ],
+  "criteria": [
+    {
+      "text": "Both named tests keep asserting that bare setup stays at user scope, and their setup is valid on Windows as well as Linux",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The report states the root cause of the case-variant failure on Windows and whether the product code was wrong there; a product fix comes with a test that fails without it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0 on Linux",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change stays inside the Assignment scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/scope.ts",
+    "packages/runtime/tests/setup-scope.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw8savyv-n704",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T05:15:20.547Z"
+  },
+  "createdAt": "2026-11-09T05:15:20.547Z"
+}
