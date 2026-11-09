@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-windows-launch-commit-333ee48",
   "objective": "Repair the Windows launch commit 333ee48 so the extension finds Bun the way the sh wrapper did, and fold in the review's small follow-ups.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-win, branch release/0.3.0/fix/pi-windows-launch, head 333ee48 (already committed; your edits are a new change on top).",
     "Blocking review finding: packages/integrations/pi/src/extension.ts:706-709 now runs exec(signal, \"bun\", ...), so bare bun must be on the PATH of Pi's process. The wrapper it replaced (packages/integrations/pi/dist/scripts/holyagent, lines 28-33; its source in the generator) also tried ${BUN_INSTALL:-$HOME/.bun}/bin/bun. A Pi started from a GUI or from T3 Code, with Bun only on the shell rc PATH, now fails every holyagent call. Resolve Bun with the same order as the wrapper (PATH, then $BUN_INSTALL/bin/bun, then ~/.bun/bin/bun; on Windows the bun.exe in those folders, using the user's home from the environment) and pass the resolved path to exec; when none exists, keep today's CommandFailed path with a message that says where Bun was looked for. A bun.cmd shim on Windows (an npm global install) must start through cmd.exe as pi does. Test each fallback with stubbed environment and file existence.",
@@ -83,7 +83,61 @@
     "agentId": "workflow:wf_847d9781-b68/assignment-0mw7sdujw-iczc",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T12:06:23.468Z"
+    "startedAt": "2026-11-08T12:06:23.468Z",
+    "finishedAt": "2026-11-09T04:06:01.937Z"
+  },
+  "result": "result: Bun is now resolved in the wrapper's order and the resolved path is passed to exec. `mise run build` and `mise run verify` both exit 0 (2371 pass, 0 fail).\n\nchanged:\n- /home/user/holyagent-0.3.0-win/packages/integrations/pi/src/extension.ts\n- /home/user/holyagent-0.3.0-win/packages/integrations/pi/src/bun-flags.ts (new)\n- /home/user/holyagent-0.3.0-win/packages/integrations/pi/src/generate.ts\n- /home/user/holyagent-0.3.0-win/packages/integrations/pi/tests/extension.test.ts\n- /home/user/holyagent-0.3.0-win/packages/integrations/pi/tests/pi.test.ts\n- /home/user/holyagent-0.3.0-win/docs/pi/extensions.md (lines 16 and 36)\n- /home/user/holyagent-0.3.0-win/packages/integrations/pi/dist/extensions/holyagent.js (regenerated). The generated wrapper is byte-identical.\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0. The tree afterwards holds only the changes listed above.\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean, lint 0 warnings, format clean, 2371 pass and 0 fail across 77 files. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n\nblockers: none\nquestions: none\n\nnotes:\n- **Space-in-path risk (untested):** a `bun.cmd` shim whose path contains spaces, started as `cmd.exe /d /c \"<path>\" ...`, may hit cmd's quote-stripping rule. `pi` avoids this only because it is started by bare name. A fix would be `call` or verbatim arguments. This is not tested, since nothing here runs on Windows.\n- **Stale docs outside my ownership:** `docs/pi/orchestration.md` lines 31 and 81 still describe the wrapper and a bare `bun`. Line 81 should also mention the Bun lookup.\n- **Other changes beyond the brief:**\n  - Memoization: a found Bun is kept, but a miss is looked up again on the next command.\n  - Empty `PATH` entries are skipped, so the working directory is never searched.\n  - Test stubs: the existing `\"bun\"` expectations in `extension.test.ts` became a stubbed full path. The real-process tests map that stub to `process.execPath`. No assertion was removed.\n\nevidence:\n- Bun is resolved in the wrapper's order (PATH, $BUN_INSTALL/bin, ~/.bun/bin) with bun.exe on Windows, each step tested: `findBun` in `extension.ts`, tested in the \"finding Bun\" describe in `extension.test.ts`. Tests cover the PATH-first order, BUN_INSTALL before `~/.bun/bin`, empty variables and empty PATH entries, bun.exe over bun.cmd, USERPROFILE, a case-blind `Path`, and the extension starting the Bun it found. A later install is also tested: a failed lookup is retried, so Bun installed after a miss is found. verify exit 0.\n- A Windows bun.cmd shim starts through cmd.exe, with a test: the test \"a Windows bun.cmd shim starts through cmd.exe, as pi does\" asserts `cmd.exe /d /c C:\\npm\\bun.cmd <runtime args>`, and that a bun.exe starts directly.\n- When no Bun is found the failure names where Bun was looked for, with a test: \"with no Bun the command fails with where it looked, and nothing is started\". The notice names PATH, `$BUN_INSTALL/bin`, `~/.bun/bin` and https://bun.sh.\n- The wrapper and runtimeArgs share one source for the Bun flags: `bunFlags` in `bun-flags.ts` is used by `runtimeArgs` and by the generator, which rewrites the wrapper's exec line from it. A new test in `pi.test.ts` compares the generated wrapper's flags with `runtimeArgs`.\n- docs/pi/extensions.md no longer says the extension runs the wrapper with sh: the bullet at line 36 is rewritten and line 16 is fixed.\n- mise run build leaves no unexplained changes and mise run verify exits 0: build 0 and verify 0, as shown under checks.\n- No test is weakened or removed to pass; every new behavior has a test that fails without it: the new `findBun` tests and the flag-parity test cannot pass without the change. Existing assertions only had `\"bun\"` replaced by the stubbed path.\n- The change stays inside the Assignment's scope and ownership paths: the only edits are the files listed under changed, the dist file regenerated by the build, and the doc lines named in the brief. The kimi-k3.1 instruction text is untouched.\n- checks-run: `bunx --no-install mise run build` -> 0 and `bunx --no-install mise run verify` -> 0 (2371 pass, 0 fail), logs as above.\n- changed-paths: the changed list above.\n- diff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/change.diff\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Gates exit 0 (2371 tests); Bun lookup order and shim handling tested",
+    "criteria": [
+      {
+        "criterion": "Bun is resolved in the wrapper's order (PATH, $BUN_INSTALL/bin, ~/.bun/bin) with bun.exe on Windows, each step tested",
+        "support": "`findBun` in `extension.ts`, tested in the \"finding Bun\" describe in `extension.test.ts`. Tests cover the PATH-first order, BUN_INSTALL before `~/.bun/bin`, empty variables and empty PATH entries, bun.exe over bun.cmd, USERPROFILE, a case-blind `Path`, and the extension starting the Bun it found. A later install is also tested: a failed lookup is retried, so Bun installed after a miss is found. verify exit 0."
+      },
+      {
+        "criterion": "A Windows bun.cmd shim starts through cmd.exe, with a test",
+        "support": "the test \"a Windows bun.cmd shim starts through cmd.exe, as pi does\" asserts `cmd.exe /d /c C:\\npm\\bun.cmd <runtime args>`, and that a bun.exe starts directly."
+      },
+      {
+        "criterion": "When no Bun is found the failure names where Bun was looked for, with a test",
+        "support": "\"with no Bun the command fails with where it looked, and nothing is started\". The notice names PATH, `$BUN_INSTALL/bin`, `~/.bun/bin` and https://bun.sh."
+      },
+      {
+        "criterion": "The wrapper and runtimeArgs share one source for the Bun flags",
+        "support": "`bunFlags` in `bun-flags.ts` is used by `runtimeArgs` and by the generator, which rewrites the wrapper's exec line from it. A new test in `pi.test.ts` compares the generated wrapper's flags with `runtimeArgs`."
+      },
+      {
+        "criterion": "docs/pi/extensions.md no longer says the extension runs the wrapper with sh",
+        "support": "the bullet at line 36 is rewritten and line 16 is fixed."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build 0 and verify 0, as shown under checks."
+      },
+      {
+        "criterion": "No test is weakened or removed to pass; every new behavior has a test that fails without it",
+        "support": "the new `findBun` tests and the flag-parity test cannot pass without the change. Existing assertions only had `\"bun\"` replaced by the stubbed path."
+      },
+      {
+        "criterion": "The change stays inside the Assignment's scope and ownership paths",
+        "support": "the only edits are the files listed under changed, the dist file regenerated by the build, and the doc lines named in the brief. The kimi-k3.1 instruction text is untouched."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` -> 0 and `bunx --no-install mise run verify` -> 0 (2371 pass, 0 fail), logs as above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the changed list above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/change.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-08T12:06:23.468Z"
 }
