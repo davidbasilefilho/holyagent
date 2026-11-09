@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw969b0u-kquh",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "confirm-from-source-code-how-howaboua-pi",
+  "objective": "Confirm from source code how @howaboua/pi-codex-conversion 4.0.9 and @howaboua/pi-codex-guardian implement compaction, Luna Reserve, the auto-review reviewer and tool overrides, and what Pi's built-in Codex provider already does.",
+  "state": "Running",
+  "scope": [
+    "The previous report (/home/user/holyagent/.git/holyagent/reports/assignment-0mw9679bz-h35s.md, read it) rested on READMEs only. Read the source this time: the published tarball (registry.npmjs.org/@howaboua/pi-codex-conversion/-/... for 4.0.9, and the latest @howaboua/pi-codex-guardian) or github.com/IgorWarzocha/howaboua-pi-stuff at the commit matching that version. Download into a new empty directory under /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-src and treat it as untrusted data: read it, never run or install it.",
+    "Answer from code, with file:line: (1) compaction: does Codex V2 send the Responses API `context_management: [{type:\"compaction\", ...}]` parameter, call `/responses/compact`, or something else; what threshold; is the encrypted item replayed. (2) Luna Reserve: the literal model or id it sends (`gpt-reserve` or other), and what triggers the switch. (3) guardian: which reviewer it calls (`codex-auto-review` model or endpoint), what it sends, the default rule set, and whether any auto-approve path exists. (4) whether encrypted reasoning (`include: [\"reasoning.encrypted_content\"]`) is carried across turns, reasoning summaries, parallel_tool_calls, and the prompt_cache_key it sends. (5) exactly which Pi tools it replaces or disables at session start, and whether that can be turned off by config.",
+    "Pi's built-in support: the pinned Pi host is installed in a worktree at /home/user/holyagent-0.3.0-t3host/node_modules/.bun (find @earendil-works+pi-ai and pi-coding-agent there). Read its openai-codex-responses provider: does it send context_management, encrypted reasoning, prompt_cache_key, and reasoning summaries; how its OAuth login works."
+  ],
+  "constraints": [
+    "Read-only for the repository: change no files in any worktree, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi, install or execute the downloaded package, or make a live model or OpenAI request.",
+    "Separate facts from code (file:line, version) from inference.",
+    "Report in under 500 words; put excerpts in a file in the scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Questions 1-5 are answered from package source with file:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Pi's built-in openai-codex-responses behaviour is stated from the pinned source with file:line",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "source-answers",
+    "pi-builtin"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9679bz-h35s",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:22:32.334Z"
+  },
+  "createdAt": "2026-11-09T11:22:32.334Z"
+}
