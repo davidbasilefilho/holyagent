@@ -178,6 +178,10 @@ const fakeApi = (
     readonly pi?: PiProbe
     /** Makes `setActiveTools` throw this. */
     readonly toolsFail?: Error
+    /** The context's run mode; read only by a session under T3 Code, so absent for any other. */
+    readonly mode?: ExtensionContext["mode"]
+    /** The context's `ui`, likewise only for a session that uses it. */
+    readonly ui?: object
   } = {},
 ) => {
   const flags = new Map<string, { type: string; default?: string }>()
@@ -230,12 +234,15 @@ const fakeApi = (
       }
     },
   }
-  // Only `cwd` of the context is read: any other member, the TUI's `ui` included, fails the test.
+  // Only `cwd` of the context is read, and `mode` and `ui` when the test gives them: any other
+  // member fails the test.
   const context = new Proxy(
     { cwd },
     {
       get: (target, key) => {
         if (key === "cwd") return target.cwd
+        if (key === "mode" && session.mode !== undefined) return session.mode
+        if (key === "ui" && session.ui !== undefined) return session.ui
         touched.push(String(key))
         throw new Error(`the extension used ctx.${String(key)}`)
       },
@@ -280,6 +287,8 @@ const run = async (
     allTools?: ReadonlyArray<string>
     pi?: PiProbe
     toolsFail?: Error
+    mode?: ExtensionContext["mode"]
+    ui?: object
     deadlineMs?: number
     /** Starts the session and stops there, so no run takes what the start produced. */
     startOnly?: boolean
@@ -299,6 +308,8 @@ const run = async (
     ...(options.allTools === undefined ? {} : { allTools: options.allTools }),
     ...(options.pi === undefined ? {} : { pi: options.pi }),
     ...(options.toolsFail === undefined ? {} : { toolsFail: options.toolsFail }),
+    ...(options.mode === undefined ? {} : { mode: options.mode }),
+    ...(options.ui === undefined ? {} : { ui: options.ui }),
   })
   const env = options.env ?? {}
   createExtension({
@@ -367,6 +378,7 @@ describe("the factory", () => {
       "session_compact",
       "session_shutdown",
       "session_start",
+      "session_tree",
       "tool_call",
     ])
     expect(api.calls).toEqual([])
@@ -3286,5 +3298,215 @@ describe("the provider", () => {
     const { api } = await run(healthy("/missing", { status: { code: 3, stderr: "error: boom\n" } }))
     await Bun.sleep(20)
     expect(piCalls(api)).toEqual([])
+  })
+})
+
+describe("under T3 Code", () => {
+  const RPC = { mode: "rpc" } as const
+  const T3_ENV = { T3_PI_RUNTIME_MODE: "full-access", T3_MCP_URL: "http://127.0.0.1:1/mcp" }
+  const KEPT_T3 = [
+    "mcp__t3-code__html_render",
+    "mcp__t3-code__html_preview",
+    "mcp__t3_code__preview_open",
+    "mcp__t3-code__t3_preview_snapshot",
+    "mcp__t3-code__device_list",
+  ]
+  const DROPPED_T3 = [
+    "mcp__t3-code__orchestrator_capabilities",
+    "mcp__t3_code__orchestrator_capabilities",
+    "mcp__t3-code__delegate_task",
+    "mcp__t3-code__task_status",
+    "mcp__t3-code__task_cancel",
+    "mcp__t3-code__create_threads",
+    "mcp__t3-code__t3_thread_list",
+    "mcp__t3_code__t3_thread_send",
+    "mcp__t3-code__schedule_task",
+    "mcp__t3-code__list_scheduled_tasks",
+    "mcp__t3-code__delete_scheduled_task",
+    "mcp__t3-code__t3_pending_request",
+    "mcp__t3-code__something_new",
+  ]
+  const OTHERS = ["read", "bash", "todo", "tool_search", "mcp__other__lookup"]
+  const ALL = [...OTHERS, "write", "edit", "codemode", ...KEPT_T3, ...DROPPED_T3]
+  const call = (toolName: string) => ({ toolName, toolCallId: "call-1/1", input: {} })
+
+  /** A `ctx.ui` that records every member the extension reads and every call it makes. */
+  const recordingUi = () => {
+    const accessed = new Set<string>()
+    const calls: Array<{ readonly method: string; readonly args: ReadonlyArray<unknown> }> = []
+    const ui = new Proxy(
+      {},
+      {
+        get: (_target, key) => {
+          accessed.add(String(key))
+          return (...args: Array<unknown>) => void calls.push({ method: String(key), args })
+        },
+      },
+    )
+    return { ui, accessed, calls }
+  }
+  const t3 = (mode: string | undefined, options: Parameters<typeof run>[1] = {}) => {
+    const recorded = recordingUi()
+    const env = { ...T3_ENV, ...(mode === undefined ? {} : { T3_PI_RUNTIME_MODE: mode }) }
+    return run(healthy("/missing"), {
+      ...RPC,
+      ui: recorded.ui,
+      env,
+      activeTools: [...ALL],
+      startOnly: true,
+      ...options,
+    }).then(({ api }) => ({ api, ...recorded }))
+  }
+
+  test("the root's tools lose every T3 tool but the kept families, in both spellings, once at the start", async () => {
+    const { api } = await t3("full-access")
+    expect(api.toolSets).toEqual([[...OTHERS, "codemode", ...KEPT_T3]])
+    expect(api.toolSets[0]).not.toContain("write")
+    for (const name of DROPPED_T3) expect(api.pi.getActiveTools()).not.toContain(name)
+  })
+
+  test("a tool that T3 registered but left inactive is not activated by the start", async () => {
+    const { api } = await t3("full-access", {
+      activeTools: ["read", "mcp__t3-code__delegate_task"],
+      allTools: [...ALL],
+    })
+    // `codemode` and the kept T3 tools come from the root's selection only when it adds them.
+    expect(api.toolSets).toEqual([["read", "codemode"]])
+  })
+
+  test("drift is corrected on before_agent_start and session_tree, and only then", async () => {
+    const { api } = await t3("full-access")
+    const applied = api.toolSets.length
+    // Nothing drifted: the provider's tool list is not touched, whatever the event.
+    await api.emit("before_agent_start", { prompt: "x", systemPrompt: "p" })
+    await api.emit("session_tree", {})
+    expect(api.toolSets).toHaveLength(applied)
+    // T3's bridge re-adds tools in its own handlers, `tool_search` for itself among them.
+    api.pi.setActiveTools([...api.pi.getActiveTools(), "mcp__t3-code__delegate_task"])
+    const drifted = api.toolSets.length
+    await api.emit("before_agent_start", { prompt: "x", systemPrompt: "p" })
+    expect(api.toolSets).toHaveLength(drifted + 1)
+    expect(api.toolSets.at(-1)).toEqual([...OTHERS, "codemode", ...KEPT_T3])
+    api.pi.setActiveTools([...api.pi.getActiveTools(), "mcp__t3_code__schedule_task"])
+    const again = api.toolSets.length
+    await api.emit("session_tree", { newLeafId: "a", oldLeafId: "b" })
+    expect(api.toolSets).toHaveLength(again + 1)
+    expect(api.toolSets.at(-1)).toEqual([...OTHERS, "codemode", ...KEPT_T3])
+    await api.emit("session_tree", {})
+    expect(api.toolSets).toHaveLength(again + 1)
+  })
+
+  test("a call to a deactivated T3 tool is refused with a reason that names it, active or not", async () => {
+    const { api } = await t3("full-access")
+    for (const name of [...DROPPED_T3, "mcp__t3-code__not_registered_at_the_start"]) {
+      const [refusal] = (await api.emit("tool_call", call(name))) as Array<
+        { block: boolean; reason: string } | undefined
+      >
+      expect(refusal?.block).toBe(true)
+      expect(refusal?.reason).toContain(name)
+    }
+    for (const name of [...KEPT_T3, ...OTHERS, "codemode", "mcp__other__delegate_task"])
+      expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+  })
+
+  test("a child keeps its tools and is not refused its calls", async () => {
+    const { api } = await t3("full-access", { sessionName: "reviewer-visual#a1b2c3d4" })
+    expect(api.toolSets).toEqual([])
+    expect(await api.emit("tool_call", call("mcp__t3-code__delegate_task"))).toEqual([undefined])
+  })
+
+  test("below Full access one warning goes out as a notice and as the status, and not again", async () => {
+    for (const mode of ["approval-required", "auto-accept-edits"]) {
+      const { api, calls } = await t3(mode)
+      expect(calls).toEqual([{ method: "setStatus", args: ["holyagent", expect.any(String)] }])
+      const messages = await nextMessages(api)
+      const warnings = messages.filter((message) => message?.content.includes("Full access"))
+      expect(warnings).toHaveLength(1)
+      expect(warnings[0]).toMatchObject({ customType: NOTICE_MESSAGE, display: true })
+      expect(warnings[0]?.content).toContain("every HolyAgent tool call asks for approval")
+      expect(warnings[0]?.content).toContain("specialists can stall")
+      expect(warnings[0]?.content.length).toBeLessThan(500)
+      expect(await nextMessages(api)).toEqual([])
+      expect(calls).toHaveLength(1)
+    }
+  })
+
+  test("at Full access, with no mode set, or outside RPC, no warning is shown", async () => {
+    for (const options of [
+      { mode: "full-access" },
+      { mode: undefined },
+      { mode: "approval-required", rpc: "tui" as const },
+    ]) {
+      const { api, calls } = await t3(
+        options.mode,
+        options.rpc === undefined ? {} : { mode: options.rpc },
+      )
+      expect(calls).toEqual([])
+      expect(
+        (await nextMessages(api)).filter((message) => message?.content.includes("Full access")),
+      ).toEqual([])
+    }
+  })
+
+  test("a child gets no warning", async () => {
+    const { api, calls } = await t3("approval-required", {
+      sessionName: "reviewer-visual#a1b2c3d4",
+    })
+    expect(calls).toEqual([])
+    expect(await nextMessages(api)).toEqual([])
+  })
+
+  test("a status that cannot be set leaves the notice", async () => {
+    const ui = new Proxy(
+      {},
+      {
+        get: () => () => {
+          throw new Error("stale context")
+        },
+      },
+    )
+    const { api } = await t3("approval-required", { ui })
+    const messages = await nextMessages(api)
+    expect(messages.some((message) => message?.content.includes("Full access"))).toBe(true)
+  })
+
+  test("outside T3 Code the tools and messages are what they were", async () => {
+    // RPC mode alone is not T3: the environment decides, and the context is never read.
+    for (const env of [{}, { T3_PI_RUNTIME_MODE: "", T3_MCP_URL: "  " }]) {
+      const { api } = await run(healthy("/missing"), {
+        env,
+        activeTools: [...ALL],
+        startOnly: true,
+      })
+      expect(api.toolSets).toEqual([ALL.filter((name) => name !== "write" && name !== "edit")])
+      for (const name of DROPPED_T3)
+        expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+      const messages = await nextMessages(api)
+      expect(messages).toEqual([])
+      expect(api.touched).toEqual([])
+    }
+    // A T3 variable in a terminal session (mode tui) is not T3 either.
+    const { api } = await run(healthy("/missing"), {
+      env: { ...T3_ENV, T3_PI_RUNTIME_MODE: "approval-required" },
+      mode: "tui",
+      activeTools: [...ALL],
+      startOnly: true,
+    })
+    expect(api.toolSets[0]).toContain("mcp__t3-code__delegate_task")
+    expect(await api.emit("tool_call", call("mcp__t3-code__delegate_task"))).toEqual([undefined])
+    expect(await nextMessages(api)).toEqual([])
+  })
+
+  test("in RPC mode the extension calls no ui method but setStatus", async () => {
+    const { api, accessed, calls } = await t3("approval-required", { startOnly: false })
+    await api.emit("session_tree", {})
+    await api.emit("session_compact", { reason: "manual" })
+    await api.emit("tool_call", call("mcp__t3-code__delegate_task"))
+    await api.emit("before_agent_start", { prompt: "x", systemPrompt: "p" })
+    await api.emit("session_shutdown", {})
+    // Not custom, setWidget, setFooter, setHeader, setTitle or the theme: RPC drops or no-ops them.
+    expect([...accessed]).toEqual(["setStatus"])
+    expect(calls.map(({ method }) => method)).toEqual(["setStatus"])
+    expect(api.touched).toEqual([])
   })
 })
