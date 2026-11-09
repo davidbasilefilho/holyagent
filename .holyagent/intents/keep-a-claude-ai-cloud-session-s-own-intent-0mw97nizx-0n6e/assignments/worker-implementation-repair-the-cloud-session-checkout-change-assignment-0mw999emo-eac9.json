@@ -80,6 +80,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mw98bm41-hhjx",
   "specialist": {
+    "agentId": "workflow:wf_27e78b45-d7b/assignment-0mw999emo-eac9",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-09T12:46:35.856Z"
