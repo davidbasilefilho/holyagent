@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-windows-launch-repairs",
   "objective": "Re-review the Windows launch repairs (range 333ee48..b511fe3 in /home/user/holyagent-0.3.0-win, commits 2cfd3be and b511fe3) against the findings they repair, for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous blocking finding: packages/integrations/pi/src/extension.ts ran exec(\"bun\") so bare bun had to be on Pi's PATH, while the sh wrapper also tried ${BUN_INSTALL:-$HOME/.bun}/bin/bun; a Pi started from a GUI or T3 Code failed every holyagent call. Previous non-blocking: the wrapper's flags and runtimeArgs were duplicated with a substring test; docs/pi/extensions.md still said sh.",
     "Added since: a bun.cmd shim (and pi) start through cmd.exe /d /s /c call with each word quoted, and a word cmd.exe reads as syntax is refused. Judge the quoting against how Pi's exec passes arguments to Node's spawn on Windows (read Pi 1.5.0's exec source in node_modules), whether a legitimate path (with spaces, parentheses as in 'Program Files (x86)', ampersands, non-ASCII) is wrongly refused or broken, and whether the Bun lookup order and caching are correct.",
@@ -43,7 +43,33 @@
     "agentId": "workflow:wf_b5d10776-296/assignment-0mw8r45oq-if5r",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:18:37.898Z"
+    "startedAt": "2026-11-09T04:18:37.898Z",
+    "finishedAt": "2026-11-09T04:27:42.901Z"
+  },
+  "result": "result: The range is merge-ready. The previous blocking finding is closed, and I found no new blocker.\n\nBoth reviews read the same range (`333ee48...b511fe3`) in `/home/user/holyagent-0.3.0-win`. `/code-review` ran through the Skill tool and was the built-in (not shadowed); I read the code behind each of its six findings. Every finding below is non-blocking.\n\nfindings:\n1. `packages/integrations/pi/src/extension.ts:635-638` (`cmdExeArguments`). When a `bun.cmd` shim is the Bun found, a project path with no space that contains `( ) & | < >`, or any path with `% ^ !`, is refused. Examples are `C:\\Users\\me\\Downloads\\app(1)`, `...\\a&b` and `...\\100%done`. I ran the first two against `cmdExeArguments` and both return `ok:false`, so every `holyagent` call fails with a notice. `npm i -g bun` produces that shim. The refusal is correct, because bare syntax would be command injection. The fix is optional: when cmd.exe refuses a candidate, try the next Bun candidate (usually `~/.bun/bin/bun.exe`) instead of failing.\n2. `extension.ts:826-832`. The found Bun path is cached for the whole session and cleared only on a lookup miss. If Bun is upgraded or moved while Pi runs, every call fails with ENOENT until Pi restarts. Clearing the cache on a spawn failure would fix it.\n3. `extension.ts:614-620`. Relative `PATH` entries such as `bin` or `./node_modules/.bin` are kept. They are checked against Node's cwd, but the spawn runs with `cwd: packageRoot`, so the path found is not the path run. Resolve such entries to absolute paths or skip them. The doc comment's \"no planted bun\" claim is not fully true until then.\n4. `extension.ts:576`. `isFile` does not check the executable bit, while `command -v` in the wrapper skips non-executable files. A stale non-executable `bun` early on `PATH` (POSIX only) would be chosen and fail with EACCES. Windows is unaffected.\n5. `extension.ts:606-611`. The extension searches both `$BUN_INSTALL/bin` and `~/.bun/bin`. The wrapper searches only `${BUN_INSTALL:-$HOME/.bun}/bin`. This is harmless but differs. When Bun is absent, each command repeats a synchronous `PATH` walk.\n6. `bun-flags.ts:3`. The \"one place that names them\" comment holds only for the Pi wrapper and the extension. The Claude `wrapper.sh`, the Claude hook command and the setup steps keep their own literals. The generator's regex-replace plus throw-if-missing guard is more machinery than the duplication it removes. Optional.\n\nQuoting against Pi 1.5.0 `dist/core/exec.js` (it calls `spawn(command, args, {cwd, shell:false})`, with no `windowsVerbatimArguments`):\n- Node quotes an argument only when it holds a space, tab or quote, so `cmd.exe /d /s /c call \"<bun.cmd>\" ...` is read correctly. The line starts with `call`, so `/s` strips no quotes.\n- Paths with spaces, `Program Files (x86)`, or `&` plus a space are quoted by Node and pass. A non-ASCII path (`Jürgen`) passes.\n- Refusing `\"`, `%`, `^`, `!`, control characters and bare operators is safe and fails closed.\n- I read this against Node's quoting rules and did not run it on Windows.\n\nLookup order and caching:\n- Order is `PATH`, then `BUN_INSTALL/bin`, then `~/.bun/bin`. On Windows it is `bun.exe` before `bun.cmd` in each `PATH` folder, with `USERPROFILE` ahead of `HOME`. This matches the wrapper apart from item 5.\n- Empty variables are treated as unset, empty `PATH` entries are skipped, and the Windows environment key is matched case-insensitively. A hit is cached and a miss is looked up again (see item 2).\n\nPrevious findings:\n- Blocking, bare `bun` had to be on Pi's `PATH`: closed. `findBun` looks in `PATH`, `BUN_INSTALL` and `~/.bun/bin`, and a miss says where it looked.\n- Duplicated flags and the substring test: closed for the Pi wrapper and the extension. The Pi wrapper's exec line is generated from `bunFlags`, with a guard if the source line changes (item 6 notes the Claude copies).\n- `docs/pi/extensions.md` still saying `sh`: closed. `docs/pi/orchestration.md` is updated too.\n\nchecks:\n- `bun test packages/integrations/pi` -> exit 0, 268 pass, 0 fail.\n- `bun check` -> exit 0, no type errors in 211 files.\n- Not run: lint, format, the full `mise run verify`, anything on Windows, and any live spawn of `pi`, `bun.cmd` or T3 Code.\n\nverdict: merge-ready. No blocker remains. Items 1-4 are worth a follow-up.\n\nevidence:\nEvery blocking finding names path:line and a concrete failure scenario: no blocking findings; the six non-blocking findings above each give path:line and a scenario.\nThe review states for each previous finding whether it is closed, and whether the range is merge-ready: all three previous findings are closed, and the range is merge-ready (see \"Previous findings\" and verdict).\nfindings: items 1-6 above, all non-blocking.\nverdict: merge-ready. Checks: `bun test packages/integrations/pi` exit 0 (268 pass), `bun check` exit 0.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Previous blocker closed; quoting traced against Pi exec",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding names path:line and a concrete failure scenario",
+        "support": "no blocking findings; the six non-blocking findings above each give path:line and a scenario."
+      },
+      {
+        "criterion": "The review states for each previous finding whether it is closed, and whether the range is merge-ready",
+        "support": "all three previous findings are closed, and the range is merge-ready (see \"Previous findings\" and verdict)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1-6 above, all non-blocking."
+      },
+      {
+        "label": "verdict",
+        "support": "merge-ready. Checks: `bun test packages/integrations/pi` exit 0 (268 pass), `bun check` exit 0."
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:18:37.898Z"
 }
