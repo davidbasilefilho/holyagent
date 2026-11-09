@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw96qjlf-o4zi",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 4,
+  "roleTask": "Librarian.research",
+  "slug": "identify-the-fff-tool-the-maintainer",
+  "objective": "Identify the 'fff' tool the maintainer means and how it would integrate with Pi and HolyAgent, and establish how Billion Context's compression interacts with the Codex provider's native compaction and with just-bash as the bash backend.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"we have the fff integration right? as well as billion context?\". The repository has no fff integration (no match in packages or docs of /home/user/holyagent-0.3.0-t3branch). Billion Context is pinned at 0.1.212 in packages/runtime/src/config/pi-packages.json; its research is in docs/pi/caching-and-subagents.md of that worktree (read it).",
+    "fff: find the candidates from authoritative sources (npm registry, GitHub, pi.dev packages): the fast file finder 'fff' by dmtrKovalenko (fff.nvim and its MCP server or library), any Pi package that wraps it (search pi.dev/packages and npm for 'pi fff' or 'pi-fff'), and any other tool named fff used by coding agents. For the most likely one give what it does (fuzzy file and content search, frecency, git status awareness), how it is installed (native binary, npm package, Rust crate), platforms, license, latest version and date, and how it plugs into Pi (an extension with tools, an MCP server, or a binary called from bash). Say how it overlaps with Pi's own find, grep and ls tools and with just-bash's built-in rg and find.",
+    "Billion Context: from its source (github.com/ranxianglei/billion-context at v0.1.212, the dist/agent/pi-native.js route), whether it cancels or replaces Pi's compaction, whether it rewrites the message history sent to the provider, and so whether it would conflict with @howaboua/pi-codex-conversion's native Codex V2 compaction (an encrypted compaction item replayed in the input) or with that package's applyPatchOnly mode, where native compaction is off. Also whether Billion Context hooks or wraps the bash tool (so whether just-bash as the bash backend affects it)."
+  ],
+  "constraints": [
+    "Read-only: change no files, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi, install or execute any package, or make a live model request.",
+    "Separate sourced facts (URL or file and symbol, version, date fetched) from inference.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "The fff tool is identified with sources, and how it would integrate with Pi and overlaps existing tools is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Billion Context's interaction with Codex native compaction and with the bash tool is stated from its source",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "fff",
+    "billion-context"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:35:56.595Z"
+  },
+  "createdAt": "2026-11-09T11:35:56.595Z"
+}
