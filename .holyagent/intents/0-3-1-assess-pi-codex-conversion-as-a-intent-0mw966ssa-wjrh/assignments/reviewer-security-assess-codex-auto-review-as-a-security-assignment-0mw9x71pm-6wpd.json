@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mw9x71pm-6wpd",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 21,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-codex-auto-review-as-a-security",
+  "objective": "Assess Codex auto-review as a security control: whether a model or repository content can bypass, disable or mislead it, and whether it leaks data.",
+  "state": "Running",
+  "scope": [
+    "Commit 08b054b on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range 91d9eb07..08b054b); source diff without generated dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/auto-review-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9wh8o1-xebk.md; design research /home/user/holyagent/.git/holyagent/reports/assignment-0mw96z5n3-mw6f.md.",
+    "Testing rule: unit tests with recorded or synthesized fixtures only; the reviewer request is made through an injectable client so tests never reach a network.",
+    "Testing rule: never start pi or make a model or network request; unit tests only.",
+    "Points to trace: classifier bypasses (shell quoting, command substitution, aliases, env tricks, path tricks to write outside the root, symlinks, tools that write through other names such as apply_patch, edit, write and MCP tools); fail-open paths (exceptions, schema decode, timeouts, the breaker, the /approve override and whether a model or tool output can trigger it); prompt injection from the untrusted transcript into the reviewer; config keys that replace the policy and whether a repository-level config can weaken it; what the request sends off-machine."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Report in under 400 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each validated bypass, fail-open path or data exposure is reported with source, sink and a concrete scenario, or none is found",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9wh8o1-xebk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T23:56:36.586Z"
+  },
+  "createdAt": "2026-11-09T23:56:36.586Z"
+}
