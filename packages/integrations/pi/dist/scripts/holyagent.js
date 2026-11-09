@@ -26809,18 +26809,20 @@ var TUI_PACKAGES = {
 
 import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join20 } from "path";
+import { basename as basename5, dirname as dirname5, join as join20, posix, win32 } from "path";
 import { pathToFileURL } from "url";
-var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
+var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win32 : posix, cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory(env);
+  const { join } = pathModule(platform);
   if (platform === "win32")
-    return firstNonEmpty(env["LOCALAPPDATA"]) ?? join20(home, "AppData", "Local");
+    return firstNonEmpty(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
   const xdg = firstNonEmpty(env["XDG_CACHE_HOME"]);
-  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join20(home, ".cache");
+  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
 }, guardedFolders = (env, platform) => {
-  const holyagent = join20(cacheHome(env, platform), "holyagent");
-  return [holyagent, join20(holyagent, "setup-tui")];
-}, lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8), tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => join20(guardedFolders(env, platform)[1] ?? "", [
+  const { join } = pathModule(platform);
+  const holyagent = join(cacheHome(env, platform), "holyagent");
+  return [holyagent, join(holyagent, "setup-tui")];
+}, lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8), tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
   ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
   lockHash(lock)
 ].join("_")), INSTALLED_MARKER = ".holyagent-installed", markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
