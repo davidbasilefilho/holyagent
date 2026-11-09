@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw98bhbo-gj8f",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.security",
+  "slug": "check-the-setup-tui-round-1-repair",
+  "objective": "Check the setup TUI round-1 repair closes the earlier security findings without opening new ones.",
+  "state": "Running",
+  "scope": [
+    "Read the diff file /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r1.diff (commit 0130a8b2 against df6a410c in /home/user/holyagent-0.3.0-tui); the earlier findings are in /home/user/holyagent/.git/holyagent/briefs/assignment-0mw96v3mr-d6nb.md. The install fetches the OpenTUI renderer packages into a per-user cache folder and runs them, so trace the cache path, the temp-folder rename, the marker, the owner and mode checks, the lockfile subset with --frozen-lockfile and the escape stripping."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 400 words; long notes go to no file (read-only) or to a scratchpad file if you have a shell."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier security finding is confirmed closed or reported open with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new vulnerability is introduced: symlink or race in the cache and rename path, unpinned package resolution, terminal escape injection",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw96v3mr-d6nb"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:20:13.044Z"
+  },
+  "createdAt": "2026-11-09T12:20:13.044Z"
+}
