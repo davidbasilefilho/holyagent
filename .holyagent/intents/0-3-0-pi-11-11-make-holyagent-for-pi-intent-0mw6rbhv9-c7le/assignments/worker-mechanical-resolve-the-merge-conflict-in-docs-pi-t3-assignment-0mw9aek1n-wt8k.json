@@ -53,5 +53,29 @@
     "finishedAt": "2026-11-09T13:22:03.564Z"
   },
   "result": "result: Conflict in docs/pi/t3-code.md resolved (both sides kept, markers removed, section order unchanged); build leaves no unexplained changes; verify exits 0.\nchanged: docs/pi/t3-code.md (unstaged working-tree edit on top of the merge; the dist files are the auto-merged staged content, unchanged by build)\nchecks:\n`bun install --frozen-lockfile` -> 0 (no changes)\n`bunx --no-install mise run build` -> 0; unstaged diff after build touches only docs/pi/t3-code.md\n`bunx --no-install mise run verify` -> 0; type-check 241 files no errors; lint 242 files no problems; tests 2702 pass, 0 fail, 87 files\nblockers: none\nquestions: none\nnotes: The \"other side\" sentence said the device and worktree choices \"come in a later change\", which contradicts the setup-screen paragraph. I kept the setup-screen text and merged in \"(both default to on)\" from the other side. Please confirm that wording.\nevidence:\n[blocking] docs/pi/t3-code.md has no conflict markers and keeps both sides' content: grep for conflict markers returns 0; lines 155-159 merged, see diff file\n[blocking] mise run build leaves no unexplained changes and mise run verify exits 0: build exit 0, verify exit 0 (log /home/user/holyagent-0.3.0-tui/../scratchpad: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log)\ngates: build and verify as above\nresolution: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3-code-merge.diff\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Independent merge review gtqj confirms the resolution matches the merged code",
+    "criteria": [
+      {
+        "criterion": "docs/pi/t3-code.md has no conflict markers and keeps both sides' content",
+        "support": "grep for conflict markers returns 0; lines 155-159 merged, see diff file"
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0, verify exit 0 (log /home/user/holyagent-0.3.0-tui/../scratchpad: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log)"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "gates",
+        "support": "build and verify as above"
+      },
+      {
+        "label": "resolution",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3-code-merge.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-09T13:18:35.771Z"
 }
