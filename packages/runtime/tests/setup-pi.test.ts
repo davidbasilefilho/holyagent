@@ -66,6 +66,7 @@ const CAPABILITY_LINES_OK = [
   "ok   pi capability mcp: normal form, both, nothing to install",
   "ok   pi capability computer-use: normal form, specialists, 1 package listed at its pin",
   "ok   pi capability just-bash: normal form, both, nothing to install",
+  "ok   pi capability fff: normal form, specialists, 1 package listed at its pin",
 ]
 const PI_LINES_OK = [BASE_OK, FORM_OK, ...CAPABILITY_LINES_OK]
 const IN_USE = { HOLYAGENT_HOST: "pi" }
@@ -463,6 +464,7 @@ describe("holyagent doctor, capabilities", () => {
       "ok   pi capability mcp",
       "ok   pi capability computer-use",
       "ok   pi capability just-bash",
+      "ok   pi capability fff",
     ])
     expect(report.ok).toBe(false)
   })
@@ -503,11 +505,18 @@ describe("holyagent doctor, capabilities", () => {
       form: "headless" | "normal",
       listed: ReadonlyArray<string>,
       commands: ReadonlyArray<string>,
+      platform?: string,
     ) =>
       Effect.runPromise(
-        checkCapability({ HOME: home }, "user", definition, form, listed, [
-          "/pi/settings.json",
-        ]).pipe(Effect.provide(fakeShell({ commands }).layer)),
+        checkCapability(
+          { HOME: home },
+          "user",
+          definition,
+          form,
+          listed,
+          ["/pi/settings.json"],
+          platform,
+        ).pipe(Effect.provide(fakeShell({ commands }).layer)),
       )
 
     test("a missing command and a missing package are named together, with the way to fix each", async () => {
@@ -525,6 +534,24 @@ describe("holyagent doctor, capabilities", () => {
       expect(await probe(entry, "headless", [], ["bun"])).toBe(
         "ok   pi capability just-bash: headless form, both, nothing to install",
       )
+    })
+
+    test("fff is healthy where its native library has a build, and a note that fails nothing where it has none", async () => {
+      const entry = CAPABILITIES.find((capability) => capability.name === "fff")
+      if (entry === undefined) throw new Error("no fff capability")
+      const source = "npm:@ff-labs/pi-fff@0.11.0"
+      for (const form of ["normal", "headless"] as const) {
+        expect(await probe(entry, form, [source], [], "linux-arm64")).toBe(
+          `ok   pi capability fff: ${form} form, specialists, 1 package listed at its pin`,
+        )
+        expect(await probe(entry, form, [], [], "linux-x64")).toStartWith(
+          "FAIL pi capability fff: npm:@ff-labs/pi-fff@0.11.0 is not listed",
+        )
+        // Not listed is fine where Pi keeps its own find and grep: nothing is expected of it.
+        expect(await probe(entry, form, [], [], "freebsd-x64")).toBe(
+          `~ pi capability fff: not offered in the ${form} form (its native library does not cover freebsd-x64, only darwin-arm64, darwin-x64, linux-arm64, linux-x64, win32-arm64, win32-x64, android-arm64); nothing is expected of it`,
+        )
+      }
     })
 
     test("a present command and a listed package are healthy, and the form decides what is expected", async () => {

@@ -35,6 +35,7 @@ describe("piPackages", () => {
       "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
       "npm:@aliou/pi-processes@0.13.6",
       "npm:@amaster.ai/pi-computer-use@0.1.36",
+      "npm:@ff-labs/pi-fff@0.11.0",
     ])
   })
 
@@ -43,6 +44,7 @@ describe("piPackages", () => {
     ["todo", "@juicesharp/rpiv-todo"],
     ["ask", "@juicesharp/rpiv-ask-user-question"],
     ["computerUse", "@amaster.ai/pi-computer-use"],
+    ["fff", "@ff-labs/pi-fff"],
     ["contextCompression", "billion-context"],
     ["subagents", "@tintinweb/pi-subagents"],
   ] as const)("disabling %s drops %s and nothing else", (feature, name) => {
@@ -65,6 +67,7 @@ describe("piPackages", () => {
       computerUse: false,
       contextCompression: false,
       subagents: false,
+      fff: false,
     })
     expect(piPackages(off)).toEqual([pinned("pi-provider-kimi-code")])
   })

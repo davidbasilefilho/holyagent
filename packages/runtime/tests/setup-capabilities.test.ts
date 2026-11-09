@@ -100,6 +100,28 @@ describe("a capability flag in setup", () => {
     expect(piCommands(shell)).toEqual([`pi install ${TODO}`])
   })
 
+  test("fff off removes @ff-labs/pi-fff and the override mode setup wrote, so Pi keeps its own find and grep; on installs and sets it again", async () => {
+    const piFff = join(home, ".pi", "agent", "pi-fff.json")
+    const FFF = ALL.find((source) => source.includes("pi-fff")) as string
+    await write(globalSettings(), { packages: ALL })
+    await runSetup(withPi())
+    expect(await read(piFff)).toEqual({ mode: "override" })
+
+    const off = withPi()
+    const turnedOff = await runSetup(off, { capabilities: { fff: false } })
+    expect(turnedOff.lines).toContain(
+      `- capability fff: turned off (pi.features.fff in ${userConfig()})`,
+    )
+    expect(piCommands(off)).toEqual([`pi remove ${FFF.replace(/@[^@/]+$/, "")}`])
+    expect(await read(piFff)).toEqual({})
+
+    await write(globalSettings(), { packages: ALL.filter((source) => source !== FFF) })
+    const on = withPi()
+    await runSetup(on, { capabilities: { fff: true } })
+    expect(piCommands(on)).toEqual([`pi install ${FFF}`])
+    expect(await read(piFff)).toEqual({ mode: "override" })
+  })
+
   test("a choice equal to what the config decides writes nothing, so a default is never frozen into the file", async () => {
     await write(globalSettings(), { packages: ALL })
     const report = await runSetup(withPi(), { capabilities: { todo: true } })

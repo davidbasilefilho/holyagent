@@ -10644,20 +10644,38 @@ var init_guardrails = __esm(() => {
   };
 });
 
-var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, T3_PREFIX = "mcp__t3*code__", T3_VISUAL_TOOLS, COMPUTER_USE_TOOLS, sameForm = (packages) => ({
+var FFF_OVERRIDE_SETTINGS, FFF_OVERRIDE_TOOLS, FFF_NATIVE_HOSTS;
+var init_settings = __esm(() => {
+  FFF_OVERRIDE_SETTINGS = { mode: "override" };
+  FFF_OVERRIDE_TOOLS = ["grep", "find", "multi_grep"];
+  FFF_NATIVE_HOSTS = [
+    "darwin-arm64",
+    "darwin-x64",
+    "linux-arm64",
+    "linux-x64",
+    "win32-arm64",
+    "win32-x64",
+    "android-arm64"
+  ];
+});
+
+var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, PI_FFF_FILE = "~/.pi/agent/pi-fff.json", T3_PREFIX = "mcp__t3*code__", T3_VISUAL_TOOLS, COMPUTER_USE_TOOLS, sameForm = (packages) => ({
   headless: { packages, mcpServers: [] },
   normal: { packages, mcpServers: [] }
 }), CAPABILITIES, FEATURE_DEFAULTS, formContent = (capability, form) => {
   const entry = capability.forms[form];
   return "unavailable" in entry ? undefined : entry;
-}, FEATURE_PACKAGES, unavailableIn = (capability, form) => {
+}, FEATURE_PACKAGES, hostPlatform = () => `${process.platform}-${process.arch}`, unavailableIn = (capability, form, platform = hostPlatform()) => {
   const entry = capability.forms[form];
-  return "unavailable" in entry ? entry.unavailable : undefined;
-}, enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider)), capabilityPackages = (features, form, definitions = CAPABILITIES) => enabledCapabilities(features, { form, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []), managedCapabilityPackages = (definitions = CAPABILITIES) => [
+  if ("unavailable" in entry)
+    return entry.unavailable;
+  return capability.nativeHosts === undefined || capability.nativeHosts.includes(platform) ? undefined : `its native library does not cover ${platform}, only ${capability.nativeHosts.join(", ")}`;
+}, enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form, options.platform) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider)), capabilityPackages = (features, form, definitions = CAPABILITIES, platform) => enabledCapabilities(features, { form, platform, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []), managedCapabilityPackages = (definitions = CAPABILITIES) => [
   ...new Set(definitions.flatMap((capability) => CAPABILITY_FORMS.flatMap((form) => formContent(capability, form)?.packages ?? [])))
 ];
 var init_capabilities = __esm(() => {
   init_guardrails();
+  init_settings();
   CAPABILITY_FORMS = ["headless", "normal"];
   SUBAGENTS_ONLY_SPECIALISTS = {
     disableDefaultAgents: true,
@@ -10824,6 +10842,20 @@ var init_capabilities = __esm(() => {
         }
       ],
       health: ["needs"]
+    },
+    {
+      name: "fff",
+      feature: "fff",
+      description: "Replaces Pi's find and grep with fff, a fast indexed file and content search (@ff-labs/pi-fff)",
+      skills: [],
+      applicability: "specialists",
+      defaultOn: true,
+      needs: [],
+      nativeHosts: FFF_NATIVE_HOSTS,
+      forms: sameForm(["@ff-labs/pi-fff"]),
+      tools: { rootExclude: FFF_OVERRIDE_TOOLS, visual: [] },
+      settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
+      health: ["needs", "packages"]
     }
   ];
   FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
@@ -14976,7 +15008,7 @@ var init_pr = __esm(() => {
 });
 
 var readSettings = (directories, env = process.env) => loadConfig({ projectDirectories: directories, env }).pipe(map5((config) => config.vcs));
-var init_settings = __esm(() => {
+var init_settings2 = __esm(() => {
   init_dist();
   init_load();
   init_schema();
@@ -14999,7 +15031,7 @@ var init_commands = __esm(() => {
   init_message();
   init_pr();
   init_record();
-  init_settings();
+  init_settings2();
   VCS_COMMANDS = [
     {
       path: ["vcs", "commit"],
@@ -15345,7 +15377,8 @@ var init_pi_packages = __esm(() => {
     "@juicesharp/rpiv-ask-user-question": "2.15.0",
     "@aliou/pi-processes": "0.13.6",
     "@amaster.ai/pi-computer-use": "0.1.36",
-    "pi-web-kit": "0.5.0"
+    "pi-web-kit": "0.5.0",
+    "@ff-labs/pi-fff": "0.11.0"
   };
 });
 
@@ -16136,7 +16169,7 @@ var MARKETPLACE, PLUGIN_ID, CACHE_TTLS, ROOT_MODEL = "claude-opus-5-5", userSett
       return `~ ${path}: kept ${show(value)} (setup did not record adding it; remove it by hand if you want it gone)`;
   }
 }, undoUserSettings, missingSettingKeys;
-var init_settings2 = __esm(() => {
+var init_settings3 = __esm(() => {
   init_dist();
   init_json_file();
   init_record2();
@@ -16258,7 +16291,7 @@ var init_scope = __esm(() => {
   init_environment();
   init_errors6();
   init_json_file();
-  init_settings2();
+  init_settings3();
   init_shell();
   SCOPES = ["user", "project", "local"];
   refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
@@ -16418,7 +16451,7 @@ var init_check = __esm(() => {
   init_identity();
   init_environment();
   init_scope();
-  init_settings2();
+  init_settings3();
   init_shell();
 });
 
@@ -24597,7 +24630,7 @@ var init_hook = __esm(() => {
   init_git();
   init_identity();
   init_message();
-  init_settings();
+  init_settings2();
   init_assignment2();
   init_errors3();
   init_git_push();
@@ -24970,13 +25003,13 @@ var init_form = __esm(() => {
   };
 });
 
-var WEB_KIT_PACKAGE = "pi-web-kit", piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES) => {
+var WEB_KIT_PACKAGE = "pi-web-kit", piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
   const { enable, features } = config.pi;
   if (!enable)
     return [];
   const names = [
     ...profile.package === undefined ? [] : [profile.package],
-    ...capabilityPackages(features, form, definitions),
+    ...capabilityPackages(features, form, definitions, platform),
     ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
   ];
   return names.map((name) => piPackageSource(name));
@@ -25092,9 +25125,9 @@ ${result.stderr}`;
     return hasDisplay(env) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
   const found = yield* (yield* Shell).which(need.command);
   return isSome2(found) ? undefined : `needs ${need.command} on PATH; ${need.fix}`;
-}), checkCapability = (env, scope, capability, form, listed, files) => gen2(function* () {
+}), checkCapability = (env, scope, capability, form, listed, files, platform) => gen2(function* () {
   const name = `pi capability ${capability.name}`;
-  const reason = unavailableIn(capability, form);
+  const reason = unavailableIn(capability, form, platform);
   if (reason !== undefined)
     return hint(`${name}: not offered in the ${form} form (${reason}); nothing is expected of it`);
   const content = formContent(capability, form);
@@ -25174,11 +25207,11 @@ var init_pi_check = __esm(() => {
   GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i;
 });
 
-var init_settings3 = __esm(() => {
+var init_settings4 = __esm(() => {
   init_guardrails();
 });
 
-var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`), T3_TOOL, T3_VISUAL, toolSettings = (config, profile = providerProfile(config), form = "normal") => {
+var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`), T3_TOOL, T3_VISUAL, toolSettings = (config, profile = providerProfile(config), form = "normal", platform) => {
   const { enable, features } = config.pi;
   if (!enable)
     return [];
@@ -25193,13 +25226,13 @@ var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), pattern
         }
       }
     ] : [],
-    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings).filter((patch) => patch.whileOn === undefined || features[patch.whileOn] === true)
+    ...enabledCapabilities(features, { form, platform, provider: config.pi.provider }).flatMap((capability) => capability.settings).filter((patch) => patch.whileOn === undefined || features[patch.whileOn] === true)
   ];
 };
 var init_tools = __esm(() => {
   init_capabilities();
   init_route();
-  init_settings3();
+  init_settings4();
   init_provider();
   T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
   T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
@@ -25218,6 +25251,8 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
     const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join17(home, ".config");
     return join17(base, "billion-context", "billion-context.json");
   }
+  if (logical === PI_FFF_FILE)
+    return project ? undefined : join17(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
     return project ? join17(cwd, ".pi", name) : join17(piAgentDirectory(env), name);
@@ -25286,7 +25321,7 @@ var init_pi_settings = __esm(() => {
   init_pi_check();
   init_record2();
   init_scope();
-  init_settings2();
+  init_settings3();
   PACKAGE_DEFAULTS = new Map([
     [
       PI_SETTINGS_FILE,
@@ -25297,6 +25332,7 @@ var init_pi_settings = __esm(() => {
       }
     ],
     [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
+    [PI_FFF_FILE, { mode: "tools-and-ui" }],
     ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [
       [
         profile.toolsFile,
@@ -25309,6 +25345,7 @@ var init_pi_settings = __esm(() => {
   KNOWN_FILES = [
     PI_SETTINGS_FILE,
     SUBAGENTS_SETTINGS_FILE,
+    PI_FFF_FILE,
     BILLION_CONTEXT_FILE,
     ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [profile.toolsFile])
   ];
@@ -25791,7 +25828,7 @@ var init_t3_settings = __esm(() => {
   init_json_file();
   init_pi_check();
   init_record2();
-  init_settings2();
+  init_settings3();
   T3_STORAGE_CLEANUP = {
     logsAfterDays: 30,
     browserArtifactsAfterDays: 14,
@@ -25978,7 +26015,7 @@ var init_steps = __esm(() => {
   init_pi_install();
   init_pi_settings();
   init_scope();
-  init_settings2();
+  init_settings3();
   init_shell();
   init_t3_settings();
   ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dryRun) {
@@ -26109,7 +26146,7 @@ var init_doctor = __esm(() => {
   init_pi_check();
   init_pi_settings();
   init_scope();
-  init_settings2();
+  init_settings3();
   init_shell();
   init_steps();
   init_t3_settings();
@@ -27661,7 +27698,7 @@ var init_setup = __esm(() => {
   init_errors6();
   init_form();
   init_scope();
-  init_settings2();
+  init_settings3();
   init_shell();
   init_steps();
   init_session();

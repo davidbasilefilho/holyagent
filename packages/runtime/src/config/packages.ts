@@ -21,19 +21,22 @@ export const WEB_KIT_PACKAGE = "pi-web-kit" as const satisfies PiPackageName
  * neither is one the form does not offer (computer use in the headless form); the web tools of a
  * provider that offers them load no package, and with `pi.enable` off nothing is loaded. The
  * profile defaults to the selected provider's, and the form to `normal`; a test passes another of
- * either, or its own `definitions`.
+ * either, or its own `definitions`. A capability whose native library does not cover the `platform`
+ * (the machine's by default) is not offered either, so its package is neither loaded nor required
+ * there.
  */
 export const piPackages = (
   config: Config,
   profile: ProviderProfile = providerProfile(config),
   form: CapabilityForm = "normal",
   definitions: ReadonlyArray<CapabilityDefinition> = CAPABILITIES,
+  platform?: string,
 ): ReadonlyArray<string> => {
   const { enable, features } = config.pi
   if (!enable) return []
   const names: ReadonlyArray<PiPackageName> = [
     ...(profile.package === undefined ? [] : [profile.package]),
-    ...capabilityPackages(features, form, definitions),
+    ...capabilityPackages(features, form, definitions, platform),
     ...(webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []),
   ]
   return names.map((name) => piPackageSource(name))

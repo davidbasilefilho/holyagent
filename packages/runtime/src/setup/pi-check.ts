@@ -371,13 +371,14 @@ const unmetNeed = (env: Env, need: SystemNeed) =>
   })
 
 /**
- * Doctor's line on one enabled capability in a form. A form the capability does not offer is a `~`
- * line saying why and that nothing is expected (never a failure, since a headless machine is not
- * broken). Otherwise the probes of its `health` run: `needs` checks each system need
- * ({@link
- * SystemNeed}), `packages` that each package of the form is listed at its pin in the files
- * that count; every problem is named in one `FAIL` line, and a healthy capability is one `ok` line
- * with its form and whom it applies to.
+ * Doctor's line on one enabled capability in a form on a host (the machine's by default). A form
+ * the capability does not offer, or a host its native library does not cover, is a `~` line saying
+ * why and that nothing is expected (never a failure, since a headless machine is not broken, nor is
+ * one without a native build, where Pi keeps its own tools). Otherwise the probes of its `health`
+ * run: `needs` checks each system need ({@link
+ * SystemNeed}), `packages` that each package of the
+ * form is listed at its pin in the files that count; every problem is named in one `FAIL` line, and
+ * a healthy capability is one `ok` line with its form and whom it applies to.
  */
 export const checkCapability = (
   env: Env,
@@ -386,10 +387,11 @@ export const checkCapability = (
   form: CapabilityForm,
   listed: ReadonlyArray<string>,
   files: ReadonlyArray<string>,
+  platform?: string,
 ) =>
   Effect.gen(function* () {
     const name = `pi capability ${capability.name}`
-    const reason = unavailableIn(capability, form)
+    const reason = unavailableIn(capability, form, platform)
     if (reason !== undefined)
       return hint(`${name}: not offered in the ${form} form (${reason}); nothing is expected of it`)
     const content = formContent(capability, form)

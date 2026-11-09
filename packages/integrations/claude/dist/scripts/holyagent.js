@@ -12537,6 +12537,18 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
+var FFF_OVERRIDE_SETTINGS = { mode: "override" };
+var FFF_OVERRIDE_TOOLS = ["grep", "find", "multi_grep"];
+var FFF_NATIVE_HOSTS = [
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-arm64",
+  "linux-x64",
+  "win32-arm64",
+  "win32-x64",
+  "android-arm64"
+];
+
 var CAPABILITY_FORMS = ["headless", "normal"];
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
@@ -12545,6 +12557,7 @@ var SUBAGENTS_ONLY_SPECIALISTS = {
   disableDefaultAgents: true,
   fallbackSubagent: "none"
 };
+var PI_FFF_FILE = "~/.pi/agent/pi-fff.json";
 var T3_PREFIX = "mcp__t3*code__";
 var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}preview_*`,
@@ -12711,6 +12724,20 @@ var CAPABILITIES = [
       }
     ],
     health: ["needs"]
+  },
+  {
+    name: "fff",
+    feature: "fff",
+    description: "Replaces Pi's find and grep with fff, a fast indexed file and content search (@ff-labs/pi-fff)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [],
+    nativeHosts: FFF_NATIVE_HOSTS,
+    forms: sameForm(["@ff-labs/pi-fff"]),
+    tools: { rootExclude: FFF_OVERRIDE_TOOLS, visual: [] },
+    settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
+    health: ["needs", "packages"]
   }
 ];
 var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
@@ -12722,12 +12749,15 @@ var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
   const [first] = formContent(capability, "normal")?.packages ?? [];
   return first === undefined ? [] : [[capability.feature, first]];
 }));
-var unavailableIn = (capability, form) => {
+var hostPlatform = () => `${process.platform}-${process.arch}`;
+var unavailableIn = (capability, form, platform = hostPlatform()) => {
   const entry = capability.forms[form];
-  return "unavailable" in entry ? entry.unavailable : undefined;
+  if ("unavailable" in entry)
+    return entry.unavailable;
+  return capability.nativeHosts === undefined || capability.nativeHosts.includes(platform) ? undefined : `its native library does not cover ${platform}, only ${capability.nativeHosts.join(", ")}`;
 };
-var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider));
-var capabilityPackages = (features, form, definitions = CAPABILITIES) => enabledCapabilities(features, { form, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []);
+var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form, options.platform) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider));
+var capabilityPackages = (features, form, definitions = CAPABILITIES, platform) => enabledCapabilities(features, { form, platform, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []);
 var managedCapabilityPackages = (definitions = CAPABILITIES) => [
   ...new Set(definitions.flatMap((capability) => CAPABILITY_FORMS.flatMap((form) => formContent(capability, form)?.packages ?? [])))
 ];
@@ -13205,7 +13235,8 @@ var pi_packages_default = {
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.6",
   "@amaster.ai/pi-computer-use": "0.1.36",
-  "pi-web-kit": "0.5.0"
+  "pi-web-kit": "0.5.0",
+  "@ff-labs/pi-fff": "0.11.0"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
@@ -22875,13 +22906,13 @@ var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set b
 import { join as join16 } from "path";
 
 var WEB_KIT_PACKAGE = "pi-web-kit";
-var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES) => {
+var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
   const { enable, features } = config.pi;
   if (!enable)
     return [];
   const names = [
     ...profile.package === undefined ? [] : [profile.package],
-    ...capabilityPackages(features, form, definitions),
+    ...capabilityPackages(features, form, definitions, platform),
     ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
   ];
   return names.map((name) => piPackageSource(name));
@@ -23028,9 +23059,9 @@ var unmetNeed = (env, need) => gen2(function* () {
   const found = yield* (yield* Shell).which(need.command);
   return isSome2(found) ? undefined : `needs ${need.command} on PATH; ${need.fix}`;
 });
-var checkCapability = (env, scope, capability, form, listed, files) => gen2(function* () {
+var checkCapability = (env, scope, capability, form, listed, files, platform) => gen2(function* () {
   const name = `pi capability ${capability.name}`;
-  const reason = unavailableIn(capability, form);
+  const reason = unavailableIn(capability, form, platform);
   if (reason !== undefined)
     return hint(`${name}: not offered in the ${form} form (${reason}); nothing is expected of it`);
   const content = formContent(capability, form);
@@ -23090,7 +23121,7 @@ var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
 var T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
 var T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
-var toolSettings = (config, profile = providerProfile(config), form = "normal") => {
+var toolSettings = (config, profile = providerProfile(config), form = "normal", platform) => {
   const { enable, features } = config.pi;
   if (!enable)
     return [];
@@ -23105,7 +23136,7 @@ var toolSettings = (config, profile = providerProfile(config), form = "normal") 
         }
       }
     ] : [],
-    ...enabledCapabilities(features, { form, provider: config.pi.provider }).flatMap((capability) => capability.settings).filter((patch) => patch.whileOn === undefined || features[patch.whileOn] === true)
+    ...enabledCapabilities(features, { form, platform, provider: config.pi.provider }).flatMap((capability) => capability.settings).filter((patch) => patch.whileOn === undefined || features[patch.whileOn] === true)
   ];
 };
 
@@ -23119,6 +23150,7 @@ var PACKAGE_DEFAULTS = new Map([
     }
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
+  [PI_FFF_FILE, { mode: "tools-and-ui" }],
   ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [
     [
       profile.toolsFile,
@@ -23133,6 +23165,7 @@ var leaves = (content, prefix = []) => Object.entries(content).flatMap(([key, ch
 var KNOWN_FILES = [
   PI_SETTINGS_FILE,
   SUBAGENTS_SETTINGS_FILE,
+  PI_FFF_FILE,
   BILLION_CONTEXT_FILE,
   ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [profile.toolsFile])
 ];
@@ -23150,6 +23183,8 @@ var locate2 = (env, cwd, scope, logical) => {
     const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join17(home, ".config");
     return join17(base, "billion-context", "billion-context.json");
   }
+  if (logical === PI_FFF_FILE)
+    return project ? undefined : join17(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
     return project ? join17(cwd, ".pi", name) : join17(piAgentDirectory(env), name);

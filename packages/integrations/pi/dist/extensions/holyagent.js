@@ -14093,6 +14093,18 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
+var FFF_OVERRIDE_SETTINGS = { mode: "override" };
+var FFF_OVERRIDE_TOOLS = ["grep", "find", "multi_grep"];
+var FFF_NATIVE_HOSTS = [
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-arm64",
+  "linux-x64",
+  "win32-arm64",
+  "win32-x64",
+  "android-arm64"
+];
+
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
 var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
@@ -14100,6 +14112,7 @@ var SUBAGENTS_ONLY_SPECIALISTS = {
   disableDefaultAgents: true,
   fallbackSubagent: "none"
 };
+var PI_FFF_FILE = "~/.pi/agent/pi-fff.json";
 var T3_PREFIX = "mcp__t3*code__";
 var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}preview_*`,
@@ -14266,6 +14279,20 @@ var CAPABILITIES = [
       }
     ],
     health: ["needs"]
+  },
+  {
+    name: "fff",
+    feature: "fff",
+    description: "Replaces Pi's find and grep with fff, a fast indexed file and content search (@ff-labs/pi-fff)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [],
+    nativeHosts: FFF_NATIVE_HOSTS,
+    forms: sameForm(["@ff-labs/pi-fff"]),
+    tools: { rootExclude: FFF_OVERRIDE_TOOLS, visual: [] },
+    settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
+    health: ["needs", "packages"]
   }
 ];
 var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
@@ -14277,11 +14304,14 @@ var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
   const [first] = formContent(capability, "normal")?.packages ?? [];
   return first === undefined ? [] : [[capability.feature, first]];
 }));
-var unavailableIn = (capability, form) => {
+var hostPlatform = () => `${process.platform}-${process.arch}`;
+var unavailableIn = (capability, form, platform = hostPlatform()) => {
   const entry = capability.forms[form];
-  return "unavailable" in entry ? entry.unavailable : undefined;
+  if ("unavailable" in entry)
+    return entry.unavailable;
+  return capability.nativeHosts === undefined || capability.nativeHosts.includes(platform) ? undefined : `its native library does not cover ${platform}, only ${capability.nativeHosts.join(", ")}`;
 };
-var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider));
+var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form, options.platform) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider));
 
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed5(value)));
 var VcsSettings = Struct({
@@ -17270,7 +17300,7 @@ Pick the cheapest specialist whose agent description fits and whose result you c
 - With several Intents open and none in use, choose one through \`ask_user_question\`.
 `;
 
-var search_default2 = "## Searching\n\nSearch file contents with `holyagent rg` and file names with `holyagent fd`, never with grep, find or pi's grep and find tools. They run the ripgrep and fd that ship with the package and take those programs' own arguments, so every machine gives the same answer. Always pass the path, for example `.`: with no path and a piped or redirected stdin, rg reads stdin and reports no matches. Use the system rg, fd, grep or find only when either fails with UnsupportedPlatform.\n";
+var search_default2 = "## Searching\n\nSearch file contents with `holyagent rg` and file names with `holyagent fd`, never with grep, find or the grep and find tools. They run the ripgrep and fd that ship with the package and take those programs' own arguments, so every machine gives the same answer. Always pass the path, for example `.`: with no path and a piped or redirected stdin, rg reads stdin and reports no matches. Use the system rg, fd, grep or find only when either fails with UnsupportedPlatform.\n";
 
 var skills_default2 = "## Skills\n\nClassify the situation first, then load only the skill that matches it; each holds rules that matter only then. <!-- K9, K28: situation-specific rules load on demand and stay out of this prompt. -->\n\n- `dev-server`: visual work needs a running, capturable render target (a web app or served static build, a terminal UI, a desktop or mobile app); it has Worker.operations start the one target per platform that the visual specialists share, or report why it cannot run here. T3 Code's browser and preview tools are optional aids for that target.\n- `visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch, and again when rendered work is accepted, repaired or explained visually; it holds how you pick the platform skill, your own final pass that decides acceptance, what counts as material and the repair rounds.\n- `web-design`, `mobile-design`, `desktop-design`, `tui-design`: the platform standard for visual work, for a web page or app, an iOS or Android app, a desktop app and a terminal UI. `visual-judging` says how to pick and name them; load the one you picked yourself for the final pass.\n- `evidence-judging`: a specialist report carries a verdict you must accept or reject (a blocking finding, a research claim with conflicting sources or numbers, prose for people, a material design choice).\n- `ci-watch`: a pushed PR or commit needs its CI watched or judged.\n- `state-mode`: a clone has no Intent yet, so choose where state lives before the first Intent of a clone.\n- `instruction-writing`: you write or review model-facing text other than a brief.\n- `user-busy`: the user says they are away, asleep, busy or not to be asked; load it before asking anything.\n\nUsing `dev-server`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.\n";
 

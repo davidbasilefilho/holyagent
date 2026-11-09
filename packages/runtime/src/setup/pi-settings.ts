@@ -11,6 +11,7 @@ import type { Config } from "../config/schema.ts"
 import { PROVIDERS, ROOT_MODEL_PAIR, rootModelSettings } from "../pi/provider.ts"
 import {
   BILLION_CONTEXT_FILE,
+  PI_FFF_FILE,
   PI_SETTINGS_FILE,
   SUBAGENTS_SETTINGS_FILE,
   toolSettings,
@@ -50,6 +51,7 @@ import { take } from "./settings.ts"
  * - `@tintinweb/pi-subagents@0.23.1`, README "Disable defaults": `disableDefaultAgents` is `false`.
  * - `pi-provider-kimi-code@0.6.13`, `src/config.ts` `makeDefaultTools`: each Moonshot tool is
  *   `enabled: false`.
+ * - `@ff-labs/pi-fff@0.11.0`, `README.md` "Modes": `mode` defaults to `tools-and-ui`.
  */
 const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonObject>([
   [
@@ -61,6 +63,7 @@ const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonOb
     },
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
+  [PI_FFF_FILE, { mode: "tools-and-ui" }],
   ...Object.values(PROVIDERS).flatMap((profile) =>
     profile.toolsFile === undefined
       ? []
@@ -91,6 +94,7 @@ const leaves = (content: JsonObject, prefix: ReadonlyArray<string> = []): Readon
 const KNOWN_FILES: ReadonlyArray<string> = [
   PI_SETTINGS_FILE,
   SUBAGENTS_SETTINGS_FILE,
+  PI_FFF_FILE,
   BILLION_CONTEXT_FILE,
   ...Object.values(PROVIDERS).flatMap((profile) =>
     profile.toolsFile === undefined ? [] : [profile.toolsFile],
@@ -106,7 +110,9 @@ const PI_PREFIX = "~/.pi/"
  * (`PI_CODING_AGENT_DIR` honored), the home directory's `.pi` for the provider's file, and for
  * Billion Context `BILI_CONFIG_FILE`, else `XDG_CONFIG_HOME`, else `~/.config`. Scopes `project`
  * and `local` use the project's `.pi` folder, where Pi and the packages read project settings;
- * Billion Context has no project file, so its setting is user scope only.
+ * Billion Context has no project file, and `@ff-labs/pi-fff` reads `pi-fff.json` from Pi's agent
+ * folder only (its project config could not safely choose tool names), so their settings are user
+ * scope only.
  */
 const locate = (env: Env, cwd: string, scope: Scope, logical: string): string | undefined => {
   const project = scope !== "user"
@@ -118,6 +124,8 @@ const locate = (env: Env, cwd: string, scope: Scope, logical: string): string | 
     const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join(home, ".config")
     return join(base, "billion-context", "billion-context.json")
   }
+  if (logical === PI_FFF_FILE)
+    return project ? undefined : join(piAgentDirectory(env), "pi-fff.json")
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length)
     return project ? join(cwd, ".pi", name) : join(piAgentDirectory(env), name)
@@ -429,12 +437,13 @@ const revertUnplanned = Effect.fn("revertUnplannedToolSettings")(function* (
  * not written either ({@link resolveTarget}), and a symlinked `.pi` folder or file is a `!` line
  * with nothing written ({@link refuseLinks}). Keys the file already holds are never touched. The
  * keys it adds are recorded outside the project, which is what {@link undoPiToolSettings} removes.
- * Scope `user` writes Pi's global files, `project` and `local` the project's `.pi` folder (Billion
- * Context's file, which has no project location, is skipped with a `-` line). A file that is not a
- * JSON object is a `!` line and stays as it is, and the other files are still written. Each write
- * goes through a temporary file renamed over the target. With `dryRun` nothing is written or
- * recorded. With `pi.enable` off nothing is written, but the keys of a revertable setting that
- * setup recorded are still taken back out; a config that cannot be loaded gives no lines.
+ * Scope `user` writes Pi's global files, `project` and `local` the project's `.pi` folder (the
+ * files of Billion Context and `@ff-labs/pi-fff`, which have no project location, are skipped with
+ * a `-` line). A file that is not a JSON object is a `!` line and stays as it is, and the other
+ * files are still written. Each write goes through a temporary file renamed over the target. With
+ * `dryRun` nothing is written or recorded. With `pi.enable` off nothing is written, but the keys of
+ * a revertable setting that setup recorded are still taken back out; a config that cannot be loaded
+ * gives no lines.
  */
 export const installPiToolSettings = Effect.fn("installPiToolSettings")(function* (
   env: Env,

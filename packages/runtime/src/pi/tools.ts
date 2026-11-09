@@ -3,6 +3,7 @@ import {
   type CapabilityForm,
   COMPUTER_USE_TOOLS,
   enabledCapabilities,
+  PI_FFF_FILE,
   PI_SETTINGS_FILE,
   type SettingsPatch,
   SUBAGENTS_ONLY_SPECIALISTS,
@@ -228,6 +229,7 @@ export const allToolArgs = (
 // the files are re-exported here for the callers that name them.
 export {
   BILLION_CONTEXT_FILE,
+  PI_FFF_FILE,
   PI_SETTINGS_FILE,
   type SettingsPatch,
   SUBAGENTS_ONLY_SPECIALISTS,
@@ -248,14 +250,17 @@ export {
  *   specialists the package ships can launch; Billion Context's own `acp_delegate` subagents off
  *   while context compression stays on; the computer-use confirmations off, the decided "full
  *   access, no prompts"; Billion Context's bash guardrails off while the bash tool runs on
- *   just-bash, and only while Billion Context itself is on (a patch's `whileOn`).
+ *   just-bash, and only while Billion Context itself is on (a patch's `whileOn`);
+ *   `@ff-labs/pi-fff`'s override mode while fff is on and its native library covers the
+ *   `platform`.
  *
- * The form defaults to `normal`.
+ * The form defaults to `normal` and the platform to the machine's.
  */
 export const toolSettings = (
   config: Config,
   profile: ProviderProfile = providerProfile(config),
   form: CapabilityForm = "normal",
+  platform?: string,
 ): ReadonlyArray<SettingsPatch> => {
   const { enable, features } = config.pi
   if (!enable) return []
@@ -272,7 +277,7 @@ export const toolSettings = (
           },
         ]
       : []),
-    ...enabledCapabilities(features, { form, provider: config.pi.provider })
+    ...enabledCapabilities(features, { form, platform, provider: config.pi.provider })
       .flatMap((capability) => capability.settings)
       .filter(
         (patch) =>
