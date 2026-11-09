@@ -68,7 +68,7 @@ Models tend to ship cramped or misaligned spacing that a glance at the whole pag
 - Give every container (card, panel, button, field, cell) padding on all sides, so text and media never touch its edge.
 - Keep a gap between every block and the rules, dividers, borders and section edges around it, below and beside it as well as above, so nothing sits flush against a line.
 - Let the content of a column share one left edge and one right edge: headings, text and the outer edges of cards line up, and an element that starts further in or out than its neighbours has a reason the design states. Two edges in one column read as a mistake.
-- Let no wrapped line begin with a dash or other closing punctuation (an em or en dash, comma, period, colon, or a closing quote or bracket). Join the mark to the word before it with a non-breaking join or the platform's text-wrap control, or reword, because a mark that wraps to a line start reads as a break. A dash that opens a line on purpose, such as an attribution, is fine.
+- Let no wrapped line begin with a dash or other closing punctuation (an em or en dash, comma, period, colon, or a closing quote or bracket). Join the mark to the word before it with a non-breaking join or the platform's text-wrap control, or reword (in a terminal frame, where no such join exists, reword or move the break), because a mark that wraps to a line start reads as a break. A dash that opens a line on purpose, such as an attribution, is fine.
 
 ### Quality floor, unannounced
 
