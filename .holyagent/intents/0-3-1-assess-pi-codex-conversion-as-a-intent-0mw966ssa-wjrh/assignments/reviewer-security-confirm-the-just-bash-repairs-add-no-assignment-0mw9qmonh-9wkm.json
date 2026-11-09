@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mw9qmonh-9wkm",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-just-bash-repairs-add-no",
+  "objective": "Confirm the just-bash repairs add no command-injection, path or privilege defect in host passthrough, path-given programs, the null device or the guardrail revert.",
+  "state": "Running",
+  "scope": [
+    "The just-bash work: commits fd3d876 (repair) and 618be49 (/dev/null fix) on top of 971b9ea0, plus a merge of the Codex provider branch (d5604d4) whose generated dist was rebuilt. Review 971b9ea0 (first just-bash commit) through the merge commit d149c9c at the head of release/0.3.1/feat/just-bash in /home/user/holyagent-0.3.1-bash; the Codex commits are reviewed separately (PR davidbasilefilho/holyagent#105), so judge only how the merge combines them.",
+    "Diffs: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-0.3.1-bash-fix.diff (fd3d876) and /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-devnull.diff (618be49). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odug6-6vgw.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odupl-x2zg.md (security); writer reports /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os41y-etgw.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9q5dw2-a16f.md",
+    "Requirements: just-bash built-ins win over host executables of the same name; commands just-bash lacks pass through to real executables on PATH and other relevant places on Linux, macOS and Windows; TypeScript first, JavaScript fallback; Billion Context bash guardrails off."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no git writes. Run commands in /home/user/holyagent-0.3.1-bash, not the main checkout, and pass explicit ranges (971b9ea0..HEAD of that worktree) to any review command.",
+    "Judge whether previous findings are closed and whether the repairs or the merge introduced defects; the /dev/null tests skipped on Windows need a judgement too.",
+    "Testing is unit tests and fixtures only: never start pi or make live model requests.",
+    "Report in under 400 words; start each evidence line with the exact criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous security finding is closed or still correctly non-blocking",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Path-given program execution and PATH carry-over cannot run something other than what the command names, and Windows .cmd and .bat arguments cannot inject commands",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The guardrail revert touches only the settings HolyAgent recorded, in the files it recorded",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The null device cannot expose or overwrite host files",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9os41y-etgw",
+    "assignment-0mw9q5dw2-a16f"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T20:52:48.845Z"
+  },
+  "createdAt": "2026-11-09T20:52:48.845Z"
+}
