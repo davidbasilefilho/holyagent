@@ -12,6 +12,12 @@ export const NOW = "2026-01-02T12:00:00.000Z"
 export const after = (minutes: number): string =>
   new Date(Date.parse(NOW) + minutes * 60_000).toISOString()
 
+/**
+ * The timeout of a test that starts the CLI or a bundle as a process: cold starts of the unbundled
+ * CLI stall for long stretches on the slow Windows runners.
+ */
+export const PROCESS_TIMEOUT_MS = process.platform === "win32" ? 120_000 : 30_000
+
 /** An open Intent at revision 1; override any field. */
 export const intent = (over: Partial<Intent> = {}): Intent => ({
   id: "intent-a",

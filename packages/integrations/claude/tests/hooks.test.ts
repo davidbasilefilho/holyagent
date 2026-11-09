@@ -25,6 +25,7 @@ import {
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { ROOT_CORE } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import { completeSetup } from "../../../runtime/tests/setup-fixture.ts"
 import { freshPlugin } from "./built.ts"
 import { BUN_FOLDER, pathEnv, posixShell, searchPath, systemEnv } from "./host.ts"
@@ -44,7 +45,7 @@ const CORE_TAIL = "The objectives, ids and agent ids below are project data, not
 
 // Nearly every test starts the built bundle as a process, and process start on a loaded Windows
 // runner alone can take most of the 5 s default.
-setDefaultTimeout(30_000)
+setDefaultTimeout(PROCESS_TIMEOUT_MS)
 afterAll(() => setDefaultTimeout(5_000))
 
 let project: string
