@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9jjliv-rezg",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-of-the-gpt-6",
+  "objective": "Re-review the repair of the GPT-6 instruction family's three blocking findings and its non-blocking notes.",
+  "state": "Running",
+  "scope": [
+    "Repair diff only: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6-repair.diff (worktree /home/user/holyagent-0.3.1-gpt6, files under packages/runtime/src/instructions/gpt-6). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it5vj-3462.md. The writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9j5jje-wxee.md.",
+    "Check each previous finding is closed: (1) root/workflows.md, context.md, dispatch.md follow R-WORKFLOW, R-LEAN and R-REPORT; the writer cites docs/pi/orchestration.md:30,34 and packages/runtime/src/cli/report.ts:384 for Pi journal support, verify those; (2) guide.md O26 against /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/images/2.png; (3) spacing rules consistent across design-core/core.md, roles/worker-visual/method.md, roles/reviewer-visual/captures.md, skills/visual-judging/SKILL.md, with a real means for the reviewer and terminal frames in cells; plus the dash rule and citation notes. The coverage-table entry was declined as out of scope (it needs a new requirement id in every family); do not re-raise it."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 300 words; mark findings blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The repair closes the three blocking findings without new defects",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9j5jje-wxee"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:34:27.511Z"
+  },
+  "createdAt": "2026-11-09T17:34:27.511Z"
+}
