@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-start-branch-skip-rule-in",
   "objective": "Make the start-branch skip rule in startBranch apply only when the clone settled on the repository's default branch, as its doc comment says.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-cloudstart, branch release/0.3.1/fix/cloud-start-branch (head f56c8ec).",
     "Review finding (non-blocking), packages/runtime/src/cli/status.ts about lines 36-41: the rule skips a first reflog move from a full commit id when the next move leaves that move's destination, but never checks that the destination is the default branch. A session that starts detached, goes to B, then to C reports C instead of B.",
@@ -57,7 +57,9 @@
   "specialist": {
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T16:20:13.897Z"
+    "startedAt": "2026-11-09T16:20:13.897Z",
+    "finishedAt": "2026-11-09T16:20:36.278Z"
   },
+  "result": "stopped: result: not launched. A claude.ai clone has no refs/remotes/origin/HEAD (checked in this session: git symbolic-ref -q refs/remotes/origin/HEAD exits 1), so a default-branch check from origin/HEAD would turn the fix off exactly where it is needed. The finding stays a known limit.\n",
   "createdAt": "2026-11-09T16:20:13.897Z"
 }
