@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "check-two-external-claims-in-the-0-3-0",
   "objective": "Check two external claims in the 0.3.0 docs against their upstream sources and say for each whether it holds, with the source line.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Claim A, the todo panel (docs/pi in /home/user/holyagent-0.3.0-docs; search the docs for setWidget and rpiv-todo): @juicesharp/rpiv-todo draws its live panel through Pi's ctx.ui.setWidget, and that panel does not show under T3 Code while the todo tool still works. Check the package source at the version HolyAgent pins (find the pin in packages/integrations/pi/src of the same worktree) on npm or GitHub, and check from T3 Code's Pi provider source (pingdotgg/t3code) whether T3 renders Pi widgets.",
     "Claim B, docs/pi/t3-code.md:168 'What the generator reads': T3 appends custom instructions to its thread-naming prompt with the first message and images, starts Pi for text generation with --no-tools and --no-extensions and without --no-context-files, so only AGENTS.md and CLAUDE.md reach it. Sources named there: ThreadLaunchService.ts, textGenerationPrompts.ts and the Pi provider's textGeneration.ts in pingdotgg/t3code on main."
@@ -38,7 +38,33 @@
     "agentId": "workflow:wf_7c6338ca-a62/assignment-0mw9bjvi7-07jb",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-09T13:50:43.519Z"
+    "startedAt": "2026-11-09T13:50:43.519Z",
+    "finishedAt": "2026-11-09T14:00:05.889Z"
+  },
+  "result": "result: Claim A holds at rpiv-todo 2.15.0. Claim B mostly holds, with two corrections. I could not read `ThreadLaunchService.ts`, and no check ran against T3's `main` itself.\n\n**Claim A: holds**\nPin: `@juicesharp/rpiv-todo` 2.15.0, in `/home/user/holyagent-0.3.0-docs/packages/runtime/src/config/pi-packages.json:5`.\nFact: the panel is drawn through Pi's `setWidget`. `todo-overlay.ts` calls `this.uiCtx.setWidget(WIDGET_KEY, (tui, factoryTheme) => …, { placement: \"aboveEditor\" })` in `update()`. The file header reads \"Lifecycle controller for Pi's `setWidget` contract\". Source: https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-todo/todo-overlay.ts\n  - That is `main`, not the 2.15.0 tag. unpkg's 2.15.0 listing shows the same `todo-overlay.ts` file, but I could not fetch its content, so the match to 2.15.0 is inferred.\nFact: the `todo` tool is registered separately from the overlay (`registerTodoTool(pi)` in `index.ts`). The overlay only loads when `ctx.hasUI`. Source: https://github.com/juicesharp/rpiv-mono/blob/main/packages/rpiv-todo/index.ts\nFact: T3's own user doc says \"Blocking `select`, `confirm`, `input`, and `editor` dialogs work in T3 Code… Terminal titles and generic widgets do not have a T3 Code equivalent.\" Source: https://github.com/pingdotgg/t3code/blob/main/docs/user/providers-pi.md\nInference: the panel does not show under T3 while the tool still works. This rests on the doc sentence above. I did not read T3's Pi RPC client code to confirm that `setWidget` is dropped.\n\n**Claim B: mostly holds**\nFact: the Pi text-generation path launches with `disableExtensions: true` and `disableTools: true`. `buildPiRpcLaunch` then appends `--no-extensions` and `--no-tools`. It also adds `--no-session`, plus `--offline` because it sets `shortLived: true`. It never adds `--no-context-files`.\n  - Source: https://git.kaki87.net/VibedByKaKi/t3-code-android-nightly/src/branch/main/packages/provider-pi/src/server/textGeneration.ts, and `mcpInjection.ts` in the same directory.\n  - Caveat: this is a third-party mirror, not `pingdotgg/t3code` on `main`.\n  - Correction: a user's Pi launch args pass through, and `--no-context-files` is not on T3's reserved list. A user who sets it there would remove `AGENTS.md` and `CLAUDE.md` from the generator.\nFact: custom instructions are appended after the user message as \"Additional instructions:\", capped at 4,000 characters. Source: https://github.com/pingdotgg/t3code/blob/78f462c4/apps/server/src/textGeneration/TextGenerationPrompts.ts. That is a pinned commit, not `main`.\n  - `buildBranchNamePrompt` appends `policy.branchInstructions`. The first message is capped at 8,000 characters.\n  - Correction: images are sent only as \"Attachment metadata\" (name, MIME type, size). The Pi runner sends `prompt` as text only, so the generator does not see the pixels.\nFact: the Pi runner is wrapped in `withoutInvestigation(\"Pi\", …)`, which matches \"no repository search\".\nNot checked: `ThreadLaunchService.ts` returned CRAWL_NOT_FOUND on the paths I tried.\nRelated finding: thread-title instructions have no settings field, so `policy.threadTitleInstructions` is unset. Branch-naming instructions are settable. Source: https://github.com/pingdotgg/t3code/discussions/6836 (2026-07-30). The doc covers only branches, so this is consistent.\n\nSuggested edits to `docs/pi/t3-code.md:168`: say the generator gets image metadata only, and say a `--no-context-files` launch arg in the Pi settings would hide the context files.\n\nevidence:\nclaim-a: Holds. `todo-overlay.ts` calls `setWidget` (juicesharp/rpiv-mono `main`, pin is 2.15.0); T3's `docs/user/providers-pi.md` says \"generic widgets do not have a T3 Code equivalent\".\nclaim-b: Mostly holds. The flags and the instruction append are confirmed; only a mirror and a pinned commit were read, and `ThreadLaunchService.ts` was not read.\nClaim A is confirmed or refuted from the pinned rpiv-todo source and T3's Pi provider source: Confirmed from the rpiv-todo source at `main` plus T3's `docs/user/providers-pi.md`. I did not read T3's RPC client code.\nClaim B is confirmed or refuted from the named t3code files: Partly confirmed; `textGenerationPrompts.ts` and `textGeneration.ts` were read, and `ThreadLaunchService.ts` was not reachable.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "both claims checked against upstream source with URLs; two corrections to t3-code.md:168 carried into a repair",
+    "criteria": [
+      {
+        "criterion": "Claim A is confirmed or refuted from the pinned rpiv-todo source and T3's Pi provider source",
+        "support": "Confirmed from the rpiv-todo source at `main` plus T3's `docs/user/providers-pi.md`. I did not read T3's RPC client code."
+      },
+      {
+        "criterion": "Claim B is confirmed or refuted from the named t3code files",
+        "support": "Partly confirmed; `textGenerationPrompts.ts` and `textGeneration.ts` were read, and `ThreadLaunchService.ts` was not reachable."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "claim-a",
+        "support": "Holds. `todo-overlay.ts` calls `setWidget` (juicesharp/rpiv-mono `main`, pin is 2.15.0); T3's `docs/user/providers-pi.md` says \"generic widgets do not have a T3 Code equivalent\"."
+      },
+      {
+        "label": "claim-b",
+        "support": "Mostly holds. The flags and the instruction append are confirmed; only a mirror and a pinned commit were read, and `ThreadLaunchService.ts` was not read."
+      }
+    ]
   },
   "createdAt": "2026-11-09T13:50:43.519Z"
 }
