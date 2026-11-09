@@ -24730,7 +24730,7 @@ var init_pi_check = __esm(() => {
   GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i;
 });
 
-var T3_PREFIX = "mcp__t3*code__", T3_VISUAL_TOOLS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, toolSettings = (config, profile = providerProfile(config)) => {
+var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`), T3_PREFIX = "mcp__t3*code__", T3_VISUAL_TOOLS, T3_TOOL, T3_VISUAL, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, toolSettings = (config, profile = providerProfile(config)) => {
   const { enable, features } = config.pi;
   if (!enable)
     return [];
@@ -24767,6 +24767,8 @@ var init_tools = __esm(() => {
     `${T3_PREFIX}html_preview`,
     `${T3_PREFIX}device_*`
   ];
+  T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
+  T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
   SUBAGENTS_ONLY_SPECIALISTS = {
     disableDefaultAgents: true,
     fallbackSubagent: "none"

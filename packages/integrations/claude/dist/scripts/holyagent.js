@@ -22602,6 +22602,8 @@ var piChecks = (env, cwd, scope) => gen2(function* () {
 
 import { join as join17, relative as relative6, resolve as resolve7, sep as sep7 } from "path";
 
+var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
 var T3_PREFIX = "mcp__t3*code__";
 var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}preview_*`,
@@ -22610,6 +22612,8 @@ var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}html_preview`,
   `${T3_PREFIX}device_*`
 ];
+var T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
+var T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
 var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";

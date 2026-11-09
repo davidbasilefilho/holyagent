@@ -9,6 +9,8 @@ import {
   BILLION_CONTEXT_FILE,
   CODEMODE_MAX_WORKERS_ENV,
   COMPUTER_USE_TOOLS,
+  deactivatedT3Tools,
+  isDeactivatedT3Tool,
   PI_SETTINGS_FILE,
   POWERSHELL_ENTRY,
   rootActiveTools,
@@ -470,5 +472,57 @@ describe("rootActiveTools", () => {
 
   test("a tool in both the selection and the additions appears once", () => {
     expect(rootActiveTools(root, ["codemode", "read"], registered)).toEqual(["codemode", "read"])
+  })
+})
+
+describe("the T3 Code tools the root keeps off", () => {
+  const KEPT = [
+    "html_render",
+    "html_preview",
+    "preview_open",
+    "preview_snapshot",
+    "t3_preview_open",
+    "device_list",
+    "device_tap",
+  ]
+  const DROPPED = [
+    "orchestrator_capabilities",
+    "delegate_task",
+    "task_status",
+    "task_cancel",
+    "create_threads",
+    "t3_thread_list",
+    "t3_thread_send",
+    "schedule_task",
+    "list_scheduled_tasks",
+    "delete_scheduled_task",
+    "t3_pending_request",
+    "html_render_all",
+    "devices",
+  ]
+
+  test("are every T3 tool, in either spelling of the server, outside the visual families", () => {
+    for (const server of ["mcp__t3-code__", "mcp__t3_code__"]) {
+      for (const name of KEPT) expect(isDeactivatedT3Tool(`${server}${name}`)).toBe(false)
+      for (const name of DROPPED) expect(isDeactivatedT3Tool(`${server}${name}`)).toBe(true)
+    }
+  })
+
+  test("leave every tool of another server or of Pi alone", () => {
+    for (const name of ["read", "bash", "codemode", "mcp__other__delegate_task", "delegate_task"])
+      expect(isDeactivatedT3Tool(name)).toBe(false)
+  })
+
+  test("are picked out of a registered list in its order", () => {
+    const registered = [
+      "read",
+      "mcp__t3-code__delegate_task",
+      "mcp__t3-code__html_render",
+      "mcp__t3_code__schedule_task",
+    ]
+    expect(deactivatedT3Tools(registered)).toEqual([
+      "mcp__t3-code__delegate_task",
+      "mcp__t3_code__schedule_task",
+    ])
   })
 })
