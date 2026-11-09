@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-docs-pi-claude-parity-md-agree-with",
   "objective": "Make docs/pi/claude-parity.md agree with itself about how the root text reaches Pi's system prompt.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-docs, branch release/0.3.0/docs/t3-first-pi-docs (head f19116d).",
     "docs/pi/claude-parity.md:72 still says the extension adds the root text through --append-system-prompt or APPEND_SYSTEM.md, 'to be settled', while 'Still open' point 1 of the same page now says it is settled: the extension's before_agent_start handler (packages/integrations/pi/src/extension.ts:1343) puts it in the system prompt. Rewrite line 72 to state the handler, and rewrite the section 1 row 'Root instructions survive compression' (around line 107) so it says the before_agent_start handler is what ships instead of offering --append-system-prompt or APPEND_SYSTEM.md.",
@@ -48,7 +48,33 @@
     "agentId": "workflow:wf_7c6338ca-a62/assignment-0mw9bjldr-6gsx",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T13:50:30.399Z"
+    "startedAt": "2026-11-09T13:50:30.399Z",
+    "finishedAt": "2026-11-09T14:00:05.499Z"
+  },
+  "result": "result: Rewrote the root-text carrier in `docs/pi/claude-parity.md` to name the `before_agent_start` handler (extension.ts:1343) everywhere it appeared. Only that file changed.\nchanged: docs/pi/claude-parity.md\nchecks:\n`bun install --frozen-lockfile` -> 0 (no changes)\n`bunx --no-install mise run build` -> 0; tree clean except the doc\n`bunx --no-install mise run verify` -> 0 on run 2 (2702 pass, 0 fail, 87 files); run 1 printed \"1 fail\" in a second test block with exit 0, unattributed and not reproduced; standalone `bun test` -> 0, 2702 pass\n`bun fmt` on the doc (fmt:check: 563 files formatted)\nblockers: none\nquestions: none\nnotes: The brief put the row at line ~107; the actual row is line 24. Removed the now-unused `[cli-sys]` and `[cfg-sys]` link definitions.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/parity-diff.patch\nevidence:\nclaude-parity.md names one carrier for the root text, the before_agent_start handler, everywhere it mentions one: docs/pi/claude-parity.md lines 24, 72 and 169; grep finds no append-system-prompt or APPEND_SYSTEM in the file\nOnly docs/pi/claude-parity.md changes and mise run verify exits 0: git status shows only that path; verify exit 0 (run 2)\nchecks-run: build exit 0, verify exit 0, bun test exit 0 (see checks)\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/parity-diff.patch\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "build and verify exit 0; grep finds one carrier left; only the parity page changed",
+    "criteria": [
+      {
+        "criterion": "claude-parity.md names one carrier for the root text, the before_agent_start handler, everywhere it mentions one",
+        "support": "docs/pi/claude-parity.md lines 24, 72 and 169; grep finds no append-system-prompt or APPEND_SYSTEM in the file"
+      },
+      {
+        "criterion": "Only docs/pi/claude-parity.md changes and mise run verify exits 0",
+        "support": "git status shows only that path; verify exit 0 (run 2)"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build exit 0, verify exit 0, bun test exit 0 (see checks)"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/parity-diff.patch"
+      }
+    ]
   },
   "createdAt": "2026-11-09T13:50:30.399Z"
 }
