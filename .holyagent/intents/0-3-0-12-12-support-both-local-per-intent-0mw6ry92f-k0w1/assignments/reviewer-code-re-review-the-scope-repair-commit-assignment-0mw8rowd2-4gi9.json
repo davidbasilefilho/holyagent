@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw8rowd2-4gi9",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-scope-repair-commit",
+  "objective": "Re-review the scope repair commit b9464e3 (range 1991d0c..b9464e3 in /home/user/holyagent-0.3.0-scope) against the finding it repairs.",
+  "state": "Running",
+  "scope": [
+    "Previous blocking finding: installedScope and enablement (packages/runtime/src/setup/scope.ts) never checked that .claude/settings.local.json is untracked, so a repository that commits it made bare setup run at local scope and pi install -l with the repository's .npmrc. The rule now: infer local only in a trusted git work tree where git reports the local file untracked; a tracked file, an untrusted folder or no git work tree gives user with a line naming the file.",
+    "Review `git diff 1991d0c..b9464e3` and the code it touches; check the git calls (Bun Shell, quoting, cwd, failure handling when git is missing), every path through setup, doctor, --undo and --fix, and the tests; run `bunx --no-install mise run verify` there."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes.",
+    "Never start pi, T3 Code or a Kimi request.",
+    "Mark each finding blocking or non-blocking with path:line and a concrete failure scenario.",
+    "Report in under 400 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding names path:line and a concrete failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states for each previous finding whether it is closed, and whether the range is merge-ready",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8rgofm-5enb"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:34:45.590Z"
+  },
+  "createdAt": "2026-11-09T04:34:45.590Z"
+}
