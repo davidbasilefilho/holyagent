@@ -836,21 +836,22 @@ describe("the default scope is user unless the local settings enable the plugin"
   test("a tracked top-level entry that is the .claude folder by identity never infers local", async () => {
     const target = await initRepo()
     await write(files().local, enabled)
-    // Git lists `.claude.` apart from `.claude`, so no pathspec for the folder finds it. The entry
-    // goes into the index directly, so no `.claude.` is created on disk: Windows folds that name
-    // onto `.claude` and would overwrite the local file.
-    await trackEntry(".claude./settings.local.json", "{}")
+    // Git lists `CLAUDE~1` apart from `.claude`, so no pathspec for the folder finds it. The entry
+    // goes into the index directly, so no `CLAUDE~1` is created on disk: Windows resolves that 8.3
+    // short name to the `.claude` folder and would overwrite the local file. Git for Windows accepts
+    // this path where a trailing-dot name is refused by core.protectNTFS.
+    await trackEntry("CLAUDE~1/settings.local.json", "{}")
     expect(await $`git -C ${repo()} ls-files --cached -- ${":(icase,literal).claude"}`.text()).toBe(
       "",
     )
     expect(await $`git -C ${repo()} ls-files --cached`.text()).toBe(
-      ".claude./settings.local.json\n",
+      "CLAUDE~1/settings.local.json\n",
     )
-    // A folding file system (a trailing dot on Windows, an 8.3 short name, an HFS+ ignorable code
+    // A folding file system (an 8.3 short name on Windows, a trailing dot, an HFS+ ignorable code
     // point) answers for the tracked name with the identity of the .claude folder. Linux cannot
     // fold names and cannot hard-link folders, so the test makes lstat answer that way.
     const original = filesystem.lstat
-    const folded = join(await realpath(repo()), ".claude.")
+    const folded = join(await realpath(repo()), "CLAUDE~1")
     const spy = spyOn(filesystem, "lstat").mockImplementation(((
       ...args: Parameters<typeof filesystem.lstat>
     ) =>
@@ -864,7 +865,7 @@ describe("the default scope is user unless the local settings enable the plugin"
       const lines = result.stdout.split("\n")
       expect(lines[0]).toBe(DEFAULT)
       expect(lines[1]).toBe(
-        `~ scope: ${target.local} enables HolyAgent but git tracks .claude. as .claude, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+        `~ scope: ${target.local} enables HolyAgent but git tracks CLAUDE~1 as .claude, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
       )
     } finally {
       spy.mockRestore()
