@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw9bgglr-dml4",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-docs-repair-commit-f19116d",
+  "objective": "Re-review the docs repair commit f19116d in /home/user/holyagent-0.3.0-docs and say whether it closes the earlier review's findings without adding new false claims.",
+  "state": "Ready",
+  "scope": [
+    "The repair diff only: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/docs-rereview.diff (commit f19116d on release/0.3.0/docs/t3-first-pi-docs, worktree /home/user/holyagent-0.3.0-docs).",
+    "The earlier findings to check are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9b33ys-yoxq.md; read it first.",
+    "Verify each changed claim against the source in the worktree (packages/runtime/src, packages/integrations/pi/src), since the docs must describe 0.3.0 as built."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits; this is a read-only review.",
+    "Judge only what the repair touched plus whether each earlier finding is closed; do not re-review unchanged pages.",
+    "Report in under 400 words; mark each finding blocking or non-blocking with the file and line."
+  ],
+  "criteria": [
+    {
+      "text": "Every finding of the earlier review is closed by the repair or its remaining state is named",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No changed line states something the source contradicts",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The changed pages stay in the repository's docs style and the README structure rule holds",
+      "blocking": false,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "claims-checked"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [
+    "assignment-0mw9b607a-daok"
+  ],
+  "independentFrom": [
+    "assignment-0mw9b607a-daok"
+  ],
+  "createdAt": "2026-11-09T13:48:04.239Z"
+}
