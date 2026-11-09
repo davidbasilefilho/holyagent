@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.visual",
   "slug": "re-inspect-the-setup-tui-captures-the",
   "objective": "Re-inspect the setup TUI captures the round-2 repair changed.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Captures are text frames in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/. The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bh2g-iu59.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bhbo-gj8f.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bgsf-onrz.md (visual); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0le-38a4.md.",
     "Read the terminal design skill at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/tui-design/SKILL.md and judge against it.",
@@ -46,7 +46,37 @@
     "agentId": "workflow:wf_27e78b45-d7b/assignment-0mw999edh-lyf1",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:46:35.525Z"
+    "startedAt": "2026-11-09T12:46:35.525Z",
+    "finishedAt": "2026-11-09T12:54:23.654Z"
+  },
+  "result": "result: All three blocking criteria are met, and I found no material discrepancy. I judged text frames only, did not run the TUI, and did not re-check the `pty-*` frames.\n\n**Findings**\n1. Dry-run failure wording is fixed at 80x24, 40x20 and 120x40 in `apply-failure-dry-run-*`.\n   - The header reads \"RESULT (DRY RUN)\" and the body says \"Dry run finished with failures; the lines marked ! failed. Fix the cause, then run the dry run again.\"\n   - The success line reads \"dry run: would add 10, nothing written\". Both \"added 10\" and \"Close T3 Code\" are gone. A grep of every `*dry*` capture for them found no matches.\n   - The `!` line still gives the cause. Rows wrap with a hanging indent and nothing is clipped.\n   - The `!`, `~` and `+` markers and the text carry the status, so colour is not the only signal.\n2. `review-dry-run-end-40x20` now reaches the end. The scroll line reads \"Lines 20-28 of 28, PgUp for earlier\", the last item \"(yours wins)\" is visible, and the Apply (dry run), Back and Cancel actions are on screen. `review-dry-run-end-80x24` ends \"Lines 5-19 of 19\" with the actions visible. I did not read `review-dry-run-end-120x40`.\n3. `review-failed-*` shows the recovery hint and actions at every saved size.\n   - At 80x24, 40x20 and 120x40 it shows the cause, then \"Fix the cause, then choose Back and review again, or choose Cancel and run holyagent setup later.\", then \"❯ Back\" and \"Cancel\".\n   - The ASCII-locale frames at 80x24 and 40x20 show the same content with `>` and `up/down`, and no non-ASCII glyphs. I did not read `review-failed-ascii-locale-120x40`.\n   - The focused action is marked with `❯`, bold and cyan. Nothing is clipped or overlapping.\n\n**Material:** none.\n\n**Preference (optional, unchanged from round 1)**\nThe heading \"REVIEW (DRY RUN: WOULD CHANGE, NOTHING IS WRITTEN)\" is wordy and wraps at 40 columns.\n\"(Apply (dry run))\" and the result header both say dry run, which is mildly redundant.\n\n**Captures judged** (in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/`)\n`apply-failure-dry-run-80x24.txt`\n`apply-failure-dry-run-40x20.txt`\n`apply-failure-dry-run-120x40.txt`\n`review-dry-run-end-40x20.txt`\n`review-dry-run-end-80x24.txt`\n`review-failed-80x24.txt`\n`review-failed-40x20.txt`\n`review-failed-120x40.txt`\n`review-failed-ascii-locale-80x24.txt`\n`review-failed-ascii-locale-40x20.txt`\n\nevidence:\nThe dry-run failure captures use would-change wording with a dry-run next step and review-dry-run-end-40x20 reaches the end: `apply-failure-dry-run-{80x24,40x20,120x40}` show \"would add 10, nothing written\" and \"run the dry run again\". `review-dry-run-end-40x20` shows \"Lines 20-28 of 28\" with the actions visible.\nNo new material discrepancy in the changed captures: none found in the ten captures judged. The review-failed hint and actions are visible at every size I read.\nThe final captures judged are listed by file name: see \"Captures judged\" above.\nfindings: see Findings above (no material discrepancy, two optional preferences).\ncaptures: see \"Captures judged\" above; all are under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/`.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Re-review evidence cites code lines, pty runs, tests and captures on e1beb56",
+    "criteria": [
+      {
+        "criterion": "The dry-run failure captures use would-change wording with a dry-run next step and review-dry-run-end-40x20 reaches the end",
+        "support": "`apply-failure-dry-run-{80x24,40x20,120x40}` show \"would add 10, nothing written\" and \"run the dry run again\". `review-dry-run-end-40x20` shows \"Lines 20-28 of 28\" with the actions visible."
+      },
+      {
+        "criterion": "No new material discrepancy in the changed captures",
+        "support": "none found in the ten captures judged. The review-failed hint and actions are visible at every size I read."
+      },
+      {
+        "criterion": "The final captures judged are listed by file name",
+        "support": "see \"Captures judged\" above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see Findings above (no material discrepancy, two optional preferences)."
+      },
+      {
+        "label": "captures",
+        "support": "see \"Captures judged\" above; all are under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/`."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:46:35.525Z"
 }
