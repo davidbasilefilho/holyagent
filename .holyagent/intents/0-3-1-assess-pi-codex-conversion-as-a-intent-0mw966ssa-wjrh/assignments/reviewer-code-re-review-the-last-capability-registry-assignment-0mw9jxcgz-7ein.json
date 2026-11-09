@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-last-capability-registry",
   "objective": "Re-review the last capability registry repair commit (HEAD) on release/0.3.1/feat/capabilities in /home/user/holyagent-0.3.1-cap.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Run git -C /home/user/holyagent-0.3.1-cap show HEAD. It answers non-blocking notes 1-4 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw9jjlrq-eaae.md: the symlink check now runs on dry runs before the dryRun branch, setup/tui/theme.ts uses the truthy CI rule (inCi) and docs/usage.md says so, the skip line names the capabilities whose choice was not saved, and a JSDoc link is on one line.",
     "Check those four and that no other behavior changed, in particular that the symlink check still runs before any write on real runs and the .pi writes are unaffected. Run mise run verify in that worktree."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_2b5a684c-a35/assignment-0mw9jxcgz-7ein",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:45:08.963Z"
+    "startedAt": "2026-11-09T17:45:08.963Z",
+    "finishedAt": "2026-11-09T17:48:56.355Z"
+  },
+  "result": "result: No blockers. The repair fixes all four notes and adds no new defects. `mise run verify` passes.\n\nchanged: none (read-only review)\n\nchecks: `bunx --no-install mise run verify` in /home/user/holyagent-0.3.1-cap -> exit 0. Type-check and lint clean, fmt clean, 2788 pass, 0 fail.\n\nBuilt-in `/code-review` (`HEAD~1...HEAD`) returned 4 findings. I classify all four as non-blocking.\n\nblockers: none\n\nnotes (non-blocking):\n1. /home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/tui/theme.ts:1 imports `inCi` from `../form.ts`. That adds about 138 lines of capability registry to both `setup-tui.js` bundles. Moving `inCi` to a leaf module would avoid it.\n2. /home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/steps.ts:227 lists every chosen capability. That is accurate, because a failed capability step writes nothing, but it does not say which capability caused the refusal.\n3. /home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/capabilities.ts:92: the symlink check still sits after `changed.length === 0`. This is unchanged from the base, so the check is skipped only when nothing would be written.\n4. /home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/tui/theme.ts:74: `FORCE_COLOR` is still compared literally to `\"0\"`, so the colour policy treats the two variables differently. This existed before the repair.\n\nThe four notes:\nThe symlink check now runs before the `!dryRun` branch, so a dry run refuses a symlinked config.\n`theme.ts` uses `inCi`, and `docs/usage.md:182` states the truthy rule.\nThe skip line names the capabilities whose choice was not saved.\nThe `{@link refuseLinks}` JSDoc is on one line.\n\nReal runs still call `refuseLinks` before `readJsonObject` and `writeJsonObject`. The `.pi` call sites (`pi-settings.ts:256`, `376`, `507`) are untouched.\n\nevidence:\nThe repair fixes the four notes without new defects: `git show HEAD` read in full; verify exit 0 (2788 pass, 0 fail); non-blocking notes 1-4 above.\nfindings: no blockers; 4 non-blocking notes above.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Four notes fixed, real-run symlink order intact, verify exit 0 (2788 pass); remaining notes non-blocking.",
+    "criteria": [
+      {
+        "criterion": "The repair fixes the four notes without new defects",
+        "support": "`git show HEAD` read in full; verify exit 0 (2788 pass, 0 fail); non-blocking notes 1-4 above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers; 4 non-blocking notes above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:45:08.963Z"
 }
