@@ -26750,7 +26750,8 @@ var TUI_PACKAGES = {
 }
 `;
 
-import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, writeFile as writeFile2 } from "fs/promises";
+import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
+import { userInfo as userInfo2 } from "os";
 import { basename as basename5, dirname as dirname5, join as join20 } from "path";
 import { pathToFileURL } from "url";
 var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
@@ -26768,7 +26769,7 @@ var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
 ].join("_")), INSTALLED_MARKER = ".holyagent-installed", markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
 `, FORMAT_CHARACTERS, plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
   const code = character.codePointAt(0) ?? 0;
-  return code > 31 && (code < 127 || code > 159);
+  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
 }).join(""), oneLine2 = (text) => plain(text.trim().split(`
 `)[0] ?? "").trim(), failureLine = (text) => {
   const lines = text.split(`
@@ -26806,7 +26807,7 @@ var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
   return;
 })), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join20(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
-}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", fileSystem = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home = false) => gen2(function* () {
+}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", fileSystem = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
     yield* fileSystem(`cannot create ${folder}`, () => mkdir5(folder, { recursive: true, mode: 448 }));
   const found = yield* tryPromise2({
@@ -26816,15 +26817,27 @@ var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
   if (found === undefined || uid === undefined)
     return;
   const refuse = (why) => new TuiUnavailable({
-    reason: home ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
+    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
   });
-  if (found.isSymbolicLink() || !found.isDirectory())
+  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat4(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
+  if (target.isSymbolicLink() || !target.isDirectory())
     return yield* refuse("is not a plain directory");
-  if (found.uid !== uid)
+  if (target.uid !== uid)
     return yield* refuse("belongs to another user");
-  if ((found.mode & 18) !== 0 && !(home && (found.mode & STICKY) !== 0))
-    return yield* refuse("can be written by others");
-}), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm6(temporary, { force: true }))), remove = (path) => promise2(() => rm6(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
+  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
+    return;
+  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
+    return;
+  return yield* refuse("can be written by others");
+}), namesPrivateGroup = (groupFile, gid, userName) => {
+  const entries = groupFile.split(`
+`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
+  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
+}, privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
+  const name = userName ?? (yield* try_2(() => userInfo2().username));
+  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
+  return namesPrivateGroup(text, gid, name);
+}).pipe(orElseSucceed2(() => false)), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm6(temporary, { force: true }))), remove = (path) => promise2(() => rm6(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
   for (let attempt = 0;attempt < 3; attempt += 1) {
     const moved = yield* exit2(fileSystem(`cannot move ${temporary}`, () => rename5(temporary, directory)));
     if (moved._tag === "Success")
@@ -26834,7 +26847,13 @@ var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
     yield* remove(directory);
   }
   return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
-}), STALE_AFTER_MS, sweepStale = (directory, uid) => gen2(function* () {
+}), STALE_AFTER_MS, newestChange = (path) => gen2(function* () {
+  const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map5((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map5((names) => names.map((name) => join20(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join20(path, "node_modules"))];
+  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
+  return Math.max(...times);
+}), sweepStale = (directory, uid) => gen2(function* () {
   const parent = dirname5(directory);
   const prefix = `.${basename5(directory)}-`;
   const cutoff = Date.now() - STALE_AFTER_MS;
@@ -26842,7 +26861,7 @@ var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
     const path = join20(parent, name);
     const found = yield* tryPromise2(() => lstat5(path));
-    if (found.isDirectory() && (uid === undefined || found.uid === uid) && found.mtimeMs < cutoff)
+    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
 }).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join20(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
@@ -26866,7 +26885,7 @@ var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
     catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
   });
   if (options.directory === undefined)
-    yield* privateFolder(cacheHome(env, process.platform), uid, false, true);
+    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
   for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname5(directory)])
     yield* privateFolder(folder, uid, true);
   yield* privateFolder(directory, uid, false);

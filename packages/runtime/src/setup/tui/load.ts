@@ -1,4 +1,5 @@
-import { lstat, mkdir, mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
+import { userInfo } from "node:os"
 import { basename, dirname, join } from "node:path"
 import { pathToFileURL } from "node:url"
 
@@ -110,6 +111,18 @@ export interface LoaderOptions extends Partial<LoaderSteps> {
    * platform without user ids (Windows), where ownership and permissions are not checked.
    */
   readonly uid?: number
+  /**
+   * The group id of the process, which a group-writable cache home must belong to. The id of the
+   * process when absent.
+   */
+  readonly gid?: number
+  /**
+   * The user name that the user's private group is named after; the OS's name for the user when
+   * absent.
+   */
+  readonly userName?: string
+  /** The group database that names the user's private group; `/etc/group` when absent. */
+  readonly groupFile?: string
   /** Called before a first install, which takes a moment; prints nothing when absent. */
   readonly notify?: (text: string) => Effect.Effect<void>
 }
@@ -120,7 +133,8 @@ export interface LoaderOptions extends Partial<LoaderSteps> {
 const FORMAT_CHARACTERS = /\p{Cf}/gu
 
 /**
- * Text with escape sequences, control characters, line breaks and invisible format characters (bidi
+ * Text with escape sequences, control characters (C0, DEL and C1, which include the line breaks),
+ * the Unicode line and paragraph separators (U+2028, U+2029) and invisible format characters (bidi
  * controls, zero-width characters) removed: what a tool such as Bun, or a registry behind it,
  * printed is shown to the user only as plain characters, so it cannot recolour the terminal, move
  * the cursor or reorder what the line says.
@@ -129,7 +143,7 @@ export const plain = (text: string): string =>
   Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, ""))
     .filter((character) => {
       const code = character.codePointAt(0) ?? 0
-      return code > 0x1f && (code < 0x7f || code > 0x9f)
+      return code > 0x1f && (code < 0x7f || code > 0x9f) && code !== 0x2028 && code !== 0x2029
     })
     .join("")
 
@@ -247,16 +261,17 @@ const errorCode = (error: unknown) =>
  * Makes sure `folder` is a directory only the current user can change, creating it with mode 0700
  * (where the OS has modes) when it is missing: it must not be a symbolic link, must belong to `uid`
  * and must not be writable by group or others, or whoever can write there could plant the code that
- * setup then runs. The cache home (`home`) is the user's own folder and holds more than
- * HolyAgent's, so it is not asked to be 0700: group or other write access is accepted there only
- * with the sticky bit, which keeps others from renaming what is inside. Not checked where there is
- * no `uid` (Windows).
+ * setup then runs. The cache home (`home`, with the test for a private group) is the user's own
+ * folder and holds more than HolyAgent's, so it is not asked to be 0700: it may be a link, in which
+ * case its target is checked, and group or other write access is accepted there only with the
+ * sticky bit, which keeps others from renaming what is inside, or, for group write alone, when the
+ * group is the user's private one. Not checked where there is no `uid` (Windows).
  */
 const privateFolder = (
   folder: string,
   uid: number | undefined,
   create: boolean,
-  home: boolean = false,
+  home?: (gid: number) => Effect.Effect<boolean>,
 ) =>
   Effect.gen(function* () {
     if (create)
@@ -276,16 +291,64 @@ const privateFolder = (
     if (found === undefined || uid === undefined) return
     const refuse = (why: string) =>
       new TuiUnavailable({
-        reason: home
-          ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours`
-          : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`,
+        reason:
+          home !== undefined
+            ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours`
+            : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`,
       })
-    if (found.isSymbolicLink() || !found.isDirectory())
+    // A link as the cache home (for example to another disk) is followed once: what it leads to is
+    // the folder checked, and a link that leads nowhere is refused.
+    const target =
+      home !== undefined && found.isSymbolicLink()
+        ? yield* Effect.tryPromise(() => stat(folder)).pipe(
+            Effect.catch(() => Effect.fail(refuse("is not a plain directory"))),
+          )
+        : found
+    if (target.isSymbolicLink() || !target.isDirectory())
       return yield* refuse("is not a plain directory")
-    if (found.uid !== uid) return yield* refuse("belongs to another user")
-    if ((found.mode & 0o022) !== 0 && !(home && (found.mode & STICKY) !== 0))
-      return yield* refuse("can be written by others")
+    if (target.uid !== uid) return yield* refuse("belongs to another user")
+    if ((target.mode & 0o022) === 0 || (home !== undefined && (target.mode & STICKY) !== 0)) return
+    if (home !== undefined && (target.mode & 0o002) === 0 && (yield* home(target.gid))) return
+    return yield* refuse("can be written by others")
   })
+
+/**
+ * Whether `groupFile` (the `/etc/group` format) names the group `gid` after `userName` with no
+ * other member, so only that user is in it and group write access is the user's alone.
+ */
+const namesPrivateGroup = (groupFile: string, gid: number, userName: string): boolean => {
+  const entries = groupFile
+    .split("\n")
+    .map((line) => line.split(":"))
+    .filter((fields) => fields[2] === String(gid))
+  return (
+    entries.length > 0 &&
+    entries.every(
+      ([name, , , members = ""]) =>
+        name === userName &&
+        members
+          .split(",")
+          .filter((member) => member !== "")
+          .every((member) => member === userName),
+    )
+  )
+}
+
+/**
+ * Tells whether a cache home's group is the user's private group: the group of the process, named
+ * after the user in the group database, with no other member. Anything that cannot be read or
+ * resolved counts as not private.
+ */
+const privateGroup =
+  (gid: number | undefined, userName: string | undefined, groupFile: string) =>
+  (homeGid: number): Effect.Effect<boolean> =>
+    gid === undefined || homeGid !== gid
+      ? Effect.succeed(false)
+      : Effect.gen(function* () {
+          const name = userName ?? (yield* Effect.try(() => userInfo().username))
+          const text = yield* Effect.tryPromise(() => Bun.file(groupFile).text())
+          return namesPrivateGroup(text, gid, name)
+        }).pipe(Effect.orElseSucceed(() => false))
 
 /** Writes `text` to `target` without following a link planted there: a new file, then a rename. */
 const writeFresh = (target: string, text: string) =>
@@ -327,10 +390,33 @@ const promote = (
 const STALE_AFTER_MS = 60 * 60 * 1000
 
 /**
+ * The newest modification time in `path`, a temporary install folder: its own, those of the entries
+ * directly inside it and those of the entries directly inside its `node_modules`, so a long install
+ * that keeps writing there is not mistaken for a dead one whose folder was last touched at its
+ * start. An entry that cannot be read is skipped.
+ */
+const newestChange = (path: string) =>
+  Effect.gen(function* () {
+    const modified = (entry: string) =>
+      Effect.tryPromise(() => lstat(entry)).pipe(
+        Effect.map((found) => found.mtimeMs),
+        Effect.orElseSucceed(() => 0),
+      )
+    const children = (folder: string) =>
+      Effect.tryPromise(() => readdir(folder)).pipe(
+        Effect.map((names) => names.map((name) => join(folder, name))),
+        Effect.orElseSucceed((): string[] => []),
+      )
+    const inside = [...(yield* children(path)), ...(yield* children(join(path, "node_modules")))]
+    const times = yield* Effect.forEach([path, ...inside], modified, { concurrency: 16 })
+    return Math.max(...times)
+  })
+
+/**
  * Removes the temporary install folders (`.<name>-*`) beside `directory` that an install killed
- * before its cleanup left behind: plain directories of `uid` not touched for
- * {@link STALE_AFTER_MS}, so a run that is installing now keeps its own. Best effort: whatever
- * cannot be read or removed stays, and the install goes on.
+ * before its cleanup left behind: plain directories of `uid` with nothing changed in them for
+ * {@link STALE_AFTER_MS} (see {@link newestChange}), so a run that is installing now keeps its own.
+ * Best effort: whatever cannot be read or removed stays, and the install goes on.
  */
 const sweepStale = (directory: string, uid: number | undefined) =>
   Effect.gen(function* () {
@@ -347,7 +433,7 @@ const sweepStale = (directory: string, uid: number | undefined) =>
           if (
             found.isDirectory() &&
             (uid === undefined || found.uid === uid) &&
-            found.mtimeMs < cutoff
+            (yield* newestChange(path)) < cutoff
           )
             yield* remove(path)
         }).pipe(Effect.ignore),
@@ -396,7 +482,8 @@ const installAtomically = (
  * plugin) and the packages it runs on are installed on first use, from the lockfile subset the
  * build embedded ({@link TUI_LOCK}), into a per-user cache folder ({@link tuiDirectory}). The cache
  * folders are created private (mode 0700) and are refused when they are another user's or writable
- * by others, and so is the cache home itself unless it is a sticky folder of the user's. An install
+ * by others, and so is the cache home itself (a link to it is followed) unless it is a sticky
+ * folder of the user's or, for group write only, belongs to the user's private group. An install
  * goes into a temporary folder that is renamed into place with a completion marker, so a folder
  * without the marker counts as absent. The bundle is copied next to the installed `node_modules`,
  * where its imports resolve, without following a link planted at its path; Solid's preload (which
@@ -420,7 +507,16 @@ export const loadSetupTui = (
       catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause),
     })
     if (options.directory === undefined)
-      yield* privateFolder(cacheHome(env, process.platform), uid, false, true)
+      yield* privateFolder(
+        cacheHome(env, process.platform),
+        uid,
+        false,
+        privateGroup(
+          options.gid ?? process.getgid?.(),
+          options.userName,
+          options.groupFile ?? "/etc/group",
+        ),
+      )
     for (const folder of options.directory === undefined
       ? guardedFolders(env, process.platform)
       : [dirname(directory)])

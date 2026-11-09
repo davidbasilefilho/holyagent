@@ -446,11 +446,27 @@ describe("an install that is interrupted, raced or planted", () => {
     const leftovers = [".versions-AbC123", ".versions-Zz9999"]
     await mkdir(parent, { recursive: true, mode: 0o700 })
     await chmod(parent, 0o700)
-    for (const name of [...leftovers, ".versions-recent", ".other-AbC123", "plain"]) {
-      await mkdir(join(parent, name, "node_modules"), { recursive: true })
-      await writeFile(join(parent, name, "node_modules", "file"), "x")
+    const kept = [".versions-live-package", ".versions-live-top"]
+    for (const name of [...leftovers, ...kept, ".versions-recent", ".other-AbC123", "plain"]) {
+      await mkdir(join(parent, name, "node_modules", "package"), { recursive: true })
+      await writeFile(join(parent, name, "node_modules", "package", "file"), "x")
+      await writeFile(join(parent, name, "top"), "x")
     }
-    for (const name of [...leftovers, ".other-AbC123"]) await utimes(join(parent, name), old, old)
+    // Everything inside is old, deepest first so that a change does not touch what encloses it, except
+    // for the one entry of each "live" folder, which a long install changed within the hour.
+    const live: Record<string, string> = {
+      ".versions-live-package": join("node_modules", "package"),
+      ".versions-live-top": "top",
+    }
+    for (const name of [...leftovers, ...kept, ".other-AbC123"])
+      for (const inner of [
+        join("node_modules", "package", "file"),
+        join("node_modules", "package"),
+        "top",
+        "node_modules",
+        "",
+      ])
+        if (live[name] !== inner) await utimes(join(parent, name, inner), old, old)
     let installs = 0
     await loaded({
       packages: PACKAGES,
@@ -463,6 +479,7 @@ describe("an install that is interrupted, raced or planted", () => {
     expect(installs).toBe(1)
     expect((await readdir(parent)).toSorted()).toEqual([
       ".other-AbC123",
+      ...kept,
       ".versions-recent",
       "plain",
       "versions",
@@ -533,7 +550,9 @@ describe("an install that is interrupted, raced or planted", () => {
   describe.skipIf(!POSIX)("the cache home itself", () => {
     // The folder every cache folder sits in: XDG_CACHE_HOME, as the real load resolves it.
     const home = () => join(directory, "cache-home")
-    const attempt = async (options: { uid?: number } = {}) => {
+    const attempt = async (
+      options: { uid?: number; gid?: number; userName?: string; groupFile?: string } = {},
+    ) => {
       const bundle = await bundleFile("export const runSetupTui = 1")
       let installs = 0
       const run = loadSetupTui(
@@ -553,10 +572,15 @@ describe("an install that is interrupted, raced or planted", () => {
       return { outcome, installs: () => installs }
     }
 
+    // A group database in which no group is anyone's private one.
+    const NO_GROUPS = () => join(directory, "no-group")
+    const message = (outcome: Awaited<ReturnType<typeof attempt>>["outcome"]) =>
+      outcome._tag === "Failure" ? outcome.failure.message : ""
+
     test("a group-writable cache home is refused, with nothing installed", async () => {
       await mkdir(home(), { recursive: true })
       await chmod(home(), 0o775)
-      const { outcome, installs } = await attempt()
+      const { outcome, installs } = await attempt({ groupFile: NO_GROUPS() })
       expect(outcome._tag).toBe("Failure")
       expect(outcome._tag === "Failure" ? outcome.failure.message : "").toContain(
         `the cache home ${home()} can be written by others`,
@@ -577,15 +601,92 @@ describe("an install that is interrupted, raced or planted", () => {
       expect((await attempt()).outcome._tag).toBe("Success")
     })
 
-    test("a cache home that is a link is refused", async () => {
-      await mkdir(join(directory, "elsewhere"), { recursive: true, mode: 0o700 })
-      await symlink(join(directory, "elsewhere"), home(), "dir")
-      const { outcome, installs } = await attempt()
-      expect(outcome._tag === "Failure" ? outcome.failure.message : "").toContain(
-        `the cache home ${home()} is not a plain directory`,
-      )
-      expect(installs()).toBe(0)
-      expect(await readdir(join(directory, "elsewhere"))).toEqual([])
+    describe("a group-writable cache home", () => {
+      const groups = async (text: string) => {
+        const file = join(directory, "group")
+        await writeFile(file, text)
+        return file
+      }
+      const writable = async (mode: number) => {
+        await mkdir(home(), { recursive: true })
+        await chmod(home(), mode)
+        return (await stat(home())).gid
+      }
+
+      test("is kept when its group is the user's private group", async () => {
+        const gid = await writable(0o775)
+        const { outcome, installs } = await attempt({
+          gid,
+          userName: "me",
+          groupFile: await groups(`root:x:${gid + 1}:\nme:x:${gid}:\n`),
+        })
+        expect(outcome._tag).toBe("Success")
+        expect(installs()).toBe(1)
+        // The user may be listed in its own group.
+        await rm(join(home(), "holyagent"), { recursive: true })
+        const listed = await attempt({
+          gid,
+          userName: "me",
+          groupFile: await groups(`me:x:${gid}:me\n`),
+        })
+        expect(listed.outcome._tag).toBe("Success")
+      })
+
+      test("is refused when the group has another member or another name, is not the process's, or is not named", async () => {
+        const gid = await writable(0o775)
+        const refused = async (options: Parameters<typeof attempt>[0]) => {
+          const { outcome, installs } = await attempt(options)
+          expect(message(outcome)).toContain(`the cache home ${home()} can be written by others`)
+          expect(installs()).toBe(0)
+        }
+        await refused({ gid, userName: "me", groupFile: await groups(`me:x:${gid}:me,other\n`) })
+        await refused({ gid, userName: "me", groupFile: await groups(`staff:x:${gid}:me\n`) })
+        await refused({ gid, userName: "me", groupFile: await groups(`me:x:${gid + 1}:\n`) })
+        await refused({ gid: gid + 1, userName: "me", groupFile: await groups(`me:x:${gid}:\n`) })
+        await refused({ gid, userName: "me", groupFile: join(directory, "missing") })
+      })
+
+      test("is refused when others can write too, even in a private group", async () => {
+        const gid = await writable(0o777)
+        const { outcome, installs } = await attempt({
+          gid,
+          userName: "me",
+          groupFile: await groups(`me:x:${gid}:\n`),
+        })
+        expect(message(outcome)).toContain(`the cache home ${home()} can be written by others`)
+        expect(installs()).toBe(0)
+      })
+    })
+
+    describe("a cache home that is a link", () => {
+      const elsewhere = () => join(directory, "elsewhere")
+
+      test("is followed to a folder of the user's, and the install goes there", async () => {
+        await mkdir(elsewhere(), { recursive: true, mode: 0o700 })
+        await symlink(elsewhere(), home(), "dir")
+        const { outcome, installs } = await attempt()
+        expect(outcome._tag).toBe("Success")
+        expect(installs()).toBe(1)
+        expect(await readdir(elsewhere())).toEqual(["holyagent"])
+        expect((await lstat(home())).isSymbolicLink()).toBe(true)
+      })
+
+      test("is refused when what it leads to is writable by others, another user's, or missing", async () => {
+        await mkdir(elsewhere(), { recursive: true })
+        await chmod(elsewhere(), 0o777)
+        await symlink(elsewhere(), home(), "dir")
+        const open = await attempt({ groupFile: join(directory, "no-group") })
+        expect(message(open.outcome)).toContain(`the cache home ${home()} can be written by others`)
+        await chmod(elsewhere(), 0o700)
+        const other = await attempt({ uid: (process.getuid?.() ?? 0) + 1 })
+        expect(message(other.outcome)).toContain(`the cache home ${home()} belongs to another user`)
+        await rm(elsewhere(), { recursive: true })
+        const dangling = await attempt()
+        expect(message(dangling.outcome)).toContain(
+          `the cache home ${home()} is not a plain directory`,
+        )
+        expect(open.installs() + other.installs() + dangling.installs()).toBe(0)
+      })
     })
 
     test("a cache home that belongs to another user is refused", async () => {
@@ -696,6 +797,7 @@ describe("what the install is held to", () => {
       "red link",
     )
     expect(plain("a\u0000b\u0007c\u007Fd\u0085e\r\nf\tg")).toBe("abcdefg")
+    expect(plain("line\u2028break\u2029paragraph")).toBe("linebreakparagraph")
     expect(plain("日本語 ünï ✓")).toBe("日本語 ünï ✓")
   })
 
