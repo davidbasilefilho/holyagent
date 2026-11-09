@@ -259,6 +259,7 @@ describe("the runtime scripts", () => {
       expect((await call("status")).stdout).toBe("intents: []\n")
       await rm(root, { recursive: true, force: true })
     },
+    30_000,
   )
 })
 

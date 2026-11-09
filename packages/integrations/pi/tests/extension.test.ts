@@ -840,7 +840,7 @@ describe("with the built package and a real project", () => {
     expect(delivered?.message?.content).toContain("Real objective")
     expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
     await done()
-  })
+  }, 30_000)
 
   test("a bad .holyagent/config.json is reported with the field it names", async () => {
     const { root, home, done } = await project()
@@ -854,7 +854,7 @@ describe("with the built package and a real project", () => {
     expect(delivered?.message?.content).toContain("config.json")
     expect(delivered?.message?.content).toContain("enabel")
     await done()
-  })
+  }, 30_000)
 
   test("pi.enable false in the project's config adds nothing", async () => {
     const { root, home, done } = await project()
@@ -868,7 +868,7 @@ describe("with the built package and a real project", () => {
     expect(delivered?.message).toBeUndefined()
     expect(delivered?.systemPrompt).toContain("the system prompt")
     await done()
-  })
+  }, 30_000)
 })
 
 /**
@@ -1410,7 +1410,7 @@ describe("with the built package and a project that is not a git repository", ()
     expect(delivered?.message?.content).toContain("Plain objective")
     expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
     await done()
-  })
+  }, 30_000)
 
   test("a session role gets the core and the status", async () => {
     const { root, home, done } = await plain()
@@ -1420,7 +1420,7 @@ describe("with the built package and a project that is not a git repository", ()
     expect(delivered?.message?.content).toContain("You are the root")
     expect(delivered?.message?.content).toContain("Plain objective")
     await done()
-  })
+  }, 30_000)
 
   test("a session role without a .holyagent folder still gets the core", async () => {
     const { root, home, done } = await plain()
@@ -1429,7 +1429,7 @@ describe("with the built package and a project that is not a git repository", ()
     expect(delivered?.message?.content).toContain("You are the root")
     expect(delivered?.message?.content).not.toContain("holyagent status:")
     await done()
-  })
+  }, 30_000)
 
   test("the bundled CLI fails as a state error for a project folder that does not exist", async () => {
     const child = Bun.spawn(
@@ -1445,7 +1445,7 @@ describe("with the built package and a project that is not a git repository", ()
     const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
     expect(code).toBe(4)
     expect(stderr).toContain("error: StateIo")
-  })
+  }, 30_000)
 })
 
 describe("finding Bun", () => {

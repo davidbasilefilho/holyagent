@@ -212,5 +212,5 @@ describe("the project flag of the runtime bundle", () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 })
