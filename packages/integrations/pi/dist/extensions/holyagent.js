@@ -16463,6 +16463,8 @@ var POWERSHELL_ENTRY = "+powershell";
 var CODEMODE_ENTRY = "+codemode";
 var CODEMODE_TOOL = "codemode";
 var CODEMODE_MAX_WORKERS_ENV = "PI_CODEMODE_MAX_WORKERS";
+var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
 var T3_PREFIX = "mcp__t3*code__";
 var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}preview_*`,
@@ -16471,7 +16473,9 @@ var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}html_preview`,
   `${T3_PREFIX}device_*`
 ];
-var isDeactivatedT3Tool = (name) => toolMatches(`${T3_PREFIX}*`, name) && !T3_VISUAL_TOOLS.some((pattern) => toolMatches(pattern, name));
+var T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
+var T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
+var isDeactivatedT3Tool = (name) => T3_TOOL.test(name) && !T3_VISUAL.some((pattern) => pattern.test(name));
 var deactivatedT3Tools = (registered) => registered.filter(isDeactivatedT3Tool);
 var COMPUTER_USE_TOOLS = ["computer_use_*"];
 var build = (tools, excludeTools, noMcp, maxWorkers) => ({
@@ -16514,8 +16518,7 @@ var toolArgs = (config, key, profile = providerProfile(config)) => {
   const unique = [...new Set(tools)];
   return build([...unique, CODEMODE_TOOL], WRITE_TOOLS.filter((tool) => !unique.includes(tool)), noMcp, maxWorkers);
 };
-var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-var toolMatches = (pattern, name) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`).test(name);
+var toolMatches = (pattern, name) => patternRegExp(pattern).test(name);
 var rootActiveTools = (args, active, registered) => {
   const added = args.tools.flatMap((entry) => {
     const name = entry.startsWith("+") ? entry.slice(1) : entry;
@@ -17053,8 +17056,10 @@ var createExtension = ({
         if (result?.config !== undefined)
           startProviderCheck(taken, result.config);
         if (result?.tools !== undefined) {
-          taken.t3Root = taken.t3;
-          taken.setupNotice = applyRootTools(result.tools, taken.t3);
+          const notApplied = applyRootTools(result.tools, taken.t3);
+          taken.t3Gate = taken.t3;
+          taken.t3Root = taken.t3 && notApplied === undefined;
+          taken.setupNotice = notApplied;
           if (taken.t3 && belowFullAccess(env))
             taken.setupNotice = joinNotices(taken.setupNotice, warnBelowFullAccess(ctx));
         }
@@ -17082,6 +17087,7 @@ var createExtension = ({
       excluded: runSync2(startingExclusions),
       started: false,
       t3: isT3Session(ctx, env),
+      t3Gate: false,
       t3Root: false,
       probe: undefined,
       readiness: undefined,
@@ -17134,7 +17140,7 @@ ${event.systemPrompt}` : undefined;
     return message === undefined ? undefined : { message };
   });
   pi.registerToolRenderer(workflowRenderers);
-  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : refuseExcludedTool(event, held?.excluded ?? []) ?? (held?.t3Root === true ? refuseDeactivatedT3Tool(event) : undefined) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
+  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : refuseExcludedTool(event, held?.excluded ?? []) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
   pi.on("session_shutdown", () => release());
 };
 var extension_default = createExtension();

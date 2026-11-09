@@ -178,6 +178,8 @@ const fakeApi = (
     readonly pi?: PiProbe
     /** Makes `setActiveTools` throw this. */
     readonly toolsFail?: Error
+    /** Makes the first `setActiveTools` throw this; later calls succeed. */
+    readonly toolsFailOnce?: Error
     /** The context's run mode; read only by a session under T3 Code, so absent for any other. */
     readonly mode?: ExtensionContext["mode"]
     /** The context's `ui`, likewise only for a session that uses it. */
@@ -193,6 +195,7 @@ const fakeApi = (
   // The test's own list when it gives one, so a change it makes mid-session reaches the extension.
   const active = (session.activeTools ?? []) as Array<string>
   const touched: Array<string> = []
+  let failedOnce = false
   const renderers: Array<ToolRendererResolver> = []
   // The commands started and not yet settled: a process that is still running.
   const running = { count: 0 }
@@ -206,6 +209,10 @@ const fakeApi = (
     getAllTools: () => (session.allTools ?? active).map((name) => ({ name })),
     setActiveTools: (names: ReadonlyArray<string>) => {
       if (session.toolsFail !== undefined) throw session.toolsFail
+      if (session.toolsFailOnce !== undefined && !failedOnce) {
+        failedOnce = true
+        throw session.toolsFailOnce
+      }
       toolSets.push(names)
       active.splice(0, active.length, ...names)
     },
@@ -287,6 +294,7 @@ const run = async (
     allTools?: ReadonlyArray<string>
     pi?: PiProbe
     toolsFail?: Error
+    toolsFailOnce?: Error
     mode?: ExtensionContext["mode"]
     ui?: object
     deadlineMs?: number
@@ -308,6 +316,7 @@ const run = async (
     ...(options.allTools === undefined ? {} : { allTools: options.allTools }),
     ...(options.pi === undefined ? {} : { pi: options.pi }),
     ...(options.toolsFail === undefined ? {} : { toolsFail: options.toolsFail }),
+    ...(options.toolsFailOnce === undefined ? {} : { toolsFailOnce: options.toolsFailOnce }),
     ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.ui === undefined ? {} : { ui: options.ui }),
   })
@@ -3394,6 +3403,22 @@ describe("under T3 Code", () => {
     expect(api.toolSets.at(-1)).toEqual([...OTHERS, "codemode", ...KEPT_T3])
     await api.emit("session_tree", {})
     expect(api.toolSets).toHaveLength(again + 1)
+  })
+
+  test("a start whose setActiveTools throws leaves drift uncorrected, and the gate still refuses", async () => {
+    const { api } = await t3("full-access", { toolsFailOnce: new Error("no such loadout") })
+    expect(api.toolSets).toEqual([])
+    // The start's selection never took effect, so a later tool list is not corrected against it.
+    api.pi.setActiveTools([...api.pi.getActiveTools(), "mcp__t3-code__delegate_task"])
+    const drifted = api.toolSets.length
+    await api.emit("before_agent_start", { prompt: "x", systemPrompt: "p" })
+    await api.emit("session_tree", {})
+    expect(api.toolSets).toHaveLength(drifted)
+    expect(api.pi.getActiveTools()).toContain("mcp__t3-code__delegate_task")
+    // Refusing is the safe side: the gate does not wait for the tools to have been applied.
+    expect(await api.emit("tool_call", call("mcp__t3-code__delegate_task"))).toEqual([
+      expect.objectContaining({ block: true }),
+    ])
   })
 
   test("a call to a deactivated T3 tool is refused with a reason that names it, active or not", async () => {
