@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "confirm-the-fff-repair-closes-the-root",
   "objective": "Confirm the fff repair closes the root-exclusion and symlink findings without regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit 3f1c135b on release/0.3.1/feat/fff in /home/user/holyagent-0.3.1-fff; diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-fix-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9svyiy-qjsm.md",
     "Findings it repairs: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fck-0tru.md (root exclusion of fff's own tool names) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fmw-apeq.md finding 1 (followSymlinks)."
@@ -44,7 +44,33 @@
     "agentId": "workflow:wf_82be7f16-e89/assignment-0mw9tj1o6-e56c",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T22:13:57.942Z"
+    "startedAt": "2026-11-09T22:13:57.942Z",
+    "finishedAt": "2026-11-09T22:19:49.652Z"
+  },
+  "result": "result: The repair closes both findings. `mise run build` left the tree unchanged and `mise run verify` exited 0.\n\n**Built-in `/code-review`:** I ran it on `3f1c135b~1...3f1c135b`. It reported six items, and I classified all six as optional or rejected. None is a blocker.\n- Optional: `followSymlinks` is written at user scope only. At project scope setup prints a skipped line but still installs the package. The same limit already applied to `mode`, and the docs state it.\n- Optional: nothing checks the `FFF_TOOLS` copy against the pinned package, and the tool names are repeated as literals in `tools.test.ts` and `extension.test.ts`. A comment in `pi-packages.ts` asks for a recheck when the pin moves.\n- Optional: `FFF_OVERRIDE_SETTINGS` keeps an override-only name though it now also carries `followSymlinks`.\n- Optional: doctor now prints a new `lacks mode, followSymlinks` line for users who set up before this change. I count that as expected behavior.\n- Rejected: the root is not kept off the fff tools when the capability is off but the package is installed in Pi separately. That is outside what this capability controls.\n- Rejected: file symlinks may still be indexed. `followSymlinks` is documented in the package schema as directory symlinks only, so the docs are consistent. I did not run a file-symlink case.\n\n**Package check:** I downloaded `@ff-labs/pi-fff` 0.11.0 and read its source.\n- `index.ts` registers exactly `FFF_TOOL_NAMES` (`ffgrep`, `fffind`, `fff-multi-grep`) or `OVERRIDE_TOOL_NAMES` (`grep`, `find`, `multi_grep`), depending on mode. That is the six names in `FFF_TOOLS`.\n- `pi-fff.schema.json` has boolean `followSymlinks`, default true, and `config.ts` validates it as a boolean.\n- The package also has the `--fff-follow-symlinks` flag and the `FFF_FOLLOW_SYMLINKS` env var.\n\n**Specialists:** `rootExclude` applies only to the root, so specialists keep their fff tools. The changed `tools.test.ts` and `extension.test.ts` assert the six-name exclusion for the root.\n\n**Settings behavior:** The new `setup-pi-settings.test.ts` cases cover the following:\n- It writes `followSymlinks: false` and records it.\n- It keeps `followSymlinks: true` when the user already set it.\n- On revert it removes only the keys whose value still equals what setup wrote.\n- It leaves a value the user changed after setup.\n\nI read the revert logic only through these tests and did not trace the code. The `setup-capabilities.test.ts` and doctor tests were updated to match.\n\n**Not run:** the real Pi session behavior. I read the tool lists and settings; I did not start Pi with the package.\n\nblockers: none\n\nevidence:\nThe root cannot list or call any of the six fff tool names in any pi-fff mode, and specialists keep their fff tools: `rootExclude` in `capabilities.ts` is `FFF_TOOLS` (`grep`, `find`, `multi_grep`, `ffgrep`, `fffind`, `fff-multi-grep`), which matches `index.ts` of pi-fff 0.11.0. `tools.test.ts` and `extension.test.ts` assert it for the root only.\nfollowSymlinks false is written, recorded, kept when the file has its own value and reverted only when unchanged, matching pi-fff 0.11.0's schema: the schema has a boolean `followSymlinks`, default true. The new `setup-pi-settings.test.ts` cases cover write, keep and conditional revert, and they pass.\nGates: mise run build leaves the tree unchanged and mise run verify exits 0 at 3f1c135b: `bunx --no-install mise run build` exited 0 and `git status --short` was empty before and after. `bunx --no-install mise run verify` exited 0 with 3030 pass, 0 fail across 101 files, no type errors in 282 files and no lint problems in 283 files.\nfindings: none blocking; the optional items are listed above.\n",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Closed both findings against the real package; build unchanged, verify 3030 pass.",
+    "criteria": [
+      {
+        "criterion": "The root cannot list or call any of the six fff tool names in any pi-fff mode, and specialists keep their fff tools",
+        "support": "`rootExclude` in `capabilities.ts` is `FFF_TOOLS` (`grep`, `find`, `multi_grep`, `ffgrep`, `fffind`, `fff-multi-grep`), which matches `index.ts` of pi-fff 0.11.0. `tools.test.ts` and `extension.test.ts` assert it for the root only."
+      },
+      {
+        "criterion": "followSymlinks false is written, recorded, kept when the file has its own value and reverted only when unchanged, matching pi-fff 0.11.0's schema",
+        "support": "the schema has a boolean `followSymlinks`, default true. The new `setup-pi-settings.test.ts` cases cover write, keep and conditional revert, and they pass."
+      },
+      {
+        "criterion": "Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at 3f1c135b",
+        "support": "`bunx --no-install mise run build` exited 0 and `git status --short` was empty before and after. `bunx --no-install mise run verify` exited 0 with 3030 pass, 0 fail across 101 files, no type errors in 282 files and no lint problems in 283 files."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking; the optional items are listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T22:13:57.942Z"
 }
