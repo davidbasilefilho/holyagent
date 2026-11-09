@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "re-review-the-reworked-t3-rpc-contract",
   "objective": "Re-review the reworked T3 RPC contract test against the four blocking findings of the previous testing review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-t3rpc, newest commit; diff in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3rpc-rework.diff. Previous review with findings 1-4: /home/user/holyagent/.git/holyagent/reports/assignment-0mw8u28td-78i2.md."
   ],
@@ -35,7 +35,29 @@
     "agentId": "workflow:wf_cc31cad4-180/assignment-0mw94vzmq-hzwa",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-09T10:44:11.426Z"
+    "startedAt": "2026-11-09T10:44:11.426Z",
+    "finishedAt": "2026-11-09T10:48:02.348Z"
+  },
+  "result": "result: Findings 1, 3 and 4 are closed. Finding 2 is closed by descoping, since the test now says it proves nothing. No blockers.\n\nCheck: `bun test tests/t3-rpc.test.ts` in `/home/user/holyagent-0.3.0-t3rpc/packages/integrations/pi` exited 0 with 12 pass, 0 fail and 145 expects. The log is at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3rpc-rereview.log`. I did not run `bun check` or `mise run verify`, and I did not run a mutation of the extension. The conclusions below come from reading the diff and `src/extension.ts`.\n\nfindings:\n1. Circular fixtures: closed. `t3-rpc.test.ts:333-368` runs the real `createExtension` in RPC mode with each fixture's events, in all three access modes, with the launch env from the `t3_launch` fixture event. It asserts the handlers registered, the `ctx.ui` members touched, the members of `ctx` other than `cwd`, `mode` and `ui` that were touched, and the exact `setStatus` call below Full access. The only `ctx.ui` use in the extension is `src/extension.ts:1246`. The remaining fixture checks are labelled as not evidence about the extension (`:75-82`, `docs/development.md:118`). The test covers `ctx.ui` only; it does not assert other extension behaviour such as the tool filtering, which the T3 environment affects. That is a narrower claim than before, not a blocker.\n2. Turn tracker tests itself: closed by descoping. The negative self-tests are deleted. `turnsOf` (`:453-470`) is documented as reading a well-formed fixture, and the late-completion fixture header and description say it is not a regression test (`record.ts:23-24,215`; `docs/development.md:118`).\n3. UI-method scan: closed. The regex scan is replaced by a Proxy on `ctx.ui` (`:200-217`) that records every `get` and `has`. That catches aliases, destructuring and optional chaining. `:370-397` plants a destructured `setWidget`, an aliased `custom` and a direct `setTitle`, and asserts all three are caught.\n4. `uiProblem` tautology: closed. The predicate and its synthetic test are removed. The `RENDERED` and `IGNORED` checks now run on the extension's recorded accesses (`:353-357`).\n\nOptional: the `session_start` handler is the only place that calls `ctx.ui` today, so the assertion that a non-Full-access run makes exactly one `setStatus` call mostly pins that handler.\n\nverdict: accept as a ctx.ui regression test with accurate scope. The late-completion fixture is correctly marked as documentation.\n\nevidence:\nThe review states for each previous finding whether it is closed, with path:line: findings 1-4 above (`t3-rpc.test.ts:200-217,333-397,453-470`, `src/extension.ts:1246`).\nfindings: items 1-4 above, none blocking.\nverdict: accept with the narrowed scope.\n",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "All four previous findings closed with path:line; test drives the real extension; 12 pass",
+    "criteria": [
+      {
+        "criterion": "The review states for each previous finding whether it is closed, with path:line",
+        "support": "findings 1-4 above (`t3-rpc.test.ts:200-217,333-397,453-470`, `src/extension.ts:1246`)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1-4 above, none blocking."
+      },
+      {
+        "label": "verdict",
+        "support": "accept with the narrowed scope."
+      }
+    ]
   },
   "createdAt": "2026-11-09T10:44:11.426Z"
 }
