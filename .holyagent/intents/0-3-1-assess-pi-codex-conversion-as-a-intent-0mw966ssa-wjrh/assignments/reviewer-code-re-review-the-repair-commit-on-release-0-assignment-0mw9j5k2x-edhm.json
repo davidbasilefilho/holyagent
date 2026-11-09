@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9j5k2x-edhm",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-repair-commit-on-release-0",
+  "objective": "Re-review the repair commit on release/0.3.1/test/windows-temp-cleanup in /home/user/holyagent-0.3.1-rmfix that widens the temporary-folder removal retry and tightens its test.",
+  "state": "Running",
+  "scope": [
+    "Run git -C /home/user/holyagent-0.3.1-rmfix show HEAD (the repair only). Previous findings it answers: the retry budget was about 0.9 s (temp-folder.ts L6), and the test asserted calls < 50 (temp-folder.test.ts L33).",
+    "Check the budget is a few seconds and bounded, the delay growth is capped, the exact-count assertion holds, and the injected delay keeps the tests fast."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 200 words; mark findings blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The repair answers both findings without new defects",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9it6no-e9pm"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:23:32.457Z"
+  },
+  "createdAt": "2026-11-09T17:23:32.457Z"
+}
