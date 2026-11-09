@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "confirm-the-browse-and-screen-capability",
   "objective": "Confirm the browse and screen capability work is correct, regression-free and merge-ready.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit ec15538d on release/0.3.1/feat/screen in /home/user/holyagent-0.3.1-screen (range 3f1c135b..ec15538d), plus merges of the fff branch and the integration branch up to c6a2ac71; source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9trshx-cnhq.md",
     "Requirements: opencode browse is @opencode/browse (MIT, 0.0.15, stdio MCP server plus a paired Chromium extension driving the user's real browser), registered for Pi at an exact pin moved by deps:update; setup reports when the extension is not installed or paired. Computer use is not a role but a screen capability an Assignment can carry; it grants computer-use tools (pi-computer-use), browser use (opencode browse) and the T3 in-app browser (T3 preview tools where T3 hosts the session), and routes that Assignment to GPT-6.1 Terra whatever its role, at least medium. The screen capabilities are granted per Assignment to keep specialist tool lists small. Capabilities have headless and normal forms: the screen capability uses a headless Playwright Chromium in a cloud or CI session and the paired real browser and desktop computer use on a desktop; setup and doctor detect the system and pick the form, and a capability whose needs are missing is reported, not silently dropped. Everything is modular, can be turned off on its own, with exact pins moved by deps:update.",
@@ -62,7 +62,45 @@
     "agentId": "workflow:wf_b07570cb-735/assignment-0mw9v0jpx-7whl",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T22:55:34.101Z"
+    "startedAt": "2026-11-09T22:55:34.101Z",
+    "finishedAt": "2026-11-09T23:02:27.344Z"
+  },
+  "result": "result: All six blocking criteria pass at c6a2ac71. I found no blockers and four optional items. (c6a2ac71 is the merge of ec15538d with the integration and fff branches.)\n\nchanged: none. Read-only, and the tree is clean after build and verify.\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0; built 39 Claude files and 103 Pi package files. `git status --short` afterwards printed nothing.\n- `bunx --no-install mise run verify` -> exit 0; type-check clean (289 files), lint clean (290 files), format clean (705 files), `3184 pass, 0 fail` across 105 test files.\n- Built-in `/code-review`: the loaded skill was the built-in, run on `3f1c135b..c6a2ac71` at medium. It gave 6 findings; I classified them below.\n- Read from code and not run: the Pi launcher, the real Pi MCP registration and Codex runtime behavior. I checked `registerMcpServer` against the Pi 1.5.0 docs.\n\nblockers: none\n\nnotes:\n- Optional, accepted from the built-in review:\n  1. `extension.ts:1393`: with `pi.features.mcp` off the process starts with `--no-mcp`, yet browse is still registered and no notice is given.\n  2. `setup/browser-use.ts`: an unreadable `browser-tokens.json` fails the whole setup step, while doctor reports one FAIL line.\n  3. `setup/browse.ts`: the strict `Pairing` field types could report a pairing as missing if browse changes a field type. 0.0.15 writes the types the schema expects.\n  4. `capabilities.ts:377`: the need only checks that `npx` exists, but browse declares `node >= 22.19.0`.\n- Rejected, out of this change: the two `pi/bash/devices.ts` findings (the per-call `realpath` cost, and `mv`/`cp` to `/dev/` or `/` passing through). That code comes from the just-bash merge (#106), not ec15538d.\n- Known gaps judged as non-blocking:\n  - The headless Playwright form is not built. Browse 0.0.15 itself forbids `executablePath` and launches no browser, so the headless form is correctly reported as unavailable.\n  - The 0.0.15 pin is fine.\n  - Writing two agent files per specialist is sound, because a launcher can grant tools only through the agent file.\n  - The Claude host refusing screen Assignments is tested.\n- Weak test: \"the launch of a screen Assignment is recorded for the -screen agent only\" never records a mismatched agent type, so it does not prove the `AgentMismatch` path.\n\nevidence:\n- A screen Assignment's specialist gets exactly the screen tools and an ordinary one gets none, through dispatch, the brief and the Pi launcher: Dispatch returns `agent: <role>-screen` and the brief carries `SCREEN_LINE`. The agent file's `tools:` is role tools plus `computer_use_*`, `mcp__browse__*` and the T3 preview tools. Ordinary files have no browse tools and no screen additions. The extension registers browse only for `isScreenAgent` sessions. Covered by `packages/runtime/tests/screen.test.ts`, `packages/runtime/tests/pi/tools.test.ts`, `packages/integrations/pi/tests/pi.test.ts` and `packages/integrations/pi/tests/extension.test.ts`; verify exit 0.\n- Codex routing of screen Assignments to Terra at medium or higher is correct and leaves other routes unchanged: `screenRoute` in `packages/runtime/src/pi/codex/routes.ts` returns Terra at the higher of the row's effort and medium, and `routeModel` applies it only with `screen: true` and only under Codex. `packages/runtime/tests/screen.test.ts` checks all 18 roles through the CLI. Luna rows move to Terra at medium, `Worker.debugging` stays at xhigh, and plain Codex rows and every Kimi row are unchanged.\n- The browse MCP registration matches what @opencode/browse 0.0.15 exposes: I unpacked 0.0.15 from npm. It is MIT and declares `engines.node >= 22.19.0`. `cli.mjs` serves `mcp` when argv is exactly `browse mcp`, so `npx -y @opencode/browse@0.0.15 mcp` is valid. Its tool names are `status`, `execute`, `session_*` and so on, reached as `mcp__browse__*` by server name. The pairing file path (`OPENCODE_BROWSER_HOME`, else `XDG_DATA_HOME` or `~/.local/share`, plus `browse/browser-tokens.json`) and the 43-character base64url token rule match `browse.ts`. `pi.registerMcpServer` exists in Pi 1.5.0 with the `command` and `args` shape.\n- No regression in dispatch, warm reuse, the Claude host or the existing capabilities: `screen` is an optional key that is stored only when true. Warm reuse gains a \"same screen capability\" stage, and `bindSpecialist` refuses a mismatch. The Claude host ignores `screen` and refuses screen dispatch. Visual roles keep their old tools. Verify exit 0 with 0 failures.\n- Changed behavior has tests that fail without the change, and no test is weakened: new `screen.test.ts` (runtime and pi), `setup-browse.test.ts` and the `tools.test.ts` screen block assert the new behavior. Edits to existing tests only add the `-screen` names or set `browserUse: false` to keep their assertions exact.\n- Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at c6a2ac71: build exit 0 with an empty `git status`; verify exit 0 with 3184 pass and 0 fail.\n- findings: 4 optional (listed in notes), 2 rejected as out of scope, 0 blockers. The built-in review output is in the ReportFindings call.\n",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Review evidence holds; findings go to the repair",
+    "criteria": [
+      {
+        "criterion": "A screen Assignment's specialist gets exactly the screen tools and an ordinary one gets none, through dispatch, the brief and the Pi launcher",
+        "support": "Dispatch returns `agent: <role>-screen` and the brief carries `SCREEN_LINE`. The agent file's `tools:` is role tools plus `computer_use_*`, `mcp__browse__*` and the T3 preview tools. Ordinary files have no browse tools and no screen additions. The extension registers browse only for `isScreenAgent` sessions. Covered by `packages/runtime/tests/screen.test.ts`, `packages/runtime/tests/pi/tools.test.ts`, `packages/integrations/pi/tests/pi.test.ts` and `packages/integrations/pi/tests/extension.test.ts`; verify exit 0."
+      },
+      {
+        "criterion": "Codex routing of screen Assignments to Terra at medium or higher is correct and leaves other routes unchanged",
+        "support": "`screenRoute` in `packages/runtime/src/pi/codex/routes.ts` returns Terra at the higher of the row's effort and medium, and `routeModel` applies it only with `screen: true` and only under Codex. `packages/runtime/tests/screen.test.ts` checks all 18 roles through the CLI. Luna rows move to Terra at medium, `Worker.debugging` stays at xhigh, and plain Codex rows and every Kimi row are unchanged."
+      },
+      {
+        "criterion": "The browse MCP registration matches what @opencode/browse 0.0.15 exposes",
+        "support": "I unpacked 0.0.15 from npm. It is MIT and declares `engines.node >= 22.19.0`. `cli.mjs` serves `mcp` when argv is exactly `browse mcp`, so `npx -y @opencode/browse@0.0.15 mcp` is valid. Its tool names are `status`, `execute`, `session_*` and so on, reached as `mcp__browse__*` by server name. The pairing file path (`OPENCODE_BROWSER_HOME`, else `XDG_DATA_HOME` or `~/.local/share`, plus `browse/browser-tokens.json`) and the 43-character base64url token rule match `browse.ts`. `pi.registerMcpServer` exists in Pi 1.5.0 with the `command` and `args` shape."
+      },
+      {
+        "criterion": "No regression in dispatch, warm reuse, the Claude host or the existing capabilities",
+        "support": "`screen` is an optional key that is stored only when true. Warm reuse gains a \"same screen capability\" stage, and `bindSpecialist` refuses a mismatch. The Claude host ignores `screen` and refuses screen dispatch. Visual roles keep their old tools. Verify exit 0 with 0 failures."
+      },
+      {
+        "criterion": "Changed behavior has tests that fail without the change, and no test is weakened",
+        "support": "new `screen.test.ts` (runtime and pi), `setup-browse.test.ts` and the `tools.test.ts` screen block assert the new behavior. Edits to existing tests only add the `-screen` names or set `browserUse: false` to keep their assertions exact."
+      },
+      {
+        "criterion": "Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at c6a2ac71",
+        "support": "build exit 0 with an empty `git status`; verify exit 0 with 3184 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "4 optional (listed in notes), 2 rejected as out of scope, 0 blockers. The built-in review output is in the ReportFindings call."
+      }
+    ]
   },
   "createdAt": "2026-11-09T22:55:34.101Z"
 }
