@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mw9dof59-eckn",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.implementation",
+  "slug": "give-every-test-that-spawns-the-built",
+  "objective": "Give every test that spawns the built runtime bundle or CLI as a child process an explicit timeout, so Windows CI stops failing them at Bun's 5 s default.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-docs, branch release/0.3.0/docs/t3-first-pi-docs (head 62e7ea1).",
+    "Windows CI timed out at exactly 5000 ms on two different such tests in consecutive runs: packages/runtime/tests/version.test.ts:9 ('--version prints the version of the root package.json', job 129213135347) and packages/integrations/pi/tests/session-context.test.ts:158 ('the project flag of the runtime bundle > the entry runs the CLI command after the flag…', job 129226565670). Both passed on other runs of the same code, and the Windows runner takes 2.5-15 s on many spawn-heavy tests (logs: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win97.log and win96b.log). Process start of the bundle on the Windows runner is close to 5 s.",
+    "Follow the repository's existing convention for slow tests: a per-test timeout as the last argument of test(), as in vcs-commit.test.ts:360 (60_000), state-hook-locks.test.ts:143 (15_000) and state-branch.test.ts:1340. Use a shared named constant if a test helper already has one; otherwise pick one value (30_000 suggested) and apply it consistently.",
+    "Find every other test in packages/*/tests that spawns the built bundle or the CLI (Bun.spawn, $ from bun, or a helper that runs dist/scripts/holyagent.js or the runtime entry) and has no explicit timeout, and give it the same timeout. Change no assertion and no test body."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Do not skip, retry-wrap or weaken any test; only add timeouts.",
+    "Report in under 300 words; list each test given a timeout."
+  ],
+  "criteria": [
+    {
+      "text": "Every test that spawns the bundle or CLI has an explicit timeout above 5 s, by the repository's per-test timeout convention",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No assertion or test body changes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests",
+    "packages/integrations/pi/tests",
+    "packages/integrations/claude/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T14:50:14.829Z"
+  },
+  "createdAt": "2026-11-09T14:50:14.829Z"
+}
