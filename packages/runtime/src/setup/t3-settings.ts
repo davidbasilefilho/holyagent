@@ -1,4 +1,4 @@
-import { rm, stat } from "node:fs/promises"
+import { stat } from "node:fs/promises"
 import { join } from "node:path"
 
 import { Effect, Equal } from "effect"
@@ -7,17 +7,19 @@ import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import {
   applyDefaults,
+  decodeJsonObject,
   type Default,
-  fileOperation,
   isJsonObject,
   type JsonObject,
   type JsonSnapshot,
   readJsonObjectSnapshot,
+  readJsonText,
+  removeFileIfUnchanged,
   writeJsonObject,
   writeJsonObjectIfUnchanged,
 } from "./json-file.ts"
 import { loadPiConfig, piInUse } from "./pi-check.ts"
-import { addRecorded, clearRecorded, readRecorded } from "./record.ts"
+import { addRecorded, clearRecorded, readRecorded, type Recorded } from "./record.ts"
 import { hint, pass, show, skipped } from "./report.ts"
 import { take } from "./settings.ts"
 
@@ -74,11 +76,68 @@ export interface T3SettingsOptions {
   readonly deviceAccess?: boolean
   /** The operating system, `process.platform` when absent; only Xcode detection reads it. */
   readonly platform?: string
-  /** Writes the file; {@link writeJsonObject} when absent. A seam for tests of the read-back. */
-  readonly write?: (path: string, value: JsonObject) => Effect.Effect<void, SetupFailure>
+  /**
+   * Writes the file; {@link writeSettings} when absent. `unchangedSince` is the text the file must
+   * still have (`undefined` for a file that did not exist), and a write that finds another text
+   * fails and leaves the file as it is. A seam for tests of the races and the read-back.
+   */
+  readonly write?: (
+    path: string,
+    value: JsonObject,
+    unchangedSince?: string,
+  ) => Effect.Effect<void, SetupFailure>
+  /**
+   * Puts the file back to `previous` (removes it when `undefined`) only while it still has the text
+   * `unchangedSince`, and returns whether it did; {@link restoreSettings} when absent. A seam for
+   * tests of the restore.
+   */
+  readonly restore?: (
+    path: string,
+    previous: JsonObject | undefined,
+    unchangedSince: string | undefined,
+  ) => Effect.Effect<boolean, SetupFailure>
 }
 
 const label = "t3 settings"
+
+/**
+ * Puts T3's settings file back to `previous`, or removes it when there was none, only while it
+ * still has the text `unchangedSince`; returns whether it did. A file that changed since stays as
+ * it is.
+ */
+export const restoreSettings = (
+  path: string,
+  previous: JsonObject | undefined,
+  unchangedSince: string | undefined,
+) =>
+  previous === undefined
+    ? removeFileIfUnchanged(path, unchangedSince)
+    : unchangedSince === undefined
+      ? Effect.succeed(false)
+      : writeSettings(path, previous, unchangedSince).pipe(
+          Effect.as(true),
+          Effect.orElseSucceed(() => false),
+        )
+
+/**
+ * Writes T3's settings file. With `unchangedSince` (the text the step read), it writes only while
+ * the file still has that text, so a save by T3 Code in between is never overwritten; otherwise it
+ * fails naming the file and writes nothing. Without it (the file did not exist) it writes plainly.
+ */
+export const writeSettings = (path: string, value: JsonObject, unchangedSince?: string) =>
+  unchangedSince === undefined
+    ? writeJsonObject(path, value)
+    : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(
+        Effect.flatMap((wrote) =>
+          wrote
+            ? Effect.void
+            : Effect.fail(
+                new SetupFailure({
+                  message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`,
+                }),
+              ),
+        ),
+      )
 
 /** T3 Code's home: `T3CODE_HOME`, else `.t3` in the home directory. */
 export const t3Home = (env: Env) =>
@@ -248,15 +307,31 @@ const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
 
 /**
  * The keys to write into a file as it is: those of every unit that is not refused, whose value
- * differs from T3's default. Returns them with a note for each unit left out whole.
+ * differs from T3's default. Returns them with a note for each unit left out whole, and the names
+ * of the whole units that are in the file because the setup `recorded` wrote them: those are not
+ * left out, they are already written.
  */
 const wantedKeys = (
   existing: JsonObject,
   all: ReadonlyArray<Unit>,
-): { readonly keys: ReadonlyArray<Default>; readonly left: ReadonlyArray<string> } => {
+  recorded: ReadonlyArray<Recorded> = [],
+): {
+  readonly keys: ReadonlyArray<Default>
+  readonly left: ReadonlyArray<string>
+  readonly own: ReadonlyArray<string>
+} => {
   const keys: Array<Default> = []
   const left: Array<string> = []
+  const own: Array<string> = []
   for (const unit of all) {
+    if (
+      unit.whole !== undefined &&
+      existing[unit.whole] !== undefined &&
+      recorded.some(({ path }) => path[0] === unit.whole)
+    ) {
+      own.push(unit.name)
+      continue
+    }
     const reason =
       unit.whole !== undefined && existing[unit.whole] !== undefined
         ? `${unit.whole} is set`
@@ -267,7 +342,7 @@ const wantedKeys = (
     }
     keys.push(...unit.keys.filter((key) => !Equal.equals(key.value, key.default)))
   }
-  return { keys, left }
+  return { keys, left, own }
 }
 
 /** What the step needs of a machine: the T3 file to work on, and the units wanted there. */
@@ -324,38 +399,41 @@ const decide = Effect.fn("t3SettingsDecide")(function* (
 })
 
 /**
- * Writes a settings object, reads the file again and compares. When the file does not decode or
- * differs from what was written (T3 Code writes its own file too, and a client save close to ours
- * can overwrite it), it puts the previous content back, or removes the file when there was none,
- * and fails naming the file. The previous content is restored only while the file still holds what
- * the read-back saw, so a newer change is never overwritten.
+ * Writes a settings object only while the file still has the text `before` read ({@link
+ * writeSettings}), reads the file again and compares. When the file does not decode or differs from
+ * what was written (T3 Code writes its own file too, and a client save close to ours can overwrite
+ * it), it puts the previous content back, or removes the file when there was none, and fails naming
+ * the file. That is done only while the file still has the text the read-back saw, so a save that
+ * came after the read-back is never overwritten or deleted; then the file is left as it is.
  */
 const writeVerified = Effect.fn("t3SettingsWriteVerified")(function* (
   file: string,
   value: JsonObject,
   before: JsonSnapshot,
-  write: NonNullable<T3SettingsOptions["write"]>,
+  options: Pick<T3SettingsOptions, "write" | "restore">,
 ) {
-  yield* write(file, value)
-  const back = yield* readJsonObjectSnapshot(file).pipe(
-    Effect.match({
-      onFailure: (error) => ({ error: error.message }) as const,
-      onSuccess: (snapshot) => ({ snapshot }) as const,
-    }),
+  const write = options.write ?? writeSettings
+  const restore = options.restore ?? restoreSettings
+  yield* write(file, value, before.text)
+  const back = yield* readJsonText(file).pipe(
+    Effect.flatMap((text) =>
+      decodeJsonObject(file, text ?? "").pipe(
+        Effect.match({
+          onFailure: (error) => ({ text, error: error.message }) as const,
+          onSuccess: (decoded) => ({ text, decoded }) as const,
+        }),
+      ),
+    ),
+    Effect.catch((error) => Effect.succeed({ text: undefined, error: error.message } as const)),
   )
-  if ("snapshot" in back && JSON.stringify(back.snapshot.value) === JSON.stringify(value)) return
+  if ("decoded" in back && JSON.stringify(back.decoded) === JSON.stringify(value)) return
   const problem =
     "error" in back ? `does not decode afterwards: ${back.error}` : "differs from what was written"
-  const current = yield* fileOperation(file, "read", () => Bun.file(file).text())
-  const restored =
-    before.text === undefined
-      ? yield* fileOperation(file, "remove", () => rm(file, { force: true })).pipe(
-          Effect.as(true),
-          Effect.orElseSucceed(() => false),
-        )
-      : yield* writeJsonObjectIfUnchanged(file, before.value, current).pipe(
-          Effect.orElseSucceed(() => false),
-        )
+  const restored = yield* restore(
+    file,
+    before.text === undefined ? undefined : before.value,
+    back.text,
+  ).pipe(Effect.orElseSucceed(() => false))
   return yield* new SetupFailure({
     message: `${file} ${problem}; ${restored ? "its previous content was put back" : "it changed again, so it was left as it is"}. Close T3 Code and run setup again`,
   })
@@ -380,9 +458,11 @@ const names = (paths: ReadonlyArray<{ readonly path: string }>) =>
  * Nothing is written without T3's home folder (T3 Code is not installed), with `pi.enable` off, or
  * with `pi.t3.scope` `project`. A file that does not decode as a JSON object fails with a
  * {@link SetupFailure} naming it and stays untouched. The write goes through a temporary file
- * renamed over the target and is read back ({@link writeVerified}). The keys it adds are recorded
- * outside the file, which is what {@link undoT3Settings} removes. With `dryRun` nothing is written
- * or recorded.
+ * renamed over the target only while the file still has the text the step read, so a T3 save in
+ * between fails the step naming the file instead of being lost, and is read back
+ * ({@link writeVerified}). A group of keys the setup record shows setup wrote earlier is reported
+ * as already written, not as left out. The keys it adds are recorded outside the file, which is
+ * what {@link undoT3Settings} removes. With `dryRun` nothing is written or recorded.
  */
 export const installT3Settings = Effect.fn("installT3Settings")(function* (
   env: Env,
@@ -394,7 +474,9 @@ export const installT3Settings = Effect.fn("installT3Settings")(function* (
   if ("line" in decided) return [decided.line]
   const { file, units: wanted, deviceNote } = decided.target
   const before = yield* readJsonObjectSnapshot(file)
-  const { keys, left } = wantedKeys(before.value, wanted)
+  // Only for the report here; the write below reads the record again and fails on one that is bad.
+  const recorded = yield* readRecorded(env, file).pipe(Effect.orElseSucceed(() => []))
+  const { keys, left, own } = wantedKeys(before.value, wanted, recorded)
   const { merged, entries } = applyDefaults(before.value, keys)
   const added = entries.filter((entry) => entry.status === "added")
   const present = entries.filter((entry) => entry.status === "present")
@@ -403,7 +485,7 @@ export const installT3Settings = Effect.fn("installT3Settings")(function* (
     const written = new Set(added.map((entry) => entry.path))
     // Read the record first, so one that cannot be decoded stops the run before the file changes.
     yield* readRecorded(env, file)
-    yield* writeVerified(file, merged, before, options.write ?? writeJsonObject)
+    yield* writeVerified(file, merged, before, options)
     yield* addRecorded(
       env,
       file,
@@ -430,6 +512,7 @@ export const installT3Settings = Effect.fn("installT3Settings")(function* (
       (entry) =>
         `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`,
     ),
+    ...(own.length === 0 ? [] : [`already written: ${own.join(", ")}`]),
     ...(left.length === 0 ? [] : [`left out: ${left.join(", ")}`]),
     ...(deviceNote === undefined ? [] : [deviceNote]),
   ]
@@ -444,13 +527,13 @@ export const installT3Settings = Effect.fn("installT3Settings")(function* (
  * while its value still equals what setup wrote, so a value the user changed since stays and is
  * named in the line; a key setup did not record is never removed. An object the removal empties is
  * dropped, and the record is cleared after a real run. It follows the record, not the config, and
- * reads the file again after the write like the install. No record gives no line; a file that does
- * not decode fails naming it and stays as it is. With `dryRun` nothing is written and the record
- * stays.
+ * writes only while the file is as it was read and reads it again afterwards, like the install. No
+ * record gives no line; a file that does not decode fails naming it and stays as it is. With
+ * `dryRun` nothing is written and the record stays.
  */
 export const undoT3Settings = Effect.fn("undoT3Settings")(function* (
   env: Env,
-  options: Pick<T3SettingsOptions, "dryRun" | "write">,
+  options: Pick<T3SettingsOptions, "dryRun" | "write" | "restore">,
 ) {
   const file = t3SettingsFile(env)
   const recorded = yield* readRecorded(env, file)
@@ -467,8 +550,7 @@ export const undoT3Settings = Effect.fn("undoT3Settings")(function* (
       kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`)
   }
   if (!options.dryRun) {
-    if (removed.length > 0)
-      yield* writeVerified(file, result, before, options.write ?? writeJsonObject)
+    if (removed.length > 0) yield* writeVerified(file, result, before, options)
     yield* clearRecorded(env, file)
   }
   const parts = [

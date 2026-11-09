@@ -13,10 +13,12 @@ import { recordPath } from "../src/setup/record.ts"
 import { setup } from "../src/setup/steps.ts"
 import {
   installT3Settings,
+  restoreSettings,
   T3_WRITING_INSTRUCTIONS,
   t3SettingsFile,
   type T3SettingsOptions,
   undoT3Settings,
+  writeSettings,
 } from "../src/setup/t3-settings.ts"
 import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
 
@@ -264,6 +266,21 @@ describe("holyagent setup, T3 Code settings", () => {
     expect(t3Lines(report)[0]).toStartWith(`= t3 settings ${settingsFile()}: already set: `)
   })
 
+  test("a rerun reports the groups setup wrote as already written, and a group the user set as left out", async () => {
+    await machine()
+    await runSetup()
+    const line = t3Lines(await runSetup())[0] ?? ""
+    expect(line).toStartWith(`= t3 settings ${settingsFile()}: already set: `)
+    expect(line).toContain("already written: background activity, source control writing")
+    expect(line).not.toContain("left out")
+    // The record of setup's own keys is what tells them apart from the user's.
+    await write(settingsFile(), { backgroundActivity: { profile: "performance" } })
+    await Bun.write(recordPath(env()), "{}")
+    expect(t3Lines(await runSetup())[0]).toContain(
+      "left out: background activity (backgroundActivity is set)",
+    )
+  })
+
   test("a dry run writes and records nothing", async () => {
     await machine()
     const report = await runSetup({ dryRun: true })
@@ -427,6 +444,65 @@ describe("T3 settings, failures", () => {
     expect(await exists(settingsFile())).toBe(false)
   })
 
+  test("a T3 save between reading and writing is never overwritten: the step fails naming the file", async () => {
+    await machine()
+    await write(settingsFile(), { theme: "mine" })
+    const saved = JSON.stringify({ theme: "mine", t3Saved: true })
+    const failure = await installFailure({
+      dryRun: false,
+      write: (file, value, since) =>
+        Effect.promise(() => Bun.write(file, saved)).pipe(
+          Effect.andThen(writeSettings(file, value, since)),
+        ),
+    })
+    expect(failure.message).toContain(settingsFile())
+    expect(failure.message).toContain("changed while setup was working on it")
+    expect(await readText(settingsFile())).toBe(saved)
+    expect(await exists(recordPath(env()))).toBe(false)
+    // Run again, and T3's save is still in the file beside setup's keys.
+    await install({ dryRun: false })
+    expect(await read(settingsFile())).toEqual({ ...ALL, theme: "mine", t3Saved: true })
+  })
+
+  test("a restore is refused when the file changed after the read-back, and the file is left as it is", async () => {
+    await machine()
+    await write(settingsFile(), { theme: "mine" })
+    const saved = JSON.stringify({ theme: "mine", t3Saved: true })
+    const failure = await installFailure({
+      dryRun: false,
+      // A client overwrites our write with its cached settings.
+      write: (file) =>
+        Effect.promise(() => Bun.write(file, JSON.stringify({ theme: "mine", raced: true }))),
+      // Then T3 saves again before the restore.
+      restore: (file, previous, since) =>
+        Effect.promise(() => Bun.write(file, saved)).pipe(
+          Effect.andThen(restoreSettings(file, previous, since)),
+        ),
+    })
+    expect(failure.message).toContain(settingsFile())
+    expect(failure.message).toContain("differs from what was written")
+    expect(failure.message).toContain("it changed again, so it was left as it is")
+    expect(await readText(settingsFile())).toBe(saved)
+    expect(await exists(recordPath(env()))).toBe(false)
+  })
+
+  test("a file that did not exist is deleted only while it holds what the read-back saw", async () => {
+    await machine()
+    const saved = JSON.stringify({ t3Saved: true })
+    const failure = await installFailure({
+      dryRun: false,
+      write: (file) => Effect.promise(() => Bun.write(file, '{"torn": ')),
+      // T3 saves its own settings before the removal.
+      restore: (file, previous, since) =>
+        Effect.promise(() => Bun.write(file, saved)).pipe(
+          Effect.andThen(restoreSettings(file, previous, since)),
+        ),
+    })
+    expect(failure.message).toContain(settingsFile())
+    expect(failure.message).toContain("it changed again, so it was left as it is")
+    expect(await readText(settingsFile())).toBe(saved)
+  })
+
   test("a setup record that cannot be read stops the step before the file changes", async () => {
     await machine()
     await write(settingsFile(), { theme: "mine" })
@@ -496,6 +572,48 @@ describe("holyagent setup --undo, T3 Code settings", () => {
     expect(await readText(settingsFile())).toBe("{ nope")
     await write(settingsFile(), ALL)
     expect(t3Lines(await runSetup({ undo: true }))[0]).toStartWith("- t3 settings ")
+  })
+
+  test("a T3 save between reading and writing is never overwritten by the undo, and the record stays", async () => {
+    await machine()
+    await runSetup()
+    const saved = JSON.stringify({ ...ALL, t3Saved: true })
+    const failure = await Effect.runPromise(
+      undoT3Settings(env(), {
+        dryRun: false,
+        write: (file, value, since) =>
+          Effect.promise(() => Bun.write(file, saved)).pipe(
+            Effect.andThen(writeSettings(file, value, since)),
+          ),
+      }).pipe(Effect.flip),
+    )
+    expect(failure.message).toContain(settingsFile())
+    expect(failure.message).toContain("changed while setup was working on it")
+    expect(await readText(settingsFile())).toBe(saved)
+    // The record is kept, so a rerun removes setup's keys and keeps T3's save.
+    expect(t3Lines(await runSetup({ undo: true }))[0]).toStartWith("- t3 settings ")
+    expect(await read(settingsFile())).toEqual({ t3Saved: true })
+  })
+
+  test("a read-back that differs puts the file back as it was and keeps the record", async () => {
+    await machine()
+    await runSetup()
+    const before = await readText(settingsFile())
+    const failure = await Effect.runPromise(
+      undoT3Settings(env(), {
+        dryRun: false,
+        // A client overwrites the undo with its cached settings.
+        write: (file) =>
+          Effect.promise(() => Bun.write(file, JSON.stringify({ ...ALL, raced: true }))),
+      }).pipe(Effect.flip),
+    )
+    expect(failure.message).toContain(settingsFile())
+    expect(failure.message).toContain("differs from what was written")
+    expect(failure.message).toContain("its previous content was put back")
+    expect(await read(settingsFile())).toEqual(JSON.parse(before))
+    // The record is kept, so the undo can be run again.
+    expect(t3Lines(await runSetup({ undo: true }))[0]).toStartWith("- t3 settings ")
+    expect(await read(settingsFile())).toEqual({})
   })
 
   test("undoes through the step's own entry", async () => {

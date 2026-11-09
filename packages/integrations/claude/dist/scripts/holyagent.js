@@ -13484,14 +13484,25 @@ var isJsonObject2 = (value) => typeof value === "object" && value !== null && !A
 var fileExists2 = (path) => tryPromise2(() => Bun.file(path).exists()).pipe(orElseSucceed2(() => false));
 var readJsonObject = (path) => readJsonObjectSnapshot(path).pipe(map4((snapshot) => snapshot.value));
 var readJsonObjectSnapshot = (path) => gen2(function* () {
-  if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists()))) {
-    return { value: empty3, text: undefined };
-  }
-  const text = yield* fileOperation(path, "read", () => Bun.file(path).text());
-  if (text.trim() === "")
+  const text = yield* readJsonText(path);
+  if (text === undefined)
     return { value: empty3, text };
-  const value = yield* decodeUnknownEffect2(JsonObjectText)(text, strict2).pipe(mapError2((error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` })));
-  return { value, text };
+  return { value: yield* decodeJsonObject(path, text), text };
+});
+var readJsonText = (path) => gen2(function* () {
+  if (!(yield* fileOperation(path, "read", () => Bun.file(path).exists())))
+    return;
+  return yield* fileOperation(path, "read", () => Bun.file(path).text());
+});
+var decodeJsonObject = (path, text) => text.trim() === "" ? succeed6(empty3) : decodeUnknownEffect2(JsonObjectText)(text, strict2).pipe(mapError2((error) => new SetupFailure({ message: `${path} is not a JSON object: ${error.message}` })));
+var removeFileIfUnchanged = (path, unchangedSince) => gen2(function* () {
+  const text = yield* readJsonText(path);
+  if (text === undefined)
+    return unchangedSince === undefined;
+  if (text !== unchangedSince)
+    return false;
+  yield* fileOperation(path, "remove", () => rm5(path, { force: true }));
+  return true;
 });
 var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2);
 var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince);
@@ -22802,7 +22813,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   return lines;
 });
 
-import { rm as rm6, stat as stat3 } from "fs/promises";
+import { stat as stat3 } from "fs/promises";
 import { join as join18 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
@@ -22811,6 +22822,10 @@ var T3_STORAGE_CLEANUP = {
 };
 var T3_WRITING_INSTRUCTIONS = "Write as the author, in the first person or a neutral voice, about what the change does and why. " + "Keep AI agents, assistants, sessions and tools out of commit messages and pull request text, and " + "add no attribution trailers (no Co-authored-by or Generated-by lines).";
 var label2 = "t3 settings";
+var restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false));
+var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
+  message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
+}))));
 var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join18(homeDirectory(env), ".t3");
 var t3SettingsFile = (env) => join18(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map4((info) => info.isDirectory()), orElseSucceed2(() => false));
@@ -22927,10 +22942,15 @@ var units = (devices, worktrees) => [
     ]
   }
 ];
-var wantedKeys = (existing, all) => {
+var wantedKeys = (existing, all, recorded = []) => {
   const keys = [];
   const left = [];
+  const own = [];
   for (const unit of all) {
+    if (unit.whole !== undefined && existing[unit.whole] !== undefined && recorded.some(({ path }) => path[0] === unit.whole)) {
+      own.push(unit.name);
+      continue;
+    }
     const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
     if (reason !== undefined) {
       left.push(`${unit.name} (${reason})`);
@@ -22938,7 +22958,7 @@ var wantedKeys = (existing, all) => {
     }
     keys.push(...unit.keys.filter((key) => !equals(key.value, key.default)));
   }
-  return { keys, left };
+  return { keys, left, own };
 };
 var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
   const config = yield* loadPiConfig(env, cwd, "user").pipe(orElseSucceed2(() => {
@@ -22966,17 +22986,18 @@ var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
     }
   };
 });
-var writeVerified = fn2("t3SettingsWriteVerified")(function* (file, value, before, write) {
-  yield* write(file, value);
-  const back = yield* readJsonObjectSnapshot(file).pipe(match4({
-    onFailure: (error) => ({ error: error.message }),
-    onSuccess: (snapshot) => ({ snapshot })
-  }));
-  if ("snapshot" in back && JSON.stringify(back.snapshot.value) === JSON.stringify(value))
+var writeVerified = fn2("t3SettingsWriteVerified")(function* (file, value, before, options) {
+  const write = options.write ?? writeSettings;
+  const restore = options.restore ?? restoreSettings;
+  yield* write(file, value, before.text);
+  const back = yield* readJsonText(file).pipe(flatMap2((text) => decodeJsonObject(file, text ?? "").pipe(match4({
+    onFailure: (error) => ({ text, error: error.message }),
+    onSuccess: (decoded) => ({ text, decoded })
+  }))), catch_2((error) => succeed6({ text: undefined, error: error.message })));
+  if ("decoded" in back && JSON.stringify(back.decoded) === JSON.stringify(value))
     return;
   const problem = "error" in back ? `does not decode afterwards: ${back.error}` : "differs from what was written";
-  const current = yield* fileOperation(file, "read", () => Bun.file(file).text());
-  const restored = before.text === undefined ? yield* fileOperation(file, "remove", () => rm6(file, { force: true })).pipe(as2(true), orElseSucceed2(() => false)) : yield* writeJsonObjectIfUnchanged(file, before.value, current).pipe(orElseSucceed2(() => false));
+  const restored = yield* restore(file, before.text === undefined ? undefined : before.value, back.text).pipe(orElseSucceed2(() => false));
   return yield* new SetupFailure({
     message: `${file} ${problem}; ${restored ? "its previous content was put back" : "it changed again, so it was left as it is"}. Close T3 Code and run setup again`
   });
@@ -22990,7 +23011,8 @@ var installT3Settings = fn2("installT3Settings")(function* (env, cwd, options) {
     return [decided.line];
   const { file, units: wanted, deviceNote } = decided.target;
   const before = yield* readJsonObjectSnapshot(file);
-  const { keys, left } = wantedKeys(before.value, wanted);
+  const recorded = yield* readRecorded(env, file).pipe(orElseSucceed2(() => []));
+  const { keys, left, own } = wantedKeys(before.value, wanted, recorded);
   const { merged, entries } = applyDefaults(before.value, keys);
   const added = entries.filter((entry) => entry.status === "added");
   const present = entries.filter((entry) => entry.status === "present");
@@ -22998,7 +23020,7 @@ var installT3Settings = fn2("installT3Settings")(function* (env, cwd, options) {
   if (added.length > 0 && !options.dryRun) {
     const written = new Set(added.map((entry) => entry.path));
     yield* readRecorded(env, file);
-    yield* writeVerified(file, merged, before, options.write ?? writeJsonObject);
+    yield* writeVerified(file, merged, before, options);
     yield* addRecorded(env, file, keys.filter(({ path }) => written.has(path.join("."))).map(({ path, value }) => ({ path, value }))).pipe(mapError2((error) => new SetupFailure({
       message: `${file} was written, but its keys could not be recorded, so --undo will not remove them: ${error.message}`
     })));
@@ -23009,6 +23031,7 @@ var installT3Settings = fn2("installT3Settings")(function* (env, cwd, options) {
     ],
     ...present.length === 0 ? [] : [`already set: ${names(present)}`],
     ...kept.map((entry) => `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`),
+    ...own.length === 0 ? [] : [`already written: ${own.join(", ")}`],
     ...left.length === 0 ? [] : [`left out: ${left.join(", ")}`],
     ...deviceNote === undefined ? [] : [deviceNote]
   ];
@@ -23036,7 +23059,7 @@ var undoT3Settings = fn2("undoT3Settings")(function* (env, options) {
   }
   if (!options.dryRun) {
     if (removed.length > 0)
-      yield* writeVerified(file, result, before, options.write ?? writeJsonObject);
+      yield* writeVerified(file, result, before, options);
     yield* clearRecorded(env, file);
   }
   const parts = [
