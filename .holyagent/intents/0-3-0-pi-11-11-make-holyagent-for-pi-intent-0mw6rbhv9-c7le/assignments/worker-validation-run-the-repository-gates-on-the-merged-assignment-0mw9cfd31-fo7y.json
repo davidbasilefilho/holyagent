@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mw9cfd31-fo7y",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.validation",
+  "slug": "run-the-repository-gates-on-the-merged",
+  "objective": "Run the repository gates on the merged head 0fd41f80 of release/0.3.0/docs/t3-first-pi-docs in /home/user/holyagent-0.3.0-docs and report their outcome.",
+  "state": "Running",
+  "scope": [
+    "The head merges release/0.3.0/feat/setup-tui (773037e) into the docs branch without conflicts; only README.md and docs/ differ from setup-tui.",
+    "Run in that worktree: bun install --frozen-lockfile, then bunx --no-install mise run build (the tree must stay clean afterwards: report git status --short), then bunx --no-install mise run verify."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout; make no edits and no git writes.",
+    "Report in under 150 words: each command, its exit code and the test counts; put long logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "build exits 0 and leaves the tree clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T14:15:12.637Z"
+  },
+  "createdAt": "2026-11-09T14:15:12.637Z"
+}
