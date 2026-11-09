@@ -563,8 +563,10 @@ export const runShell = (
       filesystem: new InMemoryFs(stubs),
     }))
     const hostFs = (root: string) => new ReadWriteFs({ root, allowSymlinks: true })
-    const fs = withNullDevice(
-      withProgramLaunch(
+    // The device guard sits below the launch wrapper: the guard asks the file system for real paths,
+    // which would break the `exists`, `stat`, `readFile` sequence the launch wrapper watches for.
+    const fs = withProgramLaunch(
+      withNullDevice(
         windows
           ? new MountableFs({
               base: new InMemoryFs(),
@@ -577,8 +579,8 @@ export const runShell = (
               ],
             })
           : new MountableFs({ base: hostFs("/"), mounts: stubMounts }),
-        { toHost: (path) => toHostPath(path, drives, platform), platform, extensions },
       ),
+      { toHost: (path) => toHostPath(path, drives, platform), platform, extensions },
     )
 
     const hostCommands = [...plan.passthrough, ...plan.aliases].map(([name, path]) =>

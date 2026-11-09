@@ -45,8 +45,9 @@ const splitPath = (value: string, platform: NodeJS.Platform): ReadonlyArray<stri
  * The folders the shell finds host programs in: the `PATH` of the call, then the places a program
  * of a developer's machine lives that a `PATH` set by a launcher (a desktop app, a service, a
  * minimal shell) may leave out: Bun's install folder, `~/.local/bin`, mise's shims, cargo's `bin`,
- * Homebrew and the system folders. A folder `PATH` already lists keeps its place. Folders that do
- * not exist are harmless: the scan skips them.
+ * Homebrew, Git for Windows' `cmd` folders (machine-wide and per-user) and the system folders. A
+ * folder `PATH` already lists keeps its place. Folders that do not exist are harmless: the scan
+ * skips them.
  */
 export const hostSearchFolders = (
   env: Env,
@@ -67,6 +68,8 @@ export const hostSearchFolders = (
         ...under(variable(env, "LOCALAPPDATA", platform), "mise", "shims"),
         ...under(variable(env, "APPDATA", platform), "npm"),
         ...under(variable(env, "ProgramFiles", platform), "Git", "cmd"),
+        ...under(variable(env, "ProgramW6432", platform), "Git", "cmd"),
+        ...under(variable(env, "LOCALAPPDATA", platform), "Programs", "Git", "cmd"),
         ...under(variable(env, "ProgramFiles", platform), "GitHub CLI"),
         ...under(variable(env, "SystemRoot", platform), "System32"),
         ...under(variable(env, "SystemRoot", platform)),
