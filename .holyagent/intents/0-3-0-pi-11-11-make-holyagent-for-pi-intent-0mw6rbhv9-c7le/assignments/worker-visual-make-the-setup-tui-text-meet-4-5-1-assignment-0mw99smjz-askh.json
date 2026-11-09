@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mw99smjz-askh",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.visual",
+  "slug": "make-the-setup-tui-text-meet-4-5-1",
+  "objective": "Make the setup TUI text meet 4.5:1 contrast and stay legible on light terminal backgrounds (round 1 of 3).",
+  "state": "Running",
+  "scope": [
+    "Work only in /home/user/holyagent-0.3.0-tui (branch release/0.3.0/feat/setup-tui, head fa398da). Read the terminal design skill at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/tui-design/SKILL.md first and build against its checklist and capture list.",
+    "Finding 1 (material, accessibility): the hint tone #737aa2 in packages/runtime/src/setup/tui/theme.ts carries real content (explanations, recovery hints, paths, 'already set' lines) at about 4.1:1 on the Tokyo Night background #1a1b26 and about 4.2:1 on white; text needs at least 4.5:1. Pick a secondary tone that clears 4.5:1 on the dark background and stays distinct from the #a9b1d6 argument tone; state the measured ratios.",
+    "Finding 2 (material, legibility): the theme is dark-only with no background detection, so on a light terminal the cyan #7dcfff focus and hint line and the other light tones fall far below 3:1. Add light-background support as the skill says: detect a light or dark background with a bounded query (OSC 11 with a short timeout, or COLORFGBG when set) and default to dark; give a light palette (for example the Tokyo Night Day tokens) whose text tones each clear 4.5:1 on its background; keep NO_COLOR, the 16-colour tier and the ASCII locale working. Keep the tone names and the holycodex look on dark.",
+    "Extend scripts/capture-setup-tui.ts with light-background scenes (initial, review, apply-success, apply-failure, review-failed at 80x24 and 40x20) and re-run it so /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/ holds the current frames; keep the pty-* frames by copying them back if the script clears them. Record each tone's contrast ratio on its background in the report."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; list the re-saved and new captures by name."
+  ],
+  "criteria": [
+    {
+      "text": "Every text tone used for content clears 4.5:1 on the dark default background, with the ratios stated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A light terminal background is detected by a bounded query with a dark default, and the light palette's text tones each clear 4.5:1 on it, with tests for detection and its timeout",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Light-background captures exist for initial, review, apply-success, apply-failure and review-failed at 80x24 and 40x20",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "NO_COLOR, the 16-colour tier and the ASCII locale still render as before",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "gates",
+    "captures",
+    "contrast"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/tui/theme.ts",
+    "packages/runtime/src/setup/tui/app.tsx",
+    "packages/runtime/src/setup/tui/model.ts",
+    "packages/runtime/src/setup/tui/entry.tsx",
+    "packages/runtime/src/setup/tui/session.ts",
+    "packages/runtime/src/setup/tui/background.ts",
+    "packages/runtime/tests/setup-tui.test.ts",
+    "packages/runtime/tests/setup-tui-entry.test.ts",
+    "packages/runtime/tests/setup-tui-theme.test.ts",
+    "packages/runtime/tests/setup-tui-harness.ts",
+    "scripts/capture-setup-tui.ts",
+    "packages/integrations/claude/dist/scripts/setup-tui.js",
+    "packages/integrations/pi/dist/scripts/setup-tui.js",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:01:32.591Z"
+  },
+  "createdAt": "2026-11-09T13:01:32.591Z"
+}
