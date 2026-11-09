@@ -48,13 +48,20 @@ import {
   toolArgs,
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
+import { findChromium } from "../../../runtime/src/setup/chromium.ts"
 import { detectForm } from "../../../runtime/src/setup/form.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
 import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { familyAgentPrompt, familySkillPaths } from "./families.ts"
-import { registerScreenServers, screenServers } from "./screen.ts"
+import {
+  isScreenAgent,
+  refuseT3PreviewOutsideT3,
+  registerScreenServers,
+  screenFormOf,
+  screenServers,
+} from "./screen.ts"
 import { AGENT_TYPES, SPECIALIST_NAMES } from "./specialists.ts"
 import {
   belowFullAccess,
@@ -128,7 +135,7 @@ export const childAgent = (sessionName: string | undefined): string | undefined 
 
 // What the refusals list as the agents a launch may name: the 18 specialists, each also under the
 // name a screen Assignment is dispatched to.
-const SPECIALIST_CHOICES = `${SPECIALIST_NAMES.join(", ")} (each also as <name>-screen)`
+const SPECIALIST_CHOICES = `${SPECIALIST_NAMES.join(", ")} (each also as <name>-screen, or <name>-headless-screen on a headless machine)`
 
 /**
  * The variables the `holyagent` calls of the root need: the host (`pi`) and whether workflows are
@@ -541,16 +548,17 @@ const rootExclusions = (configs: ReadonlyArray<Config>): ReadonlyArray<string> =
 
 /**
  * What a config decides for a session of `role`: the worker cap and the provider's variables for
- * every role, for a specialist the MCP servers of the screen capability in the machine's `form`,
- * and for the root also its prompt and its tool selection. The root's exclusions are those of
- * `config` and of `bound`, the configs whose exclusions it keeps whatever `config` says (the
- * defaults and the user's).
+ * every role, for a specialist the MCP servers of the screen capability in the machine's `form`
+ * (`chromium` finds the Chromium the machine provides for the headless one), and for the root also
+ * its prompt and its tool selection. The root's exclusions are those of `config` and of `bound`,
+ * the configs whose exclusions it keeps whatever `config` says (the defaults and the user's).
  */
 const settingsFor = (
   config: Config,
   role: PiRole,
   bound: ReadonlyArray<Config> = [],
   form: CapabilityForm = "normal",
+  chromium: () => string | undefined = () => undefined,
 ): Collected => {
   const rootArgs = toolArgs(config, "root")
   const codex = codexSettings(config)
@@ -559,7 +567,7 @@ const settingsFor = (
     providerEnvironment: providerEnv(config),
     ...(codex === undefined ? {} : { codex }),
     ...(justBashOn(config) ? { justBash: true as const } : {}),
-    ...(role === "specialist" ? { screenServers: screenServers(config, form) } : {}),
+    ...(role === "specialist" ? { screenServers: screenServers(config, form, chromium()) } : {}),
     ...(role === "root"
       ? {
           rootPrompt: true,
@@ -1019,8 +1027,13 @@ export const createExtension =
       onExcessProperty: "error",
     })
 
-    // The form of the machine, from its environment alone, as setup and doctor detect it.
-    const machineForm = (): CapabilityForm => detectForm(env, platform).form
+    // The form of the machine, from its environment alone, as setup and doctor detect it; a screen
+    // specialist takes the form of the agent file it was launched from instead, so its servers and
+    // its tools agree.
+    const machineForm = (): CapabilityForm => {
+      const agent = childAgent(pi.getSessionName())
+      return isScreenAgent(agent) ? screenFormOf(agent) : detectForm(env, platform).form
+    }
 
     // The session's role: a child the package launched is a specialist whatever the flag says, since
     // the flag defaults to the root in every Pi session and a child has no launch line of its own.
@@ -1042,7 +1055,13 @@ export const createExtension =
       Effect.gen(function* () {
         const role = yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE))
         const defaults = yield* defaultConfig
-        return settingsFor(config ?? defaults, role, boundConfigs(defaults, user), machineForm())
+        return settingsFor(
+          config ?? defaults,
+          role,
+          boundConfigs(defaults, user),
+          machineForm(),
+          () => findChromium(env),
+        )
       }).pipe(Effect.orDie)
 
     // The root's exclusions before any config is known: the defaults', so a run in flight while a
@@ -1131,6 +1150,7 @@ export const createExtension =
               yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE)),
               bound,
               machineForm(),
+              () => findChromium(env),
             )
             return {
               enabled: false,
@@ -1139,7 +1159,7 @@ export const createExtension =
             } satisfies Collected
           }
           const role = yield* roleOf
-          configured = settingsFor(config, role, bound, machineForm())
+          configured = settingsFor(config, role, bound, machineForm(), () => findChromium(env))
           // Status first, then reconcile: for a project that keeps state, status makes the state
           // worktree that the next calls read.
           const status = yield* holyagent(signal, project, "status").pipe(
@@ -1349,9 +1369,15 @@ export const createExtension =
     // connect right away. A server that cannot be registered is told to the specialist on its
     // first run, which then has none of that server's tools.
     const registerScreen = (servers: ReadonlyArray<McpServer>): Delivery | undefined => {
+      const agent = childAgent(pi.getSessionName())
+      // No server for a screen specialist: `pi.features.mcp` or the capability is off, so tell it.
+      if (isScreenAgent(agent) && servers.length === 0)
+        return notice(
+          "no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing",
+        )
       const { failures } = registerScreenServers(
         (name, server) => pi.registerMcpServer(name, server),
-        childAgent(pi.getSessionName()),
+        agent,
         servers,
       )
       return failures.length === 0
@@ -1560,6 +1586,7 @@ export const createExtension =
         ? undefined
         : (refuseExcludedTool(event, held?.excluded ?? []) ??
           (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
+          refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ??
           Effect.runPromise(
             refuseNonSpecialistWorkflow(event).pipe(
               Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),

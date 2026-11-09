@@ -3830,6 +3830,16 @@ var runSyncExitWith = (context) => {
   };
 };
 var runSyncExit = /* @__PURE__ */ runSyncExitWith(/* @__PURE__ */ empty());
+var runSyncWith = (context) => {
+  const runSyncExit = runSyncExitWith(context);
+  return (effect) => {
+    const exit = runSyncExit(effect);
+    if (exit._tag === "Failure")
+      throw causeSquash(exit.cause);
+    return exit.value;
+  };
+};
+var runSync = /* @__PURE__ */ runSyncWith(/* @__PURE__ */ empty());
 var bigint02 = /* @__PURE__ */ BigInt(0);
 var NoopSpanProto = {
   _tag: "Span",
@@ -4558,6 +4568,7 @@ var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
 var onError2 = onError;
 var runPromise2 = runPromise;
+var runSync2 = runSync;
 var runSyncExit2 = runSyncExit;
 var fn2 = fn;
 var mapEager2 = mapEager;
@@ -7151,7 +7162,7 @@ function asOption(parser) {
     return none2();
   };
 }
-function runSync2(effect, message) {
+function runSync3(effect, message) {
   const exit = runSyncExit2(effect);
   if (isSuccess3(exit)) {
     return exit.value;
@@ -7189,7 +7200,7 @@ function constructSync(entry, input, options) {
     if (output !== invalid2 && output !== missing)
       return output;
   }
-  return runSync2(parserResult(entry.makeEffect(input, parseOptions), input), constructorDefectMessage);
+  return runSync3(parserResult(entry.makeEffect(input, parseOptions), input), constructorDefectMessage);
 }
 var normalCompiler = (ast) => resolve2(ast).parser;
 var constructorCompiler = (ast) => resolve2(ast).makeEffect;
@@ -8021,7 +8032,10 @@ var routeFor = (roleTask) => ({
   ...SPECS[roleTask]
 });
 var SCREEN_AGENT_SUFFIX = "-screen";
-var agentFor = (route, screen) => screen === true ? `${route.agent}${SCREEN_AGENT_SUFFIX}` : route.agent;
+var HEADLESS_SCREEN_AGENT_SUFFIX = `-headless${SCREEN_AGENT_SUFFIX}`;
+var agentFor = (route, screen, form = "normal") => screen === true ? `${route.agent}${form === "headless" ? HEADLESS_SCREEN_AGENT_SUFFIX : SCREEN_AGENT_SUFFIX}` : route.agent;
+var agentsFor = (route, screen) => screen === true ? [agentFor(route, true, "normal"), agentFor(route, true, "headless")] : [route.agent];
+var isHeadlessScreenAgent = (agent) => agent?.endsWith(HEADLESS_SCREEN_AGENT_SUFFIX) === true;
 var ROUTES = RoleTask.literals.map(routeFor);
 var isWriter = (roleTask) => SPECS[roleTask].mutability === "ScopedWrite";
 var isReviewer = (roleTask) => SPECS[roleTask].role === "Reviewer";
@@ -8250,7 +8264,7 @@ var directiveFor = (assignment, registry, now, config) => {
     if (pool.length === 0)
       return {
         action: "spawn",
-        agent: agentFor(route, assignment.screen),
+        agent: agentFor(route, assignment.screen, config.screenForm),
         model: route.model,
         effort: route.effort,
         reason: `no ${name}`
@@ -8261,7 +8275,7 @@ var directiveFor = (assignment, registry, now, config) => {
   if (best === undefined)
     return {
       action: "spawn",
-      agent: agentFor(route, assignment.screen),
+      agent: agentFor(route, assignment.screen, config.screenForm),
       model: route.model,
       effort: route.effort,
       reason: "no specialist with relevant context"
@@ -12135,13 +12149,14 @@ var PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-
 var dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
 `, 1)[0] ?? "")?.[1];
 var SCREEN_LINE = "Screen capability: this Assignment carries it, so the computer-use, browser-use (mcp__browse__*) and T3 preview tools are yours where this machine provides them. Report a tool that is missing instead of working around it.";
+var HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.";
 var renderPrompt = (assignment, agent) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
   `Objective: ${assignment.objective}`,
   ...section2("Scope", assignment.scope),
   ...section2("Constraints", assignment.constraints),
   ...section2("Ownership paths (write only here)", assignment.ownershipPaths),
-  ...assignment.screen === true ? [SCREEN_LINE] : [],
+  ...assignment.screen === true ? [isHeadlessScreenAgent(agent) ? HEADLESS_SCREEN_LINE : SCREEN_LINE] : [],
   ...section2("Acceptance criteria", assignment.criteria.map(({ text, blocking, dimension }) => `[${blocking ? "blocking" : "non-blocking"}] ${text} (${dimension})`)),
   ...section2("Required evidence", assignment.evidence),
   "End your report with an `evidence:` line followed by one `<criterion or evidence label>: <support>` line for each blocking criterion and each required evidence label above. A criterion may be named by its text before the first colon."
@@ -12192,13 +12207,13 @@ var journalResults = (journal, source) => gen2(function* () {
   }
   return results;
 });
-var dispatchedCall = (assignment, agent, briefPath, launch) => ({
+var dispatchedCall = (assignment, agent, briefPath, launch, form = "normal") => ({
   id: assignment.id,
   key: journalKey({
     prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
     label: assignment.id,
     model: launch.model,
-    agentType: agentFor(routeFor(assignment.roleTask), assignment.screen),
+    agentType: agentFor(routeFor(assignment.roleTask), assignment.screen, form),
     effort: launch.effort
   })
 });
@@ -12609,7 +12624,8 @@ var pi_packages_default = {
   "@amaster.ai/pi-computer-use": "0.1.36",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.15"
+  "@opencode/browse": "0.0.15",
+  "@playwright/mcp": "0.0.85"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
@@ -12636,11 +12652,36 @@ var COMPUTER_USE_TOOLS = ["computer_use_*"];
 var BROWSE_PACKAGE = "@opencode/browse";
 var BROWSE_SERVER = "browse";
 var BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
+var NPM_REGISTRY = "https://registry.npmjs.org/";
+var npxServerArgs = (name, rest) => [
+  `--registry=${NPM_REGISTRY}`,
+  ...name.startsWith("@") ? [`--${name.slice(0, name.indexOf("/"))}:registry=${NPM_REGISTRY}`] : [],
+  "-y",
+  `${name}@${PI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
 var BROWSE_MCP_SERVER = {
   name: BROWSE_SERVER,
   command: "npx",
-  args: ["-y", `${BROWSE_PACKAGE}@${PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]}`, "mcp"]
+  args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
 };
+var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
+var PLAYWRIGHT_SERVER = "playwright";
+var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
+var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
+var PLAYWRIGHT_MCP_SERVER = {
+  name: PLAYWRIGHT_SERVER,
+  command: "npx",
+  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
+  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+};
+var BROWSE_MINIMUM_NODE = [22, 19, 0];
+var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var nodeNeed = (minimum) => ({
+  kind: "node",
+  minimum,
+  fix: `install Node.js ${minimum.join(".")} or newer from https://nodejs.org, which ships npx`
+});
 var sameForm = (packages) => ({
   headless: { packages, mcpServers: [] },
   normal: { packages, mcpServers: [] }
@@ -12752,27 +12793,37 @@ var CAPABILITIES = [
   {
     name: "browser-use",
     feature: "browserUse",
-    description: "Lets screen specialists drive the user's real browser through opencode browse (@opencode/browse)",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
     needs: [
-      { kind: "display" },
       {
         kind: "command",
         command: "npx",
-        fix: "install Node.js 22.19 or newer from https://nodejs.org, which ships npx"
+        fix: "install Node.js from https://nodejs.org, which ships npx"
       }
     ],
     forms: {
       headless: {
-        unavailable: "browse drives the browser of a graphical session through its extension and starts none itself, and this machine has no graphical session"
+        packages: [],
+        mcpServers: [PLAYWRIGHT_MCP_SERVER],
+        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
       },
-      normal: { packages: [], mcpServers: [BROWSE_MCP_SERVER] }
+      normal: {
+        packages: [],
+        mcpServers: [BROWSE_MCP_SERVER],
+        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        pairing: true
+      }
     },
-    tools: { rootExclude: BROWSE_TOOLS, visual: [], screen: BROWSE_TOOLS },
+    tools: {
+      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      visual: [],
+      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+    },
     settings: [],
-    health: ["needs", "pairing"]
+    health: ["needs"]
   },
   {
     name: "luna-reserve",
@@ -12848,6 +12899,11 @@ var formContent = (capability, form) => {
   const entry = capability.forms[form];
   return "unavailable" in entry ? undefined : entry;
 };
+var formNeeds = (capability, form) => {
+  const content = formContent(capability, form);
+  return content === undefined ? [] : [...capability.needs, ...content.needs ?? []];
+};
+var serversWithheld = (capability, form, features) => features["mcp"] === true || (formContent(capability, form)?.mcpServers ?? []).length === 0 ? undefined : "pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools";
 var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
   const [first] = formContent(capability, "normal")?.packages ?? [];
   return first === undefined ? [] : [[capability.feature, first]];
@@ -13328,6 +13384,29 @@ var closeAssignment = (project, registry, assignmentId, input, now) => gen2(func
   };
 });
 
+var FORM_CHOICES = CAPABILITY_FORMS;
+var DEFAULT_FORM_CHOICE = {
+  form: "normal",
+  source: "default",
+  reason: "no form was asked for"
+};
+var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
+var inCi = (env) => {
+  const value = env["CI"]?.trim().toLowerCase();
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
+var detectForm = (env, platform = process.platform) => {
+  if (inCloudSession(env))
+    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
+  if (inCi(env))
+    return { form: "headless", source: "detected", reason: "CI is set" };
+  if (!hasDisplay(env, platform))
+    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
+  return { form: "normal", source: "detected", reason: "a graphical session is available" };
+};
+var chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` };
+var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
+
 import { join as join8 } from "path";
 
 var APPLY_PATCH_TOOL = "apply_patch";
@@ -13445,7 +13524,8 @@ var workflowsAvailable = (env, root) => {
 var loadConfig2 = (env, root) => all2({
   ttlMinutes: reuseTtl(env),
   workflowsAvailable: workflowsAvailable(env, root),
-  host: agentHostOf(env)
+  host: agentHostOf(env),
+  screenForm: succeed6(detectForm(env).form)
 }).pipe(map4((config) => config));
 var launchesOf = (env, root, host) => host === "claude" ? succeed6((roleTask, _screen) => {
   const { model, effort } = routeFor(roleTask);
@@ -13560,9 +13640,13 @@ var recordLaunch = (update, id, agentId, launchedAs) => update((snapshot) => gen
   const assignment = yield* findAssignment(snapshot.project, id);
   const route = routeFor(assignment.roleTask);
   const { model, effort } = route;
-  const agent = agentFor(route, assignment.screen);
-  if (launchedAs !== undefined && withoutNamespace(launchedAs.type) !== agent)
-    return yield* new AgentMismatch({ expected: agent, launched: launchedAs.type });
+  const agents = agentsFor(route, assignment.screen);
+  const launched = withoutNamespace(launchedAs?.type);
+  if (launchedAs !== undefined && (launched === undefined || !agents.includes(launched)))
+    return yield* new AgentMismatch({
+      expected: agents.join(" or "),
+      launched: launchedAs.type
+    });
   return yield* record2(snapshot.project, snapshot.specialists, id, agentId === undefined ? { launched: false } : { launched: true, agentId, model, effort });
 })).pipe(map4(({ assignment }) => assignment));
 var idArgument = (positionals) => positionals[0] ?? "";
@@ -13599,7 +13683,8 @@ var piReports = (call, source, text) => gen2(function* () {
       return agentId !== undefined && (agentId.startsWith(PI_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) ? [{ id, agentId }] : [];
     }));
   const launchOf = yield* launchesOf(call.env, call.root, "pi");
-  const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map4((path) => dispatchedCall(assignment, agentTypeFor("pi", agentFor(routeFor(assignment.roleTask), assignment.screen)), path, launchOf(assignment.roleTask, assignment.screen)))));
+  const screenForm = detectForm(call.env).form;
+  const calls = yield* forEach2(project.assignments, (assignment) => briefPath(call, assignment.id).pipe(map4((path) => dispatchedCall(assignment, agentTypeFor("pi", agentFor(routeFor(assignment.roleTask), assignment.screen, screenForm)), path, launchOf(assignment.roleTask, assignment.screen), screenForm))));
   return yield* piJournalReports(text, source, calls);
 });
 var ASSIGNMENT_COMMANDS = [
@@ -13646,7 +13731,7 @@ var ASSIGNMENT_COMMANDS = [
             message: `The screen capability is available under the pi host only; this is the ${settings.host} host. Dispatch the Assignment without screen`
           });
         const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
-        const agent = agentTypeFor(settings.host, agentFor(routeFor(dispatched.assignment.roleTask), dispatched.assignment.screen));
+        const agent = agentTypeFor(settings.host, agentFor(routeFor(dispatched.assignment.roleTask), dispatched.assignment.screen, settings.screenForm));
         const path = yield* writeBrief(call, dispatched.assignment.id, briefText(dispatched.assignment, agent, settings.host));
         return {
           ...dispatched,
@@ -22983,29 +23068,6 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-var FORM_CHOICES = CAPABILITY_FORMS;
-var DEFAULT_FORM_CHOICE = {
-  form: "normal",
-  source: "default",
-  reason: "no form was asked for"
-};
-var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
-var inCi = (env) => {
-  const value = env["CI"]?.trim().toLowerCase();
-  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
-};
-var detectForm = (env, platform = process.platform) => {
-  if (inCloudSession(env))
-    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
-  if (inCi(env))
-    return { form: "headless", source: "detected", reason: "CI is set" };
-  if (!hasDisplay(env, platform))
-    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
-  return { form: "normal", source: "detected", reason: "a graphical session is available" };
-};
-var chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` };
-var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
-
 import { join as join17 } from "path";
 
 var WEB_KIT_PACKAGE = "pi-web-kit";
@@ -23025,6 +23087,7 @@ import { isAbsolute as isAbsolute3, join as join16 } from "path";
 var BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE];
 var BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
 var BROWSE_PAIR_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page when no browser has it and pairs the browser (\`${BROWSE_COMMAND} pair\` prints a code to enter in the extension's options instead)`;
+var BROWSE_INSTALL_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page, and add it to your browser`;
 var browseDataDirectory = (env) => {
   const home = firstNonEmpty(env["OPENCODE_BROWSER_HOME"]);
   if (home !== undefined)
@@ -23064,6 +23127,103 @@ var readBrowsePairing = (env) => gen2(function* () {
 });
 var seen = (browser) => browser.lastSeen === undefined ? "not connected yet" : `last seen ${new Date(browser.lastSeen).toISOString()}`;
 var describePairing = (pairing) => pairing.state === "unpaired" ? "no browser is paired with browse (the extension is not installed or not paired; browse cannot tell which)" : `${pairing.browsers.length === 1 ? "1 browser" : `${pairing.browsers.length} browsers`} paired with browse (the extension is installed): ${pairing.browsers.map((browser) => `${browser.name ?? browser.id ?? browser.key}, ${seen(browser)}`).join("; ")}`;
+var BROWSE_EXTENSION_IDS = [
+  "mfnicocicmmlkpjnaffgihfjhdgjkdjg",
+  "afeafocngkodbmaipcngoamamfmekgfo"
+];
+var browserDirectories = (env, platform = process.platform) => {
+  const home = homeDirectory(env);
+  if (platform === "darwin") {
+    const support = join16(home, "Library", "Application Support");
+    return [
+      ["Google Chrome", "Google/Chrome"],
+      ["Google Chrome Beta", "Google/Chrome Beta"],
+      ["Google Chrome Canary", "Google/Chrome Canary"],
+      ["Chromium", "Chromium"],
+      ["Microsoft Edge", "Microsoft Edge"],
+      ["Brave", "BraveSoftware/Brave-Browser"],
+      ["Opera", "com.operasoftware.Opera"],
+      ["Vivaldi", "Vivaldi"],
+      ["Arc", "Arc/User Data"]
+    ].map(([name = "", folder = ""]) => ({ name, directory: join16(support, folder) }));
+  }
+  if (platform === "win32") {
+    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join16(home, "AppData", "Local");
+    const roaming = firstNonEmpty(env["APPDATA"]) ?? join16(home, "AppData", "Roaming");
+    return [
+      { name: "Google Chrome", directory: join16(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join16(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join16(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join16(local, "Vivaldi", "User Data") },
+      { name: "Opera", directory: join16(roaming, "Opera Software", "Opera Stable") }
+    ];
+  }
+  const configured = firstNonEmpty(env["XDG_CONFIG_HOME"]);
+  const config = configured !== undefined && isAbsolute3(configured) ? configured : join16(home, ".config");
+  return [
+    ["Google Chrome", "google-chrome"],
+    ["Google Chrome Beta", "google-chrome-beta"],
+    ["Google Chrome Unstable", "google-chrome-unstable"],
+    ["Chromium", "chromium"],
+    ["Microsoft Edge", "microsoft-edge"],
+    ["Brave", "BraveSoftware/Brave-Browser"],
+    ["Opera", "opera"],
+    ["Vivaldi", "vivaldi"]
+  ].map(([name = "", folder = ""]) => ({ name, directory: join16(config, folder) }));
+};
+var LocalState = fromJsonString2(StructWithRest(Struct({
+  profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String4, Open)) }), [Open]))
+}), [Open]));
+var Preferences = fromJsonString2(StructWithRest(Struct({
+  extensions: optionalKey2(StructWithRest(Struct({ settings: optionalKey2(Record(String4, Open)) }), [Open]))
+}), [Open]));
+var readOptional = (file) => readJsonText(file).pipe(orElseSucceed2(() => {
+  return;
+}));
+var isDisabled = (setting) => {
+  const reasons = setting["disable_reasons"];
+  return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
+};
+var findBrowseExtension = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
+  const state = yield* readOptional(join16(directory, "Local State"));
+  const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
+  const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
+  const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
+  const found = yield* forEach2(profiles, (profile) => gen2(function* () {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join16(directory, profile, file)).pipe(map4((text) => {
+      const parsed = text === undefined ? undefined : decodeUnknownOption2(Preferences)(text, {
+        onExcessProperty: "error"
+      });
+      return parsed?._tag === "Some" ? parsed.value.extensions?.settings ?? {} : {};
+    })));
+    const entry = settings.flatMap((entries) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [entries[id]]))[0];
+    return entry === undefined ? [] : [{ browser: name, profile, enabled: !isDisabled(entry) }];
+  }));
+  return found.flat();
+})).pipe(map4((installs) => installs.flat()));
+var readBrowseState = (env, platform = process.platform) => gen2(function* () {
+  const pairing = yield* readBrowsePairing(env);
+  if (pairing.state === "paired")
+    return pairing;
+  const installs = yield* findBrowseExtension(env, platform);
+  return installs.length > 0 ? { state: "installed", installs } : {
+    state: "missing",
+    scanned: browserDirectories(env, platform).map(({ name }) => name)
+  };
+});
+var describeBrowseState = (state) => {
+  if (state.state === "paired")
+    return { text: describePairing(state) };
+  if (state.state === "installed")
+    return {
+      text: `the browse extension is installed (${state.installs.map(({ browser, profile, enabled }) => `${browser}, profile ${profile}${enabled ? "" : ", disabled"}`).join("; ")}) but no browser is paired with browse`,
+      fix: BROWSE_PAIR_FIX
+    };
+  return {
+    text: `the browse extension is not installed in any browser this check scans (${state.scanned.join(", ")}) and no browser is paired with browse`,
+    fix: BROWSE_INSTALL_FIX
+  };
+};
 
 var PI_HOST_VERSION = "1.5.0";
 var PI_MINIMUM_NODE = "22.19.0";
@@ -23203,8 +23363,23 @@ var checkBasePackages = (files, scope, config, listed) => {
 var unmetNeed = (env, need) => gen2(function* () {
   if (need.kind === "display")
     return hasDisplay(env) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
+  if (need.kind === "node")
+    return yield* unmetNode(env, need);
   const found = yield* (yield* Shell).which(need.command);
   return isSome2(found) ? undefined : `needs ${need.command} on PATH; ${need.fix}`;
+});
+var unmetNode = (env, need) => gen2(function* () {
+  const shell = yield* Shell;
+  const found = yield* shell.which("node");
+  const minimum = need.minimum.join(".");
+  if (isNone2(found))
+    return `needs Node.js ${minimum} or newer on PATH; ${need.fix}`;
+  const result = yield* shell.run("node", ["--version"], { cwd: homeDirectory(env) });
+  const release = result.exitCode === 0 ? releaseIn(`${result.stdout}
+${result.stderr}`) : undefined;
+  if (release === undefined)
+    return `needs Node.js ${minimum} or newer, and ${found.value} did not report a version for --version (exit ${result.exitCode}); ${need.fix}`;
+  return compareReleases(release, need.minimum) < 0 ? `needs Node.js ${minimum} or newer, but ${found.value} is ${release.join(".")}; ${need.fix}` : undefined;
 });
 var checkCapability = (env, scope, capability, form, listed, files, platform) => gen2(function* () {
   const name = `pi capability ${capability.name}`;
@@ -23214,7 +23389,7 @@ var checkCapability = (env, scope, capability, form, listed, files, platform) =>
   const content = formContent(capability, form);
   const problems = [];
   if (capability.health.includes("needs")) {
-    for (const need of capability.needs) {
+    for (const need of formNeeds(capability, form)) {
       const unmet = yield* unmetNeed(env, need);
       if (unmet !== undefined)
         problems.push(unmet);
@@ -23232,22 +23407,28 @@ var checkCapability = (env, scope, capability, form, listed, files, platform) =>
   return pass(name, `${form} form, ${capability.applicability}, ${what}`);
 });
 var checkPairing = (env, capability, form, platform) => gen2(function* () {
-  if (!capability.health.includes("pairing"))
-    return [];
   if (unavailableIn(capability, form, platform) !== undefined)
     return [];
+  if (formContent(capability, form)?.pairing !== true)
+    return [];
   const name = `pi capability ${capability.name} pairing`;
-  const found = yield* readBrowsePairing(env).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+  const found = yield* readBrowseState(env, platform).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
   if (found instanceof SetupFailure)
     return [fail6(name, found.message)];
-  return found.state === "paired" ? [pass(name, describePairing(found))] : [hint(`${name}: ${describePairing(found)}; ${BROWSE_PAIR_FIX}`)];
+  const { text, fix } = describeBrowseState(found);
+  return found.state === "paired" ? [pass(name, text)] : [hint(`${name}: ${text}${fix === undefined ? "" : `; ${fix}`}`)];
 });
+var checkServers = (capability, form, config) => {
+  const reason = unavailableIn(capability, form) === undefined ? serversWithheld(capability, form, config.pi.features) : undefined;
+  return reason === undefined ? [] : [hint(`pi capability ${capability.name}: ${reason}`)];
+};
 var checkCapabilities = (env, cwd, scope, config, choice, listed) => gen2(function* () {
   const files = piPresenceFiles(env, cwd, scope);
   const lines = yield* forEach2(enabledCapabilities(config.pi.features, { provider: config.pi.provider }), (capability) => gen2(function* () {
     return [
       yield* checkCapability(env, scope, capability, choice.form, listed, files),
-      ...yield* checkPairing(env, capability, choice.form)
+      ...yield* checkPairing(env, capability, choice.form),
+      ...checkServers(capability, choice.form, config)
     ];
   }));
   return [pass("pi form", describeForm(choice)), ...lines.flat()];
@@ -23602,9 +23783,44 @@ var checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   return lines;
 });
 
-import { join as join21 } from "path";
+import { join as join22 } from "path";
 
-var reportOne = (env, capability, options) => gen2(function* () {
+import { existsSync, readdirSync } from "fs";
+import { join as join19 } from "path";
+var PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
+var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
+var BUILD_EXECUTABLES = {
+  linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
+  darwin: [
+    "chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
+    "chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+  ],
+  win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
+};
+var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
+var inFolder = (folder, platform, exists, list) => {
+  const entry = join19(folder, "chromium");
+  if (exists(entry))
+    return entry;
+  const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
+  for (const build of builds)
+    for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
+      const path = join19(folder, build, ...executable.split("/"));
+      if (exists(path))
+        return path;
+    }
+  return;
+};
+var safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => [])));
+var findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
+  const given = firstNonEmpty(env[PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE]);
+  if (given !== undefined)
+    return given;
+  const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
+  return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
+};
+
+var reportOne = (env, capability, features, options) => gen2(function* () {
   const form = options.form ?? "normal";
   const label = capability.name;
   const reason = unavailableIn(capability, form);
@@ -23612,26 +23828,37 @@ var reportOne = (env, capability, options) => gen2(function* () {
     return [
       hint(`${label}: not offered in the ${form} form (${reason}); screen specialists get no tools of it here`)
     ];
-  const servers = (formContent(capability, form)?.mcpServers ?? []).map(({ command, args }) => `${command} ${args.join(" ")}`);
-  const unmet = yield* forEach2(capability.needs, (need) => unmetNeed(env, need));
-  const pairing = yield* readBrowsePairing(env);
+  const content = formContent(capability, form);
+  const withheld = serversWithheld(capability, form, features);
+  const unmet = yield* forEach2(formNeeds(capability, form), (need) => unmetNeed(env, need));
+  const needs = unmet.flatMap((problem) => problem === undefined ? [] : [hint(`${label}: ${problem}`)]);
+  const servers = (content?.mcpServers ?? []).map(({ command, args }) => `${command} ${args.join(" ")}`);
+  const chromium = (content?.mcpServers ?? []).some(({ chromiumFlag }) => chromiumFlag !== undefined) ? findChromium(env) : undefined;
+  const browser = chromium === undefined ? [] : [present2(`${label}: the headless browser is the Chromium at ${chromium}`)];
+  const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env).pipe(map4((state) => {
+    const { text, fix } = describeBrowseState(state);
+    return state.state === "paired" ? present2(`${label}: ${text}`) : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`);
+  }), catchTag2("SetupFailure", (error) => succeed6(hint(`${label}: cannot tell whether a browser is paired: ${error.message}`))), map4((line) => [line])) : [];
   return [
-    present2(`${label}: ${form} form; the extension registers \`${servers.join("`, `")}\` for screen specialists and writes no file for it`),
-    ...unmet.flatMap((problem) => problem === undefined ? [] : [hint(`${label}: ${problem}`)]),
-    pairing.state === "paired" ? present2(`${label}: ${describePairing(pairing)}`) : hint(`${label}: ${describePairing(pairing)}; ${BROWSE_PAIR_FIX}`)
+    withheld === undefined ? present2(`${label}: ${form} form; the extension registers \`${servers.join("`, `")}\` for screen specialists and writes no file for it`) : hint(`${label}: ${form} form; ${withheld}`),
+    ...needs,
+    ...browser,
+    ...pairing
   ];
 });
 var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options) {
   const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices);
   if (!config.pi.enable)
     return [];
-  const probing = enabledCapabilities(config.pi.features, { provider: config.pi.provider }).filter((capability) => capability.health.includes("pairing"));
-  const lines = yield* forEach2(probing, (capability) => reportOne(env, capability, options));
+  const reporting = enabledCapabilities(config.pi.features, {
+    provider: config.pi.provider
+  }).filter((capability) => Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
+  const lines = yield* forEach2(reporting, (capability) => reportOne(env, capability, config.pi.features, options));
   return lines.flat();
 });
 
-import { join as join19 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join19(stateDirectory(cwd), CONFIG_FILE);
+import { join as join20 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join20(stateDirectory(cwd), CONFIG_FILE);
 var objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
@@ -23758,7 +23985,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
 });
 
 import { stat as stat3 } from "fs/promises";
-import { join as join20 } from "path";
+import { join as join21 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
   browserArtifactsAfterDays: 14,
@@ -23771,21 +23998,21 @@ var restoreSettings = (path, previous, unchangedSince) => previous === undefined
 var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
-var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join20(homeDirectory(env), ".t3");
-var t3SettingsFile = (env) => join20(t3Home(env), "userdata", "settings.json");
+var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join21(homeDirectory(env), ".t3");
+var t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory(env);
   if (platform === "darwin") {
     const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-    const simulator = join20(developer, "Platforms", "iPhoneSimulator.platform");
+    const simulator = join21(developer, "Platforms", "iPhoneSimulator.platform");
     if (yield* isDirectory2(simulator))
       return `Xcode (${developer})`;
   }
   const sdkFolders = [
     firstNonEmpty(env["ANDROID_HOME"]),
     firstNonEmpty(env["ANDROID_SDK_ROOT"]),
-    platform === "darwin" ? join20(home, "Library", "Android", "sdk") : platform === "win32" ? join20(firstNonEmpty(env["LOCALAPPDATA"]) ?? join20(home, "AppData", "Local"), "Android", "Sdk") : join20(home, "Android", "Sdk")
+    platform === "darwin" ? join21(home, "Library", "Android", "sdk") : platform === "win32" ? join21(firstNonEmpty(env["LOCALAPPDATA"]) ?? join21(home, "AppData", "Local"), "Android", "Sdk") : join21(home, "Android", "Sdk")
   ];
   for (const folder of sdkFolders) {
     if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -24106,7 +24333,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join21(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join21(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join22(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join22(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present2("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -24242,7 +24469,7 @@ var doctor = fn2("doctor")(function* (env, options) {
 
 import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join22, posix, win32 } from "path";
+import { basename as basename5, dirname as dirname5, join as join23, posix, win32 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -25447,8 +25674,8 @@ var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join22(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join22(directory, file)}`, cause)
+      try: () => Bun.write(join23(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join23(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -25467,11 +25694,11 @@ var importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
 });
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join22(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join23(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
 }));
 var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join22(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join23(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
 var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
@@ -25527,8 +25754,8 @@ var promote = (temporary, directory, packages, lock) => gen2(function* () {
 var STALE_AFTER_MS = 60 * 60 * 1000;
 var newestChange = (path) => gen2(function* () {
   const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join22(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join22(path, "node_modules"))];
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join23(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join23(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 });
@@ -25538,26 +25765,26 @@ var sweepStale = (directory, uid) => gen2(function* () {
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir2(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join22(parent, name);
+    const path = join23(parent, name);
     const found = yield* tryPromise2(() => lstat5(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
 }).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join22(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join23(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join22(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join23(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove);
 var loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join22(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join23(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -25576,9 +25803,9 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join22(directory, TUI_BUNDLE);
+  const target = join23(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join22(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join23(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -25951,14 +26178,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join23 } from "path";
+import { join as join24 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join23(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join24(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -25975,7 +26202,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join23(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join24(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))

@@ -41,7 +41,11 @@ import {
   PACKAGE_FILES,
   PI_FAMILY,
 } from "../src/generate.ts"
-import { SCREEN_DESCRIPTION } from "../src/screen.ts"
+import {
+  HEADLESS_SCREEN_DESCRIPTION,
+  HEADLESS_SCREEN_NOTE,
+  SCREEN_DESCRIPTION,
+} from "../src/screen.ts"
 import { AGENT_TYPES, SCREEN_SPECIALIST_NAMES, SPECIALIST_NAMES } from "../src/specialists.ts"
 import { removeTemporary } from "./temp-folder.ts"
 
@@ -350,12 +354,14 @@ describe("the specialists", () => {
     return { frontmatter: Bun.YAML.parse(head) as Record<string, unknown>, body }
   }
 
-  test("are two agent files for each of the 18 specialists, with and without the screen tools, and the manifest names their folder", () => {
+  test("are three agent files for each of the 18 specialists: plain, screen, and screen on a headless machine, and the manifest names their folder", () => {
     expect(files.map((file) => file.path.slice(`${DIST_DIRECTORY}/agents/`.length))).toEqual(
       AGENT_TYPES.map((name) => `${name}.md`).toSorted(),
     )
     expect(SPECIALIST_NAMES).toHaveLength(18)
-    expect(SCREEN_SPECIALIST_NAMES).toEqual(SPECIALIST_NAMES.map((name) => `${name}-screen`))
+    expect(SCREEN_SPECIALIST_NAMES).toEqual(
+      SPECIALIST_NAMES.flatMap((name) => [`${name}-screen`, `${name}-headless-screen`]),
+    )
     const manifest = readJson(DIST_DIRECTORY, "package.json") as { pi: Record<string, unknown> }
     expect(manifest.pi["subagents"]).toEqual({ agents: ["./agents"] })
   })
@@ -373,10 +379,13 @@ describe("the specialists", () => {
       expect(frontmatter["name"]).toBe(name)
       expect(frontmatter["prompt_mode"]).toBe("replace")
       expect(String(frontmatter["description"])).toStartWith(
-        `Use for ${name?.replace(/-screen$/, "")}: `,
+        `Use for ${name?.replace(/(-headless)?-screen$/, "")}: `,
       )
       expect(String(frontmatter["description"]).endsWith(SCREEN_DESCRIPTION)).toBe(
-        name?.endsWith("-screen") === true,
+        name?.endsWith("-screen") === true && name.endsWith("-headless-screen") === false,
+      )
+      expect(String(frontmatter["description"]).endsWith(HEADLESS_SCREEN_DESCRIPTION)).toBe(
+        name?.endsWith("-headless-screen") === true,
       )
     }
   })
@@ -407,6 +416,35 @@ describe("the specialists", () => {
         ).toBe(false)
       }
     }
+  })
+
+  test("a headless screen specialist lists the headless browser's tools and no computer-use or browse tool, and its prompt says it has no desktop", () => {
+    const file = (name: string) =>
+      parsed(files.find((entry) => entry.path.endsWith(`/${name}.md`)) ?? { content: "" })
+    for (const route of ROUTES) {
+      const headless = file(`${route.agent}-headless-screen`)
+      const tools = String(headless.frontmatter["tools"]).split(", ")
+      expect(tools, route.agent).toEqual([...agentTools(config, route, true, "headless")])
+      for (const tool of ["mcp__playwright__browser_*", "mcp__t3*code__preview_*"])
+        expect(tools, route.agent).toContain(tool)
+      // Not even a visual role, whose own file has them: the machine has no desktop to drive.
+      for (const tool of ["ext:pi-computer-use", "mcp__browse__*"])
+        expect(tools, route.agent).not.toContain(tool)
+      expect(
+        tools.some((tool) => /browse__|computer/.test(tool)),
+        route.agent,
+      ).toBe(false)
+      // The normal screen file has browse and computer use and never the Playwright server.
+      const normal = String(file(`${route.agent}-screen`).frontmatter["tools"]).split(", ")
+      expect(normal, route.agent).not.toContain("mcp__playwright__browser_*")
+      expect(normal, route.agent).toContain("mcp__browse__*")
+      // The prompt is the role's, then the note that this machine has a headless browser and no desktop.
+      expect(headless.body, route.agent).toStartWith(file(route.agent).body)
+      expect(headless.body.trimEnd(), route.agent).toEndWith(HEADLESS_SCREEN_NOTE)
+      expect(file(`${route.agent}-screen`).body, route.agent).toBe(file(route.agent).body)
+    }
+    expect(HEADLESS_SCREEN_NOTE).toContain("headless browser")
+    expect(HEADLESS_SCREEN_NOTE).toContain("no desktop")
   })
 
   test("grant the tools toolArgs decides, in the package's entry forms", () => {

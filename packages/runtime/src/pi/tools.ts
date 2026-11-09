@@ -5,6 +5,7 @@ import {
   enabledCapabilities,
   PI_FFF_FILE,
   PI_SETTINGS_FILE,
+  screenTools,
   type SettingsPatch,
   SUBAGENTS_ONLY_SPECIALISTS,
   SUBAGENTS_SETTINGS_FILE,
@@ -139,9 +140,13 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
  *   the computer-use tools while `pi.features.computerUse` is on.
  *
  * With `screen` (an Assignment that carries the screen capability) a specialist also gets the
- * `screen` tools of each enabled capability, whatever its role: the computer-use tools, opencode
- * browse's and, while `pi.features.mcp` is on, T3 Code's preview and render tools. Without it none
- * of them is granted beyond what VisualInspection gives. The root takes no `screen`.
+ * `screen` tools of each enabled capability the `form` offers (`screenTools`), whatever its role,
+ * and a visual role's own computer-use tools only where the form offers them: in the normal form
+ * the computer-use tools and opencode browse's, in the headless form the Playwright server's (a
+ * headless machine has no desktop to drive), and, while `pi.features.mcp` is on, T3 Code's preview
+ * and render tools in both; every `mcp__` tool needs `pi.features.mcp`, the extension that runs the
+ * servers. Without `screen` none of them is granted beyond what VisualInspection gives. The root
+ * takes no `screen`. The form defaults to `normal`.
  *
  * A specialist's allowlist never names `todo`, `ask_user_question` or the process tools: the root
  * alone has them. Tools registered `model-only` (`ask_user_question`) stay directly callable under
@@ -152,10 +157,16 @@ export const toolArgs = (
   config: Config,
   key: RouteKey,
   profile: ProviderProfile = providerProfile(config),
-  options: { readonly screen?: boolean } = {},
+  options: { readonly screen?: boolean; readonly form?: CapabilityForm } = {},
 ): ToolArgs => {
   const { features } = config.pi
   const enabled = enabledCapabilities(features, { provider: config.pi.provider })
+  // What the form offers: a headless machine has no desktop, so a specialist launched for it has
+  // no computer-use tools, not even a visual role, whose own tools they are in the normal form.
+  const formEnabled = enabledCapabilities(features, {
+    form: options.form ?? "normal",
+    provider: config.pi.provider,
+  })
   const noMcp = !features.mcp
   const env = {
     [CODEMODE_MAX_WORKERS_ENV]: String(config.pi.codemode.maxWorkers),
@@ -178,9 +189,13 @@ export const toolArgs = (
     ...(has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : []),
     ...(has(capabilities, "Search") ? webChoice(profile, features.web).tools : []),
     ...(has(capabilities, "VisualInspection")
-      ? enabled.flatMap((capability) => capability.tools.visual)
+      ? formEnabled.flatMap((capability) => capability.tools.visual)
       : []),
-    ...(options.screen === true ? enabled.flatMap((capability) => capability.tools.screen) : []),
+    ...(options.screen === true
+      ? formEnabled
+          .flatMap((capability) => screenTools(capability, options.form ?? "normal"))
+          .filter((tool) => features.mcp || !tool.startsWith("mcp__"))
+      : []),
   ]
   const unique = [...new Set(tools)]
   return build(

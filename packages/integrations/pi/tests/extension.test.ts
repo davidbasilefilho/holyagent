@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -2118,7 +2118,9 @@ describe("the Agent tool", () => {
     for (const type of ["worker-implementation-screen-screen", "screen", "explorer-map-screens"]) {
       const result = refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: type } })
       expect(result?.block, type).toBe(true)
-      expect(result?.reason, type).toContain("(each also as <name>-screen)")
+      expect(result?.reason, type).toContain(
+        "(each also as <name>-screen, or <name>-headless-screen on a headless machine)",
+      )
     }
   })
 
@@ -2202,7 +2204,9 @@ describe("the SubagentWorkflow tool", () => {
     ).toBeUndefined()
     const result = await refusedWorkflow({ script: workflowScript("explorer-map-screens") })
     expect(result?.block).toBe(true)
-    expect(result?.reason).toContain("(each also as <name>-screen)")
+    expect(result?.reason).toContain(
+      "(each also as <name>-screen, or <name>-headless-screen on a headless machine)",
+    )
   })
 
   test("a script that starts a default, a foreign or a computed agent is refused", async () => {
@@ -3851,21 +3855,26 @@ describe("the MCP servers of the screen capability", () => {
     return api.mcpServers
   }
 
+  const REGISTRY = [
+    "--registry=https://registry.npmjs.org/",
+    "--@opencode:registry=https://registry.npmjs.org/",
+  ]
+
   test("a screen specialist registers browse at the pinned release, with no file written and no other option", async () => {
     expect(await registered("worker-implementation-screen#a1b2c3d4")).toEqual([
       {
         name: "browse",
-        config: { command: "npx", args: ["-y", "@opencode/browse@0.0.15", "mcp"] },
+        config: { command: "npx", args: [...REGISTRY, "-y", "@opencode/browse@0.0.15", "mcp"] },
       },
     ])
   })
 
-  test("every screen specialist does, whatever its role", async () => {
+  test("every screen specialist registers the server of the form its agent file was made for, whatever its role", async () => {
     for (const name of SCREEN_SPECIALIST_NAMES)
       expect(
         (await registered(`${name}#a1b2c3d4`)).map((server) => server.name),
         name,
-      ).toEqual(["browse"])
+      ).toEqual([name.endsWith("-headless-screen") ? "playwright" : "browse"])
   })
 
   test("the root and the specialists without the capability register none, so no other process starts the server", async () => {
@@ -3875,17 +3884,54 @@ describe("the MCP servers of the screen capability", () => {
     expect(await registered("my chat#1")).toEqual([])
   })
 
-  test("the headless form offers no server: nothing registers where there is no graphical session", async () => {
-    expect(await registered("worker-visual-screen#a1b2c3d4", { env: {} })).toEqual([])
-    expect(
-      await registered("worker-visual-screen#a1b2c3d4", { env: { CI: "true", ...DISPLAY } }),
-    ).toEqual([])
+  test("a headless screen specialist registers the Playwright server headless and isolated, with the machine's Chromium when there is one", async () => {
+    const browsers = await mkdtemp(join(tmpdir(), "holyagent-chromium-"))
+    try {
+      // The server comes from the agent file's form, whatever the machine's environment says.
+      const bare = await registered("worker-visual-headless-screen#a1b2c3d4", {
+        env: { ...DISPLAY, PLAYWRIGHT_BROWSERS_PATH: browsers },
+      })
+      expect(bare).toHaveLength(1)
+      expect(bare[0]?.name).toBe("playwright")
+      const args = (bare[0]?.config as { args: Array<string> }).args
+      expect(args.slice(0, 2)).toEqual([
+        "--registry=https://registry.npmjs.org/",
+        "--@playwright:registry=https://registry.npmjs.org/",
+      ])
+      expect(args.join(" ")).toContain("--headless --isolated --browser chromium")
+      expect(args).not.toContain("--executable-path")
+      await writeFile(join(browsers, "chromium"), "")
+      const preinstalled = await registered("worker-visual-headless-screen#a1b2c3d4", {
+        env: { PLAYWRIGHT_BROWSERS_PATH: browsers },
+      })
+      expect((preinstalled[0]?.config as { args: Array<string> }).args.slice(-2)).toEqual([
+        "--executable-path",
+        join(browsers, "chromium"),
+      ])
+    } finally {
+      await rm(browsers, { recursive: true, force: true })
+    }
   })
 
-  test("browser use switched off registers none", async () => {
-    expect(
-      await registered("worker-visual-screen#a1b2c3d4", { features: { browserUse: false } }),
-    ).toEqual([])
+  test("browser use switched off registers none, and the specialist is told", async () => {
+    const { api, delivered } = await run(configWith({ browserUse: false }), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: DISPLAY,
+    })
+    expect(api.mcpServers).toEqual([])
+    expect(delivered?.message?.content).toContain("no MCP server of the screen capability")
+    expect(delivered?.message?.content).toContain("report that they are missing")
+  })
+
+  test("with the MCP extension off no server is registered, in either form, and the specialist is told", async () => {
+    for (const name of ["worker-visual-screen", "worker-visual-headless-screen"]) {
+      const { api, delivered } = await run(configWith({ mcp: false }), {
+        sessionName: `${name}#a1b2c3d4`,
+        env: DISPLAY,
+      })
+      expect(api.mcpServers, name).toEqual([])
+      expect(delivered?.message?.content, name).toContain("pi.features.mcp")
+    }
   })
 
   test("a server that cannot be registered is told to the specialist on its first run, and the session goes on", async () => {
@@ -3898,5 +3944,59 @@ describe("the MCP servers of the screen capability", () => {
       "an MCP server of the screen capability was not registered (browse: the name is taken)",
     )
     expect(delivered?.message?.content).toContain("report that they are missing")
+  })
+})
+
+describe("T3's preview tools for a screen specialist", () => {
+  const T3_ENV = { T3_PI_RUNTIME_MODE: "full-access", T3_MCP_URL: "http://127.0.0.1:1/mcp" }
+  const call = (toolName: string) => ({ toolName, toolCallId: "t1", input: {} })
+  const PREVIEW = [
+    "mcp__t3-code__preview_open",
+    "mcp__t3_code__t3_preview_snapshot",
+    "mcp__t3-code__html_render",
+  ]
+
+  test("are refused when T3 does not host the session", async () => {
+    for (const env of [{}, { DISPLAY: ":0" }, T3_ENV]) {
+      // An env with T3's variables but a mode that is not RPC is not T3's host either.
+      const { api } = await run(healthy("/missing"), {
+        sessionName: "worker-visual-screen#a1b2c3d4",
+        env,
+        mode: "print",
+        startOnly: true,
+      })
+      for (const name of PREVIEW)
+        expect(await api.emit("tool_call", call(name)), name).toEqual([
+          expect.objectContaining({ block: true }),
+        ])
+    }
+  })
+
+  test("are granted when T3 hosts the session", async () => {
+    const { api } = await run(healthy("/missing"), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: T3_ENV,
+      mode: "rpc",
+      startOnly: true,
+    })
+    for (const name of PREVIEW)
+      expect(await api.emit("tool_call", call(name)), name).toEqual([undefined])
+  })
+
+  test("the gate is for screen specialists: another session, and another tool, pass", async () => {
+    const { api } = await run(healthy("/missing"), {
+      sessionName: "worker-visual#a1b2c3d4",
+      env: {},
+      startOnly: true,
+    })
+    expect(await api.emit("tool_call", call("mcp__t3-code__preview_open"))).toEqual([undefined])
+    const screen = await run(healthy("/missing"), {
+      sessionName: "worker-visual-headless-screen#a1b2c3d4",
+      env: {},
+      startOnly: true,
+    })
+    expect(await screen.api.emit("tool_call", call("mcp__playwright__browser_navigate"))).toEqual([
+      undefined,
+    ])
   })
 })

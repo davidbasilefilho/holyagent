@@ -14,9 +14,11 @@ import { join } from "node:path"
 import { decode } from "@toon-format/toon"
 import { Effect } from "effect"
 
-import { StdinMissing } from "../src/cli/errors.ts"
+import { recordLaunch } from "../src/cli/assignment.ts"
+import { AgentMismatch, StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
-import { renderPrompt } from "../src/cli/report.ts"
+import { HEADLESS_SCREEN_LINE, renderPrompt } from "../src/cli/report.ts"
+import type { Call } from "../src/cli/types.ts"
 import { BROWSE_PACKAGE, CAPABILITIES } from "../src/config/capabilities.ts"
 import { PI_PACKAGE_VERSIONS } from "../src/config/pi-packages.ts"
 import { DEFAULT_CONFIG as EXECUTION, directiveFor } from "../src/domain/directive.ts"
@@ -25,7 +27,16 @@ import { bindSpecialist } from "../src/domain/specialists.ts"
 import { CODEX_ROUTES, SCREEN_MINIMUM_THINKING, screenRoute } from "../src/pi/codex/routes.ts"
 import { routeModel } from "../src/pi/provider.ts"
 import { DEFAULT_CONFIG as DEFAULT_PI_CONFIG } from "./config/defaults.ts"
-import { after, assignment, entry, NOW, ok, refused } from "./fixtures.ts"
+import {
+  after,
+  assignment,
+  entry,
+  NOW,
+  ok,
+  project as projectOf,
+  refused,
+  running,
+} from "./fixtures.ts"
 
 // A test that makes a repository and a state worktree runs a dozen git processes; see cli.test.ts.
 if (process.platform === "win32") setDefaultTimeout(60_000)
@@ -45,7 +56,10 @@ afterEach(() =>
   ]),
 )
 
-const PI = { HOLYAGENT_HOST: "pi" }
+// The form is detected from the environment the command runs in: a display makes it `normal`, a
+// cloud session or CI `headless`; the process's own environment never counts.
+const PI = { HOLYAGENT_HOST: "pi", DISPLAY: ":0" }
+const HEADLESS = { HOLYAGENT_HOST: "pi", CI: "1" }
 
 const cli = (argv: ReadonlyArray<string>, stdin?: unknown, env: Record<string, string> = {}) =>
   Effect.runPromise(
@@ -128,6 +142,17 @@ describe("the screen capability on an Assignment's draft", () => {
     expect(screen.split("\n")[0]).toBe(
       "Role: Worker.implementation (worker-implementation-screen). Assignment: assignment-a.",
     )
+  })
+
+  test("the brief of a headless screen specialist says it has a headless browser and no desktop", () => {
+    const headless = renderPrompt(
+      assignment({ screen: true }),
+      "worker-implementation-headless-screen",
+    )
+    expect(headless).toContain(HEADLESS_SCREEN_LINE)
+    expect(HEADLESS_SCREEN_LINE).toContain("headless browser")
+    expect(HEADLESS_SCREEN_LINE).toContain("no desktop")
+    expect(headless).not.toContain("computer-use, browser-use (mcp__browse__*)")
   })
 })
 
@@ -235,6 +260,47 @@ describe("dispatching a screen Assignment under the pi host", () => {
     expect(brief).toContain("Screen capability: this Assignment carries it")
   })
 
+  test("on a headless machine it names the -headless-screen agent and tells the specialist so", async () => {
+    await createIntent()
+    const screen = data(
+      await cli(
+        ["assignment", "dispatch"],
+        draft("Worker.implementation", { objective: "Drive the headless browser", screen: true }),
+        HEADLESS,
+      ),
+    )
+    expect(screen["agent"]).toBe("worker-implementation-headless-screen")
+    const path = String(screen["prompt"]).match(/Read the brief at (\S+) with/)?.[1] ?? ""
+    const brief = await readFile(path, "utf8")
+    expect(brief).toContain("(worker-implementation-headless-screen)")
+    expect(brief).toContain(HEADLESS_SCREEN_LINE)
+    // An Assignment without the capability keeps the role's own agent on the same machine.
+    const plain = data(
+      await cli(["assignment", "dispatch"], draft("Worker.implementation"), HEADLESS),
+    )
+    expect(plain["agent"]).toBe("worker-implementation")
+  })
+
+  test("a cloud session is headless too, and a display makes the machine normal", async () => {
+    await createIntent()
+    const cloud = data(
+      await cli(
+        ["assignment", "dispatch"],
+        draft("Reviewer.visual", { objective: "Look in the cloud", screen: true }),
+        { HOLYAGENT_HOST: "pi", CLAUDE_CODE_REMOTE: "true", DISPLAY: ":0" },
+      ),
+    )
+    expect(cloud["agent"]).toBe("reviewer-visual-headless-screen")
+    const desktop = data(
+      await cli(
+        ["assignment", "dispatch"],
+        draft("Reviewer.visual", { objective: "Look at the desktop", screen: true }),
+        { ...PI, CI: "false" },
+      ),
+    )
+    expect(desktop["agent"]).toBe("reviewer-visual-screen")
+  })
+
   test("the launch of a screen Assignment is recorded for the -screen agent only", async () => {
     await createIntent()
     const dispatched = data(
@@ -246,6 +312,54 @@ describe("dispatching a screen Assignment under the pi host", () => {
       PI,
     )
     expect(data(recorded)).toMatchObject({ state: "Running", agent: "pi:agent-1" })
+  })
+})
+
+describe("recording the launch of a screen Assignment", () => {
+  // The state transition the command would commit, applied to a snapshot held in memory.
+  const recorded = (screen: boolean | undefined, type: string | undefined) => {
+    const target = running(screen === undefined ? {} : { screen })
+    const snapshot = { project: projectOf([target]), specialists: [], links: {}, workTrees: {} }
+    const update = ((transition: (value: typeof snapshot) => Effect.Effect<unknown>) =>
+      transition(snapshot)) as unknown as Call["update"]
+    return Effect.runPromise(
+      Effect.flip(recordLaunch(update, target.id, "agent-1", { type })).pipe(
+        Effect.catch(() => Effect.succeed(undefined)),
+      ),
+    )
+  }
+
+  test("refuses a screen Assignment launched as an agent without the screen tools", async () => {
+    for (const wrong of [
+      "worker-implementation",
+      "holyagent:worker-implementation",
+      "reviewer-code-screen",
+      "general-purpose",
+      undefined,
+    ]) {
+      const error = await recorded(true, wrong)
+      expect(error, String(wrong)).toBeInstanceOf(AgentMismatch)
+      expect(error).toMatchObject({
+        expected: "worker-implementation-screen or worker-implementation-headless-screen",
+      })
+    }
+  })
+
+  test("accepts either form's screen agent for a screen Assignment, with or without the namespace", async () => {
+    for (const right of [
+      "worker-implementation-screen",
+      "worker-implementation-headless-screen",
+      "holyagent:worker-implementation-headless-screen",
+    ])
+      expect(await recorded(true, right), right).toBeUndefined()
+  })
+
+  test("refuses a plain Assignment launched as a screen agent, and accepts its own agent", async () => {
+    expect(await recorded(undefined, "worker-implementation-screen")).toBeInstanceOf(AgentMismatch)
+    expect(await recorded(undefined, "worker-implementation-headless-screen")).toBeInstanceOf(
+      AgentMismatch,
+    )
+    expect(await recorded(undefined, "worker-implementation")).toBeUndefined()
   })
 })
 
@@ -369,7 +483,17 @@ describe("the browse pin", () => {
     expect(server).toMatchObject({
       packages: [],
       mcpServers: [
-        { name: "browse", command: "npx", args: ["-y", "@opencode/browse@0.0.15", "mcp"] },
+        {
+          name: "browse",
+          command: "npx",
+          args: [
+            "--registry=https://registry.npmjs.org/",
+            "--@opencode:registry=https://registry.npmjs.org/",
+            "-y",
+            "@opencode/browse@0.0.15",
+            "mcp",
+          ],
+        },
       ],
     })
   })

@@ -1,7 +1,14 @@
 import { type Assignment, relatedIds } from "./assignment.ts"
 import type { AgentHost } from "./host.ts"
 import { firstOverlap } from "./paths.ts"
-import { agentFor, type Effort, isReviewer, type Model, routeFor } from "./route.ts"
+import {
+  agentFor,
+  type Effort,
+  isReviewer,
+  type Model,
+  routeFor,
+  type ScreenForm,
+} from "./route.ts"
 import type { Registry, SpecialistEntry } from "./specialists.ts"
 
 /** Tunables of warm reuse. */
@@ -12,6 +19,11 @@ export interface ExecutionConfig {
   readonly workflowsAvailable: boolean
   /** The host the commands run under, which decides the tool names the output uses. */
   readonly host: AgentHost
+  /**
+   * The form of the machine, which picks the agent file a screen Assignment is launched as; absent
+   * means `normal`.
+   */
+  readonly screenForm?: ScreenForm
 }
 
 /** The default configuration. */
@@ -158,7 +170,7 @@ export const directiveFor = (
     if (pool.length === 0)
       return {
         action: "spawn",
-        agent: agentFor(route, assignment.screen),
+        agent: agentFor(route, assignment.screen, config.screenForm),
         model: route.model,
         effort: route.effort,
         reason: `no ${name}`,
@@ -169,7 +181,7 @@ export const directiveFor = (
   if (best === undefined)
     return {
       action: "spawn",
-      agent: agentFor(route, assignment.screen),
+      agent: agentFor(route, assignment.screen, config.screenForm),
       model: route.model,
       effort: route.effort,
       reason: "no specialist with relevant context",

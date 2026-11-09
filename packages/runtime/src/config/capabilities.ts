@@ -24,6 +24,12 @@ export interface McpServer {
   readonly command: string
   /** The arguments of the command. */
   readonly args: ReadonlyArray<string>
+  /**
+   * The flag that takes the path of the browser executable, for a server that launches a browser:
+   * the extension appends it and the path of the Chromium the machine provides (see
+   * `findChromium`), and leaves both out when the machine has none, so the server uses its own.
+   */
+  readonly chromiumFlag?: string
 }
 
 /** What a capability installs in one form: Pi packages (by npm name, pinned) and MCP servers. */
@@ -32,6 +38,13 @@ export interface FormContent {
   readonly packages: ReadonlyArray<PiPackageName>
   /** The MCP servers the form adds, registered by the extension; empty for most capabilities. */
   readonly mcpServers: ReadonlyArray<McpServer>
+  /** What the form needs of the system besides the capability's own `needs`. */
+  readonly needs?: ReadonlyArray<SystemNeed>
+  /**
+   * Whether doctor and setup check that a browser is paired with the browser extension the form's
+   * MCP server drives (see `readBrowsePairing`).
+   */
+  readonly pairing?: true
 }
 
 /** A form the capability does not have on this kind of machine, with the reason doctor prints. */
@@ -53,12 +66,17 @@ export type SystemNeed =
       /** How the person gets it, appended to the failing line. */
       readonly fix: string
     }
+  | {
+      /** Node.js on PATH at `minimum` or newer, as `node --version` reports it. */
+      readonly kind: "node"
+      /** The oldest release as `[major, minor, patch]`. */
+      readonly minimum: readonly [number, number, number]
+      /** How the person gets it, appended to the failing line. */
+      readonly fix: string
+    }
 
-/**
- * What doctor checks of an enabled capability: its system needs, that its packages are listed, and
- * (`pairing`) that a browser is paired with the browser extension its MCP server drives.
- */
-export type HealthProbe = "needs" | "packages" | "pairing"
+/** What doctor checks of an enabled capability: its system needs and that its packages are listed. */
+export type HealthProbe = "needs" | "packages"
 
 /**
  * One JSON settings file that setup writes by merging, never by replacing: `content` holds the keys
@@ -123,7 +141,8 @@ export interface CapabilityDefinition {
   }
   /**
    * The tool patterns it decides: the root excludes `rootExclude`, visual specialists get `visual`,
-   * and a specialist launched for an Assignment that carries the screen capability gets `screen`.
+   * and a specialist launched for an Assignment that carries the screen capability gets `screen`
+   * (see {@link screenTools}: the tools of an MCP server belong to the form that registers it).
    */
   readonly tools: {
     readonly rootExclude: ReadonlyArray<string>
@@ -212,12 +231,91 @@ export const BROWSE_SERVER = "browse"
 /** The tools of opencode browse's MCP server, as one pattern on the names Pi gives them. */
 export const BROWSE_TOOLS: ReadonlyArray<string> = [`mcp__${BROWSE_SERVER}__*`]
 
+/**
+ * The public npm registry. Every `npx` launch of a screen MCP server passes it explicitly ({@link
+ * npxServerArgs}): npm reads the `.npmrc` of the project it runs in, and a repository's `.npmrc`
+ * must not choose where the code of a server with browser or desktop control comes from.
+ */
+export const NPM_REGISTRY = "https://registry.npmjs.org/"
+
+/**
+ * The arguments of `npx` for an exact release of a pinned package: the public registry for the
+ * package's scope and for everything else (a scope's own `@scope:registry` line of an `.npmrc`
+ * outranks the plain one), `-y`, the package at its pin, then `rest` for the package.
+ */
+export const npxServerArgs = (
+  name: PiPackageName,
+  rest: ReadonlyArray<string>,
+): ReadonlyArray<string> => [
+  `--registry=${NPM_REGISTRY}`,
+  ...(name.startsWith("@")
+    ? [`--${name.slice(0, name.indexOf("/"))}:registry=${NPM_REGISTRY}`]
+    : []),
+  "-y",
+  `${name}@${PI_PACKAGE_VERSIONS[name]}`,
+  ...rest,
+]
+
 /** The `browse` MCP server at the pinned release: `npx -y @opencode/browse@<pin> mcp`. */
 export const BROWSE_MCP_SERVER: McpServer = {
   name: BROWSE_SERVER,
   command: "npx",
-  args: ["-y", `${BROWSE_PACKAGE}@${PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]}`, "mcp"],
+  args: npxServerArgs(BROWSE_PACKAGE, ["mcp"]),
 }
+
+/**
+ * The npm package of the Playwright MCP server, the headless form of the `browser-use` capability.
+ * It is pinned in `pi-packages.json` with the Pi packages, so the updater moves it; the MCP server
+ * runs it through `npx` at that exact release.
+ */
+export const PLAYWRIGHT_PACKAGE = "@playwright/mcp" as const satisfies PiPackageName
+
+/**
+ * The name the Playwright MCP server is registered under; Pi names its tools
+ * `mcp__playwright__<tool>`.
+ */
+export const PLAYWRIGHT_SERVER = "playwright"
+
+/**
+ * The tools of the Playwright MCP server (`browser_navigate`, `browser_snapshot`, ...), as one
+ * pattern.
+ */
+export const PLAYWRIGHT_TOOLS: ReadonlyArray<string> = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`]
+
+/**
+ * The flag of the Playwright MCP server that takes the browser's executable path
+ * (`--executable-path <path>`), which the extension passes when the machine has a Chromium
+ * preinstalled.
+ */
+export const PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path"
+
+/**
+ * The Playwright MCP server at the pinned release, launched headless (`--headless`), isolated (the
+ * profile stays in memory and nothing is written to disk, `--isolated`) and on Chromium (`--browser
+ * chromium`). The Chromium of the machine is added to it by the extension when there is one ({@link
+ * McpServer.chromiumFlag}); otherwise the server uses the browser Playwright installs.
+ */
+export const PLAYWRIGHT_MCP_SERVER: McpServer = {
+  name: PLAYWRIGHT_SERVER,
+  command: "npx",
+  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
+  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG,
+}
+
+/** The oldest Node.js release opencode browse runs on (the `engines` field of `@opencode/browse`). */
+export const BROWSE_MINIMUM_NODE = [22, 19, 0] as const
+
+/**
+ * The oldest Node.js release the Playwright MCP server runs on (the `engines` field of
+ * `@playwright/mcp`).
+ */
+export const PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0] as const
+
+const nodeNeed = (minimum: readonly [number, number, number]): SystemNeed => ({
+  kind: "node",
+  minimum,
+  fix: `install Node.js ${minimum.join(".")} or newer from https://nodejs.org, which ships npx`,
+})
 
 /** The same packages in both forms, with no MCP server. */
 const sameForm = <const P extends ReadonlyArray<PiPackageName>>(packages: P) =>
@@ -345,36 +443,47 @@ export const CAPABILITIES = [
     health: ["needs", "packages"],
   },
   {
-    // opencode browse (`@opencode/browse`): a stdio MCP server that drives the user's own browser
-    // through the browse extension. It starts no browser (the package forbids `executablePath` and
-    // has no launch code), so it needs a graphical session with a browser paired to it, and the
-    // headless form is not offered. The extension registers the server only in the sessions of
-    // screen specialists (`screen.ts` of the Pi integration), so no other process starts it.
+    // Browser use for screen specialists, in two forms. Normal: opencode browse (`@opencode/browse`),
+    // a stdio MCP server that drives the user's own browser through the browse extension; it starts
+    // no browser (the package forbids `executablePath` and has no launch code), so it needs a
+    // graphical session and a browser paired to it. Headless: the Playwright MCP server
+    // (`@playwright/mcp`), which launches an isolated headless Chromium of its own. The extension
+    // registers a form's server only in the sessions of screen specialists (`screen.ts` of the Pi
+    // integration), so no other process starts it.
     name: "browser-use",
     feature: "browserUse",
     description:
-      "Lets screen specialists drive the user's real browser through opencode browse (@opencode/browse)",
+      "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
     needs: [
-      { kind: "display" },
       {
         kind: "command",
         command: "npx",
-        fix: "install Node.js 22.19 or newer from https://nodejs.org, which ships npx",
+        fix: "install Node.js from https://nodejs.org, which ships npx",
       },
     ],
     forms: {
       headless: {
-        unavailable:
-          "browse drives the browser of a graphical session through its extension and starts none itself, and this machine has no graphical session",
+        packages: [],
+        mcpServers: [PLAYWRIGHT_MCP_SERVER],
+        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)],
       },
-      normal: { packages: [], mcpServers: [BROWSE_MCP_SERVER] },
+      normal: {
+        packages: [],
+        mcpServers: [BROWSE_MCP_SERVER],
+        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        pairing: true,
+      },
     },
-    tools: { rootExclude: BROWSE_TOOLS, visual: [], screen: BROWSE_TOOLS },
+    tools: {
+      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      visual: [],
+      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+    },
     settings: [],
-    health: ["needs", "pairing"],
+    health: ["needs"],
   },
   {
     // Part of the Codex provider (`pi/codex/luna-reserve.ts`): it has no package, no tool and no
@@ -485,6 +594,57 @@ export const formContent = (
   const entry = capability.forms[form]
   return "unavailable" in entry ? undefined : entry
 }
+
+/**
+ * What a capability needs of the system in a form: its own `needs` and those of the form. A form
+ * the capability does not offer has none.
+ */
+export const formNeeds = (
+  capability: CapabilityDefinition,
+  form: CapabilityForm,
+): ReadonlyArray<SystemNeed> => {
+  const content = formContent(capability, form)
+  return content === undefined ? [] : [...capability.needs, ...(content.needs ?? [])]
+}
+
+/**
+ * The screen tools a capability grants in a form: its `tools.screen` without the tools of an MCP
+ * server that another form registers and this one does not (a tool of server `name` is named
+ * `mcp__<name>__...`), so the headless form lists the Playwright server's tools and not browse's,
+ * and the normal form the reverse. A form the capability does not offer grants none.
+ */
+export const screenTools = (
+  capability: CapabilityDefinition,
+  form: CapabilityForm,
+): ReadonlyArray<string> => {
+  const content = formContent(capability, form)
+  if (content === undefined) return []
+  const prefix = ({ name }: McpServer) => `mcp__${name}__`
+  const own = content.mcpServers.map(prefix)
+  const others = CAPABILITY_FORMS.flatMap(
+    (other) => formContent(capability, other)?.mcpServers ?? [],
+  )
+    .map(prefix)
+    .filter((candidate) => !own.includes(candidate))
+  return capability.tools.screen.filter(
+    (pattern) => !others.some((candidate) => pattern.startsWith(candidate)),
+  )
+}
+
+/**
+ * The reason the MCP servers of a capability are not registered although the form offers them:
+ * `pi.features.mcp` is off, so every process starts with `--no-mcp` and Pi's MCP extension, which
+ * runs the servers, is not loaded. `undefined` when the capability adds no server in the form or
+ * the extension is on.
+ */
+export const serversWithheld = (
+  capability: CapabilityDefinition,
+  form: CapabilityForm,
+  features: Readonly<Record<string, unknown>>,
+): string | undefined =>
+  features["mcp"] === true || (formContent(capability, form)?.mcpServers ?? []).length === 0
+    ? undefined
+    : "pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools"
 
 /** The first package a capability's normal form loads, if it loads one. */
 type NormalPackage<D> = D extends {

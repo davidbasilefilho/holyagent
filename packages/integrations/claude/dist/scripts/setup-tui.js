@@ -3417,7 +3417,8 @@ var pi_packages_default = {
   "@amaster.ai/pi-computer-use": "0.1.36",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.15"
+  "@opencode/browse": "0.0.15",
+  "@playwright/mcp": "0.0.85"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
@@ -3442,11 +3443,36 @@ var COMPUTER_USE_TOOLS = ["computer_use_*"];
 var BROWSE_PACKAGE = "@opencode/browse";
 var BROWSE_SERVER = "browse";
 var BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
+var NPM_REGISTRY = "https://registry.npmjs.org/";
+var npxServerArgs = (name, rest) => [
+  `--registry=${NPM_REGISTRY}`,
+  ...name.startsWith("@") ? [`--${name.slice(0, name.indexOf("/"))}:registry=${NPM_REGISTRY}`] : [],
+  "-y",
+  `${name}@${PI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
 var BROWSE_MCP_SERVER = {
   name: BROWSE_SERVER,
   command: "npx",
-  args: ["-y", `${BROWSE_PACKAGE}@${PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]}`, "mcp"]
+  args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
 };
+var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
+var PLAYWRIGHT_SERVER = "playwright";
+var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
+var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
+var PLAYWRIGHT_MCP_SERVER = {
+  name: PLAYWRIGHT_SERVER,
+  command: "npx",
+  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
+  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+};
+var BROWSE_MINIMUM_NODE = [22, 19, 0];
+var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var nodeNeed = (minimum) => ({
+  kind: "node",
+  minimum,
+  fix: `install Node.js ${minimum.join(".")} or newer from https://nodejs.org, which ships npx`
+});
 var sameForm = (packages) => ({
   headless: { packages, mcpServers: [] },
   normal: { packages, mcpServers: [] }
@@ -3558,27 +3584,37 @@ var CAPABILITIES = [
   {
     name: "browser-use",
     feature: "browserUse",
-    description: "Lets screen specialists drive the user's real browser through opencode browse (@opencode/browse)",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
     needs: [
-      { kind: "display" },
       {
         kind: "command",
         command: "npx",
-        fix: "install Node.js 22.19 or newer from https://nodejs.org, which ships npx"
+        fix: "install Node.js from https://nodejs.org, which ships npx"
       }
     ],
     forms: {
       headless: {
-        unavailable: "browse drives the browser of a graphical session through its extension and starts none itself, and this machine has no graphical session"
+        packages: [],
+        mcpServers: [PLAYWRIGHT_MCP_SERVER],
+        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
       },
-      normal: { packages: [], mcpServers: [BROWSE_MCP_SERVER] }
+      normal: {
+        packages: [],
+        mcpServers: [BROWSE_MCP_SERVER],
+        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        pairing: true
+      }
     },
-    tools: { rootExclude: BROWSE_TOOLS, visual: [], screen: BROWSE_TOOLS },
+    tools: {
+      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      visual: [],
+      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+    },
     settings: [],
-    health: ["needs", "pairing"]
+    health: ["needs"]
   },
   {
     name: "luna-reserve",

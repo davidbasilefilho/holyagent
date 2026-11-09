@@ -149,7 +149,7 @@ Limits of that finding:
 | `Worker.implementation`, `Reviewer.code`, `Worker.visual`, `Reviewer.visual`                          | `gpt-6.1-terra` | high   |
 | `Worker.debugging`, `Reviewer.security`                                                               | `gpt-6.1-terra` | xhigh  |
 
-An Assignment that uses the screen capability runs on Terra at medium or above; that capability is a later addition, so no row applies it yet. The launch-time catalog check validates these ids against `pi --list-models` like the Kimi ones.
+An Assignment that carries the screen capability runs on Terra at medium or above, whatever its role ([screen.md](screen.md#the-route)); no row of this table applies it. The launch-time catalog check validates these ids against `pi --list-models` like the Kimi ones.
 
 **Instructions.** The root's prompt, each specialist's prompt and the skills Pi lists are the GPT-6 family's (`packages/runtime/src/instructions/gpt-6`). The Pi package ships the Kimi family as its own `agents/` and `skills/` and the GPT-6 copies below `families/gpt-6/`; the extension swaps a Codex session onto them: the root gets the family's prompt, a specialist's own prompt is replaced by the family's one for the same agent (whatever Pi adds around it stays), and the `SKILL.md` paths of the skill list are pointed at the family's folder. A skill that a person runs with `/skill:<name>` is still the package's own (Kimi) copy, since Pi reads that file itself.
 

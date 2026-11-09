@@ -68,7 +68,11 @@ export const codexSettings = (config: Config): CodexSettings | undefined => {
     lunaReserve: config.pi.features.lunaReserve,
     applyPatchAgents: RoleTask.literals.flatMap((roleTask) =>
       toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL)
-        ? [agentFor(routeFor(roleTask), false), agentFor(routeFor(roleTask), true)]
+        ? [
+            agentFor(routeFor(roleTask), false),
+            agentFor(routeFor(roleTask), true, "normal"),
+            agentFor(routeFor(roleTask), true, "headless"),
+          ]
         : [],
     ),
   }

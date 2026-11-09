@@ -8,6 +8,7 @@ import { AGENT_HOSTS, type AgentHost } from "../domain/host.ts"
 import { type RoleTask, routeFor } from "../domain/route.ts"
 import { routeModel, subagentModel } from "../pi/provider.ts"
 import { claudeConfigDirectory } from "../setup/environment.ts"
+import { detectForm } from "../setup/form.ts"
 import { readText } from "../state/files.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { Usage } from "./errors.ts"
@@ -129,14 +130,16 @@ export const workflowsAvailable = (env: Host["env"], root: string) => {
 }
 
 /**
- * The execution settings: the TTL from the environment, whether workflows are available and the
- * agent host.
+ * The execution settings: the TTL from the environment, whether workflows are available, the agent
+ * host and the form of the machine (the one setup and doctor detect), which picks the agent file of
+ * a screen Assignment.
  */
 export const loadConfig = (env: Host["env"], root: string) =>
   Effect.all({
     ttlMinutes: reuseTtl(env),
     workflowsAvailable: workflowsAvailable(env, root),
     host: agentHostOf(env),
+    screenForm: Effect.succeed(detectForm(env).form),
   }).pipe(Effect.map((config): ExecutionConfig => config))
 
 /**

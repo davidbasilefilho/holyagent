@@ -10,12 +10,14 @@ export const SPECIALIST_NAMES: ReadonlyArray<string> = ROUTES.map((route) => rou
 
 /**
  * The names of the same 18 specialists as launched for an Assignment that carries the screen
- * capability (`worker-implementation-screen`): each has an agent file of its own, with the screen
- * tools added to the role's.
+ * capability, in both forms of the machine (`worker-implementation-screen`, and
+ * `worker-implementation-headless-screen` on a headless one): each has an agent file of its own,
+ * with the screen tools of the form added to the role's.
  */
-export const SCREEN_SPECIALIST_NAMES: ReadonlyArray<string> = ROUTES.map((route) =>
-  agentFor(route, true),
-)
+export const SCREEN_SPECIALIST_NAMES: ReadonlyArray<string> = ROUTES.flatMap((route) => [
+  agentFor(route, true, "normal"),
+  agentFor(route, true, "headless"),
+])
 
 /** Every agent type a launch may name: the 18 specialists, each with and without the screen tools. */
 export const AGENT_TYPES: ReadonlyArray<string> = [...SPECIALIST_NAMES, ...SCREEN_SPECIALIST_NAMES]

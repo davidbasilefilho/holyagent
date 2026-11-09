@@ -21,7 +21,8 @@ import { AssignmentId, IntentId, newId } from "../domain/ids.ts"
 import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
 import { findAssignment, findIntent, type Project } from "../domain/project.ts"
-import { agentFor, RoleTask, routeFor } from "../domain/route.ts"
+import { agentFor, agentsFor, RoleTask, routeFor } from "../domain/route.ts"
+import { detectForm } from "../setup/form.ts"
 import { io } from "../state/files.ts"
 import { workTreeKey } from "../state/local.ts"
 import { readState, type Snapshot } from "../state/store.ts"
@@ -182,9 +183,15 @@ export const recordLaunch = (
       const assignment = yield* findAssignment(snapshot.project, id)
       const route = routeFor(assignment.roleTask)
       const { model, effort } = route
-      const agent = agentFor(route, assignment.screen)
-      if (launchedAs !== undefined && withoutNamespace(launchedAs.type) !== agent)
-        return yield* new AgentMismatch({ expected: agent, launched: launchedAs.type })
+      // A screen Assignment may be launched as the agent file of either form; the one a machine
+      // uses is decided at dispatch, and a plain agent never carries the screen tools.
+      const agents = agentsFor(route, assignment.screen)
+      const launched = withoutNamespace(launchedAs?.type)
+      if (launchedAs !== undefined && (launched === undefined || !agents.includes(launched)))
+        return yield* new AgentMismatch({
+          expected: agents.join(" or "),
+          launched: launchedAs.type,
+        })
       return yield* record(
         snapshot.project,
         snapshot.specialists,
@@ -258,14 +265,19 @@ const piReports = (call: Call, source: string, text: string) =>
         }),
       )
     const launchOf = yield* launchesOf(call.env, call.root, "pi")
+    const screenForm = detectForm(call.env).form
     const calls = yield* Effect.forEach(project.assignments, (assignment) =>
       briefPath(call, assignment.id).pipe(
         Effect.map((path) =>
           dispatchedCall(
             assignment,
-            agentTypeFor("pi", agentFor(routeFor(assignment.roleTask), assignment.screen)),
+            agentTypeFor(
+              "pi",
+              agentFor(routeFor(assignment.roleTask), assignment.screen, screenForm),
+            ),
             path,
             launchOf(assignment.roleTask, assignment.screen),
+            screenForm,
           ),
         ),
       ),
@@ -349,7 +361,11 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             // Assignment Ready instead of Running with no prompt to send.
             const agent = agentTypeFor(
               settings.host,
-              agentFor(routeFor(dispatched.assignment.roleTask), dispatched.assignment.screen),
+              agentFor(
+                routeFor(dispatched.assignment.roleTask),
+                dispatched.assignment.screen,
+                settings.screenForm,
+              ),
             )
             const path = yield* writeBrief(
               call,

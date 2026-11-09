@@ -7,7 +7,7 @@ import type { Assignment } from "../domain/assignment.ts"
 import { PI_WORKFLOW_AGENT_PREFIX } from "../domain/directive.ts"
 import { InsufficientAcceptance } from "../domain/errors.ts"
 import { CLAUDE_WORDS, type HostWords, PI_WORDS } from "../domain/host.ts"
-import { agentFor, routeFor } from "../domain/route.ts"
+import { agentFor, isHeadlessScreenAgent, routeFor, type ScreenForm } from "../domain/route.ts"
 import {
   decodePiJournal,
   type ExpectedCall,
@@ -231,6 +231,14 @@ const SCREEN_LINE =
   "Screen capability: this Assignment carries it, so the computer-use, browser-use (mcp__browse__*) and T3 preview tools are yours where this machine provides them. Report a tool that is missing instead of working around it."
 
 /**
+ * What a headless screen specialist is told (its agent name ends in `-headless-screen`): the
+ * machine has no graphical session, so it drives a headless browser through the Playwright MCP
+ * tools and has no desktop.
+ */
+export const HEADLESS_SCREEN_LINE =
+  "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it."
+
+/**
  * The Assignment as the specialist reads it, in a fixed order: the role line (the marker
  * {@link dispatchedAssignment} reads back), objective, scope, constraints, ownership paths, the
  * screen capability when it carries one, acceptance criteria, required evidence and the closing
@@ -244,7 +252,9 @@ export const renderPrompt = (assignment: Assignment, agent: string): string =>
     ...section("Scope", assignment.scope),
     ...section("Constraints", assignment.constraints),
     ...section("Ownership paths (write only here)", assignment.ownershipPaths),
-    ...(assignment.screen === true ? [SCREEN_LINE] : []),
+    ...(assignment.screen === true
+      ? [isHeadlessScreenAgent(agent) ? HEADLESS_SCREEN_LINE : SCREEN_LINE]
+      : []),
     ...section(
       "Acceptance criteria",
       assignment.criteria.map(
@@ -348,22 +358,23 @@ export const journalResults = (journal: string, source: string) =>
  * prompt that {@link dispatchPrompt} prints for the pi host (`agent` is the namespaced agent it
  * names, `briefPath` the brief file it points at), the Assignment id as the label, the route's
  * agent (the Claude slug without its namespace, which the Pi package ships under that name, and
- * with `-screen` for an Assignment that carries the screen capability), and the model and effort as
- * the dispatch printed them (`launch`, see `launchesOf`). The script passes no isolation, gate,
- * resume or schema.
+ * with `-screen` (`-headless-screen` on a `headless` machine) for an Assignment that carries the
+ * screen capability), and the model and effort as the dispatch printed them (`launch`, see
+ * `launchesOf`). The script passes no isolation, gate, resume or schema.
  */
 export const dispatchedCall = (
   assignment: Assignment,
   agent: string,
   briefPath: string,
   launch: Launch,
+  form: ScreenForm = "normal",
 ): ExpectedCall => ({
   id: assignment.id,
   key: journalKey({
     prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
     label: assignment.id,
     model: launch.model,
-    agentType: agentFor(routeFor(assignment.roleTask), assignment.screen),
+    agentType: agentFor(routeFor(assignment.roleTask), assignment.screen, form),
     effort: launch.effort,
   }),
 })

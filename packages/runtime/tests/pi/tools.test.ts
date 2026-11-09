@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { BROWSE_TOOLS, T3_PREVIEW_TOOLS } from "../../src/config/capabilities.ts"
+import { BROWSE_TOOLS, PLAYWRIGHT_TOOLS, T3_PREVIEW_TOOLS } from "../../src/config/capabilities.ts"
 import { piPackages } from "../../src/config/packages.ts"
 import type { Config } from "../../src/config/schema.ts"
 import { RoleTask, routeFor } from "../../src/domain/route.ts"
@@ -144,6 +144,7 @@ describe("toolArgs for the root", () => {
         "edit",
         ...COMPUTER_USE_TOOLS,
         ...BROWSE_TOOLS,
+        ...PLAYWRIGHT_TOOLS,
         ...FFF_TOOLS,
         ...MOONSHOT,
       ],
@@ -153,7 +154,7 @@ describe("toolArgs for the root", () => {
         "--tools",
         "+codemode",
         "--exclude-tools",
-        "write,edit,computer_use_*,mcp__browse__*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
+        "write,edit,computer_use_*,mcp__browse__*,mcp__playwright__browser_*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
       ],
     })
   })
@@ -655,7 +656,51 @@ describe("toolArgs with the screen capability", () => {
     expect(tools({ computerUse: false })).not.toContain("computer_use_*")
     expect(tools({ browserUse: false })).not.toContain("mcp__browse__*")
     expect(tools({ mcp: false }).some((tool) => tool.startsWith("mcp__t3"))).toBe(false)
-    expect(tools({ mcp: false })).toContain("mcp__browse__*")
+    // The MCP servers run in Pi's MCP extension, so their tools need it on.
+    expect(tools({ mcp: false }).some((tool) => tool.startsWith("mcp__"))).toBe(false)
+    expect(tools({ mcp: false })).toContain("computer_use_*")
+    expect(tools({ mcp: true })).toContain("mcp__browse__*")
+  })
+
+  test("the headless form grants the Playwright tools and no computer-use or browse tool, whatever the role", () => {
+    for (const role of RoleTask.literals) {
+      const screen = toolArgs(DEFAULT_CONFIG, role, undefined, {
+        screen: true,
+        form: "headless",
+      }).tools
+      for (const tool of [...PLAYWRIGHT_TOOLS, ...T3_PREVIEW_TOOLS])
+        expect(screen, role).toContain(tool)
+      expect(
+        screen.some((tool) => BROWSE_TOOLS.includes(tool)),
+        role,
+      ).toBe(false)
+      // Not even a visual role, whose own tools they are in the normal form: a headless machine has
+      // no desktop.
+      expect(
+        screen.some((tool) => COMPUTER_USE_TOOLS.includes(tool)),
+        role,
+      ).toBe(false)
+    }
+  })
+
+  test("the normal form grants browse and no Playwright tool, and is the default", () => {
+    const normal = toolArgs(DEFAULT_CONFIG, "Worker.implementation", undefined, {
+      screen: true,
+      form: "normal",
+    }).tools
+    expect(normal).toEqual(
+      toolArgs(DEFAULT_CONFIG, "Worker.implementation", undefined, { screen: true }).tools,
+    )
+    for (const tool of BROWSE_TOOLS) expect(normal).toContain(tool)
+    expect(normal.some((tool) => PLAYWRIGHT_TOOLS.includes(tool))).toBe(false)
+  })
+
+  test("without the capability the form changes nothing but a visual role's computer-use tools", () => {
+    for (const role of RoleTask.literals) {
+      const normal = toolArgs(DEFAULT_CONFIG, role).tools
+      const headless = toolArgs(DEFAULT_CONFIG, role, undefined, { form: "headless" }).tools
+      expect(headless, role).toEqual(normal.filter((tool) => !COMPUTER_USE_TOOLS.includes(tool)))
+    }
   })
 
   test("the root takes no screen tools: it excludes them whether or not the option is passed", () => {

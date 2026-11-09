@@ -9,6 +9,7 @@ import {
   CAPABILITIES,
   type CapabilityDefinition,
   FEATURE_PACKAGES,
+  formNeeds,
 } from "../src/config/capabilities.ts"
 import { piPackages } from "../src/config/packages.ts"
 import { PI_PACKAGE_VERSIONS, piPackageSource } from "../src/config/pi-packages.ts"
@@ -136,7 +137,8 @@ describe("holyagent doctor, Pi checks", () => {
       `ok   pi package: listed in ${globalSettings()}`,
       ...PI_LINES_OK,
     ])
-    expect(shell.lines()).toEqual(["pi --version", "node --version"])
+    // The second `node --version` is the browse need (Node.js 22.19 or newer) of browser use.
+    expect(shell.lines()).toEqual(["pi --version", "node --version", "node --version"])
   })
 
   test("report each missing part with the command that fixes it, and install nothing even with --fix", async () => {
@@ -158,10 +160,19 @@ describe("holyagent doctor, Pi checks", () => {
               return [
                 `ok   pi capability ${capability.name}: normal form, both, nothing to install`,
               ]
-            // Browse needs npx, which this shell lacks; its pairing is read from the home directory.
+            // Browse needs npx and Node.js, which this shell lacks; its pairing is read from the home
+            // directory.
             if (capability.name === "browser-use")
               return [
-                `FAIL pi capability browser-use: needs npx on PATH; ${capability.needs.flatMap((need) => (need.kind === "command" ? [need.fix] : []))[0]}`,
+                `FAIL pi capability browser-use: ${formNeeds(capability, "normal")
+                  .flatMap((need) =>
+                    need.kind === "command"
+                      ? [`needs ${need.command} on PATH; ${need.fix}`]
+                      : need.kind === "node"
+                        ? [`needs Node.js ${need.minimum.join(".")} or newer on PATH; ${need.fix}`]
+                        : [],
+                  )
+                  .join("; ")}`,
                 BROWSE_PAIRING_OK,
               ]
             const source = piPackageSource(
@@ -470,11 +481,7 @@ describe("holyagent doctor, capabilities", () => {
             ]
           : line.includes("browser-use pairing")
             ? []
-            : line.includes("capability browser-use")
-              ? [
-                  "~ pi capability browser-use: not offered in the headless form (browse drives the browser of a graphical session through its extension and starts none itself, and this machine has no graphical session); nothing is expected of it",
-                ]
-              : [line.replace("normal form", "headless form")],
+            : [line.replace("normal form", "headless form")],
       ),
     ])
   })

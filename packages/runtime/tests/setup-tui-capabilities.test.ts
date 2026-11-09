@@ -77,14 +77,15 @@ describe("the setup interface, capability rows", () => {
       capabilities: capabilityOffers(HEADLESS),
     })
     // The focus wraps up from the first row to the last (fff), then back through just-bash,
-    // context-management, luna-reserve and browser-use to computer-use.
+    // context-management, luna-reserve and browser-use to computer-use. Browser use is offered
+    // headless (the Playwright server), so only computer use says it is not.
     await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
     expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("browser-use")
-    expect(screen.lines().join(" ").replace(/\s+/g, " ")).toContain("Not offered in this form")
+    expect(screen.lines().join(" ").replace(/\s+/g, " ")).not.toContain("Not offered in this form")
     await screen.keys("k")
     expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("computer-use")
     expect(screen.lines().join(" ").replace(/\s+/g, " ")).toContain("Not offered in this form")
@@ -103,7 +104,7 @@ describe("the capability helpers of the setup session", () => {
       capabilityOffers(HEADLESS)
         .filter((offer) => offer.unavailable !== undefined)
         .map((offer) => offer.name),
-    ).toEqual(["computer-use", "browser-use"])
+    ).toEqual(["computer-use"])
   })
 
   test("the switches of a config are read by key, and only the differing ones are written", () => {
