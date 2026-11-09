@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw9b33ys-yoxq",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-0-3-0-docs-commit-for",
+  "objective": "Review the 0.3.0 docs commit for accuracy against the code and completeness against its nine items.",
+  "state": "Running",
+  "scope": [
+    "The commit is 6563330 on release/0.3.0/docs/t3-first-pi-docs in /home/user/holyagent-0.3.0-docs; its diff is /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/docs-final.diff. The writer's report, with the nine items and where each landed, is /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ak0wk-9gsw.md. The code it documents is in the same worktree.",
+    "Check each changed statement against the code (setup flags and screen in packages/runtime/src/setup and cli, Pi install scopes, specialists in-process, todo panel under T3, Windows Kimi wrapper, CONTEXT_BUDGET numbers in the session-context code and sessioncontext.test.ts), that README.md keeps exactly its six sections in AGENTS.md's order, and that nothing still calls shipped 0.3.0 work planned. The T3 generator claims come from T3's own source, which you may not be able to read; mark them unverified rather than wrong."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every changed statement matches the code, or each mismatch is reported with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The nine items are each covered",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README.md keeps exactly its six sections in order",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9ak0wk-9gsw"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:37:41.332Z"
+  },
+  "createdAt": "2026-11-09T13:37:41.332Z"
+}
