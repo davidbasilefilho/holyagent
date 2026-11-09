@@ -40,6 +40,11 @@ export const CODEMODE_TOOL = "codemode"
 /** The environment variable that caps the codemode workers alive in one Pi process. */
 export const CODEMODE_MAX_WORKERS_ENV = "PI_CODEMODE_MAX_WORKERS"
 
+const escapeRegExp = (text: string): string => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+
+const patternRegExp = (pattern: string): RegExp =>
+  new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`)
+
 /**
  * The prefix of T3 Code's tools as a pattern. Pi names an MCP tool `mcp__<server>__<tool>` with
  * every character but letters, digits and `_` of the server name turned into `_`, so a server the
@@ -63,6 +68,10 @@ export const T3_VISUAL_TOOLS: ReadonlyArray<string> = [
   `${T3_PREFIX}device_*`,
 ]
 
+// Compiled once: the `tool_call` gate asks for every call of a T3 session.
+const T3_TOOL = patternRegExp(`${T3_PREFIX}*`)
+const T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp)
+
 /**
  * Whether the root keeps no use for a registered tool under T3 Code: it is one of T3's own tools
  * (either spelling of the server name, see {@link T3_PREFIX}) outside the {@link T3_VISUAL_TOOLS}
@@ -70,8 +79,7 @@ export const T3_VISUAL_TOOLS: ReadonlyArray<string> = [
  * does through its specialists, so the root has them neither active nor callable.
  */
 export const isDeactivatedT3Tool = (name: string): boolean =>
-  toolMatches(`${T3_PREFIX}*`, name) &&
-  !T3_VISUAL_TOOLS.some((pattern) => toolMatches(pattern, name))
+  T3_TOOL.test(name) && !T3_VISUAL.some((pattern) => pattern.test(name))
 
 /** The names among `registered` that {@link isDeactivatedT3Tool} names, in their order. */
 export const deactivatedT3Tools = (registered: ReadonlyArray<string>): ReadonlyArray<string> =>
@@ -179,14 +187,12 @@ export const toolArgs = (
   )
 }
 
-const escapeRegExp = (text: string): string => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-
 /**
  * Whether a tool name matches a `--tools` or `--exclude-tools` entry: an exact name, or a pattern
  * whose `*` stands for any run of characters (`computer_use_*`).
  */
 export const toolMatches = (pattern: string, name: string): boolean =>
-  new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`).test(name)
+  patternRegExp(pattern).test(name)
 
 /**
  * The tools the root has active, for `pi.setActiveTools`, which takes names only: Pi's current

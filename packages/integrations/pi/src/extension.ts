@@ -470,8 +470,14 @@ interface Held {
   /** True when the session runs under T3 Code (see {@link isT3Session}). */
   t3: boolean
   /**
+   * True once the start ran for a root under T3 Code, applied or not: T3's tools the root keeps off
+   * are refused when called. Refusing is the safe side when the tools were not applied.
+   */
+  t3Gate: boolean
+  /**
    * True once the start applied the root's tools under T3 Code: T3's tools the root keeps off are
-   * then held off after drift and refused when called.
+   * then also held off after drift. A start that failed to apply them leaves it false, so no
+   * correction acts on a selection that never took effect.
    */
   t3Root: boolean
   /** The notice the provider checks produced, until the next run delivers it. */
@@ -1279,8 +1285,10 @@ export const createExtension =
           taken.started = true
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
           if (result?.tools !== undefined) {
-            taken.t3Root = taken.t3
-            taken.setupNotice = applyRootTools(result.tools, taken.t3)
+            const notApplied = applyRootTools(result.tools, taken.t3)
+            taken.t3Gate = taken.t3
+            taken.t3Root = taken.t3 && notApplied === undefined
+            taken.setupNotice = notApplied
             if (taken.t3 && belowFullAccess(env))
               taken.setupNotice = joinNotices(taken.setupNotice, warnBelowFullAccess(ctx))
           }
@@ -1308,6 +1316,7 @@ export const createExtension =
         excluded: Effect.runSync(startingExclusions),
         started: false,
         t3: isT3Session(ctx, env),
+        t3Gate: false,
         t3Root: false,
         probe: undefined,
         readiness: undefined,
@@ -1408,7 +1417,7 @@ export const createExtension =
       held?.gatesOff === true
         ? undefined
         : (refuseExcludedTool(event, held?.excluded ?? []) ??
-          (held?.t3Root === true ? refuseDeactivatedT3Tool(event) : undefined) ??
+          (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
           Effect.runPromise(
             refuseNonSpecialistWorkflow(event).pipe(
               Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),
