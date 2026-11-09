@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw8tcv6j-ybxq",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Explorer.trace",
+  "slug": "establish-from-the-pinned-pi-host-source",
+  "objective": "Establish from the pinned Pi host source and the HolyAgent Pi extension what the extension can observe and control for the remaining 0.3.0 Pi work: running under T3 Code in RPC mode, the permission mode, tool activation, project trust for specialists, and the root model route.",
+  "state": "Running",
+  "scope": [
+    "Pi host source: /home/user/holyagent-0.3.0-scope/node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0/node_modules/@earendil-works/pi-coding-agent (version 1.5.0; read dist and its .d.ts, docs and examples if present). HolyAgent code: /home/user/holyagent-0.3.0-scope (packages/integrations/pi/src/extension.ts, launcher and workflow tool files under packages/integrations/pi/src, packages/runtime/src/pi/tools.ts, packages/runtime/src/domain/route.ts). Plan doc: docs/pi/t3-code.md in that worktree.",
+    "Answer each question with path:line in the Pi source and, where relevant, the HolyAgent call site that would change:",
+    "1. How an extension knows it runs in RPC mode (pi --mode rpc) versus interactive, print or JSON mode, and which ctx.ui methods work in RPC mode (select, confirm, input, notify, setStatus, setWidget, setFooter, setTitle, custom, theme): which send extension_ui_request events, which are no-ops, which throw.",
+    "2. Whether any environment variable, flag or RPC message tells the extension the client is T3 Code, and what T3 passes for its Full access / Supervised modes (an approval or permission setting Pi receives, if any). If Pi has no such signal, say so.",
+    "3. Events and APIs for tool activation: session_start, session_tree (does it exist, when it fires), setActiveTools/getActiveTools, tool_call blocking; whether tools registered by other packages (names with a T3 prefix, as packages/runtime/src/pi/tools.ts T3_PREFIX expects) appear before session_start ends.",
+    "4. Project trust: how Pi decides a project is trusted (defaultProjectTrust, the trust prompt, --approve), whether an extension can read whether the current session trusted the project, and exactly where the HolyAgent specialist launcher builds the child pi command line so --approve could be added only when the parent trusted it.",
+    "5. The root model route: how the root session model is set in Pi (a --model flag, settings, an extension API such as setModel), and where HolyAgent passes or should pass the route model for the root (task: root route --model on Pi)."
+  ],
+  "constraints": [
+    "Read-only; never start pi.",
+    "Report in under 600 words; put long excerpts in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the five questions is answered with path:line support, or marked as having no support in the source",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "For each question the HolyAgent file and function a change would touch is named",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "answers"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:21:23.419Z"
+  },
+  "createdAt": "2026-11-09T05:21:23.419Z"
+}
