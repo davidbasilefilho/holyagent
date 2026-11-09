@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { delimiter, dirname, join, parse } from "node:path"
 
 import { Effect } from "effect"
 
 import { cmdExeArguments } from "../../src/pi/bash/cmd.ts"
+import { withNullDevice } from "../../src/pi/bash/devices.ts"
 import {
   hostPathValue,
   hostSearchFolders,
@@ -649,6 +650,29 @@ describe("the shell runs a program given by path on the machine", () => {
   )
 
   test.skipIf(WINDOWS)(
+    "a binary given by path reads as its bytes, also after a file test, and still runs on the machine",
+    async () => {
+      const path = join(work, "path-bytes")
+      await program(path, "console.log('ran')")
+      const bytes = await Bun.file(path).text()
+      for (const command of [
+        "cat ./path-bytes",
+        "[ -x ./path-bytes ] && cat ./path-bytes",
+        "[ -e ./path-bytes ] && [ -x ./path-bytes ] && cat ./path-bytes",
+        "[[ -x ./path-bytes ]] && sed -n p ./path-bytes",
+      ])
+        expect(await shell(command)).toMatchObject({ exitCode: 0, text: bytes })
+      expect((await shell("test -x ./path-bytes && grep -c ran ./path-bytes")).text).toBe("1\n")
+      const diff = await shell("[ -x ./path-bytes ] && diff ./path-bytes ./path-bytes")
+      expect(diff).toMatchObject({ exitCode: 0, text: "" })
+      expect(
+        (await shell("cat ./path-bytes >/dev/null; [ -x ./path-bytes ] && ./path-bytes")).text,
+      ).toBe("ran\n")
+    },
+    PROCESS_TIMEOUT_MS,
+  )
+
+  test.skipIf(WINDOWS)(
     "a folder added to PATH in the call is searched, and the program gets it in its PATH",
     async () => {
       const bin = join(work, "path-added")
@@ -712,6 +736,29 @@ describe("exit keeps the state the run had", () => {
     expect(nested.changes.set).toEqual({ N: "1" })
   })
 
+  test("an exit in a subshell or a command substitution leaves the state of the shell around it alone", async () => {
+    // The script ends by `set -e`, not by an `exit` of its own, so only what the shell had counts.
+    const sub = await shell("export A=1; set -e; (cd /usr; export B=2; exit 3); echo not reached")
+    expect(sub).toMatchObject({ exitCode: 3, text: "", cwd: work })
+    expect(sub.changes).toEqual({ set: { A: "1" }, unset: [] })
+    const substitution = await shell(
+      "set -e; export A=1; V=$(export B=2; exit 4); echo not reached",
+    )
+    expect(substitution.exitCode).toBe(4)
+    expect(substitution.changes.set).not.toHaveProperty("B")
+    expect(substitution.changes.set).toMatchObject({ A: "1" })
+    // A subshell's exit does not stop the exit of the shell itself from recording its state.
+    const both = await shell("export A=1; (export B=2; exit 3); export C=3; exit 4")
+    expect(both.exitCode).toBe(4)
+    expect(both.changes.set).toEqual({ A: "1", C: "3" })
+  })
+
+  test("declare outside a function is session state when exit runs, local inside one is not", async () => {
+    const out = await shell("declare D=1; typeset T=2; f() { local L=1; declare M=2; exit 2; }; f")
+    expect(out.exitCode).toBe(2)
+    expect(out.changes).toEqual({ set: { D: "1", T: "2" }, unset: [] })
+  })
+
   test("the local variables of the function that calls exit are not session state", async () => {
     const out = await shell("f() { local L=1 M; G=2; exit 3; }; f", { env: { M: "keep" } })
     expect(out.exitCode).toBe(3)
@@ -724,34 +771,148 @@ describe("exit keeps the state the run had", () => {
 })
 
 describe("redirects to /dev/null", () => {
+  // What only just-bash's own commands do, so it holds on every system, Windows included.
+  test("discard what a builtin writes, and /dev/null reads as empty", async () => {
+    expect(await shell("echo hidden >/dev/null; echo shown")).toMatchObject({
+      exitCode: 0,
+      text: "shown\n",
+    })
+    expect((await shell("echo hidden > /dev/null; echo more >> /dev/null; echo shown")).text).toBe(
+      "shown\n",
+    )
+    expect((await shell("ls /nope-missing 2>/dev/null; echo rc=$?")).text).toBe("rc=2\n")
+    expect((await shell("{ echo out; echo err >&2; } &>/dev/null; echo shown")).text).toBe(
+      "shown\n",
+    )
+    expect((await shell("{ echo out; echo err >&2; } >/dev/null 2>&1; echo shown")).text).toBe(
+      "shown\n",
+    )
+    expect(
+      (await shell('cat </dev/null; echo -n "[$(cat /dev/null)]"; wc -c </dev/null')).text,
+    ).toMatch(/^\[\]\s*0\n?$/)
+    expect((await shell("echo a >/dev/null; cat /dev/null | wc -c")).text.trim()).toBe("0")
+  })
+
   test.skipIf(WINDOWS)(
-    "discard what a builtin or a host program writes, and /dev/null reads as empty",
+    "discard what a host program writes",
     async () => {
       const noisy = `${HOST} -e "console.log('out'); console.error('err')"`
-      expect(await shell("echo hidden >/dev/null; echo shown")).toMatchObject({
-        exitCode: 0,
-        text: "shown\n",
-      })
-      expect(
-        (await shell("echo hidden > /dev/null; echo more >> /dev/null; echo shown")).text,
-      ).toBe("shown\n")
-      expect((await shell("ls /nope-missing 2>/dev/null; echo rc=$?")).text).toBe("rc=2\n")
-      expect((await shell("{ echo out; echo err >&2; } &>/dev/null; echo shown")).text).toBe(
-        "shown\n",
-      )
-      expect((await shell("{ echo out; echo err >&2; } >/dev/null 2>&1; echo shown")).text).toBe(
-        "shown\n",
-      )
       expect((await shell(`${noisy} >/dev/null`)).text).toBe("err\n")
       expect((await shell(`${noisy} 2>/dev/null`)).text).toBe("out\n")
       expect((await shell(`${noisy} &>/dev/null; echo done`)).text).toBe("done\n")
       expect((await shell(`${noisy} >/dev/null 2>&1; echo done`)).text).toBe("done\n")
-      expect(
-        (await shell('cat </dev/null; echo -n "[$(cat /dev/null)]"; wc -c </dev/null')).text,
-      ).toMatch(/^\[\]\s*0\n?$/)
-      expect((await shell("echo a >/dev/null; cat /dev/null | wc -c")).text.trim()).toBe("0")
     },
+    PROCESS_TIMEOUT_MS,
   )
+
+  test("no file system call on the device reaches the disk, whatever the call or the spelling", async () => {
+    const seen: Array<string> = []
+    const methods = [
+      "readFile",
+      "readFileBytes",
+      "readFileBuffer",
+      "writeFile",
+      "appendFile",
+      "exists",
+      "stat",
+      "lstat",
+      "mkdir",
+      "readdir",
+      "rm",
+      "cp",
+      "mv",
+      "chmod",
+      "symlink",
+      "link",
+      "readlink",
+      "realpath",
+      "utimes",
+    ]
+    const disk = Object.fromEntries(
+      methods.map((name) => [
+        name,
+        (...args: Array<unknown>) => {
+          seen.push(`${name} ${String(args[0])}`)
+          return Effect.runPromise(Effect.succeed(undefined))
+        },
+      ]),
+    )
+    const fs = withNullDevice(disk as never) as unknown as Record<
+      string,
+      (...args: Array<unknown>) => Promise<unknown>
+    >
+    const settled = async (name: string, ...args: Array<unknown>) =>
+      (fs[name] as (...args: Array<unknown>) => Promise<unknown>)(...args).then(
+        () => "ok",
+        (error: Error) => error.message,
+      )
+    for (const device of [
+      "/dev/null",
+      "/dev//null",
+      "/dev/./null",
+      "/dev/../dev/null",
+      "/dev/null/",
+    ]) {
+      for (const name of methods.filter(
+        (method) => !["cp", "mv", "symlink", "link"].includes(method),
+      ))
+        await settled(name, device, 0o600, new Date(0))
+      await settled("cp", device, "/dev/null", { recursive: true })
+      await settled("cp", "/tmp/x", device)
+      await settled("cp", device, "/tmp/copy")
+      await settled("mv", device, "/tmp/y")
+      await settled("mv", "/tmp/y", device)
+      await settled("symlink", device, "/tmp/link")
+      await settled("symlink", "/tmp/target", device)
+      await settled("link", device, "/tmp/link")
+      await settled("link", "/tmp/target", device)
+    }
+    // A copy from the device makes an empty file at the destination, which is the only call through.
+    expect([...new Set(seen)]).toEqual(["writeFile /tmp/copy"])
+  })
+
+  test("rm, mv, mkdir, ln and the other calls that would change the device are refused, copies to it vanish, and chmod does nothing", async () => {
+    await writeFile(join(work, "null-source"), "kept\n")
+    for (const command of [
+      "rm /dev/null",
+      "mv /dev/null null-moved",
+      "mv null-source /dev/null",
+      "mv -f null-source /dev/null",
+      "mkdir /dev/null",
+      "mkdir -p /dev/null",
+      "ln /dev/null null-hard",
+      "ln -s /dev/null null-soft",
+      "ln -sf null-source /dev/null",
+      "readlink /dev/null",
+    ]) {
+      const out = await shell(`${command} 2>/dev/null; echo rc=$?`)
+      expect(`${command}: ${out.text.trim()}`).toMatch(/: rc=[1-9]\d*$/)
+    }
+    // `rm -f` hides the refusal, as it hides any other failure, and the device is still there.
+    expect(
+      (await shell("rm -f /dev/null; rm -rf /dev/null; test -e /dev/null && echo there")).text,
+    ).toBe("there\n")
+    // The source of a refused move or link is still there, and nothing was made.
+    expect(
+      (await shell("cat null-source; ls null-moved null-hard null-soft 2>&1 | wc -l")).text,
+    ).toMatch(/^kept\n\s*3\n?$/)
+    expect(
+      (await shell("cp null-source /dev/null; echo rc=$?; cat /dev/null | wc -c")).text,
+    ).toMatch(/^rc=0\n\s*0\n?$/)
+    expect(
+      (await shell("chmod 000 /dev/null; echo rc=$?; echo ok >/dev/null; echo still")).text,
+    ).toBe("rc=0\nstill\n")
+    expect(
+      (await shell("cp /dev/null null-empty; wc -c < null-empty; ls -l /dev/null | wc -l")).text,
+    ).toMatch(/^\s*0\n\s*1\n?$/)
+    expect((await shell("cd /dev; rm null; echo rc=$?")).text).toMatch(/^rc=[1-9]/)
+    if (!WINDOWS) {
+      // The disk's device is what it was.
+      const device = await stat("/dev/null")
+      expect(device.isCharacterDevice()).toBe(true)
+      expect(device.mode & 0o666).toBe(0o666)
+    }
+  })
 
   test.skipIf(WINDOWS)("discard what a program given by path writes", async () => {
     await mkdir(join(work, "null-bin"), { recursive: true })

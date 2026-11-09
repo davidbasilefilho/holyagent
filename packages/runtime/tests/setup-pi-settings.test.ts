@@ -399,6 +399,19 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(billion())).toEqual(BILLION)
     })
 
+    test("also takes them out when pi.enable is off, by the same record", async () => {
+      await installed()
+      await runSetup(withPi())
+      expect(await read(billion())).toEqual(BILLION)
+      await setConfig({ pi: { enable: false, features: { justBash: false } } })
+      const report = await runSetup(withPi())
+      expect(report.ok).toBe(true)
+      expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
+      expect(toolLines(report)).toEqual([`- tool settings ${billion()}: removed ${GUARDRAILS}`])
+      // Nothing else is written or touched with Pi off, and a second run has nothing to revert.
+      expect(toolLines(await runSetup(withPi()))).toEqual([])
+    })
+
     test("leaves a guardrail key the user set before setup, and one the user changed since", async () => {
       await installed()
       await write(billion(), { guardrails: { bashTimeout: 30 } })

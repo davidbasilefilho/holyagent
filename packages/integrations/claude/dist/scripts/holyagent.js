@@ -23209,6 +23209,7 @@ var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
 var planAt = (env, cwd, scope, form, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
   return;
 }));
+var piDisabledAt = (env, cwd, scope, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map4((config) => !config.pi.enable), orElseSucceed2(() => false));
 var label = "tool settings";
 var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned) {
   const { dryRun } = options;
@@ -23280,7 +23281,7 @@ var revertUnplanned = fn2("revertUnplannedToolSettings")(function* (env, options
     const file = locate2(env, options.cwd, options.scope, logical);
     if (file === undefined)
       continue;
-    const planned = plan.targets.some((target) => target.file === file && target.all.some((key) => keyName(key) === keyName(leaf) && equals(key.value, leaf.value)));
+    const planned = (plan?.targets ?? []).some((target) => target.file === file && target.all.some((key) => keyName(key) === keyName(leaf) && equals(key.value, leaf.value)));
     if (!planned)
       byFile.set(file, [...byFile.get(file) ?? [], leaf]);
   }
@@ -23292,7 +23293,7 @@ var revertUnplanned = fn2("revertUnplannedToolSettings")(function* (env, options
 var installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
   const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices);
   if (plan === undefined)
-    return [];
+    return (yield* piDisabledAt(env, options.cwd, options.scope, options.choices)) ? yield* revertUnplanned(env, options, undefined) : [];
   const lines = [];
   for (const target of plan.targets) {
     lines.push(yield* mergeTarget(env, options, target).pipe(catchTag2("SetupFailure", (error) => succeed6(`! ${label}: ${error.message}`))));

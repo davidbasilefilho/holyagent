@@ -254,6 +254,13 @@ const planAt = (
     Effect.orElseSucceed(() => undefined),
   )
 
+/** Whether the config of the scope loads and turns `pi.enable` off, which plans no setting at all. */
+const piDisabledAt = (env: Env, cwd: string, scope: Scope, choices?: CapabilityChoices) =>
+  loadPiConfig(env, cwd, scope, choices).pipe(
+    Effect.map((config) => !config.pi.enable),
+    Effect.orElseSucceed(() => false),
+  )
+
 const label = "tool settings"
 
 /** Merges one target into its file and returns its report line. */
@@ -378,18 +385,19 @@ const revertFile = Effect.fn("revertToolSettingsFile")(function* (
 /**
  * The lines for the keys of a setting that must not outlive its capability: those of
  * {@link REVERTABLE} that the plan no longer asks for and that setup recorded writing are taken back
- * out of their file at the scope, so turning the capability off restores what it changed.
+ * out of their file at the scope, so turning the capability off restores what it changed. With no
+ * plan (`pi.enable` off) every revertable key is unplanned.
  */
 const revertUnplanned = Effect.fn("revertUnplannedToolSettings")(function* (
   env: Env,
   options: PiInstallOptions,
-  plan: Plan,
+  plan: Plan | undefined,
 ) {
   const byFile = new Map<string, Array<Default>>()
   for (const { file: logical, leaf } of REVERTABLE) {
     const file = locate(env, options.cwd, options.scope, logical)
     if (file === undefined) continue
-    const planned = plan.targets.some(
+    const planned = (plan?.targets ?? []).some(
       (target) =>
         target.file === file &&
         target.all.some(
@@ -425,14 +433,18 @@ const revertUnplanned = Effect.fn("revertUnplannedToolSettings")(function* (
  * Context's file, which has no project location, is skipped with a `-` line). A file that is not a
  * JSON object is a `!` line and stays as it is, and the other files are still written. Each write
  * goes through a temporary file renamed over the target. With `dryRun` nothing is written or
- * recorded. With `pi.enable` off, or a config that cannot be loaded, there are no lines.
+ * recorded. With `pi.enable` off nothing is written, but the keys of a revertable setting that
+ * setup recorded are still taken back out; a config that cannot be loaded gives no lines.
  */
 export const installPiToolSettings = Effect.fn("installPiToolSettings")(function* (
   env: Env,
   options: PiInstallOptions,
 ) {
   const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices)
-  if (plan === undefined) return []
+  if (plan === undefined)
+    return (yield* piDisabledAt(env, options.cwd, options.scope, options.choices))
+      ? yield* revertUnplanned(env, options, undefined)
+      : []
   const lines: Array<string> = []
   for (const target of plan.targets) {
     lines.push(

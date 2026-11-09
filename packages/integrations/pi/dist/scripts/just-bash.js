@@ -89830,37 +89830,59 @@ var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
 
 import { posix as posix3 } from "path";
 var NULL_DEVICE = "/dev/null";
+
+class NullDeviceRefused extends TaggedError2("NullDeviceRefused") {
+}
 var NULL_STAT = {
   isFile: true,
   isDirectory: false,
   isSymbolicLink: false,
   mode: 438,
   size: 0,
-  mtime: new Date(0)
+  mtime: new Date(0),
+  identity: "holyagent:null-device"
 };
-var NULL_CALLS = {
-  writeFile: () => {
-    return;
-  },
-  appendFile: () => {
-    return;
-  },
-  readFile: () => "",
-  readFileBytes: () => "",
-  readFileBuffer: () => new Uint8Array(0),
-  exists: () => true,
-  stat: () => NULL_STAT,
-  lstat: () => NULL_STAT
-};
+var isDevice = (path) => typeof path === "string" && posix3.normalize(path).replace(/\/+$/, "") === NULL_DEVICE;
+var answer = (value) => runPromise2(succeed5(value));
+var refuse = (code, reason, call, path) => runPromise2(fail5(new NullDeviceRefused({ message: `${code}: ${reason}, ${call} '${path}'` })));
+var denied = (call, path) => refuse("EPERM", "operation not permitted", call, path);
+var ON_PATH = new Map(Object.entries({
+  writeFile: () => answer(undefined),
+  appendFile: () => answer(undefined),
+  chmod: () => answer(undefined),
+  utimes: () => answer(undefined),
+  readFile: () => answer(""),
+  readFileBytes: () => answer(""),
+  readFileBuffer: () => answer(new Uint8Array(0)),
+  exists: () => answer(true),
+  stat: () => answer(NULL_STAT),
+  lstat: () => answer(NULL_STAT),
+  realpath: () => answer(NULL_DEVICE),
+  rm: (path) => denied("rm", path),
+  mkdir: (path) => refuse("EEXIST", "file already exists", "mkdir", path),
+  readdir: (path) => refuse("ENOTDIR", "not a directory", "scandir", path),
+  readlink: (path) => refuse("EINVAL", "invalid argument", "readlink", path)
+}));
+var ON_PAIR = new Map(Object.entries({
+  mv: (_fs, source, destination) => isDevice(source) ? denied("mv", source) : isDevice(destination) ? denied("mv", destination) : undefined,
+  cp: (fs, source, destination) => isDevice(destination) ? answer(undefined) : isDevice(source) && typeof destination === "string" ? fs.writeFile(destination, "") : undefined,
+  link: (_fs, existing, created) => isDevice(existing) ? denied("link", existing) : isDevice(created) ? denied("link", created) : undefined,
+  symlink: (_fs, target, created) => isDevice(target) ? denied("symlink", target) : isDevice(created) ? refuse("EEXIST", "file already exists", "symlink", created) : undefined
+}));
 var withNullDevice = (fs) => new Proxy(fs, {
   get: (target, name) => {
     const member = Reflect.get(target, name, target);
-    const answer = typeof name === "string" ? NULL_CALLS[name] : undefined;
-    if (typeof member !== "function" || answer === undefined)
+    if (typeof member !== "function" || typeof name !== "string")
+      return member;
+    const onPath = ON_PATH.get(name);
+    const onPair = ON_PAIR.get(name);
+    if (onPath === undefined && onPair === undefined)
       return member;
     return (...args) => {
-      if (typeof args[0] === "string" && posix3.normalize(args[0]) === NULL_DEVICE)
-        return runPromise2(sync2(answer));
+      const [first, second] = args;
+      const handled = onPair !== undefined ? onPair(target, first, second) : isDevice(first) ? onPath?.(first) : undefined;
+      if (handled !== undefined)
+        return handled;
       const result = Reflect.apply(member, target, args);
       return result;
     };
@@ -89881,7 +89903,7 @@ var isNamed = (node, names) => {
 var EXIT_COMMAND = new Set(["exit"]);
 var isExit3 = (node) => isNamed(node, EXIT_COMMAND);
 var around = (exit, locals) => {
-  const [statement] = He8(`{ ${[SNAPSHOT, ...locals].join(" ")}; exit; }`).statements;
+  const [statement] = He8(`{ ${[SNAPSHOT, "$$", "$BASHPID", ...locals].join(" ")}; exit; }`).statements;
   const group = statement?.pipelines[0]?.commands[0];
   if (group?.type !== "Group")
     return exit;
@@ -89900,12 +89922,13 @@ var declaredName = (word) => {
   return match !== null && (match[2] === "=" || word.parts.length === 1) ? match[1] : undefined;
 };
 var literalOf = (word) => word.parts.length === 1 && word.parts[0]?.type === "Literal" ? word.parts[0].value : undefined;
-var collectLocals = (node, found) => {
+var collectLocals = (node, found, inFunction = false) => {
   if (Array.isArray(node))
-    return node.forEach((item) => collectLocals(item, found));
+    return node.forEach((item) => collectLocals(item, found, inFunction));
   if (typeof node !== "object" || node === null)
     return;
-  if (isNamed(node, LOCAL_COMMANDS)) {
+  const inside = inFunction || node.type === "FunctionDef";
+  if (inside && isNamed(node, LOCAL_COMMANDS)) {
     const [command] = node.name?.parts ?? [];
     const global = command?.type === "Literal" && command.value !== "local" && node.args.some((word) => /^-\w*g/.test(literalOf(word) ?? ""));
     if (!global)
@@ -89916,7 +89939,7 @@ var collectLocals = (node, found) => {
       }
   }
   for (const value of Object.values(node))
-    collectLocals(value, found);
+    collectLocals(value, found, inside);
 };
 var wrapExits = (node, locals, inFunction) => {
   if (Array.isArray(node)) {
@@ -89940,7 +89963,9 @@ var watchExit = (start) => {
   let first = true;
   let completed = false;
   let recorded;
-  const snapshot = id(SNAPSHOT, (locals, ctx) => {
+  const snapshot = id(SNAPSHOT, ([shell, subshell, ...locals], ctx) => {
+    if (shell !== subshell)
+      return runPromise2(status(ctx));
     const env = Object.fromEntries(ctx.env);
     for (const name of locals) {
       delete env[name];

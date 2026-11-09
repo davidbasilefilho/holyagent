@@ -51,10 +51,14 @@ const EXIT_COMMAND: ReadonlySet<string> = new Set(["exit"])
 const isExit = (node: unknown): node is Extract<CommandNode, { type: "SimpleCommand" }> =>
   isNamed(node, EXIT_COMMAND)
 
-// `{ holyagent-snapshot <locals>; exit; }` with the real `exit` command put in the place of the
-// second one, so that its arguments and redirections stay as written.
+// `{ holyagent-snapshot $$ $BASHPID <locals>; exit; }` with the real `exit` command put in the place
+// of the second one, so that its arguments and redirections stay as written. `$$` is the pid of the
+// shell and `$BASHPID` the one of the (sub)shell the `exit` runs in: they differ below `( )` and
+// `$( )`, where `exit` ends that subshell and the session's state is not what it leaves.
 const around = (exit: CommandNode, locals: ReadonlyArray<string>): CommandNode => {
-  const [statement] = parse(`{ ${[SNAPSHOT, ...locals].join(" ")}; exit; }`).statements
+  const [statement] = parse(
+    `{ ${[SNAPSHOT, "$$", "$BASHPID", ...locals].join(" ")}; exit; }`,
+  ).statements
   const group = statement?.pipelines[0]?.commands[0]
   if (group?.type !== "Group") return exit
   const last = group.body[1]?.pipelines[0]
@@ -77,11 +81,12 @@ const literalOf = (word: WordNode): string | undefined =>
   word.parts.length === 1 && word.parts[0]?.type === "Literal" ? word.parts[0].value : undefined
 
 // Collects the variables that `local` (or `declare` and `typeset` without `-g`) makes local to a
-// function, anywhere below `node`.
-const collectLocals = (node: unknown, found: Set<string>): void => {
-  if (Array.isArray(node)) return node.forEach((item) => collectLocals(item, found))
+// function, anywhere below `node`. The same commands outside a function declare session state.
+const collectLocals = (node: unknown, found: Set<string>, inFunction = false): void => {
+  if (Array.isArray(node)) return node.forEach((item) => collectLocals(item, found, inFunction))
   if (typeof node !== "object" || node === null) return
-  if (isNamed(node, LOCAL_COMMANDS)) {
+  const inside = inFunction || (node as { type?: unknown }).type === "FunctionDef"
+  if (inside && isNamed(node, LOCAL_COMMANDS)) {
     const [command] = node.name?.parts ?? []
     const global =
       command?.type === "Literal" &&
@@ -93,7 +98,7 @@ const collectLocals = (node: unknown, found: Set<string>): void => {
         if (name !== undefined) found.add(name)
       }
   }
-  for (const value of Object.values(node)) collectLocals(value, found)
+  for (const value of Object.values(node)) collectLocals(value, found, inside)
 }
 
 // Replaces every `exit` command below `node` (functions, subshells and substitutions included) and
@@ -127,17 +132,22 @@ const status = (ctx: ResolvedCommandContext): Effect.Effect<ExecResult> =>
  * changed before it runs: each `exit` command is preceded by {@link SNAPSHOT}, which records the
  * state, and {@link DONE} is added at the end, which tells a script that ran to its end (whose state
  * just-bash reports itself) from one `exit` ended. Both commands pass the exit status on unchanged,
- * so `exit` with no argument and `$?` behave as before. An `exit` inside a function is given the
- * names that `local` declares anywhere in the script (the function may be called from another one),
- * which are not session state: the snapshot leaves them out and keeps the value the run `start`ed
- * with. Only the first script of a run is changed, which is the command line; scripts that commands
- * start (`bash -c`) are left alone. A script with no `exit` is not changed at all.
+ * so `exit` with no argument and `$?` behave as before. An `exit` in a subshell or a command
+ * substitution (which ends that subshell only) records nothing, so it cannot replace the state of
+ * the shell around it. An `exit` inside a function is given the names that `local` (or `declare`
+ * without `-g`) declares in a function anywhere in the script (the function may be called from
+ * another one), which are not session state: the snapshot leaves them out and keeps the value the
+ * run `start`ed with. The same commands at the top level declare session state. Only the first
+ * script of a run is changed, which is the command line; scripts that commands start (`bash -c`)
+ * are left alone. A script with no `exit` is not changed at all.
  */
 export const watchExit = (start: Readonly<Record<string, string>>): ExitWatch => {
   let first = true
   let completed = false
   let recorded: ExitState | undefined
-  const snapshot = defineCommand(SNAPSHOT, (locals, ctx) => {
+  const snapshot = defineCommand(SNAPSHOT, ([shell, subshell, ...locals], ctx) => {
+    // An `exit` in a subshell ends only that subshell: what it records is not the session's.
+    if (shell !== subshell) return Effect.runPromise(status(ctx))
     // A local variable is not the session's: it goes, and the value the run started with stands in.
     const env = Object.fromEntries(ctx.env)
     for (const name of locals) {

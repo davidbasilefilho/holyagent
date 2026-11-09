@@ -25253,7 +25253,7 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
   return { targets, unplaced };
 }, resolveTarget, planAt = (env, cwd, scope, form, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map5((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
   return;
-})), label = "tool settings", mergeTarget, REVERTABLE, revertFile, revertUnplanned, installPiToolSettings, undoPiToolSettings, fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``, routeLine, checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
+})), piDisabledAt = (env, cwd, scope, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map5((config) => !config.pi.enable), orElseSucceed2(() => false)), label = "tool settings", mergeTarget, REVERTABLE, revertFile, revertUnplanned, installPiToolSettings, undoPiToolSettings, fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``, routeLine, checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [];
   const plan = yield* planAt(env, cwd, scope, form);
@@ -25400,7 +25400,7 @@ var init_pi_settings = __esm(() => {
       const file = locate2(env, options.cwd, options.scope, logical);
       if (file === undefined)
         continue;
-      const planned = plan.targets.some((target) => target.file === file && target.all.some((key) => keyName(key) === keyName(leaf) && equals(key.value, leaf.value)));
+      const planned = (plan?.targets ?? []).some((target) => target.file === file && target.all.some((key) => keyName(key) === keyName(leaf) && equals(key.value, leaf.value)));
       if (!planned)
         byFile.set(file, [...byFile.get(file) ?? [], leaf]);
     }
@@ -25412,7 +25412,7 @@ var init_pi_settings = __esm(() => {
   installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
     const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices);
     if (plan === undefined)
-      return [];
+      return (yield* piDisabledAt(env, options.cwd, options.scope, options.choices)) ? yield* revertUnplanned(env, options, undefined) : [];
     const lines = [];
     for (const target of plan.targets) {
       lines.push(yield* mergeTarget(env, options, target).pipe(catchTag2("SetupFailure", (error) => succeed6(`! ${label}: ${error.message}`))));
