@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw99k5gu-yh66",
+  "intentId": "intent-0mw97nizx-0n6e",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-instruction-text-and-docs",
+  "objective": "Re-review the instruction text and docs of the cloud-session checkout repair.",
+  "state": "Running",
+  "scope": [
+    "The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0vv-klze.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v14z-rjm5.md (artifact) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v1e0-v4vz.md (security); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw999emo-eac9.md. Review only the repair commit 323dfb1 in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r1.diff) and say whether each earlier finding is closed.",
+    "Instruction text follows /home/user/holyagent-0.3.0-cloudbranch/.claude/skills/requirements/SKILL.md and the family guides."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier artifact finding is closed, or reported open with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No instruction left tells a cloud session to create a branch in its primary checkout, and the two families agree in meaning",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw999emo-eac9"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:54:57.198Z"
+  },
+  "createdAt": "2026-11-09T12:54:57.198Z"
+}
