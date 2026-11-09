@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9os3gn-w3sc",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-apply-patch-containment",
+  "objective": "Confirm the apply_patch containment repair closes the dangling-link and alias bypasses and introduces no new path-escape or rollback vulnerability.",
+  "state": "Ready",
+  "scope": [
+    "Commit 956092de on release/0.3.1/feat/codex-provider in the worktree /home/user/holyagent-0.3.1-codex (range ce16cb67..956092de); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-containment-commit.diff",
+    "Files: packages/integrations/pi/src/codex.ts, packages/runtime/src/pi/codex/apply-patch.ts, their tests, and the generated dist/extensions/holyagent.js",
+    "Previous security findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9n3p0w-cjii.md; repair report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odu6j-3nns.md"
+  ],
+  "constraints": [
+    "Read-only: make no edits and no git writes. Pass explicit SHA ranges (ce16cb67..956092de) to any review command, and run commands in /home/user/holyagent-0.3.1-codex, not the main checkout.",
+    "This is a re-review of a repair: judge whether the previous findings are closed and whether the repair introduced new defects; do not reopen accepted design choices (Luna Reserve endpoint, effort cap, route table).",
+    "Testing is unit tests and fixtures only: never start pi or make live Codex, OpenAI or Kimi requests.",
+    "Report in under 400 words; start each evidence line with the criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous blocking security finding is closed by the repair, traced source to sink",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new path escape outside the project root via symlinks, link chains, dangling links, moves or deletes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Rollback cannot write or delete outside the project root",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover each closed finding and fail without the repair",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9odu6j-3nns"
+  ],
+  "createdAt": "2026-11-09T20:01:02.087Z"
+}
