@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw8u28kl-48kw",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-newest-commit-on-release-0-3",
+  "objective": "Review the newest commit on release/0.3.0/feat/pi-t3-host (T3 Code detection, the T3 tool filter with drift correction and tool_call backstop, and the Full-access warning in the HolyAgent Pi extension) against the T3 Intent requirements it implements.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3host; diff HEAD~1..HEAD (sources and tests in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3host-review.diff).",
+    "Requirements: under T3 (ctx.mode rpc plus T3_PI_RUNTIME_MODE or T3_MCP_URL) the root keeps html_render, html_preview, preview_*, t3_preview_*, device_* of mcp__t3-code__ and its hidden alias mcp__t3_code__, and deactivates every other T3 tool; set once at session_start, restored on before_agent_start and session_tree only after drift so the tool list stays stable for prompt caching; a tool_call block refuses a deactivated T3 tool (also one reached through tool_search); below Full access (T3_PI_RUNTIME_MODE approval-required or auto-accept-edits) one warning through the notice path and setStatus; no change outside T3; the extension calls no custom, setWidget, setFooter, setHeader, setTitle or theme under rpc.",
+    "Research behind it: /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tdgpq-hfsl.md (T3 bridge) and assignment-0mw8td52p-27ab.md (Pi API).",
+    "Check also: interaction with the existing root tool selection and excluded tools, child and specialist sessions, the pi.test.ts handler-list change, and whether an unset T3_PI_RUNTIME_MODE under T3 is handled as the bridge does."
+  ],
+  "constraints": [
+    "Read-only; you may run bun test and mise run verify in that worktree.",
+    "Mark a finding blocking only when behaviour is wrong, incomplete, untested on an error path, or breaks existing behaviour; give path:line and a failure scenario.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has path:line and a failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether each listed requirement is met",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8tiqva-3j37"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T05:41:07.174Z"
+  },
+  "createdAt": "2026-11-09T05:41:07.174Z"
+}
