@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw9fn9el-va8m",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 18,
+  "roleTask": "Worker.operations",
+  "slug": "bump-the-version-to-0-3-1-in-the",
+  "objective": "Bump the version to 0.3.1 in the worktree /home/user/holyagent-0.3.1-bump with the repository's own bump task, and regenerate the copies.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-bump, branch release/0.3.1/chore/bump-version, cut from main at 6126e2d (0.3.0).",
+    "Run: bun install --frozen-lockfile, then bunx --no-install mise run bump:patch (edits only the root package.json), then bunx --no-install mise run build (copies the version to the workspace package.json files, bun.lock and the generated plugin and marketplace manifests), then bunx --no-install mise run verify.",
+    "The version must read 0.3.1 everywhere scripts/bump-version.test.ts checks."
+  ],
+  "constraints": [
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits.",
+    "Do not check out other commits in any checkout.",
+    "Edit no file by hand; only the bump and build tasks change files.",
+    "Report in under 150 words: each command with its exit code and test counts, and git status --short after the build."
+  ],
+  "criteria": [
+    {
+      "text": "The root package.json and every generated copy read 0.3.1",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "bump:patch, build and verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "packages",
+    "bun.lock",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T15:45:19.965Z"
+  },
+  "createdAt": "2026-11-09T15:45:19.965Z"
+}
