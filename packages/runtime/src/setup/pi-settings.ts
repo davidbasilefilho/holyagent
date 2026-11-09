@@ -1,4 +1,4 @@
-import { join, relative, resolve, sep } from "node:path"
+import { join, resolve } from "node:path"
 
 import { Effect, Equal } from "effect"
 
@@ -25,7 +25,7 @@ import { type CapabilityChoices, loadPiConfig, piAgentDirectory, piInUse } from 
 import type { PiInstallOptions } from "./pi-install.ts"
 import { addRecorded, clearRecorded, readRecorded } from "./record.ts"
 import { hint, pass, show, skipped } from "./report.ts"
-import { isSymlink, type Scope } from "./scope.ts"
+import { refuseLinks, type Scope } from "./scope.ts"
 import { take } from "./settings.ts"
 
 /**
@@ -224,29 +224,6 @@ const resolveTarget = Effect.fn("resolveToolSettingsTarget")(function* (target: 
     atGlobal: target.all.filter(setGlobally).map(keyName),
     atPair: target.all.filter(leftWithPair).map(keyName),
   } satisfies Resolved
-})
-
-/**
- * Refuses a symlinked `.pi` folder, folder below it or settings file at project and local scope, so
- * a repository cannot redirect a write (or an `--undo`) to a file outside the project, as the
- * Claude settings step does for `.claude`. Scope `user` follows its links, as before.
- */
-const refuseLinks = Effect.fn("refuseProjectLinks")(function* (
-  cwd: string,
-  scope: Scope,
-  file: string,
-  action: string,
-) {
-  if (scope === "user") return
-  const parts = relative(cwd, file).split(sep)
-  for (let depth = 1; depth <= parts.length; depth++) {
-    const path = join(cwd, ...parts.slice(0, depth))
-    if (yield* isSymlink(path)) {
-      return yield* new SetupFailure({
-        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`,
-      })
-    }
-  }
 })
 
 /**

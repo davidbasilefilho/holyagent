@@ -45,9 +45,18 @@ describe("form detection", () => {
     expect(detectForm({ CI: "1", DISPLAY: ":0" }, "linux").form).toBe("headless")
   })
 
-  test("CI set to false or empty does not make a machine headless", () => {
-    expect(detectForm({ CI: "false" }, "darwin").form).toBe("normal")
-    expect(detectForm({ CI: "" }, "win32").form).toBe("normal")
+  test.each(["false", "", "0", "no", "off", "False", "OFF", " "])(
+    "CI=%j does not make a machine headless",
+    (ci) => {
+      expect(detectForm({ CI: ci }, "darwin").form).toBe("normal")
+    },
+  )
+
+  test.each(["true", "1", "yes", "TRUE"])("CI=%s makes a machine headless", (ci) => {
+    expect(detectForm({ CI: ci, DISPLAY: ":0" }, "linux")).toMatchObject({
+      form: "headless",
+      reason: "CI is set",
+    })
   })
 
   test("the flag overrides the detection in both directions", () => {

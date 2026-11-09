@@ -63,6 +63,16 @@ const setAt = (value: unknown, path: ReadonlyArray<string>, leaf: unknown): unkn
     : { ...(isRecord(value) ? value : {}), [key]: setAt(valueAt(value, [key]), rest, leaf) }
 }
 
+/**
+ * Whether a decoded user-level config switches the setting at `path` off for good: it holds the
+ * "off" value of a setting the project cannot turn back on (`pi.features.computerUse`,
+ * `pi.features.web`, `pi.t3.deviceAccess`).
+ */
+export const userLocksOff = (user: unknown, path: ReadonlyArray<string>): boolean =>
+  FINAL_OFF.some(
+    (entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off,
+  )
+
 /** Merges the project over the user, then restores every setting the user switched off for good. */
 const mergeFiles = (user: unknown, project: unknown): unknown =>
   FINAL_OFF.reduce(

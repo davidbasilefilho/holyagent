@@ -2,15 +2,15 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
-import { CAPABILITIES } from "../config/capabilities.ts"
-import { userConfigFile } from "../config/load.ts"
+import { CAPABILITIES, type CapabilityDefinition } from "../config/capabilities.ts"
+import { readConfigFile, userConfigFile, userLocksOff } from "../config/load.ts"
 import { CONFIG_FILE, stateDirectory } from "../state/layout.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { isJsonObject, type JsonObject, readJsonObject, writeJsonObject } from "./json-file.ts"
 import { type CapabilityChoices, loadPiConfig } from "./pi-check.ts"
 import { added, present, skipped } from "./report.ts"
-import type { Scope } from "./scope.ts"
+import { refuseLinks, type Scope } from "./scope.ts"
 
 /**
  * The HolyAgent config file that a scope's capability choices are written to: the user's
@@ -29,13 +29,41 @@ const objectAt = (parent: JsonObject, key: string, file: string, path: string) =
 }
 
 /**
+ * Fails when a capability to turn on is one the user's config switches off for good, which a
+ * project or local file cannot turn back on, naming the user setting.
+ */
+const refuseLockedOn = Effect.fn("refuseLockedCapabilities")(function* (
+  env: Env,
+  changed: ReadonlyArray<{ readonly capability: CapabilityDefinition; readonly value: boolean }>,
+) {
+  const wanted = changed.filter(({ value }) => value)
+  if (wanted.length === 0) return
+  const file = userConfigFile(env)
+  const user = yield* readConfigFile(file).pipe(
+    Effect.mapError((error) => new SetupFailure({ message: error.message })),
+  )
+  const locked = wanted.find(({ capability }) =>
+    userLocksOff(user, ["pi", "features", capability.feature]),
+  )
+  if (locked !== undefined)
+    return yield* new SetupFailure({
+      message: `capability ${locked.capability.name} cannot be turned on here: ${file} sets pi.features.${locked.capability.feature} to false, which a project or local config cannot override; change it there or use --scope user`,
+    })
+})
+
+/**
  * The capability step of `holyagent setup`: records each capability the run switched (`--<name>
  * on|off`, or a row of the setup screen) as `pi.features.<key>` in the HolyAgent config of the
  * scope ({@link capabilityConfigFile}), so setup, doctor and the Pi extension agree afterwards. A
  * choice equal to what the config already decides gets an `=` line and no write, so a run never
  * freezes today's defaults into the file; every other key of the file stays. On a dry run the lines
  * say what would be written. A config that cannot be loaded, or whose `pi` or `pi.features` is not
- * an object, is a {@link SetupFailure}.
+ * an object, is a {@link SetupFailure}, and so is a choice to turn on, at scope `project` or
+ * `local`, a capability the user's config switches off for good (the merged config would stay off,
+ * yet the package would be installed): the message names the user setting, and nothing is written.
+ * A project or local config file that is, or sits below, a symlink is refused too
+ * ({@link
+ * refuseLinks}), so a repository cannot redirect the write.
  */
 export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(function* (
   env: Env,
@@ -61,7 +89,9 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
     )
   if (changed.length === 0) return lines
   const file = capabilityConfigFile(env, options.cwd, options.scope)
+  if (options.scope !== "user") yield* refuseLockedOn(env, changed)
   if (!options.dryRun) {
+    yield* refuseLinks(options.cwd, options.scope, file, "write")
     const existing = yield* readJsonObject(file)
     const pi = yield* objectAt(existing, "pi", file, "pi")
     const features = yield* objectAt(pi, "features", file, "pi.features")

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, rm, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
@@ -134,6 +134,70 @@ describe("a capability flag in setup", () => {
     expect(report.ok).toBe(false)
     expect(report.lines.some((line) => line.startsWith("! capabilities: "))).toBe(true)
     expect(await Bun.file(userConfig()).text()).toBe('{"pi": 3}')
+  })
+
+  test("turning on a capability the user config locks off, at project or local scope, is refused and installs nothing", async () => {
+    await write(userConfig(), { pi: { features: { computerUse: false } } })
+    await write(globalSettings(), { packages: ALL.filter((source) => source !== COMPUTER_USE) })
+    for (const scope of ["project", "local"] as const) {
+      const shell = withPi()
+      const report = await runSetup(shell, { scope, capabilities: { computerUse: true } })
+      expect(report.ok).toBe(false)
+      expect(report.lines).toContain(
+        `! capabilities: capability computer-use cannot be turned on here: ${userConfig()} sets pi.features.computerUse to false, which a project or local config cannot override; change it there or use --scope user`,
+      )
+      expect(piCommands(shell)).toEqual([])
+      expect(await Bun.file(projectConfig()).exists()).toBe(false)
+    }
+  })
+
+  test("a locked capability can still be turned off at project scope, and on in the user file itself", async () => {
+    await write(userConfig(), { pi: { features: { computerUse: false } } })
+    await write(globalSettings(), { packages: ALL.filter((source) => source !== COMPUTER_USE) })
+    const off = await runSetup(withPi(), { scope: "project", capabilities: { computerUse: false } })
+    expect(off.ok).toBe(true)
+    const on = await runSetup(withPi(), { capabilities: { computerUse: true } })
+    expect(on.ok).toBe(true)
+    expect(await read(userConfig())).toEqual({ pi: { features: { computerUse: true } } })
+  })
+
+  test("when the choices cannot be saved, no package or tool setting changes", async () => {
+    // A plain file where the config folder should be: the config loads (as empty) but cannot be written.
+    await write(join(home, ".holyagent"), "not a folder")
+    await write(globalSettings(), { packages: ALL.filter((source) => source !== TODO) })
+    const shell = withPi()
+    const report = await runSetup(shell, { capabilities: { todo: true, ask: false } })
+    expect(report.ok).toBe(false)
+    expect(report.lines.some((line) => line.startsWith("! capabilities: "))).toBe(true)
+    expect(piCommands(shell)).toEqual([])
+    expect(await read(globalSettings())).toEqual({
+      packages: ALL.filter((source) => source !== TODO),
+    })
+  })
+
+  test("a project or local config that is a symlink is not written through", async () => {
+    await write(globalSettings(), { packages: ALL })
+    const target = join(project, "..", "elsewhere.json")
+    await write(target, { vcs: { allowWords: ["Claude Code"] } })
+    await mkdir(join(project, ".holyagent"), { recursive: true })
+    await symlink(target, projectConfig())
+    const shell = withPi()
+    const report = await runSetup(shell, { scope: "project", capabilities: { todo: false } })
+    expect(report.ok).toBe(false)
+    expect(
+      report.lines.some(
+        (line) => line.startsWith("! capabilities: ") && line.includes("is a symlink; refusing"),
+      ),
+    ).toBe(true)
+    expect(await read(target)).toEqual({ vcs: { allowWords: ["Claude Code"] } })
+    expect(piCommands(shell)).toEqual([])
+    // A folder that is a link is refused as well.
+    await rm(join(project, ".holyagent"), { recursive: true })
+    await mkdir(join(project, "..", "folder"), { recursive: true })
+    await symlink(join(project, "..", "folder"), join(project, ".holyagent"))
+    const folder = await runSetup(withPi(), { scope: "local", capabilities: { todo: false } })
+    expect(folder.ok).toBe(false)
+    expect(await Bun.file(join(project, "..", "folder", "config.json")).exists()).toBe(false)
   })
 
   test("without Pi in use the choice is not applied, and the report says so", async () => {

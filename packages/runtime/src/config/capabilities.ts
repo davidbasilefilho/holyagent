@@ -9,7 +9,11 @@ export const CAPABILITY_FORMS = ["headless", "normal"] as const
 /** One capability form. */
 export type CapabilityForm = (typeof CAPABILITY_FORMS)[number]
 
-/** An MCP server a capability adds to Pi's own MCP extension. */
+/**
+ * An MCP server a capability adds to Pi's own MCP extension. No capability adds one yet: the later
+ * capabilities of this release fill {@link FormContent.mcpServers}, and setup does not read it
+ * before then.
+ */
 export interface McpServer {
   /** The name the server is registered under. */
   readonly name: string
@@ -23,7 +27,10 @@ export interface McpServer {
 export interface FormContent {
   /** The Pi packages the form loads; their versions are the pins of `pi-packages.json`. */
   readonly packages: ReadonlyArray<PiPackageName>
-  /** The MCP servers the form adds. */
+  /**
+   * The MCP servers the form adds; empty for every capability until the later capabilities of this
+   * release.
+   */
   readonly mcpServers: ReadonlyArray<McpServer>
 }
 
@@ -70,7 +77,10 @@ export interface CapabilityDefinition {
   readonly feature: string
   /** What it gives, in a sentence. */
   readonly description: string
-  /** The skills it carries. */
+  /**
+   * The skills it carries; empty for every capability until the later capabilities of this release
+   * add some.
+   */
   readonly skills: ReadonlyArray<string>
   /** Whose tools it reaches: the root, the specialists, or both. */
   readonly applicability: "root" | "specialists" | "both"

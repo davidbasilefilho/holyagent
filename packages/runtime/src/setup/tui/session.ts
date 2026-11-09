@@ -9,7 +9,7 @@ import {
 import type { Config } from "../../config/schema.ts"
 import { inCloudSession } from "../../vcs/identity.ts"
 import type { Env } from "../environment.ts"
-import { describeForm, type FormChoice } from "../form.ts"
+import { describeForm, type FormChoice, inCi } from "../form.ts"
 import { type CapabilityChoices, loadPiConfig, piInUse } from "../pi-check.ts"
 import { hint, type Report } from "../report.ts"
 import type { Scope } from "../scope.ts"
@@ -40,12 +40,10 @@ export interface Terminal {
  */
 export const DEFAULT_CHOICES: Choices = { worktrees: true, deviceAccess: true, capabilities: {} }
 
-const set = (value: string | undefined) => value !== undefined && value !== ""
-
 /**
  * Why the interface is not used, or `undefined` when it can be: `--no-tui` or a choice flag was
- * given (the flags apply directly), stdin or stdout is not a terminal, `CI` is set (other than
- * `false`) or `TERM` is `dumb`.
+ * given (the flags apply directly), stdin or stdout is not a terminal, `CI` is set to a truthy
+ * value ({@link inCi}) or `TERM` is `dumb`.
  */
 export const tuiFallbackReason = (options: {
   readonly env: Env
@@ -58,7 +56,7 @@ export const tuiFallbackReason = (options: {
   if (options.choiceFlag) return "a choice flag was passed, so it applies directly"
   if (terminal === undefined || !terminal.stdin || !terminal.stdout)
     return "stdin or stdout is not a terminal"
-  if (set(env["CI"]) && env["CI"] !== "false") return "CI is set"
+  if (inCi(env)) return "CI is set"
   if (env["TERM"] === "dumb") return "TERM is dumb"
   return undefined
 }
@@ -66,19 +64,28 @@ export const tuiFallbackReason = (options: {
 /**
  * The T3 settings step as it would run: a {@link T3Preview} when the T3 part of setup has work on
  * this machine (not an undo, scope `user`, not a cloud session, Pi in use, T3 Code installed), else
- * `undefined`, in which case there is nothing to choose and no interface.
+ * `undefined`, in which case there is nothing to choose and no interface. The caller has probed
+ * whether Pi is in use (`piUsed`) and loaded the config of the scope (`config`, `undefined` when it
+ * cannot be loaded), so neither is repeated here; at scope `user` that is the config the step
+ * reads.
  */
 export const t3Offer = Effect.fn("t3Offer")(function* (
   env: Env,
   cwd: string,
-  options: { readonly scope: Scope; readonly undo: boolean },
+  options: {
+    readonly scope: Scope
+    readonly undo: boolean
+    readonly piUsed: boolean
+    readonly config: Config | undefined
+  },
 ) {
   if (options.undo || options.scope !== "user" || inCloudSession(env)) return undefined
-  if (!(yield* piInUse(env))) return undefined
+  if (!options.piUsed || options.config === undefined) return undefined
   // A settings file that cannot be read is reported by the line-based step, which then runs.
-  const preview = yield* previewT3Settings(env, cwd, DEFAULT_CHOICES).pipe(
-    Effect.catchTag("SetupFailure", () => Effect.succeed(undefined)),
-  )
+  const preview = yield* previewT3Settings(env, cwd, {
+    ...DEFAULT_CHOICES,
+    config: options.config,
+  }).pipe(Effect.catchTag("SetupFailure", () => Effect.succeed(undefined)))
   return preview === undefined || "line" in preview ? undefined : preview
 })
 
@@ -273,24 +280,31 @@ const decodeOutcome = Schema.decodeUnknownEffect(TuiOutcomeSchema, { onExcessPro
  * Offers the capability switches and the T3 choices in the interface when Pi is in use (and setup
  * is not an undo or in a cloud session) and there is something to choose: a capability row for each
  * registry entry while the config loads with `pi.enable` on, and the T3 rows when the T3 part of
- * setup has work. It falls back to the line-based setup, with one note saying why, when a flag or
- * the terminal rules the interface out, when it cannot be installed or imported (offline), or when
- * it fails to start or answers in a shape the command does not know. Cancelling writes nothing and
- * reports it; an applied run reports the setup it ran.
+ * setup has work. It falls back to the line-based setup when a flag or the terminal rules the
+ * interface out (with one note saying why, unless the T3 part has no work and the capability rows
+ * are all there was to show), when it cannot be installed or imported (offline), or when it fails
+ * to start or answers in a shape the command does not know. Cancelling writes nothing and reports
+ * it; an applied run reports the setup it ran.
  */
 export const runInteractive = Effect.fn("runInteractive")(function* (options: InteractiveOptions) {
   const line = { kind: "line", notes: [] } satisfies Interactive
-  if (options.undo || inCloudSession(options.env) || !(yield* piInUse(options.env))) return line
-  const preview = yield* t3Offer(options.env, options.cwd, options)
-  // A config that cannot be read is reported by the line-based Pi steps, which then run.
-  const features = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(
-    Effect.map((config) => (config.pi.enable ? featureSwitches(config.pi.features) : undefined)),
+  if (options.undo || inCloudSession(options.env)) return line
+  const piUsed = yield* piInUse(options.env)
+  if (!piUsed) return line
+  // Loaded once for the run: a config that cannot be read is reported by the line-based Pi steps,
+  // which then run.
+  const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(
     Effect.catchTag("SetupFailure", () => Effect.succeed(undefined)),
   )
+  const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config })
+  const features =
+    config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features)
   const offers = features === undefined ? [] : capabilityOffers(options.form)
   if (preview === undefined && offers.length === 0) return line
   const reason = tuiFallbackReason(options)
-  if (reason !== undefined) return fallback(reason)
+  // With no T3 work the capability rows are all the screen would hold; a scripted run has nothing
+  // to explain then, as before the rows existed.
+  if (reason !== undefined) return preview === undefined ? line : fallback(reason)
   const load = options.load ?? ((env, notify) => loadSetupTui(env, { notify }))
   const loaded = yield* load(options.env, options.notify).pipe(
     Effect.catchTag("TuiUnavailable", (error) => Effect.succeed(error)),
@@ -308,7 +322,10 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
           const next =
             preview === undefined
               ? undefined
-              : yield* previewT3Settings(options.env, options.cwd, choices)
+              : yield* previewT3Settings(options.env, options.cwd, {
+                  ...choices,
+                  ...(config === undefined ? {} : { config }),
+                })
           if (preview !== undefined && (next === undefined || "line" in next))
             return yield* Effect.fail(new Error("the T3 settings step has nothing to do any more"))
           return reviewOf(

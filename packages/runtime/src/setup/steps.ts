@@ -147,12 +147,14 @@ export interface SetupOptions {
  * installPiPackages}, {@link installPiToolSettings} and {@link installT3Settings}; all only when Pi
  * is in use, never in a cloud session), and the recommended keys of the settings of the chosen
  * scope (`user` unless set). Every step checks its own result first, and a step that fails does not
- * stop the next one. On a dry run nothing is installed or written, and the lines say what would be.
- * In a claude.ai cloud session ctx7 is skipped, and the settings are still merged. With `undo` only
- * settings change: the values setup recorded adding are removed from the chosen scope's file and
- * from the Pi tool settings files ({@link undoPiToolSettings}) and T3's ({@link undoT3Settings});
- * ctx7 and the Pi packages stay installed. A `project` or `local` target that is a symlink is
- * refused with a `!` line and nothing is written to the settings.
+ * stop the next one, except that when the capability choices cannot be saved the Pi packages, tool
+ * settings and T3 steps are not run, so no package changes without the config that explains it. On
+ * a dry run nothing is installed or written, and the lines say what would be. In a claude.ai cloud
+ * session ctx7 is skipped, and the settings are still merged. With `undo` only settings change: the
+ * values setup recorded adding are removed from the chosen scope's file and from the Pi tool
+ * settings files ({@link undoPiToolSettings}) and T3's ({@link undoT3Settings}); ctx7 and the Pi
+ * packages stay installed. A `project` or `local` target that is a symlink is refused with a `!`
+ * line and nothing is written to the settings.
  */
 export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptions) {
   const scope = options.scope ?? "user"
@@ -193,30 +195,42 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
   }
   const cloud = inCloudSession(env)
   const piUsed = !cloud && (yield* piInUse(env))
+  const ctx7Lines = options.skipCtx7
+    ? [skipped("ctx7: skipped by flag")]
+    : cloud
+      ? [skipped(`ctx7: ${CLOUD_SKIP}`)]
+      : yield* asStep("ctx7", installCtx7(env, options.dryRun))
+  const capabilityLines = piUsed
+    ? yield* asStep(
+        "capabilities",
+        applyCapabilityChoices(env, {
+          scope,
+          cwd: piOptions.cwd,
+          dryRun: options.dryRun,
+          choices,
+        }),
+      )
+    : Object.keys(choices).length > 0
+      ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")]
+      : []
+  // The Pi steps plan from the choices laid over the config, so when they could not be saved those
+  // steps stop: a package must not change without the config that explains it.
+  const piSteps = piUsed && !capabilityLines.some((line) => line.startsWith("! "))
   const lines = [
-    ...(options.skipCtx7
-      ? [skipped("ctx7: skipped by flag")]
-      : cloud
-        ? [skipped(`ctx7: ${CLOUD_SKIP}`)]
-        : yield* asStep("ctx7", installCtx7(env, options.dryRun))),
+    ...ctx7Lines,
     ...(piUsed ? [hint(`form: ${describeForm(form)}`)] : []),
-    ...(piUsed
-      ? yield* asStep(
-          "capabilities",
-          applyCapabilityChoices(env, {
-            scope,
-            cwd: piOptions.cwd,
-            dryRun: options.dryRun,
-            choices,
-          }),
-        )
-      : Object.keys(choices).length > 0
-        ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")]
-        : []),
-    ...(piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : []),
-    ...(piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : []),
+    ...capabilityLines,
+    ...(piUsed && !piSteps
+      ? [
+          skipped(
+            "pi packages, tool settings and t3 settings: not run, because the capability choices were not saved",
+          ),
+        ]
+      : []),
+    ...(piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : []),
+    ...(piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : []),
     // T3 Code's server settings are the user's own, so the step runs at scope user only.
-    ...(piUsed && scope === "user"
+    ...(piSteps && scope === "user"
       ? yield* asStep(
           "t3 settings",
           installT3Settings(env, piOptions.cwd, {

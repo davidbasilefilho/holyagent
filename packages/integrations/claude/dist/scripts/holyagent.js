@@ -12735,6 +12735,7 @@ var setAt = (value, path, leaf) => {
   const [key, ...rest] = path;
   return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
 };
+var userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off);
 var mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, project));
 var JsonValue = fromJsonString2(Unknown2);
 var withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value;
@@ -13924,6 +13925,19 @@ var isSymlink = (path) => tryPromise2({
   try: () => lstat3(path),
   catch: (cause) => cause
 }).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
+var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
+  if (scope === "user")
+    return;
+  const parts = relative4(cwd, file).split(sep6);
+  for (let depth = 1;depth <= parts.length; depth++) {
+    const path = join12(cwd, ...parts.slice(0, depth));
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
+      });
+    }
+  }
+});
 var claudeFolder = fn2("claudeFolder")(function* (cwd) {
   const shell = yield* Shell;
   const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
@@ -22677,11 +22691,14 @@ var DEFAULT_FORM_CHOICE = {
   reason: "no form was asked for"
 };
 var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
+var inCi = (env) => {
+  const value = env["CI"]?.trim().toLowerCase();
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
 var detectForm = (env, platform = process.platform) => {
   if (inCloudSession(env))
     return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
-  const ci = env["CI"];
-  if (ci !== undefined && ci !== "" && ci !== "false")
+  if (inCi(env))
     return { form: "headless", source: "detected", reason: "CI is set" };
   if (!hasDisplay(env, platform))
     return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
@@ -22902,7 +22919,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function*
   }));
 });
 
-import { join as join17, relative as relative6, resolve as resolve7, sep as sep7 } from "path";
+import { join as join17, resolve as resolve7 } from "path";
 
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
@@ -23019,19 +23036,6 @@ var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
     atGlobal: target.all.filter(setGlobally).map(keyName),
     atPair: target.all.filter(leftWithPair).map(keyName)
   };
-});
-var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
-  if (scope === "user")
-    return;
-  const parts = relative6(cwd, file).split(sep7);
-  for (let depth = 1;depth <= parts.length; depth++) {
-    const path = join17(cwd, ...parts.slice(0, depth));
-    if (yield* isSymlink(path)) {
-      return yield* new SetupFailure({
-        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
-      });
-    }
-  }
 });
 var planAt = (env, cwd, scope, form, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
   return;
@@ -23192,6 +23196,18 @@ var objectAt = (parent, key, file, path) => {
     return succeed6({});
   return isJsonObject2(value) ? succeed6(value) : fail5(new SetupFailure({ message: `${file}: ${path} is not an object` }));
 };
+var refuseLockedOn = fn2("refuseLockedCapabilities")(function* (env, changed) {
+  const wanted = changed.filter(({ value }) => value);
+  if (wanted.length === 0)
+    return;
+  const file = userConfigFile(env);
+  const user = yield* readConfigFile(file).pipe(mapError2((error) => new SetupFailure({ message: error.message })));
+  const locked = wanted.find(({ capability }) => userLocksOff(user, ["pi", "features", capability.feature]));
+  if (locked !== undefined)
+    return yield* new SetupFailure({
+      message: `capability ${locked.capability.name} cannot be turned on here: ${file} sets pi.features.${locked.capability.feature} to false, which a project or local config cannot override; change it there or use --scope user`
+    });
+});
 var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, options) {
   const chosen = CAPABILITIES.flatMap((capability) => {
     const value = options.choices[capability.feature];
@@ -23206,7 +23222,10 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   if (changed.length === 0)
     return lines;
   const file = capabilityConfigFile(env, options.cwd, options.scope);
+  if (options.scope !== "user")
+    yield* refuseLockedOn(env, changed);
   if (!options.dryRun) {
+    yield* refuseLinks(options.cwd, options.scope, file, "write");
     const existing = yield* readJsonObject(file);
     const pi = yield* objectAt(existing, "pi", file, "pi");
     const features = yield* objectAt(pi, "features", file, "pi.features");
@@ -23458,9 +23477,9 @@ var wantedKeys = (existing, all, recorded = []) => {
   return { keys, left, own };
 };
 var decide = fn2("t3SettingsDecide")(function* (env, cwd, options) {
-  const config = yield* loadPiConfig(env, cwd, "user").pipe(orElseSucceed2(() => {
+  const config = options.config ?? (yield* loadPiConfig(env, cwd, "user").pipe(orElseSucceed2(() => {
     return;
-  }));
+  })));
   if (config === undefined || !config.pi.enable)
     return;
   const home = t3Home(env);
@@ -23695,18 +23714,24 @@ var setup = fn2("setup")(function* (env, options) {
   }
   const cloud = inCloudSession(env);
   const piUsed = !cloud && (yield* piInUse(env));
+  const ctx7Lines = options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun));
+  const capabilityLines = piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
+    scope,
+    cwd: piOptions.cwd,
+    dryRun: options.dryRun,
+    choices
+  })) : Object.keys(choices).length > 0 ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")] : [];
+  const piSteps = piUsed && !capabilityLines.some((line) => line.startsWith("! "));
   const lines = [
-    ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
+    ...ctx7Lines,
     ...piUsed ? [hint(`form: ${describeForm(form)}`)] : [],
-    ...piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
-      scope,
-      cwd: piOptions.cwd,
-      dryRun: options.dryRun,
-      choices
-    })) : Object.keys(choices).length > 0 ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")] : [],
-    ...piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
-    ...piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
-    ...piUsed && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+    ...capabilityLines,
+    ...piUsed && !piSteps ? [
+      skipped("pi packages, tool settings and t3 settings: not run, because the capability choices were not saved")
+    ] : [],
+    ...piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
+    ...piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
+    ...piSteps && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
       dryRun: options.dryRun,
       ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
       ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
@@ -25128,7 +25153,6 @@ var TuiOutcomeSchema = Union2([
 ]);
 
 var DEFAULT_CHOICES = { worktrees: true, deviceAccess: true, capabilities: {} };
-var set = (value) => value !== undefined && value !== "";
 var tuiFallbackReason = (options) => {
   const { env, terminal } = options;
   if (options.noTui)
@@ -25137,7 +25161,7 @@ var tuiFallbackReason = (options) => {
     return "a choice flag was passed, so it applies directly";
   if (terminal === undefined || !terminal.stdin || !terminal.stdout)
     return "stdin or stdout is not a terminal";
-  if (set(env["CI"]) && env["CI"] !== "false")
+  if (inCi(env))
     return "CI is set";
   if (env["TERM"] === "dumb")
     return "TERM is dumb";
@@ -25146,9 +25170,12 @@ var tuiFallbackReason = (options) => {
 var t3Offer = fn2("t3Offer")(function* (env, cwd, options) {
   if (options.undo || options.scope !== "user" || inCloudSession(env))
     return;
-  if (!(yield* piInUse(env)))
+  if (!options.piUsed || options.config === undefined)
     return;
-  const preview = yield* previewT3Settings(env, cwd, DEFAULT_CHOICES).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
+  const preview = yield* previewT3Settings(env, cwd, {
+    ...DEFAULT_CHOICES,
+    config: options.config
+  }).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
   return preview === undefined || "line" in preview ? undefined : preview;
 });
 var capabilityOffers = (form, definitions = CAPABILITIES) => definitions.map((capability) => ({
@@ -25232,16 +25259,20 @@ var fallback = (reason) => ({
 var decodeOutcome = decodeUnknownEffect2(TuiOutcomeSchema, { onExcessProperty: "error" });
 var runInteractive = fn2("runInteractive")(function* (options) {
   const line = { kind: "line", notes: [] };
-  if (options.undo || inCloudSession(options.env) || !(yield* piInUse(options.env)))
+  if (options.undo || inCloudSession(options.env))
     return line;
-  const preview = yield* t3Offer(options.env, options.cwd, options);
-  const features = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(map4((config) => config.pi.enable ? featureSwitches(config.pi.features) : undefined), catchTag2("SetupFailure", () => succeed6(undefined)));
+  const piUsed = yield* piInUse(options.env);
+  if (!piUsed)
+    return line;
+  const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
+  const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config });
+  const features = config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features);
   const offers = features === undefined ? [] : capabilityOffers(options.form);
   if (preview === undefined && offers.length === 0)
     return line;
   const reason = tuiFallbackReason(options);
   if (reason !== undefined)
-    return fallback(reason);
+    return preview === undefined ? line : fallback(reason);
   const load = options.load ?? ((env, notify) => loadSetupTui(env, { notify }));
   const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
   if (loaded instanceof TuiUnavailable)
@@ -25253,7 +25284,10 @@ var runInteractive = fn2("runInteractive")(function* (options) {
     initial: { ...DEFAULT_CHOICES, capabilities: initialSwitches },
     dryRun: options.dryRun,
     review: (choices) => runPromise2(gen2(function* () {
-      const next = preview === undefined ? undefined : yield* previewT3Settings(options.env, options.cwd, choices);
+      const next = preview === undefined ? undefined : yield* previewT3Settings(options.env, options.cwd, {
+        ...choices,
+        ...config === undefined ? {} : { config }
+      });
       if (preview !== undefined && (next === undefined || ("line" in next)))
         return yield* fail5(new Error("the T3 settings step has nothing to do any more"));
       return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));

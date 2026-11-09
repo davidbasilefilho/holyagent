@@ -175,6 +175,21 @@ describe("setup without the interface", () => {
     },
   )
 
+  test.each([
+    ["no terminal", [], undefined],
+    ["--no-tui", ["--no-tui"], TERMINAL],
+    ["a capability flag", ["--todo", "off"], TERMINAL],
+  ])("%s prints no interface line where the T3 part has no work", async (_, argv, terminal) => {
+    await machine({ t3: false })
+    const shown = interface_(() => Promise.reject(new Error("must not run")))
+    const result = await cli(argv, {
+      ...(terminal === undefined ? {} : { terminal }),
+      setupTui: shown.loader,
+    })
+    expect(shown.loaded()).toBe(0)
+    expect(result.stdout).not.toContain("t3 tui")
+  })
+
   test("says nothing about the interface where Pi is not in use, and for an undo", async () => {
     await machine({ t3: false })
     const shown = interface_(() => Promise.reject(new Error("must not run")))

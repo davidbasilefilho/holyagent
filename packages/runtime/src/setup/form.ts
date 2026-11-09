@@ -36,16 +36,24 @@ export const hasDisplay = (env: Env, platform: string = process.platform): boole
   [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "")
 
 /**
- * Picks the form from the machine: `headless` in a claude.ai cloud session, when `CI` is set (other
- * than `false`), and where there is no graphical session ({@link hasDisplay}); `normal` otherwise.
- * It reads the environment and the platform only, so setup and doctor choose the same form.
+ * Whether the run is in CI: `CI` holds a truthy value. Empty, `0`, `false`, `no` and `off` (in any
+ * case) count as unset, as the variable is often exported as a negative on a desktop.
+ */
+export const inCi = (env: Env): boolean => {
+  const value = env["CI"]?.trim().toLowerCase()
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value)
+}
+
+/**
+ * Picks the form from the machine: `headless` in a claude.ai cloud session, when `CI` is set to a
+ * truthy value ({@link inCi}), and where there is no graphical session ({@link hasDisplay});
+ * `normal` otherwise. It reads the environment and the platform only, so setup and doctor choose
+ * the same form.
  */
 export const detectForm = (env: Env, platform: string = process.platform): FormChoice => {
   if (inCloudSession(env))
     return { form: "headless", source: "detected", reason: "a claude.ai cloud session" }
-  const ci = env["CI"]
-  if (ci !== undefined && ci !== "" && ci !== "false")
-    return { form: "headless", source: "detected", reason: "CI is set" }
+  if (inCi(env)) return { form: "headless", source: "detected", reason: "CI is set" }
   if (!hasDisplay(env, platform))
     return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" }
   return { form: "normal", source: "detected", reason: "a graphical session is available" }
