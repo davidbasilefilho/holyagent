@@ -133,6 +133,8 @@ export const mount = async (options: Mount) => {
         // The key parser holds a lone Escape back until no escape sequence can follow.
         await Bun.sleep(80)
       } else if (name === "ctrl-c") setup.mockInput.pressCtrlC()
+      else if (name === "pagedown") setup.mockInput.pressKey("\u001B[6~")
+      else if (name === "pageup") setup.mockInput.pressKey("\u001B[5~")
       else if (name === "up" || name === "down") setup.mockInput.pressArrow(name)
       else setup.mockInput.pressKey(name)
       await settle()

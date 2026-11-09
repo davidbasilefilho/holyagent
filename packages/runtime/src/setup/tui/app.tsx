@@ -13,6 +13,7 @@ import {
   reviewed,
   reviewFailed,
   rowsOf,
+  scrollOf,
   type State,
   view,
 } from "./model.ts"
@@ -59,17 +60,16 @@ export const SetupApp = (props: SetupAppProps) => {
   const abort = new AbortController()
   let ticket = 0
 
-  const lines = createMemo((): ReadonlyArray<Line> => {
-    const context: Context = {
-      rows,
-      offer: props.input.offer,
-      dryRun: props.input.dryRun,
-      width: dimensions().width,
-      height: dimensions().height,
-      look,
-    }
-    return view(state(), context)
+  const context = (): Context => ({
+    rows,
+    offer: props.input.offer,
+    dryRun: props.input.dryRun,
+    width: dimensions().width,
+    height: dimensions().height,
+    look,
   })
+
+  const lines = createMemo((): ReadonlyArray<Line> => view(state(), context()))
 
   const run = (command: Command) => {
     const current = state()
@@ -115,7 +115,12 @@ export const SetupApp = (props: SetupAppProps) => {
   useKeyboard((event) => {
     // A key that goes back to the choices makes any review reply still on its way stale.
     const before = state()
-    const next = press(before, rows, { name: event.name, ctrl: event.ctrl })
+    const next = press(
+      before,
+      rows,
+      { name: event.name, ctrl: event.ctrl },
+      scrollOf(before, context()),
+    )
     if (next.state.screen !== before.screen && next.state.screen === "choose") ticket += 1
     setState(next.state)
     if (next.command !== undefined) run(next.command)

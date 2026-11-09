@@ -1,6 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, readFile, symlink, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import {
+  chmod,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises"
+import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
 
@@ -10,11 +20,14 @@ import {
   bunInstall,
   cacheHome,
   importFile,
+  INSTALLED_MARKER,
   loadSetupTui,
+  markerText,
+  plain,
   tuiDirectory,
   TuiUnavailable,
 } from "../src/setup/tui/load.ts"
-import { TUI_PACKAGES } from "../src/setup/tui/packages.ts"
+import { TUI_LOCK, TUI_PACKAGES } from "../src/setup/tui/packages.ts"
 import { tuiFallbackReason } from "../src/setup/tui/session.ts"
 import type { SetupTuiModule } from "../src/setup/tui/types.ts"
 import { fakeShell, scratch } from "./setup-fixture.ts"
@@ -30,10 +43,18 @@ beforeEach(async () => {
 afterEach(() => remove())
 
 const PACKAGES = { "@opentui/core": "1.0.0", "@opentui/solid": "1.0.1", "solid-js": "2.0.0" }
+// The first eight hex digits of the SHA-256 of the lock text "lock".
 const EXPECTED_DIRECTORY = (root: string) =>
-  join(root, "holyagent", "setup-tui", "opentui-core-1.0.0_opentui-solid-1.0.1_solid-js-2.0.0")
+  join(
+    root,
+    "holyagent",
+    "setup-tui",
+    "opentui-core-1.0.0_opentui-solid-1.0.1_solid-js-2.0.0_0c030586",
+  )
 
-/** Puts the packages in a folder as an install would, at the given versions. */
+const POSIX = process.platform !== "win32"
+
+/** Puts the packages in a folder as an install would, at the given versions, marker last. */
 const installTo = async (folder: string, versions: Record<string, string>) => {
   for (const [name, version] of Object.entries(versions)) {
     await mkdir(join(folder, "node_modules", name), { recursive: true })
@@ -42,6 +63,7 @@ const installTo = async (folder: string, versions: Record<string, string>) => {
       JSON.stringify({ name, version }),
     )
   }
+  await writeFile(join(folder, INSTALLED_MARKER), markerText(PACKAGES))
 }
 
 const bundleFile = async (text = "export const runSetupTui = () => Promise.resolve({})") => {
@@ -91,10 +113,12 @@ describe("where the interface is installed", () => {
   })
 
   test("names the folder by the exact versions, so a newer release installs beside an older one", () => {
-    expect(tuiDirectory({ XDG_CACHE_HOME: "/c" }, PACKAGES, "linux")).toBe(EXPECTED_DIRECTORY("/c"))
-    expect(
-      tuiDirectory({ XDG_CACHE_HOME: "/c" }, { ...PACKAGES, "solid-js": "2.0.1" }, "linux"),
-    ).not.toBe(EXPECTED_DIRECTORY("/c"))
+    const at = (packages: Record<string, string>, lock: string) =>
+      tuiDirectory({ XDG_CACHE_HOME: "/c" }, packages, "linux", lock)
+    expect(at(PACKAGES, "lock")).toBe(EXPECTED_DIRECTORY("/c"))
+    expect(at({ ...PACKAGES, "solid-js": "2.0.1" }, "lock")).not.toBe(EXPECTED_DIRECTORY("/c"))
+    // A lock that moved a transitive package installs beside the old folder too.
+    expect(at(PACKAGES, "another lock")).not.toBe(EXPECTED_DIRECTORY("/c"))
   })
 })
 
@@ -146,17 +170,19 @@ describe("loading the interface", () => {
     const bundle = await bundleFile("export const runSetupTui = 1")
     const target = join(directory, "cache")
     const imported: Array<string> = []
-    const installs: Array<readonly [string, Record<string, string>]> = []
+    const installs: Array<readonly [string, Record<string, string>, string]> = []
     const notices: Array<string> = []
     const module = await loaded({
       packages: PACKAGES,
+      lock: "the lock",
       bundle,
       directory: target,
       notify: (text) => Effect.sync(() => void notices.push(text)),
-      install: (folder, packages) =>
+      install: (folder, packages, lock) =>
         Effect.promise(async () => {
-          installs.push([folder, packages])
+          installs.push([folder, packages, lock])
           await installTo(folder, packages)
+          await rm(join(folder, INSTALLED_MARKER))
         }),
       importModule: (path) =>
         Effect.sync(() => {
@@ -165,7 +191,14 @@ describe("loading the interface", () => {
         }),
     })
     expect(module).toBe(MODULE)
-    expect(installs).toEqual([[target, PACKAGES]])
+    // The install runs in a fresh folder beside the final one, with the lock, and is renamed into place.
+    expect(installs).toHaveLength(1)
+    expect(installs[0]?.[0]).not.toBe(target)
+    expect(dirname(installs[0]?.[0] ?? "")).toBe(dirname(target))
+    expect(installs[0]?.[1]).toEqual(PACKAGES)
+    expect(installs[0]?.[2]).toBe("the lock")
+    expect(await readFile(join(target, INSTALLED_MARKER), "utf8")).toBe(markerText(PACKAGES))
+    expect((await readdir(dirname(target))).toSorted()).toEqual(["cache", "source"])
     expect(notices).toHaveLength(1)
     expect(notices[0]).toContain(`installing the setup interface into ${target} (first run only)`)
     expect(imported).toEqual([
@@ -301,11 +334,256 @@ describe("loading the interface", () => {
   })
 })
 
+describe("an install that is interrupted, raced or planted", () => {
+  const stage = async () => {
+    const bundle = await bundleFile("export const runSetupTui = 1")
+    return { bundle, target: join(directory, "cache", "versions") }
+  }
+  const fullInstall = (folder: string, packages: Record<string, string>) =>
+    Effect.promise(() => installTo(folder, packages))
+
+  test("a killed install leaves nothing at the final folder, and the next run installs again", async () => {
+    const { bundle, target } = await stage()
+    const killed = await load({
+      packages: PACKAGES,
+      bundle,
+      directory: target,
+      install: (folder, packages) =>
+        Effect.promise(async () => {
+          await installTo(folder, packages)
+          await rm(join(folder, "node_modules", "@opentui", "solid", "package.json"))
+        }).pipe(Effect.andThen(Effect.fail(new TuiUnavailable({ reason: "killed halfway" })))),
+      importModule: () => Effect.succeed(MODULE),
+    })
+    expect(killed.message).toBe("killed halfway")
+    expect(await readdir(dirname(target))).toEqual([])
+    let installs = 0
+    await loaded({
+      packages: PACKAGES,
+      bundle,
+      directory: target,
+      install: (folder, packages) =>
+        Effect.sync(() => void (installs += 1)).pipe(Effect.andThen(fullInstall(folder, packages))),
+      importModule: () => Effect.succeed(MODULE),
+    })
+    expect(installs).toBe(1)
+  })
+
+  test("a folder without the completion marker is absent: it is replaced, not trusted", async () => {
+    const { bundle, target } = await stage()
+    // Every package in place at its version, as a killed install could leave it, but no marker.
+    await installTo(target, PACKAGES)
+    await rm(join(target, INSTALLED_MARKER))
+    await writeFile(join(target, "half-written.js"), "export const")
+    let installs = 0
+    await loaded({
+      packages: PACKAGES,
+      bundle,
+      directory: target,
+      install: (folder, packages) =>
+        Effect.sync(() => void (installs += 1)).pipe(Effect.andThen(fullInstall(folder, packages))),
+      importModule: () => Effect.succeed(MODULE),
+    })
+    expect(installs).toBe(1)
+    expect(await readFile(join(target, INSTALLED_MARKER), "utf8")).toBe(markerText(PACKAGES))
+    expect(await readdir(target)).not.toContain("half-written.js")
+  })
+
+  test("a marker for other packages does not count either", async () => {
+    const { bundle, target } = await stage()
+    await installTo(target, PACKAGES)
+    await writeFile(
+      join(target, INSTALLED_MARKER),
+      markerText({ ...PACKAGES, "solid-js": "1.0.0" }),
+    )
+    let installs = 0
+    await loaded({
+      packages: PACKAGES,
+      bundle,
+      directory: target,
+      install: (folder, packages) =>
+        Effect.sync(() => void (installs += 1)).pipe(Effect.andThen(fullInstall(folder, packages))),
+      importModule: () => Effect.succeed(MODULE),
+    })
+    expect(installs).toBe(1)
+  })
+
+  test("two first runs at once: the first rename wins and the second uses it without a mess", async () => {
+    const { bundle, target } = await stage()
+    let installs = 0
+    await loaded({
+      packages: PACKAGES,
+      bundle,
+      directory: target,
+      // Another run finishes its install and renames it into place while this one is installing.
+      install: (folder, packages) =>
+        Effect.promise(async () => {
+          installs += 1
+          await installTo(target, packages)
+          await writeFile(join(target, "winner"), "first")
+          await installTo(folder, packages)
+        }),
+      importModule: () => Effect.succeed(MODULE),
+    })
+    expect(installs).toBe(1)
+    expect(await readFile(join(target, "winner"), "utf8")).toBe("first")
+    expect((await readdir(dirname(target))).toSorted()).toEqual(["versions"])
+  })
+
+  test.skipIf(!POSIX)("creates the cache folders private, with mode 0700", async () => {
+    const { bundle, target } = await stage()
+    await loaded({
+      packages: PACKAGES,
+      bundle,
+      directory: target,
+      install: fullInstall,
+      importModule: () => Effect.succeed(MODULE),
+    })
+    expect((await stat(dirname(target))).mode & 0o777).toBe(0o700)
+    expect((await stat(target)).mode & 0o777).toBe(0o700)
+  })
+
+  test.skipIf(!POSIX)(
+    "refuses a cache folder that others can write, and falls back with the reason",
+    async () => {
+      const { bundle, target } = await stage()
+      await mkdir(dirname(target), { recursive: true })
+      await chmod(dirname(target), 0o777)
+      let installs = 0
+      const failure = await load({
+        packages: PACKAGES,
+        bundle,
+        directory: target,
+        install: () => Effect.sync(() => void (installs += 1)),
+        importModule: () => Effect.succeed(MODULE),
+      })
+      expect(failure).toBeInstanceOf(TuiUnavailable)
+      expect(failure.message).toContain(
+        `the cache folder ${dirname(target)} can be written by others`,
+      )
+      expect(installs).toBe(0)
+      await chmod(dirname(target), 0o770)
+      expect((await load({ packages: PACKAGES, bundle, directory: target })).message).toContain(
+        "can be written by others",
+      )
+    },
+  )
+
+  test.skipIf(!POSIX)("refuses a cache folder that belongs to another user", async () => {
+    const { bundle, target } = await stage()
+    await installTo(target, PACKAGES)
+    await chmod(target, 0o700)
+    let imports = 0
+    const failure = await load({
+      packages: PACKAGES,
+      bundle,
+      directory: target,
+      uid: (process.getuid?.() ?? 0) + 1,
+      importModule: () => Effect.sync(() => void (imports += 1)),
+    })
+    expect(failure.message).toContain("belongs to another user")
+    expect(imports).toBe(0)
+  })
+
+  test.skipIf(!POSIX)(
+    "refuses an installed folder that is a link or that others can write",
+    async () => {
+      const { bundle, target } = await stage()
+      await installTo(join(directory, "elsewhere"), PACKAGES)
+      await mkdir(dirname(target), { recursive: true })
+      await symlink(join(directory, "elsewhere"), target, "dir")
+      const linked = await load({ packages: PACKAGES, bundle, directory: target })
+      expect(linked.message).toContain("is not a plain directory")
+      await rm(target)
+      await installTo(target, PACKAGES)
+      await chmod(target, 0o777)
+      expect((await load({ packages: PACKAGES, bundle, directory: target })).message).toContain(
+        "can be written by others",
+      )
+    },
+  )
+
+  test.skipIf(!POSIX)(
+    "writes the bundle without following a link planted at its path",
+    async () => {
+      const { bundle, target } = await stage()
+      await installTo(target, PACKAGES)
+      await chmod(target, 0o700)
+      const victim = join(directory, "victim.txt")
+      await writeFile(victim, "keep me")
+      await symlink(victim, join(target, TUI_BUNDLE))
+      await loaded({
+        packages: PACKAGES,
+        bundle,
+        directory: target,
+        importModule: () => Effect.succeed(MODULE),
+      })
+      expect(await readFile(victim, "utf8")).toBe("keep me")
+      expect((await lstat(join(target, TUI_BUNDLE))).isSymbolicLink()).toBe(false)
+      expect(await readFile(join(target, TUI_BUNDLE), "utf8")).toBe("export const runSetupTui = 1")
+    },
+  )
+})
+
+describe("what the install is held to", () => {
+  test("the embedded lock names the three packages and the whole tree the repository's lock resolves", async () => {
+    const root = Bun.JSONC.parse(
+      await readFile(join(import.meta.dir, "../../../bun.lock"), "utf8"),
+    ) as { packages: Record<string, unknown> }
+    const lock = JSON.parse(TUI_LOCK) as {
+      workspaces: Record<string, { dependencies: Record<string, string> }>
+      packages: Record<string, unknown>
+    }
+    expect(lock.workspaces[""]?.dependencies).toEqual(TUI_PACKAGES)
+    // Entries are the repository's, byte for byte, so versions and integrity hashes are the same.
+    for (const [key, entry] of Object.entries(lock.packages))
+      expect(entry).toEqual(root.packages[key])
+    // Solid's s-js and the native renderer, which no direct dependency pins, are in the lock.
+    for (const key of ["s-js", "@opentui/core-linux-x64", "@opentui/core-darwin-arm64"])
+      expect(Object.keys(lock.packages)).toContain(key)
+    // It holds the tree of the three packages and nothing of the repository's other dependencies.
+    expect(Object.keys(lock.packages)).not.toContain("effect")
+    expect(Object.keys(lock.packages).length).toBeLessThan(Object.keys(root.packages).length)
+  })
+
+  test("a bun install failure's output cannot move the cursor or recolour the terminal", async () => {
+    const shell = fakeShell({
+      commands: ["bun"],
+      respond: () => ({
+        exitCode: 1,
+        stderr:
+          "Resolving dependencies\n\u001B[31m\u001B]0;pwned\u0007error\u001B[0m: bad\u001B[2J\u0008\r tail\n",
+      }),
+    })
+    const failure = await Effect.runPromise(
+      bunInstall(join(directory, "cache"), PACKAGES).pipe(Effect.flip, Effect.provide(shell.layer)),
+    )
+    expect(failure.message).toBe("bun install failed (exit 1): error: bad tail")
+  })
+
+  test("plain removes escape sequences, control characters and line breaks", () => {
+    expect(plain("\u001B[1;31mred\u001B[0m \u001B]8;;http://x\u0007link\u001B]8;;\u0007")).toBe(
+      "red link",
+    )
+    expect(plain("a\u0000b\u0007c\u007Fd\u0085e\r\nf\tg")).toBe("abcdefg")
+    expect(plain("日本語 ünï ✓")).toBe("日本語 ünï ✓")
+  })
+
+  test("an import error's text is plain too", async () => {
+    const failure = await Effect.runPromise(
+      importFile(join(directory, "nothing\u001B[31m.js")).pipe(Effect.flip),
+    )
+    expect(failure.message).not.toContain("\u001B")
+  })
+})
+
 describe("the real install and import steps", () => {
   test("bun install writes the exact versions and runs with no .env and the empty Bun config", async () => {
     const shell = fakeShell({ commands: ["bun"] })
     const target = join(directory, "cache")
-    await Effect.runPromise(bunInstall(target, PACKAGES).pipe(Effect.provide(shell.layer)))
+    await Effect.runPromise(
+      bunInstall(target, PACKAGES, "the lock\n").pipe(Effect.provide(shell.layer)),
+    )
     expect(JSON.parse(await readFile(join(target, "package.json"), "utf8"))).toEqual({
       name: "holyagent-setup-tui",
       private: true,
@@ -317,9 +595,12 @@ describe("the real install and import steps", () => {
       "--no-env-file",
       `--config=${EMPTY_BUNFIG}`,
       "install",
+      "--frozen-lockfile",
       "--ignore-scripts",
     ])
     expect(shell.calls[0]?.cwd).toBe(target)
+    // The lock beside the manifest is what `--frozen-lockfile` holds the install to.
+    expect(await readFile(join(target, "bun.lock"), "utf8")).toBe("the lock\n")
   })
 
   test("a failing bun install is TuiUnavailable with the line of its output that says why", async () => {
@@ -353,6 +634,7 @@ describe("the real install and import steps", () => {
       join(target, "node_modules"),
       "dir",
     )
+    await writeFile(join(target, INSTALLED_MARKER), markerText(TUI_PACKAGES))
     const bundle = join(import.meta.dir, "../../integrations/claude/dist/scripts", TUI_BUNDLE)
     const module = await loaded({ bundle, directory: target })
     expect(typeof module.runSetupTui).toBe("function")

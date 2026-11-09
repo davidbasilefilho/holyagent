@@ -304,6 +304,21 @@ describe("setup with the interface", () => {
     expect(await t3Settings()).toMatchObject({ defaultThreadEnvMode: "worktree" })
   })
 
+  test("shows the reason as plain text, with no escape sequence or control character of its own", async () => {
+    await machine()
+    const result = await cli([], {
+      terminal: TERMINAL,
+      setupTui: () =>
+        Effect.fail(
+          new TuiUnavailable({ reason: "bun install failed: \u001B[2J\u001B[31mENOTFOUND\u0007" }),
+        ),
+    })
+    expect(tuiLine(result.stdout)).toBe(
+      "~ t3 tui: unavailable (bun install failed: ENOTFOUND); using the line-based setup",
+    )
+    expect(result.stdout).not.toContain("\u001B")
+  })
+
   test("uses the line-based setup when the screen fails to start", async () => {
     await machine()
     const shown = interface_(() => Promise.reject(new Error("no native library for linux-riscv64")))

@@ -32,6 +32,16 @@ const SUCCESS: Applied = {
     "= user settings /home/user/.claude/settings.json: already set",
   ],
 }
+// What a real dry run reports: the same lines, as what would change.
+const DRY_SUCCESS: Applied = {
+  ok: true,
+  lines: [
+    "~ scope: user (default)",
+    "- ctx7: skipped by flag",
+    '+ t3 settings /home/user/.t3/userdata/settings.json: would add defaultThreadEnvMode "worktree", autoResumeLimitedThreads true (dry run, nothing written)',
+    "= user settings /home/user/.claude/settings.json: already set",
+  ],
+}
 const FAILURE: Applied = {
   ok: false,
   lines: [
@@ -50,6 +60,8 @@ interface Scene {
 }
 
 const never = new Promise<never>(() => {})
+const NO_COLOR = { TERM: "xterm-256color", NO_COLOR: "1" }
+const ASCII = { TERM: "xterm-256color", LANG: "C" }
 
 const SCENES: ReadonlyArray<Scene> = [
   { name: "initial" },
@@ -74,6 +86,13 @@ const SCENES: ReadonlyArray<Scene> = [
         Promise.reject(new Error("/home/user/.t3/userdata/settings.json is not a JSON object")),
     },
     keys: ["enter"],
+  },
+  { name: "review-scrolled", keys: ["enter", "pagedown"] },
+  { name: "review-end", keys: ["enter", "pagedown", "pagedown", "pagedown", "pagedown"] },
+  {
+    name: "review-dry-run-end",
+    options: { dryRun: true },
+    keys: ["enter", "pagedown", "pagedown"],
   },
   { name: "review-back-action", keys: ["enter", "down"] },
   { name: "review-cancel-action", keys: ["enter", "down", "down"] },
@@ -103,8 +122,46 @@ const SCENES: ReadonlyArray<Scene> = [
   },
   {
     name: "apply-success-dry-run",
-    options: { dryRun: true, apply: () => Promise.resolve(SUCCESS) },
+    options: { dryRun: true, apply: () => Promise.resolve(DRY_SUCCESS) },
     keys: ["enter", "enter"],
+  },
+  {
+    name: "apply-failure-dry-run",
+    options: { dryRun: true, apply: () => Promise.resolve(FAILURE) },
+    keys: ["enter", "enter"],
+  },
+  {
+    name: "apply-success-no-color",
+    options: { env: NO_COLOR, apply: () => Promise.resolve(SUCCESS) },
+    keys: ["enter", "enter"],
+  },
+  {
+    name: "apply-failure-no-color",
+    options: { env: NO_COLOR, apply: () => Promise.resolve(FAILURE) },
+    keys: ["enter", "enter"],
+  },
+  {
+    name: "apply-success-ascii-locale",
+    options: { env: ASCII, apply: () => Promise.resolve(SUCCESS) },
+    keys: ["enter", "enter"],
+  },
+  {
+    name: "apply-failure-ascii-locale",
+    options: { env: ASCII, apply: () => Promise.resolve(FAILURE) },
+    keys: ["enter", "enter"],
+  },
+  {
+    name: "review-failed-ascii-locale",
+    options: {
+      env: ASCII,
+      review: () => Promise.reject(new Error("settings.json is not a JSON object")),
+    },
+    keys: ["enter"],
+  },
+  {
+    name: "review-ascii-locale-end",
+    options: { env: ASCII },
+    keys: ["enter", "pagedown", "pagedown", "pagedown", "pagedown"],
   },
   { name: "no-color", options: { env: { TERM: "xterm-256color", NO_COLOR: "1" } } },
   {

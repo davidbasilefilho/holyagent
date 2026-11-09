@@ -3012,50 +3012,59 @@ var clip = (text, width, ellipsis) => {
   const room = width - cells(ellipsis);
   return room <= 0 ? prefix(ellipsis, width) : prefix(text, room) + ellipsis;
 };
-var clipStart = (text, width, ellipsis) => {
-  if (width <= 0)
-    return "";
-  if (cells(text) <= width)
-    return text;
-  const room = width - cells(ellipsis);
-  if (room <= 0)
-    return prefix(ellipsis, width);
-  let kept = "";
-  for (const grapheme of graphemes(text).toReversed()) {
-    if (cells(grapheme + kept) > room)
-      break;
-    kept = grapheme + kept;
-  }
-  return ellipsis + kept;
-};
 var pad = (text, width) => text + " ".repeat(Math.max(0, width - cells(text)));
-var wrap = (text, width) => {
-  const room = Math.max(1, width);
+var FOLDERS = new Set(["/", "\\"]);
+var MARKS = new Set([".", "_", "-"]);
+var head2 = (word, room) => {
+  const fits = prefix(word, room);
+  let folder = -1;
+  let mark = -1;
+  let size = 0;
+  let before = "/";
+  for (const grapheme of graphemes(fits)) {
+    size += grapheme.length;
+    if (FOLDERS.has(grapheme))
+      folder = size;
+    else if (MARKS.has(grapheme) && !(grapheme === "." && FOLDERS.has(before)))
+      mark = size;
+    before = grapheme;
+  }
+  const usable = (cut) => cut >= 3 || cut > 0 && cut === fits.length;
+  const cut = usable(folder) ? folder : usable(mark) ? mark : -1;
+  return cut > 0 ? fits.slice(0, cut) : fits;
+};
+var wrap = (text, width, hang = 0) => {
   const lines = [];
   let line = "";
+  const room = () => Math.max(1, width - (lines.length === 0 ? 0 : hang));
+  const flush = () => {
+    lines.push(`${lines.length === 0 ? "" : " ".repeat(hang)}${line}`);
+    line = "";
+  };
   for (const word of text.split(/\s+/).filter((part) => part !== "")) {
     let rest = word;
-    while (cells(rest) > room) {
-      if (line !== "") {
-        lines.push(line);
-        line = "";
-      }
-      const head = prefix(rest, room);
-      if (head === "")
+    while (cells(rest) > room()) {
+      if (line !== "")
+        flush();
+      const piece = head2(rest, room());
+      if (piece === "")
         break;
-      lines.push(head);
-      rest = rest.slice(head.length);
+      line = piece;
+      flush();
+      rest = rest.slice(piece.length);
     }
     if (line === "")
       line = rest;
-    else if (cells(`${line} ${rest}`) <= room)
+    else if (cells(`${line} ${rest}`) <= room())
       line = `${line} ${rest}`;
     else {
-      lines.push(line);
+      flush();
       line = rest;
     }
   }
-  return line === "" ? lines : [...lines, line];
+  if (line !== "")
+    flush();
+  return lines;
 };
 var wrapItems = (items, width, separator) => {
   const lines = [];
@@ -3120,6 +3129,7 @@ var initialState = (choices) => ({
   screen: "choose",
   focus: 0,
   action: 0,
+  scroll: 0,
   choices,
   review: undefined,
   failure: undefined,
@@ -3132,7 +3142,16 @@ var isEnter = (key) => key.name === "return" || key.name === "enter";
 var stepOf = (key) => key.ctrl ? 0 : key.name === "up" || key.name === "k" ? -1 : key.name === "down" || key.name === "j" ? 1 : 0;
 var wrapped = (index, step, length) => ((index + step) % length + length) % length;
 var toggled = (choices, row) => row === "deviceAccess" ? { ...choices, deviceAccess: !choices.deviceAccess } : row === "worktrees" ? { ...choices, worktrees: !choices.worktrees } : choices;
-var press = (state, rows, key) => {
+var pagedBy = (state, key, scroll) => {
+  if (key.ctrl)
+    return;
+  const direction = key.name === "pagedown" ? 1 : key.name === "pageup" ? -1 : 0;
+  if (direction === 0)
+    return;
+  const from = Math.min(state.scroll, scroll.max);
+  return { ...state, scroll: Math.min(scroll.max, Math.max(0, from + direction * scroll.page)) };
+};
+var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
   if (state.screen === "choose") {
     if (isQuit(key))
       return { state, command: "cancel" };
@@ -3145,7 +3164,14 @@ var press = (state, rows, key) => {
     }
     if (isEnter(key))
       return {
-        state: { ...state, screen: "review", action: 0, review: undefined, failure: undefined },
+        state: {
+          ...state,
+          screen: "review",
+          action: 0,
+          scroll: 0,
+          review: undefined,
+          failure: undefined
+        },
         command: "review"
       };
     return { state };
@@ -3153,6 +3179,9 @@ var press = (state, rows, key) => {
   if (state.screen === "review") {
     if (isQuit(key))
       return { state, command: "cancel" };
+    const paged = pagedBy(state, key, scroll);
+    if (paged !== undefined)
+      return { state: paged };
     const actions = reviewActions(state);
     const step = stepOf(key);
     if (step !== 0)
@@ -3162,31 +3191,38 @@ var press = (state, rows, key) => {
       if (action === "apply")
         return { state: { ...state, screen: "applying" }, command: "apply" };
       if (action === "back")
-        return { state: { ...state, screen: "choose", review: undefined, failure: undefined } };
+        return {
+          state: { ...state, screen: "choose", scroll: 0, review: undefined, failure: undefined }
+        };
       return { state, command: "cancel" };
     }
     return { state };
   }
   if (state.screen === "applying")
     return key.ctrl && key.name === "c" ? { state, command: "interrupt" } : { state };
+  const paged = pagedBy(state, key, scroll);
+  if (paged !== undefined)
+    return { state: paged };
   return isQuit(key) || isEnter(key) || key.name === "space" ? { state, command: "close" } : { state };
 };
-var reviewed = (state, review) => state.screen === "review" ? { ...state, review, failure: undefined, action: 0 } : state;
-var reviewFailed = (state, failure) => state.screen === "review" ? { ...state, review: undefined, failure, action: 0 } : state;
+var reviewed = (state, review) => state.screen === "review" ? { ...state, review, failure: undefined, action: 0, scroll: 0 } : state;
+var reviewFailed = (state, failure) => state.screen === "review" ? { ...state, review: undefined, failure, action: 0, scroll: 0 } : state;
 var finished = (state, applied) => ({
   ...state,
   screen: "done",
+  scroll: 0,
   applied
 });
 var KEY_GAP = "   ";
 var segment = (text, tone) => tone === undefined ? { text } : { text, tone };
 var title = (look) => [segment(`HolyAgent  ${glyphs(look).dot}  setup`, "heading")];
 var keyLines = (items, width) => wrapItems(items, width, KEY_GAP).map((text) => [segment(text, "option")]);
-var heading = (text) => [segment(text.toUpperCase(), "heading")];
+var heading = (text, width) => wrap(text.toUpperCase(), width).map((part) => [segment(part, "heading")]);
 var blank = [];
 var hintLines = (text, width) => wrap(text, width).map((part) => [segment(part, "hint")]);
 var hintOf = (row, offer) => row === "pi" ? "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose." : row === "deviceAccess" ? `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.` : "New T3 Code threads start in their own git worktree instead of the local checkout.";
 var checkbox = (row, choices) => row === "pi" ? { box: "[x]", word: "fixed" } : (row === "deviceAccess" ? choices.deviceAccess : choices.worktrees) ? { box: "[x]", word: "enabled" } : { box: "[ ]", word: "disabled" };
+var FIXED = { page: 1, max: 0 };
 var chooseLines = (state, context) => {
   const { rows, offer, width, look } = context;
   const g = glyphs(look);
@@ -3204,14 +3240,14 @@ var chooseLines = (state, context) => {
       return [segment(`${g.focus} ${label}  ${value}`, "focus")];
     return [
       segment(`  ${label}  `, "argument"),
-      segment(value, row === "pi" ? "hint" : (row === "deviceAccess" ? state.choices.deviceAccess : state.choices.worktrees) ? "enabled" : "disabled")
+      segment(value, row === "pi" || !(row === "deviceAccess" ? state.choices.deviceAccess : state.choices.worktrees) ? "disabled" : "enabled")
     ];
   });
   const focused = rows[state.focus];
   return [
-    ...keyLines([`${g.arrows} focus`, "Space toggle", "Enter review", "Esc cancel"], width),
+    ...keyLines([`${g.arrows} or j/k focus`, "Space toggle", "Enter review", "Esc cancel"], width),
     blank,
-    heading("T3 Code"),
+    ...heading("T3 Code", width),
     ...body,
     blank,
     ...focused === undefined ? [] : hintLines(hintOf(focused, offer), width)
@@ -3223,25 +3259,42 @@ var MARK_TONES = {
   "~": "warning",
   "-": "hint"
 };
-var MIN_DETAIL = 12;
-var reviewLine = (line, nameWidth, width, ellipsis) => {
-  const head = `  ${line.mark} ${pad(line.name, nameWidth)}  `;
-  const room = width - cells(head);
-  const detail = room >= MIN_DETAIL ? clip(line.detail, room, ellipsis) : "";
-  return [
-    segment(`  ${line.mark} `, MARK_TONES[line.mark]),
+var MIN_DETAIL = 24;
+var reviewEntry = (line, nameWidth, width) => {
+  const mark = segment(`  ${line.mark} `, MARK_TONES[line.mark]);
+  const side = cells(mark.text) + nameWidth + 2;
+  const room = width - side;
+  if (room < MIN_DETAIL)
+    return [
+      [mark, segment(line.name, "argument")],
+      ...wrap(line.detail, width - 4).map((part) => [segment(`    ${part}`, "hint")])
+    ];
+  const parts = wrap(line.detail, room);
+  return (parts.length === 0 ? [""] : parts).map((part, index) => index === 0 ? [
+    mark,
     segment(pad(line.name, nameWidth), "argument"),
-    ...detail === "" ? [] : [segment(`  ${detail}`, "hint")]
-  ];
+    ...part === "" ? [] : [segment(`  ${part}`, "hint")]
+  ] : [segment(`${" ".repeat(side)}${part}`, "hint")]);
 };
-var reviewLines = (state, context) => {
+var pageOf = (body, room, from) => {
+  if (body.length <= room)
+    return { shown: body, indicator: undefined, scroll: FIXED };
+  const size = Math.max(1, room - 1);
+  const max = body.length - size;
+  const start = Math.min(Math.max(0, from), max);
+  const end = start + size;
+  const more = start === 0 ? "PgDn for more" : end === body.length ? "PgUp for earlier" : "PgUp/PgDn";
+  return {
+    shown: body.slice(start, end),
+    indicator: [segment(`Lines ${start + 1}-${end} of ${body.length}, ${more}`, "hint")],
+    scroll: { page: Math.max(1, size - 1), max }
+  };
+};
+var REVIEW_RECOVERY = "Fix the cause, then choose Back and review again, or choose Cancel and run holyagent setup later.";
+var reviewLayout = (state, context) => {
   const { width, look } = context;
   const g = glyphs(look);
-  const top = [
-    ...keyLines([`${g.arrows} focus`, "Enter select", "Esc cancel"], width),
-    blank,
-    heading(context.dryRun ? "Review (dry run, nothing is written)" : "Review")
-  ];
+  const heading_ = heading(context.dryRun ? "Review (dry run: would change, nothing is written)" : "Review", width);
   const actionLines = () => reviewActions(state).map((action, index) => {
     const text = action === "apply" ? context.dryRun ? "Apply (dry run)" : "Apply" : action === "back" ? "Back" : "Cancel";
     if (index === state.action)
@@ -3249,62 +3302,92 @@ var reviewLines = (state, context) => {
     const tone = action === "apply" ? "enabled" : action === "cancel" ? "error" : "argument";
     return [segment(`  ${text}`, tone)];
   });
+  const keys = (scrolling) => keyLines([
+    `${g.arrows} or j/k focus`,
+    ...scrolling ? ["PgUp/PgDn scroll"] : [],
+    "Enter select",
+    "Esc cancel"
+  ], width);
   if (state.failure !== undefined) {
-    return [
-      ...top,
-      ...wrap(state.failure, width - 2).map((part) => [segment(`  ${part}`, "error")]),
-      blank,
-      ...actionLines()
-    ];
+    return {
+      lines: [
+        ...keys(false),
+        blank,
+        ...heading_,
+        ...wrap(state.failure, width - 2).map((part) => [segment(`  ${part}`, "error")]),
+        blank,
+        ...hintLines(REVIEW_RECOVERY, width),
+        blank,
+        ...actionLines()
+      ],
+      scroll: FIXED
+    };
   }
   if (state.review === undefined) {
-    return [...top, [segment("  Reading what will change", "hint")], blank, ...actionLines()];
+    return {
+      lines: [
+        ...keys(false),
+        blank,
+        ...heading_,
+        [segment("  Reading what will change", "hint")],
+        blank,
+        ...actionLines()
+      ],
+      scroll: FIXED
+    };
   }
   const { review } = state;
   const nameWidth = Math.max(...[...review.choices, ...review.always].map((line) => cells(line.name)));
-  const make = (shown) => {
-    const more = review.always.length - shown;
-    return [
-      ...top,
-      [segment(`  ${clipStart(review.file, width - 2, g.ellipsis)}`, "hint")],
-      blank,
-      heading("Your choices"),
-      ...review.choices.map((line) => reviewLine(line, nameWidth, width, g.ellipsis)),
-      blank,
-      heading("Always applied"),
-      ...review.always.slice(0, shown).map((line) => reviewLine(line, nameWidth, width, g.ellipsis)),
-      ...more > 0 ? [[segment(`  ${g.ellipsis} ${more} more`, "hint")]] : [],
-      blank,
-      ...actionLines()
-    ];
+  const entries = (lines) => lines.flatMap((line) => reviewEntry(line, nameWidth, width));
+  const body = [
+    ...wrap(review.file, width - 2).map((part) => [segment(`  ${part}`, "hint")]),
+    blank,
+    ...heading("Your choices", width),
+    ...entries(review.choices),
+    blank,
+    ...heading("Always applied", width),
+    ...entries(review.always)
+  ];
+  const actions = actionLines();
+  const build = (scrolling) => {
+    const top = [...keys(scrolling), blank, ...heading_];
+    const room = context.height - 1 - top.length - 1 - actions.length;
+    const page = pageOf(body, room, state.scroll);
+    return {
+      lines: [...top, ...page.shown, page.indicator ?? blank, ...actions],
+      scroll: page.scroll,
+      fits: page.indicator === undefined
+    };
   };
-  let shown = review.always.length;
-  while (shown > 0 && 1 + make(shown).length > context.height)
-    shown -= 1;
-  return make(shown);
+  const plain = build(false);
+  return plain.fits ? plain : build(true);
 };
 var reportTone = (line) => line.startsWith("+ ") ? "success" : line.startsWith("! ") ? "error" : line.startsWith("~ ") ? "warning" : "hint";
-var doneLines = (state, context) => {
-  const { width, height, look } = context;
-  const g = glyphs(look);
+var doneHeadline = (ok, dryRun) => ok ? dryRun ? "Dry run finished; nothing was written." : "Setup finished." : dryRun ? "Dry run finished with failures; the lines marked ! failed. Fix the cause, then run the dry run again." : "Setup finished with failures; the lines marked ! failed. Fix the cause, then run holyagent setup again.";
+var doneLayout = (state, context) => {
+  const { width, height } = context;
   const applied = state.applied;
-  const lines = applied?.lines ?? [];
-  const make = (shown) => {
-    const more = lines.length - shown;
-    return [
-      ...keyLines(["Enter close", "Esc close"], width),
+  const ok = applied?.ok !== false;
+  const body = (applied?.lines ?? []).flatMap((line) => wrap(line, width, 2).map((part) => [segment(part, reportTone(line))]));
+  const build = (scrolling) => {
+    const top = [
+      ...keyLines(["Enter close", ...scrolling ? ["PgUp/PgDn scroll"] : []], width),
       blank,
-      heading(context.dryRun ? "Result (dry run)" : "Result"),
-      applied?.ok === false ? [segment("Setup finished with failures; the lines marked ! failed.", "error")] : [segment("Setup finished.", "success")],
-      blank,
-      ...lines.slice(0, shown).map((line) => [segment(clip(line, width, g.ellipsis), reportTone(line))]),
-      ...more > 0 ? [[segment(`${g.ellipsis} ${more} more, printed after you close`, "hint")]] : []
+      ...heading(context.dryRun ? "Result (dry run)" : "Result", width),
+      ...wrap(doneHeadline(ok, context.dryRun), width).map((part) => [
+        segment(part, ok ? "success" : "error")
+      ]),
+      blank
     ];
+    const page = pageOf(body, height - 1 - top.length, state.scroll);
+    return {
+      lines: [...top, ...page.shown, ...page.indicator === undefined ? [] : [page.indicator]],
+      scroll: page.scroll,
+      fits: page.indicator === undefined
+    };
   };
-  let shown = lines.length;
-  while (shown > 0 && 1 + make(shown).length > height)
-    shown -= 1;
-  return make(shown);
+  const plain = build(false);
+  return plain.fits ? plain : build(true);
 };
 var fitLine = (line, width, ellipsis) => {
   const total = line.reduce((sum, { text }) => sum + cells(text), 0);
@@ -3327,15 +3410,17 @@ var fitLine = (line, width, ellipsis) => {
   }
   return kept;
 };
-var view = (state, context) => {
-  const body = state.screen === "choose" ? chooseLines(state, context) : state.screen === "review" ? reviewLines(state, context) : state.screen === "applying" ? [
+var layoutOf = (state, context) => state.screen === "choose" ? { lines: chooseLines(state, context), scroll: FIXED } : state.screen === "review" ? reviewLayout(state, context) : state.screen === "applying" ? {
+  lines: [
     [segment("Press Ctrl-C to stop", "option")],
     blank,
-    heading("Applying"),
+    ...heading("Applying", context.width),
     [segment("Applying setup; this can take a moment.", "argument")]
-  ] : doneLines(state, context);
-  return [title(context.look), ...body].map((line) => fitLine(line, context.width, glyphs(context.look).ellipsis));
-};
+  ],
+  scroll: FIXED
+} : doneLayout(state, context);
+var scrollOf = (state, context) => layoutOf(state, context).scroll;
+var view = (state, context) => [title(context.look), ...layoutOf(state, context).lines].map((line) => fitLine(line, context.width, glyphs(context.look).ellipsis));
 
 // packages/runtime/src/setup/tui/app.tsx
 var settle = (run, onResult) => runFork2(tryPromise2({
@@ -3356,17 +3441,15 @@ var SetupApp = (props) => {
   const [state, setState] = createSignal(initialState(props.input.initial));
   const abort = new AbortController;
   let ticket = 0;
-  const lines = createMemo(() => {
-    const context = {
-      rows,
-      offer: props.input.offer,
-      dryRun: props.input.dryRun,
-      width: dimensions().width,
-      height: dimensions().height,
-      look
-    };
-    return view(state(), context);
+  const context = () => ({
+    rows,
+    offer: props.input.offer,
+    dryRun: props.input.dryRun,
+    width: dimensions().width,
+    height: dimensions().height,
+    look
   });
+  const lines = createMemo(() => view(state(), context()));
   const run = (command) => {
     const current = state();
     if (command === "cancel")
@@ -3412,7 +3495,7 @@ var SetupApp = (props) => {
     const next = press(before, rows, {
       name: event.name,
       ctrl: event.ctrl
-    });
+    }, scrollOf(before, context()));
     if (next.state.screen !== before.screen && next.state.screen === "choose")
       ticket += 1;
     setState(next.state);

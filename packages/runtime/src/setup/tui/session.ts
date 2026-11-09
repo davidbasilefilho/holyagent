@@ -7,7 +7,7 @@ import { hint, type Report } from "../report.ts"
 import type { Scope } from "../scope.ts"
 import type { Shell } from "../shell.ts"
 import { previewT3Settings, type T3Preview, type T3UnitPreview } from "../t3-settings.ts"
-import { loadSetupTui, TuiUnavailable } from "./load.ts"
+import { loadSetupTui, plain, TuiUnavailable } from "./load.ts"
 import {
   type Applied,
   type Choices,
@@ -159,7 +159,7 @@ export type Interactive =
 
 const fallback = (reason: string): Interactive => ({
   kind: "line",
-  notes: [hint(`t3 tui: ${reason}; using the line-based setup`)],
+  notes: [hint(`t3 tui: ${plain(reason)}; using the line-based setup`)],
 })
 
 const decodeOutcome = Schema.decodeUnknownEffect(TuiOutcomeSchema, { onExcessProperty: "error" })
