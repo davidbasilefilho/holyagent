@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9wgea6-ne4s",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 21,
+  "roleTask": "Reviewer.code",
+  "slug": "judge-whether-the-screen-repair-is",
+  "objective": "Judge whether the screen repair is correct, complete and merge-ready, and whether its findings close.",
+  "state": "Running",
+  "scope": [
+    "Repair commit 91d9eb07 on release/0.3.1/feat/screen in /home/user/holyagent-0.3.1-screen (range c6a2ac71..91d9eb07); source diff without generated dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-repair-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9vajbp-mb3c.md. Review only this repair; the earlier findings it answers are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0jpx-7whl.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0k14-hk7i.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0kb6-ydwu.md (audit).",
+    "Requirements the repair implements: the headless screen form (cloud or CI) registers @playwright/mcp at an exact pin moved by deps:update, launched headless and isolated through npx with the public npm registry passed explicitly, using the preinstalled Chromium when present; the normal form keeps @opencode/browse with a paired real browser plus pi-computer-use. Specialist agent files list only the screen tools of the form in use, and a headless specialist is told it has no desktop. T3 preview tools only where T3 hosts the session. Setup and doctor separate not-installed from not-paired, report an unreadable pairing file without failing, check node >= 22.19, and say when MCP is off.",
+    "Testing rule: never start pi, a browser, T3 or a model request; unit tests only."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Run in the worktree: bun install --frozen-lockfile, then bunx --no-install mise run build (tree unchanged after it) and bunx --no-install mise run verify; give command, exit code and counts.",
+    "Report in under 400 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The earlier code and audit findings the repair addresses are closed, each with file and line evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair introduces no regression or untested error path, and the headless agent-file selection, Chromium detection and registry flags behave as described",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Build leaves the tree unchanged and verify passes on 91d9eb07",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9vajbp-mb3c"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T23:35:53.166Z"
+  },
+  "createdAt": "2026-11-09T23:35:53.166Z"
+}
