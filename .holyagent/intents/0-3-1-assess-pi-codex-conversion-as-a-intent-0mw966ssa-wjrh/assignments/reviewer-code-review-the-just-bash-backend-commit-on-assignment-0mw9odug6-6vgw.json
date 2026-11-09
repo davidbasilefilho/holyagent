@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-just-bash-backend-commit-on",
   "objective": "Review the just-bash backend commit on release/0.3.1/feat/just-bash against the merge-ready bar and its requirements.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-bash; range git diff ce16cb6..HEAD (one commit). Writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9n3pas-ln21.md. Spike it follows: /home/user/holyagent/.git/holyagent/reports/assignment-0mw96w93p-53j2.md.",
     "Requirements, verbatim:",
@@ -50,7 +50,33 @@
     "agentId": "workflow:wf_ed8f2424-ff0/assignment-0mw9odug6-6vgw",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T19:49:57.222Z"
+    "startedAt": "2026-11-09T19:49:57.222Z",
+    "finishedAt": "2026-11-09T19:59:01.654Z"
+  },
+  "result": "result: Two blockers, 5 non-blocking findings. `mise run verify` exits 0 (2904 pass, 0 fail, check, lint and fmt clean). I could not run Windows or macOS.\n\n**Built-in `/code-review`:** it ran, but it reviewed the wrong tree. All 7 findings cite `setup/capabilities.ts`, `setup/pi-install.ts`, `setup/tui/session.ts` and form-aware `toolArgs`. None of those are in `ce16cb6..HEAD`. The `config/capabilities.ts` finding is about scaffolding that predates this commit. Rejected all 7 as out of range.\n\n**Blocking**\n1. **Programs given by path do not run** (behavior).\n   - `shell.ts:357`: the shell `PATH` is fixed at `/usr/bin:/bin`, and only stubs are registered. I ran `./elf hello` in the built bundle. just-bash parses the binary as a script and fails with `unexpected EOF`, exit 2.\n   - The same applies to `./node_modules/.bin/tsc` (a shebang JS file), `./target/debug/app` and `./a.out`.\n   - `export PATH=/x:$PATH; tool` never finds a native `tool` either, because host lookup uses the request-time `PATH`.\n   - `docs/pi/shell.md:18` and `guidelines.ts` admit this (\"run it by name or through bunx\").\n   - It is a real regression against Pi's bash and against \"executables on PATH and other relevant places\". The root can accept it as a documented limitation or ask for a fix.\n2. **Turning the capability off leaves Billion Context's guardrails disabled** (regressions).\n   - `capabilities.ts:355` writes `guardrails.{bashTimeout:0, maxOutputBytes:0, repetition:false}` to the Billion Context file, with no revert path.\n   - After `--just-bash off`, Pi's own bash still has no default timeout, output cap or repeat breaker.\n   - `docs/pi/shell.md:39` states this. It breaks \"restores Pi's own bash and nothing else changes\". The environment variables do revert (`tools.ts:155`).\n\n**Non-blocking**\n**`exit` drops cwd and env** (`shell.ts:411`). I confirmed it: `cd /usr; export B=2; unset A; exit 3` returns exit 3 with empty changes and cwd unchanged. The root's default said to keep state on `exit`; the writer disclosed the miss and `guidelines.ts` documents it.\n**Output order** (`shell.ts:394-397`). Non-streaming runs send all stdout, then all stderr, so interleaving differs from real bash.\n**Concurrent calls** (`bash.ts:178`). Shared `state` is last-write-wins if Pi runs two bash calls at once.\n**`rg --version` fails** (disclosed). Each call also scans every `PATH` folder, which costs about 0.2 s per call here, in line with the docs' ~100 ms startup claim.\n**Untested on Windows:** registering the tool after session start, `.cmd` shim spawning, drive mounts and `taskkill` are unit-tested on their pure parts only, or not at all.\n\n**Checked and fine**\n**Process per call:** state persists correctly for `cd` and `export`. The abort, timeout and grandchild-kill tests pass. The kill is `process.kill(-pid)` on POSIX and `taskkill /T` on Windows.\n**Precedence:** built-ins win, `host-<name>` aliases cover shadowed programs, and relative `PATH` entries are ignored.\n**TypeScript first:** `js-exec` TypeScript worked in my runs, including code on stdin.\n**Bundle:** committing `dist/scripts/just-bash.js` matches how `holyagent.js` ships (1 MB). Its only `/home/user` and `/root` hits are just-bash's virtual defaults, so there are no machine paths. `sql.js` is stubbed.\n**Pin:** `EXACT_PACKAGES` pins `just-bash` at exact `3.6.0`, with a test.\n**Tests:** they need `bun` as the runner executable, which is acceptable under mise.\n\nevidence:\nThe just-bash backend meets its requirements on Linux, macOS and Windows as far as code and tests show: blocker 1 above (`shell.ts:357`, reproduced on the bundle). The rest holds on Linux only. `bash.test.ts` and `bash-shell.test.ts` pass, and Windows is covered only by pure-function tests.\nTurning the capability off restores Pi's own bash and nothing else changes: blocker 2 above (`capabilities.ts:355`). Pi's own operations are restored (`bash.ts:114`, tested at `bash.test.ts:229`).\nTests cover the change and fail without it: the 3 new test files cover passthrough, precedence, abort, timeout, process-tree kill, TypeScript/JavaScript and the guardrails. No test covers `exit` state or path-given binaries. `mise run verify` exit 0, log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\nfindings: see the Blocking and Non-blocking lists above.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Two blockers reproduced with file and line (path-given programs; guardrails not reverted); verify exit 0; five non-blocking.",
+    "criteria": [
+      {
+        "criterion": "The just-bash backend meets its requirements on Linux, macOS and Windows as far as code and tests show",
+        "support": "blocker 1 above (`shell.ts:357`, reproduced on the bundle). The rest holds on Linux only. `bash.test.ts` and `bash-shell.test.ts` pass, and Windows is covered only by pure-function tests."
+      },
+      {
+        "criterion": "Turning the capability off restores Pi's own bash and nothing else changes",
+        "support": "blocker 2 above (`capabilities.ts:355`). Pi's own operations are restored (`bash.ts:114`, tested at `bash.test.ts:229`)."
+      },
+      {
+        "criterion": "Tests cover the change and fail without it",
+        "support": "the 3 new test files cover passthrough, precedence, abort, timeout, process-tree kill, TypeScript/JavaScript and the guardrails. No test covers `exit` state or path-given binaries. `mise run verify` exit 0, log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see the Blocking and Non-blocking lists above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T19:49:57.222Z"
 }
