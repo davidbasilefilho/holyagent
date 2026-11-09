@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-just-bash-pi-bash-backend-so",
   "objective": "Repair the just-bash Pi bash backend so programs given by path run on the host and turning the capability off reverts the Billion guardrail settings, and close the review's non-blocking notes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-bash, branch release/0.3.1/feat/just-bash at 971b9ea0",
     "Code review findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odug6-6vgw.md; security review findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odupl-x2zg.md; original writer report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9n3pas-ln21.md",
@@ -94,7 +94,45 @@
     "agentId": "workflow:wf_36f1f10f-8f1/assignment-0mw9os41y-etgw",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T20:01:17.910Z"
+    "startedAt": "2026-11-09T20:01:17.910Z",
+    "finishedAt": "2026-11-09T20:32:25.040Z"
+  },
+  "result": "result: All eight criteria are implemented and tested. `mise run build` (exit 0) leaves only the expected generated changes, and `mise run verify` exits 0. Windows paths are covered by unit tests only.\n\nchanged (worktree `/home/user/holyagent-0.3.1-bash`):\nsrc: `packages/runtime/src/pi/bash/{hosts,shell,state,guidelines}.ts`, new `{cmd,exit,programs}.ts`, `packages/integrations/pi/src/bash.ts`, `packages/runtime/src/config/capabilities.ts`, `packages/runtime/src/setup/{pi-settings,record}.ts`\ntests: `packages/runtime/tests/pi/{bash-shell,tools}.test.ts`, `packages/runtime/tests/setup-pi-settings.test.ts`, `packages/integrations/pi/tests/bash.test.ts`\ngenerated: `packages/integrations/pi/dist/{extensions/holyagent.js,scripts/{holyagent,just-bash,setup-tui}.js}`, `packages/integrations/claude/dist/scripts/{holyagent,setup-tui}.js`\ndocs: `docs/README.md`, `docs/development.md`, `docs/pi/shell.md`\n\nchecks:\n`bunx --no-install mise run build` -> exit 0, no unexplained changes (24 paths, all listed above).\n`bunx --no-install mise run verify` -> exit 0: 2983 pass, 0 fail, no type or lint problems, format check clean. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify2.log`.\n\nblockers: none\n\nquestions: none\n\nnotes:\n**Pre-existing, serious:** any redirect to `/dev/null` (`cmd 2>/dev/null`, `>/dev/null`) aborts the whole call with `EACCES: cannot write special file '/dev/null'`. I did not fix it because it is outside the Assignment. A probe showed a `/dev/null` write discard in `withProgramLaunch` would fix it, since an in-memory mount at `/dev` keeps written content.\n`cmdExeArguments` is now duplicated in `packages/runtime/src/pi/bash/cmd.ts`, because the shell bundle cannot import `extension.ts`. Have `extension.ts` import it from `cmd.ts` and delete its copy.\nThe path-program fix depends on how just-bash 3.6.0 runs a script: it asks `exists`, then `stat`, then `readFile` on the same path. A just-bash bump could change that; the real-shell tests in `bash-shell.test.ts` would catch it.\n`exit` inside a function reports that function's `local` variables as set.\nA shell PATH change is now carried to the next call like any other variable. `echo $PATH` now shows the call's real `PATH` after the shell's two stub folders.\n\nevidence:\nPrograms given by path (./prog, node_modules/.bin/tsc, a relative or absolute path, a directory added to an exported PATH within the session) run on the host, with tests (shell.ts around line 357): `programs.ts` plus `shell.ts`. Tests in `bash-shell.test.ts`, \"the shell runs a program given by path on the machine\", cover relative, absolute and symlinked `.bin` paths, a binary, stdin, a shell script by path, and `export PATH` in the call, which is also carried to the next call. All pass in verify.\nTurning the just-bash capability off reverts the Billion guardrail settings it wrote, using the recorded undo, without touching settings it did not write, with tests (capabilities.ts around line 355): `revertWhenOff` in `capabilities.ts`, `revertUnplanned` in `setup/pi-settings.ts`, `removeRecorded` in `setup/record.ts`. Five tests in `setup-pi-settings.test.ts` under \"turning just-bash off\" cover revert by record, user-set and changed keys left alone, dry run, and Billion Context off.\nGates: mise run build leaves no unexplained changes and mise run verify exits 0: build exit 0, 24 changed paths all in the lists above; verify exit 0 with 2983 pass and 0 fail.\nchecks-run: `bunx --no-install mise run build` (exit 0); `bunx --no-install mise run verify` (exit 0, 2983 pass, 0 fail). Log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify2.log`.\nchanged-paths: the lists under `changed` above, plus new files `packages/runtime/src/pi/bash/{cmd,exit,programs}.ts`.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-0.3.1-bash-fix.diff` (taken after the build; it includes the three new files and omits the generated 1 MB `dist/scripts/just-bash.js`).\n\nNon-blocking items closed:\n**exit keeps the session cwd and env consistent:** `exit.ts`; tests in `bash-shell.test.ts` (\"exit keeps the state the run had\") and `bash.test.ts`.\n**Host passthrough keeps stdout and stderr in their emitted order:** `emittedOrder` in `shell.ts`; tests in `bash-shell.test.ts`.\n**Concurrent bash calls do not overwrite each other's shared state:** `afterCall` in `state.ts`; tests in `bash.test.ts`.\n**Windows .cmd and .bat passthrough quotes arguments with the cmdExeArguments rules:** `hostLaunch` in `shell.ts`; tests in `bash-shell.test.ts`.\n**The ROOTED filter applies to the extra search folders:** `hosts.ts`; test in `bash-shell.test.ts`.\n**docs/README.md lists pi/shell.md, and docs/development.md mentions the generated dist/scripts/just-bash.js:** both edited.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Both blockers and all non-blocking items implemented with tests; build exit 0 and verify 2983 pass; to be independently reviewed.",
+    "criteria": [
+      {
+        "criterion": "Programs given by path (./prog, node_modules/.bin/tsc, a relative or absolute path, a directory added to an exported PATH within the session) run on the host, with tests (shell.ts around line 357)",
+        "support": "`programs.ts` plus `shell.ts`. Tests in `bash-shell.test.ts`, \"the shell runs a program given by path on the machine\", cover relative, absolute and symlinked `.bin` paths, a binary, stdin, a shell script by path, and `export PATH` in the call, which is also carried to the next call. All pass in verify."
+      },
+      {
+        "criterion": "Turning the just-bash capability off reverts the Billion guardrail settings it wrote, using the recorded undo, without touching settings it did not write, with tests (capabilities.ts around line 355)",
+        "support": "`revertWhenOff` in `capabilities.ts`, `revertUnplanned` in `setup/pi-settings.ts`, `removeRecorded` in `setup/record.ts`. Five tests in `setup-pi-settings.test.ts` under \"turning just-bash off\" cover revert by record, user-set and changed keys left alone, dry run, and Billion Context off."
+      },
+      {
+        "criterion": "docs/README.md lists pi/shell.md, and docs/development.md mentions the generated dist/scripts/just-bash.js",
+        "support": "** both edited."
+      },
+      {
+        "criterion": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0, 24 changed paths all in the lists above; verify exit 0 with 2983 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` (exit 0); `bunx --no-install mise run verify` (exit 0, 2983 pass, 0 fail). Log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify2.log`."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the lists under `changed` above, plus new files `packages/runtime/src/pi/bash/{cmd,exit,programs}.ts`."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-0.3.1-bash-fix.diff` (taken after the build; it includes the three new files and omits the generated 1 MB `dist/scripts/just-bash.js`)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T20:01:02.854Z"
 }
