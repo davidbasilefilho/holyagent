@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9ak0nm-gtqj",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-merge-that-brings-the",
+  "objective": "Review the merge that brings the integration branch and the cloud-session change into the setup TUI branch.",
+  "state": "Running",
+  "scope": [
+    "In /home/user/holyagent-0.3.0-tui, merge commit 85d8a4d joins release/0.3.0/feat/setup-tui (e195b25) with release/0.3.0/fix/cloud-session-branch (b1a82c5, which contains release/0.3.0/integration). The TUI branch was cut from an older integration commit, so the merge brings in #93 (T3 branch naming) and #94 (root judgement) as well.",
+    "Check the files both sides changed: git diff e195b25 85d8a4d and git diff b1a82c5 85d8a4d, especially packages/runtime/src/setup/t3-settings.ts (auto-merged), the setup steps and flags, docs/pi/t3-code.md (hand-resolved: the stale sentence that device and worktree choices 'come in a later change' was dropped in favour of the setup-screen text, keeping '(both default to on)'), and that the generated dist files match the merged sources.",
+    "Run bun test packages/runtime/tests/setup-tui* packages/runtime/tests/t3*  and bunx --no-install mise run build, then confirm git status is clean."
+  ],
+  "constraints": [
+    "Read-only for sources: no edits and no git writes. The build must leave the tree clean; report any file it changes.",
+    "Do not check out other commits in any checkout.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The merge keeps both sides' behaviour: T3 branch naming and the setup TUI settings both apply, with no lost or duplicated setting",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The docs/pi/t3-code.md resolution is accurate for the merged code",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The build leaves the tree clean and the named tests pass",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "tests"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9aek1n-wt8k"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:22:50.578Z"
+  },
+  "createdAt": "2026-11-09T13:22:50.578Z"
+}
