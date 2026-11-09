@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw958hk5-x8wy",
+  "intentId": "intent-0mw94kj67-lb5f",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-repair-that-keeps-reserved",
+  "objective": "Re-review the repair that keeps reserved approvals out of the root's take-the-recommendation rule.",
+  "state": "Running",
+  "scope": [
+    "Repair diff only: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/judge-rereview.diff (worktree /home/user/holyagent-0.3.0-judge, commit ebba81b on top of 8aeb35d). Read the three changed asking.md files in full there.",
+    "Previous blocking finding: the sentence 'A question whose recommended option you would take anyway is not asked: take that option and record it as a default.' was unscoped, so a model could take its own recommendation for a force-push, publish, merge, credential or protected or platform-assigned branch push. Non-blocking: duplicated opening and 'unnecessary when settled' statement; Kimi 'Routine choices ... are yours' repeat; no pointer to where reserved approvals are listed.",
+    "The writer also changed one sentence of R-REASK (no-answer case) so a reserved approval is parked instead of defaulted when the user is away; check it agrees with the rest.",
+    "Maintainer (verbatim): \"the agent is supposed to trust its judgement and fallback to asking the user\"; the loosening for routine and research-settled choices must stay."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Mark a finding blocking only when the text would make a model ask a routine question, skip a reserved approval, contradict another rule, or break the family guide; quote the line.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The review states whether each previous finding is closed, quoting the lines",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every blocking finding quotes the line and says what a model would do wrong",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw952anw-l9xt"
+  ],
+  "followUpOf": "assignment-0mw94yk3b-qstv",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T10:53:54.533Z"
+  },
+  "createdAt": "2026-11-09T10:53:54.533Z"
+}
