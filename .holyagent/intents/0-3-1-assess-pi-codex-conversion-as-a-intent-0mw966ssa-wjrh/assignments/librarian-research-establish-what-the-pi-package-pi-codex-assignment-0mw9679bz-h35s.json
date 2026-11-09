@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mw9679bz-h35s",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-what-the-pi-package-pi-codex",
+  "objective": "Establish what the Pi package pi-codex-conversion does as a Codex provider for Pi, and whether it supports Codex's context_management system, gpt-reserve, auto-review/auto-approve and comparable Codex features.",
+  "state": "Running",
+  "scope": [
+    "Maintainer question (verbatim): \"I'd like to know whether pi-codex-conversion does context_management (the new system), gpt-reserve, auto-review/auto-approve, etc\".",
+    "Find pi-codex-conversion from authoritative sources: its npm registry entry (registry.npmjs.org/pi-codex-conversion), its source repository and README, its latest version, publish date, license and maintenance activity. Read its source, not just the README, for each feature claim.",
+    "Define each named feature from OpenAI's own sources (the openai/codex repository, its docs and changelog, and the OpenAI API docs) before checking it: what Codex's new context_management system is (compaction or context editing in the Responses API or Codex CLI), what 'gpt-reserve' refers to (if no source defines that term, say so and give the closest real feature, such as a reserved output or context budget, with the source), and what Codex's auto-review and auto-approve are (approval modes, an automatic reviewer of commands or changes). Then state per feature whether pi-codex-conversion implements it, partly, or not, with file:line or URL evidence.",
+    "The 'etc': also cover the other Codex-specific behaviour a Codex provider for Pi would need or miss: ChatGPT-subscription OAuth versus API key, the Responses API and reasoning effort or summaries, encrypted reasoning carried across turns, prompt caching keys, Codex's tool formats (apply_patch, shell), parallel tool calls, web search, image input, and anything the package documents as unsupported.",
+    "Compare with what Pi itself already offers for OpenAI or Codex (the pinned Pi host is at /home/user/holyagent/node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0+8980da4117b98cd5/node_modules/@earendil-works/pi-coding-agent and its dependencies; look for a built-in openai-codex or openai-responses provider), so the report says what the package adds over Pi's built-in support.",
+    "Note how HolyAgent would consume it: HolyAgent installs Pi packages at exact pins from packages/runtime/src/config/pi-packages.json and its provider code is under packages/runtime/src/pi and packages/integrations/pi/src; state whether the package fits that model (a Pi package with an extension or provider), with paths."
+  ],
+  "constraints": [
+    "Read-only: change no files, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi, start a Pi session or make a live model or OpenAI request; reading registries, repositories and documentation is fine.",
+    "Separate sourced facts (with URL or path:line and the date fetched) from inference, and give versions.",
+    "Report in under 600 words; put long excerpts in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each named feature (context_management, gpt-reserve, auto-review, auto-approve) is defined from an OpenAI source and marked implemented, partial or absent in pi-codex-conversion with evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The other Codex-specific behaviours listed are each marked with evidence, and what the package adds over Pi's built-in support is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Package facts (version, date, license, maintenance, fit with HolyAgent's Pi package pins) are sourced",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "features",
+    "package",
+    "comparison"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:20:56.831Z"
+  },
+  "createdAt": "2026-11-09T11:20:56.831Z"
+}
