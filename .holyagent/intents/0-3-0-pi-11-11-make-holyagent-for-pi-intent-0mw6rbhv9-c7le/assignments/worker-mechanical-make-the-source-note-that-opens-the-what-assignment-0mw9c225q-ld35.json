@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-the-source-note-that-opens-the-what",
   "objective": "Make the source note that opens the 'What the generator reads' paragraph in docs/pi/t3-code.md state exactly what was read.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-docs, branch release/0.3.0/docs/t3-first-pi-docs.",
     "The paragraph opens 'Read from T3's main on 2026-11-09 (ThreadLaunchService.ts, textGenerationPrompts.ts and the Pi provider's textGeneration.ts in pingdotgg/t3code; re-check against the release in use)'. What was actually read on 2026-11-09: apps/server/src/textGeneration/TextGenerationPrompts.ts in pingdotgg/t3code at commit 78f462c4, the Pi provider's packages/provider-pi/src/server/textGeneration.ts and mcpInjection.ts from a mirror of t3code (git.kaki87.net/VibedByKaKi/t3-code-android-nightly, branch main), and T3's docs/user/providers-pi.md. ThreadLaunchService.ts was not read.",
@@ -48,7 +48,33 @@
     "agentId": "workflow:wf_f74ca343-f6d/assignment-0mw9c225q-ld35",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T14:04:51.950Z"
+    "startedAt": "2026-11-09T14:04:51.950Z",
+    "finishedAt": "2026-11-09T14:08:12.259Z"
+  },
+  "result": "result: Rewrote the opening source note of 'What the generator reads' in docs/pi/t3-code.md to list the sources actually read, with commit 78f462c4 and the mirror, and removed the later duplicate commit citation. Build and verify both exit 0; only that file changed.\nchanged: docs/pi/t3-code.md\nchecks:\n`bunx --no-install mise run build` -> exit 0; \"built 39 files\" and \"built 37 Pi package files\"; tree shows only docs/pi/t3-code.md modified afterwards.\n`bunx --no-install mise run verify` -> exit 0; type-check 241 files no errors; lint 242 files no problems; fmt 563 files formatted; tests 2702 pass, 0 fail, 17919 expect() calls across 87 files.\n`bun install --frozen-lockfile` -> exit 0; 338 installs, no changes.\nblockers: none\nquestions: none\nnotes: none\nevidence:\nchecks-run: build exit 0; verify exit 0 with counts above; logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and verify.log\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3-code-docs.diff\nOnly docs/pi/t3-code.md changes and mise run verify exits 0: git status shows only docs/pi/t3-code.md; verify exit 0 (2702 pass, 0 fail)\nThe paragraph's source note names only sources that were read, with the commit and the mirror: docs/pi/t3-code.md line 168, diff hunk @@ -165,7 +165,7 @@\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "the source note now lists exactly the sources in the research report, as the reviewer suggested; verify exit 0",
+    "criteria": [
+      {
+        "criterion": "The paragraph's source note names only sources that were read, with the commit and the mirror",
+        "support": "docs/pi/t3-code.md line 168, diff hunk @@ -165,7 +165,7 @@"
+      },
+      {
+        "criterion": "Only docs/pi/t3-code.md changes and mise run verify exits 0",
+        "support": "git status shows only docs/pi/t3-code.md; verify exit 0 (2702 pass, 0 fail)"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build exit 0; verify exit 0 with counts above; logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and verify.log"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3-code-docs.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T14:04:51.950Z"
 }
