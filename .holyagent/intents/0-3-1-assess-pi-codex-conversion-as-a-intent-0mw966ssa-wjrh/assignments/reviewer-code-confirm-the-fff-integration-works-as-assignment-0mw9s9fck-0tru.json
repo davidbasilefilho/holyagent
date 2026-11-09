@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mw9s9fck-0tru",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-fff-integration-works-as",
+  "objective": "Confirm the fff integration works as specified against the real pi-fff package and meets the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "Commit e2cacd11 on release/0.3.1/feat/fff in /home/user/holyagent-0.3.1-fff (range e6f334c7..e2cacd11); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9rpdzt-cwur.md",
+    "Requirement: @ff-labs/pi-fff 0.11.0 at an exact pin in override mode, so its tools replace Pi find and grep and Pi prompt guidance stays consistent; a capability with headless and normal forms, switchable and modular; the Claude plugin keeps bundled ripgrep and fd.",
+    "Open points from the writer to judge: whether the root's exclusion of fff's grep, find and multi_grep holds if pi-fff registers its tools after HolyAgent's session start; whether specialists get fff's tools under the names their agent files list; whether every model family's instruction text (kimi-k3.1 and gpt-6) is consistent with fff's tools; that a supported host whose binding failed to install is not detected; whether a user-level off should be final."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes. Run commands only in /home/user/holyagent-0.3.1-fff and pass the explicit range e6f334c7..e2cacd11 to any review command.",
+    "Read the installed package (node_modules/@ff-labs/pi-fff, after `bun install --frozen-lockfile` if missing) to check what the integration assumes about it.",
+    "Testing is unit tests and fixtures only: never start pi or make live model requests.",
+    "Report in under 400 words; start each evidence line with the exact criterion text, a colon and the support inline.",
+    "Run `bunx --no-install mise run build` (tree must stay unchanged) and `bunx --no-install mise run verify`; report command, exit code and counts."
+  ],
+  "criteria": [
+    {
+      "text": "With fff on, Pi loads pi-fff in override mode and its tools replace find and grep for specialists, and the root keeps its own search; with fff off, Pi keeps its own tools",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The integration matches what pi-fff 0.11.0 actually reads and registers",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every instruction set's search guidance for Pi is consistent with the tools present",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Changed behavior has tests that fail without the change, and no test is weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Repository rules hold: Effect, Schema at boundaries, JSDoc, exact pin through the pin table",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at e2cacd11",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9rpdzt-cwur"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T21:38:29.492Z"
+  },
+  "createdAt": "2026-11-09T21:38:29.492Z"
+}
