@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw94yk3b-qstv",
+  "intentId": "intent-0mw94kj67-lb5f",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-change-that-makes",
+  "objective": "Review the instruction change that makes the root decide by its own judgement and ask the user only as a fallback, in the requirement and both model family instruction sets.",
+  "state": "Running",
+  "scope": [
+    "Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/judge-review.diff (worktree /home/user/holyagent-0.3.0-judge, newest commit). Read the changed files in full there: packages/runtime/src/instructions/requirements/root/asking.md, claude-5.5/root/asking.md, kimi-k3.1/root/asking.md, and each family guide (claude-5.5/guide.md, kimi-k3.1/guide.md).",
+    "Maintainer (verbatim): \"the agent is supposed to trust its judgement and fallback to asking the user\" and \"you are asking too many questions you could answer yourself\".",
+    "Judge against the writing rules in /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md and the repository skill /home/user/holyagent-0.3.0-judge/.claude/skills/requirements/SKILL.md: does the text make a model decide routine and research-settled choices itself, still ask where the choice is genuinely the maintainer's, keep the approvals the rules reserve (merge, publish, force-push, protected branches, credentials, the platform-assigned branch push), avoid contradicting the other root sections (task-list, user-messages, version-control), and read as natural instructions for each family per its guide."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Mark a finding blocking only when the text would make a model ask a routine question, skip a reserved approval, contradict another rule, or break the family guide; quote the line.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The review states whether the change meets the maintainer request without loosening any reserved approval, quoting the lines it relies on",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every blocking finding quotes the line and says what a model would do wrong",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw94kwhr-hrpi"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T10:46:11.255Z"
+  },
+  "createdAt": "2026-11-09T10:46:11.255Z"
+}
