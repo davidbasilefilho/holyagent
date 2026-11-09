@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-the-setup-tui-commit-s-first-use",
   "objective": "Assess the setup TUI commit's first-use package install and cache loading for security vulnerabilities.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-tui, commit df6a410; diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-review.diff. Focus: packages/runtime/src/setup/tui/ (install into a per-user cache with the Bun Shell, then import a bundle from there), bundle.ts and the generate.ts changes.",
     "Trace sources to sinks: the cache path (environment variables XDG_CACHE_HOME, HOME, LOCALAPPDATA), the version strings embedded at build time, the Bun Shell command that installs, the registry used, lockfile or integrity checking, what is imported and from where, a cache another local user or process could write to, a half-written install, symlinks in the cache, and whether a project's own bunfig.toml or .npmrc in the current directory can redirect the install."
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_45422cce-dee/assignment-0mw96j05j-0wku",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T11:30:04.807Z"
+    "startedAt": "2026-11-09T11:30:04.807Z",
+    "finishedAt": "2026-11-09T11:39:04.359Z"
+  },
+  "result": "result: No blocker. A project's `bunfig.toml`, `.npmrc` or `.env` cannot redirect the install. Cache tampering and registry redirection are possible under preconditions listed below, rated Low to Medium.\nchanged: none (read-only)\nchecks: The built-in `/security-review` failed to start, because this worktree has no `origin/HEAD` and the skill's own git call errored, so it covered nothing. I reviewed the diff, `load.ts`, `lock.ts`, `packages.ts`, `build.ts`, `files.ts` and `shell.ts` by hand. I had no shell, so I did not run Bun to confirm its `.npmrc` lookup.\n\n**Findings** (all in `packages/runtime/src/setup/tui/`)\n\n1. **Medium (conditional): the cache is trusted by version number only.** The `installed()` check at `load.ts:131-147,180` reads only each package's `package.json` version. It never checks file contents, ownership or mode. Nothing sets permissions: `Bun.write` uses `createPath` with the default umask (`load.ts:105,193`). The path is `<cache>/holyagent/setup-tui/<name>-<version>_…` and has no per-user part (`load.ts:27-54`). `XDG_CACHE_HOME` is accepted for any absolute path (`load.ts:32`).\n   - Attack path: if `XDG_CACHE_HOME` points at a shared directory such as `/tmp/...` or a CI cache, another local user pre-creates `node_modules/@opentui/{core,solid}` and `solid-js` with the matching versions and a malicious entry file. The victim's next run skips the install and executes it at `load.ts:196-199` (the preload import, then the bundle).\n   - Under the default `~/.cache` this needs the same user's write access, so it is not a privilege boundary.\n   - The same precondition lets a planted symlink at `<dir>/setup-tui.js` make `Bun.write` (`load.ts:193`) overwrite another file. The bundle itself is re-copied from the plugin on every run, so a tampered bundle does not persist.\n   - Fix: create the directory 0700 and check its owner. Alternatively install into a temp directory and rename it, or reject a non-user-owned directory.\n\n2. **Low to Medium: no lockfile or integrity check.** The install writes only a `package.json` (`load.ts:106`) and runs `bun install --ignore-scripts` (`load.ts:115`). Only the three top-level versions are pinned (`lock.ts:23-33`).\n   - `@opentui/solid` also depends on `s-js ^0.4.9`, so that dependency floats.\n   - The native `@opentui/core-<platform>` binary is exact-pinned but not hash-checked. `--ignore-scripts` does not stop it being loaded in-process.\n   - A registry compromise would therefore run code at import. The registry comes from the user's `~/.npmrc` or process env: `shell.ts:117` passes the full env, and `--no-env-file` only skips `.env` files.\n   - Fix: ship a `bun.lock` subset and use `--frozen-lockfile`.\n\n3. **Low: a half-written install can pass the check.** `installed()` passes when the three top-level `package.json` files exist, so an interrupted extract can leave truncated files that then load (`load.ts:180`). Two concurrent runs share one directory with no lock. The effect is a permanent fallback to the line-based setup until the cache is deleted, or loading a truncated file.\n\n4. **Low (info): unsanitized registry text on the terminal.** `failureLine`/`oneLine` (`load.ts:79-94,120`) print a Bun stderr line, which can contain registry-controlled text. Control characters and ANSI escapes are not stripped.\n\n**Checked and sound**\nThe version strings come from `bun.lock` at build time through a Bun macro (`packages.ts`, `lock.ts`) and are repo-controlled.\n`bundle.ts`, `build.ts` and the `generate.ts` changes only add a plugin option and an extra output file.\nThe Bun Shell call takes an argument array, so there is no shell injection.\nThe install runs with the cache directory as cwd, and `package.json` is written there first (`load.ts:105,116`).\n`--config=EMPTY_BUNFIG`, `--no-env-file` and `--ignore-scripts` are set.\nThe bundle imported is copied from the plugin directory, not read from the cache.\n\n**Verdict**\nNot redirectable by project files.\nRedirectable by user-level environment variables or `~/.npmrc`, which are the user's own.\nTamperable by anyone who can write the cache directory (finding 1) or the registry (finding 2).\n\nevidence:\nEach finding has path:line, an attack path and a severity: findings 1-4 above, each with a `load.ts` line reference, an attack path or effect, and a severity.\nThe review states whether the install and import can be redirected or tampered with: see Verdict and finding 1.\nfindings: items 1-4 above.\nverdict: no blocker; project-file redirection ruled out; cache and registry tampering possible under the stated preconditions.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Findings carry capture or path:line, scenario and reason; verdict stated",
+    "criteria": [
+      {
+        "criterion": "Each finding has path:line, an attack path and a severity",
+        "support": "findings 1-4 above, each with a `load.ts` line reference, an attack path or effect, and a severity."
+      },
+      {
+        "criterion": "The review states whether the install and import can be redirected or tampered with",
+        "support": "see Verdict and finding 1."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1-4 above."
+      },
+      {
+        "label": "verdict",
+        "support": "no blocker; project-file redirection ruled out; cache and registry tampering possible under the stated preconditions."
+      }
+    ]
   },
   "createdAt": "2026-11-09T11:30:04.807Z"
 }
