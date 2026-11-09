@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw8u28td-78i2",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Reviewer.testing",
+  "slug": "review-the-newest-commit-on-release-0-3",
+  "objective": "Review the newest commit on release/0.3.0/test/pi-t3-rpc-fixtures, which adds synthesized T3 RPC fixtures and a replaying contract test, for whether it would catch the regressions it claims to.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3rpc; diff HEAD~1..HEAD (also /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3rpc-review.diff).",
+    "Claims: the fixtures cover a T3 session start, select, confirm, input, editor, notify and setStatus with responses, and a specialist completion arriving after agent_settled that starts a new root turn; the test fails when a consumed event shape changes or a T3-ignored UI method (setWidget, setTitle, set_editor_text, custom) appears; a staleness check ties fixtures to the installed Pi version; docs/development.md documents re-recording.",
+    "Check whether any assertion is vacuous (for example a turn tracker that only tests itself), whether the source scan for UI calls is sound, and whether the fixtures are typed against the pinned Pi RPC types."
+  ],
+  "constraints": [
+    "Read-only; you may run bun test in that worktree.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The review states which claims the test proves and which it does not, with path:line",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Every blocking finding names the regression the test would miss",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8tir3m-3cll"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:41:07.490Z"
+  },
+  "createdAt": "2026-11-09T05:41:07.490Z"
+}
