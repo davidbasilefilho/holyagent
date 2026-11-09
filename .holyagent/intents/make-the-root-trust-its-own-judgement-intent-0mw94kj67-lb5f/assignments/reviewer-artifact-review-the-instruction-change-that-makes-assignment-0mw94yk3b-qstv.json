@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-instruction-change-that-makes",
   "objective": "Review the instruction change that makes the root decide by its own judgement and ask the user only as a fallback, in the requirement and both model family instruction sets.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/judge-review.diff (worktree /home/user/holyagent-0.3.0-judge, newest commit). Read the changed files in full there: packages/runtime/src/instructions/requirements/root/asking.md, claude-5.5/root/asking.md, kimi-k3.1/root/asking.md, and each family guide (claude-5.5/guide.md, kimi-k3.1/guide.md).",
     "Maintainer (verbatim): \"the agent is supposed to trust its judgement and fallback to asking the user\" and \"you are asking too many questions you could answer yourself\".",
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_71f0f22f-3e1/assignment-0mw94yk3b-qstv",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T10:46:11.255Z"
+    "startedAt": "2026-11-09T10:46:11.255Z",
+    "finishedAt": "2026-11-09T10:48:31.421Z"
+  },
+  "result": "result: Meets the maintainer request, but one blocking gap. The new \"recommended option\" rule is unscoped, so a reserved approval can be skipped. The text I read is in the worktree /home/user/holyagent-0.3.0-judge.\n\n**Maintainer request: met.**\n- All three files now open with the judgement-first rule. Claude's `asking.md` line 3 reads: \"Your own judgement decides first and the user is the fallback. … make it yourself, including picking between options once research has narrowed them. Ask only when the choice is genuinely the user's (taste, priorities, scope, a risk they must own, an approval the rules reserve) and the evidence leaves it open.\"\n- The Kimi file carries the same opening plus its explicit line \"Research that left one safe, mergeable option has settled the choice.\"\n- Routine and research-settled choices go to the root. Taste, priorities, scope and owned risk are still asked.\n- The guards that \"not your own recommendation\" and the \"an approval the rules reserve\" carve-out are dropped from the opening, which is the intended loosening.\n- Reserved approvals are not loosened by that opening: the platform-assigned branch push stays parked and never defaulted (Claude `asking.md` line 14, Kimi line 39). Merge still waits for the user to name it (Claude line 7 and `version-control.md` \"Merging\").\n- Claude and Kimi match each other in behavior. The only difference is that Kimi has the extra \"Research that left one safe, mergeable option\" line and still keeps \"Routine choices (safe, reversible, inside the request) are yours.\"\n- The Claude text reads as calm positive imperatives with reasons, as its guide asks (G4, G14, G23).\n- The Kimi file keeps its heading and numbered structure with explicit detail, as its guide asks (K1, K2, K4).\n- `task-list.md` and `user-messages.md` still agree. Task list: \"Ask only when the answer would change what you do … nothing already settles it\". User messages: \"naming it is the approval for that action itself\".\n\n**Findings**\n\n1. **Blocking.** The unscoped rule \"A question whose recommended option you would take anyway is not asked: take that option and record it as a default.\"\n   - It appears in Claude `asking.md` line 6, Kimi line 15 and the R-NOASK requirement (\"a question whose recommended option the root would take anyway is not asked: it acts and records the choice\").\n   - It sits outside the opening's carve-out \"an approval the rules reserve\".\n   - Every question the root asks carries a recommended option it would take, so read literally the rule cancels any question, reserved approvals included.\n   - A model about to ask whether to force-push, publish, merge, handle a credential or push to a protected or platform-assigned branch would take its own recommendation and act. The \"Answers\" line \"parked, never defaulted\" covers only the no-answer case, not this one.\n   - Fix: add \"except an approval the rules reserve\" to that sentence in all three files, or move the rule under the carve-out. This also keeps R-NOASK consistent with itself.\n\n2. **Non-blocking.**\n   - The opening paragraph and the \"unnecessary when something already settles it\" bullet say the same thing twice, in all three files. Consider merging them.\n   - Kimi keeps \"Routine choices … are yours\", which repeats its new opening. Claude dropped it.\n   - Neither family text lists which approvals are reserved, so the model must find them in version-control and the identity rules. Acceptable, but an inline pointer such as \"(Version control)\" would help.\n\n3. **Not run.** I did not run `mise run verify` or the build, because this review is read-only. I did not check that the generated `dist` was rebuilt.\n\nevidence:\nThe review states whether the change meets the maintainer request without loosening any reserved approval, quoting the lines it relies on: Request met (Claude `asking.md` line 3, quoted above). Reserved approvals are kept in the opening, but the unscoped \"take that option\" rule at line 6 would loosen them, so this criterion is not fully satisfied until finding 1 is fixed.\nEvery blocking finding quotes the line and says what a model would do wrong: Finding 1 quotes the line and says a model would take its own recommendation for a force-push, publish, merge, credential or protected-branch step instead of asking.\nfindings: One blocking finding (item 1) and three non-blocking ones (item 2).\nverdict: Request met, not mergeable until the \"recommended option\" rule is scoped away from reserved approvals.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Blocking finding quotes the line and the wrong action; request check quotes lines",
+    "criteria": [
+      {
+        "criterion": "The review states whether the change meets the maintainer request without loosening any reserved approval, quoting the lines it relies on",
+        "support": "Request met (Claude `asking.md` line 3, quoted above). Reserved approvals are kept in the opening, but the unscoped \"take that option\" rule at line 6 would loosen them, so this criterion is not fully satisfied until finding 1 is fixed."
+      },
+      {
+        "criterion": "Every blocking finding quotes the line and says what a model would do wrong",
+        "support": "Finding 1 quotes the line and says a model would take its own recommendation for a force-push, publish, merge, credential or protected-branch step instead of asking."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "One blocking finding (item 1) and three non-blocking ones (item 2)."
+      },
+      {
+        "label": "verdict",
+        "support": "Request met, not mergeable until the \"recommended option\" rule is scoped away from reserved approvals."
+      }
+    ]
   },
   "createdAt": "2026-11-09T10:46:11.255Z"
 }
