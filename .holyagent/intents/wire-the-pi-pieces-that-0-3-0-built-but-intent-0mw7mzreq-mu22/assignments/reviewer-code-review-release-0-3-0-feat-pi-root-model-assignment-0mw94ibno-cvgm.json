@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-release-0-3-0-feat-pi-root-model",
   "objective": "Review release/0.3.0/feat/pi-root-model (setup writing the root route model into Pi settings as a provider/model pair plus thinking level, with undo and doctor) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-model; diff 238218a..HEAD (sources, tests and docs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/model-review.diff).",
     "Rules: a key is written only where unset and different from Pi 1.5.0 default (defaultThinkingLevel medium; no default for provider or model); defaultProvider and defaultModel are written together only when neither is set (scope file, and the global file at project or local scope); undo removes only what setup wrote and keeps a pair either half of which changed; doctor reports set, unset or hand-set; the extension never calls setModel.",
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_9a289f3c-21e/assignment-0mw94ibno-cvgm",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T10:33:33.828Z"
+    "startedAt": "2026-11-09T10:33:33.828Z",
+    "finishedAt": "2026-11-09T10:43:46.700Z"
+  },
+  "result": "result: no blockers; the change meets every listed rule.\n\nchanged: none (read-only review)\n\nchecks:\n`bun test packages/runtime/tests/setup-pi-settings.test.ts` (worktree, HEAD ac4419b) -> exit 0, 46 pass, 0 fail.\n`bunx --no-install mise run verify` -> exit 0. Type-check and lint clean; 2484 tests pass, 0 fail. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n\nblockers: none\n\nquestions: none\n\nnotes:\nThe built-in `/code-review` was not the shadowed one. Its first run used the shared checkout, where `238218a...HEAD` is empty, so I reran it as `238218a...ac4419b`. I classified its five findings as follows.\nRejected: undo's pair check ignores a deleted half (`pi-settings.ts:387`). Deleted provider with the model unchanged removes only the unchanged model, so the file returns to its pre-setup state with no orphan. Deleted half plus a changed other half keeps both, via the changed half. Optional only: the unchanged leftover is removed rather than kept, and no test covers that case.\nRejected: `max` is not valid for `defaultThinkingLevel` (`provider.ts:85`). Pi 1.5.0's `docs/settings.md:15` lists `max`, and the root route defaults to `high` anyway.\nRejected: the hard-coded `medium` default (`pi-settings.ts:54`). It is a cited, version-pinned constant in the existing `PACKAGE_DEFAULTS` pattern, not a new problem.\nRejected: `routeLine` returns nothing when only thinking is unset (`pi-settings.ts:489`). The `lacks` hint names that key, and a `SetupFailure` there prints a `!` line.\nOptional: `routeLine` re-reads the global file that `resolveTarget` already read (`pi-settings.ts:458`). A `global` field on `Resolved`, like `existing`, would remove the second read and the small race.\n\nevidence:\nfindings: five from the built-in review, none confirmed as a blocker; one optional note (duplicate global read at `pi-settings.ts:458`) and one optional gap (undo with a deleted half, `pi-settings.ts:387`). The other three are rejected, with reasons above.\nverdict: merge-ready with no blockers.\nEvery blocking finding has path:line and a failure scenario: there are no blocking findings.\nThe review states whether each listed rule is met:\n  - A key is written only where unset and different from Pi's default: met. `PACKAGE_DEFAULTS` holds `defaultThinkingLevel: \"medium\"` and has no entry for provider or model. `resolveTarget` filters on global-set and default-equal, and the \"follows the route table…\" test covers it.\n  - The pair is written together only when neither half is set (file, or global at project/local scope): met. `pairHeld`/`leftWithPair` at `pi-settings.ts:~205`; three tests cover it.\n  - Undo removes only what setup wrote and keeps a pair when either half changed: met. A changed half keeps both halves, and the two undo tests cover this. A deleted half is not treated as changed, which is optional.\n  - Doctor reports set, unset or hand-set: met. `routeLine` gives a pass line for set, a `~` line for hand-set (naming the unset half), and nothing while the `lacks` line covers an unset key. Four tests cover these states.\n  - The extension never calls `setModel`: met. A search of `packages/runtime/src` and `packages/integrations/pi/src` found no `setModel`.\nThe existing Pi tool settings writer is unchanged: `resolveTarget` now reads the file once and returns `existing`. Install and doctor consume it, the error order is unchanged (a non-object global or file fails with `SetupFailure`, after `refuseLinks`), and the existing tests still pass.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Evidence holds: tests per criterion, build and verify exit 0; review has no blockers.",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has path:line and a failure scenario",
+        "support": "there are no blocking findings."
+      },
+      {
+        "criterion": "The review states whether each listed rule is met",
+        "support": "A key is written only where unset and different from Pi's default: met. `PACKAGE_DEFAULTS` holds `defaultThinkingLevel: \"medium\"` and has no entry for provider or model. `resolveTarget` filters on global-set and default-equal, and the \"follows the route table…\" test covers it.; The pair is written together only when neither half is set (file, or global at project/local scope): met. `pairHeld`/`leftWithPair` at `pi-settings.ts:~205`; three tests cover it.; Undo removes only what setup wrote and keeps a pair when either half changed: met. A changed half keeps both halves, and the two undo tests cover this. A deleted half is not treated as changed, which is optional.; Doctor reports set, unset or hand-set: met. `routeLine` gives a pass line for set, a `~` line for hand-set (naming the unset half), and nothing while the `lacks` line covers an unset key. Four tests cover these states.; The extension never calls `setModel`: met. A search of `packages/runtime/src` and `packages/integrations/pi/src` found no `setModel`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "five from the built-in review, none confirmed as a blocker; one optional note (duplicate global read at `pi-settings.ts:458`) and one optional gap (undo with a deleted half, `pi-settings.ts:387`). The other three are rejected, with reasons above."
+      },
+      {
+        "label": "verdict",
+        "support": "merge-ready with no blockers."
+      }
+    ]
   },
   "createdAt": "2026-11-09T10:33:33.828Z"
 }
