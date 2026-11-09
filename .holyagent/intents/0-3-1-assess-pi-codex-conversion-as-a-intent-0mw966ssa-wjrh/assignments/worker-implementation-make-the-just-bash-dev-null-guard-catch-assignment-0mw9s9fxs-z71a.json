@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-just-bash-dev-null-guard-catch",
   "objective": "Make the just-bash /dev/null guard catch aliases of the device, not only its literal spellings, and make the docs state its real limits.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-bash at e6f334c7 (PR davidbasilefilho/holyagent#106)",
     "Security finding 1 in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9roekg-jryb.md: isDevice in packages/runtime/src/pi/bash/devices.ts compares the normalized string only, so `ln -s /dev /tmp/d; rm /tmp/d/null`, `mv x /tmp/d/null`, `/proc/self/root/dev/null`, `rm -rf /dev` and `mv /dev x` reach the host device through ReadWriteFs.",
@@ -66,7 +66,45 @@
     "agentId": "workflow:wf_fd9334c0-993/assignment-0mw9s9fxs-z71a",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T21:38:30.256Z"
+    "startedAt": "2026-11-09T21:38:30.256Z",
+    "finishedAt": "2026-11-09T21:55:12.162Z"
+  },
+  "result": "result: the /dev/null guard now matches the device by its real path, so symlinked parents, `/proc/self/root`, `rm -rf /dev` and `mv /dev x` are refused; the three criteria and both gates are met.\n\nchanged:\n- /home/user/holyagent-0.3.1-bash/packages/runtime/src/pi/bash/devices.ts\n- /home/user/holyagent-0.3.1-bash/packages/runtime/src/pi/bash/shell.ts\n- /home/user/holyagent-0.3.1-bash/packages/runtime/tests/pi/devices.test.ts (new)\n- /home/user/holyagent-0.3.1-bash/packages/runtime/tests/pi/bash-shell.test.ts\n- /home/user/holyagent-0.3.1-bash/packages/integrations/pi/dist/scripts/just-bash.js (generated)\n- /home/user/holyagent-0.3.1-bash/docs/pi/shell.md\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0. The tree held only the six paths above afterwards.\n- `bunx --no-install mise run verify` -> exit 0: no type errors in 282 files, lint and format clean, 3057 pass and 0 fail. Real /dev/null was unchanged afterwards.\n- `bun test packages/runtime/tests/pi/devices.test.ts` -> 45 pass.\n- The same file against the old `devices.ts` -> 35 fail, 10 pass.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- `shell.ts` now wraps the guard inside `withProgramLaunch`. The guard's new `realpath` calls broke the launcher's exists/stat/readFile sequence when the guard sat outside it. This was an unplanned edit and sits within the ownership paths.\n- The existing fake-disk test in `bash-shell.test.ts` now allows the guard's `realpath` and `stat` calls.\n- `ReadWriteFs.realpath` returns root-relative paths (`dev/null`), so `devices.ts` normalizes them to absolute. `InMemoryFs.realpath` does not resolve a symlink to `/` or `..` after a link, so the test fake walks paths the way a disk does.\n- A link to the device made by something else is removed or moved as a link and is not followed; the docs say so.\n- Every guarded call now costs one extra `realpath` of the parent folder.\n- Follow-up, not built: `ln -s /dev/null x` is still refused where bash allows it.\n\nevidence:\nAliases of /dev/null through a symlinked parent, /proc/self/root, or removing or moving /dev are handled like the literal device, with tests on a fake file system that fail without the change: `devices.ts` `classify` and `resolve`; the tests are in `devices.test.ts` on an in-memory fake. 35 of 45 fail on the old `devices.ts` and all pass on the new one.\ncp from a missing source or a folder to /dev/null fails like bash, and /dev/null/ gives ENOTDIR, with tests: `devices.test.ts` \"copies to the device\" and \"the device used as a folder\"; both pass.\ndocs/pi/shell.md states that host programs bypass the guard: the `/dev/null` bullet in `docs/pi/shell.md` says `unlink`, `dd` and `/usr/bin/rm` bypass it.\nGates: mise run build leaves no unexplained changes and mise run verify exits 0: build exit 0 and verify exit 0 with 3057 pass and 0 fail; the log is `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\nchecks-run: see the checks lines above.\nchanged-paths: the six paths listed under `changed`.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/devices-guard.diff\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Real-path device guard with 45 fake-fs tests (35 red on old code); docs state host programs bypass; verify 3057 pass.",
+    "criteria": [
+      {
+        "criterion": "Aliases of /dev/null through a symlinked parent, /proc/self/root, or removing or moving /dev are handled like the literal device, with tests on a fake file system that fail without the change",
+        "support": "`devices.ts` `classify` and `resolve`; the tests are in `devices.test.ts` on an in-memory fake. 35 of 45 fail on the old `devices.ts` and all pass on the new one."
+      },
+      {
+        "criterion": "cp from a missing source or a folder to /dev/null fails like bash, and /dev/null/ gives ENOTDIR, with tests",
+        "support": "`devices.test.ts` \"copies to the device\" and \"the device used as a folder\"; both pass."
+      },
+      {
+        "criterion": "docs/pi/shell.md states that host programs bypass the guard",
+        "support": "the `/dev/null` bullet in `docs/pi/shell.md` says `unlink`, `dd` and `/usr/bin/rm` bypass it."
+      },
+      {
+        "criterion": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0 and verify exit 0 with 3057 pass and 0 fail; the log is `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see the checks lines above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the six paths listed under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/devices-guard.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T21:38:30.256Z"
 }
