@@ -590,10 +590,12 @@ describe("the extension", () => {
         on: (event: string) => void used.push(`on ${event}`),
         registerToolRenderer: () => void used.push("registerToolRenderer"),
         registerTool: (tool: { name: string }) => void used.push(`registerTool ${tool.name}`),
+        registerCommand: (name: string) => void used.push(`registerCommand ${name}`),
       }
       expect(typeof loaded.default).toBe("function")
       expect(loaded.default(api)).toBeUndefined()
       expect(used.toSorted()).toEqual([
+        "on agent_start",
         "on before_agent_start",
         "on before_agent_start",
         "on before_agent_start",
@@ -609,9 +611,12 @@ describe("the extension", () => {
         "on session_shutdown",
         "on session_start",
         "on session_start",
+        "on session_start",
         "on session_tree",
         "on session_tree",
         "on tool_call",
+        "on tool_call",
+        "registerCommand approve",
         "registerFlag holyagent-role",
         "registerTool apply_patch",
         "registerToolRenderer",

@@ -167,6 +167,16 @@ export type T3Scope = typeof T3Scope.Type
 
 const Enabled = Schema.Boolean
 
+/**
+ * The policy text of the Codex provider's auto-review (`pi.autoReview`), as Codex's `[auto_review]`
+ * table has it: `policy` replaces the default policy, `extraPolicy` is added after whichever policy
+ * stands. Both are markdown the reviewer reads; a blank value counts as absent.
+ */
+const AutoReviewPolicy = Schema.Struct({
+  policy: Schema.optionalKey(Schema.String),
+  extraPolicy: Schema.optionalKey(Schema.String),
+})
+
 const capabilitySwitch = (on: boolean) => defaulted(Enabled, on)
 
 /**
@@ -203,6 +213,7 @@ const PI_FIELDS = {
     }),
     {},
   ),
+  autoReview: defaulted(AutoReviewPolicy, {}),
 }
 
 /** The `pi` section as a file writes it: route rows may still lack a model or a thinking level. */

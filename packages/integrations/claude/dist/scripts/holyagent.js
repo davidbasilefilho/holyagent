@@ -12854,6 +12854,20 @@ var CAPABILITIES = [
     health: ["needs"]
   },
   {
+    name: "auto-review",
+    feature: "autoReview",
+    description: "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [], screen: [] },
+    settings: [],
+    health: ["needs"]
+  },
+  {
     name: "just-bash",
     feature: "justBash",
     description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
@@ -12967,6 +12981,10 @@ var WebMode = Literals(["provider", "pi-web-kit", "off"]);
 var CodemodeMode = Literals(["on", "only"]);
 var T3Scope = Literals(["global", "project"]);
 var Enabled = Boolean3;
+var AutoReviewPolicy = Struct({
+  policy: optionalKey2(String4),
+  extraPolicy: optionalKey2(String4)
+});
 var capabilitySwitch = (on) => defaulted(Enabled, on);
 var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
 var PI_FIELDS = {
@@ -12985,7 +13003,8 @@ var PI_FIELDS = {
     scope: defaulted(T3Scope, "global"),
     worktrees: defaulted(Enabled, true),
     deviceAccess: defaulted(Enabled, true)
-  }), {})
+  }), {}),
+  autoReview: defaulted(AutoReviewPolicy, {})
 };
 var PiAsWritten = Struct(PI_FIELDS);
 var PiResolved = toType2(Struct({

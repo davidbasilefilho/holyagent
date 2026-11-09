@@ -10961,6 +10961,20 @@ var init_capabilities = __esm(() => {
       health: ["needs"]
     },
     {
+      name: "auto-review",
+      feature: "autoReview",
+      description: "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+      provider: "openai-codex",
+      skills: [],
+      applicability: "both",
+      defaultOn: true,
+      needs: [],
+      forms: sameForm([]),
+      tools: { rootExclude: [], visual: [], screen: [] },
+      settings: [],
+      health: ["needs"]
+    },
+    {
       name: "just-bash",
       feature: "justBash",
       description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
@@ -11011,7 +11025,7 @@ var init_capabilities = __esm(() => {
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value))), VcsSettings, PiProvider, Thinking, ModelId, KIMI_ROOT = "k3.1-pro", KIMI_SPECIALIST = "kimi-for-coding", kimi = (model, thinking) => ({ model, thinking }), KIMI_ROUTES, PROVIDER_ROUTES, route = () => defaulted(Struct({
   model: optionalKey2(ModelId),
   thinking: optionalKey2(Thinking)
-}), {}), ROUTE_FIELDS, WebMode, CodemodeMode, T3Scope, Enabled, capabilitySwitch = (on) => defaulted(Enabled, on), CAPABILITY_FIELDS, PI_FIELDS, PiAsWritten, PiResolved, withProviderRoutes = (pi) => {
+}), {}), ROUTE_FIELDS, WebMode, CodemodeMode, T3Scope, Enabled, AutoReviewPolicy, capabilitySwitch = (on) => defaulted(Enabled, on), CAPABILITY_FIELDS, PI_FIELDS, PiAsWritten, PiResolved, withProviderRoutes = (pi) => {
   const defaults = PROVIDER_ROUTES[pi.provider];
   const routes = Object.fromEntries(Object.keys(defaults).map((key) => [
     key,
@@ -11064,6 +11078,10 @@ var init_schema = __esm(() => {
   CodemodeMode = Literals(["on", "only"]);
   T3Scope = Literals(["global", "project"]);
   Enabled = Boolean3;
+  AutoReviewPolicy = Struct({
+    policy: optionalKey2(String6),
+    extraPolicy: optionalKey2(String6)
+  });
   CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
   PI_FIELDS = {
     enable: defaulted(Enabled, true),
@@ -11081,7 +11099,8 @@ var init_schema = __esm(() => {
       scope: defaulted(T3Scope, "global"),
       worktrees: defaulted(Enabled, true),
       deviceAccess: defaulted(Enabled, true)
-    }), {})
+    }), {}),
+    autoReview: defaulted(AutoReviewPolicy, {})
   };
   PiAsWritten = Struct(PI_FIELDS);
   PiResolved = toType2(Struct({

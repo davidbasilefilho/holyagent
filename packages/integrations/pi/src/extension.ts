@@ -51,6 +51,7 @@ import {
 import { findChromium } from "../../../runtime/src/setup/chromium.ts"
 import { detectForm } from "../../../runtime/src/setup/form.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
+import { registerAutoReview } from "./auto-review.ts"
 import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
@@ -1608,6 +1609,9 @@ export const createExtension =
         if (held !== undefined) held.setupNotice = joinNotices(held.setupNotice, notice(text))
       },
     })
+    // After every other gate, so a call they refuse is never sent to review. Auto-review is its own
+    // capability: off (or another provider) leaves no policy, and the gate returns at once.
+    registerAutoReview(pi, { settings: () => held?.codex?.autoReview })
   }
 
 /**

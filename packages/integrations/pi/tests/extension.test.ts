@@ -214,6 +214,7 @@ const fakeApi = (
     getFlag: (name: string) => value ?? flags.get(name)?.default,
     registerToolRenderer: (resolver: ToolRendererResolver) => void renderers.push(resolver),
     registerTool: (tool: { readonly name: string }) => void tools.push(tool),
+    registerCommand: () => undefined,
     registerMcpServer: (name: string, config: unknown) => {
       if (session.mcpFail !== undefined) throw session.mcpFail
       mcpServers.push({ name, config })
@@ -400,6 +401,7 @@ describe("the factory", () => {
     }
     expect(api.flags.get(ROLE_FLAG)).toMatchObject({ type: "string", default: "root" })
     expect([...api.handlers.keys()].toSorted()).toEqual([
+      "agent_start",
       "before_agent_start",
       "before_provider_request",
       "message_end",

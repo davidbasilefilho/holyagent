@@ -244,11 +244,11 @@ describe("the setup interface, look", () => {
   })
 
   test("NO_COLOR draws in the terminal's own colour and keeps bold", async () => {
-    // Three rows taller than a plain terminal: the review lists one line per capability, and the Pi
-    // provider line has to stay inside the page after the twelfth.
+    // Four rows taller than a plain terminal: the review lists one line per capability, and the Pi
+    // provider line has to stay inside the page after the thirteenth.
     const screen = await shown({
       width: 80,
-      height: 27,
+      height: 28,
       env: { TERM: "xterm-256color", NO_COLOR: "1" },
     })
     await screen.keys("down", " ")
@@ -519,7 +519,7 @@ describe("the setup interface, a review longer than the screen", () => {
     const screen = await shown({ width: 40, height: 20 })
     await screen.keys("enter", "pageup")
     expect(screen.lines().join("\n")).toMatch(/^Lines 1-/m)
-    await screen.keys("pagedown", "pagedown", "pagedown", "pagedown", "pagedown")
+    await screen.keys("pagedown", "pagedown", "pagedown", "pagedown", "pagedown", "pagedown")
     const end = screen.lines().join("\n")
     expect(end).toMatch(/of (\d+), PgUp for earlier$/m)
     await screen.keys("pageup")
