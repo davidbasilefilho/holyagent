@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mw9v0jpx-7whl",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-browse-and-screen-capability",
+  "objective": "Confirm the browse and screen capability work is correct, regression-free and merge-ready.",
+  "state": "Running",
+  "scope": [
+    "Commit ec15538d on release/0.3.1/feat/screen in /home/user/holyagent-0.3.1-screen (range 3f1c135b..ec15538d), plus merges of the fff branch and the integration branch up to c6a2ac71; source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9trshx-cnhq.md",
+    "Requirements: opencode browse is @opencode/browse (MIT, 0.0.15, stdio MCP server plus a paired Chromium extension driving the user's real browser), registered for Pi at an exact pin moved by deps:update; setup reports when the extension is not installed or paired. Computer use is not a role but a screen capability an Assignment can carry; it grants computer-use tools (pi-computer-use), browser use (opencode browse) and the T3 in-app browser (T3 preview tools where T3 hosts the session), and routes that Assignment to GPT-6.1 Terra whatever its role, at least medium. The screen capabilities are granted per Assignment to keep specialist tool lists small. Capabilities have headless and normal forms: the screen capability uses a headless Playwright Chromium in a cloud or CI session and the paired real browser and desktop computer use on a desktop; setup and doctor detect the system and pick the form, and a capability whose needs are missing is reported, not silently dropped. Everything is modular, can be turned off on its own, with exact pins moved by deps:update.",
+    "Known gaps from the writer to judge: no headless Playwright Chromium form was built (browse drives a real browser only); browse 0.0.16 exists, the pin stays at 0.0.15; a second agent file per specialist (<agent>-screen, 36 in all) carries the screen tools; the Claude host refuses screen Assignments; the R-SCREEN requirement was added to the requirements tree and all three families."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes. Run commands only in /home/user/holyagent-0.3.1-screen and pass the explicit range 3f1c135b..c6a2ac71 to any review command.",
+    "Read @opencode/browse 0.0.15 from npm where the integration's assumptions need checking.",
+    "Testing is unit tests and fixtures only: never start pi, a browser, the browse server or T3.",
+    "Report in under 450 words; start each evidence line with the exact criterion text, a colon and the support inline.",
+    "Run `bunx --no-install mise run build` (tree must stay unchanged) and `bunx --no-install mise run verify`; report command, exit code and counts."
+  ],
+  "criteria": [
+    {
+      "text": "A screen Assignment's specialist gets exactly the screen tools and an ordinary one gets none, through dispatch, the brief and the Pi launcher",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Codex routing of screen Assignments to Terra at medium or higher is correct and leaves other routes unchanged",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The browse MCP registration matches what @opencode/browse 0.0.15 exposes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression in dispatch, warm reuse, the Claude host or the existing capabilities",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changed behavior has tests that fail without the change, and no test is weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at c6a2ac71",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9trshx-cnhq"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T22:55:34.101Z"
+  },
+  "createdAt": "2026-11-09T22:55:34.101Z"
+}
