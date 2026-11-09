@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-repair-of-the-gpt-6",
   "objective": "Re-review the repair of the GPT-6 instruction family's three blocking findings and its non-blocking notes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair diff only: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6-repair.diff (worktree /home/user/holyagent-0.3.1-gpt6, files under packages/runtime/src/instructions/gpt-6). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it5vj-3462.md. The writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9j5jje-wxee.md.",
     "Check each previous finding is closed: (1) root/workflows.md, context.md, dispatch.md follow R-WORKFLOW, R-LEAN and R-REPORT; the writer cites docs/pi/orchestration.md:30,34 and packages/runtime/src/cli/report.ts:384 for Pi journal support, verify those; (2) guide.md O26 against /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/images/2.png; (3) spacing rules consistent across design-core/core.md, roles/worker-visual/method.md, roles/reviewer-visual/captures.md, skills/visual-judging/SKILL.md, with a real means for the reviewer and terminal frames in cells; plus the dash rule and citation notes. The coverage-table entry was declined as out of scope (it needs a new requirement id in every family); do not re-raise it."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_2c01d32c-031/assignment-0mw9jjliv-rezg",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:34:27.511Z"
+    "startedAt": "2026-11-09T17:34:27.511Z",
+    "finishedAt": "2026-11-09T17:40:22.204Z"
+  },
+  "result": "result: all three blocking findings are closed with no new blocking defects. I read the repair diff and the files against the requirement text, the Pi docs and `images/2.png`, and ran no tests (no shell). The writer's verify run (2711 pass, 0 fail) is its own and I did not re-run it.\n\n**Finding 1, closed**\n`gpt-6/root/workflows.md:9,22-35` now returns only `{ done: [ids] }`, runs `assignment reports`, and closes from the report files. This matches R-WORKFLOW and the claude-5.5 text.\n`root/context.md:7` carries R-LEAN's \"close each Assignment from its report file\". `root/dispatch.md:9` carries R-REPORT's \"from its report file\".\nPi support is verified. `docs/pi/orchestration.md:30` gives the `pi-workflow:<run-id>/<id>` agent id. `docs/pi/orchestration.md:34` and `packages/runtime/src/cli/report.ts:384-395` show `assignment reports` reading `<run id>.workflow.jsonl` and matching entries by call key. The Kimi text's \"another journal shape\" claim is stale.\n\n**Finding 2, closed.** `guide.md` O26 matches `images/2.png`:\nThe card text starts at x=470, the card's own left edge.\nThe card's top sits on the rule at y≈185 and its right edge on the divider at x≈769.\nThe card ends at y≈404 with the page background below it.\nThe em dash opens \"—tracked\".\nThe \"two left edges\" claim is gone.\n\n**Finding 3, closed**\nThe wording is consistent across `core.md:16`, `worker-visual/method.md:3`, `reviewer-visual/captures.md:7` and `visual-judging/SKILL.md:23`. The worker measures, repairs and recaptures, then reports the places that still touch. The reviewer compares and invents no numbers. The root accepts only when neither names a remaining contact.\nThe reviewer now has a means (compare the captures and any recorded measurements), and terminal frames use character cells.\nThe dash rule now names a joiner or text-wrap control and allows a deliberate leading dash. The O2, O22 and O23 citation notes are fixed.\n\n**Non-blocking**\n`reviewer-visual/captures.md:7`: it says \"the worker's record\" but never says how the reviewer gets it. The wording degrades safely with \"any measurements\", but the brief could name it.\n`workflows.md:6`: R-WORKFLOW says `agentType` is `holyagent:<agent>`, while this file says \"as printed\". That fits Pi's unprefixed name and still matches the journal key.\n`core.md:71`: the non-breaking-join or text-wrap fix has no terminal analogue, so a terminal frame has only \"reword\".\n\nevidence:\nThe repair closes the three blocking findings without new defects: met. Finding 1 is closed at `/home/user/holyagent-0.3.1-gpt6/packages/runtime/src/instructions/gpt-6/root/workflows.md:9,35`, `root/context.md:7` and `root/dispatch.md:9`, with Pi support at `docs/pi/orchestration.md:30,34` and `packages/runtime/src/cli/report.ts:384`. Finding 2 is closed at `gpt-6/guide.md` O26 against `images/2.png`. Finding 3 is closed at `design-core/core.md:16`, `roles/worker-visual/method.md:3`, `roles/reviewer-visual/captures.md:7` and `skills/visual-judging/SKILL.md:23`. Tests were not run.\nfindings: no blocking findings and three non-blocking, as listed above.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "All three blocking findings closed, checked against files, Pi docs and screenshot; three non-blocking notes.",
+    "criteria": [
+      {
+        "criterion": "The repair closes the three blocking findings without new defects",
+        "support": "met. Finding 1 is closed at `/home/user/holyagent-0.3.1-gpt6/packages/runtime/src/instructions/gpt-6/root/workflows.md:9,35`, `root/context.md:7` and `root/dispatch.md:9`, with Pi support at `docs/pi/orchestration.md:30,34` and `packages/runtime/src/cli/report.ts:384`. Finding 2 is closed at `gpt-6/guide.md` O26 against `images/2.png`. Finding 3 is closed at `design-core/core.md:16`, `roles/worker-visual/method.md:3`, `roles/reviewer-visual/captures.md:7` and `skills/visual-judging/SKILL.md:23`. Tests were not run."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blocking findings and three non-blocking, as listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:34:27.511Z"
 }
