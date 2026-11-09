@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mw94ibvq-4n7s",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 12,
+  "roleTask": "Worker.implementation",
+  "slug": "make-holyagent-setup-write-t3-code-s",
+  "objective": "Make holyagent setup write T3 Code's environment-wide branch naming rule, branchNamingMode custom with branchNameInstructions telling T3 to follow each repository's own branch convention, only where unset, as the maintainer chose.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3branch, branch release/0.3.0/feat/t3-branch-rule.",
+    "Decision (T3 Intent revision 12, maintainer chose \"Global rule only\"): no per-project overrides (T3 ProjectIds are random UUIDs), no read of T3's database, no t3 project add; write branchNamingMode \"custom\" and branchNameInstructions in the server settings.json that packages/runtime/src/setup/t3-settings.ts already writes, each only where unset (a value set in T3 stays); pullRequestMergeMethod is not written (T3 default null, the method last chosen on the device). T3 defaults: branchNamingMode static, branchNamePrefix \"t3\", branchNameInstructions \"\".",
+    "Write the instructions as a short, plain rule for T3's branch-name generator: use the repository's own branch naming convention from AGENTS.md, CONTRIBUTING or the existing branch names, and fall back to T3's usual prefix style when the repository states none. Keep it within T3's field limits if its schema has one (see the research at /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tj2q7-d15a.md and docs/pi/t3-code.md).",
+    "Undo, doctor and docs/pi/t3-code.md follow the existing pattern for the other always-applied keys."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Setup writes branchNamingMode custom and branchNameInstructions only where unset, never pullRequestMergeMethod, and undo and doctor cover them, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/pi/t3-code.md states the rule and why no per-project override is written",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change stays inside the Assignment scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/t3-settings.ts",
+    "packages/runtime/tests/setup-t3-settings.test.ts",
+    "docs/pi/t3-code.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T10:33:34.118Z"
+  },
+  "createdAt": "2026-11-09T10:33:34.118Z"
+}
