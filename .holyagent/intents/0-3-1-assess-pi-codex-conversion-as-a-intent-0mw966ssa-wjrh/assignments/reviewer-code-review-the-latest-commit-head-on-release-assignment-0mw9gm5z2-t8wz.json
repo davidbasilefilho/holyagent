@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-latest-commit-head-on-release",
   "objective": "Review the latest commit (HEAD) on release/0.3.1/chore/bump-version in /home/user/holyagent-0.3.1-bump: a shared Windows-aware timeout for tests that start the CLI, and a stall diagnostic in the pi project-flag test.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Run git -C /home/user/holyagent-0.3.1-bump show HEAD. Files: packages/runtime/tests/fixtures.ts (PROCESS_TIMEOUT_MS, 120 s on win32 and 30 s elsewhere), pipe.test.ts, version.test.ts, pi extension.test.ts, pi.test.ts, session-context.test.ts (CHILD_DEADLINE_MS and PIPE_GRACE_MS: kills a stalled child and fails with its arguments and partial output) and claude hooks.test.ts.",
     "Purpose: the Windows runner intermittently stalls cold CLI starts; the maintainer asked to raise the timeout. Check that no assertion or test body weakened, that the diagnostic cannot fail a healthy run on Linux or macOS (13.5 s per child against a 30 s test) and kills its child cleanly, and that the bun fmt re-indentation hides no change."
@@ -39,7 +39,29 @@
     "agentId": "workflow:wf_6f9b836a-ef6/assignment-0mw9gm5z2-t8wz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T16:12:28.478Z"
+    "startedAt": "2026-11-09T16:12:28.478Z",
+    "finishedAt": "2026-11-09T16:17:36.716Z"
+  },
+  "result": "result: HEAD ac863f85 is mergeable on these criteria. I found no blockers.\n\nThe built-in `/code-review` ran as the built-in. Its six findings all cite files outside this commit (design-core, web-design SKILL, `docs/attributions.md`, and others), so they belong to another range. I rejected them as out of scope and none concerns this change. The built-in also reported it could not run tests; I ran them myself.\n\nFindings:\n**Assertions unchanged (non-blocking, verified).** I diffed with `git show HEAD -w`. The `bun fmt` re-indentation hides no change. In `extension.test.ts`, `pipe.test.ts` and `version.test.ts` the only differences are the wrapper (`test(name, fn, PROCESS_TIMEOUT_MS)`) and the import. `hooks.test.ts` and `pi.test.ts` change only the timeout value.\n**Shared constant used everywhere in the changed files (verified).** `PROCESS_TIMEOUT_MS` is imported and applied in all seven files. No literal `30_000` remains in them. `fixtures.ts:19` is 120 s on win32 and 30 s elsewhere.\n**Diagnostic is safe on a healthy run.** Only `session-context.test.ts` (around lines 195-225) has it. `Bun.spawn({timeout: CHILD_DEADLINE_MS})` kills only a child still running at 13.5 s, and `signalCode` is non-null only after that kill, so the `throw` cannot fire on a normal exit. The pipe-grace race returns the `<pipe open after exit>` placeholder only if a pipe is still open 2 s after the child exits. That case hung before this change.\n**Kill is clean (Bun built-in, not run).** The built-in `timeout` option kills the child, and `child.exited` then resolves, so `Promise.all` settles. A grandchild holding a pipe is covered by the grace race. I did not run a real stall.\n**Leftover timer (non-blocking, `session-context.test.ts` ~line 211).** `Bun.sleep(PIPE_GRACE_MS)` stays pending up to 2 s after a healthy read wins the race. It is harmless.\n**Windows timeouts not shared (non-blocking, outside this diff).** `cli.test.ts`, `vcs*.test.ts`, `migrate.test.ts` and `state-mode.test.ts` still use `60_000` on win32. `brief.test.ts` uses a flat `30_000` with no win32 branch.\n\nevidence:\nNo assertion is weakened and the diagnostic cannot fail a healthy run: `git show HEAD -w` shows only wrapper and timeout changes. The diagnostic throws only when `signalCode !== null`. `bun test` on pipe, version, session-context, extension and pi: exit 0, 285 pass, 0 fail. `bun fmt --check`, `bun lint` and `bun check` all clean.\nThe shared constant is used consistently by every changed test: all seven files import `PROCESS_TIMEOUT_MS` from `packages/runtime/tests/fixtures.ts:19`, with no `30_000` literal left in them.\nfindings: no blockers, three non-blocking notes above, and the built-in review's six findings rejected as outside this range.\n",
+  "acceptance": {
+    "revision": 18,
+    "rationale": "no blockers; reviewer diffed with -w and ran the five changed test files (285 pass)",
+    "criteria": [
+      {
+        "criterion": "No assertion is weakened and the diagnostic cannot fail a healthy run",
+        "support": "`git show HEAD -w` shows only wrapper and timeout changes. The diagnostic throws only when `signalCode !== null`. `bun test` on pipe, version, session-context, extension and pi: exit 0, 285 pass, 0 fail. `bun fmt --check`, `bun lint` and `bun check` all clean."
+      },
+      {
+        "criterion": "The shared constant is used consistently by every changed test",
+        "support": "all seven files import `PROCESS_TIMEOUT_MS` from `packages/runtime/tests/fixtures.ts:19`, with no `30_000` literal left in them."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers, three non-blocking notes above, and the built-in review's six findings rejected as outside this range."
+      }
+    ]
   },
   "createdAt": "2026-11-09T16:12:28.478Z"
 }
