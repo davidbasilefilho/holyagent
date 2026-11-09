@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mw96lmlw-w85v",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 3,
+  "roleTask": "Librarian.research",
+  "slug": "establish-from-just-bash-s-source-how",
+  "objective": "Establish, from just-bash's source, how HolyAgent can run Pi's bash tool on just-bash while passing commands it does not implement to real host executables on Linux, macOS and Windows, and how its TypeScript and JavaScript execution works.",
+  "state": "Running",
+  "scope": [
+    "Decision (maintainer, verbatim): \"use just-bash and allow the executables on PATH and other relevant places (cross-platform)\"; earlier: \"we should also support the just-bash's ts/js capabilities (ts as first option, js as fallback)\". Previous report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw96f83y-7nc4.md (read it).",
+    "From the just-bash 3.6.0 source (github.com/vercel-labs/just-bash at the 3.6.0 tag, or cdn.jsdelivr.net/npm/just-bash@3.6.0/), with file and symbol: (1) the API for custom or external commands (e.g. customCommands, defineCommand, a command-not-found hook) and whether a custom command gets argv, cwd, env, stdin and can write stdout and stderr incrementally and return an exit code; (2) how pipes, redirections, && and subshells pass data between built-in and custom commands, and whether a custom command can stream output while running; (3) the filesystem choice that lets real files change on disk (ReadWriteFs or OverlayFs) and whether host executables then see the same tree; (4) env, cwd and exported-variable persistence across exec() calls and how that maps to Pi BashOperations.exec(command, cwd, {onData, signal, timeout, env}); (5) cancellation and timeouts for a long-running host process; (6) the TypeScript and JavaScript execution: what runs JS (QuickJS WASM js-exec?), whether TypeScript is supported natively or needs stripping, what node-like APIs and child_process shims it exposes, and how a command or script selects it; (7) Windows: path handling, drive letters, PATHEXT and .cmd or .bat shims, and any documented platform limits.",
+    "Also: which commands just-bash implements itself that shadow host tools HolyAgent relies on (for example rg, find, grep, sed, tar, curl), and whether its versions differ in flags from the host ones; and whether the third-party Pi extensions sionic-ai/pi-justbash-sandbox or pi-just-bash-tools already pass commands through to the host, with file references.",
+    "HolyAgent's current bash wiring is in /home/user/holyagent-0.3.0-t3branch/packages/runtime/src/pi/tools.ts and packages/integrations/pi/src/extension.ts; the Pi BashOperations type is at the pinned host dist/core/tools/bash.d.ts:35-52 under /home/user/holyagent-0.3.0-t3host/node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0+8980da4117b98cd5/node_modules/@earendil-works/pi-coding-agent."
+  ],
+  "constraints": [
+    "Read-only: change no files, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi, install or execute just-bash, or make a live model request.",
+    "Separate facts from source (file and symbol, version) from inference; end with the risks a design must handle.",
+    "Report in under 600 words; put excerpts in a scratchpad file if you can write one."
+  ],
+  "criteria": [
+    {
+      "text": "Questions 1-7 are answered from just-bash source with file and symbol",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Shadowed host commands and existing passthrough extensions are stated with evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The risks a passthrough design must handle are listed",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "source-answers",
+    "shadowing",
+    "risks"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw96f83y-7nc4",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:32:07.220Z"
+  },
+  "createdAt": "2026-11-09T11:32:07.220Z"
+}
