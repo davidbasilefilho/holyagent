@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw8r46j3-69pu",
+  "intentId": "intent-0mw6muvcv-5we5",
+  "intentRevision": 3,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-one-wrong-attribution-in-docs",
+  "objective": "Correct one wrong attribution in docs/development.md about the Pi contract test.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-contract. docs/development.md (around line 104) says the extension-events fixture runs through the extension handlers and the outcome helpers failedFinalMessage and assignmentStatusOf. It reaches failedFinalMessage only inside the extension's message_end handler, and assignmentStatusOf is called only for the json-run fixtures. Rewrite that bullet so the extension-events fixture runs through the extension's handlers and the json-run streams are read through failedFinalMessage and assignmentStatusOf. Change nothing else."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "The bullet attributes each helper to the fixtures that reach it, and nothing else in the file changes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw7sdv5a-xe8t",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T04:18:38.991Z"
+  },
+  "createdAt": "2026-11-09T04:18:38.991Z"
+}
