@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.visual",
   "slug": "re-inspect-the-setup-tui-screens-the",
   "objective": "Re-inspect the setup TUI screens the round-1 repair changed and confirm each earlier visual finding is closed.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The repair is commit 0130a8b2 on release/0.3.0/feat/setup-tui in /home/user/holyagent-0.3.0-tui. The findings it addressed are in /home/user/holyagent/.git/holyagent/briefs/assignment-0mw96v3mr-d6nb.md; the writer's report, with the capture names per finding, is /home/user/holyagent/.git/holyagent/reports/assignment-0mw96v3mr-d6nb.md. Captures are text frames in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/ (and pty raw output in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/w/pty/).",
     "Read the terminal design skill at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/tui-design/SKILL.md and judge against its checklist and capture list.",
@@ -46,7 +46,37 @@
     "agentId": "workflow:wf_0449f5a1-d1b/assignment-0mw98bgsf-onrz",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:20:12.351Z"
+    "startedAt": "2026-11-09T12:20:12.351Z",
+    "finishedAt": "2026-11-09T12:34:45.972Z"
+  },
+  "result": "The six earlier visual findings are closed, and I found one capture-level discrepancy: the dry-run failure captures show \"added 10\" in past tense. I judged text frames only and ran nothing.\n\n**findings**\n1. Result screens wrap with a hanging indent. The full cause and every outcome line show at 80x24, 40x20 and 120x40. The long result in `pty-result-ascii-40x20` scrolls, with \"Lines 1-11 of 126, PgDn for more\" on the last row. Closed.\n2. ASCII locale on the real renderer. The `pty-ascii-80x24`, `pty-result-ascii-*` and `pty-review-ascii-40x20` headers record `LC_ALL` and `LC_CTYPE` unset and `LANG=C`, and list `non-ASCII characters on the screen: []`. A grep over every `*ascii*` text capture found zero non-ASCII bytes. The UTF-8 pty frames still show `·`, as expected. Closed.\n3. Review keys readable. At 40x20 and 80x24, `review`, `review-scrolled` and `review-end` cover every line. The scroll indicator is \"Lines a-b of n\", and PgUp/PgDn appears in the hint only when the screen scrolls. At 120x40 everything fits. No `…` appears in any capture. Closed.\n4. Path wrapping. `focus-device-40x20` breaks the Xcode path after `/`, and the long result paths wrap at separators. Closed.\n5. Failure next steps. `review-failed-*`, `apply-error-*` and `apply-failure-*` all state a recovery step. Closed.\n6. Dry-run wording. `apply-success-dry-run-*`, `review-dry-run-*` and `pty-result-80x24` read as would-change (\"would add\", \"nothing was written\"). Closed, except for the capture below.\n\n**Riding items.** The hint line names j/k. The unfocused fixed and disabled values use #a9b1d6 (`focus-device-80x24` row 05, `both-off-80x24`). \"Esc close\" is gone. Esc on review still cancels, with a reason given.\n\n**Material, capture-level.** `apply-failure-dry-run-{80x24,40x20,120x40}` sit under \"RESULT (DRY RUN)\" but show `+ user settings ...: added 10` in past tense. They also say \"Close T3 Code and run setup again\" under a header that says \"run the dry run again\". The fixture in `scripts/capture-setup-tui.ts` should use the would-add wording. The real pipeline output in `pty-result-80x24` is correct, so I judge the product text fine and the fixture wrong.\n\n**Preference (optional)**\n`review-dry-run-end-40x20` stops at \"Lines 17-25 of 28\", so its name overstates; `review-end-40x20` does reach the end.\nThe dry-run heading \"REVIEW (DRY RUN: WOULD CHANGE, NOTHING IS WRITTEN)\" is wordy and wraps at 40 columns.\nThe \"(dry run, nothing written)\" suffix repeats the result header.\n\n**No new regressions.** I found no other material discrepancy in the changed screens at the three sizes.\n\n**captures judged**\nDirectory: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/`\nResult screens: `apply-failure-{80x24,40x20,120x40}`, `apply-success-{80x24,40x20,120x40}`, `apply-error-{80x24,40x20,120x40}`, `apply-failure-dry-run-{80x24,40x20,120x40}`, `apply-success-dry-run-{80x24,40x20,120x40}`, `apply-failure-no-color-40x20`, `apply-failure-ascii-locale-40x20`\nReview screens: `review-{80x24,40x20,120x40}`, `review-scrolled-{80x24,40x20}`, `review-end-{80x24,40x20,120x40}`, `review-failed-{80x24,40x20,120x40}`, `review-dry-run-{80x24,40x20,120x40}`, `review-dry-run-end-40x20`, `review-ascii-locale-end-40x20`\nOther: `focus-device-{80x24,40x20}`, `both-off-80x24`, `device-off-80x24`, `no-device-host-80x24`\nPty frames: `pty-ascii-80x24`, `pty-result-80x24`, `pty-result-ascii-80x24`, `pty-result-ascii-40x20`, `pty-review-80x24`, `pty-review-ascii-40x20`\n\nevidence:\nEach of the six earlier visual findings is confirmed closed or reported open with the capture that shows it: Findings 1-5 are closed and finding 6 is closed in the product text. `apply-failure-dry-run-*` still shows \"added 10\", reported as a fixture fix.\nNo new material discrepancy appears in the changed screens at 80x24, 40x20 and 120x40: none in the product screens. The only discrepancy is the `apply-failure-dry-run-*` fixture text.\nThe final captures judged are listed by file name: listed above.\nfindings: see the findings section above (six closed, one material capture-fixture issue, three optional notes).\ncaptures: listed above, all under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/`. I did not read the raw pty output under `scratchpad/w/pty/`.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Review evidence cites captures, file lines and test runs on 0130a8b2",
+    "criteria": [
+      {
+        "criterion": "Each of the six earlier visual findings is confirmed closed or reported open with the capture that shows it",
+        "support": "Findings 1-5 are closed and finding 6 is closed in the product text. `apply-failure-dry-run-*` still shows \"added 10\", reported as a fixture fix."
+      },
+      {
+        "criterion": "No new material discrepancy appears in the changed screens at 80x24, 40x20 and 120x40",
+        "support": "none in the product screens. The only discrepancy is the `apply-failure-dry-run-*` fixture text."
+      },
+      {
+        "criterion": "The final captures judged are listed by file name",
+        "support": "listed above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see the findings section above (six closed, one material capture-fixture issue, three optional notes)."
+      },
+      {
+        "label": "captures",
+        "support": "listed above, all under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/`. I did not read the raw pty output under `scratchpad/w/pty/`."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:20:12.351Z"
 }
