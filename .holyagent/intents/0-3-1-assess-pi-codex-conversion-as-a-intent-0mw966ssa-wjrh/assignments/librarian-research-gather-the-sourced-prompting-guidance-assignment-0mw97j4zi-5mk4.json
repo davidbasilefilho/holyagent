@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mw97j4zi-5mk4",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 17,
+  "roleTask": "Librarian.research",
+  "slug": "gather-the-sourced-prompting-guidance",
+  "objective": "Gather the sourced prompting guidance for OpenAI GPT-6 (Luna) and GPT-6.1 (Sol, Terra) and Codex's own prompts, so a writer can draft a HolyAgent guide.md and instruction set for that family.",
+  "state": "Running",
+  "scope": [
+    "Read-only research. Sources, in order of authority: OpenAI's own prompting guides and model docs for GPT-6 and GPT-6.1 (platform.openai.com, developers.openai.com, cookbook.openai.com), the model release notes, and the prompt files in github.com/openai/codex (codex-rs core prompt.md / gpt-* prompt files, AGENTS.md handling, apply_patch tool instructions, review prompts). Use the Exa web search and fetch tools; fetch raw.githubusercontent.com for Codex files. Compare with the structure of the two existing guides, /home/user/holyagent-0.3.0-t3branch/packages/runtime/src/instructions/claude-5.5/guide.md and /home/user/holyagent-0.3.0-t3branch/packages/runtime/src/instructions/kimi-k3.1/guide.md, and read /home/user/holyagent-0.3.0-t3branch/packages/runtime/src/instructions/families.ts and the requirements skill at /home/user/holyagent-0.3.0-t3branch/.claude/skills/requirements/SKILL.md so the findings map onto what a guide must hold."
+  ],
+  "constraints": [
+    "Cite a URL (and section or line) for every guidance point; mark anything not from OpenAI or the Codex repository as inference.",
+    "Say plainly when a point applies to only one of the models (Sol, Terra, Luna) or only to GPT-6.1 versus GPT-6, because the writer must decide whether this is one family or two.",
+    "Gather findings only; the writer drafts guide.md later, so give the points, not a finished guide.",
+    "Report in under 1200 words; put the full notes with quotes in no file (you are read-only) but keep quotes short and give URLs so they can be re-read."
+  ],
+  "criteria": [
+    {
+      "text": "Each guidance point carries an OpenAI or openai/codex source URL, or is marked inference",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The report states whether GPT-6 Luna and GPT-6.1 Sol/Terra need one instruction family or two, with the evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The findings are grouped under the headings the existing guide.md files use, so they map onto a new guide",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Codex prompt conventions relevant to HolyAgent (tool use, apply_patch, AGENTS.md, reasoning effort, preambles, autonomy, planning) are listed with their file paths",
+      "blocking": false,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "family-split",
+    "guide-mapping",
+    "codex-prompts"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:58:10.687Z"
+  },
+  "createdAt": "2026-11-09T11:58:10.687Z"
+}
