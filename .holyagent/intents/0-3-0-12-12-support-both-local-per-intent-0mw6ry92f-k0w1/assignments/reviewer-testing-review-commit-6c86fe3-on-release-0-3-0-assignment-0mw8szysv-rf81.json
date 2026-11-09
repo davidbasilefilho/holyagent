@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "review-commit-6c86fe3-on-release-0-3-0",
   "objective": "Review commit 6c86fe3 on release/0.3.0/fix/pi-windows-launch, which pins the platform and path module of the Pi extension and contract tests so they pass on windows-latest, for lost coverage or weakened assertions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-win; review git diff 2ae0549 6c86fe3 (also in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-fix.diff).",
     "The windows CI job failed 103 Pi tests because the harness left the platform unset; the fix passes platform linux and the posix path module wherever stubs are POSIX-shaped, and keeps explicit win32 tests.",
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_b47fc0b6-706/assignment-0mw8szysv-rf81",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-09T05:11:21.583Z"
+    "startedAt": "2026-11-09T05:11:21.583Z",
+    "finishedAt": "2026-11-09T05:12:09.765Z"
+  },
+  "result": "Verdict: approve. Commit 6c86fe3 weakens no assertion and loses no covered behaviour.\n\n**Findings**\n- The diff touches only `contract.test.ts` and `extension.test.ts`, and only the test setup changed. Every added line pins `platform: \"linux\"` or the POSIX path module. Every removed line is the same call without them.\n- In `extension.test.ts`, the old `findBun(\"linux\", { join }, ...)` calls become `findBun(\"linux\", posix, ...)`. The `/bun` expectations at roughly lines 1457-1540 are unchanged.\n- The `RUNTIME[2]` checks now compare against `POSIX_BUNDLED`, which is `runtimeArgs(\"/pkg\", posix)[2]`. They still check that the bundled CLI is, or is not, started, so nothing is weaker.\n- `contract.test.ts:108` and `extension.test.ts:74` change `BUN` to `join(\"/stub/bin\", \"bun\")`. On Linux this is the same string as before. On Windows it matches what the extension builds.\n- In `run()` at line 310, `platform: options.platform ?? \"linux\"` replaces the conditional spread. Tests that pass win32 behave as before.\n- No `win32` assertion was removed. The only `-` line mentioning win32 is the import, which now also pulls in `posix`.\n\n**Windows coverage** is still explicit and unchanged:\n- The `bun.exe` and `bun.cmd` lookups in `findBun(\"win32\", win32, ...)` at lines 1501-1572 cover driveless entries (`bin\\\\bun.exe`, `C:bun\\\\bun.exe`), the `bun.exe` over `bun.cmd` order, and `bun.cmd` counting on PATH only.\n- The `bun.cmd` shim via `cmd.exe` is tested at lines 1585-1665, including a folder with spaces and an `&` operator. Each of these tests sets `platform: \"win32\"` and `platformPath: win32`.\n- Powershell is tested at line 1852. It runs `WINDOWS` against the default, which is now explicitly linux.\n\n**Real-platform dependence**\n- Pinning linux removes the dependence on the runner's platform for POSIX-shaped stubs. It cannot hide a win32 product defect, because win32 behaviour is only exercised through the explicit win32 tests.\n- Two small points. `BUN = join(...)` still uses the runner's path module, so it produces `\\` on Windows. The remaining tests on the default linux path never use the runner's real platform for the product code.\n\n**Checks**\n- `bun test tests/extension.test.ts tests/contract.test.ts` in `/home/user/holyagent-0.3.0-win/packages/integrations/pi`: exit 0, 245 pass, 0 fail, 992 expects. This ran on Linux only. I did not run the Windows CI job.\n\nresult: approve\nchanged: none\nblockers: none\nnotes: none\n\nevidence:\nThe review states whether any assertion was weakened or any covered behaviour lost, with path:line: No assertion weakened and no behaviour lost. The diff only changes harness setup. `extension.test.ts:310` and `:1457-1540` are the `findBun`/`run` changes, and `:74` and `contract.test.ts:108` are the `BUN` join. The `RUNTIME[2]` checks at roughly `:1580-1790` now use `POSIX_BUNDLED`. `bun test` on both files: 245 pass, 0 fail.\nThe review states whether the Windows launch behaviour remains covered by explicit win32 tests: Yes. `extension.test.ts:1501-1572` cover `bun.exe` and driveless entries, and `:1585-1665` cover `bun.cmd` via `cmd.exe`. `:1852` covers powershell. The win32 tests all pass `platform: \"win32\"` and `platformPath: win32` explicitly, and none were removed.\nfindings: No blocking findings. The only non-test-setup `-` line touching win32 is the import at `extension.test.ts:5`.\nverdict: Approve. The change is a harness-only pin and loses no coverage.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Harness-only pin; win32 tests at extension.test.ts:1501-1665 and 1852 remain explicit; 245/0 on the two files.",
+    "criteria": [
+      {
+        "criterion": "The review states whether any assertion was weakened or any covered behaviour lost, with path:line",
+        "support": "No assertion weakened and no behaviour lost. The diff only changes harness setup. `extension.test.ts:310` and `:1457-1540` are the `findBun`/`run` changes, and `:74` and `contract.test.ts:108` are the `BUN` join. The `RUNTIME[2]` checks at roughly `:1580-1790` now use `POSIX_BUNDLED`. `bun test` on both files: 245 pass, 0 fail."
+      },
+      {
+        "criterion": "The review states whether the Windows launch behaviour remains covered by explicit win32 tests",
+        "support": "Yes. `extension.test.ts:1501-1572` cover `bun.exe` and driveless entries, and `:1585-1665` cover `bun.cmd` via `cmd.exe`. `:1852` covers powershell. The win32 tests all pass `platform: \"win32\"` and `platformPath: win32` explicitly, and none were removed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "No blocking findings. The only non-test-setup `-` line touching win32 is the import at `extension.test.ts:5`."
+      },
+      {
+        "label": "verdict",
+        "support": "Approve. The change is a harness-only pin and loses no coverage."
+      }
+    ]
   },
   "createdAt": "2026-11-09T05:11:21.583Z"
 }
