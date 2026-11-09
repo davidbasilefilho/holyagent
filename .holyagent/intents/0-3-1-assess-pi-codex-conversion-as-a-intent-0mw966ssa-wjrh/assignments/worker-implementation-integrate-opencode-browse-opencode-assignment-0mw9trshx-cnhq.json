@@ -1,0 +1,95 @@
+{
+  "id": "assignment-0mw9trshx-cnhq",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 20,
+  "roleTask": "Worker.implementation",
+  "slug": "integrate-opencode-browse-opencode",
+  "objective": "Integrate opencode browse (@opencode/browse 0.0.15) for Pi as a browser-use capability and add the screen capability that an Assignment carries, granting computer use, browser use and the T3 preview tools and routing that Assignment to GPT-6.1 Terra at medium or higher.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-screen, branch release/0.3.1/feat/screen cut from release/0.3.1/feat/fff at 3f1c135b",
+    "Intent requirements (run `holyagent intent show` is not available to you; they are quoted here): opencode browse is @opencode/browse (anomalyco/browse, MIT, 0.0.15, a stdio MCP server plus a paired Chromium extension driving the user's real browser). HolyAgent registers it as an MCP server for Pi at an exact pin, moved by deps:update, and setup reports when the extension is not installed or paired. Screen capability split: pi-computer-use for desktop apps and native browser chrome; browse for web page content in a real browser; T3 preview and HTML render tools for the page shown in T3. Computer use is not a role but a screen capability an Assignment can carry; it grants the specialist the computer-use tools (pi-computer-use), browser use (opencode browse) and the in-app browser (T3 preview tools where T3 hosts the session), and routes that Assignment to GPT-6.1 Terra whatever its role, at least medium effort. The screen capabilities are granted per Assignment to keep specialist tool lists small. Capabilities have headless and normal forms: the screen capability uses a headless Playwright Chromium in a cloud or CI session and the paired real browser and desktop computer use on a desktop; setup and doctor detect the system and pick the form, and a capability whose needs are missing is reported, not silently dropped. Cloud and headless Linux use of browse is unverified; check it from the package source and say what holds.",
+    "Existing pieces to build on: the capability registry (packages/runtime/src/config/capabilities.ts, with computer-use and mcp entries and headless/normal forms), the MCP capability and how Pi MCP servers are configured, the Pi package pin table (packages/runtime/src/config/pi-packages.json and scripts/dependency-pins.ts), the Codex route table (packages/runtime/src/pi/codex/routes.ts), the specialist launcher and agent files (packages/integrations/pi/src/agents.ts), the Assignment draft schema and dispatch in the runtime CLI, and the T3 host detection.",
+    "Read @opencode/browse 0.0.15 from npm (tarball or node_modules) to learn its MCP command, tool names, the pairing check it exposes and its platform needs; base the integration on what it actually exposes and name anything you could not confirm."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Pin @opencode/browse exactly at 0.0.15 through the repository's pin conventions so deps:update moves it.",
+    "An Assignment opts into the screen capability through its draft (a field the dispatch and brief carry); without it a specialist gets none of the screen tools. With it, the Kimi route keeps its model and the Codex route moves that Assignment to GPT-6.1 Terra at max(route effort, medium).",
+    "Instruction text that tells the root when to grant the screen capability goes into the requirements tree and every model family's translation, following the requirements skill (packages/runtime/AGENTS.md and the requirements skill in .claude/skills); if that is too large, implement the mechanism and report the instruction text as the follow-up instead of writing partial translations.",
+    "Testing is unit tests and fixtures only: never start pi, a browser, the browse server or T3.",
+    "Leave packages/runtime/src/pi/bash, packages/integrations/pi/src/bash.ts and the fff files untouched.",
+    "Report in under 450 words; start each evidence line with the exact criterion text, a colon and the support inline; put long logs in a file in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "@opencode/browse is pinned at exactly 0.0.15, registered for Pi as an MCP server by the browser-use capability, and `mise run deps:check` does not flag it",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Setup and doctor report browse's form (headless or normal) and whether its browser extension is installed and paired, as far as the package exposes it, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "An Assignment that carries the screen capability gets the computer-use, browse and (under T3) preview tools and an Assignment without it gets none, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "On the Codex route a screen Assignment runs on GPT-6.1 Terra at medium or higher effort whatever its role, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Headless and normal forms are picked from the system and a missing need is reported, not dropped, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Docs describe the browse capability, the screen capability, its forms and how an Assignment requests it",
+      "blocking": false,
+      "dimension": "scope"
+    },
+    {
+      "text": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/runtime/package.json",
+    "packages/integrations/pi/src/agents.ts",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/src/screen.ts",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/src",
+    "scripts/dependency-pins.ts",
+    "requirements",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T22:20:45.957Z"
+  },
+  "createdAt": "2026-11-09T22:20:45.957Z"
+}
