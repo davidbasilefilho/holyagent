@@ -82,6 +82,8 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
       emit,
       vcs: host.vcs ?? vcsLive(root, host.env),
       tools: host.tools ?? BUNDLED_TOOLS,
+      terminal: host.terminal,
+      setupTui: host.setupTui,
       input: (schema) => readInput(host, schema, inline),
       inputBy: (pick) => readInputBy(host, pick, inline),
     } satisfies Call

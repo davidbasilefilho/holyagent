@@ -71,11 +71,16 @@ interface Wanted extends Default {
  */
 interface Unit {
   readonly name: string
+  /** The setup choice that switches the unit, for the units a person decides on. */
+  readonly choice?: T3Choice
   readonly keys: ReadonlyArray<Wanted>
   readonly whole?: string
   /** Why the unit must not be written into this file, or `undefined`. */
   readonly refuse?: (existing: JsonObject) => string | undefined
 }
+
+/** The T3 setup choices a person decides on; every other unit is always applied. */
+export type T3Choice = "pi" | "deviceAccess" | "worktrees"
 
 /** The options of the T3 settings step. */
 export interface T3SettingsOptions {
@@ -223,6 +228,7 @@ const BALANCED = {
 const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
   {
     name: "Pi provider",
+    choice: "pi",
     keys: [
       { path: ["providerInstances", "pi", "driver"], value: "pi", default: undefined },
       { path: ["providerInstances", "pi", "enabled"], value: true, default: undefined },
@@ -244,6 +250,7 @@ const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
     ? [
         {
           name: "device access",
+          choice: "deviceAccess",
           keys: [
             { path: ["enableDeviceSupport"], value: true, default: false },
             { path: ["enableAgentDeviceAccess"], value: true, default: false },
@@ -255,6 +262,7 @@ const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
     ? [
         {
           name: "worktrees",
+          choice: "worktrees",
           keys: [{ path: ["defaultThreadEnvMode"], value: "worktree", default: null }],
         } satisfies Unit,
       ]
@@ -325,6 +333,37 @@ const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
   },
 ]
 
+/** What the step does with one unit in a file as it is. */
+type UnitOutcome =
+  | { readonly status: "own" }
+  | { readonly status: "left"; readonly reason: string }
+  | { readonly status: "keys"; readonly keys: ReadonlyArray<Default> }
+
+/**
+ * What a unit adds to a file as it is: nothing when the setup `recorded` wrote its whole group
+ * earlier (`own`), nothing when the file's own group or a refusal keeps it out (`left`, with the
+ * reason), else the keys whose value differs from T3's default.
+ */
+const unitOutcome = (
+  existing: JsonObject,
+  unit: Unit,
+  recorded: ReadonlyArray<Recorded>,
+): UnitOutcome => {
+  if (
+    unit.whole !== undefined &&
+    existing[unit.whole] !== undefined &&
+    recorded.some(({ path }) => path[0] === unit.whole)
+  )
+    return { status: "own" }
+  const reason =
+    unit.whole !== undefined && existing[unit.whole] !== undefined
+      ? `${unit.whole} is set`
+      : unit.refuse?.(existing)
+  return reason !== undefined
+    ? { status: "left", reason }
+    : { status: "keys", keys: unit.keys.filter((key) => !Equal.equals(key.value, key.default)) }
+}
+
 /**
  * The keys to write into a file as it is: those of every unit that is not refused, whose value
  * differs from T3's default. Returns them with a note for each unit left out whole, and the names
@@ -344,23 +383,10 @@ const wantedKeys = (
   const left: Array<string> = []
   const own: Array<string> = []
   for (const unit of all) {
-    if (
-      unit.whole !== undefined &&
-      existing[unit.whole] !== undefined &&
-      recorded.some(({ path }) => path[0] === unit.whole)
-    ) {
-      own.push(unit.name)
-      continue
-    }
-    const reason =
-      unit.whole !== undefined && existing[unit.whole] !== undefined
-        ? `${unit.whole} is set`
-        : unit.refuse?.(existing)
-    if (reason !== undefined) {
-      left.push(`${unit.name} (${reason})`)
-      continue
-    }
-    keys.push(...unit.keys.filter((key) => !Equal.equals(key.value, key.default)))
+    const outcome = unitOutcome(existing, unit, recorded)
+    if (outcome.status === "own") own.push(unit.name)
+    else if (outcome.status === "left") left.push(`${unit.name} (${outcome.reason})`)
+    else keys.push(...outcome.keys)
   }
   return { keys, left, own }
 }
@@ -371,6 +397,10 @@ interface Target {
   readonly units: ReadonlyArray<Unit>
   /** Why device access is left out, when it is wanted but not possible. */
   readonly deviceNote: string | undefined
+  /** What lets agents use devices here (see {@link deviceHost}), whatever the choice is. */
+  readonly device: string | undefined
+  /** Whether the config lets setup write the worktree choice at all. */
+  readonly worktreesAllowed: boolean
 }
 
 /** Why the step does nothing on this machine: a report line, or `undefined` when it has work. */
@@ -401,10 +431,10 @@ const decide = Effect.fn("t3SettingsDecide")(function* (
         `${label}: pi.t3.scope is "project", whose per-project overrides setup does not write yet; nothing written`,
       ),
     } satisfies Outcome
-  const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess
-  const host = wantsDevices
+  const host = config.pi.t3.deviceAccess
     ? yield* deviceHost(env, options.platform ?? process.platform)
     : undefined
+  const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess
   const deviceNote =
     wantsDevices && host === undefined
       ? "device access left out: no Xcode or Android SDK found"
@@ -412,8 +442,13 @@ const decide = Effect.fn("t3SettingsDecide")(function* (
   return {
     target: {
       file: t3SettingsFile(env),
-      units: units(host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
+      units: units(
+        wantsDevices && host !== undefined,
+        (options.worktrees ?? true) && config.pi.t3.worktrees,
+      ),
       deviceNote,
+      device: host,
+      worktreesAllowed: config.pi.t3.worktrees,
     },
   } satisfies Outcome
 })
@@ -540,6 +575,74 @@ export const installT3Settings = Effect.fn("installT3Settings")(function* (
   return [
     `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`,
   ]
+})
+
+/** What one unit of the T3 settings step would do to the file as it is. */
+export interface T3UnitPreview {
+  readonly name: string
+  /** The setup choice that switches the unit; absent for a unit that is always applied. */
+  readonly choice?: T3Choice
+  /** `path value` of each key the run adds. */
+  readonly added: ReadonlyArray<string>
+  /** The paths of the keys already at the wanted value. */
+  readonly present: ReadonlyArray<string>
+  /** `path value` of each key the file sets differently, which setup keeps. */
+  readonly kept: ReadonlyArray<string>
+  /** Why the unit is left out whole, or `undefined`. */
+  readonly left?: string
+  /** True when the setup record shows setup wrote the whole group earlier. */
+  readonly own?: boolean
+}
+
+/** What the T3 settings step would do on this machine with the given choices. */
+export interface T3Preview {
+  /** The T3 settings file. */
+  readonly file: string
+  /** What lets agents use devices here, or `undefined`: the device choice is offered only with one. */
+  readonly device: string | undefined
+  /** Whether the config lets setup write the worktree choice: the choice is offered only then. */
+  readonly worktreesAllowed: boolean
+  /** One entry per unit the choices keep in. */
+  readonly units: ReadonlyArray<T3UnitPreview>
+}
+
+/**
+ * What {@link installT3Settings} would do, unit by unit, without writing or recording anything:
+ * `undefined` when the step has no work or no line on this machine (`pi.enable` off), a report line
+ * when it only says why it writes nothing (T3 Code is not installed, `pi.t3.scope` is `project`),
+ * else the {@link T3Preview}. It is what the setup interface offers choices from and lists in its
+ * review.
+ */
+export const previewT3Settings = Effect.fn("previewT3Settings")(function* (
+  env: Env,
+  cwd: string,
+  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform">,
+): Effect.fn.Return<T3Preview | { readonly line: string } | undefined, SetupFailure> {
+  const decided = yield* decide(env, cwd, options)
+  if (decided === undefined) return undefined
+  if ("line" in decided) return { line: decided.line }
+  const { file, units: wanted, device, worktreesAllowed } = decided.target
+  const before = yield* readJsonObjectSnapshot(file)
+  const recorded = yield* readRecorded(env, file).pipe(Effect.orElseSucceed(() => []))
+  const units = wanted.map((unit): T3UnitPreview => {
+    const outcome = unitOutcome(before.value, unit, recorded)
+    const base = { name: unit.name, ...(unit.choice === undefined ? {} : { choice: unit.choice }) }
+    if (outcome.status === "own") return { ...base, added: [], present: [], kept: [], own: true }
+    if (outcome.status === "left")
+      return { ...base, added: [], present: [], kept: [], left: outcome.reason }
+    const { entries } = applyDefaults(before.value, outcome.keys)
+    return {
+      ...base,
+      added: entries
+        .filter((entry) => entry.status === "added")
+        .map((entry) => `${entry.path} ${show(entry.value)}`),
+      present: entries.filter((entry) => entry.status === "present").map((entry) => entry.path),
+      kept: entries
+        .filter((entry) => entry.status === "kept")
+        .map((entry) => `${entry.path} ${show(entry.value)}`),
+    }
+  })
+  return { file, device, worktreesAllowed, units }
 })
 
 /**

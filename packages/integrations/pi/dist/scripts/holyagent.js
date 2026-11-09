@@ -25112,6 +25112,7 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
 })))), t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join18(homeDirectory(env), ".t3"), t3SettingsFile = (env) => join18(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
   {
     name: "Pi provider",
+    choice: "pi",
     keys: [
       { path: ["providerInstances", "pi", "driver"], value: "pi", default: undefined },
       { path: ["providerInstances", "pi", "enabled"], value: true, default: undefined }
@@ -25129,6 +25130,7 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
   ...devices ? [
     {
       name: "device access",
+      choice: "deviceAccess",
       keys: [
         { path: ["enableDeviceSupport"], value: true, default: false },
         { path: ["enableAgentDeviceAccess"], value: true, default: false }
@@ -25138,6 +25140,7 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
   ...worktrees ? [
     {
       name: "worktrees",
+      choice: "worktrees",
       keys: [{ path: ["defaultThreadEnvMode"], value: "worktree", default: null }]
     }
   ] : [],
@@ -25203,24 +25206,26 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
       }))
     ]
   }
-], wantedKeys = (existing, all, recorded = []) => {
+], unitOutcome = (existing, unit, recorded) => {
+  if (unit.whole !== undefined && existing[unit.whole] !== undefined && recorded.some(({ path }) => path[0] === unit.whole))
+    return { status: "own" };
+  const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
+  return reason !== undefined ? { status: "left", reason } : { status: "keys", keys: unit.keys.filter((key) => !equals(key.value, key.default)) };
+}, wantedKeys = (existing, all, recorded = []) => {
   const keys = [];
   const left = [];
   const own = [];
   for (const unit of all) {
-    if (unit.whole !== undefined && existing[unit.whole] !== undefined && recorded.some(({ path }) => path[0] === unit.whole)) {
+    const outcome = unitOutcome(existing, unit, recorded);
+    if (outcome.status === "own")
       own.push(unit.name);
-      continue;
-    }
-    const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
-    if (reason !== undefined) {
-      left.push(`${unit.name} (${reason})`);
-      continue;
-    }
-    keys.push(...unit.keys.filter((key) => !equals(key.value, key.default)));
+    else if (outcome.status === "left")
+      left.push(`${unit.name} (${outcome.reason})`);
+    else
+      keys.push(...outcome.keys);
   }
   return { keys, left, own };
-}, decide, writeVerified, names = (paths) => paths.map((entry) => entry.path).join(", "), installT3Settings, undoT3Settings, checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
+}, decide, writeVerified, names = (paths) => paths.map((entry) => entry.path).join(", "), installT3Settings, previewT3Settings, undoT3Settings, checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [];
   const decided = yield* decide(env, cwd, options);
@@ -25293,14 +25298,16 @@ var init_t3_settings = __esm(() => {
       return {
         line: skipped(`${label2}: pi.t3.scope is "project", whose per-project overrides setup does not write yet; nothing written`)
       };
+    const host = config.pi.t3.deviceAccess ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
     const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess;
-    const host = wantsDevices ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
     const deviceNote = wantsDevices && host === undefined ? "device access left out: no Xcode or Android SDK found" : undefined;
     return {
       target: {
         file: t3SettingsFile(env),
-        units: units(host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
-        deviceNote
+        units: units(wantsDevices && host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
+        deviceNote,
+        device: host,
+        worktreesAllowed: config.pi.t3.worktrees
       }
     };
   });
@@ -25356,6 +25363,32 @@ var init_t3_settings = __esm(() => {
     return [
       `${mark} ${label2} ${file}: ${parts.join("; ")}${added.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
     ];
+  });
+  previewT3Settings = fn2("previewT3Settings")(function* (env, cwd, options) {
+    const decided = yield* decide(env, cwd, options);
+    if (decided === undefined)
+      return;
+    if ("line" in decided)
+      return { line: decided.line };
+    const { file, units: wanted, device, worktreesAllowed } = decided.target;
+    const before = yield* readJsonObjectSnapshot(file);
+    const recorded = yield* readRecorded(env, file).pipe(orElseSucceed2(() => []));
+    const units = wanted.map((unit) => {
+      const outcome = unitOutcome(before.value, unit, recorded);
+      const base = { name: unit.name, ...unit.choice === undefined ? {} : { choice: unit.choice } };
+      if (outcome.status === "own")
+        return { ...base, added: [], present: [], kept: [], own: true };
+      if (outcome.status === "left")
+        return { ...base, added: [], present: [], kept: [], left: outcome.reason };
+      const { entries } = applyDefaults(before.value, outcome.keys);
+      return {
+        ...base,
+        added: entries.filter((entry) => entry.status === "added").map((entry) => `${entry.path} ${show(entry.value)}`),
+        present: entries.filter((entry) => entry.status === "present").map((entry) => entry.path),
+        kept: entries.filter((entry) => entry.status === "kept").map((entry) => `${entry.path} ${show(entry.value)}`)
+      };
+    });
+    return { file, device, worktreesAllowed, units };
   });
   undoT3Settings = fn2("undoT3Settings")(function* (env, options) {
     const file = t3SettingsFile(env);
@@ -25477,7 +25510,11 @@ var init_steps = __esm(() => {
       ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
       ...piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
       ...piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
-      ...piUsed && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, { dryRun: options.dryRun })) : [],
+      ...piUsed && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+        dryRun: options.dryRun,
+        ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
+        ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
+      })) : [],
       ...yield* onSettings((file) => mergeUserSettings({
         env,
         file,
@@ -25547,9 +25584,212 @@ var init_doctor = __esm(() => {
   });
 });
 
-var CacheTtlFlag, ScopeFlag, printed = (report) => new Verbatim(`${report.lines.join(`
+var TUI_BUNDLE = "setup-tui.js";
+
+var TUI_PACKAGES = {
+  "@opentui/core": "0.8.3",
+  "@opentui/solid": "0.8.3",
+  "solid-js": "1.9.18"
+};
+
+import { join as join20 } from "path";
+import { pathToFileURL } from "url";
+var TuiUnavailable, cacheHome = (env, platform = process.platform) => {
+  const home = homeDirectory(env);
+  if (platform === "win32")
+    return firstNonEmpty(env["LOCALAPPDATA"]) ?? join20(home, "AppData", "Local");
+  const xdg = firstNonEmpty(env["XDG_CACHE_HOME"]);
+  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join20(home, ".cache");
+}, tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform) => join20(cacheHome(env, platform), "holyagent", "setup-tui", Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`).join("_")), oneLine2 = (text) => text.trim().split(`
+`)[0] ?? "", failureLine = (text) => {
+  const lines = text.split(`
+`).map((line) => line.trim()).filter((line) => line !== "");
+  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
+}, unavailable = (what, cause) => new TuiUnavailable({
+  reason: `${what}: ${oneLine2(cause instanceof Error ? cause.message : String(cause))}`
+}), bunInstall = (directory, packages) => gen2(function* () {
+  yield* tryPromise2({
+    try: () => Bun.write(join20(directory, "package.json"), `${JSON.stringify({ name: "holyagent-setup-tui", private: true, dependencies: packages }, undefined, 2)}
+`, { createPath: true }),
+    catch: (cause) => unavailable(`cannot write ${join20(directory, "package.json")}`, cause)
+  });
+  const shell = yield* Shell;
+  const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "install", "--ignore-scripts"], { cwd: directory });
+  if (result.exitCode !== 0)
+    return yield* new TuiUnavailable({
+      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
+    });
+}), importFile = (path) => tryPromise2({
+  try: () => import(pathToFileURL(path).href),
+  catch: (cause) => unavailable(`cannot import ${path}`, cause)
+}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join20(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+  return;
+})), installed = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", loadSetupTui = (env, options = {}) => gen2(function* () {
+  const packages = options.packages ?? TUI_PACKAGES;
+  const directory = options.directory ?? tuiDirectory(env, packages);
+  const source = options.bundle ?? join20(import.meta.dir, TUI_BUNDLE);
+  const install = options.install ?? bunInstall;
+  const importModule = options.importModule ?? importFile;
+  const text = yield* tryPromise2({
+    try: () => Bun.file(source).text(),
+    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
+  });
+  if (!(yield* installed(directory, packages))) {
+    if (options.notify !== undefined)
+      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
+`);
+    yield* install(directory, packages);
+    if (!(yield* installed(directory, packages)))
+      return yield* new TuiUnavailable({
+        reason: `the install finished but ${directory} does not hold the expected package versions`
+      });
+  }
+  const target = join20(directory, TUI_BUNDLE);
+  yield* tryPromise2({
+    try: () => Bun.write(target, text, { createPath: true }),
+    catch: (cause) => unavailable(`cannot write ${target}`, cause)
+  });
+  yield* importModule(join20(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  const loaded = yield* importModule(target);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
+  return loaded;
+});
+var init_load2 = __esm(() => {
+  init_dist();
+  init_environment();
+  init_shell();
+  TuiUnavailable = class TuiUnavailable extends TaggedError2("TuiUnavailable") {
+    get message() {
+      return this.reason;
+    }
+  };
+});
+
+var AppliedSchema, TuiOutcomeSchema;
+var init_types = __esm(() => {
+  init_dist();
+  AppliedSchema = Struct({
+    ok: Boolean3,
+    lines: ArraySchema(String6)
+  });
+  TuiOutcomeSchema = Union2([
+    Struct({ _tag: Literal2("Applied"), applied: AppliedSchema }),
+    Struct({ _tag: Literal2("Cancelled") }),
+    Struct({ _tag: Literal2("Interrupted") })
+  ]);
+});
+
+var DEFAULT_CHOICES, set = (value) => value !== undefined && value !== "", tuiFallbackReason = (options) => {
+  const { env, terminal } = options;
+  if (options.noTui)
+    return "--no-tui was passed";
+  if (options.choiceFlag)
+    return "a choice flag was passed, so it applies directly";
+  if (terminal === undefined || !terminal.stdin || !terminal.stdout)
+    return "stdin or stdout is not a terminal";
+  if (set(env["CI"]) && env["CI"] !== "false")
+    return "CI is set";
+  if (env["TERM"] === "dumb")
+    return "TERM is dumb";
+  return;
+}, t3Offer, offerOf = (preview) => ({
+  device: preview.device,
+  worktrees: preview.worktreesAllowed
+}), capitalized = (text) => text.charAt(0).toUpperCase() + text.slice(1), lineOf = (unit) => {
+  const name = capitalized(unit.name);
+  if (unit.own === true)
+    return { mark: "=", name, detail: "already written by setup" };
+  if (unit.left !== undefined)
+    return { mark: "~", name, detail: `left out: ${unit.left}` };
+  const kept = unit.kept.length === 0 ? [] : [`kept ${unit.kept.join(", ")} (yours wins)`];
+  const added = unit.added.length <= 2 ? unit.added.join(", ") : `${unit.added.length} keys, starting with ${(unit.added[0] ?? "").split(" ")[0]}`;
+  if (unit.added.length > 0)
+    return { mark: "+", name, detail: [added, ...kept].join("; ") };
+  if (kept.length > 0)
+    return { mark: "~", name, detail: kept.join("; ") };
+  return { mark: "=", name, detail: "already set" };
+}, choiceLine = (name, unit) => unit === undefined ? { mark: "-", name, detail: "off; nothing written" } : lineOf({ ...unit, name }), reviewOf = (preview, choices) => {
+  const unit = (choice) => preview.units.find((u) => u.choice === choice);
+  const pi = unit("pi");
+  return {
+    file: preview.file,
+    choices: [
+      ...pi === undefined ? [] : [lineOf({ ...pi, name: "Pi provider" })],
+      ...preview.device === undefined ? [] : [
+        choiceLine("Agent device access", choices.deviceAccess ? unit("deviceAccess") : undefined)
+      ],
+      ...preview.worktreesAllowed ? [
+        choiceLine("New threads in worktrees", choices.worktrees ? unit("worktrees") : undefined)
+      ] : []
+    ],
+    always: preview.units.filter((u) => u.choice === undefined).map(lineOf)
+  };
+}, fallback = (reason) => ({
+  kind: "line",
+  notes: [hint(`t3 tui: ${reason}; using the line-based setup`)]
+}), decodeOutcome, runInteractive, oneLine3 = (cause) => (cause instanceof Error ? cause.message : String(cause)).trim().split(`
+`)[0] ?? "";
+var init_session = __esm(() => {
+  init_dist();
+  init_identity();
+  init_pi_check();
+  init_t3_settings();
+  init_load2();
+  init_types();
+  DEFAULT_CHOICES = { worktrees: true, deviceAccess: true };
+  t3Offer = fn2("t3Offer")(function* (env, cwd, options) {
+    if (options.undo || options.scope !== "user" || inCloudSession(env))
+      return;
+    if (!(yield* piInUse(env)))
+      return;
+    const preview = yield* previewT3Settings(env, cwd, DEFAULT_CHOICES).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
+    return preview === undefined || "line" in preview ? undefined : preview;
+  });
+  decodeOutcome = decodeUnknownEffect2(TuiOutcomeSchema, { onExcessProperty: "error" });
+  runInteractive = fn2("runInteractive")(function* (options) {
+    const preview = yield* t3Offer(options.env, options.cwd, options);
+    if (preview === undefined)
+      return { kind: "line", notes: [] };
+    const reason = tuiFallbackReason(options);
+    if (reason !== undefined)
+      return fallback(reason);
+    const load = options.load ?? ((env, notify) => loadSetupTui(env, { notify }));
+    const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
+    if (loaded instanceof TuiUnavailable)
+      return fallback(`unavailable (${loaded.reason})`);
+    const input = {
+      env: options.env,
+      offer: offerOf(preview),
+      initial: DEFAULT_CHOICES,
+      dryRun: options.dryRun,
+      review: (choices) => runPromise2(previewT3Settings(options.env, options.cwd, choices).pipe(flatMap2((next) => next === undefined || ("line" in next) ? fail5(new Error("the T3 settings step has nothing to do any more")) : succeed6(reviewOf(next, choices))))),
+      apply: (choices, signal) => runPromise2(options.apply(choices), { signal })
+    };
+    return yield* tryPromise2({
+      try: () => loaded.runSetupTui(input),
+      catch: (cause) => cause
+    }).pipe(flatMap2(decodeOutcome), map5((outcome) => {
+      if (outcome._tag === "Applied") {
+        const applied = outcome.applied;
+        return { kind: "done", report: { lines: applied.lines, ok: applied.ok } };
+      }
+      return {
+        kind: "done",
+        report: outcome._tag === "Cancelled" ? { lines: [hint("setup cancelled; nothing was written")], ok: false } : {
+          lines: [
+            "! setup was interrupted while applying; run holyagent setup again to finish"
+          ],
+          ok: false
+        }
+      };
+    }), catch_2((cause) => succeed6(fallback(`failed to start (${oneLine3(cause)})`))));
+  });
+});
+
+var CacheTtlFlag, SwitchFlag, ScopeFlag, printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
-`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]", DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]", SETUP_COMMANDS;
+`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--worktrees on|off] [--device-access on|off] [--no-tui]", switchFlag, DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]", SETUP_COMMANDS;
 var init_setup = __esm(() => {
   init_dist();
   init_doctor();
@@ -25558,14 +25798,22 @@ var init_setup = __esm(() => {
   init_settings2();
   init_shell();
   init_steps();
+  init_session();
   init_args();
   CacheTtlFlag = Literals(CACHE_TTLS);
+  SwitchFlag = Literals(["on", "off"]);
   ScopeFlag = Literals(SCOPES);
   resolveScope = fn2("resolveScope")(function* (flag, usage, cwd) {
     if (flag === undefined)
       return yield* installedScope(cwd);
     const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
     return { scope, source: "flag" };
+  });
+  switchFlag = fn2("switchFlag")(function* (args, name) {
+    const value = stringFlag(args, name);
+    if (value === undefined)
+      return;
+    return (yield* choiceFlag(SwitchFlag, name, value, SETUP_USAGE)) === "on";
   });
   SETUP_COMMANDS = [
     {
@@ -25581,39 +25829,70 @@ var init_setup = __esm(() => {
         "without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
         "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
         "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
-        "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"
+        "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+        "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
+        "in a terminal, when the T3 part has work (Pi in use, scope user, T3 Code installed), setup shows an interactive screen for the two choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
+        "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps"
       ],
       flags: {
         scope: "string",
         undo: "boolean",
         "dry-run": "boolean",
         "subagent-cache-ttl": "string",
-        "skip-ctx7": "boolean"
+        "skip-ctx7": "boolean",
+        worktrees: "string",
+        "device-access": "string",
+        "no-tui": "boolean"
       },
       stateless: true,
       positionals: 0,
-      run: ({ args, env, cwd }) => gen2(function* () {
+      run: ({ args, env, cwd, emit, terminal, setupTui }) => gen2(function* () {
         const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
         if (resolved instanceof SetupFailure) {
           return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
         }
         const subagentCacheTtl = yield* choiceFlag(CacheTtlFlag, "subagent-cache-ttl", stringFlag(args, "subagent-cache-ttl") ?? "1h", SETUP_USAGE);
-        const report = yield* setup(env, {
+        const flagged = {
+          worktrees: yield* switchFlag(args, "worktrees"),
+          deviceAccess: yield* switchFlag(args, "device-access")
+        };
+        const apply = (choices, notes = []) => gen2(function* () {
+          const report = yield* setup(env, {
+            scope: resolved.scope,
+            undo: booleanFlag(args, "undo"),
+            cwd,
+            subagentCacheTtl,
+            dryRun: booleanFlag(args, "dry-run"),
+            skipCtx7: booleanFlag(args, "skip-ctx7"),
+            ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
+            ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }
+          });
+          return {
+            ...report,
+            lines: [
+              hint(`scope: ${describeScope(resolved)}`),
+              ...scopeNotices(resolved).map((notice) => hint(`scope: ${notice}`)),
+              ...notes,
+              ...report.lines
+            ]
+          };
+        }).pipe(provide4(Shell.live(env)));
+        const interactive = yield* runInteractive({
+          env,
+          cwd,
           scope: resolved.scope,
           undo: booleanFlag(args, "undo"),
-          cwd,
-          subagentCacheTtl,
           dryRun: booleanFlag(args, "dry-run"),
-          skipCtx7: booleanFlag(args, "skip-ctx7")
+          terminal,
+          noTui: booleanFlag(args, "no-tui"),
+          choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined,
+          ...setupTui === undefined ? {} : { load: setupTui },
+          notify: emit,
+          apply: (choices) => apply(choices)
         });
-        return printed({
-          ...report,
-          lines: [
-            hint(`scope: ${describeScope(resolved)}`),
-            ...scopeNotices(resolved).map((notice) => hint(`scope: ${notice}`)),
-            ...report.lines
-          ]
-        });
+        if (interactive.kind === "done")
+          return printed(interactive.report);
+        return printed(yield* apply(flagged, interactive.notes));
       }).pipe(provide4(Shell.live(env)))
     },
     {
@@ -25688,12 +25967,12 @@ var init_state = __esm(() => {
   ];
 });
 
-import { join as join20 } from "path";
+import { join as join21 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-}, toolPath = (directory, tool, target) => join20(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
+}, toolPath = (directory, tool, target) => join21(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
     return yield* new ToolMissing({ tool: options.tool, path });
@@ -25733,7 +26012,7 @@ var init_tools2 = __esm(() => {
     { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
     { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
   ];
-  BUNDLED_TOOLS = join20(import.meta.dir, "vendor");
+  BUNDLED_TOOLS = join21(import.meta.dir, "vendor");
   UnsupportedPlatform = class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
     get message() {
       return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;
@@ -25807,6 +26086,8 @@ var forWords = (command, words) => command.forHost === undefined ? command : { .
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
     tools: host.tools ?? BUNDLED_TOOLS,
+    terminal: host.terminal,
+    setupTui: host.setupTui,
     input: (schema) => readInput(host, schema, inline),
     inputBy: (pick) => readInputBy(host, pick, inline)
   };
@@ -25912,7 +26193,8 @@ var init_main = __esm(async () => {
     cwd: process.cwd(),
     env: process.env,
     stdin,
-    emit: (text) => write(process.stdout, text)
+    emit: (text) => write(process.stdout, text),
+    terminal: { stdin: Boolean(process.stdin.isTTY), stdout: Boolean(process.stdout.isTTY) }
   }).pipe(tap2((result) => write(process.stdout, result.stdout).pipe(andThen2(write(process.stderr, result.stderr)), andThen2(sync2(() => void (process.exitCode = result.code)))))));
 });
 

@@ -8,6 +8,8 @@ import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { jsonText } from "../../../runtime/src/instructions/generated.ts"
 import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
 import { PROMPT_TEMPLATES } from "../../../runtime/src/prompts/index.ts"
+import { bundleSetupTui } from "../../../runtime/src/setup/tui/build.ts"
+import { TUI_BUNDLE, TUI_SOURCE } from "../../../runtime/src/setup/tui/files.ts"
 import { frontmatter } from "../../claude/src/agents.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles } from "./agents.ts"
@@ -173,6 +175,10 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       content: `# ${generatedNote(BUNFIG_SOURCE)}\n${await readSource(BUNFIG_SOURCE)}`,
     },
     { path: inPackage("scripts/holyagent.js"), content: await runtime() },
+    {
+      path: inPackage(`scripts/${TUI_BUNDLE}`),
+      content: await Effect.runPromise(bundleSetupTui(REPOSITORY, generatedNote(TUI_SOURCE))),
+    },
   ]
 }
 
