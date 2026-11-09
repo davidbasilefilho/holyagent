@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw8s8hov-9jat",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-commit-3869116-against-the",
+  "objective": "Re-assess commit 3869116 against the residual that a tracked name folding onto .claude/settings.local.json (case, Unicode such as U+017F, or a Windows trailing dot or space) could still make a bare setup infer local scope.",
+  "state": "Running",
+  "scope": [
+    "The repair diff is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/identity-review.diff (diff-file); read packages/runtime/src/setup/scope.ts and the new test in packages/runtime/tests/setup-scope.test.ts in full in /home/user/holyagent-0.3.0-scope.",
+    "Trace whether the device-and-inode comparison closes the folding residual on case-insensitive or normalizing file systems, and whether it opens anything new: symlink following, a stat error that flips the result, a tracked entry deleted from disk, cost on a large .claude tree."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Substantiate each finding with a source-to-sink trace and path:line; mark it blocking only when it is reachable from repository-controlled input.",
+    "Report in under 300 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has a source-to-sink trace with path:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the folding residual is closed and whether the range should hold the push",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8s3phz-nmro"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:49:59.696Z"
+  },
+  "createdAt": "2026-11-09T04:49:59.696Z"
+}
