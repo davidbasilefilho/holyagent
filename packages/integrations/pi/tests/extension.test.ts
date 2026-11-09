@@ -25,6 +25,7 @@ import {
   PI_SESSION_REMINDER,
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
+import { cmdExeArguments } from "../../../runtime/src/pi/bash/cmd.ts"
 import { providerEnv, routedModels } from "../../../runtime/src/pi/provider.ts"
 import { PI_ROOT_PROMPT, PI_ROOT_PROMPTS } from "../../../runtime/src/pi/root-prompt.ts"
 import { toolArgs } from "../../../runtime/src/pi/tools.ts"
@@ -36,7 +37,6 @@ import {
   CACHE_RETENTION_ENV,
   childAgent,
   CMD_NOT_FOUND,
-  cmdExeArguments,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
   createExtension,

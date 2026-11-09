@@ -12,13 +12,16 @@ const BARE_SYNTAX = /[&|<>()]/
 
 /**
  * The arguments that start `command args...` through `cmd.exe`, which only a shell can run for a
- * `.cmd` or `.bat` file. The rules are those of `cmdExeArguments` in the Pi extension (the same
- * quoting, the same refusals), which the shell's bundle cannot import. The spawn quotes each
- * argument itself (in quotes when it holds a space, a tab or a quote, otherwise bare) and joins
- * them with spaces, so the line starts with `call`, which keeps `cmd.exe` from stripping a leading
- * quote: `cmd.exe /d /s /c call "C:\a b\x.cmd" --flag "C:\c d\x"`. Every word stays a separate
- * argument. A word with a character that no quoting protects (see {@link UNQUOTABLE}), or with a
- * `cmd.exe` operator while the spawn would leave it unquoted, is refused instead of started.
+ * `.cmd` or `.bat` file. Both the Pi extension (for its `.cmd` shims) and the shell's host-program
+ * launch use it. The spawn is made without a shell and without `windowsVerbatimArguments`, so Node
+ * quotes each argument itself (in quotes when it holds a space, a tab or a quote, otherwise bare)
+ * and joins them with spaces; `cmd.exe` receives that line unchanged. One extra pair of quotes
+ * around the whole line cannot be passed through that quoting, which would escape the inner quotes
+ * as `\"`. The line instead starts with `call`, so it does not begin with a quote and `cmd.exe`
+ * strips none: `cmd.exe /d /s /c call "C:\a b\x.cmd" --flag "C:\c d\x"`. Every word stays a
+ * separate argument. A word with a character that no quoting protects (see {@link UNQUOTABLE}), or
+ * with a `cmd.exe` operator while the spawn would leave it unquoted, is refused instead of
+ * started.
  */
 export const cmdExeArguments = (command: string, args: ReadonlyArray<string>): CmdLaunch => {
   for (const word of [command, ...args]) {

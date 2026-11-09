@@ -23,6 +23,7 @@ import {
 } from "just-bash"
 
 import { cmdExeArguments, isBatchFile } from "./cmd.ts"
+import { withNullDevice } from "./devices.ts"
 import { DONE, SNAPSHOT, watchExit } from "./exit.ts"
 import {
   hostPathValue,
@@ -518,20 +519,22 @@ export const runShell = (
       filesystem: new InMemoryFs(stubs),
     }))
     const hostFs = (root: string) => new ReadWriteFs({ root, allowSymlinks: true })
-    const fs = withProgramLaunch(
-      windows
-        ? new MountableFs({
-            base: new InMemoryFs(),
-            mounts: [
-              ...stubMounts,
-              ...[...drives].map((letter) => ({
-                mountPoint: `/${letter}`,
-                filesystem: hostFs(`${letter.toUpperCase()}:\\`),
-              })),
-            ],
-          })
-        : new MountableFs({ base: hostFs("/"), mounts: stubMounts }),
-      { toHost: (path) => toHostPath(path, drives, platform), platform, extensions },
+    const fs = withNullDevice(
+      withProgramLaunch(
+        windows
+          ? new MountableFs({
+              base: new InMemoryFs(),
+              mounts: [
+                ...stubMounts,
+                ...[...drives].map((letter) => ({
+                  mountPoint: `/${letter}`,
+                  filesystem: hostFs(`${letter.toUpperCase()}:\\`),
+                })),
+              ],
+            })
+          : new MountableFs({ base: hostFs("/"), mounts: stubMounts }),
+        { toHost: (path) => toHostPath(path, drives, platform), platform, extensions },
+      ),
     )
 
     const hostCommands = [...plan.passthrough, ...plan.aliases].map(([name, path]) =>
@@ -542,7 +545,7 @@ export const runShell = (
       Effect.runPromise(runHost(args[0] ?? "", args.slice(1), ctx, run)),
     )
     const jsExec = defineCommand("js-exec", (args, ctx) => Effect.runPromise(runJsExec(args, ctx)))
-    const exit = watchExit()
+    const exit = watchExit(before)
     const bash = new Bash({
       fs,
       cwd,

@@ -16402,6 +16402,24 @@ var hasCode = (cause, code) => typeof cause === "object" && cause !== null && ("
 
 var hasStateFolder = (directory) => io(directory, () => stat(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed5(false)));
 
+var UNQUOTABLE = /["%^!]|\p{Cc}/u;
+var BARE_SYNTAX = /[&|<>()]/;
+var cmdExeArguments = (command, args) => {
+  for (const word of [command, ...args]) {
+    if (UNQUOTABLE.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
+      };
+    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
+      };
+  }
+  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
+};
+
 var SHELL_BUNDLE = "just-bash.js";
 var ShellRequest = Struct({
   command: String4,
@@ -18084,23 +18102,6 @@ var scriptArgs = (packageRoot, script, platformPath = nodePath2) => [
   platformPath.join(packageRoot, "scripts", script)
 ];
 var CMD_NOT_FOUND = 9009;
-var UNQUOTABLE = /["%^!]|\p{Cc}/u;
-var BARE_SYNTAX = /[&|<>()]/;
-var cmdExeArguments = (command, args) => {
-  for (const word of [command, ...args]) {
-    if (UNQUOTABLE.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
-      };
-    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
-      };
-  }
-  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
-};
 var oneLine = (text) => printable(text).replace(/\s+/g, " ").trim();
 var notice = (text) => ({
   customType: NOTICE_MESSAGE,
@@ -18545,7 +18546,6 @@ export {
   WORKFLOW_TOOL,
   applyEnvironment,
   childAgent,
-  cmdExeArguments,
   createExtension,
   extension_default as default,
   failedFinalMessage,

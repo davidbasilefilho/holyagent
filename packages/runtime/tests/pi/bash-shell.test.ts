@@ -711,6 +711,57 @@ describe("exit keeps the state the run had", () => {
     expect(nested.text).toBe("rc=3\n")
     expect(nested.changes.set).toEqual({ N: "1" })
   })
+
+  test("the local variables of the function that calls exit are not session state", async () => {
+    const out = await shell("f() { local L=1 M; G=2; exit 3; }; f", { env: { M: "keep" } })
+    expect(out.exitCode).toBe(3)
+    expect(out.changes).toEqual({ set: { G: "2" }, unset: [] })
+    const nested = await shell(
+      "f() { local L=1; g() { local K=2; exit 4; }; g; }; f; echo not reached",
+    )
+    expect(nested.changes).toEqual({ set: {}, unset: [] })
+  })
+})
+
+describe("redirects to /dev/null", () => {
+  test.skipIf(WINDOWS)(
+    "discard what a builtin or a host program writes, and /dev/null reads as empty",
+    async () => {
+      const noisy = `${HOST} -e "console.log('out'); console.error('err')"`
+      expect(await shell("echo hidden >/dev/null; echo shown")).toMatchObject({
+        exitCode: 0,
+        text: "shown\n",
+      })
+      expect(
+        (await shell("echo hidden > /dev/null; echo more >> /dev/null; echo shown")).text,
+      ).toBe("shown\n")
+      expect((await shell("ls /nope-missing 2>/dev/null; echo rc=$?")).text).toBe("rc=2\n")
+      expect((await shell("{ echo out; echo err >&2; } &>/dev/null; echo shown")).text).toBe(
+        "shown\n",
+      )
+      expect((await shell("{ echo out; echo err >&2; } >/dev/null 2>&1; echo shown")).text).toBe(
+        "shown\n",
+      )
+      expect((await shell(`${noisy} >/dev/null`)).text).toBe("err\n")
+      expect((await shell(`${noisy} 2>/dev/null`)).text).toBe("out\n")
+      expect((await shell(`${noisy} &>/dev/null; echo done`)).text).toBe("done\n")
+      expect((await shell(`${noisy} >/dev/null 2>&1; echo done`)).text).toBe("done\n")
+      expect(
+        (await shell('cat </dev/null; echo -n "[$(cat /dev/null)]"; wc -c </dev/null')).text,
+      ).toMatch(/^\[\]\s*0\n?$/)
+      expect((await shell("echo a >/dev/null; cat /dev/null | wc -c")).text.trim()).toBe("0")
+    },
+  )
+
+  test.skipIf(WINDOWS)("discard what a program given by path writes", async () => {
+    await mkdir(join(work, "null-bin"), { recursive: true })
+    const path = join(work, "null-bin", "prog")
+    await writeFile(path, `#!${process.execPath}\nconsole.log('o'); console.error('e')\n`)
+    await chmod(path, 0o755)
+    expect((await shell("./null-bin/prog >/dev/null")).text).toBe("e\n")
+    expect((await shell("./null-bin/prog 2>/dev/null")).text).toBe("o\n")
+    expect((await shell("./null-bin/prog &>/dev/null; echo done")).text).toBe("done\n")
+  })
 })
 
 describe("a host program's output keeps its order in a run that is not streamed", () => {

@@ -71531,7 +71531,7 @@ var parseRequest = (text) => decodeRequest(text).pipe(mapError2((error) => new P
 
 import { statSync as statSync3 } from "fs";
 import { constants as osConstants } from "os";
-import { delimiter as delimiter2, posix as posix3 } from "path";
+import { delimiter as delimiter2, posix as posix4 } from "path";
 
 init_chunk_353VO5TF();
 init_chunk_SRB6FXRH();
@@ -89828,19 +89828,60 @@ var cmdExeArguments = (command, args) => {
 };
 var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
 
+import { posix as posix3 } from "path";
+var NULL_DEVICE = "/dev/null";
+var NULL_STAT = {
+  isFile: true,
+  isDirectory: false,
+  isSymbolicLink: false,
+  mode: 438,
+  size: 0,
+  mtime: new Date(0)
+};
+var NULL_CALLS = {
+  writeFile: () => {
+    return;
+  },
+  appendFile: () => {
+    return;
+  },
+  readFile: () => "",
+  readFileBytes: () => "",
+  readFileBuffer: () => new Uint8Array(0),
+  exists: () => true,
+  stat: () => NULL_STAT,
+  lstat: () => NULL_STAT
+};
+var withNullDevice = (fs) => new Proxy(fs, {
+  get: (target, name) => {
+    const member = Reflect.get(target, name, target);
+    const answer = typeof name === "string" ? NULL_CALLS[name] : undefined;
+    if (typeof member !== "function" || answer === undefined)
+      return member;
+    return (...args) => {
+      if (typeof args[0] === "string" && posix3.normalize(args[0]) === NULL_DEVICE)
+        return runPromise2(sync2(answer));
+      const result = Reflect.apply(member, target, args);
+      return result;
+    };
+  }
+});
+
 var SNAPSHOT = "holyagent-snapshot";
 var DONE = "holyagent-done";
-var isExit3 = (node) => {
+var isNamed = (node, names) => {
   if (typeof node !== "object" || node === null)
     return false;
   const { type, name } = node;
   if (type !== "SimpleCommand" || name?.parts?.length !== 1)
     return false;
   const [part] = name.parts;
-  return part?.type === "Literal" && part.value === "exit";
+  return part?.type === "Literal" && typeof part.value === "string" && names.has(part.value);
 };
-var around = (exit) => {
-  const [statement] = He8(`{ ${SNAPSHOT}; exit; }`).statements;
+var EXIT_COMMAND = new Set(["exit"]);
+var isExit3 = (node) => isNamed(node, EXIT_COMMAND);
+var around = (exit, locals) => {
+  const [statement] = He8(`{ ${[SNAPSHOT, ...locals].join(" ")}; exit; }`).statements;
   const group = statement?.pipelines[0]?.commands[0];
   if (group?.type !== "Group")
     return exit;
@@ -89850,13 +89891,40 @@ var around = (exit) => {
   last.commands[0] = exit;
   return group;
 };
-var wrapExits = (node) => {
+var LOCAL_COMMANDS = new Set(["local", "declare", "typeset"]);
+var declaredName = (word) => {
+  const [first] = word.parts;
+  if (first?.type !== "Literal")
+    return;
+  const match = /^([A-Za-z_][A-Za-z0-9_]*)(=|$)/.exec(first.value);
+  return match !== null && (match[2] === "=" || word.parts.length === 1) ? match[1] : undefined;
+};
+var literalOf = (word) => word.parts.length === 1 && word.parts[0]?.type === "Literal" ? word.parts[0].value : undefined;
+var collectLocals = (node, found) => {
+  if (Array.isArray(node))
+    return node.forEach((item) => collectLocals(item, found));
+  if (typeof node !== "object" || node === null)
+    return;
+  if (isNamed(node, LOCAL_COMMANDS)) {
+    const [command] = node.name?.parts ?? [];
+    const global = command?.type === "Literal" && command.value !== "local" && node.args.some((word) => /^-\w*g/.test(literalOf(word) ?? ""));
+    if (!global)
+      for (const word of node.args) {
+        const name = declaredName(word);
+        if (name !== undefined)
+          found.add(name);
+      }
+  }
+  for (const value of Object.values(node))
+    collectLocals(value, found);
+};
+var wrapExits = (node, locals, inFunction) => {
   if (Array.isArray(node)) {
     let count = 0;
     node.forEach((item, at) => {
-      count += wrapExits(item);
+      count += wrapExits(item, locals, inFunction);
       if (isExit3(item)) {
-        node[at] = around(item);
+        node[at] = around(item, inFunction ? locals : []);
         count += 1;
       }
     });
@@ -89864,15 +89932,23 @@ var wrapExits = (node) => {
   }
   if (typeof node !== "object" || node === null)
     return 0;
-  return Object.values(node).reduce((count, value) => count + wrapExits(value), 0);
+  const inside = inFunction || node.type === "FunctionDef";
+  return Object.values(node).reduce((count, value) => count + wrapExits(value, locals, inside), 0);
 };
 var status = (ctx) => succeed5({ stdout: "", stderr: "", exitCode: Number(ctx.env.get("?") ?? 0) || 0 });
-var watchExit = () => {
+var watchExit = (start) => {
   let first = true;
   let completed = false;
   let recorded;
-  const snapshot = id(SNAPSHOT, (_args, ctx) => {
-    recorded = { cwd: ctx.cwd, env: Object.fromEntries(ctx.env) };
+  const snapshot = id(SNAPSHOT, (locals, ctx) => {
+    const env = Object.fromEntries(ctx.env);
+    for (const name of locals) {
+      delete env[name];
+      const original = start[name];
+      if (original !== undefined)
+        env[name] = original;
+    }
+    recorded = { cwd: ctx.cwd, env };
     return runPromise2(status(ctx));
   });
   const done = id(DONE, (_args, ctx) => {
@@ -89886,7 +89962,9 @@ var watchExit = () => {
         if (!first)
           return { ast };
         first = false;
-        if (wrapExits(ast.statements) > 0) {
+        const locals = new Set;
+        collectLocals(ast.statements, locals);
+        if (wrapExits(ast.statements, [...locals].sort(), false) > 0) {
           const [end] = He8(DONE).statements;
           if (end !== undefined)
             ast.statements.push(end);
@@ -90308,7 +90386,7 @@ var runShell = (request, options) => gen2(function* () {
   const cwd = toVirtualPath(request.cwd, platform);
   shellEnv["PWD"] = cwd;
   const before = { ...shellEnv };
-  const isHostProgram = (name) => plan.passthrough.has(name) || name.includes("/") && programKind(toHostPath(posix3.resolve(cwd, name), drives, platform), platform, extensions) === "native";
+  const isHostProgram = (name) => plan.passthrough.has(name) || name.includes("/") && programKind(toHostPath(posix4.resolve(cwd, name), drives, platform), platform, extensions) === "native";
   const run = {
     streaming: isSingleHostCommand(request.command, isHostProgram),
     env: request.env,
@@ -90334,7 +90412,7 @@ var runShell = (request, options) => gen2(function* () {
     filesystem: new gt7(stubs)
   }));
   const hostFs = (root) => new ei({ root, allowSymlinks: true });
-  const fs = withProgramLaunch(windows ? new Kt4({
+  const fs = withNullDevice(withProgramLaunch(windows ? new Kt4({
     base: new gt7,
     mounts: [
       ...stubMounts,
@@ -90343,11 +90421,11 @@ var runShell = (request, options) => gen2(function* () {
         filesystem: hostFs(`${letter.toUpperCase()}:\\`)
       }))
     ]
-  }) : new Kt4({ base: hostFs("/"), mounts: stubMounts }), { toHost: (path) => toHostPath(path, drives, platform), platform, extensions });
+  }) : new Kt4({ base: hostFs("/"), mounts: stubMounts }), { toHost: (path) => toHostPath(path, drives, platform), platform, extensions }));
   const hostCommands = [...plan.passthrough, ...plan.aliases].map(([name, path]) => id(name, (args, ctx) => runPromise2(runHost(path, args, ctx, run))));
   const runner = id(RUNNER, (args, ctx) => runPromise2(runHost(args[0] ?? "", args.slice(1), ctx, run)));
   const jsExec = id("js-exec", (args, ctx) => runPromise2(runJsExec(args, ctx)));
-  const exit = watchExit();
+  const exit = watchExit(before);
   const bash = new Ir2({
     fs,
     cwd,
