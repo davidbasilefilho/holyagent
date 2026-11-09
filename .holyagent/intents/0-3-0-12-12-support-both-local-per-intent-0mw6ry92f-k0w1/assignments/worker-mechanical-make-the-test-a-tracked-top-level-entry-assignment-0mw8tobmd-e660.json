@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "make-the-test-a-tracked-top-level-entry",
   "objective": "Make the test \"a tracked top-level entry that is the .claude folder by identity never infers local\" in packages/runtime/tests/setup-scope.test.ts use an aliasing folder name that Git for Windows accepts, so it runs on the windows job.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-scope, branch release/0.3.0/feat/installed-scope-default at 07f1f5b.",
     "On windows-latest, git update-index --cacheinfo refuses .claude./settings.local.json (\"Invalid path\"), because core.protectNTFS rejects trailing dots and spaces. Replace the folded name .claude. with the Windows 8.3 short name CLAUDE~1 throughout that test (the index entry, the lstat stub that answers the alias with the stats of .claude, the index assertion, the expected notice text and the test comment), keeping everything else.",
@@ -48,7 +48,33 @@
     "agentId": "workflow:wf_7ae5437a-a5b/assignment-0mw8tobmd-e660",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T05:30:17.941Z"
+    "startedAt": "2026-11-09T05:30:17.941Z",
+    "finishedAt": "2026-11-09T05:35:56.766Z"
+  },
+  "result": "result: The identity test now uses `CLAUDE~1` in place of `.claude.` (index entry, lstat stub, expected notice, comments). It passes under default git and under `core.protectNTFS=true`. Build leaves no unexplained changes and verify exits 0.\nchanged: packages/runtime/tests/setup-scope.test.ts\nchecks:\n- `bun install --frozen-lockfile` → 0 (no changes)\n- `bun test setup-scope.test.ts -t \"by identity\"` → 0, 1 pass\n- same with `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.protectNTFS GIT_CONFIG_VALUE_0=true` → 0, 1 pass\n- `git -c core.protectNTFS=true update-index --add --cacheinfo 100644,<blob>,CLAUDE~1/settings.local.json` → 0 (accepted)\n- full setup-scope.test.ts, default and protectNTFS → 0, 66 pass / 0 fail each\n- `mise run build` → 0; git status shows only the test file\n- `mise run verify` → 0, 2471 pass / 0 fail / 79 files. A first run showed two TS2322 errors in packages/integrations/pi/src/extension.ts:1385-1386 with a \"task failed\" line, yet exited 0; not caused by this change, not reproduced on the rerun, and the root should look at it.\nblockers: none\nquestions: none\nnotes: none\nevidence:\n[blocking] The test uses CLAUDE~1 and passes with core.protectNTFS true and with default git (tests): setup-scope.test.ts lines 836-872; checks above\n[blocking] mise run build leaves no unexplained changes and mise run verify exits 0 (regressions): build exit 0, status clean apart from the test file; verify exit 0 in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify2.log\nchanged-paths: packages/runtime/tests/setup-scope.test.ts\nchecks-run: build and verify logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and verify2.log\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/setup-scope-ntfs.diff\n",
+  "acceptance": {
+    "revision": 5,
+    "rationale": "Rename only; passes with core.protectNTFS true and default git; verify 2471/0 on rerun.",
+    "criteria": [
+      {
+        "criterion": "The test uses CLAUDE~1 and passes with core.protectNTFS true and with default git",
+        "support": "setup-scope.test.ts lines 836-872; checks above"
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0, status clean apart from the test file; verify exit 0 in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify2.log"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build and verify logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and verify2.log"
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/tests/setup-scope.test.ts"
+      }
+    ]
   },
   "createdAt": "2026-11-09T05:30:17.941Z"
 }
