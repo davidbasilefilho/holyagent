@@ -6,9 +6,11 @@
     "Maintainer (verbatim, 2026-11-09): \"alright for 0.3.1 let's first assess a codex provider for pi\", \"I'd like to know whether pi-codex-conversion does context_management (the new system), gpt-reserve, auto-review/auto-approve, etc\".",
     "This is an assessment only: deliver findings and stop; build nothing until the maintainer says to go ahead.",
     "Testing rules carried from 0.3.0: never run pi or make live model requests; read sources only.",
-    "Maintainer (verbatim, 2026-11-09): \"didn't we agree on using just-bash as the bash tool backend\" and \"we should also support the just-bash's ts/js capabilities (ts as first option, js as fallback)\". No earlier record of the just-bash choice exists in the repository, the Intents or this session; it is now a requirement: the bash tool runs on just-bash, and its TypeScript and JavaScript execution is supported, TypeScript first with JavaScript as the fallback. Its fit with HolyAgent (real git, bun, mise runs) is being researched before any build."
+    "Maintainer (verbatim, 2026-11-09): \"didn't we agree on using just-bash as the bash tool backend\", \"we should also support the just-bash's ts/js capabilities (ts as first option, js as fallback)\". No earlier record of that choice was found in the original request, the repository, its issues or the Intents.",
+    "Decided (maintainer, 2026-11-09, after research showed just-bash 3.6.0 is a simulated shell that cannot run host executables): \"use just-bash and allow the executables on PATH and other relevant places (cross-platform)\". The Pi bash tool runs on just-bash (through Pi 1.5.0 BashOperations); commands it does not implement resolve to real executables on PATH and other relevant locations, on Linux, macOS and Windows, so git, bun, bunx, mise, gh, node and the holyagent CLI keep working; just-bash TypeScript execution is offered first and JavaScript is the fallback.",
+    "Codex provider finding: @howaboua/pi-codex-conversion tools.applyPatchOnly keeps Pi read, bash, edit and write plus apply_patch, but turns off its native V2 compaction and Codex prompt while its own Codex provider stays registered (assignment-0mw96dgh6-ud60)."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-09T11:20:35.387Z"
 }
