@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mw9acl96-5ht4",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.mechanical",
+  "slug": "resolve-the-merge-conflict-in-docs-pi-t3",
+  "objective": "Resolve the merge conflict in docs/pi/t3-code.md and regenerate the build output of the in-progress merge in the setup TUI worktree.",
+  "state": "Running",
+  "scope": [
+    "In /home/user/holyagent-0.3.0-tui a merge of release/0.3.0/fix/cloud-session-branch into release/0.3.0/feat/setup-tui is in progress with one conflict, docs/pi/t3-code.md. Keep both sides' content: the setup TUI side documents the setup screen and its flags; the other side brings the integration branch's changes (#94 and earlier). Remove every conflict marker and keep the section order of the file.",
+    "Then run the build so the auto-merged generated files (packages/integrations/*/dist) match the merged sources, and run verify."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch, merge or merge --continue); leave the resolved files unstaged and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "docs/pi/t3-code.md has no conflict markers and keeps both sides' content",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "gates",
+    "resolution"
+  ],
+  "ownershipPaths": [
+    "docs/pi/t3-code.md",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T13:17:04.027Z"
+  },
+  "createdAt": "2026-11-09T13:17:04.027Z"
+}
