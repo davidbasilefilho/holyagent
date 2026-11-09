@@ -48,6 +48,30 @@
     "startedAt": "2026-11-09T04:18:38.991Z",
     "finishedAt": "2026-11-09T04:27:55.108Z"
   },
-  "result": "result: Rewrote the Pi contract bullet in docs/development.md so `failedFinalMessage` and `assignmentStatusOf` are attributed to the fixtures that reach them. Build and verify both exit 0.\nchanged: docs/development.md\nchecks:\n- `bun install --frozen-lockfile` -> 0 (no changes)\n- `bunx --no-install mise run build` -> 0; `git status` shows only docs/development.md\n- `bunx --no-install mise run verify` -> 0; 2390 pass, 0 fail, 78 files (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log)\nblockers: none\nquestions: none\nnotes: The brief said `failedFinalMessage` is reached only from `message_end`. contract.test.ts:347 also calls it from `outcomeOf`, which reads the json-run streams, so I attributed it to both. The build log went to /tmp/claude-0/build.log, not the scratchpad. The verify output file's tail showed 2372 passes while verify.log shows 2390; I did not resolve that.\nevidence:\nbehavior: docs/development.md:104-105, diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff.patch\nregressions: verify exit 0, 0 fail\nchecks-run: build exit 0; verify exit 0 (see checks)\nchanged-paths: docs/development.md\n",
+  "result": "result: Rewrote the Pi contract bullet in docs/development.md so `failedFinalMessage` and `assignmentStatusOf` are attributed to the fixtures that reach them. Build and verify both exit 0.\nchanged: docs/development.md\nchecks:\n- `bun install --frozen-lockfile` -> 0 (no changes)\n- `bunx --no-install mise run build` -> 0; `git status` shows only docs/development.md\n- `bunx --no-install mise run verify` -> 0; 2390 pass, 0 fail, 78 files (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log)\nblockers: none\nquestions: none\nnotes: The brief said `failedFinalMessage` is reached only from `message_end`. contract.test.ts:347 also calls it from `outcomeOf`, which reads the json-run streams, so I attributed it to both. The build log went to /tmp/claude-0/build.log, not the scratchpad. The verify output file's tail showed 2372 passes while verify.log shows 2390; I did not resolve that.\nevidence:\nbehavior: docs/development.md:104-105, diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff.patch\nregressions: verify exit 0, 0 fail\nchecks-run: build exit 0; verify exit 0 (see checks)\nchanged-paths: docs/development.md\nevidence:\n- The bullet attributes each helper to the fixtures that reach it, and nothing else in the file changes: docs/development.md is the only changed file; the bullet now ties the extension-events fixture to the extension handlers and the json-run streams to failedFinalMessage and assignmentStatusOf.\n- mise run build leaves no unexplained changes and mise run verify exits 0: build 0 with only docs/development.md changed; verify 0, 2390 pass.\nchecks-run: build 0, verify 0\nchanged-paths: docs/development.md\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "One-line doc fix; build and verify exit 0",
+    "criteria": [
+      {
+        "criterion": "The bullet attributes each helper to the fixtures that reach it, and nothing else in the file changes",
+        "support": "docs/development.md is the only changed file; the bullet now ties the extension-events fixture to the extension handlers and the json-run streams to failedFinalMessage and assignmentStatusOf."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build 0 with only docs/development.md changed; verify 0, 2390 pass."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build 0, verify 0"
+      },
+      {
+        "label": "changed-paths",
+        "support": "docs/development.md"
+      }
+    ]
+  },
   "createdAt": "2026-11-09T04:18:38.991Z"
 }
