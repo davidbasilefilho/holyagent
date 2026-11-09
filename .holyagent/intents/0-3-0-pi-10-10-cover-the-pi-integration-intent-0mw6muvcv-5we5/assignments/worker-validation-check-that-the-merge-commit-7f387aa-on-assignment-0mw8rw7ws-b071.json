@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw8rw7ws-b071",
+  "intentId": "intent-0mw6muvcv-5we5",
+  "intentRevision": 3,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-merge-commit-7f387aa-on",
+  "objective": "Check that the merge commit 7f387aa on release/0.3.0/fix/pi-windows-launch (which brings the T3 settings branch, itself carrying the contract-test branch, into the Windows launch branch) builds and passes the gates, and that it changed nothing but the merged files.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-win at HEAD 7f387aa. Run `bunx --no-install mise run build` and then `git status --short` (it must list nothing), then `bunx --no-install mise run verify`.",
+    "Run `git diff --stat 7f387aa^1 7f387aa` and confirm every file it lists is one the T3 settings branch changed relative to release/0.3.0/integration (compare with git diff --stat origin/release/0.3.0/integration release/0.3.0/feat/t3-settings), and say whether any file was changed on both sides (git diff --stat 7f387aa^2 7f387aa^1 lists the Windows side)."
+  ],
+  "constraints": [
+    "Read-only apart from build output: make no edits and no git writes; if the build changes a file, report it instead of keeping it.",
+    "Never start pi, T3 Code or a Kimi request.",
+    "Report in under 150 words: commands, exit codes, test counts and the diff-stat file list."
+  ],
+  "criteria": [
+    {
+      "text": "mise run build leaves git status empty",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The merge changes only the T3 settings branch's files",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T04:40:27.148Z"
+  },
+  "createdAt": "2026-11-09T04:40:27.148Z"
+}
