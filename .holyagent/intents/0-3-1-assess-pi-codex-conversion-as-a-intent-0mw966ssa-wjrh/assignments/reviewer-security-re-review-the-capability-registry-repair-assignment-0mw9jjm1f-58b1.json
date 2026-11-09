@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-the-capability-registry-repair",
   "objective": "Re-review the capability registry repair for the symlink-following config write and any new security issue the repair introduces.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/capability-fixes.diff (worktree /home/user/holyagent-0.3.1-cap). Previous security review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it6e8-jp52.md.",
     "Check that a symlinked .holyagent/config.json or .holyagent directory at project and local scope is refused before any write, that refuseLinks moved to setup/scope.ts still guards the .pi writes, that the user lock refusal cannot be bypassed by scope or flag order, and that a failed write stops package changes."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_2c01d32c-031/assignment-0mw9jjm1f-58b1",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:34:28.180Z"
+    "startedAt": "2026-11-09T17:34:28.180Z",
+    "finishedAt": "2026-11-09T17:40:22.861Z"
+  },
+  "result": "result: no blockers. The symlink write is refused before any write at project and local scope, and the repair adds no path to install, remove or write beyond the pinned registry entries.\n\nThe built-in `/security-review` could not run. It failed on `git log origin/HEAD...` (\"unknown revision\"), because this checkout has no `origin/HEAD`. The review is manual, over `capability-fixes.diff` and the worktree `/home/user/holyagent-0.3.1-cap`. I did not run any tests.\n\n**Checks, all sound**\n**Symlink refusal:** `applyCapabilityChoices` calls `refuseLinks(options.cwd, scope, file, \"write\")` at `setup/capabilities.ts:94`, before `readJsonObject` and `writeJsonObject`. The file is `join(cwd, \".holyagent\", \"config.json\")` (`capabilityConfigFile`, line 20). `refuseLinks` (`setup/scope.ts:72-91`) lstats each component from `cwd` down, so `.holyagent` as a symlink is refused at depth 1 and `config.json` at depth 2. A dangling symlink is refused too, because `isSymlink` uses lstat. The repair adds a test for the file and the folder case (`setup-capabilities.test.ts`).\n**Dry run:** the check is skipped on a dry run, which writes nothing.\n**`.pi` writes:** `refuseLinks` is now imported from `./scope.ts` and still guards the three `.pi` sites (`pi-settings.ts:256, 376, 507`). Behavior is identical to the old local copy, and the old copy is removed. I found no import cycle.\n**User lock refusal:** `refuseLockedOn` runs at line 92 for every non-user scope, before the write branch. It does not depend on scope choice or flag order, because `changed` is built from the decoded choice map. It does not depend on `--dry-run` either.\n  - It reads `~/.holyagent/config.json` directly and tests the `FINAL_OFF` entries through `userLocksOff` (`config/load.ts:50-74`).\n  - Any `on` for `computerUse` is refused at project or local scope, and `off` is allowed.\n  - At user scope the user may re-enable their own setting.\n  - A bad user config also yields a `SetupFailure`, so it fails closed.\n**Failed write stops package changes:** `asStep` turns a `SetupFailure` into a `! capabilities:` line. `piSteps` is false when any such line exists, so `installPiPackages`, `installPiToolSettings` and `installT3Settings` do not run (`steps.ts:218-237`). The `undo` branch returns earlier and is unaffected.\n**No new install, remove or run path:** the diff touches the form (`inCi` normalization), TUI session plumbing (a config passed in instead of reloaded) and docs, and none of it reaches install or remove sources. `inCi` only decides the form (`headless` or `normal`), the same effect as before.\n\n**Non-blocking notes**\n1. There is a small time-of-check/time-of-use gap between `refuseLinks` and `writeJsonObject`'s `realpath`. Exploiting it needs a concurrent local attacker. The `.pi` guard has the same gap, and it predates this repair.\n2. `pi install -l` at project scope writes the project's `.pi/settings.json` through the `pi` binary and has no `refuseLinks` guard. It predates this repair and is unchanged. The new write to the `.holyagent` config file is guarded.\n\nevidence:\nThe symlink write is refused and the repair adds no new path to install, remove or write beyond the pinned registry entries: `setup/capabilities.ts:94` calls `refuseLinks` before the write, and `setup/scope.ts:72-91` checks every path component with lstat, including a dangling link, at project and local scope. The `.pi` call sites still use it (`pi-settings.ts:256, 376, 507`). `setup/steps.ts:218-237` skips the package steps after a `! capabilities:` line. The diff adds no install or remove source.\nfindings: none blocking. Two non-blocking notes (a time-of-check/time-of-use gap, and the `pi install -l` write that predates the repair). The built-in `/security-review` could not run (no `origin/HEAD`).\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Symlink refusal before write traced; no new install/remove/write path; two pre-existing non-blocking notes.",
+    "criteria": [
+      {
+        "criterion": "The symlink write is refused and the repair adds no new path to install, remove or write beyond the pinned registry entries",
+        "support": "`setup/capabilities.ts:94` calls `refuseLinks` before the write, and `setup/scope.ts:72-91` checks every path component with lstat, including a dangling link, at project and local scope. The `.pi` call sites still use it (`pi-settings.ts:256, 376, 507`). `setup/steps.ts:218-237` skips the package steps after a `! capabilities:` line. The diff adds no install or remove source."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking. Two non-blocking notes (a time-of-check/time-of-use gap, and the `pi install -l` write that predates the repair). The built-in `/security-review` could not run (no `origin/HEAD`)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:34:28.180Z"
 }
