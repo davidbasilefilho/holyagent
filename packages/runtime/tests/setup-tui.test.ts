@@ -581,6 +581,10 @@ describe("the colour policy and the glyph set", () => {
     expect(colorEnabled({ FORCE_COLOR: "1", NO_COLOR: "1" }, true)).toBe(false)
     expect(colorEnabled({ CI: "true" }, true)).toBe(false)
     expect(colorEnabled({ CI: "false" }, true)).toBe(true)
+    // The same truthy rule as the CI fallback of the screen: a negative keeps the colour.
+    for (const negative of ["", "0", "no", "OFF"])
+      expect(colorEnabled({ CI: negative }, true)).toBe(true)
+    expect(colorEnabled({ CI: "1" }, true)).toBe(false)
   })
 
   test("read the locale from LC_ALL, then LC_CTYPE, then LANG", () => {

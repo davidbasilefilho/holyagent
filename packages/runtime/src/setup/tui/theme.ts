@@ -1,3 +1,5 @@
+import { inCi } from "../form.ts"
+
 /**
  * The Tokyo Night tokens of holycodex's `TERMINAL_THEME` (v0.16.12, `packages/cli/src/help.ts`),
  * which the setup interface shares so the two tools look alike. Every tone clears 4.5:1 on the
@@ -64,14 +66,14 @@ const set = (value: string | undefined): value is string => value !== undefined 
 
 /**
  * Whether to add colour, by holycodex's policy with the empty-means-unset rule: a non-empty
- * `NO_COLOR` and `TERM=dumb` turn it off; `FORCE_COLOR` (not `0`) turns it on; `CI` (not `false`)
- * turns it off; otherwise it follows whether the output is a terminal. Bold stays whatever this
- * says, as `NO_COLOR` asks only to drop added colour.
+ * `NO_COLOR` and `TERM=dumb` turn it off; `FORCE_COLOR` (not `0`) turns it on; `CI` with a truthy
+ * value ({@link inCi}) turns it off; otherwise it follows whether the output is a terminal. Bold
+ * stays whatever this says, as `NO_COLOR` asks only to drop added colour.
  */
 export const colorEnabled = (env: Env, tty: boolean): boolean => {
   if (set(env["NO_COLOR"]) || env["TERM"] === "dumb") return false
   if (set(env["FORCE_COLOR"]) && env["FORCE_COLOR"] !== "0") return true
-  if (set(env["CI"]) && env["CI"] !== "false") return false
+  if (inCi(env)) return false
   return tty
 }
 

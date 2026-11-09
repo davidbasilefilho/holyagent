@@ -23224,8 +23224,8 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   const file = capabilityConfigFile(env, options.cwd, options.scope);
   if (options.scope !== "user")
     yield* refuseLockedOn(env, changed);
+  yield* refuseLinks(options.cwd, options.scope, file, "write");
   if (!options.dryRun) {
-    yield* refuseLinks(options.cwd, options.scope, file, "write");
     const existing = yield* readJsonObject(file);
     const pi = yield* objectAt(existing, "pi", file, "pi");
     const features = yield* objectAt(pi, "features", file, "pi.features");
@@ -23727,7 +23727,7 @@ var setup = fn2("setup")(function* (env, options) {
     ...piUsed ? [hint(`form: ${describeForm(form)}`)] : [],
     ...capabilityLines,
     ...piUsed && !piSteps ? [
-      skipped("pi packages, tool settings and t3 settings: not run, because the capability choices were not saved")
+      skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
     ] : [],
     ...piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
     ...piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],

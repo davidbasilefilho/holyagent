@@ -2,6 +2,7 @@ import { join } from "node:path"
 
 import { Effect, Option } from "effect"
 
+import { CAPABILITIES } from "../config/capabilities.ts"
 import { inCloudSession } from "../vcs/identity.ts"
 import { applyCapabilityChoices } from "./capabilities.ts"
 import { type Env, homeDirectory, userFiles } from "./environment.ts"
@@ -223,7 +224,11 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
     ...(piUsed && !piSteps
       ? [
           skipped(
-            "pi packages, tool settings and t3 settings: not run, because the capability choices were not saved",
+            `pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter(
+              (capability) => choices[capability.feature] !== undefined,
+            )
+              .map((capability) => capability.name)
+              .join(", ")} was not saved`,
           ),
         ]
       : []),

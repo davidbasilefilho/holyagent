@@ -3384,6 +3384,142 @@ var wrapItems = (items, width, separator) => {
   return line === "" ? lines : [...lines, line];
 };
 
+var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
+var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
+var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
+var SUBAGENTS_ONLY_SPECIALISTS = {
+  disableDefaultAgents: true,
+  fallbackSubagent: "none"
+};
+var T3_PREFIX = "mcp__t3*code__";
+var T3_VISUAL_TOOLS = [
+  `${T3_PREFIX}preview_*`,
+  `${T3_PREFIX}t3_preview_*`,
+  `${T3_PREFIX}html_render`,
+  `${T3_PREFIX}html_preview`,
+  `${T3_PREFIX}device_*`
+];
+var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var sameForm = (packages) => ({
+  headless: { packages, mcpServers: [] },
+  normal: { packages, mcpServers: [] }
+});
+var CAPABILITIES = [
+  {
+    name: "subagents",
+    feature: "subagents",
+    description: "Runs the 18 specialists as subagents (@tintinweb/pi-subagents)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@tintinweb/pi-subagents"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "context-compression",
+    feature: "contextCompression",
+    description: "Compresses the context of long sessions (Billion Context)",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["billion-context"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "todo",
+    feature: "todo",
+    description: "Gives the root a todo list tool (@juicesharp/rpiv-todo)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@juicesharp/rpiv-todo"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "ask",
+    feature: "ask",
+    description: "Lets the root ask the user a question mid-run (@juicesharp/rpiv-ask-user-question)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@juicesharp/rpiv-ask-user-question"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "processes",
+    feature: "processes",
+    description: "Gives the root tools for background processes (@aliou/pi-processes)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@aliou/pi-processes"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "mcp",
+    feature: "mcp",
+    description: "Pi's built-in MCP extension, which brings T3 Code's browser, render and device tools",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS },
+    settings: [],
+    health: ["needs"]
+  },
+  {
+    name: "computer-use",
+    feature: "computerUse",
+    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [{ kind: "display" }],
+    forms: {
+      headless: { unavailable: "it drives a graphical session and this machine has none" },
+      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
+    },
+    settings: [
+      {
+        file: PI_SETTINGS_FILE,
+        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+      }
+    ],
+    tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
+    health: ["needs", "packages"]
+  }
+];
+var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
+var formContent = (capability, form) => {
+  const entry = capability.forms[form];
+  return "unavailable" in entry ? undefined : entry;
+};
+var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
+  const [first] = formContent(capability, "normal")?.packages ?? [];
+  return first === undefined ? [] : [[capability.feature, first]];
+}));
+
+var inCi = (env) => {
+  const value = env["CI"]?.trim().toLowerCase();
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
+
 var TERMINAL_THEME = {
   heading: "#7aa2f7",
   option: "#7dcfff",
@@ -3416,7 +3552,7 @@ var colorEnabled = (env, tty) => {
     return false;
   if (set(env["FORCE_COLOR"]) && env["FORCE_COLOR"] !== "0")
     return true;
-  if (set(env["CI"]) && env["CI"] !== "false")
+  if (inCi(env))
     return false;
   return tty;
 };

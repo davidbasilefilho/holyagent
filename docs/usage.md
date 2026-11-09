@@ -179,7 +179,7 @@ Three flags make the choices without the screen:
 | `--device-access on\|off` | Device access is written where a host is found, or left out                                                    |
 | `--no-tui`                | No screen; both choices on                                                                                     |
 
-Giving `--worktrees` or `--device-access` applies directly and leaves the other choice on. `--no-tui` is the line-based fallback, and setup also falls back to it, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, `CI` is set (other than `false`), `TERM` is `dumb`, a flag above was given, or the screen cannot be installed or started (for example offline). The fallback applies both choices on; nothing about the screen changes the other setup steps, `--dry-run` shows what would change on the review and the result, and `holyagent setup --undo` backs the T3 keys out like the rest.
+Giving `--worktrees` or `--device-access` applies directly and leaves the other choice on. `--no-tui` is the line-based fallback, and setup also falls back to it, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, `CI` is set to a truthy value (not empty, `0`, `false`, `no` or `off`, in any case), `TERM` is `dumb`, a flag above was given, or the screen cannot be installed or started (for example offline). The fallback applies both choices on; nothing about the screen changes the other setup steps, `--dry-run` shows what would change on the review and the result, and `holyagent setup --undo` backs the T3 keys out like the rest.
 
 ## Opinionated by design
 

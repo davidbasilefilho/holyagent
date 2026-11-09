@@ -148,6 +148,10 @@ describe("a capability flag in setup", () => {
       )
       expect(piCommands(shell)).toEqual([])
       expect(await Bun.file(projectConfig()).exists()).toBe(false)
+      // The skipped Pi steps name the capability whose choice was refused.
+      expect(report.lines).toContain(
+        "- pi packages, tool settings and t3 settings: not run, because the choice for computer-use was not saved",
+      )
     }
   })
 
@@ -198,6 +202,26 @@ describe("a capability flag in setup", () => {
     const folder = await runSetup(withPi(), { scope: "local", capabilities: { todo: false } })
     expect(folder.ok).toBe(false)
     expect(await Bun.file(join(project, "..", "folder", "config.json")).exists()).toBe(false)
+  })
+
+  test("a dry run against a symlinked config fails as the real run would", async () => {
+    await write(globalSettings(), { packages: ALL })
+    const target = join(project, "..", "elsewhere.json")
+    await write(target, { vcs: { allowWords: ["Claude Code"] } })
+    await mkdir(join(project, ".holyagent"), { recursive: true })
+    await symlink(target, projectConfig())
+    const report = await runSetup(withPi(), {
+      scope: "project",
+      dryRun: true,
+      capabilities: { todo: false },
+    })
+    expect(report.ok).toBe(false)
+    expect(
+      report.lines.some(
+        (line) => line.startsWith("! capabilities: ") && line.includes("is a symlink; refusing"),
+      ),
+    ).toBe(true)
+    expect(report.lines.some((line) => line.includes("would turn off"))).toBe(false)
   })
 
   test("without Pi in use the choice is not applied, and the report says so", async () => {

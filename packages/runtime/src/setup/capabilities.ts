@@ -62,8 +62,7 @@ const refuseLockedOn = Effect.fn("refuseLockedCapabilities")(function* (
  * `local`, a capability the user's config switches off for good (the merged config would stay off,
  * yet the package would be installed): the message names the user setting, and nothing is written.
  * A project or local config file that is, or sits below, a symlink is refused too
- * ({@link
- * refuseLinks}), so a repository cannot redirect the write.
+ * ({@link refuseLinks}), so a repository cannot redirect the write; a dry run refuses it too.
  */
 export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(function* (
   env: Env,
@@ -90,8 +89,8 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
   if (changed.length === 0) return lines
   const file = capabilityConfigFile(env, options.cwd, options.scope)
   if (options.scope !== "user") yield* refuseLockedOn(env, changed)
+  yield* refuseLinks(options.cwd, options.scope, file, "write")
   if (!options.dryRun) {
-    yield* refuseLinks(options.cwd, options.scope, file, "write")
     const existing = yield* readJsonObject(file)
     const pi = yield* objectAt(existing, "pi", file, "pi")
     const features = yield* objectAt(pi, "features", file, "pi.features")
