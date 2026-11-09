@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw8s1jdv-46m0",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-scope-repair-commit-6c1c321",
+  "objective": "Re-assess scope repair commit 6c1c321 (range b9464e3..6c1c321 in /home/user/holyagent-0.3.0-scope) against the findings it repairs: a .claude committed as a submodule gitlink, and a case-variant tracked settings.local.json, both passed the untracked check and let a repository steer bare holyagent setup to local scope and a pi install -l with its own .npmrc.",
+  "state": "Running",
+  "scope": [
+    "The repair diff is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/c-scope4.diff (diff-file); read packages/runtime/src/setup/scope.ts and its tests in full in /home/user/holyagent-0.3.0-scope.",
+    "Judge whether both findings are closed and whether the new checks (an index entry covering .claude, .claude in another repository, a case-insensitive match of tracked names, the git-failure path) can be bypassed by a repository-controlled input; also check that a legitimate untracked local file in an ordinary clone still infers local, so the check does not over-block."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Substantiate each finding with a source-to-sink trace and path:line; mark it blocking only when it is reachable.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has a source-to-sink trace with path:line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether each previous finding is closed and whether the range should hold the push",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8rvs8o-xoxz"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:44:35.299Z"
+  },
+  "createdAt": "2026-11-09T04:44:35.299Z"
+}
