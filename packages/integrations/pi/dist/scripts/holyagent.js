@@ -16847,6 +16847,38 @@ var init_plan = __esm(() => {
   ];
 });
 
+var REFLOG_MOVE, returnBranch, cloudCheckoutNotice = (call) => inCloudSession(call.env) ? gen2(function* () {
+  const dirs = (yield* gitMaybe([
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-dir",
+    "--git-common-dir"
+  ]))?.split(`
+`);
+  if (dirs?.length !== 2 || dirs[0] !== dirs[1])
+    return;
+  if ((yield* gitMaybe(["symbolic-ref", "-q", "HEAD"])) !== undefined)
+    return;
+  const branch = yield* returnBranch;
+  return `The primary checkout of this cloud session is on a detached HEAD, so the session panel shows its diff against the assigned branch as a stray change and offers a PR for it. Return it with \`git switch ${branch}\`, and do work and review checkouts in a git worktree.`;
+}).pipe(provide4(call.vcs)) : succeed6(undefined);
+var init_status = __esm(() => {
+  init_dist();
+  init_git();
+  init_identity();
+  REFLOG_MOVE = /^checkout: moving from (.+) to .+$/;
+  returnBranch = gen2(function* () {
+    const log = (yield* gitMaybe(["reflog", "show", "--format=%gs", "HEAD"])) ?? "";
+    const moves = log.split(`
+`).map((line) => REFLOG_MOVE.exec(line)?.[1]).filter((name) => name !== undefined).reverse();
+    for (const name of moves)
+      if ((yield* gitMaybe(["show-ref", "--verify", "--quiet", `refs/heads/${name}`])) !== undefined)
+        return name;
+    const remote = yield* gitMaybe(["symbolic-ref", "--short", "-q", "refs/remotes/origin/HEAD"]);
+    return remote?.replace(/^origin\//, "") || "main";
+  });
+});
+
 var statusFrom = (snapshot) => {
   const open = byId(snapshot.project.intents.filter((intent) => intent.state === "Open"));
   const openIds = new Set(open.map((intent) => intent.id));
@@ -16902,6 +16934,7 @@ var init_overview = __esm(() => {
   init_config();
   init_context();
   init_intent2();
+  init_status();
   init_views();
   OVERVIEW_COMMANDS = [
     {
@@ -16946,10 +16979,14 @@ var init_overview = __esm(() => {
     {
       path: ["status"],
       usage: "status",
-      summary: "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents",
+      summary: "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents; in a claude.ai cloud session whose primary checkout is on a detached HEAD, a `notice` that says so",
       flags: {},
       positionals: 0,
-      run: ({ directory }) => statusOf(directory)
+      run: (call) => gen2(function* () {
+        const status = yield* statusOf(call.directory);
+        const notice = yield* cloudCheckoutNotice(call);
+        return notice === undefined ? status : { ...status, notice };
+      })
     },
     {
       path: ["reconcile"],
@@ -24228,6 +24265,7 @@ var init_hook = __esm(() => {
   init_overview();
   init_report();
   init_sessioncontext();
+  init_status();
   init_workflow_check();
   Payload = Struct({
     tool_name: optionalKey2(String6),
@@ -24261,11 +24299,14 @@ var init_hook = __esm(() => {
   });
   INLINE_INPUTS = new Set(["script", "args"]);
   HOOK_COMMANDS = [
-    hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
+    hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user, and one line when the primary checkout is on a detached HEAD), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
       const core = rootCore(payload, call);
       const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
       return gen2(function* () {
-        const notice = yield* setupNotice(call.env, call.cwd);
+        const notices = [yield* setupNotice(call.env, call.cwd), yield* cloudCheckoutNotice(call)];
+        const notice = notices.filter((text) => text !== undefined).join(`
+
+`) || undefined;
         if (!(yield* hasStateFolder(call.directory))) {
           const found = yield* legacyFoldersWithState(call.root);
           if (found.length === 0) {

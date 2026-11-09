@@ -265,6 +265,8 @@ Chat and Cowork became one Claude on 2026-09-16 on claude.ai on the web, desktop
 
 Cloud sessions (claude.ai/code) are a different case: plugins installed on your account are synced into them, and commits follow the cloud rules in [commit-authorship.md](commit-authorship.md).
 
+**The session panel in cloud sessions.** The panel shows the branch the platform assigned (`claude/<name>`) and the diff of the primary checkout, with a Create PR button for that branch. HolyAgent leaves the primary checkout on the assigned branch at its start commit and works in git worktrees, so the diff stays empty and the button stays unused. The PRs the root opens do not belong to that branch; they appear in the panel's list of PRs. The platform sets the branch label when the session starts, and nothing in a session renames it. If the primary checkout ends up on a detached HEAD, the session start and `holyagent status` add a notice with the `git switch` that returns it, because the panel would then show that checkout's commits as a stray diff and offer a PR for them.
+
 **Branch pushes in cloud sessions.** A cloud session starts on a platform-assigned `claude/<name>` branch, and the root creates a conventionally named branch instead ([Opinionated by design](#opinionated-by-design)). Whether that push works is a platform matter, and the sources disagree by date:
 
 - Pushes were limited to `claude/*` branches: a [report from 2026-02-09](https://github.com/anthropics/claude-code/issues/24535) has the git proxy answering 403 to any other branch.
