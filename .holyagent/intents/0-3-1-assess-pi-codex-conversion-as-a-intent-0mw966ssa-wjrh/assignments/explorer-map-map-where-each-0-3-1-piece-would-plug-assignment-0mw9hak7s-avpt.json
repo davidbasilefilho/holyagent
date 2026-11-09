@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "map-where-each-0-3-1-piece-would-plug",
   "objective": "Map where each 0.3.1 piece would plug into the current Pi integration, so the work can be split into stacked PRs with disjoint files.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-cap (release/0.3.1/integration at 0.3.1). Read packages/integrations/pi/src, packages/runtime/src/config (schema.ts, pi-packages.json), packages/runtime/src/setup and doctor, packages/runtime/src/instructions (model families and the coverage table), mise.toml and scripts/ (deps:update).",
     "For each piece name the files and exported functions it would touch or extend, and the existing seam to use: (1) a capability registry replacing or driving pi.features (FEATURE_PACKAGES, piPackages, toolArgs, toolSettings, doctor checks, setup flags and the setup TUI); (2) a just-bash bash backend through Pi BashOperations, plus the Billion Context guardrail env vars for the Pi process; (3) @ff-labs/pi-fff in override mode replacing Pi find and grep; (4) a GPT-6 model family under instructions with guide.md and coverage; (5) a Codex provider (registration beside the Kimi provider, a Codex route table, provider selection in config pi.provider); (6) Codex auto-review hooks on tool calls; (7) context_management toggled by Billion Context; (8) @opencode/browse as an MCP server and a screen capability granted per Assignment.",
@@ -38,7 +38,33 @@
     "agentId": "workflow:wf_e3d9e153-cda/assignment-0mw9hak7s-avpt",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T16:31:26.680Z"
+    "startedAt": "2026-11-09T16:31:26.680Z",
+    "finishedAt": "2026-11-09T16:35:36.717Z"
+  },
+  "result": "result: Map of the 8 pieces and hot spots is below, but the full map file was NOT written: this role has no Write or shell tool, so /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/map-031.md does not exist. Paths are relative to /home/user/holyagent-0.3.1-cap. Read-only; no edits or git writes.\nchanged: none\nchecks: none run (read-only map; no project gates apply)\nblockers: map-file could not be written (no Write/Bash tool in this role); the root or a writer must save the table below to the scratchpad path.\nquestions: none\nnotes: No BashOperations, just-bash, pi-fff, Codex, Billion guardrail env or `context_management` string exists in the repo (grep empty), so pieces 2, 3, 5, 6 and 7's key name are new code. Feature toggles are not in the setup TUI (`setup/tui/model.ts` L15 has only pi/deviceAccess/worktrees).\n\n| # | Piece | Files (read) | Seam | Shared files |\n|---|---|---|---|---|\n| 1 | Capability registry | `config/schema.ts` L158-170 (`pi.features`); `config/packages.ts` L10-44 (`FEATURE_PACKAGES`, `piPackages`); `pi/tools.ts` L151 `toolArgs`, L287 `toolSettings`; `setup/pi-check.ts` L311; `setup/pi-install.ts` L79/L106; `cli/setup.ts` L44 | Existing `pi.features` keys plus `FEATURE_PACKAGES` (two lists kept in step) | all hot spots below |\n| 2 | just-bash BashOperations + Billion guardrail env | `pi/tools.ts` L13 `WRITE_TOOLS`, L19 `SHELL_TOOLS`; `integrations/pi/src/extension.ts` L138 `applyEnvironment`, L507 `settingsFor` (env from `rootArgs.env`), L95 `CACHE_RETENTION_ENV` pattern; `pi-packages.json` | `toolArgs(...).env` -> extension `environment` (L514) | `tools.ts`, `extension.ts`, `pi-packages.json` |\n| 3 | @ff-labs/pi-fff override | `pi/tools.ts` L6 `READ_TOOLS` (grep, find), L194 `toolMatches`; `extension.ts` L497 `rootExclusions`; `agents.ts` L42 `agentTools` | Exclusions in `toolArgs` plus the package's registration | `tools.ts`, `extension.ts`, `agents.ts`, `pi-packages.json` |\n| 4 | GPT-6 family | `instructions/families.ts` L10 `FAMILIES`, L22 `GUIDE_FILE`, L29 `isMirrored`; `instructions/coverage.ts` L21 `REQUIREMENT_COVERAGE`; `tests/instructions.test.ts` L70, L100; `integrations/pi/src/files.ts` L35 `PI_FAMILY` | New `instructions/gpt-6/` folder with guide.md; new `FAMILIES` and coverage keys | `families.ts`, `coverage.ts`, `instructions.test.ts`, `generated.ts` (inferred), `files.ts` |\n| 5 | Codex provider | `config/schema.ts` L34 `PiProvider`, L73 `KIMI_ROUTES` (pattern for a Codex route table); `pi/provider.ts` L5 `ProviderProfile`, L32 `PROVIDERS`, L64 `routeModel`, L100 `providerEnv`, L104 `providerSource`; `config/pi-packages.json` | Second `PROVIDERS` entry selected by `config.pi.provider` | `schema.ts`, `provider.ts`, `pi-packages.json`, `packages.ts` L32 |\n| 6 | Codex auto-review on tool calls | `extension.ts` L167 `refuseNonSpecialist`, L202 `refuseNonSpecialistWorkflow`, L538 `refuseExcludedTool`, L550 `ExtensionOptions` | Pi `tool_call` gate that already returns `ToolCallEventResult` | `extension.ts` (shared with 2, 3, 8) |\n| 7 | context_management via Billion Context | `schema.ts` L166 `contextCompression`; `packages.ts` L12; `pi/tools.ts` L244 `BILLION_CONTEXT_FILE`, L309-311 in `toolSettings`; `setup/pi-settings.ts` L95-107 path, L337 `installPiToolSettings` (user scope only, L97) | Existing `contextCompression` gate and settings writer | `tools.ts`, `pi-settings.ts`, `schema.ts`, `packages.ts` |\n| 8 | @opencode/browse MCP + screen capability | `schema.ts` L164 `mcp`, L165 `computerUse`; `pi/tools.ts` L63 `T3_VISUAL_TOOLS`, L89 `COMPUTER_USE_TOOLS`, L143 VisualInspection, L157 `--no-mcp`, L176-177 gating; `agents.ts` L50 `ext:` mapping; `extension.ts` L497/L538 | `toolArgs` VisualInspection capability; no MCP server config path found (inferred none) | `tools.ts`, `agents.ts`, `schema.ts`, `extension.ts` |\n\nConflict hot spots:\n`pi/tools.ts` (pieces 1, 2, 3, 7, 8): `toolArgs` L151, `toolSettings` L287, `READ_TOOLS` L6.\n`integrations/pi/src/extension.ts` (2, 3, 6, 8): `settingsFor` L507, `rootExclusions` L497, `refuseNonSpecialist` L167, `ExtensionOptions` L550.\n`config/schema.ts` (1, 5, 7, 8): `PiProvider` L34, `PiSection` L153-188.\n`config/pi-packages.json` and `scripts/update-dependencies.ts` L184 `PI_PACKAGE_PINS` (2, 3, 5, 7, 8): each new package is a separate pin.\n`config/packages.ts` `FEATURE_PACKAGES` L10, `piPackages` L32 (1, 2, 3, 5, 7, 8).\n`pi/provider.ts` `PROVIDERS` L32 (5; indirectly 1).\n`setup/pi-settings.ts`, `pi-check.ts`, `pi-install.ts` (1, 2, 7).\n`agents.ts` `agentTools` L42 (3, 8).\n\nPins and updater: Pi package pins in `packages/runtime/src/config/pi-packages.json` (8 entries), moved by `mise run deps:update` -> `scripts/update-dependencies.ts` (L435-450 registry lookup, stable only; `deps:check` at `mise.toml` L93-95). Vendored ripgrep and fd pins in `packages/integrations/claude/src/vendor.ts` (`VENDOR_PINS` L181). Mise tools in `mise.toml` (L343-371 parsed). Version in root `package.json` only (`bump:*`, `mise.toml` L78-84).\n\nSuggested order (inferred): piece 1 first as a no-behavior refactor, then 5 and 4 (disjoint folders), then 2, 3, 7, 8 on `tools.ts`/`extension.ts`, then 6.\n\nevidence:\n[blocking] Each of the eight pieces has its files, seam and shared files named with paths (behavior): table above, pieces 1-8, sourced from the read ranges cited.\n[blocking] Conflict hot spots across pieces are listed (scope): \"Conflict hot spots\" section above.\nmap-file: NOT WRITTEN (no Write tool available); blocker stated above.\nhot-spots: the \"Conflict hot spots\" section above.\n",
+  "acceptance": {
+    "revision": 18,
+    "rationale": "Map gives file:line seams for each 0.3.1 module and a PR order; used to plan the stack.",
+    "criteria": [
+      {
+        "criterion": "Each of the eight pieces has its files, seam and shared files named with paths",
+        "support": "table above, pieces 1-8, sourced from the read ranges cited."
+      },
+      {
+        "criterion": "Conflict hot spots across pieces are listed",
+        "support": "\"Conflict hot spots\" section above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "map-file",
+        "support": "NOT WRITTEN (no Write tool available); blocker stated above."
+      },
+      {
+        "label": "hot-spots",
+        "support": "the \"Conflict hot spots\" section above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T16:31:26.680Z"
 }
