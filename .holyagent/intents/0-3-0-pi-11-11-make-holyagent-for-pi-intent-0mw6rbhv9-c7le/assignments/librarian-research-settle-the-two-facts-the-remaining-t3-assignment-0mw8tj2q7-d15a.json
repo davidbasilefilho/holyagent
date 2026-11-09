@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw8tj2q7-d15a",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Librarian.research",
+  "slug": "settle-the-two-facts-the-remaining-t3",
+  "objective": "Settle the two facts the remaining T3 work needs: how holyagent setup can set per-project T3 git settings, and whether the pinned rpiv ask-user and todo Pi packages render through custom() TUI components.",
+  "state": "Running",
+  "scope": [
+    "Earlier T3 research: /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tdgpq-hfsl.md (read first). T3 Code source: github.com/pingdotgg/t3code (main, and the v0.1.7 tag where readable; raw.githubusercontent.com works where the GitHub API does not).",
+    "A. Per-project T3 settings: how T3 computes the ProjectId that keys projectSettingsOverrides in settings.json (a path hash, a stored UUID in its database, the git remote?), whether an external tool can compute it for a repository before T3 has opened it, and which settings a repository t3.json may declare (file location, schema, whether branchNamingMode, branchNamePrefix, branchNameInstructions and pullRequestMergeMethod are among them). Give the PullRequestMergeMethod enum values and the meaning of the key of pullRequestMergeMethodOverrides.",
+    "B. The rpiv packages pinned in HolyAgent: @juicesharp/rpiv-ask-user-question 2.15.0 and @juicesharp/rpiv-todo 2.15.0 (read their published source on unpkg.com or the npm tarball). For each: which ctx.ui methods they call (custom, select, input, confirm, editor, setWidget, setStatus), what they do when ctx.mode is rpc or when custom() returns undefined, and the tool names and parameters they register."
+  ],
+  "constraints": [
+    "Read-only. Separate sourced facts from inference.",
+    "Report in under 600 words; put long excerpts in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Question A is answered with sources, including whether setup can key a project before T3 opens it and whether t3.json can carry the git keys",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Question B is answered per package with the ctx.ui calls and rpc behaviour, with source lines",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "answers",
+    "versions"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw8tdgpq-hfsl",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:26:13.135Z"
+  },
+  "createdAt": "2026-11-09T05:26:13.135Z"
+}
