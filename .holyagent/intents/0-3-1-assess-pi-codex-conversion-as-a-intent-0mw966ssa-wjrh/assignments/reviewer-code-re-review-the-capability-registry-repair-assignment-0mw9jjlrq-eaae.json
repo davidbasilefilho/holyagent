@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9jjlrq-eaae",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-capability-registry-repair",
+  "objective": "Re-review the capability registry repair commit (HEAD) on release/0.3.1/feat/capabilities in /home/user/holyagent-0.3.1-cap.",
+  "state": "Running",
+  "scope": [
+    "Run git -C /home/user/holyagent-0.3.1-cap show HEAD (the repair only). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it65a-t41v.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it6e8-jp52.md (security). The writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9j5jte-1hoq.md.",
+    "Check the six fixes: user lock refusal for project/local capability flags; a failed capability config write stops the Pi steps; CI only when truthy; one config load and Pi probe per interactive run; refuseLinks on the .holyagent/config.json write at project and local scope (moved to setup/scope.ts); no fallback line in scripted runs without T3 work. Check each test fails without its fix, no other behavior changed, and the moved refuseLinks behaves as before for the .pi writes. Run mise run verify in that worktree."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 300 words; mark findings blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The repair makes the six fixes without new defects or other behavior changes",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9j5jte-1hoq"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:34:27.830Z"
+  },
+  "createdAt": "2026-11-09T17:34:27.830Z"
+}
