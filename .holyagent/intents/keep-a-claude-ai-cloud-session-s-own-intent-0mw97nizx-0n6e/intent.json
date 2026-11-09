@@ -1,0 +1,14 @@
+{
+  "id": "intent-0mw97nizx-0n6e",
+  "slug": "keep-a-claude-ai-cloud-session-s-own",
+  "objective": "Keep a claude.ai cloud session's own branch display truthful: the root leaves the primary checkout on the platform-assigned branch at its start, notices when it has moved, and the docs say what the session panel shows and what cannot be changed.",
+  "requirements": [
+    "Maintainer (verbatim, 2026-11-09): \"also btw I don't know which version of holyagent you are running, but if you can fix the branch in claude code cloud. or document if you can't\".",
+    "Observed: the session panel shows the platform-assigned branch (claude/charming-brown-rksw3f) with a diff of +54,746 -3,021 and a Create PR button, because the primary checkout had been left on a detached HEAD 31 commits ahead of main while the work ran in worktrees. Switching the primary checkout back to the assigned branch (equal to main) cleared it. The session runs the claude.ai-synced plugin 0.2.2.",
+    "Default (root judgement, revisitable): the session's branch label is set by the platform when the session starts and no session tool changes it, so the fix is: the root keeps the primary checkout of a cloud session on the assigned branch at its start commit, makes no commits and no checkouts there, and does all work and commit checkouts in git worktrees; session start (and holyagent status) add a notice when the primary checkout of a cloud session is on a detached HEAD or another branch; the docs explain the panel (its branch and Create PR button belong to the assigned branch and stay unused; HolyAgent's PRs appear in the panel's list) and that the label cannot be renamed.",
+    "Ships in 0.3.0 as release/0.3.0/fix/cloud-session-branch, stacked on release/0.3.0/feat/root-own-judgement."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-09T12:01:35.470Z"
+}
