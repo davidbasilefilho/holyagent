@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mw8tobmd-e660",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 5,
+  "roleTask": "Worker.mechanical",
+  "slug": "make-the-test-a-tracked-top-level-entry",
+  "objective": "Make the test \"a tracked top-level entry that is the .claude folder by identity never infers local\" in packages/runtime/tests/setup-scope.test.ts use an aliasing folder name that Git for Windows accepts, so it runs on the windows job.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-scope, branch release/0.3.0/feat/installed-scope-default at 07f1f5b.",
+    "On windows-latest, git update-index --cacheinfo refuses .claude./settings.local.json (\"Invalid path\"), because core.protectNTFS rejects trailing dots and spaces. Replace the folded name .claude. with the Windows 8.3 short name CLAUDE~1 throughout that test (the index entry, the lstat stub that answers the alias with the stats of .claude, the index assertion, the expected notice text and the test comment), keeping everything else.",
+    "Check on Linux that git -c core.protectNTFS=true update-index --add --cacheinfo accepts CLAUDE~1/settings.local.json, and run the test with git configured that way too (for example GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.protectNTFS GIT_CONFIG_VALUE_0=true bun test packages/runtime/tests/setup-scope.test.ts)."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 150 words.",
+    "Never skip or loosen the test: it must still assert user scope and the notice naming the aliasing entry."
+  ],
+  "criteria": [
+    {
+      "text": "The test uses CLAUDE~1 and passes with core.protectNTFS true and with default git",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/setup-scope.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw8t536r-96bv",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:30:17.941Z"
+  },
+  "createdAt": "2026-11-09T05:30:17.941Z"
+}
