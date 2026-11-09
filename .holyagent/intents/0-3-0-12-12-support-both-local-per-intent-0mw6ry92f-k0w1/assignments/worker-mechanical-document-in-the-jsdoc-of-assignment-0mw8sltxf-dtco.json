@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw8sltxf-dtco",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "document-in-the-jsdoc-of",
+  "objective": "Document in the JSDoc of repositoryControl in packages/runtime/src/setup/scope.ts the one limit a security review left open: the file-identity check runs only on index entries under the .claude prefix, so a tracked path such as link/settings.local.json that reaches the file through a symlinked folder is not compared; git does not write through symlinks, so only a hand-crafted index or a git bug reaches it, and statting every tracked file would cost a stat per index entry.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-scope at e87f2cb, branch release/0.3.0/feat/installed-scope-default.",
+    "Add one or two sentences to the existing JSDoc of repositoryControl (near scope.ts:200-235); change no code."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "The JSDoc of repositoryControl states the prefix limit of the file-identity check and why it stays",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No code changes; mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/scope.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw8savyv-n704",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:00:22.083Z"
+  },
+  "createdAt": "2026-11-09T05:00:22.083Z"
+}
