@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-t3-branch-rule-commit-setup",
   "objective": "Review the T3 branch rule commit: setup writes branchNamingMode custom and branchNameInstructions environment-wide in T3 settings, only where unset, and never pullRequestMergeMethod, with undo and doctor.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-t3branch, newest commit; diff in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3branch.diff. The writer follows the rules of packages/runtime/src/setup/t3-settings.ts (merge, atomic write, read-back, undo, a key written only where unset and different from T3 default). Decision: no per-project overrides, no T3 database read, no t3 project add.",
     "Check also whether writing the two keys independently can leave T3 in a confusing state (instructions written while a user-set mode is static or semantic) and whether the instruction text is clear for T3's branch-name generator."
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_cc31cad4-180/assignment-0mw94vzxm-y66g",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T10:44:11.818Z"
+    "startedAt": "2026-11-09T10:44:11.818Z",
+    "finishedAt": "2026-11-09T10:48:02.673Z"
+  },
+  "result": "result: No blockers. The rules in `packages/runtime/src/setup/t3-settings.ts` are met. `bun test packages/runtime/tests/setup-t3-settings.test.ts` exits 0 with 41 pass and 0 fail (log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rev-t3branch.log`).\nchanged: none (read-only)\nchecks: built-in `/code-review high 9a407b5...b3b1165` ran through the Skill tool and returned the shipped skill's findings. All five are classified below.\nblockers: none\n\nFindings, all optional:\n1. `t3-settings.ts:308` and `:50` (built-in finding 2, mode and instructions written independently): this is non-blocking.\n   - A user with `branchNameInstructions` set and `branchNamingMode` absent (static, instructions inert) gets `custom` written. Their own text then becomes live.\n   - A user with `semantic` or `static` set gets instructions that do nothing.\n   - The test covers both cases. The doc states the `static`/`semantic` case. The behavior follows the assignment's \"each key only where unset\" rule, and undo removes both keys.\n   - An alternative would be to write the mode only while instructions are absent or ours. I rate it a design choice, not a defect.\n2. `t3-settings.ts:50` (built-in finding 3, instruction text): the wording is clear and short, and it states a fallback. I could not run it or check it against T3's generator, because no T3 source is in the tree. If the generator cannot read AGENTS.md, it always falls back to `t3/<slug>`. That matches T3's static default, so nothing gets worse. The doc sentence \"A repository's own convention reaches T3 through the rule itself\" is unverified and could say \"if the generator can read it\".\n3. `t3-settings.ts:308` (built-in finding 1, `branchNamePrefix` under `custom`): rejected as a blocker. It is unverifiable, and T3's use of `branchNamePrefix` under `custom` is unknown. It would be worth confirming upstream, and the test does not cover a user-set prefix.\n4. `t3-settings.ts:308` (built-in finding 4, environment-wide scope): rejected. The scope is the assigned decision (no per-project overrides). The doc states it and the user can change it in T3 settings.\n5. `setup-t3-settings.test.ts:259` (built-in finding 5, test coverage): optional. The test rewrites the file between runs, and there is no user-set `static` case.\n\nRules check:\n- Each key is written only where unset and different from T3's default.\n- `pullRequestMergeMethod`, `branchNamePrefix` and `projectSettingsOverrides` are asserted not written.\n- Undo is tested, including the user-changed key.\n- Doctor is tested for missing keys and for the default values.\n- I read the merge, atomic write and read-back from the shared unit machinery, which is unchanged.\n- No T3 database read and no `t3 project add`.\n\nverdict: merge-ready, no blockers.\n\nevidence:\nfindings: five built-in findings, none blocking (list above), with path:line and failure scenarios.\nverdict: no blockers. The writer rules are met, and 41 of 41 tests pass.\nEvery blocking finding has path:line and a failure scenario: no blocking findings; the optional ones carry path:line and scenarios.\nThe review states whether the listed rules are met: yes, see \"Rules check\".\n",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "Writer rules met, 41/41 tests pass, no blocking findings",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has path:line and a failure scenario",
+        "support": "no blocking findings; the optional ones carry path:line and scenarios."
+      },
+      {
+        "criterion": "The review states whether the listed rules are met",
+        "support": "yes, see \"Rules check\"."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "five built-in findings, none blocking (list above), with path:line and failure scenarios."
+      },
+      {
+        "label": "verdict",
+        "support": "no blockers. The writer rules are met, and 41 of 41 tests pass."
+      }
+    ]
   },
   "createdAt": "2026-11-09T10:44:11.818Z"
 }
