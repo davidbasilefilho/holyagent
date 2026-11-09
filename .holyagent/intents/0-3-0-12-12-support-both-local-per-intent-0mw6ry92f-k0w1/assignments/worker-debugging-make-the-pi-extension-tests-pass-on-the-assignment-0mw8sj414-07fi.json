@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "make-the-pi-extension-tests-pass-on-the",
   "objective": "Make the Pi extension tests pass on the windows-latest CI job for PR #88 (release/0.3.0/fix/pi-windows-launch) without weakening them, and fix any real Windows defect they expose in the Bun lookup or launch.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-win on branch release/0.3.0/fix/pi-windows-launch at 2ae0549.",
     "CI log of the failing windows job at cc85aa7 (same tree): /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-88.log; 103 of 2426 tests fail, all in packages/integrations/pi/tests (extension.test.ts, session-context.test.ts, contract.test.ts and the Bun lookup tests). Unique failing names: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-88-fails.txt.",
@@ -68,7 +68,49 @@
     "agentId": "workflow:wf_f88ac27c-258/assignment-0mw8sj414-07fi",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:58:15.209Z"
+    "startedAt": "2026-11-09T04:58:15.209Z",
+    "finishedAt": "2026-11-09T05:11:07.950Z"
+  },
+  "result": "result: Fixed. With `process.platform` forced to win32, the Pi tests went from 94 failures to 0. The cause was in the tests only; I found no real Windows defect in `findBun` or the launch.\n\nchanged:\n/home/user/holyagent-0.3.0-win/packages/integrations/pi/tests/extension.test.ts\n/home/user/holyagent-0.3.0-win/packages/integrations/pi/tests/contract.test.ts\nNo source changes.\n\n**Cause:** The tests left `platform` unset, so `createExtension` read the runner's real platform. On windows-latest it looked for `bun.exe` and dropped the driveless `/stub/bin` entry. The stub was never found, so every collection failed closed.\nThe Bun lookup unit tests passed `{ join }` from `node:path`, which is `win32.join` on Windows.\nA few lookup tests compared POSIX literals such as `/opt/bun/bin/bun` against paths built with the real path module.\n\n**Fix (test side only):**\nThe `run` harness and every direct `createExtension` call now pass `platform: \"linux\"`.\nA test that wants Windows still passes `platform: \"win32\"`, as before.\n`BUN` is `join(\"/stub/bin\", \"bun\")` in both test files, so it matches what the extension builds on either OS.\nThe `findBun(\"linux\", …)` unit tests use `posix`. The local `posix` env constant is renamed `unix`.\nFour extension-level lookup tests use a POSIX package root and path module (`POSIX`, `/pkg`) and compare against `POSIX_BUNDLED`, mirroring the existing Windows tests.\n\n**Reproduction:** I could not run Windows, so I forced the platform in a bun preload.\n**Preload 1** (`process.platform = win32`, in `scratchpad/winpre/pre.ts`): 94 of the 103 CI failures reproduced, and 0 failed afterwards. Before: 94 fail, 200 pass. After: 0 fail, 294 pass (`/…/scratchpad/pi-after.log`).\n**Preload 2** (adds `node:path.join` = `win32.join`, `pre-join.ts`): the 9 remaining CI failures, the `findBun` unit tests, reproduce here. Before, the \"finding Bun\" tests had 12 failures and 8 passes. After: 20 pass, 0 fail.\nPreload 2 breaks real-filesystem tests, so I did not use it for the full run. The 9 `findBun` failures are CI-only without it.\nI cannot confirm real `win32` filesystem behaviour. CI is the proof.\n\n**Tree:** The fake-path runs left stray `\\tmp\\holyagent-pi-*` folders under `packages/integrations/pi`. I deleted them, and `git status` shows only the two test files.\n\nchecks:\n`bunx --no-install mise run build` -> exit 0, tree unchanged apart from my two files.\n`bunx --no-install mise run verify` -> exit 0, 2438 pass, 0 fail across 79 files.\n`bun install --frozen-lockfile` -> OK.\n\nblockers: none\nquestions: none\nnotes: The lookup tests now pin `platform: \"linux\"`, so nothing in this change asserts the real default platform. The Windows paths stay covered by the explicit `win32` tests.\n\nevidence:\nWith the platform forced to win32, every test in packages/integrations/pi/tests that failed in the CI log passes, and the report shows the failing count before and after: 94 fail before, 0 after (294 pass) with preload 1. The 9 `findBun` unit tests failed and now pass under preload 2. The log is /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-after.log.\nNo test is skipped, removed or loosened; each keeps asserting its named behaviour on every platform: the diff has no skip, only or todo lines. Only the injected platform, stub paths and POSIX constants changed, and no assertion was weakened.\nAny product-code defect on real Windows is fixed with a test that fails without the fix: no product defect found. The failures were all harness defaults, and the \"before\" runs above are the red evidence.\nmise run build leaves no unexplained changes and mise run verify exits 0 on Linux: build exit 0 and verify exit 0 (2438 pass, 0 fail). Logs are in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-build.log and win-verify.log.\nThe change stays inside the Assignment scope and ownership paths: only the two files under packages/integrations/pi/tests changed.\nchecks-run: see checks above.\nchanged-paths: packages/integrations/pi/tests/extension.test.ts and packages/integrations/pi/tests/contract.test.ts.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-fix.diff\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Cause is the tests reading the runner's platform; forcing win32 reproduced 94+9 = 103 failures and all pass after; verify 2438/0; test files only.",
+    "criteria": [
+      {
+        "criterion": "With the platform forced to win32, every test in packages/integrations/pi/tests that failed in the CI log passes, and the report shows the failing count before and after",
+        "support": "94 fail before, 0 after (294 pass) with preload 1. The 9 `findBun` unit tests failed and now pass under preload 2. The log is /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-after.log."
+      },
+      {
+        "criterion": "No test is skipped, removed or loosened; each keeps asserting its named behaviour on every platform",
+        "support": "the diff has no skip, only or todo lines. Only the injected platform, stub paths and POSIX constants changed, and no assertion was weakened."
+      },
+      {
+        "criterion": "Any product-code defect on real Windows is fixed with a test that fails without the fix",
+        "support": "no product defect found. The failures were all harness defaults, and the \"before\" runs above are the red evidence."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0 on Linux",
+        "support": "build exit 0 and verify exit 0 (2438 pass, 0 fail). Logs are in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-build.log and win-verify.log."
+      },
+      {
+        "criterion": "The change stays inside the Assignment scope and ownership paths",
+        "support": "only the two files under packages/integrations/pi/tests changed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see checks above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/pi/tests/extension.test.ts and packages/integrations/pi/tests/contract.test.ts."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-fix.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:58:15.209Z"
 }
