@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "confirm-the-codex-containment-repair",
   "objective": "Confirm the Codex containment repair commit closes the previous code-review findings without regressions and meets the merge-ready bar.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit 956092de on release/0.3.1/feat/codex-provider in the worktree /home/user/holyagent-0.3.1-codex (range ce16cb67..956092de); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-containment-commit.diff",
     "Files: packages/integrations/pi/src/codex.ts, packages/runtime/src/pi/codex/apply-patch.ts, their tests, and the generated dist/extensions/holyagent.js",
@@ -57,7 +57,41 @@
     "agentId": "workflow:wf_36f1f10f-8f1/assignment-0mw9os3rf-7qip",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T20:01:17.518Z"
+    "startedAt": "2026-11-09T20:01:17.518Z",
+    "finishedAt": "2026-11-09T20:32:35.077Z"
+  },
+  "result": "result: Both previous blockers stay closed and the repair adds no new blocking defect. `mise run build` exited 0 with a clean `git status`, so the committed `dist/extensions/holyagent.js` matches the build. `mise run verify` exited 0 with 2904 pass and 0 fail.\n\n**Built-in /code-review** ran as the built-in (not shadowed) on `ce16cb67..956092de` and returned 7 findings. I read the cited code for each and none is a blocker.\n1. `apply-patch.ts:452`, Delete of a symlink then Add of the same path: optional. `locateEntry` keys the delete by the link entry and `locate` keys the add by the resolved target. The result is the link unlinked and the target overwritten, with success reported. It needs one patch to delete and re-add a symlink, which is rare. The old code also wrote through the link to the target, so this is not a regression, and the finding's \"old code keyed by resolved path\" claim is wrong.\n2. `codex.ts:106`, `snapshotOf` reads whole bytes just to test existence: optional performance issue. `exists`, `locateEntry` and `writeAll` each call it.\n3. `codex.ts:107`, `readlink` failures other than EINVAL fall through to a file read: optional, since EACCES or EIO on `readlink` is improbable.\n4. `codex.ts:130`, rollback of a deleted file loses its mode: optional. `Bun.write` already behaved that way on the base.\n5. `codex.ts:131`, `symlink` restore can hit EEXIST: optional. Unlinking is atomic and the parent folder exists, so I found no realistic path to it.\n6. `apply-patch.ts:441`, `exists` reuses the \"Failed to read file to update\" message for a delete and duplicates part of `load`: optional.\n7. `codex.ts:270`, stale reserve while on another provider: rejected. The reserve rewrite in `before_provider_request` applies only to Codex, and `before_agent_start` runs before the first Codex request of a run. The new test asserts the call count on both the skipped and the Codex run.\n\n**Blocker closure:** The dangling-link bypass is closed. `realPath` now resolves the link's parent before the target, which also covers chains and a project entered through a link. The two new real-disk tests at `codex.test.ts:246` and `:261` use setups where the old resolution lands inside the project. I judged from reading that they fail on the old code and did not run them against it. The earlier blockers (Codex web tools, same-path move) are untouched.\n\n**Regressions:** I read the code and the tests and found none. Updates, adds, deletes, moves and rollback keep their behavior, now restoring exact bytes or links. `session_start` clears the reserve only for reason `new`, so resume and fork keep it, which the new test covers. The usage check runs only for Codex, and a test covers the skipped provider.\n\n**Tests:** The rewritten rollback test in `codex-apply-patch.test.ts` moves its failure injection from `write` to `restore`. It is equivalent, not weakened.\n\nnotes: Behavior I could only read, not run: a case-only rename on a case-insensitive filesystem, and a Move whose source is a link.\n\nevidence:\nEach previous blocking code finding is closed by the repair: dangling-link `realPath` fix at `codex.ts:80-103`, with two tests at `codex.test.ts:246` and `:261`; earlier blockers unchanged and still closed.\nNo regression in apply_patch updates, adds, deletes, moves, rollback, Luna Reserve persistence across resume and fork, or the Codex-only usage check: `codex.test.ts`, `codex-apply-patch.test.ts` and the full verify run pass; one optional edge (finding 1) is not a regression.\nChanged behavior has tests that fail without the change, and no test is weakened: new tests cover dangling links, link deletion, byte and link rollback, session reasons and the provider gate; I read them and did not run them against the old code.\nRepository rules hold: `tryPromise` composition and the tagged `PatchFileError` are kept, `Snapshot`, `PatchFs` and `nodePatchFs` have JSDoc, and `mise run build` exited 0 with a clean `git status`.\nGates: mise run verify exits 0 on 956092de: `bunx --no-install mise run verify` -> 0, 2904 pass, 0 fail, log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rr-verify.log`.\nfindings: no blocking findings; 6 optional (findings 1 to 6 above) and 1 rejected (finding 7).\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Blockers closed, no regression, build clean and verify 2904 pass on 956092de; optional findings go to the final repair round.",
+    "criteria": [
+      {
+        "criterion": "Each previous blocking code finding is closed by the repair",
+        "support": "dangling-link `realPath` fix at `codex.ts:80-103`, with two tests at `codex.test.ts:246` and `:261`; earlier blockers unchanged and still closed."
+      },
+      {
+        "criterion": "No regression in apply_patch updates, adds, deletes, moves, rollback, Luna Reserve persistence across resume and fork, or the Codex-only usage check",
+        "support": "`codex.test.ts`, `codex-apply-patch.test.ts` and the full verify run pass; one optional edge (finding 1) is not a regression."
+      },
+      {
+        "criterion": "Changed behavior has tests that fail without the change, and no test is weakened",
+        "support": "new tests cover dangling links, link deletion, byte and link rollback, session reasons and the provider gate; I read them and did not run them against the old code."
+      },
+      {
+        "criterion": "Repository rules hold: Effect composition with tagged errors, Schema at boundaries, JSDoc on exports, generated dist matches the build",
+        "support": "`tryPromise` composition and the tagged `PatchFileError` are kept, `Snapshot`, `PatchFs` and `nodePatchFs` have JSDoc, and `mise run build` exited 0 with a clean `git status`."
+      },
+      {
+        "criterion": "Gates: mise run verify exits 0 on 956092de",
+        "support": "`bunx --no-install mise run verify` -> 0, 2904 pass, 0 fail, log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rr-verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blocking findings; 6 optional (findings 1 to 6 above) and 1 rejected (finding 7)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T20:01:02.475Z"
 }
