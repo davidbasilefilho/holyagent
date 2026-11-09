@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-one-overstated-sentence-in-docs",
   "objective": "Correct one overstated sentence in docs/pi/t3-code.md about T3 saves during setup.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-t3set. In the 'How it writes' part of docs/pi/t3-code.md, the text says a save by T3 Code in between is never overwritten. Replace it with what the code does: a T3 save made after setup read the file is detected right before the rename and the step fails naming the file, so the user reruns; two narrow windows remain, a file T3 creates when none existed before setup's first write, and a save between that last check and the rename. Change nothing else."
   ],
@@ -45,7 +45,33 @@
     "agentId": "workflow:wf_b5d10776-296/assignment-0mw8r46bf-gl9v",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T04:18:38.715Z"
+    "startedAt": "2026-11-09T04:18:38.715Z",
+    "finishedAt": "2026-11-09T04:27:43.700Z"
+  },
+  "result": "result: The overstated T3 save sentence in docs/pi/t3-code.md (the \"How it writes\" paragraph) now states the pre-rename detection and the two remaining windows. Nothing else in the file changed.\nchanged: docs/pi/t3-code.md\nchecks:\n- `bun install --frozen-lockfile` -> exit 0 (no changes)\n- `bunx --no-install mise run build` -> exit 0, no unexplained changes (git status shows only docs/pi/t3-code.md)\n- `bunx --no-install mise run verify` -> exit 0; type-check 212 files clean, tests 2390 pass / 0 fail across 78 files (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log)\nblockers: none\nquestions: none\nnotes: none\ndiff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3set-doc.diff\nevidence:\nThe sentence states the detection and the two remaining windows, and nothing else in the file changes: git diff --stat shows 1 line changed in docs/pi/t3-code.md; diff at scratchpad t3set-doc.diff\nmise run build leaves no unexplained changes and mise run verify exits 0: build exit 0, git status only docs/pi/t3-code.md; verify exit 0, 2390 pass, 0 fail\nchecks-run: bun install --frozen-lockfile (0); mise run build (0); mise run verify (0)\nchanged-paths: docs/pi/t3-code.md\n",
+  "acceptance": {
+    "revision": 11,
+    "rationale": "Doc line corrected; verify exit 0",
+    "criteria": [
+      {
+        "criterion": "The sentence states the detection and the two remaining windows, and nothing else in the file changes",
+        "support": "git diff --stat shows 1 line changed in docs/pi/t3-code.md; diff at scratchpad t3set-doc.diff"
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0, git status only docs/pi/t3-code.md; verify exit 0, 2390 pass, 0 fail"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "bun install --frozen-lockfile (0); mise run build (0); mise run verify (0)"
+      },
+      {
+        "label": "changed-paths",
+        "support": "docs/pi/t3-code.md"
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:18:38.715Z"
 }
