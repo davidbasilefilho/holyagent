@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -64,6 +64,7 @@ import {
 } from "../src/extension.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import { SPECIALIST_NAMES } from "../src/specialists.ts"
+import { removeTemporary } from "./temp-folder.ts"
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
 // The model reads the wrapper's path with `/` only, drive letter included on Windows.
@@ -465,7 +466,7 @@ describe("session_start and session_shutdown", () => {
 describe("the role flag", () => {
   const projects = async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-role-"))
-    return { directory, done: () => rm(directory, { recursive: true, force: true }) }
+    return { directory, done: () => removeTemporary(directory) }
   }
 
   test("defaults to the root: status only, no root rules", async () => {
@@ -518,7 +519,7 @@ describe("the role flag", () => {
 describe("what runs and when", () => {
   const withState = async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-state-"))
-    return { directory, done: () => rm(directory, { recursive: true, force: true }) }
+    return { directory, done: () => removeTemporary(directory) }
   }
 
   for (const reason of ["startup", "reload", "new", "resume", "fork"] as const) {
@@ -646,7 +647,7 @@ describe("the context", () => {
       expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
       expect(delivered?.message?.content.length).toBeGreaterThan(1000)
     }
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("is empty without a .holyagent folder, except the core of a session role", async () => {
@@ -677,7 +678,7 @@ describe("failing closed", () => {
       expect(delivered?.message?.content).toContain("status")
       expect(oneLine(delivered?.message?.content)).toBe(true)
       expect(delivered?.message?.content).not.toContain("Ship the thing")
-      await rm(directory, { recursive: true, force: true })
+      await removeTemporary(directory)
     })
   }
 
@@ -695,7 +696,7 @@ describe("failing closed", () => {
     await api.emit("session_compact", { reason: "manual" })
     const again = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
     expect(again.message?.customType).toBe(CONTEXT_MESSAGE)
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("a notice carries no control character, however the failure is written", async () => {
@@ -811,7 +812,7 @@ describe("with the built package and a real project", () => {
       root,
       home: join(root, "home"),
       proc,
-      done: () => rm(root, { recursive: true, force: true }),
+      done: () => removeTemporary(root),
     }
   }
 
@@ -917,7 +918,7 @@ const gated = (
 describe("order and time", () => {
   const state = async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-order-"))
-    return { directory, done: () => rm(directory, { recursive: true, force: true }) }
+    return { directory, done: () => removeTemporary(directory) }
   }
 
   test("status finishes before reconcile starts", async () => {
@@ -1272,7 +1273,7 @@ describe("where programs start", () => {
     expect(bundled.length).toBeGreaterThan(3)
     for (const call of bundled)
       expect(call.args.slice(0, RUNTIME.length + 2)).toEqual([...RUNTIME, PI_PROJECT_FLAG, project])
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("a relative session folder is made absolute, so it cannot resolve against the package's folder", async () => {
@@ -1287,7 +1288,7 @@ describe("where programs start", () => {
     expect(wrapped.length).toBeGreaterThan(3)
     for (const call of wrapped)
       expect(call.args.slice(0, RUNTIME.length + 2)).toEqual([...RUNTIME, PI_PROJECT_FLAG, project])
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 })
 
@@ -1339,7 +1340,7 @@ describe("a project that is not a git repository", () => {
     expect(commands).not.toContain("state mode")
     expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
     expect(delivered?.message?.content).toContain("Ship the thing")
-    await rm(project, { recursive: true, force: true })
+    await removeTemporary(project)
   })
 
   test("without a .holyagent folder it gets nothing, except the core of a session role", async () => {
@@ -1348,7 +1349,7 @@ describe("a project that is not a git repository", () => {
     const { delivered } = await run(notGit, { cwd: project, flag: "session" })
     expect(delivered?.message?.content).toContain("You are the root")
     expect(delivered?.message?.content).not.toContain("holyagent status:")
-    await rm(project, { recursive: true, force: true })
+    await removeTemporary(project)
   })
 })
 
@@ -1385,7 +1386,7 @@ describe("with the built package and a project that is not a git repository", ()
     return {
       root,
       home: join(root, "home"),
-      done: () => rm(root, { recursive: true, force: true }),
+      done: () => removeTemporary(root),
     }
   }
 
@@ -1929,7 +1930,7 @@ describe("a Windows package root", () => {
     )
     expect(delivered?.message?.content).toContain(wrapper)
     expect(delivered?.message?.content).not.toContain("C:\\Users")
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 })
 
@@ -1960,7 +1961,7 @@ describe("telling a child from the root", () => {
     expect(root.endsWith(PI_SESSION_REMINDER)).toBe(true)
     expect(child).toContain("Ship the thing")
     expect(child).not.toContain(PI_SESSION_REMINDER)
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("a child fills the package folder into its prompt and leaves the root's process variables alone", async () => {
@@ -2610,7 +2611,7 @@ describe("the root's system prompt", () => {
     const { delivered: both } = await run(healthy(withState))
     expect(both?.message?.customType).toBe(CONTEXT_MESSAGE)
     expect(both?.systemPrompt).toContain(filledPrompt)
-    await rm(withState, { recursive: true, force: true })
+    await removeTemporary(withState)
   })
 
   test("stays when the status fails after the config is read, with the notice beside it", async () => {
@@ -2767,7 +2768,7 @@ describe("the root's tools", () => {
     ])
     expect(messages[1]?.content).toContain("no such loadout")
     expect(await nextMessages(api)).toEqual([])
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("are the defaults' when the config cannot be read: the root keeps its exclusions", async () => {

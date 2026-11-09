@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -29,6 +29,7 @@ import {
   renderFixture,
   RERECORD_COMMAND,
 } from "./fixtures/record.ts"
+import { removeTemporary } from "./temp-folder.ts"
 
 // These tests pin the Pi events the integration consumes to the Pi version the fixtures were
 // built for. The fixtures come from Pi's exported types (see fixtures/record.ts), not from a Pi
@@ -205,7 +206,7 @@ const withDirectory = async <A>(use: (directory: string) => Promise<A>): Promise
   try {
     return await use(directory)
   } finally {
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   }
 }
 

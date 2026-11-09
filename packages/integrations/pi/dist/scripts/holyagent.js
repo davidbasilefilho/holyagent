@@ -17002,7 +17002,7 @@ var init_plan = __esm(() => {
   ];
 });
 
-var REFLOG_MOVE, SAFE_BRANCH, safeBranch = (name) => SAFE_BRANCH.test(name) ? gitMaybe(["check-ref-format", "--branch", name]).pipe(map5((out) => out === name)) : succeed6(false), startBranch, returnBranch = (start) => gen2(function* () {
+var REFLOG_MOVE, FULL_ID, SAFE_BRANCH, safeBranch = (name) => SAFE_BRANCH.test(name) ? gitMaybe(["check-ref-format", "--branch", name]).pipe(map5((out) => out === name)) : succeed6(false), startBranch, returnBranch = (start) => gen2(function* () {
   if (start !== undefined && (yield* safeBranch(start)))
     return start;
   const remote = (yield* gitMaybe([
@@ -17037,12 +17037,15 @@ var init_status = __esm(() => {
   init_git();
   init_identity();
   REFLOG_MOVE = /^checkout: moving from (\S+) to (\S+)$/;
+  FULL_ID = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
   SAFE_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
   startBranch = gen2(function* () {
     const log = (yield* gitMaybe(["reflog", "show", "--format=%gs", "HEAD"])) ?? "";
     const moves = log.split(`
 `).map((line) => REFLOG_MOVE.exec(line)).filter((move) => move !== null).reverse();
-    for (const move of moves)
+    const [first, second] = moves;
+    const setup = first !== undefined && second !== undefined && FULL_ID.test(first[1] ?? "") && second[1] === first[2] ? moves.slice(1) : moves;
+    for (const move of setup)
       for (const name of [move[2], move[1]])
         if (name !== undefined && (yield* gitMaybe(["show-ref", "--verify", "--quiet", `refs/heads/${name}`])) !== undefined)
           return name;

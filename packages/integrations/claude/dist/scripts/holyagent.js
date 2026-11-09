@@ -14855,13 +14855,16 @@ var recommend = (project, registry, now, config, workTree) => {
 };
 
 var REFLOG_MOVE = /^checkout: moving from (\S+) to (\S+)$/;
+var FULL_ID = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 var SAFE_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 var safeBranch = (name) => SAFE_BRANCH.test(name) ? gitMaybe(["check-ref-format", "--branch", name]).pipe(map4((out) => out === name)) : succeed6(false);
 var startBranch = gen2(function* () {
   const log = (yield* gitMaybe(["reflog", "show", "--format=%gs", "HEAD"])) ?? "";
   const moves = log.split(`
 `).map((line) => REFLOG_MOVE.exec(line)).filter((move) => move !== null).reverse();
-  for (const move of moves)
+  const [first, second] = moves;
+  const setup = first !== undefined && second !== undefined && FULL_ID.test(first[1] ?? "") && second[1] === first[2] ? moves.slice(1) : moves;
+  for (const move of setup)
     for (const name of [move[2], move[1]])
       if (name !== undefined && (yield* gitMaybe(["show-ref", "--verify", "--quiet", `refs/heads/${name}`])) !== undefined)
         return name;
