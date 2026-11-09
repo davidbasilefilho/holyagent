@@ -11,8 +11,9 @@ import {
 
 /**
  * Renders the setup interface in OpenTUI's headless test renderer and saves every state at three
- * sizes as text: the character frame (`captureCharFrame`), then the colour spans. Usage: `bun
- * scripts/capture-setup-tui.ts <directory>`; the files are `<state>-<cols>x<rows>.txt`.
+ * sizes (the `light-*` states, drawn for a light terminal, at two) as text: the character frame
+ * (`captureCharFrame`), then the colour spans. Usage: `bun scripts/capture-setup-tui.ts
+ * <directory>`; the files are `<state>-<cols>x<rows>.txt`.
  */
 const directory = Bun.argv[2]
 if (directory === undefined) throw new Error("usage: bun scripts/capture-setup-tui.ts <directory>")
@@ -68,11 +69,47 @@ interface Scene {
   readonly keys?: ReadonlyArray<string>
   /** Resizes the screen to this size after the keys, before the frame; the scene starts at 80x24. */
   readonly resize?: readonly [number, number]
+  /** The sizes to capture at; every size of {@link SIZES} when absent. */
+  readonly sizes?: ReadonlyArray<readonly [number, number]>
 }
 
 const never = new Promise<never>(() => {})
 const NO_COLOR = { TERM: "xterm-256color", NO_COLOR: "1" }
 const ASCII = { TERM: "xterm-256color", LANG: "C" }
+
+// A light terminal: the interface then draws in its light palette.
+const LIGHT = { background: "light" } as const
+const LIGHT_SIZES = [
+  [80, 24],
+  [40, 20],
+] as const
+
+const LIGHT_SCENES: ReadonlyArray<Scene> = [
+  { name: "light-initial", options: LIGHT, sizes: LIGHT_SIZES },
+  { name: "light-review", options: LIGHT, keys: ["enter"], sizes: LIGHT_SIZES },
+  {
+    name: "light-apply-success",
+    options: { ...LIGHT, apply: () => Promise.resolve(SUCCESS) },
+    keys: ["enter", "enter"],
+    sizes: LIGHT_SIZES,
+  },
+  {
+    name: "light-apply-failure",
+    options: { ...LIGHT, apply: () => Promise.resolve(FAILURE) },
+    keys: ["enter", "enter"],
+    sizes: LIGHT_SIZES,
+  },
+  {
+    name: "light-review-failed",
+    options: {
+      ...LIGHT,
+      review: () =>
+        Promise.reject(new Error("/home/user/.t3/userdata/settings.json is not a JSON object")),
+    },
+    keys: ["enter"],
+    sizes: LIGHT_SIZES,
+  },
+]
 
 const SCENES: ReadonlyArray<Scene> = [
   { name: "initial" },
@@ -210,13 +247,15 @@ const SCENES: ReadonlyArray<Scene> = [
     options: { env: { TERM: "xterm-256color", LANG: "C" } },
     keys: ["enter"],
   },
+  ...LIGHT_SCENES,
 ]
 
 await rm(directory, { recursive: true, force: true })
 await mkdir(directory, { recursive: true })
 let written = 0
 for (const scene of SCENES) {
-  for (const [width, height] of scene.resize === undefined ? SIZES : ([[80, 24]] as const)) {
+  const sizes = scene.sizes ?? (scene.resize === undefined ? SIZES : ([[80, 24]] as const))
+  for (const [width, height] of sizes) {
     const mounted: Mounted = await mount({ width, height, ...scene.options })
     await mounted.keys(...(scene.keys ?? []))
     if (scene.resize !== undefined) await mounted.resize(...scene.resize)

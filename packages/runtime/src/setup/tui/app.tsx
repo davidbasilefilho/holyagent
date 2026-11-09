@@ -17,12 +17,14 @@ import {
   type State,
   view,
 } from "./model.ts"
-import { BOLD_TONES, lookFor, TERMINAL_THEME } from "./theme.ts"
+import { type Background, BOLD_TONES, lookFor, paletteOf } from "./theme.ts"
 import type { TuiInput, TuiOutcome } from "./types.ts"
 
 /** The props of {@link SetupApp}. */
 export interface SetupAppProps {
   readonly input: TuiInput
+  /** The terminal's background, which picks the palette; dark when it is not known. */
+  readonly background?: Background
   /** Called once, with how the interface ended; the caller then closes the renderer. */
   readonly done: (outcome: TuiOutcome) => void
 }
@@ -54,7 +56,8 @@ const settle = <A,>(
  */
 export const SetupApp = (props: SetupAppProps) => {
   const dimensions = useTerminalDimensions()
-  const look = lookFor(props.input.env)
+  const look = lookFor(props.input.env, props.background)
+  const palette = paletteOf(look)
   const rows = rowsOf(props.input.offer)
   const [state, setState] = createSignal<State>(initialState(props.input.initial))
   const abort = new AbortController()
@@ -132,7 +135,7 @@ export const SetupApp = (props: SetupAppProps) => {
   // Added colour is dropped under NO_COLOR, so a segment then draws in the terminal's own
   // foreground (OpenTUI's default would be white); bold stays.
   const colorOf = (tone: Line[number]["tone"]) =>
-    tone !== undefined && look.color ? TERMINAL_THEME[tone] : RGBA.defaultForeground()
+    tone !== undefined && look.color ? palette[tone] : RGBA.defaultForeground()
 
   return (
     <box flexDirection="column">

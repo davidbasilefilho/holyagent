@@ -1144,9 +1144,74 @@ var Prototype = (options) => makePrimitiveProto({
   [evaluate]: options.evaluate
 });
 
-var TypeId = "~effect/Result";
+var TypeId = "~effect/Option";
 var CommonProto = {
   [TypeId]: {
+    _A: (_) => _
+  },
+  ...PipeInspectableProto,
+  [Symbol.iterator]() {
+    return new SingleShotGen(this);
+  }
+};
+var SomeProto = /* @__PURE__ */ Object.defineProperty(/* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto), {
+  _tag: "Some",
+  _op: "Some",
+  [symbol2](that) {
+    return isOption(that) && isSome(that) && equals(this.value, that.value);
+  },
+  [symbol]() {
+    return combine(hash(this._tag))(hash(this.value));
+  },
+  toString() {
+    return `some(${format(this.value)})`;
+  },
+  toJSON() {
+    return {
+      _id: "Option",
+      _tag: this._tag,
+      value: toJson(this.value)
+    };
+  }
+}), "valueOrUndefined", {
+  get() {
+    return this.value;
+  }
+});
+var NoneHash = /* @__PURE__ */ hash("None");
+var NoneProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto), {
+  _tag: "None",
+  _op: "None",
+  valueOrUndefined: undefined,
+  [symbol2](that) {
+    return isOption(that) && isNone(that);
+  },
+  [symbol]() {
+    return NoneHash;
+  },
+  toString() {
+    return `none()`;
+  },
+  toJSON() {
+    return {
+      _id: "Option",
+      _tag: this._tag
+    };
+  }
+});
+var isOption = (input) => hasProperty(input, TypeId);
+var isNone = (fa) => fa._tag === "None";
+var isSome = (fa) => fa._tag === "Some";
+var none = /* @__PURE__ */ Object.create(NoneProto);
+var SomeImpl = function(value) {
+  this.value = value;
+};
+SomeImpl.prototype = SomeProto;
+var some = (value) => new SomeImpl(value);
+
+var TypeId2 = "~effect/Result";
+var CommonProto2 = {
+  [TypeId2]: {
     _A: (_) => _,
     _E: (_) => _
   },
@@ -1155,7 +1220,7 @@ var CommonProto = {
     return new SingleShotGen(this);
   }
 };
-var SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto), {
+var SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto2), {
   _tag: "Success",
   _op: "Success",
   [symbol2](that) {
@@ -1175,7 +1240,7 @@ var SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(C
     };
   }
 });
-var FailureProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto), {
+var FailureProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto2), {
   _tag: "Failure",
   _op: "Failure",
   [symbol2](that) {
@@ -1195,7 +1260,7 @@ var FailureProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(C
     };
   }
 });
-var isResult = (input) => hasProperty(input, TypeId);
+var isResult = (input) => hasProperty(input, TypeId2);
 var isFailure = (result) => result._tag === "Failure";
 var isSuccess = (result) => result._tag === "Success";
 var FailureImpl = function(failure) {
@@ -1223,6 +1288,10 @@ var Number2 = /* @__PURE__ */ make((self, that) => {
 });
 var mapInput = /* @__PURE__ */ dual(2, (self, f) => make((b1, b2) => self(f(b1), f(b2))));
 var isGreaterThan = (O) => dual(2, (self, that) => O(self, that) === 1);
+
+var none2 = () => none;
+var some2 = some;
+var isNone2 = isNone;
 
 var ServiceTypeId = "~effect/Context/Service";
 var Service = function() {
@@ -1274,7 +1343,7 @@ var ServiceProto = {
 };
 var cacheKeys = /* @__PURE__ */ new Set;
 var ReferenceTypeId = "~effect/Context/Reference";
-var TypeId2 = "~effect/Context";
+var TypeId3 = "~effect/Context";
 var FlattenAfterBaseHits = 8;
 var makeImpl = (cacheRoot, base, overlay, depth, maxDepth) => {
   const self = Object.create(Proto);
@@ -1328,7 +1397,7 @@ var Proto = {
     return flatten(this);
   },
   ...PipeInspectableProto,
-  [TypeId2]: {
+  [TypeId3]: {
     _Services: (_) => _
   },
   toJSON() {
@@ -1358,7 +1427,7 @@ var Proto = {
   }
 };
 var hasSameCache = (self, that) => self.cacheRoot === that.cacheRoot;
-var isContext = (u) => hasProperty(u, TypeId2);
+var isContext = (u) => hasProperty(u, TypeId3);
 var isReference = (u) => !!u[ReferenceTypeId];
 var empty = () => emptyContext2;
 var emptyContext2 = /* @__PURE__ */ makeUnsafe(/* @__PURE__ */ new Map);
@@ -1418,11 +1487,17 @@ var succeed2 = succeed;
 var fail2 = fail;
 var isFailure2 = isFailure;
 
-var TypeId3 = "~effect/Duration";
+var Array2 = globalThis.Array;
+var isArray = Array2.isArray;
+var empty2 = () => [];
+
+var TypeId4 = "~effect/Duration";
 var bigint0 = /* @__PURE__ */ BigInt(0);
 var bigint1 = /* @__PURE__ */ BigInt(1);
 var bigint2 = /* @__PURE__ */ BigInt(2);
 var bigint10 = /* @__PURE__ */ BigInt(10);
+var bigint24 = /* @__PURE__ */ BigInt(24);
+var bigint60 = /* @__PURE__ */ BigInt(60);
 var bigint1e3 = /* @__PURE__ */ BigInt(1000);
 var bigint1e6 = /* @__PURE__ */ BigInt(1e6);
 var bigint1e9 = /* @__PURE__ */ BigInt(1e9);
@@ -1511,7 +1586,7 @@ var fromInputUnsafe = (input) => {
     case "object": {
       if (input === null)
         break;
-      if (TypeId3 in input)
+      if (TypeId4 in input)
         return input;
       if (Array.isArray(input)) {
         if (input.length !== 2 || !input.every(isNumber)) {
@@ -1593,7 +1668,7 @@ var negativeInfinityDurationValue = {
   _tag: "NegativeInfinity"
 };
 var DurationProto = {
-  [TypeId3]: TypeId3,
+  [TypeId4]: TypeId4,
   [symbol]() {
     switch (this.value._tag) {
       case "Millis":
@@ -1680,7 +1755,41 @@ var make3 = (input) => {
   }
   return duration;
 };
-var isDuration = (u) => hasProperty(u, TypeId3);
+var isDuration = (u) => hasProperty(u, TypeId4);
+var isZero = (self) => {
+  switch (self.value._tag) {
+    case "Millis":
+      return self.value.millis === 0;
+    case "Nanos":
+      return self.value.nanos === bigint0;
+    case "Infinity":
+    case "NegativeInfinity":
+      return false;
+  }
+};
+var isNegative = (self) => {
+  switch (self.value._tag) {
+    case "Millis":
+      return self.value.millis < 0;
+    case "Nanos":
+      return self.value.nanos < bigint0;
+    case "NegativeInfinity":
+      return true;
+    case "Infinity":
+      return false;
+  }
+};
+var abs = (self) => {
+  switch (self.value._tag) {
+    case "Infinity":
+    case "NegativeInfinity":
+      return infinity;
+    case "Millis":
+      return self.value.millis < 0 ? make3(-self.value.millis) : self;
+    case "Nanos":
+      return self.value.nanos < bigint0 ? make3(-self.value.nanos) : self;
+  }
+};
 var zero = /* @__PURE__ */ make3(0);
 var infinity = /* @__PURE__ */ make3(Infinity);
 var negativeInfinity = /* @__PURE__ */ make3(-Infinity);
@@ -1731,6 +1840,80 @@ var Equivalence = (self, that) => matchPair(self, that, {
   onInfinity: (self, that) => self.value._tag === that.value._tag
 });
 var equals2 = /* @__PURE__ */ dual(2, (self, that) => Equivalence(self, that));
+var parts = (self) => {
+  if (self.value._tag === "Infinity") {
+    return {
+      days: Infinity,
+      hours: Infinity,
+      minutes: Infinity,
+      seconds: Infinity,
+      millis: Infinity,
+      nanos: Infinity
+    };
+  }
+  if (self.value._tag === "NegativeInfinity") {
+    return {
+      days: -Infinity,
+      hours: -Infinity,
+      minutes: -Infinity,
+      seconds: -Infinity,
+      millis: -Infinity,
+      nanos: -Infinity
+    };
+  }
+  const n = toNanosUnsafe(self);
+  const neg = n < bigint0;
+  const a = neg ? -n : n;
+  const ms = a / bigint1e6;
+  const sec = ms / bigint1e3;
+  const min = sec / bigint60;
+  const hr = min / bigint60;
+  const d = hr / bigint24;
+  const sign = neg ? -1 : 1;
+  return {
+    days: sign * Number(d),
+    hours: sign * Number(hr % bigint24),
+    minutes: sign * Number(min % bigint60),
+    seconds: sign * Number(sec % bigint60),
+    millis: sign * Number(ms % bigint1e3),
+    nanos: sign * Number(a % bigint1e6)
+  };
+};
+var format2 = (self) => {
+  if (self.value._tag === "Infinity") {
+    return "Infinity";
+  }
+  if (self.value._tag === "NegativeInfinity") {
+    return "-Infinity";
+  }
+  if (isZero(self)) {
+    return "0";
+  }
+  if (isNegative(self)) {
+    return "-" + format2(abs(self));
+  }
+  const fragments = parts(self);
+  const pieces = [];
+  if (fragments.days !== 0) {
+    pieces.push(`${fragments.days}d`);
+  }
+  if (fragments.hours !== 0) {
+    pieces.push(`${fragments.hours}h`);
+  }
+  if (fragments.minutes !== 0) {
+    pieces.push(`${fragments.minutes}m`);
+  }
+  if (fragments.seconds !== 0) {
+    pieces.push(`${fragments.seconds}s`);
+  }
+  if (fragments.millis !== 0) {
+    pieces.push(`${fragments.millis}ms`);
+  }
+  if (fragments.nanos !== 0) {
+    pieces.push(`${fragments.nanos}ns`);
+  }
+  return pieces.join(" ");
+};
 
 var Scheduler = /* @__PURE__ */ Reference("effect/Scheduler", {
   fiberCached: true,
@@ -2353,6 +2536,45 @@ var maxInlineSteps = 32;
 var fiberMiddleware = {
   interruptChildren: undefined
 };
+var fiberStackAnnotations = (fiber) => {
+  if (!fiber.cache.stackFrame)
+    return;
+  const annotations = new Map;
+  annotations.set(InterruptorStackTrace.key, fiber.cache.stackFrame);
+  return makeUnsafe(annotations);
+};
+var fiberAwaitAll = (self) => callback((resume) => {
+  const iter = self[Symbol.iterator]();
+  const exits = [];
+  let cancel = undefined;
+  function loop() {
+    let result = iter.next();
+    while (!result.done) {
+      if (result.value._exit) {
+        exits.push(result.value._exit);
+        result = iter.next();
+        continue;
+      }
+      cancel = result.value.addObserver((exit) => {
+        exits.push(exit);
+        loop();
+      });
+      return;
+    }
+    resume(succeed3(exits));
+  }
+  loop();
+  return sync(() => cancel?.());
+});
+var fiberInterruptAll = (fibers) => withFiber((parent) => {
+  const annotations = fiberStackAnnotations(parent);
+  let fiberArr = empty2();
+  for (const fiber of fibers) {
+    fiber.interruptUnsafe(parent.id, annotations);
+    fiberArr.push(fiber);
+  }
+  return asVoid(fiberAwaitAll(fiberArr));
+});
 var succeed3 = exitSucceed;
 var failCause = exitFailCause;
 var fail3 = exitFail;
@@ -2464,6 +2686,7 @@ var asyncFinalizer = /* @__PURE__ */ makePrimitive({
 });
 var callback = (register) => callbackOptions(register, register.length >= 2);
 var never = /* @__PURE__ */ callback(constVoid);
+var as = /* @__PURE__ */ dual(2, (self, value) => new ContImpl(self, returnPayload, succeed3(value)));
 var evaluateCont = function(fiber) {
   fiber._stack.push(this);
   return this[args];
@@ -2496,12 +2719,48 @@ var continuationMarksStack = /* @__PURE__ */ (() => {
   setStackTraceLimit(limit);
   return error.stack?.includes("[as " + marker + "]") === true;
 })();
+var mapCont = function(value, fiber) {
+  const f = this.payload;
+  return fiber.succeedWith(continuationMarksStack ? f(value) : internalCall(() => f(value)));
+};
 var andThenCont = function(value) {
   const f = this.payload;
   return f(value);
 };
+var asSome = (self) => map(self, some2);
 var andThen = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, isEffect(f) ? returnPayload : andThenCont, f));
+var asVoid = (self) => new ContImpl(self, returnPayload, exitVoid);
+var raceAllFirst = (all, options) => withFiber((parent) => {
+  const fibers = new Set;
+  onExitUnsafe(parent, () => fibers.size === 0 ? undefined : fiberInterruptAll(fibers));
+  return callback((resume) => {
+    let done = false;
+    let i = 0;
+    for (const effect of all) {
+      if (done)
+        break;
+      const index = i++;
+      const fiber = forkUnsafe(parent, effect, true, true, false);
+      fibers.add(fiber);
+      fiber.addObserver((exit) => {
+        fibers.delete(fiber);
+        const isWinner = !done;
+        done = true;
+        resume(exit);
+        if (isWinner && options?.onWinner) {
+          options.onWinner({
+            fiber,
+            index,
+            parentFiber: parent
+          });
+        }
+      });
+    }
+  });
+});
+var raceFirst = /* @__PURE__ */ dual((args) => isEffect(args[1]), (self, that, options) => raceAllFirst([self, that], options));
 var flatMap = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, andThenCont, f));
+var map = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, mapCont, f));
 var exitIsSuccess = (self) => self._tag === "Success";
 var exitVoid = /* @__PURE__ */ exitSucceed(undefined);
 var catchCause = /* @__PURE__ */ dual(2, (self, f) => new OnFailureImpl(self, f.length !== 1 ? (cause) => f(cause) : f));
@@ -2596,6 +2855,16 @@ var exitPrimitive = /* @__PURE__ */ makePrimitive({
     return fiber.succeedWith(exit ?? exitFailCause(cause));
   }
 });
+var timeoutOrElse = /* @__PURE__ */ dual(2, (self, options) => flatMap(timeoutOption(self, options.duration), (option) => isNone2(option) ? options.orElse() : succeed3(option.value)));
+var timeoutErrorFromDuration = (duration) => new TimeoutError(`Operation timed out after '${format2(duration)}'`);
+var timeout = /* @__PURE__ */ dual(2, (self, duration) => {
+  const decoded = fromInputUnsafe(duration);
+  return timeoutOrElse(self, {
+    duration: decoded,
+    orElse: () => fail3(timeoutErrorFromDuration(decoded))
+  });
+});
+var timeoutOption = /* @__PURE__ */ dual(2, (self, duration) => raceFirst(asSome(self), as(sleep(duration), none2())));
 var combineFinalizerCause = (exit_, finalizer) => exitIsSuccess(exit_) ? finalizer : catchCause(finalizer, (cause) => failCause(causeElectDefects(causeCombine(exit_.cause, cause))));
 var OnExitImpl = /* @__PURE__ */ function() {
   const Proto = /* @__PURE__ */ makePrimitiveProto({
@@ -2640,6 +2909,9 @@ var OnExitImpl = /* @__PURE__ */ function() {
   return OnExitImpl;
 }();
 var onExitPrimitive = (effect, onExit, interruptible) => new OnExitImpl(effect, onExit, interruptible);
+var onExitUnsafe = (fiber, f) => {
+  fiber._stack.push(new OnExitImpl(undefined, f, undefined));
+};
 var acquireUseRelease = (acquire, use, release) => uninterruptibleMask((restore) => flatMap(acquire, (a) => onExitPrimitive(suspend(() => restore(use(a))), (exit) => release(a, exit), true)));
 var setInterruptible = /* @__PURE__ */ makePrimitive({
   op: "SetInterruptible",
@@ -2688,6 +2960,22 @@ var whileLoop = /* @__PURE__ */ makePrimitive({
     return exitVoid;
   }
 });
+var forkUnsafe = (parent, effect, immediate = false, daemon = false, uninterruptible = false) => {
+  const parentRuntime = parent;
+  const interruptible = uninterruptible === "inherit" ? parentRuntime.interruptible : !uninterruptible;
+  const child = new FiberImpl(parentRuntime.context, interruptible);
+  if (!daemon) {
+    parentRuntime.children().add(child);
+    child._parent = parentRuntime;
+  }
+  if (immediate) {
+    child.evaluate(effect);
+  } else {
+    child._asyncContext = captureAsyncContext();
+    parentRuntime.currentDispatcher.scheduleTask(() => child.evaluate(effect), 0);
+  }
+  return child;
+};
 var runForkWith = (context) => (effect, options) => {
   const fiber = new FiberImpl(options?.scheduler ? add(context, Scheduler, options.scheduler) : context, options?.uninterruptible !== true);
   fiber.evaluate(effect);
@@ -2798,6 +3086,17 @@ var wallTimeNanos = /* @__PURE__ */ function() {
     return origin + monotonic;
   };
 }();
+var clockWith = (f) => withFiber((fiber) => f(fiber.getRef(ClockRef)));
+var sleep = (duration) => clockWith((clock) => clock.sleep(fromInputUnsafe(duration)));
+var TimeoutErrorTypeId = "~effect/Cause/TimeoutError";
+class TimeoutError extends (/* @__PURE__ */ TaggedError("TimeoutError")) {
+  [TimeoutErrorTypeId] = TimeoutErrorTypeId;
+  constructor(message) {
+    super({
+      message
+    });
+  }
+}
 var UnknownErrorTypeId = "~effect/Cause/UnknownError";
 class UnknownError extends (/* @__PURE__ */ TaggedError("UnknownError")) {
   [UnknownErrorTypeId] = UnknownErrorTypeId;
@@ -2974,9 +3273,12 @@ var succeed4 = succeed3;
 var sync2 = sync;
 var callback2 = callback;
 var die2 = die;
+var flatMap2 = flatMap;
 var andThen2 = andThen;
+var map2 = map;
 var catch_2 = catch_;
 var ignore2 = ignore;
+var timeout2 = timeout;
 var match4 = match3;
 var acquireUseRelease2 = acquireUseRelease;
 var runFork2 = runFork;
@@ -3092,9 +3394,22 @@ var TERMINAL_THEME = {
   success: "#73daca",
   warning: "#e0af68",
   error: "#f7768e",
-  hint: "#737aa2"
+  hint: "#7e87b2"
+};
+var LIGHT_THEME = {
+  heading: "#2a5bbd",
+  option: "#00647f",
+  argument: "#33478a",
+  focus: "#00647f",
+  enabled: "#3d6228",
+  disabled: "#33478a",
+  success: "#2a6a5f",
+  warning: "#7c5410",
+  error: "#b5223f",
+  hint: "#565f89"
 };
 var BOLD_TONES = new Set(["heading", "focus"]);
+var paletteOf = (look) => look.background === "light" ? LIGHT_THEME : TERMINAL_THEME;
 var set = (value) => value !== undefined && value !== "";
 var colorEnabled = (env, tty) => {
   if (set(env["NO_COLOR"]) || env["TERM"] === "dumb")
@@ -3109,9 +3424,20 @@ var unicodeEnabled = (env) => {
   const locale = [env["LC_ALL"], env["LC_CTYPE"], env["LANG"]].find(set);
   return locale === undefined || /utf-?8/i.test(locale);
 };
-var lookFor = (env) => ({
+var backgroundFromColorfgbg = (env) => {
+  const value = env["COLORFGBG"];
+  if (!set(value))
+    return;
+  const parts = value.split(";");
+  const last = parts.at(-1) ?? "";
+  if (parts.length < 2 || !/^\d{1,3}$/.test(last))
+    return;
+  return last === "7" || last === "15" ? "light" : "dark";
+};
+var lookFor = (env, background = "dark") => ({
   color: colorEnabled(env, true),
-  unicode: unicodeEnabled(env)
+  unicode: unicodeEnabled(env),
+  background
 });
 var glyphs = (look) => look.unicode ? { focus: "\u276F", dot: "\xB7", ellipsis: "\u2026", arrows: "\u2191/\u2193" } : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down" };
 
@@ -3452,7 +3778,8 @@ var settle = (run, onResult) => runFork2(tryPromise2({
 })));
 var SetupApp = (props) => {
   const dimensions = useTerminalDimensions();
-  const look = lookFor(props.input.env);
+  const look = lookFor(props.input.env, props.background);
+  const palette = paletteOf(look);
   const rows = rowsOf(props.input.offer);
   const [state, setState] = createSignal(initialState(props.input.initial));
   const abort = new AbortController;
@@ -3519,7 +3846,7 @@ var SetupApp = (props) => {
     if (next.command !== undefined)
       run(next.command);
   });
-  const colorOf = (tone) => tone !== undefined && look.color ? TERMINAL_THEME[tone] : RGBA.defaultForeground();
+  const colorOf = (tone) => tone !== undefined && look.color ? palette[tone] : RGBA.defaultForeground();
   return (() => {
     var _el$ = _$createElement("box");
     _$setProp(_el$, "flexDirection", "column");
@@ -3566,8 +3893,18 @@ var SetupApp = (props) => {
   })();
 };
 
+var BACKGROUND_TIMEOUT_MS = 300;
+var detectBackground = (env, renderer, timeoutMs = BACKGROUND_TIMEOUT_MS) => {
+  if (!colorEnabled(env, true))
+    return succeed4("dark");
+  const named = backgroundFromColorfgbg(env);
+  if (named !== undefined)
+    return succeed4(named);
+  return tryPromise2(() => renderer.waitForThemeMode(timeoutMs)).pipe(timeout2(timeoutMs + 50), map2((mode) => mode === "light" ? "light" : "dark"), catch_2(() => succeed4("dark")));
+};
+
 // packages/runtime/src/setup/tui/entry.tsx
-var showSetup = (acquire, input) => acquireUseRelease2(acquire, (renderer) => callback2((resume) => {
+var showSetup = (acquire, input) => acquireUseRelease2(acquire, (renderer) => detectBackground(input.env, renderer).pipe(flatMap2((background) => callback2((resume) => {
   const finish = (outcome) => resume(succeed4(outcome));
   const destroyed = () => finish({
     _tag: "Interrupted"
@@ -3577,10 +3914,11 @@ var showSetup = (acquire, input) => acquireUseRelease2(acquire, (renderer) => ca
   renderer.once("destroy", destroyed);
   runFork2(tryPromise2(() => render(() => _$createComponent2(SetupApp, {
     input,
+    background,
     done: finish
   }), renderer)).pipe(catch_2((cause) => sync2(() => resume(die2(cause))))));
   return sync2(() => renderer.off("destroy", destroyed));
-}), (renderer) => sync2(() => renderer.destroy()).pipe(andThen2(tryPromise2(() => renderer.closed)), ignore2));
+}))), (renderer) => sync2(() => renderer.destroy()).pipe(andThen2(tryPromise2(() => renderer.closed)), ignore2));
 var runSetupTui = (input) => runPromise2(showSetup(tryPromise2(() => createCliRenderer({
   exitOnCtrlC: false,
   useMouse: false,

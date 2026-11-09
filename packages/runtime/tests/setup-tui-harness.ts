@@ -2,6 +2,7 @@ import solidPlugin from "@opentui/solid/bun-plugin"
 
 import type { T3Preview } from "../src/setup/t3-settings.ts"
 import { reviewOf } from "../src/setup/tui/session.ts"
+import type { Background } from "../src/setup/tui/theme.ts"
 import type { Applied, Choices, Review, TuiInput, TuiOutcome } from "../src/setup/tui/types.ts"
 
 // The interface's JSX needs the Solid transform, which `bun test` does not apply on its own: load
@@ -81,6 +82,8 @@ export interface Mount {
   readonly device?: string | undefined
   readonly worktrees?: boolean
   readonly dryRun?: boolean
+  /** The terminal background the palette is picked for; dark when absent. */
+  readonly background?: Background
   readonly review?: (choices: Choices) => Promise<Review>
   readonly apply?: (choices: Choices, signal: AbortSignal) => Promise<Applied>
 }
@@ -115,7 +118,12 @@ export const mount = async (options: Mount) => {
     },
   }
   const setup = await testRender(
-    () => SetupApp({ input, done: (outcome) => void outcomes.push(outcome) }),
+    () =>
+      SetupApp({
+        input,
+        ...(options.background === undefined ? {} : { background: options.background }),
+        done: (outcome) => void outcomes.push(outcome),
+      }),
     { width: options.width, height: options.height, exitOnCtrlC: false },
   )
   await setup.renderOnce()

@@ -11,7 +11,8 @@ import { PREVIEW } from "./setup-tui-harness.ts"
 const { showSetup } = await import("../src/setup/tui/entry.tsx")
 
 const input = (signals: Array<AbortSignal> = []): TuiInput => ({
-  env: { TERM: "xterm-256color" },
+  // COLORFGBG names the background, so the interface starts without waiting for the terminal.
+  env: { TERM: "xterm-256color", COLORFGBG: "15;0" },
   offer: { device: undefined, worktrees: true },
   initial: { worktrees: true, deviceAccess: false },
   dryRun: false,
