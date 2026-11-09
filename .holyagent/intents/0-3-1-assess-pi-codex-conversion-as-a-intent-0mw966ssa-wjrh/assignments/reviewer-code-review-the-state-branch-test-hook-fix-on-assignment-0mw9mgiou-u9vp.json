@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-state-branch-test-hook-fix-on",
   "objective": "Review the state-branch test hook fix on release/0.3.1/test/state-start-timeout (HEAD) in /home/user/holyagent-0.3.1-statefix.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Run git -C /home/user/holyagent-0.3.1-statefix show HEAD. Diagnosis: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7rhx-8sde.md (afterEach registered before setDefaultTimeout kept Bun's 5 s hook default; the Windows test body took ~25 s and cleanup ran past 5 s).",
     "Check the diagnosis against Bun's documented hook timeout behaviour and the scratch reproduction it names, that the new hook is bounded and its message names the slow cleanup, that the race does not leave cleanup running into the next test in a harmful way, and that no assertion changed. Run the file's tests."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_62d34829-360/assignment-0mw9mgiou-u9vp",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T18:56:02.718Z"
+    "startedAt": "2026-11-09T18:56:02.718Z",
+    "finishedAt": "2026-11-09T19:08:20.261Z"
+  },
+  "result": "result: no blockers. The fix targets the diagnosed cause and weakens nothing.\n\nBuilt-in `/code-review` (`HEAD~1...HEAD`): its seven findings are all in other files (`setup/tui/theme.ts`, `setup/capabilities.ts`, `docs/usage.md` and others). The commit touches only `state-branch.test.ts`, so I take them as run against the wrong checkout and reject them as out of scope. I did not rerun it.\n\nFindings:\nDiagnosis confirmed. In the scratch reproduction in `exp/`, registering the hook before `setDefaultTimeout(60_000)` fails with \"a beforeEach/afterEach hook timed out for this test\" (h3, 7.0 s, Bun 1.4.4). Registering it after passes (h4). I could not check Bun's docs offline, so this rests on the reproduction only.\nThe new hook is bounded. The inner race timer is `PROCESS_TIMEOUT_MS` (30 s, or 120 s on Windows) and the hook's own limit is that plus 5 s, so the inner timer fires first. Its message names the slow cleanup. I only read that message path and did not run it. `clearTimeout` runs in `.finally`.\nThe race is harmless. `cleanup()` empties `made` with `splice` before it removes anything, and the next test uses its own directories. If the timer wins, `rm` keeps running in the background and the failure is reported. The leftover directories are not retried (non-blocking, `state-branch.test.ts:53`).\nNo assertion changed. The diff is the import, the moved `setDefaultTimeout` block and the hook (+22/-2).\nWindows behavior was not run. Only Linux was.\n\nchecks: `bun test packages/runtime/tests/state-branch.test.ts` -> 60 pass, 0 fail.\n\nevidence:\nThe fix addresses the diagnosed cause without weakening the test: `git show HEAD` (only the hook and import changed), the `h3`/`h4` reproduction, and the state-branch test file passing 60/0.\nfindings: none blocking; one non-blocking note above (a timed-out `rm` is not retried).\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Diagnosis confirmed by reproduction; hook bounded with named message; no assertion changed; file passes 60/0.",
+    "criteria": [
+      {
+        "criterion": "The fix addresses the diagnosed cause without weakening the test",
+        "support": "`git show HEAD` (only the hook and import changed), the `h3`/`h4` reproduction, and the state-branch test file passing 60/0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking; one non-blocking note above (a timed-out `rm` is not retried)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T18:56:02.718Z"
 }
