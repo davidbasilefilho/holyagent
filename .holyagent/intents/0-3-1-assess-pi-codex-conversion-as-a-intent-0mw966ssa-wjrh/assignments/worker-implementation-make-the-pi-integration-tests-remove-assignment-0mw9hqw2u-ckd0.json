@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-pi-integration-tests-remove",
   "objective": "Make the Pi integration tests remove their temporary folders reliably on Windows, so a folder still briefly held by an exited child process no longer fails the suite with EBUSY.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-rmfix, branch release/0.3.1/test/windows-temp-cleanup (cut from release/0.3.1/integration).",
     "Observed on the Windows CI runner (job log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win100.log, around line 2700): packages/integrations/pi/tests/extension.test.ts:863 `await done()` failed with `EBUSY: resource busy or locked, rm 'C:\\\\Users\\\\RUNNER~1\\\\AppData\\\\Local\\\\Temp\\\\holyagent-pi-real-85cIwo'` in test 'with the built package and a real project > a bad .holyagent/config.json is reported with the field it names'. All assertions before the cleanup passed. Windows holds a directory handle for a short while after a child process that used it as cwd exits, so a single rm races it.",
@@ -55,7 +55,41 @@
     "agentId": "workflow:wf_3c02ac5c-eb1/assignment-0mw9hqw2u-ckd0",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T16:44:08.551Z"
+    "startedAt": "2026-11-09T16:44:08.551Z",
+    "finishedAt": "2026-11-09T16:48:19.090Z"
+  },
+  "result": "result: All 31 temp-folder cleanups in the Pi tests now go through one retrying helper. I could not run it on Windows, so the helper is tested only against a fake remover.\n\nchanged (all under /home/user/holyagent-0.3.1-rmfix/packages/integrations/pi/tests):\ntemp-folder.ts (new): `removeTemporary(path, remove = rm, retryDelayMs = 100)`. It calls `rm` with recursive and force, retries up to 10 attempts on EBUSY, EPERM and ENOTEMPTY with a 100 ms delay, and rethrows anything else.\ntemp-folder.test.ts (new): 3 tests of the helper against a fake remover. They cover retry on all three codes, no retry on EACCES, and giving up with the last error when the folder stays busy.\ncontract.test.ts, extension.test.ts, pi.test.ts and session-context.test.ts: every `rm(x, { recursive: true, force: true })` is now `removeTemporary(x)`. The `rm` imports are dropped. No assertion changed and no test skipped.\n\nchecks:\n`bunx --no-install mise run build` -> exit 0, no generated-output changes, only the six paths above in `git status`.\n`bunx --no-install mise run verify` -> exit 0, 2706 pass, 0 fail, 88 files. The first run failed lint on an `async` arrow in the new test; I fixed it and re-ran.\nThe EBUSY race itself cannot be reproduced on Linux.\n\nblockers: none\nquestions: none\n\nnotes:\npackages/runtime/tests has no shared helper. Several files use `rm(..., { recursive: true, force: true, maxRetries: 5 })` (cli, host, stdin) and others use a bare `rm`. I did not edit them. The owner of that change could reuse the idea of `removeTemporary`, or import it from the Pi tests folder.\nI wrote an explicit retry loop instead of `rm`'s `maxRetries` and `retryDelay`, because I did not confirm that Bun retries on all three codes.\n\nevidence:\nTemporary-folder cleanup in packages/integrations/pi/tests retries on EBUSY, EPERM and ENOTEMPTY through one helper: `temp-folder.ts` is used at every former `rm` site, and `temp-folder.test.ts` passes.\nNo assertion weakened and no test skipped: the diff only swaps `rm` calls for `removeTemporary` and removes the `rm` imports; 2706 pass, 0 fail.\nmise run build and mise run verify exit 0: build exit 0; verify exit 0 with 2706 pass, 0 fail (log at scratchpad/verify.log).\nchecks-run: `bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0.\nchanged-paths: the six paths under packages/integrations/pi/tests listed above.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rmfix.diff\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "All 31 cleanups use one retrying helper with its own tests; no assertion changed; build and verify exit 0 (2706 pass).",
+    "criteria": [
+      {
+        "criterion": "Temporary-folder cleanup in packages/integrations/pi/tests retries on EBUSY, EPERM and ENOTEMPTY through one helper",
+        "support": "`temp-folder.ts` is used at every former `rm` site, and `temp-folder.test.ts` passes."
+      },
+      {
+        "criterion": "No assertion weakened and no test skipped",
+        "support": "the diff only swaps `rm` calls for `removeTemporary` and removes the `rm` imports; 2706 pass, 0 fail."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 with 2706 pass, 0 fail (log at scratchpad/verify.log)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the six paths under packages/integrations/pi/tests listed above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rmfix.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T16:44:08.551Z"
 }
