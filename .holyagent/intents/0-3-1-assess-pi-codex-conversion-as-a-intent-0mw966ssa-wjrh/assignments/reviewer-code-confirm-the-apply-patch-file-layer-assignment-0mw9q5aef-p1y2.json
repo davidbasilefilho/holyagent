@@ -54,6 +54,7 @@
     "assignment-0mw9pye41-curp"
   ],
   "specialist": {
+    "agentId": "workflow:wf_8accb238-25b/assignment-0mw9q5aef-p1y2",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-09T20:39:17.223Z"
