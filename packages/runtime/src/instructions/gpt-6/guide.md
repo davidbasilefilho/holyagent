@@ -18,6 +18,7 @@ OpenAI publishes one prompting section for the whole family, written from observ
 | P4    | Codex GPT-6 prompt text, the `instructions_template` of `gpt-6-astra` and `gpt-6.1-sol`: `raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json` |
 | P5    | Codex's earlier generic prompt, not a GPT-6 prompt: `raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/prompt.md`                                        |
 | P6    | Model pages: `developers.openai.com/api/docs/models/gpt-6.1-sol`, `.../gpt-6.1-terra` and `.../gpt-6-luna`                                                                 |
+| M1    | The maintainer's observation of pages that GPT models built, not an OpenAI page: "gpt models always mess up padding and spacing in some places"                            |
 
 ## Points
 
@@ -61,6 +62,10 @@ OpenAI publishes one prompting section for the whole family, written from observ
 
 - O25 (P1, P6, PARAM): Effort is set per request, or mid-conversation with `configuration_update` items, which keep the cache. Astra and 6.1 Sol do not accept effort `none`; Terra and Luna do. Luna supports Chat Completions function calling only with effort `none`, and tools otherwise go through the Responses API. Terra's page advises starting at `medium` and raising effort only when the quality gain is worth the time and tokens. With any effort except `none`, omit `temperature`, `top_p` and `top_logprobs`. Codex defaults the GPT-6 models to effort `low` and no reasoning summary. Sections "What's new", "Limitations" and "Update API and model parameters" (P1); the Terra page (P6). Using `xhigh` only when evals justify it is a third-party quotation of OpenAI's reasoning guide, so treat it as inference.
 
+### Rendered output
+
+- O26 (M1, PROMPT): GPT-built interfaces ship cramped or misaligned spacing. The maintainer's screenshot of a page a GPT model built shows a card flush against the heading rule above it and the column divider beside it, no gap between the card's bottom and the section edge and rule below, a column with two left edges, and an em dash wrapped to the start of a line. No OpenAI page says anything about spacing, so this rests on that observation alone. The family states the spacing rules as outcomes with their reason (one scale, padding inside every container, a gap around every block, shared column edges, no line starting with closing punctuation) and has the worker and the reviewer measure padding and gaps on the final captures, because a model that judges a still by its overall look passes a card that touches a rule. Carried in `design-core/core.md`, `roles/worker-visual/method.md`, `roles/reviewer-visual/captures.md` and `skills/visual-judging/SKILL.md`.
+
 ## Applying the points
 
 - The text names the CLI as `holyagent <command>` and every host tool by its function (the structured question tool, the task list tool, the patch tool), because no source names the tools of the host that will run this set. The integration that wires the family supplies the host's names.
@@ -70,6 +75,7 @@ OpenAI publishes one prompting section for the whole family, written from observ
 ## Gaps
 
 - The pages carry no dedicated Luna or Terra prompting guide. Only the Astra and 6.1 Sol Codex templates were read, so the Luna, Terra and 6.0 Sol templates and the change from 6.0 to 6.1 are unknown.
+- The pages carry no guidance on spacing, layout or other visual craft, so O26 is a local rule from one maintainer observation and needs checking on further GPT-built pages.
 - OpenAI's reasoning guide and the cookbook prompting guides for earlier Codex models were not read.
 - P5 predates GPT-6 and is cited only for the `AGENTS.md` scope rule.
 - Every behavior point was observed on Astra and is extended to the rest of the family by OpenAI, so each needs an evaluation on the model in use.
