@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9x71h4-9je3",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 21,
+  "roleTask": "Reviewer.code",
+  "slug": "judge-whether-codex-auto-review-is",
+  "objective": "Judge whether Codex auto-review is correct, complete and merge-ready against its requirements.",
+  "state": "Running",
+  "scope": [
+    "Commit 08b054b on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range 91d9eb07..08b054b); source diff without generated dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/auto-review-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9wh8o1-xebk.md; design research /home/user/holyagent/.git/holyagent/reports/assignment-0mw96z5n3-mw6f.md.",
+    "Testing rule: unit tests with recorded or synthesized fixtures only; the reviewer request is made through an injectable client so tests never reach a network.",
+    "Testing rule: never start pi or make a model or network request; unit tests only."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Run in the worktree: bun install --frozen-lockfile, then bunx --no-install mise run build (tree unchanged after it) and bunx --no-install mise run verify; give command, exit code and counts.",
+    "Report in under 400 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Triggers, request, decisions, breaker, override and the capability switch behave as the requirements state, with tests that fail without them",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The change introduces no regression in the Codex provider, the tool_call gate order or other providers, and error paths are handled and tested",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Build leaves the tree unchanged and verify passes on 08b054b",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9wh8o1-xebk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T23:56:36.280Z"
+  },
+  "createdAt": "2026-11-09T23:56:36.280Z"
+}
