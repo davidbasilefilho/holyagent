@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mw952anw-l9xt",
+  "intentId": "intent-0mw94kj67-lb5f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "scope-the-root-s-take-the-recommended",
+  "objective": "Scope the root's 'take the recommended option instead of asking' rule so it never covers an approval the rules reserve, in the requirement and both model family instruction sets.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-judge (branch release/0.3.0/feat/root-own-judgement). Its newest commit made the root decide by its own judgement and ask the user only as a fallback; the review of that commit found one blocking gap.",
+    "Blocking finding to repair: the sentence \"A question whose recommended option you would take anyway is not asked: take that option and record it as a default.\" (claude-5.5/root/asking.md line ~6, kimi-k3.1/root/asking.md line ~15, and the matching clause of R-NOASK in packages/runtime/src/instructions/requirements/root/asking.md) is unscoped. Every question carries a recommended option, so read literally it lets a model skip the approvals the rules reserve (merge, publish, force-push, protected or platform-assigned branch pushes, credentials, destructive steps) by taking its own recommendation. Scope it so reserved approvals are always asked or parked, in all three files, and keep the requirement consistent with itself.",
+    "Non-blocking findings that ride along: (a) the opening paragraph and the 'unnecessary when something already settles it' bullet say the same thing twice in all three files: merge them into one statement; (b) the Kimi file keeps 'Routine choices (safe, reversible, inside the request) are yours.', which repeats its new opening: fold or drop it; (c) give a short pointer to where the reserved approvals are listed (for example the Version control section and the identity rules) so a model can find them.",
+    "Follow the repository skill /home/user/holyagent-0.3.0-judge/.claude/skills/requirements/SKILL.md (requirement first, then each family translated per its guide.md, coverage table updated) and the writing rules in /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md.",
+    "The root core context sits at about 9382 of its 9400-character CONTEXT_BUDGET; the build or tests fail above it. Merging the duplicated statement (a) should free the room the scoping clause needs; stay under the budget without dropping any other rule."
+  ],
+  "constraints": [
+    "Maintainer (verbatim, binding): \"the agent is supposed to trust its judgement and fallback to asking the user\", \"you are asking too many questions you could answer yourself\". The repair keeps that loosening for routine and research-settled choices and only restores the reserved approvals.",
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The recommended-option rule excludes every approval the rules reserve, in R-NOASK and both family files",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The judgement-first loosening for routine and research-settled choices is unchanged in meaning",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The duplicated statement is merged, the Kimi routine line folded, and a pointer to the reserved approvals added",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0, within the context budget",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "verify",
+    "context-budget"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw94kwhr-hrpi",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T10:49:05.660Z"
+  },
+  "createdAt": "2026-11-09T10:49:05.660Z"
+}
