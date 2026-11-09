@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mw9j5jje-wxee",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-gpt-6-instruction-family-s",
+  "objective": "Repair the GPT-6 instruction family's review findings: the workflow-report text, the O26 description of the screenshot, and the consistency of the spacing rules and capture check, plus the non-blocking citation and coverage notes.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-gpt6, branch release/0.3.1/feat/gpt-6-instructions (two commits over 5d2bed8). The review with file:line for each finding is /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it5vj-3462.md; read it in full.",
+    "Finding 1 (workflow reports, gpt-6/root/workflows.md:6,9, root/context.md:7, root/dispatch.md:9): the text was copied from kimi-k3.1, which says reports come back in the workflow result because of Pi's journal shape. GPT-6 will run on the same Pi host (the 0.3.1 Codex provider is a Pi provider), so first establish what the Pi host actually does: read packages/integrations/pi/src (the workflow tool and the launcher) and how kimi-k3.1/guide.md or its files justify the departure. If the Pi host returns reports in the workflow result, keep the Pi-specific text and add the justification and citation the Kimi family uses, so the departure from R-WORKFLOW, R-LEAN and R-REPORT is explicit; otherwise follow R-WORKFLOW ({ done: [ids] }, assignment reports, close from the report file, agentType holyagent:<agent>). Say in the report which it was and why.",
+    "Finding 2 (guide.md:73, O26): describe the screenshot (/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/images/2.png; read it) exactly as it shows: card text starting at the card's own left edge (no inner padding); card flush against the heading rule above and the vertical divider at its right; card bottom on the section edge; an em dash wrapped to the start of a line. Drop the two-left-edges claim.",
+    "Finding 3 (consistency across design-core/core.md:16, worker-visual/method.md:3, reviewer-visual/captures.md:7, visual-judging/SKILL.md:23): the worker names each place where content still touches a rule, border or edge after its repairs (or says none remain); acceptance blocks only on places that still touch. Give the reviewer a means it actually has: comparing the captures (and any measurements the worker recorded) and naming visible contact or missing padding by location, without inventing numbers. Make the measure fit the medium: pixels or computed styles for web, mobile and desktop; character cells for terminal frames.",
+    "Non-blocking, fix too: core.md:71 dash rule: name the mechanism (a non-breaking join or text-wrap control, or rewording) and allow a deliberate leading dash such as an attribution; guide.md:58 O23 and O22 citations match what the research report gives (sections only where it names them), and mark O2's inference as one; add the spacing rules to the gpt-6 coverage table in coverage.ts with a phrase per file so a later edit cannot silently drop them."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Edit only the gpt-6 family and the gpt-6 table in coverage.ts.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "The workflow-report text either follows R-WORKFLOW or states the Pi host's departure with its justification, matching what the Pi host does",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "O26 describes the screenshot exactly",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Spacing rules and the capture check are consistent across the four files, give the reviewer a real means, and fit terminal frames",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The non-blocking notes are addressed: dash rule, citations, coverage phrases",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/gpt-6",
+    "packages/runtime/src/instructions/coverage.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9hx4wd-lvym",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:23:31.754Z"
+  },
+  "createdAt": "2026-11-09T17:23:31.754Z"
+}
