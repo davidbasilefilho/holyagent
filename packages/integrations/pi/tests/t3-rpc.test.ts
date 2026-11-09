@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
+import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { Effect, Schema } from "effect"
 
+import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
+import { routedModels } from "../../../runtime/src/pi/provider.ts"
+import { createExtension } from "../src/extension.ts"
+import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import { installedPiVersion, PI_PACKAGE } from "./fixtures/record.ts"
 import {
   renderT3Fixture,
@@ -12,11 +18,14 @@ import {
   T3FixtureHeader,
 } from "./fixtures/t3/record.ts"
 
-// These tests replay the synthesized traffic of T3 Code driving `pi --mode rpc` (see
-// fixtures/t3/record.ts) against the pinned Pi host's types. They pin what the integration relies
-// on under T3: the launch marker, the extension_ui_request methods T3 renders and no others, the
-// responses T3 sends, and a specialist's completion after `agent_settled` starting a new root
-// turn. Nothing starts Pi or T3.
+// The fixtures in fixtures/t3 are synthesized T3 Code traffic for `pi --mode rpc`, built from the
+// pinned Pi host's types (see fixtures/t3/record.ts). The tests below use them two ways. The
+// extension tests run the real HolyAgent extension (createExtension) in RPC mode with the T3
+// environment, feed it the session events of the fixtures and record which `ctx.ui` members it
+// touches; that is the one check here that exercises extension code. The others pin the shape of
+// the fixtures themselves (header, staleness, launch, message shapes) and are not evidence about
+// the extension. The late-completion fixture documents an assumed turn behaviour and proves
+// nothing: that needs @tintinweb/pi-subagents and T3 Code. Nothing starts Pi or T3.
 
 const HeaderLine = Schema.fromJsonString(Schema.Struct({ holyagentFixture: T3FixtureHeader }))
 
@@ -129,36 +138,28 @@ describe("a T3 RPC session start", () => {
 const DIALOGS = ["select", "confirm", "input", "editor"] as const
 /** The methods T3 renders without a response: a work-log notice and the composer status. */
 const NOTICES = ["notify", "setStatus"] as const
-/** What T3 renders, and so all the integration may send. */
+/** What T3 renders, and so all the integration may use of `ctx.ui`. */
 const RENDERED: ReadonlyArray<string> = [...DIALOGS, ...NOTICES]
-
 /**
- * The first problem of an extension_ui_request in a replay, or undefined when it uses a method T3
- * renders. `setWidget`, `setTitle` and `set_editor_text` are RPC methods T3 ignores, and `custom`
- * is not an RPC method (Pi resolves it with undefined and sends nothing).
+ * The `ctx.ui` members T3 does not render: RPC mode drops or no-ops them (`custom` resolves with
+ * undefined and sends nothing).
  */
-const uiProblem = (event: Record<string, unknown>): string | undefined =>
-  event["type"] !== "extension_ui_request" || RENDERED.includes(String(event["method"]))
-    ? undefined
-    : `extension_ui_request ${String(event["id"])} uses ${String(event["method"])}, which T3 Code does not render`
+const IGNORED = [
+  "custom",
+  "setWidget",
+  "setFooter",
+  "setHeader",
+  "setTitle",
+  "setTheme",
+  "setEditorText",
+] as const
 
-describe("the extension_ui_request messages under T3 Code", () => {
-  test("every message in every fixture uses a method T3 renders", async () => {
-    for (const { header, events } of await loadAll())
-      for (const event of events)
-        expect([header.name, uiProblem(event)]).toEqual([header.name, undefined])
-  })
-
+describe("the extension_ui_request messages in the fixtures", () => {
   test("the six rendered methods are all covered, each with a unique id", async () => {
     const { events } = await load("t3-ui-dialogs")
     const requests = events.filter((event) => event["type"] === "extension_ui_request")
     expect(requests.map((event) => event["method"])).toEqual([...DIALOGS, ...NOTICES])
     expect(new Set(requests.map((event) => event["id"])).size).toBe(requests.length)
-  })
-
-  test("a method T3 ignores, or custom, fails the check", () => {
-    for (const method of ["setWidget", "setTitle", "set_editor_text", "custom", "setHeader"])
-      expect(uiProblem({ type: "extension_ui_request", id: "ui-x", method })).toContain(method)
   })
 
   test("each dialog gets one response by its id, in the shape Pi reads for that method", async () => {
@@ -200,19 +201,258 @@ describe("the extension_ui_request messages under T3 Code", () => {
     expect(typeof by["setStatus"]?.["statusKey"]).toBe("string")
     expect(typeof by["setStatus"]?.["statusText"]).toBe("string")
   })
+})
 
-  test("the extension's source calls only ctx.ui methods T3 renders", async () => {
-    const sources = [...new Bun.Glob("*.ts").scanSync(join(import.meta.dir, "..", "src"))]
-    expect(sources.length).toBeGreaterThan(0)
-    for (const file of sources) {
-      const source = await Bun.file(join(import.meta.dir, "..", "src", file)).text()
-      const called = [...source.matchAll(/\bui\s*\.\s*(\w+)/g)].map((match) => match[1] ?? "")
-      expect([file, called.filter((method) => !RENDERED.includes(method))]).toEqual([file, []])
+// ---- the real extension under T3 Code ------------------------------------------------------------
+
+/** The commands `pi --list-models` and `pi auth` answer for a provider that is ready. */
+const DEFAULTS = await Effect.runPromise(defaultConfig)
+const CATALOG = [
+  "provider     model   context  max-out  thinking  images",
+  ...routedModels(DEFAULTS).map(
+    ({ provider, model }) => `${provider}  ${model}  256K  32K  yes  no`,
+  ),
+].join("\n")
+const STATUS =
+  "intents[1]{id,revision,objective,running,unaccepted}:\n  intent-a,1,Ship the thing,0,0\n"
+const RECONCILE =
+  "running[1]{id,role,agent,startedAt}:\n  assignment-1,Worker.implementation,agent-1,null\n"
+const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
+const BUN = join("/stub/bin", "bun")
+const SESSION_CWD = "/work/project/src"
+/** The T3 tools the root keeps and the ones it drops, so the extension's T3 handling has work to do. */
+const T3_TOOLS = ["mcp__t3-code__html_render", "mcp__t3-code__delegate_task"] as const
+
+/** What the commands the extension starts answer: a healthy install with a ready provider. */
+const answer = (command: string, args: ReadonlyArray<string>): Partial<ExecResult> => {
+  if (command === "pi") return args[0] === "auth" ? {} : { stdout: `${CATALOG}\n` }
+  if (command === "git") return { stdout: "/work/project\n" }
+  const at = args.indexOf(PI_PROJECT_FLAG)
+  switch (at === -1 ? undefined : args[at + 2]) {
+    case "config":
+      return { stdout: `${JSON.stringify(DEFAULTS)}\n` }
+    case "status":
+      return { stdout: STATUS }
+    case "reconcile":
+      return { stdout: RECONCILE }
+    case "state":
+      return { stdout: "mode: work\nconfigured: true\ndirectory: /missing\n" }
+    default:
+      return { code: 2, stderr: "error: Usage: unexpected\n" }
+  }
+}
+
+/** One call the extension made on `ctx.ui`. */
+interface UiCall {
+  readonly method: string
+  readonly args: ReadonlyArray<unknown>
+}
+
+/**
+ * A `ctx.ui` that records every member read from it, through any alias or destructuring (all of
+ * them go through the proxy), and every call made on it.
+ */
+const recordingUi = () => {
+  const accessed: Array<string> = []
+  const calls: Array<UiCall> = []
+  const ui = new Proxy(
+    {},
+    {
+      get: (_target, key) => {
+        accessed.push(String(key))
+        return (...args: Array<unknown>) => void calls.push({ method: String(key), args })
+      },
+      has: (_target, key) => {
+        accessed.push(String(key))
+        return true
+      },
+    },
+  )
+  return { ui, accessed, calls }
+}
+
+/** The members of `ctx.ui` in a list that T3 does not render. */
+const unrendered = (accessed: ReadonlyArray<string>): ReadonlyArray<string> =>
+  accessed.filter((member) => !RENDERED.includes(member))
+
+type Emitted = readonly [event: string, payload: object]
+
+/** What an extension handler is: Pi hands it the event and the context. */
+type Handler = (event: object, ctx: ExtensionContext) => unknown
+
+/**
+ * Starts the real extension on a fake Pi API in RPC mode with the given environment, emits the
+ * events in order (a handler's rejection fails the test), and returns what it did to `ctx.ui`.
+ * `plant` registers more handlers on the same API, to prove the recording catches a stray call.
+ */
+const drive = async (
+  env: Record<string, string | undefined>,
+  events: ReadonlyArray<Emitted>,
+  plant?: (pi: ExtensionAPI) => void,
+) => {
+  const handlers = new Map<string, Array<Handler>>()
+  const touched: Array<string> = []
+  const recorded = recordingUi()
+  const active = ["read", "bash", "write", "edit", ...T3_TOOLS]
+  const pi = {
+    registerFlag: () => undefined,
+    getFlag: () => undefined,
+    registerToolRenderer: () => undefined,
+    getSessionName: () => undefined,
+    getActiveTools: () => [...active],
+    getAllTools: () => active.map((name) => ({ name })),
+    setActiveTools: (names: ReadonlyArray<string>) =>
+      void active.splice(0, active.length, ...names),
+    sendMessage: () => undefined,
+    on: (event: string, handler: Handler) => {
+      handlers.set(event, [...(handlers.get(event) ?? []), handler])
+      return () => undefined
+    },
+    exec: (command: string, args: Array<string>): Promise<ExecResult> =>
+      Promise.resolve({
+        stdout: "",
+        stderr: "",
+        code: 0,
+        killed: false,
+        truncated: false,
+        ...answer(command, args),
+      }),
+  } as unknown as ExtensionAPI
+  createExtension({
+    packageRoot: PACKAGE_ROOT,
+    env,
+    platform: "linux",
+    bunSearch: {
+      env: { PATH: "/stub/bin" },
+      exists: (path) => path === BUN,
+      executable: () => true,
+    },
+  })(pi)
+  plant?.(pi)
+  // Any member of the context but cwd, mode and ui fails the test, as in extension.test.ts.
+  const ctx = new Proxy(
+    { cwd: SESSION_CWD },
+    {
+      get: (target, key) => {
+        if (key === "cwd") return target.cwd
+        if (key === "mode") return "rpc"
+        if (key === "ui") return recorded.ui
+        touched.push(String(key))
+        throw new Error(`the extension used ctx.${String(key)}`)
+      },
+    },
+  ) as unknown as ExtensionContext
+  for (const [event, payload] of events)
+    for (const handler of handlers.get(event) ?? []) await handler(payload, ctx)
+  return { ...recorded, touched, registered: [...handlers.keys()] }
+}
+
+/**
+ * The extension events a fixture's session produces in Pi: its `session_start` (one is added at the
+ * front when the fixture has none), `before_agent_start` for each prompt and each started turn, and
+ * then the events a T3 session goes on to produce whatever the fixture shows: the session tree
+ * changing, tool calls, a compaction and the shutdown.
+ */
+const extensionEvents = (
+  events: ReadonlyArray<Record<string, unknown>>,
+): ReadonlyArray<Emitted> => {
+  const fromFixture = events.flatMap((event): ReadonlyArray<Emitted> => {
+    switch (event["type"]) {
+      case "session_start":
+        return [["session_start", { reason: String(event["reason"]) }]]
+      case "prompt":
+        return [["before_agent_start", { prompt: String(event["message"]), systemPrompt: "p" }]]
+      case "agent_start":
+        return [["before_agent_start", { prompt: "turn", systemPrompt: "p" }]]
+      default:
+        return []
     }
+  })
+  const started = events.some((event) => event["type"] === "session_start")
+  return [
+    ...(started ? [] : [["session_start", { reason: "startup" }] as const]),
+    ...fromFixture,
+    ["session_tree", {}],
+    ...T3_TOOLS.map((toolName): Emitted => [
+      "tool_call",
+      { toolName, toolCallId: "c/1", input: {} },
+    ]),
+    ["session_compact", { reason: "manual" }],
+    ["before_agent_start", { prompt: "after compaction", systemPrompt: "p" }],
+    ["session_shutdown", {}],
+  ]
+}
+
+const MODES = ["full-access", "approval-required", "auto-accept-edits"] as const
+
+describe("the extension under T3 Code in RPC mode", () => {
+  test("it touches only the ctx.ui members T3 renders, in every access mode and every fixture session", async () => {
+    const { events: launchEvents } = await load("t3-session-start")
+    const launch = launchEvents.find((event) => event["type"] === "t3_launch") as
+      { env: Record<string, string> } | undefined
+    expect(launch?.env["T3_MCP_URL"]).toBeString()
+    const { events: dialogs } = await load("t3-ui-dialogs")
+    const statusKey = dialogs.find((event) => event["method"] === "setStatus")?.["statusKey"]
+    expect(statusKey).toBeString()
+
+    for (const { header, events } of await loadAll())
+      for (const mode of MODES) {
+        const label = `${header.name} at ${mode}`
+        const { accessed, calls, touched, registered } = await drive(
+          { ...launch?.env, T3_PI_RUNTIME_MODE: mode },
+          extensionEvents(events),
+        )
+        // The extension ran: it registered its handlers on the session events it was fed.
+        for (const event of ["session_start", "before_agent_start", "tool_call", "session_compact"])
+          expect([label, registered.includes(event)]).toEqual([label, true])
+        expect([label, unrendered(accessed)]).toEqual([label, []])
+        expect([
+          label,
+          accessed.filter((member) => IGNORED.some((name) => name === member)),
+        ]).toEqual([label, []])
+        expect([label, touched]).toEqual([label, []])
+        // Below Full access the one UI call is the status T3 shows near the composer, with the key
+        // the fixture's setStatus request uses; at Full access there is none.
+        expect([label, calls]).toEqual([
+          label,
+          mode === "full-access"
+            ? []
+            : [{ method: "setStatus", args: [statusKey, expect.any(String)] }],
+        ])
+      }
+  })
+
+  test("a stray ctx.ui call is caught, direct, through an alias or after destructuring ctx", async () => {
+    const { events } = await load("t3-session-start")
+    const planted = await drive(
+      { T3_PI_RUNTIME_MODE: "approval-required", T3_MCP_URL: "http://127.0.0.1:1/mcp" },
+      extensionEvents(events),
+      (pi) => {
+        pi.on("session_start", (_event, ctx) => {
+          const { ui } = ctx
+          ui.setWidget("holyagent", ["running"])
+        })
+        pi.on("session_tree", (_event, ctx) => {
+          const alias = ctx.ui
+          const again = alias
+          void again.custom(() => ({ render: () => [], invalidate: () => undefined }))
+        })
+        pi.on("session_compact", (_event, ctx) => {
+          ctx.ui.setTitle("holyagent")
+        })
+      },
+    )
+    expect(unrendered(planted.accessed)).toEqual(["setWidget", "custom", "setTitle"])
+    expect(planted.calls.map(({ method }) => method)).toEqual([
+      "setStatus",
+      "setWidget",
+      "custom",
+      "setTitle",
+    ])
   })
 })
 
-// ---- a completion after agent_settled ------------------------------------------------------------
+// ---- a completion after agent_settled: documentation, not a regression test ----------------------
 
 /** One root turn as T3 sees it: from `agent_start` to `agent_settled`. */
 interface Turn {
@@ -227,56 +467,49 @@ interface Turn {
 }
 
 /**
- * The root turns of an RPC stream the way T3 Code tracks them: a turn opens on `agent_start` and is
- * done on `agent_settled`. A message outside a turn, or a turn that opens inside another, is a
- * problem: T3 would not show the first, and would merge the second.
+ * The root turns of an RPC stream the way T3 Code is assumed to track them: a turn opens on
+ * `agent_start` and is done on `agent_settled`. Used only to read the fixture, which is written to
+ * be well-formed; it is not under test.
  */
-const turnsOf = (
-  events: ReadonlyArray<Record<string, unknown>>,
-): { readonly turns: ReadonlyArray<Turn>; readonly problems: ReadonlyArray<string> } => {
+const turnsOf = (events: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<Turn> => {
   const turns: Array<Turn> = []
-  const problems: Array<string> = []
   let open: Turn | undefined
   let opened = false
   events.forEach((event, index) => {
     const type = String(event["type"])
     if (type === "agent_start") {
-      if (open !== undefined) problems.push(`agent_start at ${index} inside an open turn`)
       open = { openedBy: undefined, customType: undefined, startedAt: index, settledAt: undefined }
       opened = false
     } else if (type === "agent_settled") {
-      if (open === undefined) problems.push(`agent_settled at ${index} with no open turn`)
-      else turns.push({ ...open, settledAt: index })
+      if (open !== undefined) turns.push({ ...open, settledAt: index })
       open = undefined
-    } else if (type === "message_start" && !opened) {
+    } else if (type === "message_start" && !opened && open !== undefined) {
       const message = event["message"] as { role?: string; customType?: string } | undefined
-      if (open === undefined) problems.push(`message_start at ${index} outside a root turn`)
-      else open = { ...open, openedBy: message?.role, customType: message?.customType }
+      open = { ...open, openedBy: message?.role, customType: message?.customType }
       opened = true
-    } else if (type === "message_start" && open === undefined) {
-      problems.push(`message_start at ${index} outside a root turn`)
     }
   })
-  if (open !== undefined) problems.push("a turn never settled")
-  return { turns, problems }
+  return turns
 }
 
-describe("a specialist completion after agent_settled", () => {
-  test("starts a new root turn that the first turn's settle did not end early", async () => {
+// The fixture records what the docs assume: that @tintinweb/pi-subagents' completion notice starts
+// a new root turn after the first one settled, and that T3 Code treats `agent_settled` as the end
+// of a turn. Neither the package nor T3 runs here, so the tests read the fixture back and prove
+// nothing about the extension, the package or T3; a change in either would not fail them.
+describe("the documented assumption of a specialist completion after agent_settled", () => {
+  test("the fixture records a second root turn that the notice opens after the first settled", async () => {
     const { events } = await load("t3-late-completion")
-    const { turns, problems } = turnsOf(events)
-    expect(problems).toEqual([])
+    const turns = turnsOf(events)
     expect(turns).toHaveLength(2)
     const [first, second] = turns
     expect(first?.openedBy).toBe("user")
-    // The notice arrives after the first turn settled, and opens the second turn.
     expect(second?.startedAt).toBeGreaterThan(first?.settledAt ?? Number.POSITIVE_INFINITY)
     expect(second?.openedBy).toBe("custom")
     expect(second?.customType).toBeString()
     expect(second?.settledAt).toBe(events.length - 1)
   })
 
-  test("the notice carries the specialist's report and is shown, and the new turn answers it", async () => {
+  test("the fixture's notice carries the specialist's report and is shown, and the new turn answers it", async () => {
     const { events } = await load("t3-late-completion")
     const notice = events.flatMap((event) => {
       const message = event["message"] as
@@ -300,18 +533,5 @@ describe("a specialist completion after agent_settled", () => {
           (event["message"] as { role?: string }).role === "assistant",
       ),
     ).toBe(true)
-  })
-
-  test("without the new turn the notice would sit outside any turn, which the check reports", async () => {
-    const { events } = await load("t3-late-completion")
-    const second = events.findLastIndex((event) => event["type"] === "agent_start")
-    const withoutStart = events.filter((_event, index) => index !== second)
-    const { problems } = turnsOf(withoutStart)
-    expect(problems.length).toBeGreaterThan(0)
-  })
-
-  test("a turn that never settles is reported", async () => {
-    const { events } = await load("t3-late-completion")
-    expect(turnsOf(events.slice(0, -1)).problems).toContain("a turn never settled")
   })
 })

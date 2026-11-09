@@ -6,7 +6,8 @@
  * field fails the type-check. The parts that are T3's or a package's, not Pi's, are marked
  * `synthesized` in the header with their sources: the launch (`t3_launch`) follows T3's
  * `buildPiRpcLaunch`, and the completion notice follows `@tintinweb/pi-subagents`' new-turn
- * trigger.
+ * trigger. The late-completion file documents that assumption and proves nothing about the package
+ * or T3.
  *
  * Re-record after `mise run deps:update` moves Pi: `bun
  * packages/integrations/pi/tests/fixtures/t3/record.ts`.
@@ -211,7 +212,7 @@ export const T3_FIXTURES: ReadonlyArray<T3Fixture> = [
   {
     name: "t3-late-completion",
     description:
-      "Synthesized: a root turn settles while a background specialist still runs; the specialist's completion notice then arrives after agent_settled and starts a new root turn (agent_start) with the notice as its opening message.",
+      "Synthesized: documents an assumed turn behaviour, not a regression test: a root turn settles while a background specialist still runs; the specialist's completion notice then arrives after agent_settled and starts a new root turn (agent_start) with the notice as its opening message.",
     sources: [
       "@tintinweb/pi-subagents 0.23.1: the completion is a steering message with triggerTurn true (docs/pi/caching-and-subagents.md); the notice's customType is an assumption, as the package source was not read",
       "T3 Code treats a turn as done on agent_settled (docs/pi/t3-code.md, Specialists and completion notices)",
