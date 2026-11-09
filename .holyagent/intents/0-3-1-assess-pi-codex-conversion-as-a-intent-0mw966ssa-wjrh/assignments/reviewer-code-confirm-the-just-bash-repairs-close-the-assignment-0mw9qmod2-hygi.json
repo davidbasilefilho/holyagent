@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mw9qmod2-hygi",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-just-bash-repairs-close-the",
+  "objective": "Confirm the just-bash repairs close the earlier code findings and the merged branch meets the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "The just-bash work: commits fd3d876 (repair) and 618be49 (/dev/null fix) on top of 971b9ea0, plus a merge of the Codex provider branch (d5604d4) whose generated dist was rebuilt. Review 971b9ea0 (first just-bash commit) through the merge commit d149c9c at the head of release/0.3.1/feat/just-bash in /home/user/holyagent-0.3.1-bash; the Codex commits are reviewed separately (PR davidbasilefilho/holyagent#105), so judge only how the merge combines them.",
+    "Diffs: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-0.3.1-bash-fix.diff (fd3d876) and /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-devnull.diff (618be49). Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odug6-6vgw.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9odupl-x2zg.md (security); writer reports /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os41y-etgw.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9q5dw2-a16f.md",
+    "Requirements: just-bash built-ins win over host executables of the same name; commands just-bash lacks pass through to real executables on PATH and other relevant places on Linux, macOS and Windows; TypeScript first, JavaScript fallback; Billion Context bash guardrails off."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no git writes. Run commands in /home/user/holyagent-0.3.1-bash, not the main checkout, and pass explicit ranges (971b9ea0..HEAD of that worktree) to any review command.",
+    "Judge whether previous findings are closed and whether the repairs or the merge introduced defects; the /dev/null tests skipped on Windows need a judgement too.",
+    "Testing is unit tests and fixtures only: never start pi or make live model requests.",
+    "Report in under 400 words; start each evidence line with the exact criterion text, a colon and the support inline.",
+    "Run `bun install --frozen-lockfile` if node_modules is missing, then `bunx --no-install mise run build` (the tree must stay unchanged) and `bunx --no-install mise run verify`; report command, exit code and counts."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous blocking code finding is closed with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression in the just-bash shell, host passthrough, setup capability toggles or the merged Codex code",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changed behavior has tests that fail without the change, and no test is weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Repository rules hold: Effect composition with tagged errors, Schema at boundaries, JSDoc on exports, no duplicated logic",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at the branch head",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9os41y-etgw",
+    "assignment-0mw9q5dw2-a16f"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T20:52:48.470Z"
+  },
+  "createdAt": "2026-11-09T20:52:48.470Z"
+}
