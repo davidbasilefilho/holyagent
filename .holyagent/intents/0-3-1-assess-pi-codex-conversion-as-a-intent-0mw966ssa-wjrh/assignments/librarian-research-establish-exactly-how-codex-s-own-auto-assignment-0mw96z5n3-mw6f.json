@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw96z5n3-mw6f",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 9,
+  "roleTask": "Librarian.research",
+  "slug": "establish-exactly-how-codex-s-own-auto",
+  "objective": "Establish exactly how Codex's own auto-review works, from the openai/codex source, so HolyAgent's Codex provider can reproduce it under Pi.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"the codex-auto-review should work similarly to how codex's work\". Previous findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw969b0u-kquh.md (pi-codex-guardian calls model codex-auto-review at chatgpt.com/backend-api/codex/responses, rule-based, no defaults) and assignment-0mw9679bz-h35s.md (Codex docs: approvals_reviewer = \"auto_review\" with approval_policy = \"on-request\").",
+    "From github.com/openai/codex (the Rust codex-rs tree at a recent release tag; name the tag) and its docs (learn.chatgpt.com/docs/sandboxing/auto-review and the config reference), with file and symbol or URL: (1) what triggers a review: which tool calls or sandbox escalations become approval requests under on-request (commands needing escalated permissions, writes outside the workspace, network access, apply_patch outside writable roots, MCP tool calls), and what runs without one; (2) the reviewer request: model id, endpoint, prompt or policy text source, what context is sent (transcript slice, the pending action, cwd, sandbox policy), output schema, reasoning effort, timeouts; (3) the decision handling: allow, deny, deny with feedback to the model, failure, timeout, retries, and whether a denied action is reported back to the model and how; (4) any escalation to the human (when the reviewer is unsure) and any per-session memory of decisions; (5) what of this depends on Codex's sandbox, and what a host without a sandbox (Pi) would need to emulate (deciding which commands count as needing escalation).",
+    "Then state how pi-codex-guardian differs from that, and what HolyAgent would need to build to match Codex."
+  ],
+  "constraints": [
+    "Read-only: change no files, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi or Codex, or make a live model or OpenAI request.",
+    "Separate sourced facts from inference.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "Triggers, request, decision handling and escalation are each stated from Codex source or docs with references",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "What a sandbox-less host must emulate and how pi-codex-guardian differs are stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "codex-auto-review",
+    "emulation"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:42:38.415Z"
+  },
+  "createdAt": "2026-11-09T11:42:38.415Z"
+}
