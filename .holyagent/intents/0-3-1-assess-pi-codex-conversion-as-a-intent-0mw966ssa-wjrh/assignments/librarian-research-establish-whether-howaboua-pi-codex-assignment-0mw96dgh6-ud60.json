@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "establish-whether-howaboua-pi-codex",
   "objective": "Establish whether @howaboua/pi-codex-conversion 4.0.9 can run with its apply_patch tool while keeping Pi's own bash (and read, edit, write) instead of its exec_command/write_stdin shell, and what each way of doing that keeps or loses.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Maintainer question (verbatim): \"for the codex provider, can we replace the shell tool as well? because apply_patch is fine\". Read it as: keep apply_patch, but use Pi's shell tool (bash) rather than the package's exec_command and write_stdin.",
     "Previous source reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw969b0u-kquh.md and assignment-0mw9679bz-h35s.md (read both). They found `mergeAdapterTools` drops read, bash, edit and write in normal mode, and config options `tools.applyPatchOnly`, `tools.viewImageOnly`, `voiceFeaturesOnly` and `scope`, without confirming what each keeps.",
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_1ae8d46f-7e5/assignment-0mw96dgh6-ud60",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-09T11:25:46.026Z"
+    "startedAt": "2026-11-09T11:25:46.026Z",
+    "finishedAt": "2026-11-09T11:27:52.281Z"
+  },
+  "result": "result: Yes. `tools.applyPatchOnly` adds `apply_patch` and keeps Pi's `read`, `bash`, `edit` and `write`. It does not give up the package's Codex provider. No other per-tool switch exists. I read the 4.0.9 source on jsdelivr only and ran nothing.\n\n**Q1 `tools.applyPatchOnly`**\nFacts, in `src/adapter/activation/runtime-plan.ts`:\n`resolveCodexRuntimePlan` returns `kind:\"extras\"` when `hasExtras(config)` and `scope.allProviders` is `\"off\"`, and the provider is configured or the model is Codex-like.\n`extraToolNames` in that plan is `[\"apply_patch\"]`. It adds `view_image` only if `viewImageOnly` is also set.\nIn `activation.ts`, `enableExtraTools` takes the previous loadout, strips the package-owned tools (`exec_command`, `write_stdin`, `apply_patch` and others), and re-adds `plan.toolNames`.\nThe result is Pi's `read`, `bash`, `edit` and `write` plus `apply_patch`. `exec_command` and `write_stdin` are not active.\nIn extras mode `prompt` is undefined, `nativeCompaction` is false and `nativeReplay` is false.\n`extension/register.ts` calls `registerOpenAICodexCustomProvider` unconditionally. Its `streamSimple` and `buildRequestBody` therefore replace Pi's `openai-codex` provider in every mode. This is also what hides the `gpt-reserve` model (`filterModels`).\n`adapter/provider-request.ts` `prepareCodexProviderRequest` returns undefined unless `isAdapterRuntime(plan)`. In extras mode that skips the option rewrite, the developer-message rewrite, native replay and Responses Lite.\n`extension/turn-lifecycle.ts` `beforeAgentStart` returns early for a non-adapter plan, so `prepareCodexSystemPrompt` does not run and Pi's own prompt is used.\n`reserve.beforeTurn` and `reserve.settled` are not conditioned on the plan there, only on `!voiceFeaturesOnly`.\n\nInference (not read):\nCodex V2 compaction is probably inactive in extras mode, because `nativeCompaction` and `nativeReplay` are false. I did not read `compaction-lifecycle.ts`.\nWhether `gpt-reserve` switching works is uncertain. I did not read `reserve.ts` for plan checks.\n\n**Q2 other ways to swap the shell**\nNot found. `CodexConversionConfig` has no allowlist or per-tool switch.\n`tools.*` holds only `autoReasoning`, `customRustBinariesDir`, `viewImageFallback`, `applyPatchOnly` and `viewImageOnly`.\nCustom-tool TOML adds commands. It does not change the core set.\nIn normal mode `mergeAdapterTools` keeps only tools outside `DEFAULT_TOOL_NAMES = [read, bash, edit, write]`, so `bash` is always dropped.\n`scope.allProviders: \"extras\"` applies extras mode to every provider. It does not change which tools extras adds.\n`voiceFeaturesOnly` leaves the loadout alone, but also removes `apply_patch` (`registerCore` is skipped).\n\n**Q3 prompt conflict**\nThe normal-mode prompt comes from `prepareCodexSystemPrompt` (`prompt/build-system-prompt.ts`), which I did not open.\nIt runs only for adapter runtimes. In extras mode it is skipped, so no `exec_command` text is injected (fact).\nThe `apply_patch` tool carries `promptSnippet: \"Edit files with patch\"` (`tools/apply-patch/tool.ts`). Pi's own tool list then names `bash`, `read`, `edit`, `write` and `apply_patch` together (inference).\nPi's `edit` and `write` stay active, so the model has two ways to edit files. This is not a conflict.\n\n**Q4 standalone `apply_patch`**\nFact: it is not pure TypeScript.\n`tools/apply-patch/executor.ts` `executePatchWithRust` spawns a bundled Rust binary with the patch on stdin. TypeScript only wraps rendering, validation and `withFileMutationQueue`.\nThe binary is a vendored copy of OpenAI Codex's apply-patch (`src/tools/rust/VENDORED.md`, `UPSTREAM.apply-patch`).\nIf HolyAgent does not use the package, it would need to bundle that binary or write its own.\nThe package is MIT (LICENSE: Copyright 2026 Igor Warzocha). README: \"Bundled and vendored third-party components retain their own licences and notices.\" I did not read the vendored crates' licence.\nUsing just this one tool is not exposed as a supported export. The `package.json` exports include `./apply-patch-display` and a `./*` wildcard.\n\n**Pi built-in**\nPi 1.5.0 has no `apply_patch` tool and no setting for one. `rg` for `apply_patch|applyPatch` over `@earendil-works+pi-coding-agent@1.5.0*/dist/**/*.js` found 0 matches.\nIts `dist/core/tools/` holds bash, edit, find, grep, ls, read, write and powershell.\n\nnotes: Extras mode keeps the package's provider, so the live dependency stays. Dropping that dependency would mean keeping Pi's provider and bundling the Rust binary.\n\nevidence:\nsource-answers: jsdelivr `@howaboua/pi-codex-conversion@4.0.9/src/`: `adapter/activation/{runtime-plan,activation,tool-set,config-contract}.ts`, `extension/{register,tools,turn-lifecycle}.ts`, `adapter/provider-request.ts`, `providers/openai-codex-custom-provider.ts`, `tools/apply-patch/{tool,executor}.ts`, `tools/rust/VENDORED.md`, README, LICENSE, package.json. Citations are file and symbol, not line numbers.\npi-builtin: `/home/user/holyagent-0.3.0-t3host/node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0+8980da4117b98cd5/node_modules/@earendil-works/pi-coding-agent/dist/core/tools/` lists no `apply_patch`; `rg` count was 0 matches.\nQuestions 1-4 are answered from package source with file and symbol: see source-answers; Q1-Q4 sections cite runtime-plan.ts, activation.ts, register.ts, provider-request.ts, turn-lifecycle.ts, tools/apply-patch/executor.ts by symbol.\nWhether Pi itself has an apply_patch tool is stated from the pinned source: see pi-builtin; 0 matches in pi-coding-agent 1.5.0 dist.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Source-backed answers by file and symbol; Pi has no apply_patch",
+    "criteria": [
+      {
+        "criterion": "Questions 1-4 are answered from package source with file and symbol",
+        "support": "see source-answers; Q1-Q4 sections cite runtime-plan.ts, activation.ts, register.ts, provider-request.ts, turn-lifecycle.ts, tools/apply-patch/executor.ts by symbol."
+      },
+      {
+        "criterion": "Whether Pi itself has an apply_patch tool is stated from the pinned source",
+        "support": "see pi-builtin; 0 matches in pi-coding-agent 1.5.0 dist."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "source-answers",
+        "support": "jsdelivr `@howaboua/pi-codex-conversion@4.0.9/src/`: `adapter/activation/{runtime-plan,activation,tool-set,config-contract}.ts`, `extension/{register,tools,turn-lifecycle}.ts`, `adapter/provider-request.ts`, `providers/openai-codex-custom-provider.ts`, `tools/apply-patch/{tool,executor}.ts`, `tools/rust/VENDORED.md`, README, LICENSE, package.json. Citations are file and symbol, not line numbers."
+      },
+      {
+        "label": "pi-builtin",
+        "support": "`/home/user/holyagent-0.3.0-t3host/node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0+8980da4117b98cd5/node_modules/@earendil-works/pi-coding-agent/dist/core/tools/` lists no `apply_patch`; `rg` count was 0 matches."
+      }
+    ]
   },
   "createdAt": "2026-11-09T11:25:46.026Z"
 }
