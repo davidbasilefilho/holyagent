@@ -1,0 +1,13 @@
+{
+  "id": "intent-0mw966ssa-wjrh",
+  "slug": "0-3-1-assess-pi-codex-conversion-as-a",
+  "objective": "0.3.1: assess pi-codex-conversion as a Codex provider for Pi, in particular whether it supports Codex's new context_management system, gpt-reserve, auto-review/auto-approve and comparable Codex features.",
+  "requirements": [
+    "Maintainer (verbatim, 2026-11-09): \"alright for 0.3.1 let's first assess a codex provider for pi\", \"I'd like to know whether pi-codex-conversion does context_management (the new system), gpt-reserve, auto-review/auto-approve, etc\".",
+    "This is an assessment only: deliver findings and stop; build nothing until the maintainer says to go ahead.",
+    "Testing rules carried from 0.3.0: never run pi or make live model requests; read sources only."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-09T11:20:35.387Z"
+}
