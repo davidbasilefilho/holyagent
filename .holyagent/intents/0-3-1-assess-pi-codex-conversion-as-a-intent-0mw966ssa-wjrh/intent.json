@@ -5,9 +5,10 @@
   "requirements": [
     "Maintainer (verbatim, 2026-11-09): \"alright for 0.3.1 let's first assess a codex provider for pi\", \"I'd like to know whether pi-codex-conversion does context_management (the new system), gpt-reserve, auto-review/auto-approve, etc\".",
     "This is an assessment only: deliver findings and stop; build nothing until the maintainer says to go ahead.",
-    "Testing rules carried from 0.3.0: never run pi or make live model requests; read sources only."
+    "Testing rules carried from 0.3.0: never run pi or make live model requests; read sources only.",
+    "Maintainer (verbatim, 2026-11-09): \"didn't we agree on using just-bash as the bash tool backend\" and \"we should also support the just-bash's ts/js capabilities (ts as first option, js as fallback)\". No earlier record of the just-bash choice exists in the repository, the Intents or this session; it is now a requirement: the bash tool runs on just-bash, and its TypeScript and JavaScript execution is supported, TypeScript first with JavaScript as the fallback. Its fit with HolyAgent (real git, bun, mise runs) is being researched before any build."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-09T11:20:35.387Z"
 }
