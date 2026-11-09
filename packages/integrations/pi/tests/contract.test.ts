@@ -104,8 +104,9 @@ describe("the recorded Pi version", () => {
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
 // What the extension starts Bun with: the bundled CLI, never the `sh` wrapper.
 const RUNTIME = runtimeArgs(PACKAGE_ROOT)
-// A machine with Bun on its PATH: the program the extension starts is the full path it found.
-const BUN = "/stub/bin/bun"
+// A machine with Bun on its PATH: the program the extension starts is the full path it found,
+// joined with the test process's own path module (a `\` on Windows), so the stub's is too.
+const BUN = join("/stub/bin", "bun")
 const BUN_SEARCH: BunSearch = {
   env: { PATH: "/stub/bin" },
   exists: (path) => path === BUN,
@@ -185,7 +186,8 @@ const start = (directory: string, sessionName?: string) => {
       },
     },
   ) as unknown as ExtensionContext
-  createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(
+  // A POSIX machine, whatever the platform the tests run on.
+  createExtension({ packageRoot: PACKAGE_ROOT, env: {}, platform: "linux", bunSearch: BUN_SEARCH })(
     api as unknown as ExtensionAPI,
   )
   /** Delivers a fixture event to the handlers registered for its type; the results are returned. */
