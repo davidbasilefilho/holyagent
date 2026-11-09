@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw9tj1yn-7wvw",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-fff-no-longer-follows-directory",
+  "objective": "Confirm fff no longer follows directory links by default and the settings write stays within what HolyAgent recorded.",
+  "state": "Running",
+  "scope": [
+    "Commit 3f1c135b on release/0.3.1/feat/fff in /home/user/holyagent-0.3.1-fff; diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-fix-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9svyiy-qjsm.md",
+    "Findings it repairs: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fck-0tru.md (root exclusion of fff's own tool names) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fmw-apeq.md finding 1 (followSymlinks)."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes. Run commands only in /home/user/holyagent-0.3.1-fff.",
+    "Report in under 300 words; start each evidence line with the exact criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "With HolyAgent's settings, fff does not search through directory links, and a user's own followSymlinks value is kept",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The settings write and revert touch only recorded keys at user scope",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9svyiy-qjsm"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T22:13:58.320Z"
+  },
+  "createdAt": "2026-11-09T22:13:58.320Z"
+}
