@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw9hak7s-avpt",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 18,
+  "roleTask": "Explorer.map",
+  "slug": "map-where-each-0-3-1-piece-would-plug",
+  "objective": "Map where each 0.3.1 piece would plug into the current Pi integration, so the work can be split into stacked PRs with disjoint files.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-cap (release/0.3.1/integration at 0.3.1). Read packages/integrations/pi/src, packages/runtime/src/config (schema.ts, pi-packages.json), packages/runtime/src/setup and doctor, packages/runtime/src/instructions (model families and the coverage table), mise.toml and scripts/ (deps:update).",
+    "For each piece name the files and exported functions it would touch or extend, and the existing seam to use: (1) a capability registry replacing or driving pi.features (FEATURE_PACKAGES, piPackages, toolArgs, toolSettings, doctor checks, setup flags and the setup TUI); (2) a just-bash bash backend through Pi BashOperations, plus the Billion Context guardrail env vars for the Pi process; (3) @ff-labs/pi-fff in override mode replacing Pi find and grep; (4) a GPT-6 model family under instructions with guide.md and coverage; (5) a Codex provider (registration beside the Kimi provider, a Codex route table, provider selection in config pi.provider); (6) Codex auto-review hooks on tool calls; (7) context_management toggled by Billion Context; (8) @opencode/browse as an MCP server and a screen capability granted per Assignment.",
+    "Also list where exact pins live and how deps:update moves them, and which files several pieces would share (conflict hot spots)."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes.",
+    "Report in under 700 words as a table per piece (files, seam, shared files), and write the full map to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/map-031.md."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the eight pieces has its files, seam and shared files named with paths",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Conflict hot spots across pieces are listed",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "map-file",
+    "hot-spots"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T16:31:26.680Z"
+  },
+  "createdAt": "2026-11-09T16:31:26.680Z"
+}
