@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-cloud-session-checkout",
   "objective": "Re-review the cloud-session checkout repair for correctness.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0vv-klze.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v14z-rjm5.md (artifact) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v1e0-v4vz.md (security); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw999emo-eac9.md. Review only the repair commit 323dfb1 in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r1.diff) and say whether each earlier finding is closed.",
     "Run only bun test packages/runtime/tests/cloud-checkout.test.ts packages/runtime/tests/sessioncontext.test.ts."
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_349d5eb8-b1f/assignment-0mw99k563-xfap",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:54:56.811Z"
+    "startedAt": "2026-11-09T12:54:56.811Z",
+    "finishedAt": "2026-11-09T13:00:53.509Z"
+  },
+  "result": "result: All earlier code findings are closed. The repair adds no regression to session start, status or the notice. It leaves four optional edge cases. Code review is accepted.\n\n**Built-in `/code-review`:** I ran it with `high 323dfb1~1...323dfb1`. The loaded text was the built-in's, and it returned 5 findings. All 5 are real edge cases that I classed as optional, because the notice is advisory and cannot fail a command. Details are under the optional items below.\n\n**Earlier findings, all closed:**\n**Finding 1, wrong return branch (`status.ts` `startBranch`).** It now takes the oldest reflog move whose destination is an existing local branch, falling back to the source. After a clone and `checkout -b claude/x` it names `claude/x`.\n**Finding 2, test gap.** `session()` in `cloud-checkout.test.ts` now commits on `main` before `checkout -b`. A new test asserts the reflog line `moving from main to claude/quiet-fox` and the notice `git switch claude/quiet-fox`, not `main`.\n**Finding 3, detection logic.** There is no regression:\n  - It stays silent for local sessions, linked worktrees and the start branch.\n  - It still shows on a detached HEAD.\n  - It now also shows when the checkout moved to another named branch, which has a test.\n  - Every git failure still returns `undefined`.\n  - `hook.ts` and `overview.ts` only had their description strings changed.\n**Finding 4, `git switch -c` contradiction.** `claude-5.5/root/identity.md` and `kimi-k3.1/root/identity.md` now say `git worktree add -b <name> <path> <start>`. The `requirements/root/identity.md` line points to R-CLOUD-CHECKOUT, which exists in `coverage.ts` and `requirements/root/version-control.md`. The only `git switch -c` left is in the two `version-control.md` Branches lines, scoped \"outside a cloud session (inside one, the next bullet)\".\n**Hostile branch names.** Both the reflog and `origin/HEAD` sources pass an allowlist and `git check-ref-format --branch`. The new test covers a hostile name from both sources.\n\n**Optional, not blockers:**\n1. **Clone already on the assigned branch (`status.ts` line 33).** If the clone starts on `claude/x` and the root then runs `git switch -c work`, the start resolves to `work` and no notice appears. I confirmed the reflog in a scratch repo. The repair report documents this limit. The observed platform flow (clone on `main`, then `checkout -b`) works.\n2. **Ambiguous branch name (`status.ts` line 73).** `symbolic-ref --short` returns `heads/claude/x` when a tag of the same name exists. I confirmed this in a scratch repo. The comparison then fails and the notice shows wrongly. A fix is to strip the `refs/heads/` prefix from the plain `symbolic-ref HEAD` output.\n3. **Rejected start branch (`status.ts` line 59).** If the start branch fails the allowlist and the checkout is already on `main`, the notice still says `git switch main`.\n4. **`docs/hooks.md` line 28.** It says \"four read-only git commands\", but the notice now runs a variable number, up to two `show-ref` calls per reflog move. The loop stops at the first hit, so cost stays low.\n\n**Tests:** `bun test packages/runtime/tests/cloud-checkout.test.ts packages/runtime/tests/sessioncontext.test.ts` exited 0 with 36 pass and 0 fail. I did not run the full gates; the repair report gives `mise run verify` exit 0.\n\nevidence:\nEach earlier code finding is closed, or reported open with file and line: Findings 1, 2 and 4 are closed (`/home/user/holyagent-0.3.0-cloudbranch/packages/runtime/src/cli/status.ts` `startBranch`, `packages/runtime/tests/cloud-checkout.test.ts`, the `identity.md` files). Finding 3 raised no defect. The optional edge cases are in `status.ts` lines 33, 59 and 73 and `docs/hooks.md` line 28.\nThe repair introduces no regression in session start, status or the notice: Silent cases are unchanged, every git failure returns `undefined`, and the 36 tests pass. The only unreported cases are the optional edge cases above.\nfindings: The built-in review's 5 findings are optional items 1–4, with finding 1 covering the first two.\ntests: `bun test packages/runtime/tests/cloud-checkout.test.ts packages/runtime/tests/sessioncontext.test.ts` exited 0, 36 pass.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Re-review closes every earlier finding with file lines; leftovers are optional",
+    "criteria": [
+      {
+        "criterion": "Each earlier code finding is closed, or reported open with file and line",
+        "support": "Findings 1, 2 and 4 are closed (`/home/user/holyagent-0.3.0-cloudbranch/packages/runtime/src/cli/status.ts` `startBranch`, `packages/runtime/tests/cloud-checkout.test.ts`, the `identity.md` files). Finding 3 raised no defect. The optional edge cases are in `status.ts` lines 33, 59 and 73 and `docs/hooks.md` line 28."
+      },
+      {
+        "criterion": "The repair introduces no regression in session start, status or the notice",
+        "support": "Silent cases are unchanged, every git failure returns `undefined`, and the 36 tests pass. The only unreported cases are the optional edge cases above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "The built-in review's 5 findings are optional items 1–4, with finding 1 covering the first two."
+      },
+      {
+        "label": "tests",
+        "support": "`bun test packages/runtime/tests/cloud-checkout.test.ts packages/runtime/tests/sessioncontext.test.ts` exited 0, 36 pass."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:54:56.811Z"
 }
