@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-chmod-and-utimes-end-link",
   "objective": "Confirm the chmod and utimes end-link fix closes the last /dev/null gap without a new one.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Range e6f334c7..1b9dee14 on release/0.3.1/feat/just-bash in /home/user/holyagent-0.3.1-bash (PR davidbasilefilho/holyagent#106): the real-path /dev/null guard (4e042337), the Windows which-test fix and Git folders, and the chmod/utimes end-link fix (1b9dee14). Source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/jb-final.diff",
     "Writer reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fxs-z71a.md, /home/user/holyagent/.git/holyagent/reports/assignment-0mw9svxyv-rmqq.md, /home/user/holyagent/.git/holyagent/reports/assignment-0mw9tj1do-0ets.md; earlier security reviews /home/user/holyagent/.git/holyagent/reports/assignment-0mw9svy8g-lb52.md",
@@ -40,7 +40,29 @@
     "agentId": "workflow:wf_741675ca-371/assignment-0mw9tqztx-4akc",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T22:20:08.805Z"
+    "startedAt": "2026-11-09T22:20:08.805Z",
+    "finishedAt": "2026-11-09T22:24:59.296Z"
+  },
+  "result": "result: Both blocking criteria hold on a read-only review. I found no blocker and no vulnerability introduced by `e6f334c7..1b9dee14`. I ran no tests, because this session has no shell.\n\n**Built-in review:** `/security-review` ran through the Skill tool but failed. Its `git diff origin/HEAD...` step errors with \"unknown revision\" in this clone, so it covered nothing. I reviewed the range from `jb-final.diff`, the bundled `just-bash.js` and the sources under `/home/user/holyagent-0.3.1-bash/packages/runtime/src/pi/bash/`.\n\n**Verified sound**\n- **Link-following calls:** `chmod` and `utimes` follow a link at its end in the inner `ReadWriteFs`. `chmodUnlocked` and `utimesUnlocked` resolve through `resolveAndValidate` before the `lstat`. `FOLLOWS` lists both. `followed()` takes the full `realpath`, so `n`, `rel` and `chain` all classify as the device, and the call is dropped.\n- **Other path forms:** `touch` also reaches the device through `exists` then `utimes`, and both are covered. `/proc/self/root/dev/null` and `/proc/self/fd/N` resolve to `/dev/null` through the kernel's `realpath`.\n- **Nothing new is opened:** the full real path is only used to answer \"is this the device?\". It never decides which host path is operated on. `realpath` is called on the inner file system, so there is no recursion, and failures fall back to the lexical path. The host's own checks still reject special files: write and `cp` refuse them, and `chmod` and `utimes` refuse them when `nlink` is above 1.\n- **Other changes:** the guard now sits below `withProgramLaunch`. The launch wrapper still sees its `exists`, `stat`, `readFile` sequence, and `readHead` only reads. The new `ProgramW6432` and per-user Git folders come from the call's environment and add no injection path.\n\n**Findings (non-blocking, none introduced by this range)**\n- **TOCTOU:** the guard classifies a path and then runs the call. Two concurrent calls can swap a link in between, and `chmod` of the device then lands if the user may. The same actor can run `/bin/chmod` as a host program, which the docs say bypasses the guard, so this crosses no boundary.\n- **Hard link through a symlink (suspicion, root on Linux only):** `ln n m` with `n` a symlink to the device classifies the source without following the link. `linkUnlocked` then passes the resolved target to `link(2)`. That makes a second hard-link name for the device on devtmpfs. The inner file system then refuses `chmod` and `utimes` on it, and `rm` removes only the name.\n- **Case-insensitive file systems (suspicion, macOS):** I could not confirm whether `/dev/NULL` classifies as the device there. The guard compares case-sensitively. The old lexical check had the same limit.\n\nevidence:\nchmod and utimes through any shell-made link to /dev/null cannot reach the device: `devices.ts` `decide` classifies `chmod` and `utimes` with `followed()` (`FOLLOWS` set, diff lines 214-224, 315). A link answers \"device\" and the call is dropped. The `ReadWriteFs` `chmodUnlocked` and `utimesUnlocked` follow links (just-bash.js:89655, 89769), so the guard matches the host's behaviour. `devices.test.ts` covers `n`, `rel` and `chain`. I did not run it.\nClassifying by the full real path for following calls opens no new path to the device or to other host files: the real path is used only for the device check, and `ReadWriteFs` still refuses special files on write, `cp` and multi-linked `chmod` and `utimes` (just-bash.js:89034, 89439, 89661). The only residual items are the notes above.\nfindings: none blocking. Three non-blocking notes: TOCTOU, hard link through a symlink, case-insensitive `/dev/NULL`.\n",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Both criteria hold; three residual non-blocking notes cross no boundary.",
+    "criteria": [
+      {
+        "criterion": "chmod and utimes through any shell-made link to /dev/null cannot reach the device",
+        "support": "`devices.ts` `decide` classifies `chmod` and `utimes` with `followed()` (`FOLLOWS` set, diff lines 214-224, 315). A link answers \"device\" and the call is dropped. The `ReadWriteFs` `chmodUnlocked` and `utimesUnlocked` follow links (just-bash.js:89655, 89769), so the guard matches the host's behaviour. `devices.test.ts` covers `n`, `rel` and `chain`. I did not run it."
+      },
+      {
+        "criterion": "Classifying by the full real path for following calls opens no new path to the device or to other host files",
+        "support": "the real path is used only for the device check, and `ReadWriteFs` still refuses special files on write, `cp` and multi-linked `chmod` and `utimes` (just-bash.js:89034, 89439, 89661). The only residual items are the notes above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "none blocking. Three non-blocking notes: TOCTOU, hard link through a symlink, case-insensitive `/dev/NULL`."
+      }
+    ]
   },
   "createdAt": "2026-11-09T22:20:08.805Z"
 }
