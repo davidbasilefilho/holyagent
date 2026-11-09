@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-dev-null-device-handling-and",
   "objective": "Confirm the /dev/null device handling and Windows path mapping add no path, injection or host-damage defect.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Range d149c9cd..e6f334c7 on release/0.3.1/feat/just-bash in /home/user/holyagent-0.3.1-bash (PR davidbasilefilho/holyagent#106, now targeting release/0.3.1/integration): the /dev/null and exit repair, a merge of the Codex branch's Windows test fix, the Windows path-rules fix, and a content-free merge of the integration branch. Source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/jb-r3.diff",
     "Findings these commits address: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9qmod2-hygi.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9qmonh-9wkm.md (optional items) and the Windows CI failures in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-106.txt; writer reports /home/user/holyagent/.git/holyagent/reports/assignment-0mw9qugeg-vovd.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9rc4gj-gk3c.md",
@@ -41,7 +41,29 @@
     "agentId": "workflow:wf_b8a3630b-f99/assignment-0mw9roekg-jryb",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T21:22:08.704Z"
+    "startedAt": "2026-11-09T21:22:08.704Z",
+    "finishedAt": "2026-11-09T21:30:22.221Z"
+  },
+  "result": "result: Both criteria hold for everything the change claims, with one validated gap in the /dev/null guard that the change did not introduce. I found nothing else. The built-in `/security-review` did not run: its `git diff origin/HEAD...` failed because the session checkout has no `origin/HEAD`. I reviewed `jb-r3.diff` and the worktree sources by reading. I had no Bash tool, so I ran no tests.\n\nchanged: none\n\nchecks: none run; read-only review.\n\nblockers: none. Judge the finding below against the first criterion's wording.\n\nfindings:\n1. **Validated by reading, not a regression:** the /dev/null guard is lexical only.\n   - `isDevice` in `/home/user/holyagent-0.3.1-bash/packages/runtime/src/pi/bash/devices.ts` normalizes the string it is given and compares it to `/dev/null`.\n   - The shell sits on `ReadWriteFs({root:\"/\", allowSymlinks:true})`. So `ln -s /dev /tmp/d` followed by `rm /tmp/d/null`, or `mv x /tmp/d/null`, passes `withNullDevice` untouched and reaches the host. The `/proc/self/root/dev/null` spelling does the same.\n   - Precondition: the process can modify `/dev`, which in practice means root, as in a container or CI. Impact: the host device is unlinked or replaced.\n   - `rm -rf /dev` and `mv /dev x` fall through the same way. Host programs such as `unlink`, `dd` and `truncate` bypass the shell file system by design.\n   - The docs (`docs/pi/shell.md`) say no call reaches the device \"whatever the spelling\", and the test only covers lexical spellings. Either narrow the claim to lexical spellings, or add a realpath-based check.\n   - The change did not worsen this. Before it, `rm` and `mv` were not guarded at all.\n2. **Sound for the guard's own scope:** every `IFileSystem` method that names a path is covered.\n   - `writeFile`, `appendFile`, `chmod`, `utimes` and a copy to the device are dropped.\n   - `rm`, `mv` and `link` to or from the device, `mkdir`, `readdir`, `readlink` and `symlink` are refused.\n   - A copy from the device writes an empty file through the inner file system.\n   - `createExclusive` and `readdirWithFileTypes` pass through but cannot change an existing device (EEXIST or ENOTDIR).\n3. **Pre-existing, low, no trust boundary crossed:** `toHostArgument` maps `/c/../d/x` to `C:\\..\\d\\x`, which Windows resolves as `C:\\d\\x`. The shell resolves it as `D:\\x`.\n4. **Pre-existing, low:** a quoted `PATH` entry such as `/c/x;D:/evil` becomes two host `PATH` entries after `toHostPath` and the `;` split. The command's author could already add that folder directly.\n\nNot reviewed: the `pi-settings.ts` change (reverting setup's recorded keys when `pi.enable` is off).\n\nevidence:\nNo operation in the shell can remove, replace or write the host /dev/null: Met for the shell's own file-system calls and every lexical spelling. `devices.ts` ON_PATH and ON_PAIR cover every `IFileSystem` call that names a path. Not met against symlinked-parent or `/proc/self/root` aliases (finding 1), which need root and which the change did not introduce.\nThe Windows path and PATH mapping cannot make a host program or a later call resolve a different folder or program than the shell named: Met for the change. The new `endState` only moves the existing `toHostPath` and `machinePath` logic, and `pathFor` gives the same delimiter and join as before on real hosts. Findings 3 and 4 predate the change and cross no trust boundary.\nfindings: Four listed above. The four test edits' claim is verified: `endState` in `shell.ts:348` returns `toHostPath(cwd)`, `bash.ts:178` stores it through `afterCall`, and `startFolder`, `isDirectory` and `requestLine` use it as the host path. `pwd` and `$PATH` print the shell's spelling, so `inShell` is correct. A PATH change is reported through `machinePath`, in the host's spelling, under the request's own name for it.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Review complete: Windows mapping sound; one validated gap (symlinked /dev alias) goes to a repair before push.",
+    "criteria": [
+      {
+        "criterion": "No operation in the shell can remove, replace or write the host /dev/null",
+        "support": "Met for the shell's own file-system calls and every lexical spelling. `devices.ts` ON_PATH and ON_PAIR cover every `IFileSystem` call that names a path. Not met against symlinked-parent or `/proc/self/root` aliases (finding 1), which need root and which the change did not introduce."
+      },
+      {
+        "criterion": "The Windows path and PATH mapping cannot make a host program or a later call resolve a different folder or program than the shell named",
+        "support": "Met for the change. The new `endState` only moves the existing `toHostPath` and `machinePath` logic, and `pathFor` gives the same delimiter and join as before on real hosts. Findings 3 and 4 predate the change and cross no trust boundary."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "Four listed above. The four test edits' claim is verified: `endState` in `shell.ts:348` returns `toHostPath(cwd)`, `bash.ts:178` stores it through `afterCall`, and `startFolder`, `isDirectory` and `requestLine` use it as the host path. `pwd` and `$PATH` print the shell's spelling, so `inShell` is correct. A PATH change is reported through `machinePath`, in the host's spelling, under the request's own name for it."
+      }
+    ]
   },
   "createdAt": "2026-11-09T21:22:08.704Z"
 }
