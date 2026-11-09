@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw94ibno-cvgm",
+  "intentId": "intent-0mw7mzreq-mu22",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-release-0-3-0-feat-pi-root-model",
+  "objective": "Review release/0.3.0/feat/pi-root-model (setup writing the root route model into Pi settings as a provider/model pair plus thinking level, with undo and doctor) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-model; diff 238218a..HEAD (sources, tests and docs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/model-review.diff).",
+    "Rules: a key is written only where unset and different from Pi 1.5.0 default (defaultThinkingLevel medium; no default for provider or model); defaultProvider and defaultModel are written together only when neither is set (scope file, and the global file at project or local scope); undo removes only what setup wrote and keeps a pair either half of which changed; doctor reports set, unset or hand-set; the extension never calls setModel.",
+    "Check also the existing Pi tool settings writer behaviour is unchanged (resolveTarget now reads the file itself and returns existing)."
+  ],
+  "constraints": [
+    "Read-only; you may run bun test and mise run verify in that worktree.",
+    "Mark a finding blocking only when behaviour is wrong, incomplete, untested on an error path, or breaks existing behaviour; give path:line and a failure scenario.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has path:line and a failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether each listed rule is met",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8tircf-3kht",
+    "assignment-0mw8u292g-09fx"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T10:33:33.828Z"
+  },
+  "createdAt": "2026-11-09T10:33:33.828Z"
+}
