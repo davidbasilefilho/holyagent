@@ -1,3 +1,4 @@
+import { statSync } from "node:fs"
 import nodePath, { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -42,6 +43,7 @@ import {
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
+import { bunFlags } from "./bun-flags.ts"
 import { SPECIALIST_NAMES } from "./specialists.ts"
 
 /** The launch flag that tells the extension what the session is for: root, specialist or session. */
@@ -551,22 +553,93 @@ export interface ExtensionOptions {
    * to stand in for Windows.
    */
   readonly platform?: NodeJS.Platform
+  /**
+   * Where Bun is looked up, the process's own environment and file system by default. A test passes
+   * its own to stand in for a machine with Bun in a given place.
+   */
+  readonly bunSearch?: BunSearch
+}
+
+/** What the lookup of Bun reads: an environment and a test for a file's existence. */
+export interface BunSearch {
+  /** The environment with `PATH`, `BUN_INSTALL` and the home folder; the process's by default. */
+  readonly env?: Readonly<Record<string, string | undefined>>
+  /** Whether a regular file exists at the path; the file system's answer by default. */
+  readonly exists?: (path: string) => boolean
+}
+
+/** The result of looking for Bun: the program to start, or where it was looked for. */
+export type BunLookup =
+  | { readonly found: true; readonly program: string }
+  | { readonly found: false; readonly looked: string }
+
+const isFile = (path: string): boolean =>
+  Effect.runSync(
+    Effect.try(() => statSync(path, { throwIfNoEntry: false })?.isFile() === true).pipe(
+      Effect.orElseSucceed(() => false),
+    ),
+  )
+
+/**
+ * Finds Bun in the order the `scripts/holyagent` wrapper does: on `PATH`, then `$BUN_INSTALL/bin`,
+ * then `~/.bun/bin` (the home folder is `USERPROFILE` on Windows, else `HOME`). On Windows Bun is
+ * `bun.exe`, and on `PATH` a `bun.cmd` shim (an npm global install) counts too, after the `bun.exe`
+ * of the same folder. An empty variable counts as unset, and an empty `PATH` entry is skipped,
+ * since it would name the working directory. The program is a full path, so no lookup in the
+ * working directory can pick a planted `bun`. A miss says where Bun was looked for.
+ */
+export const findBun = (
+  platform: NodeJS.Platform,
+  platformPath: Pick<typeof nodePath, "join">,
+  { env = process.env, exists = isFile }: BunSearch = {},
+): BunLookup => {
+  const windows = platform === "win32"
+  const value = (name: string): string | undefined => {
+    const key = Object.keys(env).find((entry) =>
+      windows ? entry.toUpperCase() === name : entry === name,
+    )
+    const given = key === undefined ? undefined : env[key]
+    return given === "" ? undefined : given
+  }
+  const names = windows ? ["bun.exe", "bun.cmd"] : ["bun"]
+  const home = windows ? (value("USERPROFILE") ?? value("HOME")) : value("HOME")
+  const installs = [
+    ...new Set(
+      [
+        value("BUN_INSTALL"),
+        ...(home === undefined ? [] : [platformPath.join(home, ".bun")]),
+      ].flatMap((install) => (install === undefined ? [] : [platformPath.join(install, "bin")])),
+    ),
+  ]
+  const onPath = (value("PATH") ?? "")
+    .split(windows ? ";" : ":")
+    .map((folder) => (windows ? folder.replace(/^"(.*)"$/, "$1") : folder))
+    .filter((folder) => folder !== "")
+  const candidates = [
+    ...onPath.flatMap((folder) => names.map((name) => platformPath.join(folder, name))),
+    ...installs.map((folder) => platformPath.join(folder, names[0] ?? "bun")),
+  ]
+  const program = candidates.find((candidate) => exists(candidate))
+  return program !== undefined
+    ? { found: true, program }
+    : {
+        found: false,
+        looked: `Bun was not found on PATH or in ${installs.length === 0 ? "BUN_INSTALL/bin or ~/.bun/bin (neither BUN_INSTALL nor the home folder is set)" : installs.join(" or ")}; install it from https://bun.sh`,
+      }
 }
 
 /**
- * The Bun arguments that run an installed package's bundled CLI: no env file and the empty Bun
- * config, as the `scripts/holyagent` wrapper passes them, then `scripts/holyagent.js`. The wrapper
- * would read the project's `.env` and `bunfig.toml` otherwise, which the project could use to
- * redirect the state folder or preload code. Bun is started directly, since the extension has to
- * work where there is no `sh` (native Windows); the path module is a parameter so a test can stand
- * in for Windows.
+ * The Bun arguments that run an installed package's bundled CLI: the flags the `scripts/holyagent`
+ * wrapper passes (see {@link bunFlags}), then `scripts/holyagent.js`. Without them Bun would read
+ * the project's `.env` and `bunfig.toml`, which the project could use to redirect the state folder
+ * or preload code. Bun is started directly, since the extension has to work where there is no `sh`
+ * (native Windows); the path module is a parameter so a test can stand in for Windows.
  */
 export const runtimeArgs = (
   packageRoot: string,
   platformPath: Pick<typeof nodePath, "join"> = nodePath,
 ): ReadonlyArray<string> => [
-  "--no-env-file",
-  `--config=${platformPath.join(packageRoot, "scripts", "empty-bunfig.toml")}`,
+  ...bunFlags(platformPath.join(packageRoot, "scripts", "empty-bunfig.toml")),
   platformPath.join(packageRoot, "scripts", "holyagent.js"),
 ]
 
@@ -636,10 +709,14 @@ export const createExtension =
     env = process.env,
     platformPath = nodePath,
     platform = process.platform,
+    bunSearch = {},
   }: ExtensionOptions = {}) =>
   (pi: ExtensionAPI): void => {
     const bundled = runtimeArgs(packageRoot, platformPath)
     const windows = platform === "win32"
+    // Bun is looked up when first needed, since the extension may load before an install finishes;
+    // a miss is looked up again, a hit is kept.
+    let bun: string | undefined
     // The text the model reads names the package folder with `/` only, for the same reason.
     const root = toPosix(packageRoot, platformPath.sep)
     const isChild = () => childAgent(pi.getSessionName()) !== undefined
@@ -659,9 +736,10 @@ export const createExtension =
     // command too.
     const exec = (signal: AbortSignal, command: string, args: ReadonlyArray<string>) => {
       const failed = (reason: string) => new CommandFailed({ command: args.join(" "), reason })
-      // On Windows `pi` is a `.cmd` shim, which only a shell starts. Its arguments are fixed words
-      // and the provider's id, nothing `cmd.exe` reads as syntax.
-      const shimmed = windows && command === "pi"
+      // On Windows `pi` and an npm-installed `bun.cmd` are `.cmd` shims, which only a shell starts.
+      // Their arguments are fixed words, the provider's id and paths, nothing `cmd.exe` reads as
+      // syntax.
+      const shimmed = windows && (command === "pi" || /\.cmd$/i.test(command))
       const [program, programArgs] = shimmed
         ? ["cmd.exe", ["/d", "/c", command, ...args]]
         : [command, args]
@@ -706,7 +784,17 @@ export const createExtension =
     // Bun runs the package's bundled runtime, which enters the project first; its stdout is the
     // command's output.
     const holyagent = (signal: AbortSignal, project: string, ...args: ReadonlyArray<string>) =>
-      exec(signal, "bun", [...bundled, PI_PROJECT_FLAG, project, ...args]).pipe(
+      Effect.suspend(() => {
+        if (bun === undefined) {
+          const lookup = findBun(platform, platformPath, bunSearch)
+          if (!lookup.found)
+            return Effect.fail(
+              new CommandFailed({ command: args.join(" "), reason: lookup.looked }),
+            )
+          bun = lookup.program
+        }
+        return exec(signal, bun, [...bundled, PI_PROJECT_FLAG, project, ...args])
+      }).pipe(
         Effect.flatMap((result) =>
           result.code === 0 && !result.killed
             ? Effect.succeed(result.stdout)

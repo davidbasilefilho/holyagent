@@ -212,6 +212,21 @@ describe("the runtime scripts", () => {
     expect(pi.join("\n")).not.toContain("CLAUDE")
   })
 
+  test("the wrapper starts Bun with the arguments the extension passes, flag for flag", () => {
+    const line = (scriptsOf("scripts/holyagent")?.content ?? "")
+      .split("\n")
+      .find((entry) => entry.startsWith('exec "$bun" '))
+    // `exec "$bun"` and `"$@"` are the wrapper's own; the rest, with the shell quoting and the
+    // wrapper's folder removed, is the flags and the file, which `runtimeArgs` repeats with only
+    // the file's name left of each path (a path module that keeps its last part).
+    const wrapped = (line ?? "")
+      .split(" ")
+      .slice(2, -1)
+      .map((word) => word.replaceAll('"', "").replaceAll("$here/", ""))
+    expect(wrapped.length).toBeGreaterThan(1)
+    expect(wrapped).toEqual([...runtimeArgs("/pkg", { join: (...parts) => parts.at(-1) ?? "" })])
+  })
+
   // The extension starts Bun on the bundle; the wrapper is what the model runs through its shell.
   const packageRoot = join(REPOSITORY, DIST_DIRECTORY)
   const launchers: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [

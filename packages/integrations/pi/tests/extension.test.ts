@@ -31,6 +31,7 @@ import { toolArgs } from "../../../runtime/src/pi/tools.ts"
 import {
   AGENT_TOOL,
   applyEnvironment,
+  type BunSearch,
   CACHE_RETENTION_ENV,
   childAgent,
   CMD_NOT_FOUND,
@@ -42,6 +43,7 @@ import {
   type ExtensionOptions,
   failedFinalMessage,
   fillPackageRoot,
+  findBun,
   HOST_ENV,
   hostEnvironment,
   memoizeLast,
@@ -66,6 +68,15 @@ const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
 const WRAPPER = toPosix(join(PACKAGE_ROOT, "scripts", "holyagent"))
 // What the extension starts Bun with: the bundled CLI, never the `sh` wrapper.
 const RUNTIME = runtimeArgs(PACKAGE_ROOT)
+// A machine with Bun on its PATH, and a Windows one: the program the extension starts is the
+// full path it found, never a bare `bun`.
+const BUN = "/stub/bin/bun"
+const BUN_SEARCH: BunSearch = { env: { PATH: "/stub/bin" }, exists: (path) => path === BUN }
+const WINDOWS_BUN = "C:\\stub\\bin\\bun.exe"
+const WINDOWS_SEARCH: BunSearch = {
+  env: { Path: "C:\\stub\\bin" },
+  exists: (path) => path === WINDOWS_BUN,
+}
 const DEFAULTS = await Effect.runPromise(defaultConfig)
 const CONFIG = JSON.stringify(DEFAULTS)
 const DISABLED = JSON.stringify({
@@ -99,7 +110,7 @@ type Responder = (call: Call, runtime: ReadonlyArray<string>) => Outcome | Promi
 
 /** The holyagent subcommand a call runs through the bundled CLI, or undefined for another program. */
 const subcommand = (call: Call): ReadonlyArray<string> | undefined =>
-  call.command === "bun" &&
+  (call.command === BUN || call.command === WINDOWS_BUN) &&
   call.args[0] === "--no-env-file" &&
   call.args[RUNTIME.length] === PI_PROJECT_FLAG
     ? call.args.slice(RUNTIME.length + 2)
@@ -272,6 +283,8 @@ const run = async (
     packageRoot?: string
     platformPath?: ExtensionOptions["platformPath"]
     platform?: ExtensionOptions["platform"]
+    /** Where Bun is: on the PATH of a POSIX machine, or of a Windows one with `platform` win32. */
+    bunSearch?: BunSearch
   } = {},
 ) => {
   const api = fakeApi(responder, options.flag, options.cwd, {
@@ -288,6 +301,7 @@ const run = async (
     ...(options.deadlineMs === undefined ? {} : { deadlineMs: options.deadlineMs }),
     ...(options.platformPath === undefined ? {} : { platformPath: options.platformPath }),
     ...(options.platform === undefined ? {} : { platform: options.platform }),
+    bunSearch: options.bunSearch ?? (options.platform === "win32" ? WINDOWS_SEARCH : BUN_SEARCH),
   })(api.pi)
   await api.emit("session_start", options.start ?? { reason: "startup" })
   await options.afterwards?.(api)
@@ -320,7 +334,9 @@ describe("the factory", () => {
       })
     const api = fakeApi(healthy("/none"))
     try {
-      expect(createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)).toBeUndefined()
+      expect(
+        createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi),
+      ).toBeUndefined()
     } finally {
       Object.assign(globalThis, originals)
     }
@@ -352,7 +368,7 @@ describe("the factory", () => {
 describe("session_start and session_shutdown", () => {
   test("session_start takes a stop signal for its commands and session_shutdown stops them, twice safely", async () => {
     const api = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     const signals = api.calls.map((call) => call.signal)
     expect(signals.length).toBeGreaterThan(0)
@@ -367,14 +383,14 @@ describe("session_start and session_shutdown", () => {
 
   test("a shutdown with no start is a no-op", async () => {
     const api = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     expect(await api.emit("session_shutdown", { reason: "quit" })).toEqual([undefined])
     expect(api.calls).toEqual([])
   })
 
   test("a new start releases the previous one", async () => {
     const api = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     const first = api.calls.map((call) => call.signal)
     await api.emit("session_start", { reason: "new" })
@@ -534,7 +550,7 @@ describe("what runs and when", () => {
         runtime: call.args.slice(0, RUNTIME.length),
         project: call.args.slice(RUNTIME.length, RUNTIME.length + 2),
       }).toEqual({
-        command: "bun",
+        command: BUN,
         runtime: [...RUNTIME],
         project: [PI_PROJECT_FLAG, SESSION_PROJECT],
       })
@@ -708,15 +724,18 @@ describe("with the built package and a real project", () => {
   const realExec =
     (home: string): Responder =>
     async (call) => {
-      const child = Bun.spawn([call.command, ...call.args], {
-        ...(call.cwd === undefined ? {} : { cwd: call.cwd }),
-        env: { ...process.env, HOLYAGENT_HOME: home },
-        stdout: "pipe",
-        stderr: "pipe",
-        stdin: "ignore",
-        // Pi's exec kills the process when the signal aborts.
-        ...(call.signal === undefined ? {} : { signal: call.signal }),
-      })
+      const child = Bun.spawn(
+        [call.command === BUN ? process.execPath : call.command, ...call.args],
+        {
+          ...(call.cwd === undefined ? {} : { cwd: call.cwd }),
+          env: { ...process.env, HOLYAGENT_HOME: home },
+          stdout: "pipe",
+          stderr: "pipe",
+          stdin: "ignore",
+          // Pi's exec kills the process when the signal aborts.
+          ...(call.signal === undefined ? {} : { signal: call.signal }),
+        },
+      )
       const [stdout, stderr, code] = await Promise.all([
         new Response(child.stdout).text(),
         new Response(child.stderr).text(),
@@ -839,7 +858,7 @@ describe("order and time", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? gated(hold, { stdout: STATUS }, call.signal) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     const started = api.emit("session_start", { reason: "resume" })
     await hold.entered
     expect(startedWith(api.calls)).toContain("status")
@@ -862,7 +881,7 @@ describe("order and time", () => {
         ? gated(hold, { stdout: `${CONFIG}\n` }, call.signal)
         : inner(call, runtime)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     // The config is held, and the state folder is asked while it is.
     await Promise.all([hold.entered, folderAsked.entered])
@@ -886,7 +905,9 @@ describe("order and time", () => {
     })
     // Four steps of 100ms in sequence (git, config with the state folder, status, reconcile) cross
     // a 250ms deadline in status. A slow runner only brings the deadline earlier.
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, deadlineMs: 250 })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH, deadlineMs: 250 })(
+      api.pi,
+    )
     const began = performance.now()
     await api.emit("session_start", { reason: "resume" })
     expect(performance.now() - began).toBeLessThan(5_000)
@@ -911,7 +932,7 @@ describe("order and time", () => {
       first = false
       return gated(hold, { stdout: STATUS }, call.signal)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     const older = api.calls.filter((call) => subcommand(call)?.[0] === "status")[0]?.signal
@@ -934,7 +955,7 @@ describe("order and time", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? gated(hold, { stdout: STATUS }, call.signal) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     await api.emit("session_shutdown", { reason: "quit" })
@@ -969,7 +990,7 @@ describe("no command outlives a gather", () => {
         }))
       return runtime[0] === "state" ? slowToStop(hold, { stdout: "" })(call) : inner(call, runtime)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     expect(api.running.count).toBe(0)
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
@@ -983,7 +1004,9 @@ describe("no command outlives a gather", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? slowToStop(hold, { stdout: STATUS })(call) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, deadlineMs: 100 })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH, deadlineMs: 100 })(
+      api.pi,
+    )
     await api.emit("session_start", { reason: "startup" })
     expect(api.running.count).toBe(0)
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
@@ -1020,7 +1043,7 @@ describe("no command outlives a gather", () => {
         ? lingering(hold, exit, { stdout: STATUS })(call)
         : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     // Pi does not wait for the session_start handler, and neither does this test.
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
@@ -1044,7 +1067,7 @@ describe("no command outlives a gather", () => {
       first = false
       return lingering(hold, exit, { stdout: STATUS })(call)
     })
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     // The compaction's own gather runs to its end while the older one's command is still leaving.
@@ -1067,7 +1090,9 @@ describe("no command outlives a gather", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? new Promise<Outcome>(() => hold.enter()) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, graceMs: 50 })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH, graceMs: 50 })(
+      api.pi,
+    )
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     await api.emit("session_shutdown", { reason: "quit" })
@@ -1080,7 +1105,13 @@ describe("no command outlives a gather", () => {
     const api = fakeApi((call, runtime) =>
       runtime[0] === "status" ? new Promise<Outcome>(() => {}) : inner(call, runtime),
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, deadlineMs: 50, graceMs: 50 })(api.pi)
+    createExtension({
+      packageRoot: PACKAGE_ROOT,
+      env: {},
+      bunSearch: BUN_SEARCH,
+      deadlineMs: 50,
+      graceMs: 50,
+    })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
     expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
@@ -1092,7 +1123,7 @@ describe("no command outlives a gather", () => {
     ;(api.pi as unknown as { exec: () => never }).exec = () => {
       throw new Error("sync boom")
     }
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     const delivered = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
     expect(delivered.message?.customType).toBe(NOTICE_MESSAGE)
@@ -1115,7 +1146,7 @@ describe("where programs start", () => {
     }
     const git = api.calls.filter((call) => call.command === "git")
     expect(git.map((call) => call.args)).toEqual([["-C", project, "rev-parse", "--show-toplevel"]])
-    const bundled = api.calls.filter((entry) => entry.command === "bun")
+    const bundled = api.calls.filter((entry) => entry.command === BUN)
     expect(bundled.length).toBeGreaterThan(3)
     for (const call of bundled)
       expect(call.args.slice(0, RUNTIME.length + 2)).toEqual([...RUNTIME, PI_PROJECT_FLAG, project])
@@ -1130,7 +1161,7 @@ describe("where programs start", () => {
     expect(isAbsolute(project)).toBe(true)
     const git = api.calls.filter((call) => call.command === "git")
     expect(git.map((call) => call.args)).toEqual([["-C", project, "rev-parse", "--show-toplevel"]])
-    const wrapped = api.calls.filter((call) => call.command === "bun")
+    const wrapped = api.calls.filter((call) => call.command === BUN)
     expect(wrapped.length).toBeGreaterThan(3)
     for (const call of wrapped)
       expect(call.args.slice(0, RUNTIME.length + 2)).toEqual([...RUNTIME, PI_PROJECT_FLAG, project])
@@ -1203,13 +1234,16 @@ describe("with the built package and a project that is not a git repository", ()
   const realExec =
     (home: string): Responder =>
     async (call) => {
-      const child = Bun.spawn([call.command, ...call.args], {
-        ...(call.cwd === undefined ? {} : { cwd: call.cwd }),
-        env: { ...process.env, HOLYAGENT_HOME: home },
-        stdout: "pipe",
-        stderr: "pipe",
-        stdin: "ignore",
-      })
+      const child = Bun.spawn(
+        [call.command === BUN ? process.execPath : call.command, ...call.args],
+        {
+          ...(call.cwd === undefined ? {} : { cwd: call.cwd }),
+          env: { ...process.env, HOLYAGENT_HOME: home },
+          stdout: "pipe",
+          stderr: "pipe",
+          stdin: "ignore",
+        },
+      )
       const [stdout, stderr, code] = await Promise.all([
         new Response(child.stdout).text(),
         new Response(child.stderr).text(),
@@ -1305,6 +1339,158 @@ describe("with the built package and a project that is not a git repository", ()
   })
 })
 
+describe("finding Bun", () => {
+  /** A machine whose files are exactly `files`; `asked` records every path looked at. */
+  const machine = (
+    env: Record<string, string | undefined>,
+    files: ReadonlyArray<string>,
+  ): BunSearch & { readonly asked: Array<string> } => {
+    const asked: Array<string> = []
+    return {
+      env,
+      asked,
+      exists: (path) => {
+        asked.push(path)
+        return files.includes(path)
+      },
+    }
+  }
+  const found = (lookup: ReturnType<typeof findBun>) => (lookup.found ? lookup.program : undefined)
+  const posix = { PATH: "/a:/b", BUN_INSTALL: "/opt/bun", HOME: "/home/me" }
+
+  test("a Bun on PATH wins over the install folders, in the order of PATH", () => {
+    const search = machine(posix, ["/b/bun", "/opt/bun/bin/bun", "/home/me/.bun/bin/bun"])
+    expect(found(findBun("linux", { join }, search))).toBe("/b/bun")
+    const both = machine(posix, ["/a/bun", "/b/bun"])
+    expect(found(findBun("linux", { join }, both))).toBe("/a/bun")
+  })
+
+  test("without Bun on PATH, $BUN_INSTALL/bin comes before ~/.bun/bin", () => {
+    const search = machine(posix, ["/opt/bun/bin/bun", "/home/me/.bun/bin/bun"])
+    expect(found(findBun("linux", { join }, search))).toBe("/opt/bun/bin/bun")
+    expect(search.asked).toEqual(["/a/bun", "/b/bun", "/opt/bun/bin/bun"])
+  })
+
+  test("with no $BUN_INSTALL, or none that holds Bun, ~/.bun/bin is used", () => {
+    const home = machine({ PATH: "/a", HOME: "/home/me" }, ["/home/me/.bun/bin/bun"])
+    expect(found(findBun("linux", { join }, home))).toBe("/home/me/.bun/bin/bun")
+    const stale = machine(posix, ["/home/me/.bun/bin/bun"])
+    expect(found(findBun("linux", { join }, stale))).toBe("/home/me/.bun/bin/bun")
+    const empty = machine({ PATH: "/a", BUN_INSTALL: "", HOME: "/home/me" }, [])
+    findBun("linux", { join }, empty)
+    expect(empty.asked).toEqual(["/a/bun", "/home/me/.bun/bin/bun"])
+  })
+
+  test("an empty PATH entry is skipped: it would mean the project's folder", () => {
+    const search = machine({ PATH: ":/a::", HOME: "/home/me" }, [])
+    findBun("linux", { join }, search)
+    expect(search.asked).toEqual(["/a/bun", "/home/me/.bun/bin/bun"])
+  })
+
+  test("nothing found says where Bun was looked for", () => {
+    const lookup = findBun("linux", { join }, machine(posix, []))
+    expect(lookup.found).toBe(false)
+    const looked = lookup.found ? "" : lookup.looked
+    for (const place of ["PATH", "/opt/bun/bin", "/home/me/.bun/bin", "https://bun.sh"])
+      expect(looked).toContain(place)
+    const unset = findBun("linux", { join }, machine({}, []))
+    expect(unset.found ? "" : unset.looked).toContain("neither BUN_INSTALL nor the home folder")
+  })
+
+  test("on Windows it is bun.exe, with USERPROFILE as the home and a case-blind Path", () => {
+    const env = { Path: 'C:\\a;"C:\\b c"', BUN_INSTALL: "D:\\bun", USERPROFILE: "C:\\Users\\me" }
+    const onPath = machine(env, ["C:\\b c\\bun.exe", "D:\\bun\\bin\\bun.exe"])
+    expect(found(findBun("win32", win32, onPath))).toBe("C:\\b c\\bun.exe")
+    const install = machine(env, ["D:\\bun\\bin\\bun.exe", "C:\\Users\\me\\.bun\\bin\\bun.exe"])
+    expect(found(findBun("win32", win32, install))).toBe("D:\\bun\\bin\\bun.exe")
+    expect(install.asked).toEqual([
+      "C:\\a\\bun.exe",
+      "C:\\a\\bun.cmd",
+      "C:\\b c\\bun.exe",
+      "C:\\b c\\bun.cmd",
+      "D:\\bun\\bin\\bun.exe",
+    ])
+    const home = machine({ Path: "C:\\a", USERPROFILE: "C:\\Users\\me" }, [
+      "C:\\Users\\me\\.bun\\bin\\bun.exe",
+    ])
+    expect(found(findBun("win32", win32, home))).toBe("C:\\Users\\me\\.bun\\bin\\bun.exe")
+  })
+
+  test("on Windows a bun.exe beats the bun.cmd of the same folder, which counts on PATH only", () => {
+    const env = { PATH: "C:\\npm", USERPROFILE: "C:\\Users\\me" }
+    const both = machine(env, ["C:\\npm\\bun.cmd", "C:\\npm\\bun.exe"])
+    expect(found(findBun("win32", win32, both))).toBe("C:\\npm\\bun.exe")
+    const shim = machine(env, ["C:\\npm\\bun.cmd"])
+    expect(found(findBun("win32", win32, shim))).toBe("C:\\npm\\bun.cmd")
+    const installed = machine({ USERPROFILE: "C:\\Users\\me" }, [
+      "C:\\Users\\me\\.bun\\bin\\bun.cmd",
+    ])
+    expect(found(findBun("win32", win32, installed))).toBeUndefined()
+  })
+
+  test("the extension starts the Bun it found, from $BUN_INSTALL when PATH has none", async () => {
+    const { api } = await run(healthy("/missing"), {
+      bunSearch: machine({ PATH: "/usr/bin", BUN_INSTALL: "/opt/bun" }, ["/opt/bun/bin/bun"]),
+    })
+    const bundled = api.calls.filter((call) => call.args.includes(RUNTIME[2] ?? ""))
+    expect(bundled.length).toBeGreaterThan(0)
+    for (const call of bundled) expect(call.command).toBe("/opt/bun/bin/bun")
+  })
+
+  test("a Windows bun.cmd shim starts through cmd.exe, as pi does", async () => {
+    const root = "C:\\Users\\me\\pkg"
+    const { api } = await run(healthy("/missing"), {
+      packageRoot: root,
+      platformPath: win32,
+      platform: "win32",
+      bunSearch: machine({ Path: "C:\\npm" }, ["C:\\npm\\bun.cmd"]),
+    })
+    const bundled = api.calls.filter((call) =>
+      call.args.includes(runtimeArgs(root, win32)[2] ?? ""),
+    )
+    expect(bundled.length).toBeGreaterThan(0)
+    for (const call of bundled) {
+      expect(call.command).toBe("cmd.exe")
+      expect(call.args.slice(0, 3)).toEqual(["/d", "/c", "C:\\npm\\bun.cmd"])
+      expect(call.args.slice(3, 6)).toEqual([...runtimeArgs(root, win32)])
+    }
+    // A bun.exe is a program and starts directly.
+    const direct = await run(healthy("/missing"), {
+      packageRoot: root,
+      platformPath: win32,
+      platform: "win32",
+      bunSearch: machine({ Path: "C:\\npm" }, ["C:\\npm\\bun.exe"]),
+    })
+    expect(direct.api.calls.some((call) => call.command === "cmd.exe")).toBe(false)
+    expect(direct.api.calls.some((call) => call.command === "C:\\npm\\bun.exe")).toBe(true)
+  })
+
+  test("with no Bun the command fails with where it looked, and nothing is started", async () => {
+    const { api, delivered } = await run(healthy("/missing"), {
+      bunSearch: machine({ PATH: "/usr/bin", BUN_INSTALL: "/opt/bun", HOME: "/home/me" }, []),
+    })
+    expect(api.calls.some((call) => call.args.includes(RUNTIME[2] ?? ""))).toBe(false)
+    expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
+    const text = delivered?.message?.content ?? ""
+    for (const part of ["Bun was not found", "PATH", "/opt/bun/bin", "/home/me/.bun/bin"])
+      expect(text).toContain(part)
+  })
+
+  test("a Bun installed after a failed lookup is found by the next command", async () => {
+    const files: Array<string> = []
+    const search = machine({ PATH: "/usr/bin" }, files)
+    const { api } = await run(healthy("/missing"), {
+      bunSearch: search,
+      afterwards: async (api) => {
+        expect(api.calls.some((call) => call.args.includes(RUNTIME[2] ?? ""))).toBe(false)
+        files.push("/usr/bin/bun")
+        await api.emit("session_start", { reason: "reload" })
+      },
+    })
+    expect(api.calls.some((call) => call.command === "/usr/bin/bun")).toBe(true)
+  })
+})
+
 describe("a Windows package root", () => {
   const WINDOWS_ROOT = "C:\\Users\\me\\pkg"
 
@@ -1315,7 +1501,7 @@ describe("a Windows package root", () => {
       (call) => (call.command === "git" ? { stdout: "/work/project\n" } : { stdout: CONFIG }),
       WINDOWS,
     )
-    const bundled = api.calls.filter((call) => call.command === "bun")
+    const bundled = api.calls.filter((call) => call.command === WINDOWS_BUN)
     expect(bundled.length).toBeGreaterThan(0)
     for (const call of bundled)
       expect(call.args.slice(0, 3)).toEqual([
@@ -1497,7 +1683,7 @@ describe("the host and process variables", () => {
     const env: Record<string, string | undefined> = {}
     const active: Array<string> = ["read", "codemode"]
     const api = fakeApi(healthy("/missing"), undefined, SESSION_CWD, { activeTools: active })
-    createExtension({ packageRoot: PACKAGE_ROOT, env })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env, bunSearch: BUN_SEARCH })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     await api.emit("before_agent_start", { prompt: "a" })
     expect(env["HOLYAGENT_WORKFLOWS"]).toBe("0")
@@ -1561,7 +1747,7 @@ describe("the Agent tool", () => {
 
   test("the tool_call handler blocks, and leaves model and thinking as given", async () => {
     const api = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     const input = {
       subagent_type: "reviewer-code",
       model: "kimi-coding/kimi-k3.1",
@@ -1679,7 +1865,7 @@ describe("the SubagentWorkflow tool", () => {
 
   test("the tool_call handler blocks without asking, and lets a specialist script through", async () => {
     const api = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     expect(
       await api.emit("tool_call", {
         toolName: WORKFLOW_TOOL,
@@ -1824,14 +2010,14 @@ describe("a child that settles without a usable report", () => {
     const child = fakeApi(healthy("/missing"), undefined, SESSION_CWD, {
       name: "worker-debugging#a1b2c3d4",
     })
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(child.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(child.pi)
     const [replaced] = await child.emit("message_end", { message })
     expect((replaced as { message: object }).message).toMatchObject({
       stopReason: "error",
       errorMessage: EMPTY_REPORT,
     })
     const root = fakeApi(healthy("/missing"))
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(root.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(root.pi)
     expect(await root.emit("message_end", { message })).toEqual([undefined])
   })
 })
@@ -1975,7 +2161,7 @@ describe("drawing a SubagentWorkflow call", () => {
   test("the extension registers the resolver in every session, a child's and a disabled one's too", () => {
     for (const session of [{}, { name: "worker-debugging#a1b2c3d4" }]) {
       const api = fakeApi(healthy("/missing"), undefined, SESSION_CWD, session)
-      createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+      createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
       expect(api.renderers).toEqual([workflowRenderers])
     }
   })
@@ -2230,7 +2416,7 @@ describe("the root's tools", () => {
       SESSION_CWD,
       { activeTools: [...ACTIVE] },
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     await api.emit("session_compact", { reason: "threshold" })
@@ -2439,7 +2625,7 @@ describe("the root's excluded tools", () => {
           ? gated(hold, { stdout: `${CONFIG}\n` }, callOf.signal)
           : healthy("/missing")(callOf, runtime),
       )
-      createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+      createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
       const started = api.emit("session_start", { reason })
       await hold.entered
       for (const name of EXCLUDED) expect(await api.emit("tool_call", call(name))).toEqual(blocked)
@@ -2460,7 +2646,7 @@ describe("the root's excluded tools", () => {
       SESSION_CWD,
       { name: "worker-implementation#a1b2c3d4" },
     )
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     for (const name of EXCLUDED)
@@ -2638,7 +2824,7 @@ describe("the provider", () => {
   test("the notice is delivered once, beside the status message and not in its place", async () => {
     const { directory, done } = { directory: "/missing", done: async () => {} }
     const api = fakeApi(healthy(directory), undefined, SESSION_CWD, { pi: () => ({ code: 1 }) })
-    createExtension({ packageRoot: PACKAGE_ROOT, env: {} })(api.pi)
+    createExtension({ packageRoot: PACKAGE_ROOT, env: {}, bunSearch: BUN_SEARCH })(api.pi)
     await api.emit("session_start", { reason: "startup" })
     await probesEnded(api, 1)
     const messages = (
