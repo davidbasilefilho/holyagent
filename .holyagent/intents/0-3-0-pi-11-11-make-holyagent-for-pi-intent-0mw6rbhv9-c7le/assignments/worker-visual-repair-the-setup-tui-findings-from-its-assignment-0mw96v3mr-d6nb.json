@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mw96v3mr-d6nb",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.visual",
+  "slug": "repair-the-setup-tui-findings-from-its",
+  "objective": "Repair the setup TUI findings from its visual, code and security reviews (round 1 of 3).",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-tui, on top of commit df6a410 (your earlier setup TUI). Read the three review reports in full: /home/user/holyagent/.git/holyagent/reports/assignment-0mw96iz8o-8xmw.md (visual), /home/user/holyagent/.git/holyagent/reports/assignment-0mw96izno-h3h5.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw96j05j-0wku.md (security). Do not write under .git.",
+    "Visual, material (repair all): (1) the result screen truncates instead of wrapping: apply-failure and apply-success at 80x24 and 40x20 must show the full cause and every outcome line, wrapped; (2) prove the ASCII-locale fallback on the real renderer: rerun the pty capture with LC_ALL and LC_CTYPE unset and LANG=C and record the env in the capture; fix theme.ts if it still emits non-ASCII; (3) the review screen must let every always-applied key be read at 40x20, 80x24 and 120x40 (wrap, or scroll with a visible indicator and keys shown in the hint line), with no mid-key '…' cuts; (4) wrap paths at separators, not mid-word (focus-device-40x20 Xcode path); (5) review-failed and apply-error screens state a recovery step; (6) dry-run result and review text read as would-change, not past-tense writes.",
+    "Visual, non-blocking that ride along: the hint line names j/k; the unfocused disabled and fixed value uses the disabled token #a9b1d6 as Intent requirement 30 says; drop the redundant 'Enter close   Esc close'; Esc on the review screen goes back to the choices (Ctrl-C still cancels) unless that breaks the stated keys, in which case keep it and say why. Leave the 16-colour tier, contrast of the fixed hint token, the marker legend and a ?/q key as they are.",
+    "Code and security (repair all): (a) install atomically: install into a fresh temporary directory beside the final one and rename it into place, with a completion marker written last, and treat a directory without the marker as absent (covers interrupted installs and half-written files); guard concurrent first runs (a lock file or rename-wins); (b) create the cache directories with mode 0700 where the OS supports it and refuse a cache directory not owned by the current user or writable by others (POSIX), falling back to line output with one line saying why; write the bundle copy without following a planted symlink; (c) pin the whole tree: ship a lockfile subset for the three packages generated at build time from bun.lock and install with --frozen-lockfile, so s-js and the native @opentui/core-<platform> resolve exactly as the repository's lock; (d) strip control characters and ANSI escapes from the stderr line shown on install failure; (e) tests for each: a partial install, a non-owned or world-writable cache, a symlinked bundle path, the frozen lockfile in the install command, and escape stripping."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Read /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/tui-design/SKILL.md again and inspect against its checklist and capture list until your own inspection is clean.",
+    "Re-save the captures that changed into /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/ under the same names, add result-screen captures under NO_COLOR and the ASCII locale, and list every capture path you changed or added.",
+    "Never perform a real network install in tests; inject install and import.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "Visual findings 1-6 are repaired and shown in the listed captures",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Code and security items a-e are repaired with a test each",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The riding non-blocking visual items are done or a reason is given",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "diff-file",
+    "captures",
+    "verify"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/claude",
+    "packages/integrations/pi",
+    "package.json",
+    "bun.lock",
+    "docs/pi",
+    "scripts",
+    "tsconfig.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9588qp-wtzk",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T11:39:29.187Z"
+  },
+  "createdAt": "2026-11-09T11:39:29.187Z"
+}
