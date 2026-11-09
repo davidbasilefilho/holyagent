@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-last-two-docs-commits-on",
   "objective": "Re-review the last two docs commits on release/0.3.0/docs/t3-first-pi-docs and say whether they close the earlier non-blocking findings without new false claims.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/docs-final.diff (commits c1b3e89 and the one after it, worktree /home/user/holyagent-0.3.0-docs).",
     "Earlier findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9bgglr-dml4.md item 1 (claude-parity.md named two root-text carriers) and the claim-B corrections in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9bjvi7-07jb.md (image metadata only; a user --no-context-files launch arg).",
@@ -41,7 +41,29 @@
     "agentId": "workflow:wf_3a1d2716-61d/assignment-0mw9c0mrg-47dt",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T14:03:45.340Z"
+    "startedAt": "2026-11-09T14:03:45.340Z",
+    "finishedAt": "2026-11-09T14:04:51.595Z"
+  },
+  "result": "result: Both commits close the earlier findings, and no changed line contradicts its source. I found two non-blocking issues. I read only: no checks ran, and I did not fetch the Pi or T3 sources.\n\n**Findings**\n1. Non-blocking, `docs/pi/t3-code.md:40`. The paragraph opens \"Read from T3's `main` on 2026-11-09 (`ThreadLaunchService.ts`, `textGenerationPrompts.ts` and the Pi provider's `textGeneration.ts` in `pingdotgg/t3code`...)\". The same paragraph now cites `TextGenerationPrompts.ts` \"at commit `78f462c4`\", which is not `main`. The research report (07jb) says `ThreadLaunchService.ts` was never read, and `textGeneration.ts` came from a third-party mirror. The opening sentence overstates provenance. Suggested fix: name the pinned commit and the mirror, and drop `ThreadLaunchService.ts`.\n2. Non-blocking, `docs/pi/claude-parity.md:190`. I did not check that the `[bas]` anchor (`extensions.md#L216` in Pi at `4a08025`) resolves, because the Pi source is not in the tree. `approval.md` and `extensions.md` cite neighbouring lines (L214, L218), so the anchor looks plausible.\n\n**Criterion 1: met**\nThe parity page now names one carrier, the extension's `before_agent_start` handler. This is in the section 1 row (line 24), the section 3 `settings.json` row (line 72) and \"Still open\" point 1 (line 169).\n`--append-system-prompt` and `APPEND_SYSTEM.md` appear only once, as \"not used\". The removed `[cli-sys]` and `[cfg-sys]` links have no remaining references.\nThe T3 paragraph carries both corrections: attached images reach the generator as metadata only (name, MIME type, size), and a user `--no-context-files` launch argument is passed through and would hide `AGENTS.md` and `CLAUDE.md`. Both match the 07jb report.\n\n**Criterion 2: met**\n`extension.ts:1364-1366`: for a non-child session whose `rootPrompt` is true, the handler returns `${PI_ROOT_PROMPT}\\n\\n${event.systemPrompt}`. That matches \"in front of Pi's system prompt on every run of the root\".\n`rootPrompt` is set only for the root role (lines 1274-1275), which fits the page's wording.\n\nevidence:\nThe parity page names one root-text carrier and the T3 paragraph carries both corrections: met. `claude-parity.md` lines 24, 72 and 169, and `t3-code.md:40`.\nNo changed line states something its source contradicts: met. Checked against `extension.ts:1343-1376` and the 07jb report; the non-blocking items above are not contradictions.\nfindings: items 1 and 2 above, both non-blocking.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "both criteria met against extension.ts lines and the research report; provenance overstatement goes to one repair",
+    "criteria": [
+      {
+        "criterion": "The parity page names one root-text carrier and the T3 paragraph carries both corrections",
+        "support": "met. `claude-parity.md` lines 24, 72 and 169, and `t3-code.md:40`."
+      },
+      {
+        "criterion": "No changed line states something its source contradicts",
+        "support": "met. Checked against `extension.ts:1343-1376` and the 07jb report; the non-blocking items above are not contradictions."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1 and 2 above, both non-blocking."
+      }
+    ]
   },
   "createdAt": "2026-11-09T14:03:45.340Z"
 }
