@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9jjm1f-58b1",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-capability-registry-repair",
+  "objective": "Re-review the capability registry repair for the symlink-following config write and any new security issue the repair introduces.",
+  "state": "Running",
+  "scope": [
+    "Repair diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/capability-fixes.diff (worktree /home/user/holyagent-0.3.1-cap). Previous security review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it6e8-jp52.md.",
+    "Check that a symlinked .holyagent/config.json or .holyagent directory at project and local scope is refused before any write, that refuseLinks moved to setup/scope.ts still guards the .pi writes, that the user lock refusal cannot be bypassed by scope or flag order, and that a failed write stops package changes."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 300 words; substantiate each finding with source, sink, file and line, and mark it blocking or non-blocking."
+  ],
+  "criteria": [
+    {
+      "text": "The symlink write is refused and the repair adds no new path to install, remove or write beyond the pinned registry entries",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9j5jte-1hoq"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:34:28.180Z"
+  },
+  "createdAt": "2026-11-09T17:34:28.180Z"
+}
