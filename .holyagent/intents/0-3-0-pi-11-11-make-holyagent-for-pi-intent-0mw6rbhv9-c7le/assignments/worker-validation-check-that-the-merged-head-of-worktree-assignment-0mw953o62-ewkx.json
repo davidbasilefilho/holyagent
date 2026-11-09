@@ -43,5 +43,30 @@
     "finishedAt": "2026-11-09T10:56:14.058Z"
   },
   "result": "result: Merged head 9864e28 in /home/user/holyagent-0.3.0-t3host passes both gates. The build leaves the tree clean, and verify passes with 2493 tests.\nchanged: none\nchecks:\n`bun install --frozen-lockfile` -> exit 0, \"Checked 239 installs ... (no changes)\"\n`bunx --no-install mise run build` -> exit 0, built 38 + 36 files; `git status --short` empty, `git diff --stat` empty\n`bunx --no-install mise run verify` -> exit 0; check: no type errors in 217 files; lint: no problems in 218 files; fmt: 539 files formatted; test: 2493 pass, 0 fail, 80 files; git status still clean\nblockers: none\nquestions: none\nnotes: none\nevidence:\nbunx --no-install mise run build exits 0 and leaves git status clean: exit 0, built 38 and 36 files, git status --short empty after build (log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3host-build.log)\nbunx --no-install mise run verify exits 0: exit 0, 2493 pass, 0 fail, 15661 expect() calls (log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3host-verify.log)\nbuild: exit 0, tree clean, log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3host-build.log\nverify: exit 0, 2493 pass, 0 fail, log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3host-verify.log\n",
+  "acceptance": {
+    "revision": 13,
+    "carriedFrom": 12,
+    "rationale": "build exit 0 with clean tree and verify exit 0, 0 failures; revision 13 added only the TUI packaging default, which these heads do not touch",
+    "criteria": [
+      {
+        "criterion": "bunx --no-install mise run build exits 0 and leaves git status clean",
+        "support": "exit 0, built 38 and 36 files, git status --short empty after build (log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3host-build.log)"
+      },
+      {
+        "criterion": "bunx --no-install mise run verify exits 0",
+        "support": "exit 0, 2493 pass, 0 fail, 15661 expect() calls (log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3host-verify.log)"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "build",
+        "support": "exit 0, tree clean, log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3host-build.log"
+      },
+      {
+        "label": "verify",
+        "support": "exit 0, 2493 pass, 0 fail, log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3host-verify.log"
+      }
+    ]
+  },
   "createdAt": "2026-11-09T10:50:09.818Z"
 }
