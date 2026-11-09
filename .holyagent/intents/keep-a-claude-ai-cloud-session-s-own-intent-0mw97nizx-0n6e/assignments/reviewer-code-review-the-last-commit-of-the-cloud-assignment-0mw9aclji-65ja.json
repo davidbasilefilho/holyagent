@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-last-commit-of-the-cloud",
   "objective": "Review the last commit of the cloud-session checkout change.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review commit b1a82c5 in /home/user/holyagent-0.3.0-cloudbranch (git show b1a82c5). Its brief items came from /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k563-xfap.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k5gu-yh66.md; the writer report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw9a4789-yzgd.md. Also say whether vcs/git.ts currentBranch has the same same-named-tag issue the writer noted.",
     "Run only bun test packages/runtime/tests/cloud-checkout.test.ts."
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_f53e3963-a3d/assignment-0mw9aclji-65ja",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T13:17:04.398Z"
+    "startedAt": "2026-11-09T13:17:04.398Z",
+    "finishedAt": "2026-11-09T13:18:44.578Z"
+  },
+  "result": "result: Both new tests are correct, and the DetachedHead hint and hooks.md items match the code. No blockers. `currentBranch` in `vcs/git.ts` does have the same same-named-tag bug.\n\nchecks: `bun test packages/runtime/tests/cloud-checkout.test.ts` -> 10 pass, 0 fail, 96 expect() calls. I also reproduced the tag behavior of `symbolic-ref` in a scratch repo outside the checkout.\n\nblockers: none\n\nfindings:\nThe tag fix is correct. In my scratch repo with branch and tag `feat/x`, `symbolic-ref --short -q HEAD` printed `heads/feat/x` and the plain form printed `refs/heads/feat/x`. `status.ts:76-79` strips `refs/heads/`, which handles this.\nThe fallback-branch silence at `status.ts:82` is intended by the brief. It only changes the result when the start branch is refused and the checkout already sits on the fallback, so `git switch main` would be a no-op. If start is undefined, the earlier return already applies. A detached HEAD still shows the notice, because `current === undefined` never equals `branch`.\nThe DetachedHead hint at `errors.ts:125-126` is correct and appears in both dist bundles. The `<path>` placeholder and the cloud-first wording are optional polish.\n`docs/hooks.md:28` is accurate. The five commands it lists are exactly the ones the code runs (`rev-parse`, `symbolic-ref`, `reflog`, `show-ref`, `check-ref-format`).\nI rejected the built-in review's finding about `current === branch` hiding a real move. It is the deliberate trade-off the brief asked for, and the docs state it. I also rejected its finding on non-`refs/heads` symbolic HEADs as too contrived to matter. Its test-gap and hint-wording findings are optional at most.\nNo regression: the notice's existing branches are unchanged apart from the reordered `returnBranch` call, and the earlier tests still pass.\n\nnotes:\n`currentBranch` at `vcs/git.ts:85` still uses `symbolic-ref --short`. With a same-named tag it returns `heads/<name>`, and `check-ref-format --branch` accepts that. `commit.ts` and `pr.ts` would then get a wrong branch name (`heads/<name>`). This is outside this commit; it needs its own fix and test.\n`status.ts` `returnBranch` uses `--short` on `refs/remotes/origin/HEAD`. It has an unlikely tag-collision case, optional.\n\nevidence:\nThe tag, fallback-branch, DetachedHead hint and hooks.md items are correct, or each defect is reported with file and line: `git show b1a82c5` read; `status.ts:76-83`, `errors.ts:125-126` and `docs/hooks.md:28` checked against the code; the tag behavior reproduced in a scratch repo.\nNo regression in the notice or session start: the existing notice branches are unchanged apart from the `returnBranch` reorder, and the 10 tests pass, 2 of them new.\nfindings: see the findings list above.\ntests: `bun test packages/runtime/tests/cloud-checkout.test.ts` -> 10 pass, 0 fail.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Tag case reproduced in scratch repo; 10 tests pass; no blockers",
+    "criteria": [
+      {
+        "criterion": "The tag, fallback-branch, DetachedHead hint and hooks.md items are correct, or each defect is reported with file and line",
+        "support": "`git show b1a82c5` read; `status.ts:76-83`, `errors.ts:125-126` and `docs/hooks.md:28` checked against the code; the tag behavior reproduced in a scratch repo."
+      },
+      {
+        "criterion": "No regression in the notice or session start",
+        "support": "the existing notice branches are unchanged apart from the `returnBranch` reorder, and the 10 tests pass, 2 of them new."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see the findings list above."
+      },
+      {
+        "label": "tests",
+        "support": "`bun test packages/runtime/tests/cloud-checkout.test.ts` -> 10 pass, 0 fail."
+      }
+    ]
   },
   "createdAt": "2026-11-09T13:17:04.398Z"
 }
