@@ -3,10 +3,20 @@ import { rm } from "node:fs/promises"
 /** Error codes Windows raises while a just-exited child process still holds a directory handle. */
 const TRANSIENT_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY"])
 
-const ATTEMPTS = 10
-const RETRY_DELAY_MS = 100
+/** Attempts made before the last error is rethrown. */
+export const MAX_ATTEMPTS = 20
 
-/** Removes a folder tree, retrying while Windows reports it busy, locked or not yet empty. */
+const RETRY_DELAY_MS = 50
+/**
+ * The delay grows by one base step per attempt up to this many steps; with the default base the
+ * retries total about 4.3 s.
+ */
+const MAX_DELAY_STEPS = 5
+
+/**
+ * Removes a folder tree, retrying with a growing, capped delay while Windows reports it busy,
+ * locked or not yet empty.
+ */
 export async function removeTemporary(
   path: string,
   remove: typeof rm = rm,
@@ -18,8 +28,8 @@ export async function removeTemporary(
       return
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
-      if (attempt >= ATTEMPTS || code === undefined || !TRANSIENT_CODES.has(code)) throw error
-      await Bun.sleep(retryDelayMs)
+      if (attempt >= MAX_ATTEMPTS || code === undefined || !TRANSIENT_CODES.has(code)) throw error
+      await Bun.sleep(retryDelayMs * Math.min(attempt, MAX_DELAY_STEPS))
     }
   }
 }

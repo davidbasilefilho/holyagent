@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { rm } from "node:fs/promises"
 
-import { removeTemporary } from "./temp-folder.ts"
+import { MAX_ATTEMPTS, removeTemporary } from "./temp-folder.ts"
 
 /** A remover that fails with each code in turn, then succeeds. */
 function flaky(codes: ReadonlyArray<string>) {
@@ -30,9 +30,8 @@ describe("removeTemporary", () => {
   })
 
   test("gives up with the last error when the folder stays busy", async () => {
-    const { calls, remove } = flaky(Array.from({ length: 50 }, () => "EBUSY"))
+    const { calls, remove } = flaky(Array.from({ length: MAX_ATTEMPTS * 2 }, () => "EBUSY"))
     await expect(removeTemporary("folder", remove, 1)).rejects.toMatchObject({ code: "EBUSY" })
-    expect(calls.length).toBeGreaterThan(1)
-    expect(calls.length).toBeLessThan(50)
+    expect(calls).toHaveLength(MAX_ATTEMPTS)
   })
 })
