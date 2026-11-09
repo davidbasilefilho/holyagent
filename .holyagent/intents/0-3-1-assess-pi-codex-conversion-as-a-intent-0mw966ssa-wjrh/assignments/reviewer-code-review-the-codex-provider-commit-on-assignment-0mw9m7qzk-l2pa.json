@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mw9m7qzk-l2pa",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-codex-provider-commit-on",
+  "objective": "Review the Codex provider commit on release/0.3.1/feat/codex-provider against the merge-ready bar and the approved Codex requirements.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-codex; range git diff bb412cc..HEAD (one commit, 9d54902). The writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9krmo8-3qir.md. Research it drew on: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9679bz-h35s.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw96dgh6-ud60.md.",
+    "Requirements, verbatim:",
+    "  Maintainer (verbatim, 2026-11-09): \"btw the new codex provider should have auto review and context_management\". The Codex provider HolyAgent ships has Codex auto-review (tool calls reviewed by the codex-auto-review reviewer) and context_management (Codex server-side compaction) while keeping apply_patch plus the just-bash bash and Pi read, edit and write; pi-codex-conversion applyPatchOnly mode turns native compaction off, so the plan must provide both another way.",
+    "  Conflict found (assignment-0mw96qjlf-o4zi): Billion Context cancels Pi compaction and rewrites outgoing requests, openai-codex-responses included, so it clashes with Codex context_management (server-side compaction with an encrypted item replayed); its bash guardrails (60 s default timeout, 50 KB output cap) also apply to the just-bash bash tool by name.",
+    "  Decided (maintainer, verbatim, 2026-11-09): \"btw billion context probably conflicts with context management, if they don't work similarly prefer billion, if they do prefer context management\". They work differently: Billion Context compresses the history client-side through its proxy and keeps it retrievable (compress, decompress, search_context tools), while Codex context_management replaces the history with an opaque encrypted server-side compaction item that cannot be searched or expanded. So Billion Context is preferred: while it is on (pi.features.contextCompression, the default) the Codex provider sends no context_management, and context_management is used only when Billion Context is off.",
+    "  Maintainer (verbatim, 2026-11-09): \"also come up with the model routing: use gpt 6.1 sol high for root and come up with the specialist routing using gpt 6.1 terra low->xhigh and gpt 6 luna low-high (xhigh is not good here)\", \"prefer gpt 6.1 terra for visual stuff and computer use\". The Codex route table runs the root on GPT-6.1 Sol at high effort; specialists use GPT-6.1 Terra (low to xhigh) or GPT-6 Luna (low to high, never xhigh); visual work and computer use run on Terra.",
+    "  Approved (maintainer, verbatim, 2026-11-09: \"everything is okay except for this last doubt I had\"): Codex route table. Root GPT-6.1 Sol high. GPT-6 Luna: Explorer.map, Explorer.lookup, Librarian.lookup, Worker.validation low; Worker.mechanical, Worker.operations medium; Reviewer.audit high. GPT-6.1 Terra: Explorer.trace, Librarian.research, Worker.integration, Reviewer.testing, Reviewer.artifact medium; Worker.implementation, Reviewer.code, Worker.visual, Reviewer.visual high; Worker.debugging, Reviewer.security xhigh. An Assignment that uses the screen capability runs on Terra at least medium. The auto-review reviewer uses codex-auto-review. Approved too: the auto-review design, the just-bash plan and the Codex provider plan as stated.",
+    "  Maintainer (verbatim, 2026-11-09): \"everything should be modular and easily upgradeable btw\". Each 0.3.1 piece (just-bash backend, host passthrough, TS/JS execution, Codex provider, auto-review, context_management, fff, opencode browse, the screen capability and the capability system) is its own module behind a narrow interface, can be turned off on its own, and every third-party package or binary it uses sits at an exact pin moved only through mise run deps:update, so upgrading one never requires editing the others.",
+    "Judge in particular: the route table against the approved table; apply_patch parsing and atomicity, and that paths cannot escape the project; context_management gating and replay of the compaction item; Luna Reserve (the usage endpoint and banner are unverified third-party reports, and the writer rewrites the request model instead of switching to a gpt-reserve catalog model: is that sound and does it fail safe when the endpoint differs?); that Kimi behaves unchanged; that the setup screen showing the Luna Reserve row under Kimi is acceptable; Effect, Schema and JSDoc rules from .claude/CLAUDE.md. Run the built-in /code-review on bb412cc...9d54902 (pass the explicit range) and classify its findings, and run mise run verify in the worktree."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 450 words; mark each finding blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The Codex provider meets the requirements and the approved route table",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Kimi and existing defaults behave unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests cover the change and fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9krmo8-3qir"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T18:49:13.568Z"
+  },
+  "createdAt": "2026-11-09T18:49:13.568Z"
+}
