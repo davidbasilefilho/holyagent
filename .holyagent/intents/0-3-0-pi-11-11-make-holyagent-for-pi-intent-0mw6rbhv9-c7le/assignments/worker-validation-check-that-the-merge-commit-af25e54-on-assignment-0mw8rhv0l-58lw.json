@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw8rhv0l-58lw",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-merge-commit-af25e54-on",
+  "objective": "Check that the merge commit af25e54 on release/0.3.0/feat/t3-settings (which brings the Pi contract-test branch into the T3 settings branch) builds and passes the gates, and that it changed nothing but the merged files.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3set at HEAD af25e54. Run `bunx --no-install mise run build` and then `git status --short` (it must list nothing), then `bunx --no-install mise run verify`.",
+    "Run `git diff --stat af25e54^1 af25e54` and confirm it lists only docs/development.md, packages/integrations/pi/tests/contract.test.ts and files under packages/integrations/pi/tests/fixtures/ (the contract branch's own files)."
+  ],
+  "constraints": [
+    "Read-only apart from build output: make no edits and no git writes; if the build changes a file, report it instead of keeping it.",
+    "Never start pi, T3 Code or a Kimi request.",
+    "Report in under 150 words: commands, exit codes, test counts and the diff-stat file list."
+  ],
+  "criteria": [
+    {
+      "text": "mise run build leaves git status empty",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The merge changes only the contract branch's files",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T04:29:17.253Z"
+  },
+  "createdAt": "2026-11-09T04:29:17.253Z"
+}
