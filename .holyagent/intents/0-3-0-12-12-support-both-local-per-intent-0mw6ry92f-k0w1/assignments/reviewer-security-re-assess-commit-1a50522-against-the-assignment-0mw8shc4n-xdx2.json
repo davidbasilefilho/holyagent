@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-assess-commit-1a50522-against-the",
   "objective": "Re-assess commit 1a50522 against the previous finding that a committed folder whose name folds onto .claude (trailing dot or space, HFS+ ignorable code point, Windows 8.3 short name) escaped the .claude pathspec and let a bare setup infer local scope.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The repair diff (3869116..1a50522) is in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/folder-review.diff (diff-file); read packages/runtime/src/setup/scope.ts and the new tests in packages/runtime/tests/setup-scope.test.ts in full in /home/user/holyagent-0.3.0-scope.",
     "Previous finding: scope.ts listed the index only under :(icase,literal).claude, so ls-files never returned an aliasing folder. The repair lists the whole index once, keeps the .claude-prefix checks, and compares each distinct top-level component other than the literal .claude with the .claude folder by lstat dev and ino.",
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_309e4991-12f/assignment-0mw8shc4n-xdx2",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:56:52.391Z"
+    "startedAt": "2026-11-09T04:56:52.391Z",
+    "finishedAt": "2026-11-09T04:58:33.525Z"
+  },
+  "result": "result: The previous finding is closed. I found no blocking issue, and the range need not hold the push on security grounds. The built-in `/security-review` could not run: its preprocessing failed with `fatal: ambiguous argument 'origin/HEAD...'`, because the checkout has no `origin/HEAD`. I reviewed the diff by hand instead, within 3869116..1a50522. I could not run the tests because this role has no shell, so the new spy-on-`lstat` test is unexecuted.\n\nfindings:\n- Previous finding closed. `scope.ts:208-235` now lists the whole index with `git ls-files --cached -z`. It compares every distinct top-level component, other than the literal `.claude`, with the `.claude` folder by `lstat` dev and ino.\n  - A committed `.claude.`, `.claude ` (trailing space), a name with an HFS+ ignorable code point, or a `CLAUDE~1` short name is a top-level component. Each resolves to the folder's identity on a folding file system. `repositoryControl` then returns a reason (`scope.ts:232-233`), so `installedScope` (`scope.ts:269-277`) keeps `user`.\n- Skip of the literal `.claude` (`scope.ts:230`): safe. Any index entry under the literal `.claude` is already handled. `scope.ts:217-218` catches the file, the folder or a gitlink, `scope.ts:219-224` catches identity aliases under the prefix, and `scope.ts:175` returns early if `.claude` is a symlink.\n- Lowercase prefix filter (`scope.ts:211-215`): safe. Only `.claude`'s ASCII letters matter, and none has a non-ASCII `toLowerCase` collision. Any folding beyond case is caught by the component loop, not the filter.\n- Nested aliases: none open. An alias of the root-level `.claude` has to be a top-level name. A symlinked component gives its own `lstat` identity, but git writes no entry through it (it replaces the link with a real directory), so it cannot make the file repository-controlled.\n- Low, non-blocking (hardening, requires a git bug or a hand-crafted index):\n  - `scope.ts:221` runs the file-identity check only on prefix-filtered entries. A tracked `link/settings.local.json`, where `link` is a symlink to `.claude` and git wrote through it, would be missed.\n  - Fix: run the file-identity check over `everything`, or note the limit in the JSDoc.\n- Cost (non-blocking):\n  - `git ls-files` output is unbounded in memory (`shell.ts:113-123`).\n  - The `lstat` calls run sequentially, one per distinct top-level name, so a repository with very many top-level names slows setup.\n  - This runs only when the local file enables the plugin in a trusted work tree. A Shell failure returns exit 127, so the code fails closed (`scope.ts:209`).\n- Fail-closed: a file system that reports ino 0 can make two entries compare equal, which gives a false match and so `user` scope. It cannot give a false untracked.\n\nverdict: previous finding closed; no blocker; do not hold the push.\n\nevidence:\nfindings: `scope.ts:208-235`, `scope.ts:221` (low hardening), `shell.ts:113-123` (unbounded output); no blocking findings, so no trace is required.\nverdict: closed, no hold; reviewed by hand from /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/folder-review.diff plus `scope.ts` read in full. `/security-review` failed on the missing `origin/HEAD`, and no tests were run.\nEvery blocking finding has a source-to-sink trace with path:line: no blocking findings; the low item traces from tracked `link/settings.local.json` (`scope.ts:210`) to the prefix filter (`scope.ts:212`) and the identity loop (`scope.ts:221`).\nThe review states whether the previous finding is closed and whether the range should hold the push: closed; the range need not hold the push.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Read of scope.ts:208-235 confirms each top-level component is compared by identity; the literal .claude skip is covered by the prefix checks; only low hardening remains.",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has a source-to-sink trace with path:line",
+        "support": "no blocking findings; the low item traces from tracked `link/settings.local.json` (`scope.ts:210`) to the prefix filter (`scope.ts:212`) and the identity loop (`scope.ts:221`)."
+      },
+      {
+        "criterion": "The review states whether the previous finding is closed and whether the range should hold the push",
+        "support": "closed; the range need not hold the push."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "`scope.ts:208-235`, `scope.ts:221` (low hardening), `shell.ts:113-123` (unbounded output); no blocking findings, so no trace is required."
+      },
+      {
+        "label": "verdict",
+        "support": "closed, no hold; reviewed by hand from /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/folder-review.diff plus `scope.ts` read in full. `/security-review` failed on the missing `origin/HEAD`, and no tests were run."
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:56:52.391Z"
 }
