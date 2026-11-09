@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-setup-tui-commit-for",
   "objective": "Review the setup TUI commit for correctness, regressions and repository standards.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-tui, range d732037..df6a410 (one commit). Diff without bun.lock and dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-review.diff.",
     "Intended behaviour (Intent defaults): the TUI is its own bundle built with the @opentui/solid Bun plugin with @opentui/* and solid-js external; on first interactive use setup installs those packages at the exact versions the build resolved from bun.lock (embedded by the build) into a per-user cache (XDG_CACHE_HOME or ~/.cache; LOCALAPPDATA on Windows) with the Bun Shell, then imports the TUI; it falls back to line output with one line saying why when stdin or stdout is not a TTY, CI is set, TERM is dumb, --no-tui or a choice flag (--worktrees, --device-access) is given, or the install or import fails. Flags apply directly. tsconfig.json gained jsx preserve and jsxImportSource @opentui/solid.",
@@ -43,7 +43,37 @@
     "agentId": "workflow:wf_45422cce-dee/assignment-0mw96izno-h3h5",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T11:30:04.164Z"
+    "startedAt": "2026-11-09T11:30:04.164Z",
+    "finishedAt": "2026-11-09T11:39:03.675Z"
+  },
+  "result": "result: Merge-ready. No blockers. Packaging and fallback rules are met.\n\nchanged: none (read-only review; no git writes)\n\nchecks:\n`bun test packages/runtime/tests/setup-tui*` -> exit 0, 76 pass, 0 fail, 330 expects, 3 files. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-code-review.log`\n`bunx --no-install mise run verify` in the worktree -> exit 0: type-check clean (236 files), lint clean (237 files), 2597 tests pass, 0 fail. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-verify.log`\n\nblockers: none\n\nnotes (all optional; verdicts on the built-in `/code-review` findings, which ran as the real built-in):\n1. `load.ts:144` partial install: **optional, worth fixing**. `installed()` checks only the three top-level `package.json` versions.\n   - Scenario: a first run is killed after those three are linked but before `@opentui/core-<os>` is. Later runs skip the install, the renderer fails to start, and setup falls back to line output until the user deletes the cache folder.\n   - It degrades to the line setup and never breaks it. A marker file written after a successful install, or an install into a temp folder that is then renamed, would fix it.\n   - There is no cross-process guard either. Two concurrent first runs share one folder, and the non-atomic `Bun.write` of the bundle could be imported half-written. This is rare for a one-time interactive command.\n   - `load.test.ts` has no partial-install test.\n2. `load.ts:112` transitive pins: **rejected as a blocker, optional**. In `bun.lock`, `@opentui/core` and `@opentui/solid` pin their own dependencies and native packages exactly. Only `s-js ^0.4.9` floats. The docs wording \"the exact versions bun.lock resolved\" covers only the three direct packages. That matches the Intent.\n3. `session.ts:199` Ctrl-C during apply: **optional**. An interrupt can land between `writeVerified` and `addRecorded` (`t3-settings.ts:543-544`), so the keys are written but not recorded. A kill in line mode does the same, so this is not a regression.\n4. `session.ts:224` blanket `Effect.catch`: **optional**. It can re-apply with defaults only if the outcome fails `TuiOutcomeSchema` after an apply. Teardown errors are already ignored in `entry.tsx`, and the same build produces both sides, so this is remote.\n5. `session.ts:175` preview before the fallback check: **optional, minor**. The settings read and device probe also run for `--no-tui` and non-TTY runs. The cost is small. It also means no `~ t3 tui:` line is printed when the T3 step has no work, which is a reasonable reading of the Intent.\n6. `session.ts:237` cancel exits 1: **optional**. This is a design choice and the tests assert it.\n7. `session.ts:96` duplicated line construction: **optional style** only.\n\nPackaging and fallback review:\n**Separate bundle:** built with the `@opentui/solid` Bun plugin. `@opentui/*` and `solid-js` stay external. `TUI_PACKAGES` is embedded by a Bun macro from `bun.lock` (`lock.ts`, decoded with Schema).\n**Platform-neutral plugins:** the claude and pi `setup-tui.js` bundles contain no absolute paths and no native code. They differ only in the generated-file note line.\n**Cache location:** `cacheHome` uses `LOCALAPPDATA` on win32 and `XDG_CACHE_HOME` when absolute, else `~/.cache`. The directory name is versioned, so a newer release installs beside the older one. The import goes through `pathToFileURL`, which is fine on Windows. The install runs through the Bun Shell with `--ignore-scripts`, `--no-env-file` and the empty bunfig.\n**Fallback triggers:** `tuiFallbackReason` covers no-TUI, a choice flag, a non-TTY stdin or stdout, `CI` set (but not `false`), and `TERM=dumb`. Install or import failure also falls back, with one `~ t3 tui:` note. Flags apply directly.\n**Terminal restore:** `acquireUseRelease` in `entry.tsx` destroys the renderer and awaits `closed` on success, failure and interrupt, before the command prints its report.\n**Repo rules:** `tsconfig` has `jsx` preserve and `jsxImportSource @opentui/solid`. Lint passes, so there is no try/catch, `new Promise` or async in source.\n**Not run:** a real Windows run, a real first-time install from the network, and a real PTY session. I read the code for these.\n\nevidence:\nfindings: items 1-7 above; none is a blocker. The built-in `/code-review` returned 7 claims, each read against `session.ts`, `load.ts` and `t3-settings.ts`.\nverdict: no blockers; merge-ready. `mise run verify` exits 0.\ntests: `bun test packages/runtime/tests/setup-tui*` -> 76 pass, 0 fail, exit 0, log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-code-review.log`.\nEvery blocking finding has path:line and a failure scenario: no blocking findings exist; the optional findings each carry a path:line and a scenario.\nThe review states whether the packaging and fallback rules are met: yes, both are met (see \"Packaging and fallback review\").\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Findings carry capture or path:line, scenario and reason; verdict stated",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding has path:line and a failure scenario",
+        "support": "no blocking findings exist; the optional findings each carry a path:line and a scenario."
+      },
+      {
+        "criterion": "The review states whether the packaging and fallback rules are met",
+        "support": "yes, both are met (see \"Packaging and fallback review\")."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1-7 above; none is a blocker. The built-in `/code-review` returned 7 claims, each read against `session.ts`, `load.ts` and `t3-settings.ts`."
+      },
+      {
+        "label": "verdict",
+        "support": "no blockers; merge-ready. `mise run verify` exits 0."
+      },
+      {
+        "label": "tests",
+        "support": "`bun test packages/runtime/tests/setup-tui*` -> 76 pass, 0 fail, exit 0, log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-code-review.log`."
+      }
+    ]
   },
   "createdAt": "2026-11-09T11:30:04.164Z"
 }
