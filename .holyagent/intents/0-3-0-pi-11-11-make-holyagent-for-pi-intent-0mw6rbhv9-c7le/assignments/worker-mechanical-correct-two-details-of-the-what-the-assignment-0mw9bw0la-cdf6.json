@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-two-details-of-the-what-the",
   "objective": "Correct two details of the 'What the generator reads' paragraph in docs/pi/t3-code.md:168.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-docs, branch release/0.3.0/docs/t3-first-pi-docs.",
     "Correction 1: the paragraph says T3's naming prompt holds 'the thread's first message and any attached images'. T3 passes images only as attachment metadata (name, MIME type, size) and the Pi runner sends the prompt as text, so the generator sees no image content (pingdotgg/t3code apps/server/src/textGeneration/TextGenerationPrompts.ts at commit 78f462c4). Say that.",
@@ -54,7 +54,37 @@
     "agentId": "workflow:wf_091ac4c7-629/assignment-0mw9bw0la-cdf6",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-09T14:00:09.982Z"
+    "startedAt": "2026-11-09T14:00:09.982Z",
+    "finishedAt": "2026-11-09T14:03:41.702Z"
+  },
+  "result": "result: Both corrections applied to docs/pi/t3-code.md:168; build and verify exit 0; only that file changed.\nchanged: docs/pi/t3-code.md\nchecks:\n`bun install --frozen-lockfile` -> exit 0 (no changes)\n`bunx --no-install mise run build` -> exit 0; no unexplained changes (git status shows only docs/pi/t3-code.md)\n`bunx --no-install mise run verify` -> exit 0; type-check 241 files no errors, lint 242 files no problems, tests 2702 pass / 0 fail across 87 files\nblockers: none\nquestions: none\nnotes: The paragraph cites `TextGenerationPrompts.ts` with the path from the brief (apps/server/src/textGeneration/), while the paragraph's other citation is `textGenerationPrompts.ts`; the casing and path were not checked against the T3 commit.\nevidence:\nThe paragraph says the generator receives image metadata only (behavior): docs/pi/t3-code.md:168 now states attached images reach the generator only as metadata (name, MIME type, size), with the Pi runner sending text.\nThe paragraph says a user-set --no-context-files launch arg hides the context files (behavior): docs/pi/t3-code.md:168 adds that a user's own --no-context-files Pi launch argument in T3 is passed through and hides AGENTS.md and CLAUDE.md.\nOnly docs/pi/t3-code.md changes and mise run verify exits 0 (scope): git diff --stat is 1 file, 1 insertion, 1 deletion; verify exit 0 as above.\nchecks-run: build exit 0, verify exit 0, install exit 0 (see checks)\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3-code-docs.diff\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "one-line diff carries both sourced corrections; build and verify exit 0",
+    "criteria": [
+      {
+        "criterion": "The paragraph says the generator receives image metadata only",
+        "support": "docs/pi/t3-code.md:168 now states attached images reach the generator only as metadata (name, MIME type, size), with the Pi runner sending text."
+      },
+      {
+        "criterion": "The paragraph says a user-set --no-context-files launch arg hides the context files",
+        "support": "docs/pi/t3-code.md:168 adds that a user's own --no-context-files Pi launch argument in T3 is passed through and hides AGENTS.md and CLAUDE.md."
+      },
+      {
+        "criterion": "Only docs/pi/t3-code.md changes and mise run verify exits 0",
+        "support": "git diff --stat is 1 file, 1 insertion, 1 deletion; verify exit 0 as above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build exit 0, verify exit 0, install exit 0 (see checks)"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3-code-docs.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T14:00:09.982Z"
 }
