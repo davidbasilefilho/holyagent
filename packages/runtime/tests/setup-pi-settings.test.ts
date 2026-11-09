@@ -102,6 +102,15 @@ const toolLines = (report: { readonly lines: ReadonlyArray<string> }) =>
   report.lines.filter((line) => /^[+=~!-] tool settings/.test(line))
 
 const CODEMODE = { codemode: { mode: "only" } }
+/**
+ * The root route of the default config, as Pi's settings hold it (`medium` would be Pi's own
+ * default).
+ */
+const MODEL = {
+  defaultProvider: "kimi-coding",
+  defaultModel: "k3.1-pro",
+  defaultThinkingLevel: "high",
+}
 const COMPUTER_USE = {
   "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false },
 }
@@ -115,7 +124,12 @@ describe("holyagent setup, Pi tool settings", () => {
     const shell = withPi()
     const report = await runSetup(shell)
     expect(report.ok).toBe(true)
-    expect(await read(globalSettings())).toEqual({ ...FULL(), ...CODEMODE, ...COMPUTER_USE })
+    expect(await read(globalSettings())).toEqual({
+      ...FULL(),
+      ...CODEMODE,
+      ...COMPUTER_USE,
+      ...MODEL,
+    })
     expect(await read(globalSubagents())).toEqual(SUBAGENTS)
     expect(await read(globalKimi())).toEqual(KIMI)
     expect(await read(billion())).toEqual(BILLION)
@@ -162,6 +176,7 @@ describe("holyagent setup, Pi tool settings", () => {
       ...FULL(),
       codemode: { mode: "on", inlineBudget: 100 },
       "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: false },
+      ...MODEL,
     })
     expect(await read(globalSubagents())).toEqual({
       disableDefaultAgents: false,
@@ -184,8 +199,101 @@ describe("holyagent setup, Pi tool settings", () => {
     await setConfig({ pi: { codemode: { mode: "on" } } })
     await installed()
     const report = await runSetup(withPi())
-    expect(await read(globalSettings())).toEqual({ ...FULL(), ...COMPUTER_USE })
+    expect(await read(globalSettings())).toEqual({ ...FULL(), ...COMPUTER_USE, ...MODEL })
     expect(toolLines(report).join("\n")).toContain("left out, the package default: codemode.mode")
+  })
+
+  test("writes the root route's provider and model together only when the user chose neither", async () => {
+    await write(globalSettings(), { ...FULL(), theme: "dark" })
+    const report = await runSetup(withPi())
+    expect(await read(globalSettings())).toEqual({
+      ...FULL(),
+      ...CODEMODE,
+      ...COMPUTER_USE,
+      ...MODEL,
+      theme: "dark",
+    })
+    const lines = toolLines(report).join("\n")
+    expect(lines).toContain('defaultProvider "kimi-coding"')
+    expect(lines).toContain('defaultModel "k3.1-pro"')
+    expect(lines).toContain('defaultThinkingLevel "high"')
+  })
+
+  test("writes neither of provider and model when the user set one, and still the thinking level", async () => {
+    const halves = [{ defaultProvider: "mine" }, { defaultModel: "my-model" }]
+    for (const half of halves) {
+      await write(globalSettings(), { ...FULL(), ...half, theme: "dark" })
+      const report = await runSetup(withPi())
+      expect(await read(globalSettings())).toEqual({
+        ...FULL(),
+        ...CODEMODE,
+        ...COMPUTER_USE,
+        ...half,
+        defaultThinkingLevel: "high",
+        theme: "dark",
+      })
+      const [other] = Object.keys(half).includes("defaultModel")
+        ? ["defaultProvider"]
+        : ["defaultModel"]
+      expect(toolLines(report).join("\n")).toContain(
+        `left out, the other of defaultProvider and defaultModel is yours: ${other}`,
+      )
+    }
+  })
+
+  test("project and local scope write the pair only while neither half is set in the project file or the global file", async () => {
+    for (const scope of ["project", "local"] as const) {
+      await rm(projectPi(), { recursive: true, force: true })
+      await write(globalSettings(), FULL())
+      await runSetup(withPi(), { scope })
+      expect(await read(projectPi("settings.json"))).toMatchObject(MODEL)
+
+      // One half in the project's own file.
+      for (const half of [{ defaultProvider: "mine" }, { defaultModel: "my-model" }]) {
+        await write(projectPi("settings.json"), half)
+        const report = await runSetup(withPi(), { scope })
+        const settings = await read(projectPi("settings.json"))
+        expect(settings).toMatchObject({ ...half, defaultThinkingLevel: "high" })
+        for (const key of ["defaultProvider", "defaultModel"]) {
+          if (!(key in half)) expect(settings).not.toHaveProperty(key)
+        }
+        expect(toolLines(report).join("\n")).toContain("is yours:")
+      }
+
+      // One half in the user's global file.
+      await rm(projectPi(), { recursive: true, force: true })
+      for (const half of [{ defaultProvider: "mine" }, { defaultModel: "my-model" }]) {
+        await write(globalSettings(), { ...FULL(), ...half })
+        const report = await runSetup(withPi(), { scope })
+        const settings = await read(projectPi("settings.json"))
+        expect(settings).toMatchObject({ defaultThinkingLevel: "high" })
+        expect(settings).not.toHaveProperty("defaultProvider")
+        expect(settings).not.toHaveProperty("defaultModel")
+        const lines = toolLines(report).join("\n")
+        expect(lines).toContain(`left out, set in your global file: ${Object.keys(half)[0]}`)
+        expect(lines).toContain("is yours:")
+        await rm(projectPi(), { recursive: true, force: true })
+      }
+    }
+  })
+
+  test("follows the route table of the config, and leaves out a thinking level equal to Pi's own default", async () => {
+    await setConfig({ pi: { routes: { root: { model: "kimi-for-coding", thinking: "medium" } } } })
+    await installed()
+    const report = await runSetup(withPi())
+    expect(await read(globalSettings())).toEqual({
+      ...FULL(),
+      ...CODEMODE,
+      ...COMPUTER_USE,
+      defaultProvider: "kimi-coding",
+      defaultModel: "kimi-for-coding",
+    })
+    expect(toolLines(report).join("\n")).toContain(
+      "left out, the package default: defaultThinkingLevel",
+    )
+    await setConfig({ pi: { routes: { root: { thinking: "max" } } } })
+    await runSetup(withPi())
+    expect(await read(globalSettings())).toMatchObject({ defaultThinkingLevel: "max" })
   })
 
   test("a file that is not a JSON object stays untouched with a failed line, and the others are written", async () => {
@@ -201,7 +309,12 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(failures.join("\n")).toContain(globalSubagents())
     expect(failures.join("\n")).toContain(billion())
     expect(await read(globalKimi())).toEqual(KIMI)
-    expect(await read(globalSettings())).toEqual({ ...FULL(), ...CODEMODE, ...COMPUTER_USE })
+    expect(await read(globalSettings())).toEqual({
+      ...FULL(),
+      ...CODEMODE,
+      ...COMPUTER_USE,
+      ...MODEL,
+    })
   })
 
   test("writes through a temporary file that is gone afterwards, keeping the file's mode", async () => {
@@ -252,7 +365,7 @@ describe("holyagent setup, Pi tool settings", () => {
     })
     await installed()
     await runSetup(withPi())
-    expect(await read(globalSettings())).toEqual({ ...FULL(), ...CODEMODE })
+    expect(await read(globalSettings())).toEqual({ ...FULL(), ...CODEMODE, ...MODEL })
     expect(await exists(globalSubagents())).toBe(false)
     expect(await exists(billion())).toBe(false)
     expect(await read(globalKimi())).toEqual(KIMI)
@@ -267,6 +380,7 @@ describe("holyagent setup, Pi tool settings", () => {
       ...FULL(),
       ...CODEMODE,
       ...COMPUTER_USE,
+      ...MODEL,
     })
     expect(await read(join(agent, "subagents.json"))).toEqual(SUBAGENTS)
     expect(await read(bili)).toEqual(BILLION)
@@ -285,7 +399,11 @@ describe("holyagent setup, Pi tool settings", () => {
     await setProjectConfig({ pi: { features: { subagents: false }, codemode: { mode: "only" } } })
     for (const scope of ["project", "local"] as const) {
       const report = await runSetup(withPi(), { scope })
-      expect(await read(projectPi("settings.json"))).toEqual({ ...CODEMODE, ...COMPUTER_USE })
+      expect(await read(projectPi("settings.json"))).toEqual({
+        ...CODEMODE,
+        ...COMPUTER_USE,
+        ...MODEL,
+      })
       expect(await read(projectPi("providers", "kimi-coding", "config.json"))).toEqual(KIMI)
       expect(await exists(projectPi("subagents.json"))).toBe(false)
       expect(toolLines(report).some((line) => line.includes("has no file at"))).toBe(true)
@@ -310,6 +428,7 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(projectPi("settings.json"))).toEqual({
         ...CODEMODE,
         "pi-computer-use": { confirmDangerousActions: false },
+        ...MODEL,
       })
       expect(await read(projectPi("providers", "kimi-coding", "config.json"))).toEqual({
         tools: { moonshot_fetch: { enabled: true } },
@@ -320,6 +439,19 @@ describe("holyagent setup, Pi tool settings", () => {
     }
     // The global files are as the user left them.
     expect(await read(globalKimi())).toEqual({ tools: { moonshot_search: { enabled: false } } })
+  })
+
+  test("project and local scope leave the model keys the user's global file sets", async () => {
+    await write(globalSettings(), { ...FULL(), defaultProvider: "mine", defaultModel: "m1" })
+    for (const scope of ["project", "local"] as const) {
+      const report = await runSetup(withPi(), { scope })
+      expect(await read(projectPi("settings.json"))).toMatchObject({ defaultThinkingLevel: "high" })
+      expect(await read(projectPi("settings.json"))).not.toHaveProperty("defaultModel")
+      expect(await read(projectPi("settings.json"))).not.toHaveProperty("defaultProvider")
+      expect(toolLines(report).join("\n")).toContain(
+        "left out, set in your global file: defaultProvider, defaultModel",
+      )
+    }
   })
 
   test("a global file that is not a JSON object stops the project write with a failed line", async () => {
@@ -420,7 +552,7 @@ describe("holyagent doctor, Pi tool settings", () => {
     expect(toolLines(report)).toEqual([
       lacking(
         globalSettings(),
-        "codemode.mode, pi-computer-use.confirmAppLaunch, pi-computer-use.confirmDangerousActions",
+        "codemode.mode, pi-computer-use.confirmAppLaunch, pi-computer-use.confirmDangerousActions, defaultProvider, defaultModel, defaultThinkingLevel",
       ),
       lacking(globalKimi(), "tools.moonshot_search.enabled, tools.moonshot_fetch.enabled"),
       lacking(globalSubagents(), "disableDefaultAgents, fallbackSubagent"),
@@ -451,7 +583,9 @@ describe("holyagent doctor, Pi tool settings", () => {
     })
     const lines = toolLines(await runDoctor(withPi(), { scope: "project" })).join("\n")
     expect(lines).toContain(projectPi("settings.json"))
-    expect(lines).toContain(`${projectPi("settings.json")} lacks codemode.mode;`)
+    expect(lines).toContain(
+      `${projectPi("settings.json")} lacks codemode.mode, defaultProvider, defaultModel, defaultThinkingLevel;`,
+    )
     expect(lines).not.toContain("pi-computer-use")
 
     const elsewhere = join(home, "elsewhere")
@@ -468,6 +602,100 @@ describe("holyagent doctor, Pi tool settings", () => {
     expect(toolLines(await runDoctor(withPi()))).toEqual([])
     await write(globalSubagents(), { disableDefaultAgents: false, fallbackSubagent: "Plan" })
     expect(toolLines(await runDoctor(withPi()))).toEqual([])
+  })
+
+  const rootModel = (report: { readonly lines: ReadonlyArray<string> }) =>
+    report.lines.filter((line) => line.includes("root model"))
+
+  test("reports the root model as set once setup wrote it, and says nothing while a key is unset", async () => {
+    await installed()
+    expect(rootModel(await runDoctor(withPi()))).toEqual([])
+    await runSetup(withPi())
+    expect(rootModel(await runDoctor(withPi()))).toEqual([
+      `ok   root model: kimi-coding/k3.1-pro:high set in Pi's settings (${globalSettings()})`,
+    ])
+    // A thinking level equal to Pi's default is unset by design and counts as set.
+    await setConfig({ pi: { routes: { root: { thinking: "medium" } } } })
+    await write(globalSettings(), {
+      ...FULL(),
+      defaultProvider: "kimi-coding",
+      defaultModel: "k3.1-pro",
+    })
+    expect(rootModel(await runDoctor(withPi()))).toEqual([
+      `ok   root model: kimi-coding/k3.1-pro:medium set in Pi's settings (${globalSettings()})`,
+    ])
+  })
+
+  test("reports a model key the user set to another value as theirs, without failing", async () => {
+    await write(globalSettings(), {
+      ...FULL(),
+      defaultProvider: "kimi-coding",
+      defaultModel: "my-model",
+      defaultThinkingLevel: "low",
+    })
+    const report = await runDoctor(withPi())
+    expect(report.ok).toBe(true)
+    expect(rootModel(report)).toEqual([
+      `~ root model ${globalSettings()}: defaultModel "my-model" is yours (the route sets "k3.1-pro"), defaultThinkingLevel "low" is yours (the route sets "high"); Pi follows yours`,
+    ])
+  })
+
+  test("at project scope the global file's model counts, and the project's own wins over it", async () => {
+    await write(globalSettings(), { ...FULL(), ...MODEL, defaultModel: "global-model" })
+    const [line] = rootModel(await runDoctor(withPi(), { scope: "project" }))
+    expect(line).toContain('defaultModel "global-model" is yours')
+    await write(projectPi("settings.json"), { defaultModel: "k3.1-pro" })
+    expect(rootModel(await runDoctor(withPi(), { scope: "project" }))).toEqual([
+      `ok   root model: kimi-coding/k3.1-pro:high set in Pi's settings (${projectPi("settings.json")})`,
+    ])
+  })
+
+  test("reports a provider or model the user set alone as theirs, naming the unset half, at user and project scope", async () => {
+    for (const [half, other] of [
+      [{ defaultProvider: "mine" }, "defaultModel"],
+      [{ defaultModel: "my-model" }, "defaultProvider"],
+    ] as const) {
+      const [key] = Object.keys(half)
+      const value = Object.values(half)[0]
+      const wanted = other === "defaultModel" ? "k3.1-pro" : "kimi-coding"
+      const mine = `${key} "${value}" is yours (the route sets "${key === "defaultModel" ? "k3.1-pro" : "kimi-coding"}")`
+      const unset = `${other} is unset, so Pi picks it (the route sets "${wanted}")`
+
+      await write(globalSettings(), { ...FULL(), ...half })
+      expect(rootModel(await runDoctor(withPi()))).toEqual([
+        `~ root model ${globalSettings()}: ${mine}, ${unset}; Pi follows yours`,
+      ])
+
+      // At project scope the same holds for the project's own file and for the global one.
+      await write(globalSettings(), FULL())
+      await write(projectPi("settings.json"), half)
+      expect(rootModel(await runDoctor(withPi(), { scope: "project" }))).toEqual([
+        `~ root model ${projectPi("settings.json")}: ${mine}, ${unset}; Pi follows yours`,
+      ])
+      await rm(projectPi(), { recursive: true, force: true })
+      await write(globalSettings(), { ...FULL(), ...half })
+      expect(rootModel(await runDoctor(withPi(), { scope: "project" }))).toEqual([
+        `~ root model ${projectPi("settings.json")}: ${mine}, ${unset}; Pi follows yours`,
+      ])
+      await rm(projectPi(), { recursive: true, force: true })
+    }
+  })
+
+  test("a provider that equals the route with no model is still reported, not counted as set", async () => {
+    await write(globalSettings(), { ...FULL(), defaultProvider: "kimi-coding" })
+    expect(rootModel(await runDoctor(withPi()))).toEqual([
+      `~ root model ${globalSettings()}: defaultModel is unset, so Pi picks it (the route sets "k3.1-pro")`,
+    ])
+  })
+
+  test("does not list the pair as lacking once the user holds half of it", async () => {
+    await write(globalSettings(), { ...FULL(), defaultProvider: "mine" })
+    const lacks = toolLines(await runDoctor(withPi())).find((line) =>
+      line.includes(`${globalSettings()} lacks`),
+    )
+    expect(lacks).toContain("defaultThinkingLevel")
+    expect(lacks).not.toContain("defaultModel")
+    expect(lacks).not.toContain("defaultProvider")
   })
 
   test("reports a file that is not a JSON object, and only when Pi is in use and pi.enable is on", async () => {
@@ -526,6 +754,51 @@ describe("holyagent setup --undo, Pi tool settings", () => {
       `- tool settings ${globalSubagents()}: removed disableDefaultAgents true, fallbackSubagent "none"`,
     )
     expect(report.lines.some((line) => line.startsWith("~ ctx7: left installed"))).toBe(true)
+  })
+
+  test("removes the pair setup wrote, and leaves the user's own half and the thinking level it did not write", async () => {
+    await write(globalSettings(), { ...FULL(), defaultProvider: "mine" })
+    await runSetup(withPi())
+    expect(await read(globalSettings())).toMatchObject({
+      defaultProvider: "mine",
+      defaultThinkingLevel: "high",
+    })
+    expect(await read(globalSettings())).not.toHaveProperty("defaultModel")
+    await runSetup(withPi(), { undo: true })
+    expect(await read(globalSettings())).toEqual({ ...FULL(), defaultProvider: "mine" })
+
+    await write(globalSettings(), FULL())
+    await runSetup(withPi())
+    const report = await runSetup(withPi(), { undo: true })
+    expect(await read(globalSettings())).toEqual(FULL())
+    expect(toolLines(report).join("\n")).toContain("removed")
+  })
+
+  test("keeps both of the pair when the user changed either since setup wrote it", async () => {
+    const pair = { defaultProvider: MODEL.defaultProvider, defaultModel: MODEL.defaultModel }
+    for (const change of [
+      { defaultProvider: "mine" },
+      { defaultModel: "changed" },
+      { defaultProvider: "mine", defaultModel: "changed" },
+    ]) {
+      await write(globalSettings(), FULL())
+      await runSetup(withPi())
+      await write(globalSettings(), { ...FULL(), ...MODEL, ...change })
+      const lines = toolLines(await runSetup(withPi(), { undo: true })).join("\n")
+      // The thinking level is its own key and goes as before.
+      expect(await read(globalSettings())).toEqual({ ...FULL(), ...pair, ...change })
+      expect(lines).toContain("removed defaultThinkingLevel")
+      expect(lines).toContain("kept defaultProvider")
+      expect(lines).toContain("defaultModel")
+    }
+    await write(globalSettings(), FULL())
+    await runSetup(withPi())
+    await write(globalSettings(), { ...FULL(), ...MODEL, defaultModel: "changed" })
+    const line = toolLines(await runSetup(withPi(), { undo: true })).join("\n")
+    expect(line).toContain('defaultModel "changed" (setup wrote "k3.1-pro")')
+    expect(line).toContain(
+      'defaultProvider "kimi-coding" (setup wrote "kimi-coding"; kept with its changed pair)',
+    )
   })
 
   test("keeps a value the user changed since, and a key the user already had before setup", async () => {
@@ -603,7 +876,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     for (const scope of ["project", "local"] as const) {
       await runSetup(withPi(), { scope })
       // The repository swaps the settings file for a link to the user's own, holding the same values.
-      await write(globalSettings(), { ...FULL(), ...CODEMODE, ...COMPUTER_USE })
+      await write(globalSettings(), { ...FULL(), ...CODEMODE, ...COMPUTER_USE, ...MODEL })
       const globalBefore = await Bun.file(globalSettings()).text()
       await rm(projectPi("settings.json"))
       await symlink(globalSettings(), projectPi("settings.json"))
