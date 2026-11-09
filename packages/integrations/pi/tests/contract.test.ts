@@ -20,7 +20,7 @@ import {
 } from "../src/extension.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import {
-  type FixtureHeader,
+  FixtureHeader,
   FIXTURES,
   FIXTURES_DIRECTORY,
   installedPiVersion,
@@ -30,21 +30,13 @@ import {
 } from "./fixtures/record.ts"
 
 // These tests pin the Pi events the integration consumes to the Pi version the fixtures were
-// recorded for. They feed each fixture, built from Pi's own type declarations (see
-// fixtures/record.ts), through the integration's real consumers. A Pi update that moves the
-// version fails the first describe until the fixtures are recorded again and reviewed.
+// built for. The fixtures come from Pi's exported types (see fixtures/record.ts), not from a Pi
+// run. The extension events run through the extension's handlers and the outcome helpers, the
+// JSON run streams through a reader local to this file (the real one lives in
+// @tintinweb/pi-subagents), and the extension_ui_request messages are pinned by type only. A Pi
+// update that moves the version fails the first describe until the fixtures are built again.
 
-const FixtureHeaderLine = Schema.fromJsonString(
-  Schema.Struct({
-    holyagentFixture: Schema.Struct({
-      package: Schema.String,
-      piVersion: Schema.String,
-      name: Schema.String,
-      source: Schema.Literals(["json-mode", "extension-api", "rpc-mode"]),
-      description: Schema.String,
-    }),
-  }),
-)
+const FixtureHeaderLine = Schema.fromJsonString(Schema.Struct({ holyagentFixture: FixtureHeader }))
 
 /** A fixture file read back: its header and its events. */
 interface Loaded {
@@ -94,7 +86,6 @@ describe("the recorded Pi version", () => {
   })
 
   test("the files are what record.ts writes, so none was edited by hand", async () => {
-    const installed = await installedPiVersion()
     for (const fixture of FIXTURES) {
       const { header } = await load(fixture.name)
       expect(await Bun.file(fixturePath(fixture.name)).text()).toBe(
@@ -104,7 +95,6 @@ describe("the recorded Pi version", () => {
     // Every file in the folder is one record.ts writes.
     const files = [...new Bun.Glob("*.jsonl").scanSync(FIXTURES_DIRECTORY)].toSorted()
     expect(files).toEqual(FIXTURES.map(({ name }) => `${name}.jsonl`).toSorted())
-    expect(installed).toMatch(/^\d+\.\d+\.\d+/)
   })
 })
 

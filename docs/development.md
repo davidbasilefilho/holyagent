@@ -99,7 +99,13 @@ The commit permalinks in `docs/pi/` are research references and stay as written.
 
 ### Re-recording the Pi fixtures
 
-`packages/integrations/pi/tests/contract.test.ts` pins the Pi events the integration consumes (the JSON-mode run stream with `agent_settled` and the tool execution events, the extension's `session_start`, `before_agent_start`, `message_end`, `tool_call`, `session_compact` and `session_shutdown` events, and the `extension_ui_request` messages of RPC mode) to the Pi host version the fixtures were recorded for. The fixtures are JSONL files in `packages/integrations/pi/tests/fixtures/`, each starting with a header line that names the Pi package and version. They are built from Pi's own types: `fixtures/record.ts` writes every event with `satisfies` on Pi's exported event types, so `mise run check` fails when an update renames or retypes a field, and the test feeds each file through the real consumers. Nothing starts Pi.
+`packages/integrations/pi/tests/contract.test.ts` pins the Pi events the integration consumes (the JSON-mode run stream with `agent_settled` and the tool execution events, the extension's `session_start`, `before_agent_start`, `message_end`, `tool_call`, `session_compact` and `session_shutdown` events, and the `extension_ui_request` messages of RPC mode) to the Pi host version the fixtures were recorded for. The fixtures are JSONL files in `packages/integrations/pi/tests/fixtures/`, each starting with a header line that names the Pi package and version. They are not recorded from a Pi run: `fixtures/record.ts` builds every event from Pi's exported types with `satisfies`, so `mise run check` fails when an update renames or retypes a field the event spells out. The `before_agent_start` and `session_compact` events are written against a `Pick` of their type, so only the picked fields are covered. Each group is checked differently:
+
+- The `extension-events` fixture runs through the extension's own handlers and the outcome helpers (`failedFinalMessage`, `assignmentStatusOf`).
+- The JSON-mode run streams (ending in `agent_settled`, with the tool execution events) are read by a reader local to the test, because the real reader lives in `@tintinweb/pi-subagents`; the test checks the outcome and Assignment status that reader's result implies.
+- The `extension_ui_request` messages of RPC mode are pinned by type and field shape only, because the extension has no UI consumer yet.
+
+Nothing starts Pi.
 
 `mise run deps:update` can move the host with `bun.lock`, and then the contract test fails with a message that says to re-record. To record again:
 

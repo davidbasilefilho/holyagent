@@ -1,8 +1,9 @@
 /**
  * The Pi events the HolyAgent integration consumes, written out as JSONL fixtures for the installed
  * Pi host. Every event is built from Pi 1.x's own type declarations (`satisfies` on its exported
- * event types), so a Pi update that renames or retypes a field fails the type-check; the JSONL
- * files are what `contract.test.ts` feeds through the real consumers. Nothing here starts Pi.
+ * event types), so a Pi update that renames or retypes a field the event spells out fails the
+ * type-check (a `Pick` covers only the picked fields); the JSONL files are what `contract.test.ts`
+ * reads. Nothing here starts Pi.
  *
  * Re-record after `mise run deps:update` moves Pi: `bun
  * packages/integrations/pi/tests/fixtures/record.ts`.
@@ -19,6 +20,7 @@ import type {
   SessionStartEvent,
   ToolCallEvent,
 } from "@earendil-works/pi-coding-agent"
+import { Schema } from "effect"
 
 /** The npm package that is the Pi host the fixtures are built for. */
 export const PI_PACKAGE = "@earendil-works/pi-coding-agent"
@@ -30,18 +32,21 @@ export const RERECORD_COMMAND = "bun packages/integrations/pi/tests/fixtures/rec
 export const FIXTURES_DIRECTORY = import.meta.dir
 
 /** The first line of a fixture file: what it is and the Pi version it was built for. */
-export interface FixtureHeader {
+export const FixtureHeader = Schema.Struct({
   /** The package the fixture was built for, always {@link PI_PACKAGE}. */
-  readonly package: string
+  package: Schema.String,
   /** The exact version of that package, from its installed `package.json`. */
-  readonly piVersion: string
+  piVersion: Schema.String,
   /** The fixture's file name without the extension. */
-  readonly name: string
+  name: Schema.String,
   /** Where the events come from in Pi: the JSON or RPC stdout protocol, or an extension event. */
-  readonly source: "json-mode" | "extension-api" | "rpc-mode"
+  source: Schema.Literals(["json-mode", "extension-api", "rpc-mode"]),
   /** What the events show, for a reader of the file. */
-  readonly description: string
-}
+  description: Schema.String,
+})
+
+/** The first line of a fixture file, as a type. */
+export type FixtureHeader = typeof FixtureHeader.Type
 
 /** One fixture: a header's description and the events of the file, in order. */
 export interface PiFixture {
@@ -438,7 +443,11 @@ export const FIXTURES: ReadonlyArray<PiFixture> = [
 export const installedPiVersion = async (): Promise<string> => {
   const entry = Bun.resolveSync(PI_PACKAGE, FIXTURES_DIRECTORY)
   let directory = dirname(entry)
-  while (!(await Bun.file(join(directory, "package.json")).exists())) directory = dirname(directory)
+  while (!(await Bun.file(join(directory, "package.json")).exists())) {
+    const parent = dirname(directory)
+    if (parent === directory) throw new Error(`no package.json above ${entry}`)
+    directory = parent
+  }
   const { version } = (await Bun.file(join(directory, "package.json")).json()) as {
     version: string
   }
