@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9n3p0w-cjii",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-codex-provider-repair-for",
+  "objective": "Re-review the Codex provider repair for the apply_patch symlink containment, rollback and the Luna Reserve request changes.",
+  "state": "Running",
+  "scope": [
+    "Repair diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-repair.diff (worktree /home/user/holyagent-0.3.1-codex, commit eb8adb2). Previous security review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7r8p-90gx.md.",
+    "Check that a target whose real path (or nearest existing ancestor's) leaves the project is refused before any write, including new files under a symlinked folder, moves and deletes; that rollback restores earlier writes without following a link out of the project; that time-of-check gaps are no worse than Pi's own write tool; and that the usage request now refuses redirects and only fires for Codex turns."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 300 words; substantiate each finding with source, sink, file and line, and mark it blocking or non-blocking."
+  ],
+  "criteria": [
+    {
+      "text": "apply_patch cannot write, move or delete outside the project through a symlink, and the token reaches only the intended host",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9mgiy9-d5km"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T19:14:04.016Z"
+  },
+  "createdAt": "2026-11-09T19:14:04.016Z"
+}
