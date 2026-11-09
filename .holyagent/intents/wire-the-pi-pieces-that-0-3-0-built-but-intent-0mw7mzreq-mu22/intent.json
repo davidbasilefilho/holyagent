@@ -13,9 +13,10 @@
     "Found by trace: the Pi package ships no prompts/ folder although the Kimi Reviewer.code and Reviewer.security text expects the launcher to put a first-pass code-review or security-review prompt at the start of the task; ship those prompts and put them in the Pi reviewer task.",
     "Decided (maintainer, T3 settings): a setting is written only where unset and different from the tool's own default, and a user's off wins for risky settings.",
     "Default: three stacked PRs in order: extension wiring (system prompt, active tools, provider environment and readiness), then setup tool settings, then the reviewer first-pass prompts; each from the one before so their generated files do not conflict.",
-    "Default: docs nits left from PR 82 (docs/usage.md:45,156,160, docs/components.md:62, docs/pi/README.md rows 51, 60, 64, the duplicated -l hint in pi-check.ts) ride along in the PR whose change makes each row true."
+    "Default: docs nits left from PR 82 (docs/usage.md:45,156,160, docs/components.md:62, docs/pi/README.md rows 51, 60, 64, the duplicated -l hint in pi-check.ts) ride along in the PR whose change makes each row true.",
+    "Default (root, 2026-11-09; research assignment-0mw8td52p-27ab): the root model on Pi follows the route table through Pi's own settings: holyagent setup writes defaultProvider, defaultModel and defaultThinkingLevel in Pi's settings to the root route only where each is unset and differs from Pi's default, with undo; the extension never calls setModel, because T3 owns the launch arguments and its model picker stays manual (T3 Intent), and a user's own choice wins."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-08T09:35:28.130Z"
 }
