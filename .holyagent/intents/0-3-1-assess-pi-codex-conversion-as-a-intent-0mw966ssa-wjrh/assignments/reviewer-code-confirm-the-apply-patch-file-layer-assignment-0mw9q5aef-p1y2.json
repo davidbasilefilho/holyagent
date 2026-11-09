@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mw9q5aef-p1y2",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-apply-patch-file-layer",
+  "objective": "Confirm the apply_patch file-layer repair closes the earlier optional findings without regressions and meets the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "Commit d5604d4 on release/0.3.1/feat/codex-provider in /home/user/holyagent-0.3.1-codex (range 956092de..d5604d4); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-filelayer-commit.diff",
+    "Previous findings this commit repairs: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os3gn-w3sc.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os3rf-7qip.md; repair report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9pye41-curp.md",
+    "The repair report notes: after a patch deletes a link and adds the same path, a later Update of that path in the same patch still resolves to the link's old target. Judge whether that is a defect and its severity."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no git writes. Pass explicit SHA ranges (956092de..d5604d4) to any review command, and run commands in /home/user/holyagent-0.3.1-codex, not the main checkout.",
+    "This is a re-review of a repair: judge whether the previous findings are closed and whether the repair introduced new defects; do not reopen accepted design choices (Luna Reserve endpoint, effort cap, route table).",
+    "Testing is unit tests and fixtures only: never start pi or make live Codex, OpenAI or Kimi requests.",
+    "Report in under 400 words; start each evidence line with the criterion text, a colon and the support inline.",
+    "You may run `bunx --no-install mise run verify` in /home/user/holyagent-0.3.1-codex (after `bun install --frozen-lockfile` if node_modules is missing) and report command, exit code and counts."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous blocking code finding is closed by the repair",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression in apply_patch updates, adds, deletes, moves, rollback, Luna Reserve persistence across resume and fork, or the Codex-only usage check",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Changed behavior has tests that fail without the change, and no test is weakened",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Repository rules hold: Effect composition with tagged errors, Schema at boundaries, JSDoc on exports, generated dist matches the build",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Gates: mise run verify exits 0 on d5604d4",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9pye41-curp"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T20:39:17.223Z"
+  },
+  "createdAt": "2026-11-09T20:39:17.223Z"
+}
