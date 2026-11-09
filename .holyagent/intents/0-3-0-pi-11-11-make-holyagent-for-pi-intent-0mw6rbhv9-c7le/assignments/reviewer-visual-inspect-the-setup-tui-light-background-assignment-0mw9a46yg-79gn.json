@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9a46yg-79gn",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.visual",
+  "slug": "inspect-the-setup-tui-light-background",
+  "objective": "Inspect the setup TUI light-background captures and the raised hint tone.",
+  "state": "Running",
+  "scope": [
+    "Captures are text frames with span colours in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/. Read the terminal design skill at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/tui-design/SKILL.md and judge against it.",
+    "Judge the ten light-{initial,review,apply-success,apply-failure,review-failed}-{80x24,40x20} captures on a light background (#e1e2e7 and white), and the dark captures initial, review, apply-success and review-failed at 80x24 for the new hint tone #7e87b2. Check contrast from the stated hex values, hierarchy, and that status never rests on colour alone. List the final captures you judged."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Mark each finding material or preference per the skill.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The light captures are legible with every content tone at 4.5:1 or more and hierarchy kept",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The dark captures keep their look with the new hint tone",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The final captures judged are listed by file name",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "captures"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw99k4tp-3tef",
+    "assignment-0mw99smjz-askh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:10:32.248Z"
+  },
+  "createdAt": "2026-11-09T13:10:32.248Z"
+}
