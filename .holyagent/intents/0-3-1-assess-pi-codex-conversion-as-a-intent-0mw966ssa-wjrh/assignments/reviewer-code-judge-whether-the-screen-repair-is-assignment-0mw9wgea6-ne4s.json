@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "judge-whether-the-screen-repair-is",
   "objective": "Judge whether the screen repair is correct, complete and merge-ready, and whether its findings close.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair commit 91d9eb07 on release/0.3.1/feat/screen in /home/user/holyagent-0.3.1-screen (range c6a2ac71..91d9eb07); source diff without generated dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-repair-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9vajbp-mb3c.md. Review only this repair; the earlier findings it answers are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0jpx-7whl.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0k14-hk7i.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0kb6-ydwu.md (audit).",
     "Requirements the repair implements: the headless screen form (cloud or CI) registers @playwright/mcp at an exact pin moved by deps:update, launched headless and isolated through npx with the public npm registry passed explicitly, using the preinstalled Chromium when present; the normal form keeps @opencode/browse with a paired real browser plus pi-computer-use. Specialist agent files list only the screen tools of the form in use, and a headless specialist is told it has no desktop. T3 preview tools only where T3 hosts the session. Setup and doctor separate not-installed from not-paired, report an unreadable pairing file without failing, check node >= 22.19, and say when MCP is off.",
@@ -46,7 +46,37 @@
     "agentId": "workflow:wf_789cee0b-154/assignment-0mw9wgea6-ne4s",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T23:35:53.166Z"
+    "startedAt": "2026-11-09T23:35:53.166Z",
+    "finishedAt": "2026-11-09T23:41:54.113Z"
+  },
+  "result": "result: Repair 91d9eb07 is merge-ready. I found no blockers, and the earlier findings it answers are closed. I found six optional items.\n\nchanged: none. The worktree is clean after build and verify.\n\nchecks:\n- `bun install --frozen-lockfile` -> exit 0.\n- `bunx --no-install mise run build` -> exit 0, and `git status --short` printed nothing afterwards.\n- `bunx --no-install mise run verify` -> exit 0 (type-check 291 files, lint 292 files, format clean, `3262 pass, 0 fail` across 106 test files). `git status` was still empty afterwards. The log is `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rv-verify.log`.\n- `/code-review` (medium, `c6a2ac71...91d9eb07`): the loaded skill was the built-in. It gave 7 findings, classified below.\n- `npm view @playwright/mcp@0.0.85` shows version 0.0.85, `engines.node >=18` and dist-tag latest.\n- Read only, not run: Pi's MCP registration, `npx` flag parsing, a real Chromium launch and T3 child sessions (T3 child `ctx.mode` taken from the docs that say specialists run in-process).\n\nblockers: none\n\nnotes (all optional):\n1. `cli/assignment.ts:268` (`piReports`) and `cli/config.ts` (`loadConfig`) work out the form from the environment when the command runs, not from the form each Assignment was dispatched with. A report run from a shell whose DISPLAY, CI or cloud variables differ from the dispatch shell would not match the journal key. Both run in the root's environment, so I treat this as a rare drift.\n2. `screen.ts:20` (`SCREEN_DESCRIPTION`) and `report.ts` (`SCREEN_LINE`) still say \"where this machine provides them\". A `-screen` file launched on a headless machine therefore gets text that does not match its tools.\n3. `setup/browse.ts` takes the first profile entry from `Secure Preferences`, so it can report a wrong enabled or disabled state. It also scans Opera only under `Default` or the profiles named in `Local State`.\n4. `capabilities.ts` (`npxServerArgs`): forcing the public registry is the stated requirement. It does stop machines that rely on a private mirror in their npmrc from fetching the servers, and there is no override.\n5. `browser-use.ts` (`reportBrowserUse`) selects capabilities by \"has an MCP server in any form\", not by name.\n6. The `registerScreen` notice blames `pi.features.mcp` or browser-use for any empty server list. The notice repeats on each registration.\n\nRejected:\n- `chromium.ts:41`, `chromium` being a directory: `/opt/pw-browsers/chromium` here is a symlink to the `chrome` binary, and the test covers the fallback to `chromium-<rev>`.\n- `chromium.ts:74`, no fallback when `PLAYWRIGHT_BROWSERS_PATH` is set: Playwright itself looks only in that folder, and a test asserts it.\n\nevidence:\n- The earlier code and audit findings the repair addresses are closed, each with file and line evidence: Headless form: `capabilities.ts` `PLAYWRIGHT_MCP_SERVER` and `forms.headless`, `pi-packages.json` `@playwright/mcp` 0.0.85. Not-installed vs not-paired: `browse.ts` `readBrowseState` and `describeBrowseState`. Unreadable pairing file no longer fails setup: `browser-use.ts` `catchTag`. Doctor reports it as FAIL: `pi-check.ts` `checkPairing`. Node >= 22.19: `unmetNode` in `pi-check.ts`, `BROWSE_MINIMUM_NODE`. MCP off: `serversWithheld`, `checkServers`, `screenServers` returning `[]`. T3 gating: `refuseT3PreviewOutsideT3` in `screen.ts`, wired at `extension.ts:1589`. Silent headless specialist: `HEADLESS_SCREEN_LINE`, `HEADLESS_SCREEN_NOTE`, and the notice in `registerScreen`. Registry pinning: `npxServerArgs`. Pairing-field strictness (the code review's optional #3) was not addressed; it stays optional.\n- The repair introduces no regression or untested error path, and the headless agent-file selection, Chromium detection and registry flags behave as described: In `pi/dist/agents`, `reviewer-code-headless-screen.md` and `worker-visual-headless-screen.md` list `mcp__playwright__browser_*` and the T3 tools. They have no `ext:pi-computer-use` and no `mcp__browse__*`. The `-screen` files are the reverse, and the plain files are unchanged. There are 54 files (18 roles × 3). `findChromium` order and `--executable-path` are covered by `setup-chromium.test.ts`. Registry flags before `-y` are covered by `capabilities.test.ts:345`. Unit tests cover all of this, with 0 failures.\n- Build leaves the tree unchanged and verify passes on 91d9eb07: build exit 0 with empty `git status`; verify exit 0, 3262 pass, 0 fail.\n- checks-run: see checks above.\n- findings: 0 blockers, 6 optional, 2 rejected (notes above).\n",
+  "acceptance": {
+    "revision": 21,
+    "rationale": "No blockers; earlier findings closed with file evidence; build and verify green on 91d9eb07",
+    "criteria": [
+      {
+        "criterion": "The earlier code and audit findings the repair addresses are closed, each with file and line evidence",
+        "support": "Headless form: `capabilities.ts` `PLAYWRIGHT_MCP_SERVER` and `forms.headless`, `pi-packages.json` `@playwright/mcp` 0.0.85. Not-installed vs not-paired: `browse.ts` `readBrowseState` and `describeBrowseState`. Unreadable pairing file no longer fails setup: `browser-use.ts` `catchTag`. Doctor reports it as FAIL: `pi-check.ts` `checkPairing`. Node >= 22.19: `unmetNode` in `pi-check.ts`, `BROWSE_MINIMUM_NODE`. MCP off: `serversWithheld`, `checkServers`, `screenServers` returning `[]`. T3 gating: `refuseT3PreviewOutsideT3` in `screen.ts`, wired at `extension.ts:1589`. Silent headless specialist: `HEADLESS_SCREEN_LINE`, `HEADLESS_SCREEN_NOTE`, and the notice in `registerScreen`. Registry pinning: `npxServerArgs`. Pairing-field strictness (the code review's optional #3) was not addressed; it stays optional."
+      },
+      {
+        "criterion": "The repair introduces no regression or untested error path, and the headless agent-file selection, Chromium detection and registry flags behave as described",
+        "support": "In `pi/dist/agents`, `reviewer-code-headless-screen.md` and `worker-visual-headless-screen.md` list `mcp__playwright__browser_*` and the T3 tools. They have no `ext:pi-computer-use` and no `mcp__browse__*`. The `-screen` files are the reverse, and the plain files are unchanged. There are 54 files (18 roles × 3). `findChromium` order and `--executable-path` are covered by `setup-chromium.test.ts`. Registry flags before `-y` are covered by `capabilities.test.ts:345`. Unit tests cover all of this, with 0 failures."
+      },
+      {
+        "criterion": "Build leaves the tree unchanged and verify passes on 91d9eb07",
+        "support": "build exit 0 with empty `git status`; verify exit 0, 3262 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see checks above."
+      },
+      {
+        "label": "findings",
+        "support": "0 blockers, 6 optional, 2 rejected (notes above)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T23:35:53.166Z"
 }
