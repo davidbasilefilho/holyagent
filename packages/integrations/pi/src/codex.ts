@@ -1,5 +1,6 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
-import { dirname } from "node:path"
+// Bun has no `realpath` or `readlink`, so those two stay on node:fs; the file reads and writes use Bun.
+import { readlink, realpath } from "node:fs/promises"
+import { basename, dirname, join, resolve } from "node:path"
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
@@ -74,23 +75,40 @@ export const codexSettings = (config: Config): CodexSettings | undefined => {
 const fileFailure = (path: string) => (cause: unknown) =>
   new PatchFileError({ path, reason: cause instanceof Error ? cause.message : String(cause) })
 
-/** The patch's file system over `node:fs`: what the tool runs on. */
+const isMissing = (error: PatchFileError): boolean => /ENOENT|ENOTDIR/.test(error.reason)
+
+// The path with its links resolved. A path that is not there yet is its nearest existing ancestor,
+// resolved, and the rest; a link whose target is missing still decides where a write lands, so it
+// is followed by hand.
+const realPath = (path: string): Effect.Effect<string, PatchFileError> =>
+  Effect.tryPromise({ try: () => realpath(path), catch: fileFailure(path) }).pipe(
+    Effect.catch((error) =>
+      isMissing(error)
+        ? Effect.tryPromise({ try: () => readlink(path), catch: fileFailure(path) }).pipe(
+            Effect.matchEffect({
+              onFailure: () =>
+                realPath(dirname(path)).pipe(Effect.map((parent) => join(parent, basename(path)))),
+              onSuccess: (target) => realPath(resolve(dirname(path), target)),
+            }),
+          )
+        : Effect.fail(error),
+    ),
+  )
+
+/** The patch's file system over the disk, through Bun's file API: what the tool runs on. */
 export const nodePatchFs: PatchFs = {
   read: (path) =>
-    Effect.tryPromise({ try: () => readFile(path, "utf8"), catch: fileFailure(path) }).pipe(
-      Effect.catch((error) =>
-        /ENOENT/.test(error.reason) ? Effect.succeed(undefined) : Effect.fail(error),
-      ),
+    Effect.tryPromise({ try: () => Bun.file(path).text(), catch: fileFailure(path) }).pipe(
+      Effect.catch((error) => (isMissing(error) ? Effect.succeed(undefined) : Effect.fail(error))),
     ),
+  // `Bun.write` creates the folders above the file.
   write: (path, text) =>
-    Effect.tryPromise({
-      try: async () => {
-        await mkdir(dirname(path), { recursive: true })
-        await writeFile(path, text)
-      },
-      catch: fileFailure(path),
-    }),
-  remove: (path) => Effect.tryPromise({ try: () => rm(path), catch: fileFailure(path) }),
+    Effect.tryPromise({ try: () => Bun.write(path, text), catch: fileFailure(path) }).pipe(
+      Effect.asVoid,
+    ),
+  remove: (path) =>
+    Effect.tryPromise({ try: () => Bun.file(path).delete(), catch: fileFailure(path) }),
+  real: realPath,
 }
 
 /** What the Codex module needs from the extension that hosts it. */
@@ -104,6 +122,10 @@ export interface CodexHost {
   /** The request function of the usage status call; the global `fetch` by default. */
   readonly fetcher?: Fetch
 }
+
+// The provider a finished assistant message came from, which Pi records on the message.
+const turnProvider = (message: object): string | undefined =>
+  "provider" in message && typeof message.provider === "string" ? message.provider : undefined
 
 const asReserveFailure = (): UsageStatusUnavailable =>
   new UsageStatusUnavailable({ reason: "no credentials" })
@@ -151,7 +173,11 @@ export const registerCodex = (pi: ExtensionAPI, host: CodexHost): void => {
   const forget = () => {
     compaction = NO_COMPACTION
   }
-  pi.on("session_start", forget)
+  // A new session starts on the regular model: the reserve of the one before does not carry over.
+  pi.on("session_start", () => {
+    forget()
+    reserve = false
+  })
   pi.on("session_compact", forget)
   pi.on("session_tree", forget)
 
@@ -194,7 +220,13 @@ export const registerCodex = (pi: ExtensionAPI, host: CodexHost): void => {
     )
 
   pi.on("message_end", async (event, ctx) => {
-    if (host.settings()?.lunaReserve !== true || reserve || !endedOnUsageLimit(event.message))
+    // Only a turn that ran on Codex can have hit Codex's limit, and only Codex's token is sent on.
+    if (
+      host.settings()?.lunaReserve !== true ||
+      reserve ||
+      !isCodexProvider(turnProvider(event.message)) ||
+      !endedOnUsageLimit(event.message)
+    )
       return undefined
     if ((await offered(ctx)) === true) {
       reserve = true

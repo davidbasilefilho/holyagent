@@ -125,6 +125,8 @@ export const fetchReserveOffered = (
       try: (signal) =>
         fetcher(USAGE_STATUS_URL, {
           headers: statusHeaders(token),
+          // A redirect would carry the token to a host the module does not name.
+          redirect: "error",
           signal: AbortSignal.any([signal, AbortSignal.timeout(STATUS_TIMEOUT_MS)]),
         }),
       catch: unavailable,
@@ -137,12 +139,35 @@ export const fetchReserveOffered = (
 }
 
 /**
- * Sends a request to the reserve: the request with its `model` replaced by {@link RESERVE_MODEL}. A
- * payload without a string `model` is returned as it came.
+ * The highest reasoning effort a request to the reserve carries. The reserve is Luna's allowance
+ * and Luna never runs at `xhigh` (the route table's rule); the research names no other limit of
+ * `gpt-reserve`, so `high` is kept as the ceiling, not a measured one.
+ */
+export const RESERVE_MAX_EFFORT = "high"
+
+/** The efforts above {@link RESERVE_MAX_EFFORT}. */
+const ABOVE_RESERVE_EFFORT: ReadonlySet<unknown> = new Set(["xhigh", "max"])
+
+const clampedReasoning = (reasoning: unknown): unknown =>
+  typeof reasoning === "object" &&
+  reasoning !== null &&
+  "effort" in reasoning &&
+  ABOVE_RESERVE_EFFORT.has(reasoning.effort)
+    ? { ...reasoning, effort: RESERVE_MAX_EFFORT }
+    : reasoning
+
+/**
+ * Sends a request to the reserve: the request with its `model` replaced by {@link RESERVE_MODEL}
+ * and its `reasoning.effort`, when above {@link RESERVE_MAX_EFFORT}, lowered to it, since a Sol or
+ * Terra request can ask for `xhigh`. A payload without a `model` is returned as it came.
  */
 export const toReserve = (payload: unknown): unknown =>
   typeof payload === "object" && payload !== null && "model" in payload
-    ? { ...payload, model: RESERVE_MODEL }
+    ? {
+        ...payload,
+        model: RESERVE_MODEL,
+        ...("reasoning" in payload ? { reasoning: clampedReasoning(payload.reasoning) } : {}),
+      }
     : payload
 
 /** What the user reads when the reserve opens: it waits for them, as the regular quota did. */

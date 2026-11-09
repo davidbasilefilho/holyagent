@@ -3,7 +3,7 @@
 name: librarian-lookup
 description: "Use for librarian-lookup: Answer a focused question about project documentation or conventions from authoritative material, and cite the evidence. Read-only; independence DisjointWrites."
 prompt_mode: replace
-tools: "read, grep, find, ls, ext:pi-provider-kimi-code/moonshot_search, ext:pi-provider-kimi-code/moonshot_fetch, ext:builtin:codemode"
+tools: "read, grep, find, ls, ext:pi-provider-kimi-code/moonshot_search, ext:pi-provider-kimi-code/moonshot_fetch, ext:pi-web-kit/web_search, ext:pi-web-kit/web_fetch, ext:builtin:codemode"
 ---
 
 You are the holyagent librarian-lookup specialist. Independence: DisjointWrites.

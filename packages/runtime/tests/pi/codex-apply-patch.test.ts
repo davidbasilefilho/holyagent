@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { resolve } from "node:path"
+import { resolve, sep } from "node:path"
 
 import { Effect } from "effect"
 
@@ -15,17 +15,45 @@ import {
 const CWD = resolve("/work/project")
 const at = (path: string) => resolve(CWD, path)
 
-/** An in-memory file system that records the order of its writes and removals. */
-const memory = (files: Readonly<Record<string, string>> = {}) => {
+/**
+ * An in-memory file system that records the order of its writes and removals. `links` maps a folder
+ * of the project to where it really leads, as a symbolic link does; the first write to a path of
+ * `failing` fails and leaves the file as it was.
+ */
+const memory = (
+  files: Readonly<Record<string, string>> = {},
+  options: {
+    readonly links?: Readonly<Record<string, string>>
+    readonly failing?: ReadonlyArray<string>
+  } = {},
+) => {
   const store = new Map(Object.entries(files).map(([path, text]) => [at(path), text]))
   const log: Array<string> = []
+  const links = Object.entries(options.links ?? {}).map(([from, to]) => [at(from), to] as const)
+  // Each path fails once, on its first write.
+  const failing = (options.failing ?? []).map(at)
   const fs: PatchFs = {
+    real: (path) =>
+      Effect.succeed(
+        links.reduce(
+          (current, [from, to]) =>
+            current === from || current.startsWith(`${from}${sep}`)
+              ? `${to}${current.slice(from.length)}`
+              : current,
+          path,
+        ),
+      ),
     read: (path) => Effect.succeed(store.get(path)),
     write: (path, text) =>
-      Effect.sync(() => {
-        store.set(path, text)
-        log.push(`write ${path}`)
-      }),
+      failing.includes(path)
+        ? Effect.suspend(() => {
+            failing.splice(failing.indexOf(path), 1)
+            return Effect.fail(new PatchFileError({ path, reason: "disk full" }))
+          })
+        : Effect.sync(() => {
+            store.set(path, text)
+            log.push(`write ${path}`)
+          }),
     remove: (path) =>
       store.has(path)
         ? Effect.sync(() => {
@@ -315,5 +343,106 @@ describe("applyPatch", () => {
     const { fs, text } = memory()
     await run(patch("*** Add File: ..hidden/file.txt", "+x"), fs)
     expect(text("..hidden/file.txt")).toBe("x\n")
+  })
+
+  test("a move to the file's own path is a plain update: the file stays and has the new text", async () => {
+    for (const moveTo of ["a.txt", "./a.txt", "src/../a.txt"]) {
+      const { fs, text, store } = memory({ "a.txt": "one\ntwo\n" })
+      const result = await run(
+        patch("*** Update File: a.txt", `*** Move to: ${moveTo}`, "@@", "-one", "+1"),
+        fs,
+      )
+      expect(text("a.txt")).toBe("1\ntwo\n")
+      expect(store.has(at("a.txt"))).toBe(true)
+      expect(result.changes).toEqual([{ status: "M", path: moveTo }])
+    }
+  })
+
+  test("a path that leads out of the project through a symbolic link is refused before any write", async () => {
+    const outside = resolve("/elsewhere")
+    const { fs, log, store } = memory({ "ok.txt": "x\n" }, { links: { linked: outside } })
+    for (const operation of [
+      ["*** Add File: linked/new.txt", "+x"],
+      ["*** Add File: linked/deeper/new.txt", "+x"],
+      ["*** Delete File: linked"],
+    ]) {
+      const error = await fails(patch("*** Add File: first.txt", "+1", ...operation), fs)
+      expect(error._tag).toBe("PatchPathError")
+    }
+    const moved = await fails(
+      patch("*** Update File: ok.txt", "*** Move to: linked/ok.txt", "@@", "-x", "+y"),
+      fs,
+    )
+    expect(moved._tag).toBe("PatchPathError")
+    expect(log).toEqual([])
+    expect(store.has(at("first.txt"))).toBe(false)
+  })
+
+  test("a link that stays inside the project is followed without complaint", async () => {
+    const { fs, text } = memory({}, { links: { alias: at("real") } })
+    await run(patch("*** Add File: alias/file.txt", "+x"), fs)
+    expect(text("alias/file.txt")).toBe("x\n")
+  })
+
+  test("a write that fails puts back the files already written, so the patch is whole or not at all", async () => {
+    const { fs, text, store, log } = memory(
+      { "a.txt": "one\n", "gone.txt": "bye\n", "c.txt": "keep\n" },
+      { failing: ["c.txt"] },
+    )
+    const error = await fails(
+      patch(
+        "*** Update File: a.txt",
+        "@@",
+        "-one",
+        "+1",
+        "*** Add File: new.txt",
+        "+n",
+        "*** Delete File: gone.txt",
+        "*** Update File: c.txt",
+        "@@",
+        "-keep",
+        "+changed",
+      ),
+      fs,
+    )
+    expect(error).toMatchObject({ _tag: "PatchFileError", reason: "disk full" })
+    expect(text("a.txt")).toBe("one\n")
+    expect(text("gone.txt")).toBe("bye\n")
+    expect(text("c.txt")).toBe("keep\n")
+    expect(store.has(at("new.txt"))).toBe(false)
+    // Undone newest first: the failed file is written back as it was, the deleted file comes back,
+    // the new one goes, the first update is reverted.
+    expect(log.slice(3)).toEqual([
+      `write ${at("c.txt")}`,
+      `write ${at("gone.txt")}`,
+      `remove ${at("new.txt")}`,
+      `write ${at("a.txt")}`,
+    ])
+  })
+
+  test("says which files could not be put back when the undo fails too", async () => {
+    const { fs } = memory({ "a.txt": "one\n", "b.txt": "two\n" })
+    const failingFs: PatchFs = {
+      ...fs,
+      write: (path, text) =>
+        path === at("b.txt") || (path === at("a.txt") && text === "one\n")
+          ? Effect.fail(new PatchFileError({ path, reason: "read-only" }))
+          : fs.write(path, text),
+    }
+    const error = await fails(
+      patch(
+        "*** Update File: a.txt",
+        "@@",
+        "-one",
+        "+1",
+        "*** Update File: b.txt",
+        "@@",
+        "-two",
+        "+2",
+      ),
+      failingFs,
+    )
+    expect(error.message).toContain("read-only")
+    expect(error.message).toContain(`could not restore ${at("b.txt")}, ${at("a.txt")}`)
   })
 })

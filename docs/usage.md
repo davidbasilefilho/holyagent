@@ -169,7 +169,7 @@ Not built yet: setting Pi's `npmCommand` from `holyagent setup`, the macOS permi
 
 ### The Codex provider
 
-`"pi": { "provider": "openai-codex" }` in a HolyAgent config runs the root on GPT-6.1 Sol and the specialists on GPT-6.1 Terra and GPT-6 Luna, on the GPT-6 instruction family, with `apply_patch` beside `read`, `write`, `edit` and `bash` for the specialists that write. Log in once with `/login openai-codex` in Pi (a ChatGPT sign-in, no key); `holyagent doctor` reports a missing login. It sends the server-side `context_management` only when Billion Context is off (`pi.features.contextCompression` false), and falls back to Luna Reserve when the usage limit is reached (`holyagent setup --luna-reserve off` turns that off). The route table, the details and the limits are in [pi/providers.md](pi/providers.md#codex-openai-codex).
+`"pi": { "provider": "openai-codex" }` in a HolyAgent config runs the root on GPT-6.1 Sol and the specialists on GPT-6.1 Terra and GPT-6 Luna, on the GPT-6 instruction family, with `apply_patch` beside `read`, `write`, `edit` and `bash` for the specialists that write. Log in once with `/login openai-codex` in Pi (a ChatGPT sign-in, no key); `holyagent doctor` reports a missing login. It sends the server-side `context_management` only when Billion Context is off (`pi.features.contextCompression` false) and `pi.features.contextManagement` is on (the default; `holyagent setup --context-management off` turns it off), and falls back to Luna Reserve when the usage limit is reached (`holyagent setup --luna-reserve off` turns that off). The route table, the details and the limits are in [pi/providers.md](pi/providers.md#codex-openai-codex).
 
 ### The T3 Code setup screen
 

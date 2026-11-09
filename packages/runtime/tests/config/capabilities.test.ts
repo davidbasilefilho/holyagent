@@ -100,8 +100,12 @@ describe("the capability registry", () => {
     )
     expect(file).toEqual(written)
     const config = await Effect.runPromise(Schema.decodeUnknownEffect(Config)(written))
-    // Only the key a later release added (the Codex provider's Luna Reserve) takes its default.
-    expect(config.pi.features).toEqual({ ...written.pi.features, lunaReserve: true })
+    // Only the keys a later release added (the Codex provider's Luna Reserve and context_management) take their default.
+    expect(config.pi.features).toEqual({
+      ...written.pi.features,
+      lunaReserve: true,
+      contextManagement: true,
+    })
     const unknown = Schema.decodeUnknownEffect(ConfigFile, { onExcessProperty: "error" })({
       pi: { features: { notACapability: true } },
     })

@@ -497,6 +497,11 @@ interface Held {
    * applied, the user-level config could not be read, or both in one line.
    */
   setupNotice: Delivery | undefined
+  /**
+   * What a specialist is told on its first run when `apply_patch` could not be activated for it,
+   * until that run delivers it. A specialist has no other notice channel.
+   */
+  applyPatchNotice: Delivery | undefined
 }
 
 /**
@@ -1268,16 +1273,29 @@ export const createExtension =
 
     // A specialist the Codex config gives `apply_patch` (the ones with Write; the module registers
     // the tool inactive) has it added to its active tools, beside what the package's agent file
-    // gave it. The root never does, since it writes no files. A specialist has no notice channel,
-    // so a failure leaves it with `write` and `edit`, which still change files.
-    const activateApplyPatch = (codex: CodexSettings): void => {
+    // gave it. The root never does, since it writes no files. A failure, or a tool that stays
+    // inactive because nothing registered it, is told to the specialist on its first run, which
+    // goes on with `write` and `edit`.
+    const activateApplyPatch = (codex: CodexSettings): Delivery | undefined => {
       const agent = childAgent(pi.getSessionName())
-      if (agent === undefined || !codex.applyPatchAgents.includes(agent)) return
-      Effect.runSync(
-        Effect.try(() =>
-          pi.setActiveTools([...new Set([...pi.getActiveTools(), APPLY_PATCH_TOOL])]),
-        ).pipe(Effect.ignore),
+      if (agent === undefined || !codex.applyPatchAgents.includes(agent)) return undefined
+      const reason = Effect.runSync(
+        Effect.try(() => {
+          pi.setActiveTools([...new Set([...pi.getActiveTools(), APPLY_PATCH_TOOL])])
+          return pi.getActiveTools().includes(APPLY_PATCH_TOOL)
+            ? undefined
+            : "the tool is not registered"
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.succeed(error.cause instanceof Error ? error.cause.message : "it failed"),
+          ),
+        ),
       )
+      return reason === undefined
+        ? undefined
+        : notice(
+            `apply_patch could not be activated (${reason}); change files with write and edit instead`,
+          )
     }
 
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
@@ -1310,7 +1328,7 @@ export const createExtension =
         if (result !== undefined) taken.codex = result.codex
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
-          if (result?.codex !== undefined) activateApplyPatch(result.codex)
+          if (result?.codex !== undefined) taken.applyPatchNotice = activateApplyPatch(result.codex)
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
           if (result?.tools !== undefined) {
             const notApplied = applyRootTools(result.tools, taken.t3)
@@ -1350,6 +1368,7 @@ export const createExtension =
         probe: undefined,
         readiness: undefined,
         setupNotice: undefined,
+        applyPatchNotice: undefined,
       }
       return gather(held, ctx, event.reason)
     })
@@ -1434,6 +1453,12 @@ export const createExtension =
       }
     pi.on("before_agent_start", noticeOnce("setupNotice"))
     pi.on("before_agent_start", noticeOnce("readiness"))
+    // Only a specialist ever has this notice (the root's `apply_patch` is never activated).
+    pi.on("before_agent_start", (): BeforeAgentStartEventResult | undefined => {
+      const message = held?.applyPatchNotice
+      if (held !== undefined) held.applyPatchNotice = undefined
+      return message === undefined ? undefined : { message }
+    })
 
     // After the start's collection has applied the root's tools (the handler above awaits it).
     pi.on("before_agent_start", () => {

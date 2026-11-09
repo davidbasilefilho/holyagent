@@ -3694,4 +3694,28 @@ describe("under the Codex provider", () => {
     expect(api.toolSets).toEqual([])
     expect(api.touched).toEqual([])
   })
+
+  test("a failed activation is told to the specialist on its first run, once, and to no other session", async () => {
+    const failed = await run(codexConfig(), {
+      sessionName: "worker-implementation#a1b2c3d4",
+      activeTools: ["read"],
+      toolsFail: new Error("no tools"),
+      pi: codexPi,
+    })
+    expect(failed.delivered?.message?.customType).toBe(NOTICE_MESSAGE)
+    expect(failed.delivered?.message?.content).toContain("apply_patch could not be activated")
+    expect(failed.delivered?.message?.content).toContain("no tools")
+    const again = await failed.api.emit("before_agent_start", { prompt: "next", systemPrompt: "x" })
+    expect(again.find((result) => result !== undefined)).toBeUndefined()
+    // A specialist that never had apply_patch, and the root, hear nothing about it.
+    for (const sessionName of ["explorer-map#a1b2c3d4", undefined]) {
+      const other = await run(codexConfig(), {
+        ...(sessionName === undefined ? {} : { sessionName }),
+        activeTools: ["read"],
+        toolsFail: new Error("no tools"),
+        pi: codexPi,
+      })
+      expect(other.delivered?.message?.content ?? "").not.toContain("apply_patch could not")
+    }
+  })
 })

@@ -6,10 +6,10 @@ import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { $ } from "bun"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import { PI_HOST_PACKAGES } from "../../../../scripts/dependency-pins.ts"
-import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { type Route, ROUTES } from "../../../runtime/src/domain/route.ts"
 import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
@@ -382,14 +382,20 @@ describe("the specialists", () => {
       // Each tool of toolArgs is covered: built-ins and mcp__ patterns by name, codemode, the
       // computer-use and web tools through the extension that serves them.
       const decided = toolArgs(config, route.roleTask).tools
-      const covered = decided.map((tool) =>
+      // A web tool is listed through every provider's web source: the file is shared by them all.
+      const covered = decided.flatMap((tool) =>
         tool === "codemode"
-          ? "ext:builtin:codemode"
+          ? ["ext:builtin:codemode"]
           : tool.startsWith("computer_use_")
-            ? "ext:pi-computer-use"
+            ? ["ext:pi-computer-use"]
             : tool.startsWith("moonshot_")
-              ? `ext:pi-provider-kimi-code/${tool}`
-              : tool,
+              ? [
+                  "ext:pi-provider-kimi-code/moonshot_search",
+                  "ext:pi-provider-kimi-code/moonshot_fetch",
+                  "ext:pi-web-kit/web_search",
+                  "ext:pi-web-kit/web_fetch",
+                ]
+              : [tool],
       )
       expect(tools).toEqual([...new Set(covered)])
     }
@@ -431,6 +437,38 @@ describe("the specialists", () => {
     expect(agentTools(withFeatures({ computerUse: false }), visual).join()).not.toContain(
       "computer",
     )
+  })
+
+  test("every web-using specialist lists the web tools of every provider, so a Codex session has pi-web-kit's", async () => {
+    const codex = await Effect.runPromise(
+      Schema.decodeUnknownEffect(Config)({ pi: { provider: "openai-codex" } }),
+    )
+    const web = [
+      "ext:pi-provider-kimi-code/moonshot_search",
+      "ext:pi-provider-kimi-code/moonshot_fetch",
+      "ext:pi-web-kit/web_search",
+      "ext:pi-web-kit/web_fetch",
+    ]
+    const searchers = ["librarian-lookup", "librarian-research"]
+    for (const route of ROUTES) {
+      const searches = searchers.includes(route.agent)
+      // Under either provider's config and in every family's file, the tools line is the same.
+      for (const from of [config, codex])
+        expect(
+          agentTools(from, route).filter((tool) => web.includes(tool)),
+          route.agent,
+        ).toEqual(searches ? web : [])
+      for (const folder of ["agents", familyAgents("gpt-6")]) {
+        const file = generated.find(
+          (entry) => entry.path === `${DIST_DIRECTORY}/${folder}/${route.agent}.md`,
+        )
+        const tools = String(parsed(file ?? { content: "" }).frontmatter["tools"]).split(", ")
+        expect(
+          tools.filter((tool) => web.includes(tool)),
+          `${folder}/${route.agent}`,
+        ).toEqual(searches ? web : [])
+      }
+    }
   })
 
   test("have the Kimi specialist prompt as the body, without the maintainers' notes", () => {
@@ -483,6 +521,7 @@ describe("the extension", () => {
       expect(typeof loaded.default).toBe("function")
       expect(loaded.default(api)).toBeUndefined()
       expect(used.toSorted()).toEqual([
+        "on before_agent_start",
         "on before_agent_start",
         "on before_agent_start",
         "on before_agent_start",

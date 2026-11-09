@@ -75,10 +75,17 @@ export type PatchError = PatchSyntaxError | PatchPathError | PatchContextError |
 
 /**
  * The file system a patch is applied to, with absolute paths. `read` answers `undefined` for a file
- * that does not exist; `write` creates the folders above the file; `remove` deletes the file. The
- * extension supplies one over `node:fs`, a test an in-memory one.
+ * that does not exist; `write` creates the folders above the file; `remove` deletes the file;
+ * `real` resolves symbolic links. The extension supplies one over the disk, a test an in-memory
+ * one.
  */
 export interface PatchFs {
+  /**
+   * The path with every symbolic link resolved. For a path that does not exist yet, its nearest
+   * existing ancestor is resolved and the rest is kept, so the answer says where a write would
+   * land.
+   */
+  readonly real: (path: string) => Effect.Effect<string, PatchFileError>
   /** Reads a file as text, or `undefined` when it does not exist. */
   readonly read: (path: string) => Effect.Effect<string | undefined, PatchFileError>
   /** Writes a file's whole text, creating its folders. */
@@ -343,12 +350,22 @@ const summarise = (changes: PatchResult["changes"]): string =>
     .map(({ status, path }) => `${status} ${path}`)
     .join("\n")}`
 
+/** Whether `file` is `root` or below it, by the text of the two paths. */
+const isBelow = (root: string, file: string): boolean => {
+  const inside = relative(root, file)
+  return inside !== ".." && !inside.startsWith(`..${sep}`) && !isAbsolute(inside)
+}
+
 /**
- * Applies a patch in Codex's format below `cwd`. Every path must be relative and stay below `cwd`.
- * The whole patch is planned in memory first, reading each file once and seeing the effect of the
- * operations before it, so a bad hunk, a missing file or a bad path fails before any file changes;
- * the writes then run in the order of the patch. Add overwrites an existing file; delete and update
- * need the file to exist; an update's `Move to` writes the new path and removes the old one.
+ * Applies a patch in Codex's format below `cwd`. Every path must be relative and stay below `cwd`,
+ * also once symbolic links are resolved (`PatchFs.real`), so a link inside the project cannot carry
+ * a write out of it. The whole patch is planned in memory first, reading each file once and seeing
+ * the effect of the operations before it, so a bad hunk, a missing file or a bad path fails before
+ * any file changes; the writes then run in the order of the patch. If one of them fails, the files
+ * already written are put back as they were (folders the writes created stay), so the patch is
+ * applied whole or not at all. Add overwrites an existing file; delete and update need the file to
+ * exist; an update's `Move to` writes the new path and removes the old one, and a `Move to` that
+ * names the file's own path is a plain update.
  */
 export const applyPatch = (
   text: string,
@@ -357,16 +374,20 @@ export const applyPatch = (
 ): Effect.Effect<PatchResult, PatchError> =>
   Effect.gen(function* () {
     const operations = yield* parsePatch(text)
+    const realCwd = yield* fs.real(cwd)
     const locate = (path: string) => {
       const file = resolve(cwd, path)
-      const inside = relative(cwd, file)
-      return path === "" ||
-        isAbsolute(path) ||
-        inside === ".." ||
-        inside.startsWith(`..${sep}`) ||
-        isAbsolute(inside)
+      return path === "" || isAbsolute(path) || !isBelow(cwd, file)
         ? Effect.fail(new PatchPathError({ path }))
-        : Effect.succeed(file)
+        : fs
+            .real(file)
+            .pipe(
+              Effect.flatMap((real) =>
+                isBelow(realCwd, real)
+                  ? Effect.succeed(file)
+                  : Effect.fail(new PatchPathError({ path })),
+              ),
+            )
     }
     // The planned content of each touched file, in the order first touched: its text, or `null`
     // once deleted.
@@ -401,18 +422,54 @@ export const applyPatch = (
           yield* load(file, operation.path),
           operation.hunks,
         )
-        if (operation.moveTo === undefined) stage(file, next)
-        else {
-          stage(yield* locate(operation.moveTo), next)
-          stage(file, null)
-        }
+        const target = operation.moveTo === undefined ? file : yield* locate(operation.moveTo)
+        stage(target, next)
+        // A move to the file's own path leaves the file in place: only a real move removes the old one.
+        if (target !== file) stage(file, null)
         changes.push({ status: "M", path: operation.moveTo ?? operation.path })
       }
     }
-    for (const [file, content] of planned) {
-      // A file the patch created and then moved or deleted was never on disk: nothing to remove.
-      if (content !== null) yield* fs.write(file, content)
-      else if ((yield* fs.read(file)) !== undefined) yield* fs.remove(file)
-    }
+    // What each write replaced, in the order of the writes, so a failure can put it back.
+    const written: Array<{ readonly file: string; readonly before: string | undefined }> = []
+    const writeAll = Effect.gen(function* () {
+      for (const [file, content] of planned) {
+        const before = yield* fs.read(file)
+        // A file the patch created and then moved or deleted was never on disk: nothing to remove.
+        if (content === null && before === undefined) continue
+        // Recorded before the attempt: a write that fails halfway may have left the file changed.
+        written.push({ file, before })
+        yield* content === null ? fs.remove(file) : fs.write(file, content)
+      }
+    })
+    // Puts the written files back, newest first; answers the files it could not put back.
+    const restore = Effect.suspend(() =>
+      Effect.forEach(written.toReversed(), ({ file, before }) =>
+        (before === undefined
+          ? fs
+              .read(file)
+              .pipe(Effect.flatMap((now) => (now === undefined ? Effect.void : fs.remove(file))))
+          : fs.write(file, before)
+        ).pipe(
+          Effect.as([] as ReadonlyArray<string>),
+          Effect.catch(() => Effect.succeed([file])),
+        ),
+      ).pipe(Effect.map((failed) => failed.flat())),
+    )
+    yield* writeAll.pipe(
+      Effect.catch((error) =>
+        restore.pipe(
+          Effect.flatMap((stuck) =>
+            Effect.fail(
+              stuck.length === 0
+                ? error
+                : new PatchFileError({
+                    path: error.path,
+                    reason: `${error.reason} (and could not restore ${stuck.join(", ")})`,
+                  }),
+            ),
+          ),
+        ),
+      ),
+    )
     return { changes, summary: summarise(changes) }
   })

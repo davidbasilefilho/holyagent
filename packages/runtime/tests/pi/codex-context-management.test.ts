@@ -41,6 +41,21 @@ describe("the context_management gate", () => {
     expect(contextManagementOn(on)).toBe(false)
   })
 
+  test("has its own switch, on by default, that turns it off with Billion Context off", async () => {
+    const off = await decode({
+      pi: {
+        provider: "openai-codex",
+        features: { contextCompression: false, contextManagement: false },
+      },
+    })
+    const on = await decode({
+      pi: { provider: "openai-codex", features: { contextCompression: false } },
+    })
+    expect(on.pi.features.contextManagement).toBe(true)
+    expect(contextManagementOn(on)).toBe(true)
+    expect(contextManagementOn(off)).toBe(false)
+  })
+
   test("is never on for another provider, whatever Billion Context says", async () => {
     const kimiOff = await decode({ pi: { features: { contextCompression: false } } })
     expect(contextManagementOn(kimiOff)).toBe(false)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -191,6 +191,95 @@ describe("the apply_patch tool", () => {
       await removeTemporary(folder)
     }
   })
+
+  describe("on the real disk", () => {
+    const patch = (...lines: Array<string>) =>
+      ["*** Begin Patch", ...lines, "*** End Patch"].join("\n")
+    const inFolders = async (check: (folder: string, outside: string) => Promise<void>) => {
+      const folder = await mkdtemp(join(tmpdir(), "holyagent-apply-patch-"))
+      const outside = await mkdtemp(join(tmpdir(), "holyagent-apply-outside-"))
+      try {
+        await check(folder, outside)
+      } finally {
+        await removeTemporary(folder)
+        await removeTemporary(outside)
+      }
+    }
+    const attempt = (folder: string, input: string) =>
+      start({ current: undefined }).tools[0]?.execute("call", { input }, undefined, undefined, {
+        cwd: folder,
+      })
+
+    test("a move to the file's own path leaves the file in place with the new text", async () => {
+      await inFolders(async (folder) => {
+        await writeFile(join(folder, "a.txt"), "one\ntwo\n")
+        await attempt(
+          folder,
+          patch("*** Update File: a.txt", "*** Move to: a.txt", "@@", "-one", "+1"),
+        )
+        expect(await readFile(join(folder, "a.txt"), "utf8")).toBe("1\ntwo\n")
+      })
+    })
+
+    test("a symbolic link that leads out of the project carries no write out of it", async () => {
+      await inFolders(async (folder, outside) => {
+        await symlink(outside, join(folder, "linked"))
+        await symlink(join(outside, "missing.txt"), join(folder, "dangling.txt"))
+        await writeFile(join(outside, "victim.txt"), "safe\n")
+        await symlink(join(outside, "victim.txt"), join(folder, "victim-link.txt"))
+        for (const operation of [
+          ["*** Add File: linked/new.txt", "+x"],
+          ["*** Add File: linked/deeper/new.txt", "+x"],
+          ["*** Add File: dangling.txt", "+x"],
+          ["*** Update File: victim-link.txt", "@@", "-safe", "+changed"],
+        ])
+          await expect(attempt(folder, patch(...operation))).rejects.toThrow(
+            "file references must be relative",
+          )
+        expect(await Bun.file(join(outside, "new.txt")).exists()).toBe(false)
+        expect(await Bun.file(join(outside, "deeper", "new.txt")).exists()).toBe(false)
+        expect(await Bun.file(join(outside, "missing.txt")).exists()).toBe(false)
+        expect(await readFile(join(outside, "victim.txt"), "utf8")).toBe("safe\n")
+      })
+    })
+
+    test("a link that stays inside the project is followed", async () => {
+      await inFolders(async (folder) => {
+        await mkdir(join(folder, "real"))
+        await symlink(join(folder, "real"), join(folder, "alias"))
+        await attempt(folder, patch("*** Add File: alias/file.txt", "+x"))
+        expect(await readFile(join(folder, "real", "file.txt"), "utf8")).toBe("x\n")
+      })
+    })
+
+    test("a write that fails puts back the files already written", async () => {
+      await inFolders(async (folder) => {
+        await writeFile(join(folder, "a.txt"), "one\n")
+        await writeFile(join(folder, "gone.txt"), "bye\n")
+        await mkdir(join(folder, "dir"))
+        await expect(
+          attempt(
+            folder,
+            patch(
+              "*** Update File: a.txt",
+              "@@",
+              "-one",
+              "+1",
+              "*** Add File: new.txt",
+              "+n",
+              "*** Delete File: gone.txt",
+              // A folder cannot be written as a file.
+              "*** Add File: dir",
+              "+x",
+            ),
+          ),
+        ).rejects.toThrow()
+        expect(await readFile(join(folder, "a.txt"), "utf8")).toBe("one\n")
+        expect(await readFile(join(folder, "gone.txt"), "utf8")).toBe("bye\n")
+        expect(await Bun.file(join(folder, "new.txt")).exists()).toBe(false)
+      })
+    })
+  })
 })
 
 describe("context_management in the provider request", () => {
@@ -235,6 +324,22 @@ describe("context_management in the provider request", () => {
     expect(await emit("before_provider_request", { payload })).not.toEqual([undefined])
     held.current = settings(WITH_BILLION)
     expect(await emit("before_provider_request", { payload })).toEqual([undefined])
+  })
+
+  test("has its own switch: off, a Codex request without Billion Context carries nothing", async () => {
+    const off = await decode({
+      pi: {
+        provider: "openai-codex",
+        features: { contextCompression: false, contextManagement: false },
+      },
+    })
+    expect(settings(off).contextManagement).toBe(false)
+    const { emit } = start({ current: settings(off) })
+    expect(
+      await emit("before_provider_request", {
+        payload: request("gpt-6.1-sol", [{ role: "user", content: "hi" }]),
+      }),
+    ).toEqual([undefined])
   })
 
   test("replays the compaction item the stream delivered, and forgets it when Pi's history changes", async () => {
@@ -285,6 +390,7 @@ describe("Luna Reserve in the session", () => {
   const limit = {
     message: {
       role: "assistant",
+      provider: "openai-codex",
       stopReason: "error",
       errorMessage: "You have hit your ChatGPT usage limit (plus plan).",
     },
@@ -334,7 +440,12 @@ describe("Luna Reserve in the session", () => {
     }
     const { emit } = start({ current: settings(WITH_BILLION) }, { fetcher: counting })
     await emit("message_end", {
-      message: { role: "assistant", stopReason: "error", errorMessage: "connection reset" },
+      message: {
+        role: "assistant",
+        provider: "openai-codex",
+        stopReason: "error",
+        errorMessage: "connection reset",
+      },
     })
     await emit("message_end", { message: { role: "assistant", stopReason: "stop" } })
     expect(calls).toBe(0)
@@ -392,5 +503,66 @@ describe("Luna Reserve in the session", () => {
     expect(await emit("before_provider_request", { payload: request("gpt-6-luna", []) })).toEqual([
       undefined,
     ])
+  })
+
+  test("a usage limit of a turn that ran on another provider never opens the reserve or sends the token", async () => {
+    let calls = 0
+    const fetcher: Fetch = async () => {
+      calls += 1
+      return status(RESERVE_BANNER)()
+    }
+    const { emit, notices, lookups } = start({ current: settings(WITH_BILLION) }, { fetcher })
+    for (const provider of ["kimi-coding", undefined])
+      await emit("message_end", { message: { ...limit.message, provider } })
+    expect(calls).toBe(0)
+    expect(lookups).toEqual([])
+    expect(notices).toEqual([])
+    expect(await emit("before_provider_request", { payload: request("gpt-6-luna", []) })).toEqual([
+      undefined,
+    ])
+  })
+
+  test("a new session starts on the regular model, whatever the one before did", async () => {
+    const { emit } = start(
+      { current: settings(WITH_BILLION) },
+      { fetcher: () => status(RESERVE_BANNER)() },
+    )
+    await emit("message_end", limit)
+    expect(
+      await emit("before_provider_request", { payload: request("gpt-6-luna", []) }),
+    ).not.toEqual([undefined])
+    await emit("session_start", { reason: "new" })
+    expect(await emit("before_provider_request", { payload: request("gpt-6-luna", []) })).toEqual([
+      undefined,
+    ])
+  })
+
+  test("requests that go to the reserve ask for no more than high effort, and keep a lower one", async () => {
+    const { emit } = start(
+      { current: settings(WITH_BILLION) },
+      { fetcher: () => status(RESERVE_BANNER)() },
+    )
+    await emit("message_end", limit)
+    const sent = async (effort: string) =>
+      (
+        (await emit("before_provider_request", {
+          payload: { ...request("gpt-6.1-terra", []), reasoning: { effort, summary: "auto" } },
+        })) as Array<{ model: string; reasoning: { effort: string; summary: string } }>
+      )[0]
+    expect(await sent("xhigh")).toMatchObject({
+      model: RESERVE_MODEL,
+      reasoning: { effort: "high", summary: "auto" },
+    })
+    expect((await sent("medium"))?.reasoning.effort).toBe("medium")
+  })
+
+  test("the status request refuses a redirect, so the token never follows one", async () => {
+    const inits: Array<RequestInit> = []
+    const fetcher: Fetch = async (_url, init) => {
+      inits.push(init)
+      return status(RESERVE_BANNER)()
+    }
+    await start({ current: settings(WITH_BILLION) }, { fetcher }).emit("message_end", limit)
+    expect(inits[0]?.redirect).toBe("error")
   })
 })

@@ -33,10 +33,13 @@ export const compactThreshold = (contextWindow: number | undefined): number =>
  * (`pi.features.contextCompression`) is preferred: it compresses the history on the client and
  * keeps it retrievable, while the server-side compaction replaces the history with an opaque
  * encrypted item that cannot be searched or expanded, and the two would both rewrite the same
- * request. So the parameter is sent only for the Codex provider while Billion Context is off.
+ * request. So the parameter is sent only for the Codex provider while Billion Context is off, and
+ * its own switch (`pi.features.contextManagement`, on by default) is on.
  */
 export const contextManagementOn = (config: Config): boolean =>
-  config.pi.provider === "openai-codex" && !config.pi.features.contextCompression
+  config.pi.provider === "openai-codex" &&
+  config.pi.features.contextManagement &&
+  !config.pi.features.contextCompression
 
 /** The part of a Responses request that the compaction reads: the model and the input items. */
 const Request = Schema.Struct({ model: Schema.String, input: Schema.Array(Schema.Unknown) })

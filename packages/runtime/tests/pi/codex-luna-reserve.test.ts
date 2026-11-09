@@ -8,6 +8,7 @@ import {
   endedOnUsageLimit,
   fetchReserveOffered,
   RESERVE_BANNER,
+  RESERVE_MAX_EFFORT,
   RESERVE_MODEL,
   reserveOffered,
   statusHeaders,
@@ -70,6 +71,35 @@ describe("the Luna Reserve capability entry", () => {
   })
 })
 
+describe("the context_management capability entry", () => {
+  const entry = CAPABILITIES.find((capability) => capability.name === "context-management")
+
+  test("is on by default, applies to the Codex provider only, and has no package, tool or setting", () => {
+    expect(entry).toMatchObject({
+      feature: "contextManagement",
+      defaultOn: true,
+      provider: "openai-codex",
+      applicability: "both",
+      settings: [],
+      skills: [],
+    })
+    expect(entry?.tools).toEqual({ rootExclude: [], visual: [] })
+    expect(entry?.forms.headless).toEqual({ packages: [], mcpServers: [] })
+    expect(DEFAULT_CONFIG.pi.features.contextManagement).toBe(true)
+  })
+
+  test("is listed for the Codex provider, left out under any other, and follows its switch", () => {
+    const features = DEFAULT_CONFIG.pi.features
+    const names = (provider: "kimi-coding-global" | "openai-codex", on = true) =>
+      enabledCapabilities({ ...features, contextManagement: on }, { provider }).map(
+        (capability) => capability.name,
+      )
+    expect(names("openai-codex")).toContain("context-management")
+    expect(names("kimi-coding-global")).not.toContain("context-management")
+    expect(names("openai-codex", false)).not.toContain("context-management")
+  })
+})
+
 describe("what opens the reserve", () => {
   test("only a turn that ended on a usage or rate limit", () => {
     const failed = (errorMessage: string) => ({
@@ -110,6 +140,17 @@ describe("sending to the reserve", () => {
     expect(RESERVE_MODEL).toBe("gpt-reserve")
     for (const other of [undefined, "text", { input: [] }]) expect(toReserve(other)).toBe(other)
   })
+
+  test("lowers an effort above high to high and keeps the rest of the reasoning and any lower effort", () => {
+    const sent = (reasoning: unknown) =>
+      (toReserve({ model: "gpt-6.1-sol", reasoning }) as { reasoning: unknown }).reasoning
+    expect(RESERVE_MAX_EFFORT).toBe("high")
+    expect(sent({ effort: "xhigh", summary: "auto" })).toEqual({ effort: "high", summary: "auto" })
+    expect(sent({ effort: "max" })).toEqual({ effort: "high" })
+    for (const kept of [{ effort: "high" }, { effort: "low" }, { summary: "auto" }, null, "x"])
+      expect(sent(kept)).toEqual(kept)
+    expect(toReserve({ model: "gpt-6.1-sol" })).toEqual({ model: RESERVE_MODEL })
+  })
 })
 
 describe("the access token of the status request", () => {
@@ -131,14 +172,18 @@ describe("the access token of the status request", () => {
 
   test("asks the usage status once with those headers and reads the banner", async () => {
     const seen: Array<{ url: string; headers: Record<string, string> }> = []
+    const redirects: Array<RequestRedirect | undefined> = []
     const offered = await Effect.runPromise(
       fetchReserveOffered(SECRET, (url, init) => {
+        redirects.push(init.redirect)
         seen.push({ url, headers: init.headers as Record<string, string> })
         return Promise.resolve(answer({ rate_limit_upsell: { banner_type: RESERVE_BANNER } }))
       }),
     )
     expect(offered).toBe(true)
     expect(seen).toEqual([{ url: USAGE_STATUS_URL, headers: statusHeaders(SECRET) }])
+    // The token goes to the named host only: a redirect fails the request instead of following it.
+    expect(redirects).toEqual(["error"])
     expect(
       await Effect.runPromise(
         fetchReserveOffered(SECRET, () => Promise.resolve(answer({ plan_type: "plus" }))),

@@ -302,6 +302,23 @@ export const CAPABILITIES = [
     settings: [],
     health: ["needs"],
   },
+  {
+    // Part of the Codex provider (`pi/codex/context-management.ts`): like Luna Reserve it is only
+    // the extension's behavior, so it exists only under `openai-codex`.
+    name: "context-management",
+    feature: "contextManagement",
+    description:
+      "Lets the server compact the history with context_management while Billion Context is off (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs"],
+  },
 ] as const satisfies ReadonlyArray<CapabilityDefinition>
 
 /** One registry entry as written. */

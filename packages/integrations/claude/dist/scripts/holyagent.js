@@ -12667,6 +12667,20 @@ var CAPABILITIES = [
     tools: { rootExclude: [], visual: [] },
     settings: [],
     health: ["needs"]
+  },
+  {
+    name: "context-management",
+    feature: "contextManagement",
+    description: "Lets the server compact the history with context_management while Billion Context is off (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs"]
   }
 ];
 var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
