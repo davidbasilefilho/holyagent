@@ -12922,6 +12922,10 @@ var routeModel = (config, key) => {
   const { model, thinking } = config.pi.routes[key];
   return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` };
 };
+var rootModelSettings = (config) => {
+  const { provider, model, thinking } = routeModel(config, "root");
+  return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking };
+};
 var subagentModel = ({ provider, model }) => `${provider}/${model}`;
 var WEB_KIT_TOOLS = ["web_search", "web_fetch"];
 var webChoice = (profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" && profile.webTools.length > 0 ? { source: "provider", tools: profile.webTools } : { source: "pi-web-kit", tools: WEB_KIT_TOOLS };
@@ -22645,6 +22649,7 @@ var PACKAGE_DEFAULTS = new Map([
     PI_SETTINGS_FILE,
     {
       codemode: { mode: "on" },
+      defaultThinkingLevel: "medium",
       "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true }
     }
   ],
@@ -22686,11 +22691,14 @@ var locate2 = (env, cwd, scope, logical) => {
   }
   return project || !logical.startsWith("~/") ? undefined : join17(home, logical.slice(2));
 };
+var routeLeaves = (config) => leaves(rootModelSettings(config));
 var planFor = (env, cwd, scope, config) => {
   const byFile = new Map;
   for (const patch of toolSettings(config)) {
     byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
   }
+  const route = routeLeaves(config);
+  byFile.set(PI_SETTINGS_FILE, [...byFile.get(PI_SETTINGS_FILE) ?? [], ...route]);
   const targets = [];
   const unplaced = [];
   for (const [logical, all] of byFile) {
@@ -22703,6 +22711,7 @@ var planFor = (env, cwd, scope, config) => {
       file,
       global: scope === "user" ? undefined : locate2(env, cwd, "user", logical),
       all,
+      route: logical === PI_SETTINGS_FILE ? route : [],
       defaults: PACKAGE_DEFAULTS.get(logical)
     });
   }
@@ -22818,6 +22827,33 @@ var undoPiToolSettings = fn2("undoPiToolSettings")(function* (env, options) {
   return lines;
 });
 var fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``;
+var routeLine = fn2("checkRootModel")(function* (planned, existing) {
+  if (planned.route.length === 0)
+    return [];
+  const global = planned.global === undefined ? undefined : yield* readJsonObject(planned.global);
+  const states = planned.route.map(({ path, value }) => {
+    const current = valueAt3(existing, path) ?? valueAt3(global, path);
+    const atDefault = planned.defaults !== undefined && equals(valueAt3(planned.defaults, path), value);
+    return {
+      key: path.join("."),
+      wanted: value,
+      current,
+      status: current === undefined ? atDefault ? "set" : "unset" : equals(current, value) ? "set" : "overridden"
+    };
+  });
+  const overridden = states.filter((state) => state.status === "overridden");
+  if (overridden.length > 0) {
+    return [
+      hint(`root model ${planned.file}: ${overridden.map((state) => `${state.key} ${show(state.current)} is yours (the route sets ${show(state.wanted)})`).join(", ")}; Pi follows yours`)
+    ];
+  }
+  if (states.some((state) => state.status === "unset"))
+    return [];
+  const [provider, model, thinking] = planned.route.map(({ value }) => String(value));
+  return [
+    pass("root model", `${provider}/${model}:${thinking} set in Pi's settings (${planned.file})`)
+  ];
+});
 var checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [];
@@ -22831,7 +22867,10 @@ var checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
       const target = yield* resolveTarget(planned);
       const existing = yield* readJsonObject(target.file);
       const missing = applyDefaults(existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
-      return missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)];
+      return [
+        ...missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)],
+        ...yield* routeLine(planned, existing)
+      ];
     }).pipe(catchTag2("SetupFailure", (error) => succeed6([
       hint(`${label}: ${error.message}; fix the file, then ${fixFor(scope)}`)
     ]))));

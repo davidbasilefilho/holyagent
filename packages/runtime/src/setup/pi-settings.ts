@@ -3,7 +3,7 @@ import { join, relative, resolve, sep } from "node:path"
 import { Effect, Equal } from "effect"
 
 import type { Config } from "../config/schema.ts"
-import { PROVIDERS } from "../pi/provider.ts"
+import { PROVIDERS, rootModelSettings } from "../pi/provider.ts"
 import {
   BILLION_CONTEXT_FILE,
   PI_SETTINGS_FILE,
@@ -23,7 +23,7 @@ import {
 import { loadPiConfig, piAgentDirectory, piInUse } from "./pi-check.ts"
 import type { PiInstallOptions } from "./pi-install.ts"
 import { addRecorded, clearRecorded, readRecorded } from "./record.ts"
-import { hint, show, skipped } from "./report.ts"
+import { hint, pass, show, skipped } from "./report.ts"
 import { isSymlink, type Scope } from "./scope.ts"
 import { take } from "./settings.ts"
 
@@ -37,6 +37,10 @@ import { take } from "./settings.ts"
  *
  * - Codemode is a built-in extension of Pi: `codemode.mode` defaults to `on`
  *   (`SETTINGS_DEFAULTS.codemode.mode`, docs/settings.md of `@earendil-works/pi-coding-agent`).
+ * - Pi starts on `medium` thinking when `defaultThinkingLevel` is unset (`DEFAULT_THINKING_LEVEL`,
+ *   `core/defaults.js` of `@earendil-works/pi-coding-agent@1.5.0`). `defaultProvider` and
+ *   `defaultModel` have no default to equal: unset, Pi picks the first available model of its own
+ *   preference list.
  * - `@amaster.ai/pi-computer-use@0.1.36`, `dist/config.js`: both confirmations default to `true`.
  * - `@tintinweb/pi-subagents@0.23.1`, README "Disable defaults": `disableDefaultAgents` is `false`.
  * - `pi-provider-kimi-code@0.6.13`, `src/config.ts` `makeDefaultTools`: each Moonshot tool is
@@ -47,6 +51,7 @@ const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonOb
     PI_SETTINGS_FILE,
     {
       codemode: { mode: "on" },
+      defaultThinkingLevel: "medium",
       "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true },
     },
   ],
@@ -121,8 +126,13 @@ interface Target {
   /** The user-scope file of the same settings, set at project and local scope only. */
   readonly global: string | undefined
   readonly all: ReadonlyArray<Default>
+  /** The leaves of `all` that are the root model, which doctor reports as a whole. */
+  readonly route: ReadonlyArray<Default>
   readonly defaults: JsonObject | undefined
 }
+
+/** The root model of the config as settings leaves, written to Pi's `settings.json`. */
+const routeLeaves = (config: Config): ReadonlyArray<Default> => leaves(rootModelSettings(config))
 
 /** What {@link toolSettings} asks for at a scope: the files to write, and files with no place there. */
 interface Plan {
@@ -135,6 +145,8 @@ const planFor = (env: Env, cwd: string, scope: Scope, config: Config): Plan => {
   for (const patch of toolSettings(config)) {
     byFile.set(patch.file, [...(byFile.get(patch.file) ?? []), ...leaves(patch.content)])
   }
+  const route = routeLeaves(config)
+  byFile.set(PI_SETTINGS_FILE, [...(byFile.get(PI_SETTINGS_FILE) ?? []), ...route])
   const targets: Array<Target> = []
   const unplaced: Array<string> = []
   for (const [logical, all] of byFile) {
@@ -147,6 +159,7 @@ const planFor = (env: Env, cwd: string, scope: Scope, config: Config): Plan => {
       file,
       global: scope === "user" ? undefined : locate(env, cwd, "user", logical),
       all,
+      route: logical === PI_SETTINGS_FILE ? route : [],
       defaults: PACKAGE_DEFAULTS.get(logical),
     })
   }
@@ -384,11 +397,55 @@ const fixFor = (scope: Scope) =>
   scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``
 
 /**
+ * Doctor's line on the root model of a target: `ok` when each of `defaultProvider`, `defaultModel`
+ * and `defaultThinkingLevel` is what the route table says (or unset where Pi's own default is the
+ * wanted value), a `~` line naming each key the user set to another value, which Pi follows and
+ * setup leaves alone, and nothing while a key is unset, since the "lacks" line names it. At project
+ * and local scope the project's file wins over the user's global one, as it does in Pi.
+ */
+const routeLine = Effect.fn("checkRootModel")(function* (planned: Target, existing: JsonObject) {
+  if (planned.route.length === 0) return []
+  const global = planned.global === undefined ? undefined : yield* readJsonObject(planned.global)
+  const states = planned.route.map(({ path, value }) => {
+    const current = valueAt(existing, path) ?? valueAt(global, path)
+    const atDefault =
+      planned.defaults !== undefined && Equal.equals(valueAt(planned.defaults, path), value)
+    return {
+      key: path.join("."),
+      wanted: value,
+      current,
+      status:
+        current === undefined
+          ? atDefault
+            ? "set"
+            : "unset"
+          : Equal.equals(current, value)
+            ? "set"
+            : "overridden",
+    } as const
+  })
+  const overridden = states.filter((state) => state.status === "overridden")
+  if (overridden.length > 0) {
+    return [
+      hint(
+        `root model ${planned.file}: ${overridden.map((state) => `${state.key} ${show(state.current)} is yours (the route sets ${show(state.wanted)})`).join(", ")}; Pi follows yours`,
+      ),
+    ]
+  }
+  if (states.some((state) => state.status === "unset")) return []
+  const [provider, model, thinking] = planned.route.map(({ value }) => String(value))
+  return [
+    pass("root model", `${provider}/${model}:${thinking} set in Pi's settings (${planned.file})`),
+  ]
+})
+
+/**
  * Doctor's check of the tool settings: one `~` line for each file at the scope that lacks keys
  * setup would write (or cannot be read), naming the keys and the setup command that fixes it. It
- * adds nothing when the files are complete, and nothing at all unless Pi is in use
- * ({@link piInUse}) and `pi.enable` is on in the config of the scope, the same conditions as the Pi
- * checks. A key the user set to another value is not missing. Reads files only.
+ * adds nothing when the files are complete (bar the root model's own line, {@link routeLine}), and
+ * nothing at all unless Pi is in use ({@link piInUse}) and `pi.enable` is on in the config of the
+ * scope, the same conditions as the Pi checks. A key the user set to another value is not missing.
+ * Reads files only.
  */
 export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope) =>
   Effect.gen(function* () {
@@ -405,9 +462,12 @@ export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope) =>
           const missing = applyDefaults(existing, target.keys)
             .entries.filter((entry) => entry.status === "added")
             .map((entry) => entry.path)
-          return missing.length === 0
-            ? []
-            : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)]
+          return [
+            ...(missing.length === 0
+              ? []
+              : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)]),
+            ...(yield* routeLine(planned, existing)),
+          ]
         }).pipe(
           Effect.catchTag("SetupFailure", (error) =>
             Effect.succeed([
