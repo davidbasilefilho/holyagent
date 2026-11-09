@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-capability-registry-s-non",
   "objective": "Repair the capability registry's non-blocking review findings: the user lock bypass, the write-error ordering, CI detection, repeated config loads, the symlink-following config write and the scripted-run fallback line.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-cap, branch release/0.3.1/feat/capabilities (one commit over 5d2bed8). Reviews with file:line: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it65a-t41v.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9it6e8-jp52.md (security); read both.",
     "Fix: (1) a capability flag at project or local scope that the user config locks off is refused with a message naming the user setting, instead of installing the package while the merged config stays off; (2) when writing capability choices fails, setup stops before the package and settings steps, so packages never change without the config being saved; (3) CI counts only when set to a truthy value (not 0, false, no, off, or empty); (4) load the config and probe Pi once per interactive run and pass them down; (5) refuse to write .holyagent/config.json through a symlink at project and local scope, reusing the refuseLinks check pi-settings.ts uses for .pi writes, with a test; (6) a scripted run with Pi in use and no T3 work prints no setup-screen fallback line.",
@@ -60,7 +60,41 @@
     "agentId": "workflow:wf_135ca081-bda/assignment-0mw9j5jte-1hoq",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:23:32.115Z"
+    "startedAt": "2026-11-09T17:23:32.115Z",
+    "finishedAt": "2026-11-09T17:33:51.346Z"
+  },
+  "result": "result: all six fixes made, each with a test that fails without it; build and verify exit 0.\n\nchanged:\n/home/user/holyagent-0.3.1-cap/docs/pi/configuration.md\n/home/user/holyagent-0.3.1-cap/docs/pi/t3-code.md\n/home/user/holyagent-0.3.1-cap/packages/integrations/claude/dist/scripts/holyagent.js\n/home/user/holyagent-0.3.1-cap/packages/integrations/pi/dist/scripts/holyagent.js\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/config/capabilities.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/config/load.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/capabilities.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/form.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/pi-settings.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/scope.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/steps.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/t3-settings.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/src/setup/tui/session.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/tests/setup-capabilities.test.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/tests/setup-form.test.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/tests/setup-tui-cli.test.ts\n/home/user/holyagent-0.3.1-cap/packages/runtime/tests/setup-tui-session.test.ts (new)\n\nchecks:\n`bunx --no-install mise run build` -> exit 0. The only generated changes are the two `holyagent.js` bundles.\n`bunx --no-install mise run verify` -> exit 0 on the final tree. Type-check, lint and format check are clean, 2787 pass / 0 fail across 92 files.\nI temporarily reverted each fix and re-ran the tests; each reversion failed its test, and I restored the fix afterwards.\n\nblockers: none\n\nquestions: none\n\nnotes:\nFix 2 stops only the Pi steps (packages, tool settings, T3 settings) and prints one `~` line. The Claude settings merge and ctx7 still run, since they do not depend on the capability config. Say if you want them skipped as well.\nFix 4 covers `runInteractive`: one Pi probe and one config load, passed to `t3Offer` and to the review's T3 preview through a new optional `config` field on `T3SettingsOptions`. The apply path still probes and loads inside `setup`.\nFix 6: with no T3 work, any case where the screen is not used (non-TTY, CI, dumb terminal, `--no-tui`, a choice flag) prints no `~ t3 tui:` line. Before the registry change, that case printed none.\nI moved `refuseLinks` from `pi-settings.ts` to `scope.ts` and exported it, with its JSDoc made general. Its behavior is unchanged.\n`userLocksOff` is a new export in `config/load.ts` that reuses `FINAL_OFF`.\n`docs/usage.md:182` and the `tui/theme.ts` `colorEnabled` still say \"CI (other than false)\". Both are outside my ownership paths, so I left them.\nJSDoc says \"capabilities of this release\" rather than \"0.3.1\", because the registry test rejects version strings in `capabilities.ts`.\n\nevidence:\nEach of the six fixes is made and has a test that fails without it: tests in `setup-capabilities.test.ts` (lock refusal, write-failure ordering, symlink), `setup-form.test.ts` and `setup-tui-session.test.ts` (CI), `setup-tui-session.test.ts` (single probe, config reused by the review), `setup-tui-cli.test.ts` (no fallback line); each failed on reversion.\nNo other behavior changes: verify exit 0, 2787 pass / 0 fail. The only deltas are the six fixes and the doc notes.\nmise run build and mise run verify exit 0: build exit 0; verify exit 0 (2787 pass, 0 fail).\nchecks-run: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2787 pass / 0 fail; fmt applied with `mise run fmt`.\nchanged-paths: the 17 paths listed under `changed`.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/capability-fixes.diff\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Six fixes, each with a test that failed on reversion; build and verify exit 0 (2787 pass).",
+    "criteria": [
+      {
+        "criterion": "Each of the six fixes is made and has a test that fails without it",
+        "support": "tests in `setup-capabilities.test.ts` (lock refusal, write-failure ordering, symlink), `setup-form.test.ts` and `setup-tui-session.test.ts` (CI), `setup-tui-session.test.ts` (single probe, config reused by the review), `setup-tui-cli.test.ts` (no fallback line); each failed on reversion."
+      },
+      {
+        "criterion": "No other behavior changes",
+        "support": "verify exit 0, 2787 pass / 0 fail. The only deltas are the six fixes and the doc notes."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 (2787 pass, 0 fail)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 2787 pass / 0 fail; fmt applied with `mise run fmt`."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the 17 paths listed under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/capability-fixes.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:23:32.115Z"
 }
