@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-t3-settings-repair-commit",
   "objective": "Re-review the T3 settings repair commit 31fe898 (range 7bcd5b7..31fe898 in /home/user/holyagent-0.3.0-t3set) against the findings it repairs, for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Previous findings it repairs: the install (t3-settings.ts install write) and undo writes used writeJsonObject between the snapshot and the rename, so a T3 save in that window was lost; the read-back restore ran rm without checking content when the file had not existed and compared against itself otherwise; a rerun reported setup's own backgroundActivity and sourceControlWritingStyle as left out; the undo read-back mismatch had no test.",
     "Review only `git diff 7bcd5b7..31fe898` there and the code it touches; judge whether each finding is closed, whether the new write and restore paths are correct on every branch, and whether tests cover them. The worker noted that a T3 file created between the absent-file snapshot and the first write is still not detected; judge whether that matters."
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_b4b9cb9e-480/assignment-0mw8qq1bn-g28i",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:07:39.059Z"
+    "startedAt": "2026-11-09T04:07:39.059Z",
+    "finishedAt": "2026-11-09T04:17:35.886Z"
+  },
+  "result": "result: Range 7bcd5b7..31fe898 is merge-ready. All four previous findings are closed, and I found no blockers.\n\nBuilt-in `/code-review` ran through the Skill tool as the built-in (medium, `7bcd5b7...31fe898`). I read each of its seven findings against the code. Classifications are below.\n\n**Previous findings**\n1. Install and undo writes lost a T3 save made after the snapshot. Closed.\n   - The install and undo writes now go through `writeSettings`, which calls `writeJsonObjectIfUnchanged` (`json-file.ts:~150`). It compares text against the snapshot right before the rename and fails naming the file.\n   - Tests: `setup-t3-settings.test.ts` \"a T3 save between reading and writing is never overwritten\" for install, and the same for undo. Both check the file is untouched. The install test checks no record was written and a rerun keeps T3's key. The undo test checks the record is kept and a rerun keeps T3's key.\n2. The restore ran `rm` without checking content, or compared against itself. Closed.\n   - `restoreSettings` and `removeFileIfUnchanged` compare against the read-back text (`back.text`) captured before the restore call.\n   - Tests: \"a restore is refused when the file changed after the read-back\" and \"a file that did not exist is deleted only while it holds what the read-back saw\".\n3. A rerun reported setup's own groups as \"left out\". Closed.\n   - `wantedKeys` has a new `own` path (`t3-settings.ts:329`), reported as \"already written\".\n   - The test also checks that a group the user set, with no record entry, still reports \"left out\".\n4. The undo read-back mismatch had no test. Closed.\n   - New test \"a read-back that differs puts the file back as it was and keeps the record\".\n\n**Checks**\n- `bunx --no-install mise run verify` -> exit 0: type-check, lint, format and 2390 tests pass.\n- `bun test setup-t3-settings.test.ts` -> 38 pass.\n- Both dist bundles contain the new code.\n- Not checked: whether the dist bundles are byte-identical to a fresh `mise run build`.\n\n**Non-blocking**\n- `t3-settings.ts:~458` (`writeSettings` without `unchangedSince`): a settings file created by T3 after the absent-file read and before the rename is overwritten, and the read-back passes against our own content. I judge this not worth blocking. The window is milliseconds, and it needs T3 to create the file in that moment after the home folder already exists. The worker already flagged it. Optional fix: for the absent case, create the file with `link()` or an exclusive create instead of `rename`.\n- `docs/pi/t3-code.md` \"How it writes\": \"a save by T3 Code in between is never overwritten\" overstates it. The absent-file case and the compare-to-rename window are not covered. Optional: say \"narrowed to the rename\" and name the absent-file exception.\n- `json-file.ts:~87` (`removeFileIfUnchanged`): the read and the `rm` are two steps, so a T3 save between them would be deleted. This is the same microsecond class, and it is only reachable on the restore path when the file did not exist before.\n- `t3-settings.ts:~417`: `writeVerified` turns a read-back I/O error into `text: undefined`. Restoring an existing file then returns false, and the message says \"it changed again\" while unverified content stays. This is rare and the error text is misleading, not data loss.\n- `t3-settings.ts:~437`: the restore re-serializes `before.value`, so it is not byte-identical to the original. This predates the repair, and the docs say \"content\", not \"bytes\".\n- `t3-settings.ts:329`: `own` matches on `path[0]` in the record. If the user later replaced the group, it still reports \"already written\". It is a label only, since the group was refused before too, so there is no behavior change. In a dry run with an undecodable record, `orElseSucceed` reports \"left out\", while a real run fails. Cosmetic.\n\nI rejected built-in finding 4 (the `own` branch skipping a unit). It only relabels a unit that was already refused because `whole` is set.\n\nevidence:\n- Every blocking finding names path:line and a concrete failure scenario: there are no blocking findings. Non-blocking items above carry path:line and scenarios.\n- findings: seven built-in findings classified and the reviewer's own findings listed above, all non-blocking or rejected. Full verify log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log.\n- verdict: merge-ready. All four previous findings are closed, with tests asserting each. `mise run verify` exits 0 (2390 pass, 0 fail).\n- The review states for each previous finding whether it is closed, and whether the range is merge-ready: all four closed, range merge-ready (see the numbered list and verdict above).\n",
+  "acceptance": {
+    "revision": 11,
+    "rationale": "All four findings closed with tests; verify exit 0",
+    "criteria": [
+      {
+        "criterion": "Every blocking finding names path:line and a concrete failure scenario",
+        "support": "there are no blocking findings. Non-blocking items above carry path:line and scenarios."
+      },
+      {
+        "criterion": "The review states for each previous finding whether it is closed, and whether the range is merge-ready",
+        "support": "all four closed, range merge-ready (see the numbered list and verdict above)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "seven built-in findings classified and the reviewer's own findings listed above, all non-blocking or rejected. Full verify log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log."
+      },
+      {
+        "label": "verdict",
+        "support": "merge-ready. All four previous findings are closed, with tests asserting each. `mise run verify` exits 0 (2390 pass, 0 fail)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:07:39.059Z"
 }
