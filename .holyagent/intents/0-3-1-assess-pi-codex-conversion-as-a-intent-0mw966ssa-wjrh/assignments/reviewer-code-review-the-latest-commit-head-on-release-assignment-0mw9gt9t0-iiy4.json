@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw9gt9t0-iiy4",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 18,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-latest-commit-head-on-release",
+  "objective": "Review the latest commit (HEAD) on release/0.3.1/fix/cloud-start-branch in /home/user/holyagent-0.3.1-cloudstart, which changes how the cloud-checkout notice finds a session's start branch.",
+  "state": "Running",
+  "scope": [
+    "Run git -C /home/user/holyagent-0.3.1-cloudstart show HEAD; the source change is startBranch in packages/runtime/src/cli/status.ts, the test is packages/runtime/tests/cloud-checkout.test.ts, and the dist bundles are generated.",
+    "Real reflog of a claude.ai session, oldest last: 'checkout: moving from main to claude/charming-brown-rksw3f', then 'checkout: moving from <40-hex sha> to main', then the clone entry. The old code named main as the start branch; the fix skips a first move from a full commit id to the default branch when the next move leaves that branch.",
+    "Check that the skip rule cannot name a branch the session did not start on in other realistic reflogs (a local clone with no platform checkout, a clone followed by user switches, a short reflog, an expired reflog), that the safeBranch allowlist and check-ref-format validation still apply to the chosen name, and that the new test would fail without the fix."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 300 words; mark each finding blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The start branch is correct for the platform's reflog and unchanged for other clones",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The new test fails without the fix and the existing tests still hold",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9gmixg-yzan"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T16:18:00.036Z"
+  },
+  "createdAt": "2026-11-09T16:18:00.036Z"
+}
