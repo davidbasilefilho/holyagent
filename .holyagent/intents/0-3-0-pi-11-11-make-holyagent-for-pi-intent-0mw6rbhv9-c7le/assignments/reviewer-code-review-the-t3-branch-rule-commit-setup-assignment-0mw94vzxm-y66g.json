@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw94vzxm-y66g",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 12,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-t3-branch-rule-commit-setup",
+  "objective": "Review the T3 branch rule commit: setup writes branchNamingMode custom and branchNameInstructions environment-wide in T3 settings, only where unset, and never pullRequestMergeMethod, with undo and doctor.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3branch, newest commit; diff in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3branch.diff. The writer follows the rules of packages/runtime/src/setup/t3-settings.ts (merge, atomic write, read-back, undo, a key written only where unset and different from T3 default). Decision: no per-project overrides, no T3 database read, no t3 project add.",
+    "Check also whether writing the two keys independently can leave T3 in a confusing state (instructions written while a user-set mode is static or semantic) and whether the instruction text is clear for T3's branch-name generator."
+  ],
+  "constraints": [
+    "Read-only; you may run bun test in that worktree, writing any log to a file name of your own in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad (not build.log or verify.log, which other workers share).",
+    "Mark a finding blocking only when behaviour is wrong, incomplete, untested on an error path, or breaks existing behaviour; give path:line and a failure scenario.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has path:line and a failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the listed rules are met",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw94ibvq-4n7s"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T10:44:11.818Z"
+  },
+  "createdAt": "2026-11-09T10:44:11.818Z"
+}
