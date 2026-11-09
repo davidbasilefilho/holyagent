@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mw9svyiy-qjsm",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 20,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-fff-review-findings-keep-the",
+  "objective": "Close the fff review findings: keep the root off every fff tool name and stop fff from following directory links by default.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-fff at e2cacd11",
+    "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fck-0tru.md (root exclusion misses ffgrep, fffind and fff-multi-grep in pi-fff's default mode, with --fff-mode or PI_FFF_MODE, and in override mode when the cwd is opted out of indexing; FFF_OVERRIDE_TOOLS not tied to the pin) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fmw-apeq.md (finding 1: pi-fff follows directory symlinks by default where Pi's rg and fd do not)",
+    "Decision recorded in the Intent: setup writes followSymlinks: false to pi-fff.json with mode override, and the root exclusion also covers fff's own tool names."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Check the exact setting key and value pi-fff 0.11.0 reads for symlink following (its config schema rejects unknown keys) before writing it; write, record and revert it the same way as mode, keeping a user's own value.",
+    "Leave packages/runtime/src/pi/bash and packages/integrations/pi/src/bash.ts untouched.",
+    "Report in under 300 words; start each evidence line with the exact criterion text, a colon and the support inline; put long logs in a file in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "The root's exclusion and tool_call gate cover grep, find, multi_grep, ffgrep, fffind and fff-multi-grep, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup writes the symlink-following setting off with override mode, records it, keeps a user's own value and reverts only what it wrote, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The fff tool names sit next to the pin with a note that a pin move must recheck them",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "docs/pi/search.md describes both settings",
+      "blocking": false,
+      "dimension": "scope"
+    },
+    {
+      "text": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/config",
+    "packages/runtime/src/pi/tools.ts",
+    "packages/runtime/src/pi/fff",
+    "packages/runtime/src/setup/pi-settings.ts",
+    "packages/runtime/tests/pi/tools.test.ts",
+    "packages/runtime/tests/setup-pi-settings.test.ts",
+    "packages/runtime/tests/config",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests/extension.test.ts",
+    "packages/integrations/pi/dist/extensions/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/scripts/setup-tui.js",
+    "packages/integrations/claude/dist/scripts",
+    "docs/pi/search.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9rpdzt-cwur",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T21:56:00.779Z"
+  },
+  "createdAt": "2026-11-09T21:56:00.779Z"
+}
