@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-a-root-requirement-that-the-root",
   "objective": "Add a root requirement that the root trusts its own judgement and asks the user only as a fallback, and carry it into every model family instruction set.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-judge, branch release/0.3.0/feat/root-own-judgement (from release/0.3.0/integration).",
     "Follow the repository skill at /home/user/holyagent-0.3.0-judge/.claude/skills/requirements/SKILL.md for editing the requirements tree, translating per family guide (claude-5.5, kimi-k3.1) and updating the coverage table, and the writing rules at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md (state what to do and why, so a model can apply it beyond the example).",
@@ -59,7 +59,45 @@
     "agentId": "workflow:wf_de4855a9-196/assignment-0mw94kwhr-hrpi",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T10:35:34.143Z"
+    "startedAt": "2026-11-09T10:35:34.143Z",
+    "finishedAt": "2026-11-09T10:46:08.722Z"
+  },
+  "result": "result: R-NOASK now leads with judgement and asks the user only as a fallback; claude-5.5 and kimi-k3.1 carry it, and build and verify pass.\n\nchanged (all under /home/user/holyagent-0.3.0-judge):\npackages/runtime/src/instructions/requirements/root/asking.md\npackages/runtime/src/instructions/claude-5.5/root/asking.md\npackages/runtime/src/instructions/kimi-k3.1/root/asking.md\npackages/runtime/src/instructions/coverage.ts\npackages/integrations/claude/dist/agents/holyagent.md (generated)\npackages/integrations/pi/dist/extensions/holyagent.js (generated)\n\nWhat changed in the wording:\n**Judgement first:** the root settles a choice itself when the request, the repository, research or a specialist can, including picking between options once research has narrowed them.\n**Fallback:** it asks only when the choice is genuinely the user's (taste, priorities, scope, a risk they must own, an approval the rules reserve) and the evidence leaves it open.\n**Not-asked case:** a question whose recommended option the root would take anyway is not asked. It acts and records the choice as a default the user can revisit.\n**Removed:** the clause \"not your own recommendation for the question\", which told the root to ask exactly the questions this change stops.\n**Kept:** the merge, branch-deletion, push and named-action illustrations, and the parked-approval rule.\n**Coverage:** the R-NOASK phrase for both families is now \"Your own judgement decides first and the user is the fallback\".\n\nchecks (S = /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad):\n`bunx --no-install mise run build` -> 0. It changed only the two dist files above; `git status` shows nothing unexplained.\n`bunx --no-install mise run verify` -> 0. Type-check clean (215 files), lint clean (216 files), format check clean (537 files), tests 2471 pass and 0 fail. The log is `S/verify.log`.\nThe first verify run failed one test, `sessioncontext.test.ts` \"stay whole while the status can still narrow to fit them\". My longer text pushed the root core past `CONTEXT_BUDGET` (9400), so I trimmed my own wording instead of raising the budget.\n\nblockers: none\nquestions: none\nnotes:\nHeadroom under `CONTEXT_BUDGET` is now tiny: the test scenario renders 9382 of 9400 characters. The next addition to the root core will hit it, so the budget or the root text needs a decision then.\nI left `claude-5.5/root/task-list.md` and `kimi-k3.1/root/task-list.md` unchanged to save space and keep one owner for the rule. They still say \"Ask only when the answer would change what you do\", which is compatible.\n`packages/integrations/claude/tests/plugin.test.ts` asserts several of the old phrases, so I kept them intact. It is outside my ownership paths and I did not touch it.\n\nevidence:\nThe root requirement states judgement first and asking as a fallback, with the not-asked case for a question whose recommended option the root would take anyway, and keeps the approvals reserved for the user: requirements/root/asking.md R-NOASK; claude-5.5/root/asking.md intro and the line \"A question whose recommended option you would take anyway is not asked\"; the parked-approval rule is unchanged; diff at S/change.diff.\nBoth family instruction sets carry it per their guides and the coverage table names it: claude-5.5 and kimi-k3.1 root/asking.md, plus the two R-NOASK entries in coverage.ts. The coverage and mirror tests pass inside the verify run.\nmise run build leaves no unexplained changes and mise run verify exits 0: build -> 0, verify -> 0, 2471 pass and 0 fail.\nThe change stays inside the Assignment scope and ownership paths: all six changed paths are under packages/runtime/src/instructions or the two dist folders.\nchecks-run: build -> 0; verify -> 0 (logs `S/build.log`, `S/verify.log`).\nchanged-paths: the six paths listed under `changed` above.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/change.diff\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Requirement and both families carry judgement-first wording; coverage updated; build and verify exit 0.",
+    "criteria": [
+      {
+        "criterion": "The root requirement states judgement first and asking as a fallback, with the not-asked case for a question whose recommended option the root would take anyway, and keeps the approvals reserved for the user",
+        "support": "requirements/root/asking.md R-NOASK; claude-5.5/root/asking.md intro and the line \"A question whose recommended option you would take anyway is not asked\"; the parked-approval rule is unchanged; diff at S/change.diff."
+      },
+      {
+        "criterion": "Both family instruction sets carry it per their guides and the coverage table names it",
+        "support": "claude-5.5 and kimi-k3.1 root/asking.md, plus the two R-NOASK entries in coverage.ts. The coverage and mirror tests pass inside the verify run."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build -> 0, verify -> 0, 2471 pass and 0 fail."
+      },
+      {
+        "criterion": "The change stays inside the Assignment scope and ownership paths",
+        "support": "all six changed paths are under packages/runtime/src/instructions or the two dist folders."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build -> 0; verify -> 0 (logs `S/build.log`, `S/verify.log`)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the six paths listed under `changed` above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/change.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T10:35:34.143Z"
 }
