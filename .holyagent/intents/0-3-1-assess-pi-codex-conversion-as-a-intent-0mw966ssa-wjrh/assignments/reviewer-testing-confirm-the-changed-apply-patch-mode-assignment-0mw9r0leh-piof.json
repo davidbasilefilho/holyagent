@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw9r0leh-piof",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.testing",
+  "slug": "confirm-the-changed-apply-patch-mode",
+  "objective": "Confirm the changed apply_patch mode-restore test still proves modes are restored and will pass on Windows.",
+  "state": "Running",
+  "scope": [
+    "HEAD commit of /home/user/holyagent-0.3.1-codex (release/0.3.1/feat/codex-provider); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/mode-test-commit.diff",
+    "Windows failure it fixes: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-105.log lines 2770-2795 (expected 384, received 438)"
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes; run commands only in /home/user/holyagent-0.3.1-codex.",
+    "You may run `bun test packages/integrations/pi/tests/codex.test.ts` there.",
+    "Report in under 200 words; start each evidence line with the exact criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "The test still fails when restore does not put the mode back on POSIX systems",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The test is not skipped on any platform and its assertions hold on Windows",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9qvo4c-kvvc"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T21:03:37.817Z"
+  },
+  "createdAt": "2026-11-09T21:03:37.817Z"
+}
