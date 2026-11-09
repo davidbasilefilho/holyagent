@@ -573,6 +573,14 @@ describe("the default scope is user unless the local settings enable the plugin"
     }
   }
 
+  /** Adds an index entry named `path` holding `content`, without touching the work tree. */
+  const trackEntry = async (path: string, content: string) => {
+    const source = join(home, "blob.json")
+    await writeFile(source, content)
+    const object = (await $`git -C ${repo()} hash-object -w ${source}`.text()).trim()
+    await $`git -C ${repo()} update-index --add --cacheinfo ${`100644,${object},${path}`}`.quiet()
+  }
+
   test.each([
     [["local"]],
     [["local", "project"]],
@@ -787,13 +795,17 @@ describe("the default scope is user unless the local settings enable the plugin"
 
   test("a tracked local file of another letter case never infers local", async () => {
     const target = await initRepo()
-    // The literal name is untracked; where the file system ignores case it is the same file.
+    // The literal name is untracked; where the file system ignores case it is the same file. The
+    // index entry is written directly: `git add` of a path in another case than the file's own
+    // adds nothing on Windows (it exists there, so git does not complain) and would track nothing.
     await write(files().local, enabled)
-    await write(join(repo(), ".claude", "Settings.Local.json"), enabled)
-    await $`git -C ${repo()} add -f .claude/Settings.Local.json`.quiet()
+    await trackEntry(".claude/Settings.Local.json", JSON.stringify(enabled))
     expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
       "",
     )
+    expect(
+      await $`git -C ${repo()} ls-files --cached -- ${":(icase,literal).claude/settings.local.json"}`.text(),
+    ).toBe(".claude/Settings.Local.json\n")
     const result = await cli(["setup", "--skip-ctx7"], nested())
     expect(result.code).toBe(0)
     const lines = result.stdout.split("\n")
@@ -824,11 +836,15 @@ describe("the default scope is user unless the local settings enable the plugin"
   test("a tracked top-level entry that is the .claude folder by identity never infers local", async () => {
     const target = await initRepo()
     await write(files().local, enabled)
-    // Git lists `.claude.` apart from `.claude`, so no pathspec for the folder finds it.
-    await write(join(repo(), ".claude.", "settings.local.json"), {})
-    await $`git -C ${repo()} add -f .claude./settings.local.json`.quiet()
+    // Git lists `.claude.` apart from `.claude`, so no pathspec for the folder finds it. The entry
+    // goes into the index directly, so no `.claude.` is created on disk: Windows folds that name
+    // onto `.claude` and would overwrite the local file.
+    await trackEntry(".claude./settings.local.json", "{}")
     expect(await $`git -C ${repo()} ls-files --cached -- ${":(icase,literal).claude"}`.text()).toBe(
       "",
+    )
+    expect(await $`git -C ${repo()} ls-files --cached`.text()).toBe(
+      ".claude./settings.local.json\n",
     )
     // A folding file system (a trailing dot on Windows, an 8.3 short name, an HFS+ ignorable code
     // point) answers for the tracked name with the identity of the .claude folder. Linux cannot
