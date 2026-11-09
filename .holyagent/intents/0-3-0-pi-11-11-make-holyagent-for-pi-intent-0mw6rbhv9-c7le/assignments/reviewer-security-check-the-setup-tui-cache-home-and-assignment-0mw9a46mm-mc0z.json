@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw9a46mm-mc0z",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.security",
+  "slug": "check-the-setup-tui-cache-home-and",
+  "objective": "Check the setup TUI cache-home and background-query commits for security issues.",
+  "state": "Running",
+  "scope": [
+    "Review commits fa398da (cache home, sweep, plain) and e195b25 (contrast, light background) on release/0.3.0/feat/setup-tui in /home/user/holyagent-0.3.0-tui: git diff e1beb56 HEAD, also as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r3.diff without generated output. Writer reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k4tp-3tef.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw99smjz-askh.md.",
+    "Trace: the private-group acceptance (can another user gain write to the cache path through a group the code accepts), symlink resolution of the cache home (TOCTOU, links into another user's folder), and the OSC 11 reply parsing (terminal-supplied bytes: bounds, injection into output, a hostile reply)."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "No new vulnerability in the cache-home acceptance, symlink resolution or terminal reply parsing, or each is reported with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw99k4tp-3tef",
+    "assignment-0mw99smjz-askh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:10:31.822Z"
+  },
+  "createdAt": "2026-11-09T13:10:31.822Z"
+}
