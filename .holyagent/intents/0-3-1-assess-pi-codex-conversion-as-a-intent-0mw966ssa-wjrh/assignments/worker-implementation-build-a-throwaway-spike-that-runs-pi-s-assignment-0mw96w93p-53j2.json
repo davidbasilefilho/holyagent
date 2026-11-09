@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mw96w93p-53j2",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 8,
+  "roleTask": "Worker.implementation",
+  "slug": "build-a-throwaway-spike-that-runs-pi-s",
+  "objective": "Build a throwaway spike that runs Pi's bash tool contract on just-bash with host passthrough and TS/JS execution, and measure on Linux which required behaviours work.",
+  "state": "Running",
+  "scope": [
+    "Work only in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/spike (a scratch folder outside every repository): its own package.json, `bun add just-bash@3.6.0` (exact) there, and a Bun TypeScript harness. Nothing goes into any repository or worktree.",
+    "Background (read): /home/user/holyagent/.git/holyagent/reports/assignment-0mw96lmlw-w85v.md (just-bash API: customCommands/defineCommand, ctx.origCommand, ReadWriteFs, exec options, js-exec, no streaming, env and cwd reset per exec, cooperative cancel, maxExecutionTimeMs 30s) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw96qjlf-o4zi.md (Billion Context's bash guardrails). Pi's contract is BashOperations.exec(command, cwd, {onData, signal, timeout, env}) => Promise<{exitCode}> in /home/user/holyagent-0.3.0-t3host/node_modules/.bun/@earendil-works+pi-coding-agent@1.5.0+8980da4117b98cd5/node_modules/@earendil-works/pi-coding-agent/dist/core/tools/bash.d.ts:35-52; implement that signature (import the type from that path or copy it).",
+    "Decided design to spike: (1) just-bash on ReadWriteFs over the real filesystem so host programs and just-bash see the same files at the same paths; (2) commands just-bash implements run as its built-ins (they win over PATH); every other executable found on PATH (and ~/.bun/bin, ~/.local/bin and mise shims if present) is registered as a custom command that spawns the real program with argv, cwd, env and stdin, kills its process tree on ctx.signal, and returns stdout, stderr and the exit code; (3) env, exported variables and cwd persist across exec() calls in the adapter; (4) a command line that is exactly one host program streams its output to onData while running (bypass or side channel), and mixed lines deliver output at the end; (5) Pi's timeout is honoured and just-bash's maxExecutionTimeMs is raised to match; (6) TypeScript first: strip types with Bun.Transpiler and run in just-bash's js-exec; if stripping fails, run as JavaScript.",
+    "Run each case and record pass or fail with the observed output: (a) `git -C /home/user/holyagent-0.3.0-t3branch log --oneline -3`; (b) `bun --version` and `bunx --no-install mise --version`; (c) the real long gate `cd /home/user/holyagent-0.3.0-t3branch && bunx --no-install mise run verify` (must exit 0 and stream output while running; record the time to first output); (d) the holyagent CLI `bun --no-env-file --config=/root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/scripts/empty-bunfig.toml /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/scripts/holyagent.js help`; (e) persistence: `cd /tmp && export SPIKE=1` in one call, then `pwd; echo $SPIKE` in the next; (f) a mixed pipe `git -C /home/user/holyagent-0.3.0-t3branch log --oneline -20 | grep feat | head -3`; (g) a timeout of 2s on `sleep 30` run as a host program and on a just-bash loop; (h) cancel through an AbortSignal during a host `sleep 30` and confirm no child process survives (check with ps); (i) redirection to a file then reading it with the host `cat` and the built-in; (j) a TypeScript snippet with type annotations and a plain JavaScript one, plus a TS snippet that fails to strip falling back to JS; (k) a binary-safe case (pipe a small gzip file through a host program). Also note what the Windows and macOS paths would need (drive letters, PATHEXT, .cmd shims) from reading the code; they cannot run here.",
+    "Billion Context: from its source at v0.1.212 (github.com/ranxianglei/billion-context, src/agent/tool-guardrails.ts and src/knobs.ts, or the published package files on cdn.jsdelivr.net), find whether the bash guardrails (default 60s timeout, 50 KB output cap, repeat detection) can be turned off by config, environment variable or knob, with the exact key and file it is read from."
+  ],
+  "constraints": [
+    "Never run pi, start a Pi session, or make a live model request; the harness calls the adapter directly.",
+    "Make no changes in /home/user/holyagent or any worktree; read and run only. Make no git writes.",
+    "Keep long logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/spike/logs and give paths.",
+    "Keep working until every case has a result; a failing case is a result, not a blocker.",
+    "Report in under 500 words: a table of cases with pass, fail and the observation, the Billion Context answer, and the design changes the results call for."
+  ],
+  "criteria": [
+    {
+      "text": "Every case a-k has a recorded result with its observation",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Whether Billion Context's bash guardrails can be turned off is stated from its source with the key",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The design changes the results call for are listed",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "cases",
+    "billion-context",
+    "design",
+    "code-path"
+  ],
+  "ownershipPaths": [
+    "spike-scratch"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T11:40:22.933Z"
+  },
+  "createdAt": "2026-11-09T11:40:22.933Z"
+}
