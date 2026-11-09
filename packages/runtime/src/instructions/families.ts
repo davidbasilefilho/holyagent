@@ -7,7 +7,7 @@ import { join } from "node:path"
  * A family folder may hold `guide.md` alone before it is listed, and the mirror and coverage tests
  * apply to listed families only.
  */
-export const FAMILIES = ["claude-5.5", "kimi-k3.1"] as const
+export const FAMILIES = ["claude-5.5", "kimi-k3.1", "gpt-6"] as const
 
 /** A supported model family: an entry of {@link FAMILIES}. */
 export type Family = (typeof FAMILIES)[number]
