@@ -90033,6 +90033,8 @@ var hostSearchFolders = (env, platform = process.platform) => {
     ...under(variable(env, "LOCALAPPDATA", platform), "mise", "shims"),
     ...under(variable(env, "APPDATA", platform), "npm"),
     ...under(variable(env, "ProgramFiles", platform), "Git", "cmd"),
+    ...under(variable(env, "ProgramW6432", platform), "Git", "cmd"),
+    ...under(variable(env, "LOCALAPPDATA", platform), "Programs", "Git", "cmd"),
     ...under(variable(env, "ProgramFiles", platform), "GitHub CLI"),
     ...under(variable(env, "SystemRoot", platform), "System32"),
     ...under(variable(env, "SystemRoot", platform))

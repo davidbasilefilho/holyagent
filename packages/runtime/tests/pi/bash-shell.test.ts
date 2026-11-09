@@ -220,6 +220,23 @@ describe("where host programs are looked for", () => {
     )
   })
 
+  test("Windows finds Git for Windows in its machine-wide and per-user folders when Path lacks them", () => {
+    const folders = hostSearchFolders(
+      {
+        Path: "C:\\Tools",
+        ProgramFiles: "C:\\Program Files",
+        ProgramW6432: "C:\\Program Files",
+        LOCALAPPDATA: "C:\\Users\\me\\AppData\\Local",
+      },
+      "win32",
+    )
+    expect(folders).toContain("C:\\Program Files\\Git\\cmd")
+    expect(folders).toContain("C:\\Users\\me\\AppData\\Local\\Programs\\Git\\cmd")
+    expect(folders.filter((folder) => folder === "C:\\Program Files\\Git\\cmd")).toHaveLength(1)
+    // Without the variables there is no folder to name, and nothing relative is made up.
+    expect(hostSearchFolders({ Path: "C:\\Tools" }, "win32")).toEqual(["C:\\Tools"])
+  })
+
   test("a Windows program is a file with a PATHEXT extension, named without it, the first extension preferred", () => {
     const extensions = programExtensions({ PATHEXT: ".COM;.EXE;.BAT;.CMD" })
     expect(extensions).toEqual([".com", ".exe", ".bat", ".cmd"])
@@ -420,7 +437,12 @@ describe("the shell runs commands", () => {
       expect((await shell("echo $PATH")).text.trim()).toBe(
         `${SHELL_PATH}:${toVirtualPath(HOST_DIR)}`,
       )
-      expect((await shell("which git cat")).text).toBe("/usr/bin/git\n/usr/bin/cat\n")
+      // The call's env is only PATH and HOME, so the one host program certain to be found is the
+      // Bun that runs the tests, which sits in the call's PATH; `git` is not (on Windows it is
+      // found through `ProgramFiles`, which this env does not have).
+      expect((await shell(`which ${HOST.toLowerCase()} cat`)).text).toBe(
+        `/usr/bin/${HOST.toLowerCase()}\n/usr/bin/cat\n`,
+      )
     },
     PROCESS_TIMEOUT_MS,
   )
