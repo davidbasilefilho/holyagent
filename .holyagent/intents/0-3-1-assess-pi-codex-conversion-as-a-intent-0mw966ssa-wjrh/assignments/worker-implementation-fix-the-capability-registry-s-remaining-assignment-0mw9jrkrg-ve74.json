@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mw9jrkrg-ve74",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-the-capability-registry-s-remaining",
+  "objective": "Fix the capability registry's remaining non-blocking review notes: the dry-run symlink check, the CI rule in the theme and docs, the capability step's skip line, and a split JSDoc link.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-cap, branch release/0.3.1/feat/capabilities (HEAD a38a5ee). Review with file:line: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9jjlrq-eaae.md, findings 1-4.",
+    "(1) setup/capabilities.ts:92-94: run the refuseLinks check on dry runs too, before the dryRun branch, so a dry run against a symlinked .holyagent/config.json fails as the real run would (the .pi writes already check on dry runs); test it. (2) setup/tui/theme.ts:74 and docs/usage.md:182: use the same truthy CI rule as inCi (reuse inCi), and say so in the docs; test CI=0 keeps colour. (3) setup/steps.ts:219-228: the skip line names which capability was refused; keep refusing the whole step. (4) capabilities.ts:66: keep the {@link refuseLinks} on one line."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "The four notes are fixed, with tests for 1 and 2 that fail without them",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup",
+    "packages/runtime/tests",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist",
+    "docs/usage.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9j5jte-1hoq",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:40:39.772Z"
+  },
+  "createdAt": "2026-11-09T17:40:39.772Z"
+}
