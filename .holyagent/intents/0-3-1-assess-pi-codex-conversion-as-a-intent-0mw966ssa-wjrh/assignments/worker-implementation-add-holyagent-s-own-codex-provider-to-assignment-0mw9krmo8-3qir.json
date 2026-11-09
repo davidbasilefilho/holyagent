@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-holyagent-s-own-codex-provider-to",
   "objective": "Add HolyAgent's own Codex provider to the Pi integration: GPT-6.1 Sol, GPT-6.1 Terra and GPT-6 Luna models through the approved route table, the GPT-6 instruction family, apply_patch alongside Pi's read, edit, write and bash, Luna Reserve, and Codex context_management only while Billion Context is off.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-codex, branch release/0.3.1/feat/codex-provider (cut from release/0.3.1/integration at bb412cc, which has the capability registry and the gpt-6 family).",
     "Binding requirements, verbatim from the Intent:",
@@ -100,7 +100,61 @@
     "agentId": "workflow:wf_b5cad32a-f52/assignment-0mw9krmo8-3qir",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T18:08:41.864Z"
+    "startedAt": "2026-11-09T18:08:41.864Z",
+    "finishedAt": "2026-11-09T18:48:14.263Z"
+  },
+  "result": "result: Codex provider added as `pi.provider: \"openai-codex\"`; every acceptance criterion is met and checked. It adds no third-party package or pin. Luna Reserve's usage endpoint is a best guess that I could not verify.\n\nchanged (worktree /home/user/holyagent-0.3.1-codex, branch release/0.3.1/feat/codex-provider):\nRuntime: `packages/runtime/src/pi/codex/` (new: `routes.ts`, `apply-patch.ts`, `context-management.ts`, `luna-reserve.ts`) and edits to `config/{schema,capabilities,packages}.ts`, `instructions/families.ts`, `pi/{provider,root-prompt,tools}.ts`, `setup/{pi-check,pi-install,pi-settings}.ts`.\nPi integration: new `src/codex.ts` and `src/families.ts`; edits to `src/{agents,extension,files,generate}.ts`.\nGenerated output: `packages/integrations/pi/dist` (including the new `dist/families/gpt-6/{agents,skills}`) and `packages/integrations/claude/dist/scripts/{holyagent,setup-tui}.js`.\nTests: new `codex-{provider,apply-patch,context-management,luna-reserve}.test.ts` under `packages/runtime/tests/pi/` and `packages/integrations/pi/tests/codex.test.ts`; existing tests updated and extended, plus new Codex tests in `packages/integrations/pi/tests/extension.test.ts`.\nDocs: `docs/pi/{providers,configuration,README}.md`, `docs/usage.md`.\n\nchecks:\n`bunx --no-install mise run build` -> exit 0; the tree after it has only the expected generated changes.\n`bunx --no-install mise run verify` -> exit 0: type-check clean, lint clean, 675 files formatted, 2876 pass, 0 fail (log in the scratchpad: `verify.log`).\n\n**Route table as implemented** (`CODEX_ROUTES`; model ids `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`):\nRoot: `gpt-6.1-sol` high.\n`gpt-6-luna`: low for Explorer.map, Explorer.lookup, Librarian.lookup, Worker.validation; medium for Worker.mechanical, Worker.operations; high for Reviewer.audit.\n`gpt-6.1-terra`: medium for Explorer.trace, Librarian.research, Worker.integration, Reviewer.testing, Reviewer.artifact; high for Worker.implementation, Reviewer.code, Worker.visual, Reviewer.visual; xhigh for Worker.debugging, Reviewer.security.\nA route row a user overrides keeps the Codex value for the key it leaves out.\n\n**New config keys and flags:**\n`pi.provider` accepts `\"openai-codex\"`; the default stays Kimi.\n`pi.features.lunaReserve` defaults to true and is a registry entry with a new `provider: \"openai-codex\"` field.\nSetup flag `--luna-reserve on|off` and a setup screen row.\n`enabledCapabilities` takes an optional `provider`; doctor lists Luna Reserve only under Codex.\n\n**How the behaviours work:**\n`apply_patch` uses Codex's patch format, runs in the extension, and applies a patch whole or not at all. The root never has it.\n`apply_patch` is registered inactive for every provider and activated only for Codex specialists that have Write.\n`context_management` is sent only while Billion Context is off, with a threshold of 90% of the model's window. It keeps and replays the compaction item the server returns.\nThe GPT-6 family is used for the root prompt, each specialist prompt (swapped in by the extension), and the skill paths Pi lists.\n\nquestions: none.\n\nblockers: none.\n\nnotes:\n**Luna Reserve endpoint is unverified.** The usage URL (`GET .../backend-api/wham/usage`) and the `luna_reserve` banner come from third-party reports, not an OpenAI spec. Each is one constant in `luna-reserve.ts` if they turn out to differ.\n**Reserve routing is my design, not the research's.** The research had the package switch to a `gpt-reserve` model in the catalog; Pi's catalog lacks it, so I rewrite the request's `model` instead.\n**Setup screen shows the Luna Reserve row under Kimi too.** The offer list is not config-aware. The description says \"Codex provider only\".\n**`/skill:<name>` still reads the package's Kimi skill file.** Pi reads that file itself.\n**Repo disagreement:** the research said Pi's catalog had no GPT-6.1 models. Pi 1.5.0 in this repo lists all three, so no provider package is needed.\n**For the later auto-review PR:** the extension handlers go through `registerCodex` and `CodexSettings` in `packages/integrations/pi/src/codex.ts`. A reviewer pin or tool slots in beside them. `codexSettings(config)` is the one place that says the Codex provider is active.\n**Not implemented:** an Assignment that uses the screen capability running on Terra at medium or above. The later capability applies it.\n\nevidence:\nSelecting the Codex provider routes the root and every specialist role to the approved model and effort, and the gpt-6 family is used: `packages/runtime/tests/pi/codex-provider.test.ts` (all 19 rows), `packages/integrations/pi/tests/extension.test.ts` (\"under the Codex provider\": root prompt, specialist swap, skill paths), `packages/integrations/pi/tests/pi.test.ts` (\"other families\"); verify exit 0.\napply_patch works per Codex's format with Pi read, edit, write and bash still present: `codex-apply-patch.test.ts` (format, matching, atomicity, path refusal), `codex.test.ts` (the tool on a real folder), `codex-provider.test.ts` (tool lists keep read/write/edit/bash and add `apply_patch`).\ncontext_management is sent only while Billion Context is off: `codex.test.ts` (on, off, other provider, switching between requests), `codex-context-management.test.ts` (the gate and replay); verify exit 0.\nLuna Reserve is a Codex-only capability entry, default on, and behaves per the research: `codex-luna-reserve.test.ts` (entry fields, provider filter, trigger, banner, token handling) and `codex.test.ts` (enter, exit, no-offer and failure paths); entry at `packages/runtime/src/config/capabilities.ts`.\nThe Kimi provider and existing defaults behave unchanged: the existing Kimi suites pass (route table, readiness, tools, setup); explicit Kimi tests in `codex-provider.test.ts`; `bun test` has 0 failures. Existing tests changed only for the new provider literal, the new `lunaReserve` key, the extra registered tool and handlers, and the extra setup row.\nTests cover routing, apply_patch, context_management gating, Luna Reserve and auth handling from fixtures, each failing without the change: the new test files named above; the auth cases are in `codex-provider.test.ts` (\"auth handling\") and `codex-luna-reserve.test.ts` (\"the access token\"). All of this is new code, so no test passes on the base.\nmise run build and mise run verify exit 0: build exit 0; verify exit 0, 2876 pass, 0 fail.\nDocs describe selecting and using the Codex provider: `docs/pi/providers.md` (\"Codex (`openai-codex`)\"), `docs/pi/configuration.md`, `docs/usage.md` (\"The Codex provider\"), `docs/pi/README.md`.\nchecks-run: `bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0 (2876 pass, 0 fail).\nchanged-paths: the list under changed above (34 modified and 40 new files per `git status`).\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-provider.diff\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "All criteria evidenced by named tests; build and verify exit 0 (2876 pass); Luna Reserve endpoint unverified, flagged for review.",
+    "criteria": [
+      {
+        "criterion": "Selecting the Codex provider routes the root and every specialist role to the approved model and effort, and the gpt-6 family is used",
+        "support": "`packages/runtime/tests/pi/codex-provider.test.ts` (all 19 rows), `packages/integrations/pi/tests/extension.test.ts` (\"under the Codex provider\": root prompt, specialist swap, skill paths), `packages/integrations/pi/tests/pi.test.ts` (\"other families\"); verify exit 0."
+      },
+      {
+        "criterion": "apply_patch works per Codex's format with Pi read, edit, write and bash still present",
+        "support": "`codex-apply-patch.test.ts` (format, matching, atomicity, path refusal), `codex.test.ts` (the tool on a real folder), `codex-provider.test.ts` (tool lists keep read/write/edit/bash and add `apply_patch`)."
+      },
+      {
+        "criterion": "context_management is sent only while Billion Context is off",
+        "support": "`codex.test.ts` (on, off, other provider, switching between requests), `codex-context-management.test.ts` (the gate and replay); verify exit 0."
+      },
+      {
+        "criterion": "Luna Reserve is a Codex-only capability entry, default on, and behaves per the research",
+        "support": "`codex-luna-reserve.test.ts` (entry fields, provider filter, trigger, banner, token handling) and `codex.test.ts` (enter, exit, no-offer and failure paths); entry at `packages/runtime/src/config/capabilities.ts`."
+      },
+      {
+        "criterion": "The Kimi provider and existing defaults behave unchanged",
+        "support": "the existing Kimi suites pass (route table, readiness, tools, setup); explicit Kimi tests in `codex-provider.test.ts`; `bun test` has 0 failures. Existing tests changed only for the new provider literal, the new `lunaReserve` key, the extra registered tool and handlers, and the extra setup row."
+      },
+      {
+        "criterion": "Tests cover routing, apply_patch, context_management gating, Luna Reserve and auth handling from fixtures, each failing without the change",
+        "support": "the new test files named above; the auth cases are in `codex-provider.test.ts` (\"auth handling\") and `codex-luna-reserve.test.ts` (\"the access token\"). All of this is new code, so no test passes on the base."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0, 2876 pass, 0 fail."
+      },
+      {
+        "criterion": "Docs describe selecting and using the Codex provider",
+        "support": "`docs/pi/providers.md` (\"Codex (`openai-codex`)\"), `docs/pi/configuration.md`, `docs/usage.md` (\"The Codex provider\"), `docs/pi/README.md`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` -> 0; `bunx --no-install mise run verify` -> 0 (2876 pass, 0 fail)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the list under changed above (34 modified and 40 new files per `git status`)."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-provider.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T18:08:41.864Z"
 }
