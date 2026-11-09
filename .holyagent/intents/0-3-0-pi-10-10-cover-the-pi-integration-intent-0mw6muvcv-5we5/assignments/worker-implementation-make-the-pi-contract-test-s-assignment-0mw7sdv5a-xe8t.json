@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-pi-contract-test-s",
   "objective": "Make the Pi contract test's documentation and helpers of commit 0e2dc03 say exactly what the test checks, and tidy the review's small items.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-contract, branch release/0.3.0/test/pi-event-contract, head 0e2dc03 (already committed; your edits are a new change on top).",
     "docs/development.md: it says the test 'feeds each file through the real consumers' and calls the fixtures 'recorded'. Say that the fixtures are built from Pi's exported types by tests/fixtures/record.ts (not recorded from a Pi run), that the extension-event fixtures run through the extension handlers and the outcome helpers, that the agent_settled run streams are read by a test-local reader because the reader lives in @tintinweb/pi-subagents, and that extension_ui_request is pinned by type only because the extension has no UI consumer yet. Also correct the claim that mise run check fails on any renamed or retyped field: the Pick on before_agent_start and session_compact (record.ts:295) covers only the picked fields.",
@@ -66,7 +66,45 @@
     "agentId": "workflow:wf_847d9781-b68/assignment-0mw7sdv5a-xe8t",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-08T12:06:24.238Z"
+    "startedAt": "2026-11-08T12:06:24.238Z",
+    "finishedAt": "2026-11-09T04:06:02.547Z"
+  },
+  "result": "result: Docs, walk-up stop, header derivation and the vacuous assertion are done. Build and verify both exit 0.\n\nchanged:\n- /home/user/holyagent-0.3.0-contract/docs/development.md\n- /home/user/holyagent-0.3.0-contract/packages/integrations/pi/tests/contract.test.ts\n- /home/user/holyagent-0.3.0-contract/packages/integrations/pi/tests/fixtures/record.ts\n\nchecks:\n- `bun install --frozen-lockfile` -> 0, no changes.\n- `bunx --no-install mise run build` -> 0. `git status` afterwards shows only the 3 paths above, so there are no generated changes.\n- `bunx --no-install mise run verify` -> 0. Type-check has no errors in 212 files, lint has no problems in 213 files, and the format check passed. Tests: 2372 pass, 0 fail across 78 files. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n\nblockers: none\nquestions: none\n\nnotes:\n- The line numbers in the brief did not match the file. `contract.test.ts:84` and `:143` pointed at other code, so I went by content. For the assertion that proves nothing, I dropped `expect(installed).toMatch(/^\\d+\\.\\d+\\.\\d+/)` and its now-unused `installed` variable in the \"files are what record.ts writes\" test.\n- `record.ts` now exports `FixtureHeader` as an Effect Schema struct, with `FixtureHeader` as its type, so the interface became a schema. `contract.test.ts` wraps it in `holyagentFixture` for `FixtureHeaderLine`.\n- The walk-up loop now throws an `Error` (\"no package.json above ...\") when it reaches the filesystem root. I did not make it a tagged error, since `record.ts` is test tooling.\n- I also corrected two comments with the same overclaim: the `record.ts` header and the `contract.test.ts` header. Both now state the `Pick` limit and that the fixtures are built, not recorded. This goes slightly past the listed items.\n- Idea, not done: the docs section title \"Re-recording the Pi fixtures\" and `RERECORD_COMMAND` still say \"record\", which is the repository's established term.\n\nevidence:\ndocs/development.md states how each fixture group is checked and that fixtures are built from Pi's types: `docs/development.md`, section \"Re-recording the Pi fixtures\", paragraph and three bullets.\nThe walk-up loop in record.ts stops at the filesystem root: `installedPiVersion` in `record.ts` now compares `dirname(directory)` to `directory` and throws at the root.\nmise run build leaves no unexplained changes and mise run verify exits 0: build exit 0 with only the 3 owned paths modified; verify exit 0 with 2372 pass and 0 fail.\nThe change stays inside the Assignment's scope and ownership paths: the diff touches only the 3 owned paths.\nchecks-run: build 0, verify 0 (2372 pass, 0 fail; check, lint and format passed), install 0.\nchanged-paths: `docs/development.md`, `packages/integrations/pi/tests/contract.test.ts`, `packages/integrations/pi/tests/fixtures/record.ts`.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-contract-docs.diff\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Gates exit 0; docs now state how each fixture group is checked",
+    "criteria": [
+      {
+        "criterion": "docs/development.md states how each fixture group is checked and that fixtures are built from Pi's types",
+        "support": "`docs/development.md`, section \"Re-recording the Pi fixtures\", paragraph and three bullets."
+      },
+      {
+        "criterion": "The walk-up loop in record.ts stops at the filesystem root",
+        "support": "`installedPiVersion` in `record.ts` now compares `dirname(directory)` to `directory` and throws at the root."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0 with only the 3 owned paths modified; verify exit 0 with 2372 pass and 0 fail."
+      },
+      {
+        "criterion": "The change stays inside the Assignment's scope and ownership paths",
+        "support": "the diff touches only the 3 owned paths."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build 0, verify 0 (2372 pass, 0 fail; check, lint and format passed), install 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "`docs/development.md`, `packages/integrations/pi/tests/contract.test.ts`, `packages/integrations/pi/tests/fixtures/record.ts`."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/pi-contract-docs.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-08T12:06:24.238Z"
 }
