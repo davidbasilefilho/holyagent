@@ -10437,7 +10437,7 @@ var init_errors2 = __esm(() => {
     NothingToCommit: "Check the paths; commit only after the files changed.",
     StagedOutsideScope: "Unstage them with `git restore --staged <path>` or name them in the commit.",
     RemoteMismatch: "Set origin to the GitHub repository (`git remote add origin <url>`) and retry.",
-    DetachedHead: "Check out or create a branch with `git switch -c <name>`."
+    DetachedHead: "Check out a branch: in a cloud session, work in a git worktree (`git worktree add -b <name> <path>`), not the primary checkout; otherwise `git switch -c <name>`."
   };
 });
 
@@ -15559,7 +15559,7 @@ You own the user relationship, material decisions, acceptance, version control a
 - Write artifacts (PRs, commits, docs, instruction text) in English by default unless the target repository's convention says otherwise. Write the task list and text to the user in the language of the user's latest message.
 - Keep written deliverables (PR text, the final report) free of filler sections, redundant summaries and boilerplate.
 - Never force-push, and never push to the base, default or a protected branch without the user's approval. The base is the branch the conventions or the user name as the work's target, else the default branch. Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.
-- Never work on a branch the platform assigns: a cloud session starts on one the platform created, such as \`claude/<name>\`, whose name carries no meaning; a branch the user named as the work branch is not one. Before the first commit, check \`git branch --show-current\`; on an assigned branch, first create the conventional branch (\`git switch -c <name> <start>\`, both set by the stack plan) and commit and push only there. If that push is refused, stop that line, report the blocker and ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away.
+- Never work on a branch the platform assigns: a cloud session starts on one the platform created, such as \`claude/<name>\`, whose name carries no meaning; a branch the user named as the work branch is not one. Before the first commit, check \`git branch --show-current\`; on an assigned branch, first create the conventional branch in a worktree (\`git worktree add -b <name> <path> <start>\`, per the plan) and commit and push only there. If that push is refused, stop that line, report the blocker and ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away.
 - After a denial, stop that line of work, report a blocker and continue other work; never reach the same result through another tool (Monitor, scripts).
 - Commit only with \`holyagent vcs commit\`; use plain Git and \`gh\` for branches, pushes, merges and CI.
 - Reply on threads only when the request or repository workflow authorizes it.
@@ -16859,6 +16859,54 @@ var init_plan = __esm(() => {
   ];
 });
 
+var REFLOG_MOVE, SAFE_BRANCH, safeBranch = (name) => SAFE_BRANCH.test(name) ? gitMaybe(["check-ref-format", "--branch", name]).pipe(map5((out) => out === name)) : succeed6(false), startBranch, returnBranch = (start) => gen2(function* () {
+  if (start !== undefined && (yield* safeBranch(start)))
+    return start;
+  const remote = (yield* gitMaybe([
+    "symbolic-ref",
+    "--short",
+    "-q",
+    "refs/remotes/origin/HEAD"
+  ]))?.replace(/^origin\//, "");
+  return remote !== undefined && (yield* safeBranch(remote)) ? remote : "main";
+}), cloudCheckoutNotice = (call) => inCloudSession(call.env) ? gen2(function* () {
+  const dirs = (yield* gitMaybe([
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-dir",
+    "--git-common-dir"
+  ]))?.split(`
+`);
+  if (dirs?.length !== 2 || dirs[0] !== dirs[1])
+    return;
+  const current = (yield* gitMaybe(["symbolic-ref", "-q", "HEAD"]))?.replace(/^refs\/heads\//, "");
+  const start = yield* startBranch;
+  if (current !== undefined && (start === undefined || current === start))
+    return;
+  const branch = yield* returnBranch(start);
+  if (current === branch)
+    return;
+  const moved = current === undefined ? "is on a detached HEAD" : "moved off the branch it started on";
+  return `The primary checkout of this cloud session ${moved}, so the session panel shows its diff against the assigned branch as a stray change and offers a PR for it. Return it with \`git switch ${branch}\`, and do work and review checkouts in a git worktree.`;
+}).pipe(provide4(call.vcs)) : succeed6(undefined);
+var init_status = __esm(() => {
+  init_dist();
+  init_git();
+  init_identity();
+  REFLOG_MOVE = /^checkout: moving from (\S+) to (\S+)$/;
+  SAFE_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
+  startBranch = gen2(function* () {
+    const log = (yield* gitMaybe(["reflog", "show", "--format=%gs", "HEAD"])) ?? "";
+    const moves = log.split(`
+`).map((line) => REFLOG_MOVE.exec(line)).filter((move) => move !== null).reverse();
+    for (const move of moves)
+      for (const name of [move[2], move[1]])
+        if (name !== undefined && (yield* gitMaybe(["show-ref", "--verify", "--quiet", `refs/heads/${name}`])) !== undefined)
+          return name;
+    return;
+  });
+});
+
 var statusFrom = (snapshot) => {
   const open = byId(snapshot.project.intents.filter((intent) => intent.state === "Open"));
   const openIds = new Set(open.map((intent) => intent.id));
@@ -16914,6 +16962,7 @@ var init_overview = __esm(() => {
   init_config();
   init_context();
   init_intent2();
+  init_status();
   init_views();
   OVERVIEW_COMMANDS = [
     {
@@ -16958,10 +17007,14 @@ var init_overview = __esm(() => {
     {
       path: ["status"],
       usage: "status",
-      summary: "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents",
+      summary: "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents; in a claude.ai cloud session whose primary checkout is on a detached HEAD or on a branch other than the one it started on, a `notice` that says so",
       flags: {},
       positionals: 0,
-      run: ({ directory }) => statusOf(directory)
+      run: (call) => gen2(function* () {
+        const status = yield* statusOf(call.directory);
+        const notice = yield* cloudCheckoutNotice(call);
+        return notice === undefined ? status : { ...status, notice };
+      })
     },
     {
       path: ["reconcile"],
@@ -24240,6 +24293,7 @@ var init_hook = __esm(() => {
   init_overview();
   init_report();
   init_sessioncontext();
+  init_status();
   init_workflow_check();
   Payload = Struct({
     tool_name: optionalKey2(String6),
@@ -24273,11 +24327,14 @@ var init_hook = __esm(() => {
   });
   INLINE_INPUTS = new Set(["script", "args"]);
   HOOK_COMMANDS = [
-    hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
+    hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user, and one line when the primary checkout is on a detached HEAD or on a branch other than the one it started on), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
       const core = rootCore(payload, call);
       const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
       return gen2(function* () {
-        const notice = yield* setupNotice(call.env, call.cwd);
+        const notices = [yield* setupNotice(call.env, call.cwd), yield* cloudCheckoutNotice(call)];
+        const notice = notices.filter((text) => text !== undefined).join(`
+
+`) || undefined;
         if (!(yield* hasStateFolder(call.directory))) {
           const found = yield* legacyFoldersWithState(call.root);
           if (found.length === 0) {

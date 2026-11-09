@@ -7,6 +7,7 @@ import { readOpenState, type Snapshot } from "../state/store.ts"
 import { agentHostOf } from "./config.ts"
 import { nowIso } from "./context.ts"
 import { intentInUse, resolveIntent } from "./intent.ts"
+import { cloudCheckoutNotice } from "./status.ts"
 import type { Command } from "./types.ts"
 import { assignmentRow, byId, oneLine, present } from "./views.ts"
 
@@ -165,10 +166,15 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     path: ["status"],
     usage: "status",
     summary:
-      "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents",
+      "Summarize the open Intents and the work waiting on the root: the Running and unaccepted Assignments of the Intent in use, and counts for the other open Intents; in a claude.ai cloud session whose primary checkout is on a detached HEAD or on a branch other than the one it started on, a `notice` that says so",
     flags: {},
     positionals: 0,
-    run: ({ directory }) => statusOf(directory),
+    run: (call) =>
+      Effect.gen(function* () {
+        const status = yield* statusOf(call.directory)
+        const notice = yield* cloudCheckoutNotice(call)
+        return notice === undefined ? status : { ...status, notice }
+      }),
   },
   {
     path: ["reconcile"],

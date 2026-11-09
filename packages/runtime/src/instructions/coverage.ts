@@ -111,6 +111,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/identity.md",
       phrase: "Never work on a branch the platform assigns",
     },
+    "R-CLOUD-CHECKOUT": {
+      section: "root/version-control.md",
+      phrase: "leave the primary checkout on the assigned branch at its start commit",
+    },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
       phrase: "set the mode with `holyagent state mode <mode>`",
@@ -121,7 +125,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-NOASK": {
       section: "root/asking.md",
-      phrase: "A question is unnecessary when its answer would not change what you do",
+      phrase: "Your own judgement decides first and the user is the fallback",
     },
     "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
     "R-MERGEWAIT": {
@@ -322,6 +326,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/identity.md",
       phrase: "Never work on a branch the platform assigns",
     },
+    "R-CLOUD-CHECKOUT": {
+      section: "root/version-control.md",
+      phrase: "leave the primary checkout on the assigned branch at its start commit",
+    },
     "R-REASK": {
       section: "root/asking.md",
       phrase: "without choosing an option is not a choice",
@@ -332,7 +340,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-NOASK": {
       section: "root/asking.md",
-      phrase: "A question is unnecessary when its answer would not change what you do",
+      phrase: "Your own judgement decides first and the user is the fallback",
     },
     "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
     "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
