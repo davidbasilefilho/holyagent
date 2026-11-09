@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mw96izno-h3h5",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-setup-tui-commit-for",
+  "objective": "Review the setup TUI commit for correctness, regressions and repository standards.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-tui, range d732037..df6a410 (one commit). Diff without bun.lock and dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-review.diff.",
+    "Intended behaviour (Intent defaults): the TUI is its own bundle built with the @opentui/solid Bun plugin with @opentui/* and solid-js external; on first interactive use setup installs those packages at the exact versions the build resolved from bun.lock (embedded by the build) into a per-user cache (XDG_CACHE_HOME or ~/.cache; LOCALAPPDATA on Windows) with the Bun Shell, then imports the TUI; it falls back to line output with one line saying why when stdin or stdout is not a TTY, CI is set, TERM is dumb, --no-tui or a choice flag (--worktrees, --device-access) is given, or the install or import fails. Flags apply directly. tsconfig.json gained jsx preserve and jsxImportSource @opentui/solid.",
+    "Repository rules: .claude/CLAUDE.md and AGENTS.md in the worktree (Effect for effects and tagged errors, no try/catch or new Promise or async in runtime and CLI source, Effect Schema at boundaries with onExcessProperty error, Bun Shell, JSDoc on exports, caret ranges at line boundary, version only via bump). Check the Windows paths, the cache's concurrency and partial-install handling, the terminal restore on every exit path, and that the generated plugins stay platform-neutral."
+  ],
+  "constraints": [
+    "Run the built-in /code-review on the range, then judge each of its findings.",
+    "Run the targeted tests (`bun test packages/runtime/tests/setup-tui*`) and report counts; write logs to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-code-review.log.",
+    "Make no git writes and no edits.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding has path:line and a failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states whether the packaging and fallback rules are met",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict",
+    "tests"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9588qp-wtzk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T11:30:04.164Z"
+  },
+  "createdAt": "2026-11-09T11:30:04.164Z"
+}
