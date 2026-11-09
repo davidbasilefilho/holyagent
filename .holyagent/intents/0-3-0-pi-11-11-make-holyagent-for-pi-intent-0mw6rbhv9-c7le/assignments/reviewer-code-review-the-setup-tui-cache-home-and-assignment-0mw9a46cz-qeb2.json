@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw9a46cz-qeb2",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-setup-tui-cache-home-and",
+  "objective": "Review the setup TUI cache-home and light-background commits for correctness.",
+  "state": "Running",
+  "scope": [
+    "Review commits fa398da (cache home, sweep, plain) and e195b25 (contrast, light background) on release/0.3.0/feat/setup-tui in /home/user/holyagent-0.3.0-tui: git diff e1beb56 HEAD, also as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r3.diff without generated output. Writer reports: /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k4tp-3tef.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw99smjz-askh.md.",
+    "Check: /etc/group parsing and the private-group rule, the symlink resolution, the sweep's newest-entry rule; the OSC 11 detection (bounded, dark default, first frame waits, no leftover reply bytes reaching input), COLORFGBG parsing, palette selection under NO_COLOR and the ASCII locale.",
+    "Run only bun test packages/runtime/tests/setup-tui*."
+  ],
+  "constraints": [
+    "Read-only: no edits and no git writes.",
+    "Do not check out other commits in any checkout; read the range with git diff and git show.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The cache-home, sweep, plain and background-detection changes are correct, or each defect is reported with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No regression in the setup flow, flags, fallback or input handling",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "tests"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw99k4tp-3tef",
+    "assignment-0mw99smjz-askh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:10:31.475Z"
+  },
+  "createdAt": "2026-11-09T13:10:31.475Z"
+}
