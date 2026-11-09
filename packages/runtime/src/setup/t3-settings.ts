@@ -47,6 +47,17 @@ export const T3_WRITING_INSTRUCTIONS =
   "Keep AI agents, assistants, sessions and tools out of commit messages and pull request text, and " +
   "add no attribution trailers (no Co-authored-by or Generated-by lines)."
 
+/**
+ * The instructions setup gives T3's branch name generator under the `custom` naming mode: the
+ * repository's own convention wins, and T3's usual `t3/` prefix style is the fallback. One rule for
+ * every project, since T3's project ids are random and setup cannot key a repository before T3
+ * opens it.
+ */
+export const T3_BRANCH_INSTRUCTIONS =
+  "Name each branch by the repository's own branch naming convention, as its AGENTS.md, CONTRIBUTING " +
+  "guide or existing branch names show it. When the repository states none, use a short, lowercase, " +
+  "hyphenated name under the `t3/` prefix."
+
 /** How a setting is placed in `settings.json`, with the value T3 Code uses while it is absent. */
 interface Wanted extends Default {
   /** T3's default; a key whose wanted value equals it is left out. */
@@ -206,6 +217,8 @@ const BALANCED = {
  *   already off in that profile and is not written.
  * - `sourceControlWritingStyle`: its custom instructions apply in every mode, Conventional Commits
  *   included.
+ * - `branchNamingMode` and `branchNameInstructions`: the environment-wide rule, each key on its own
+ *   (T3's `pullRequestMergeMethod` is left at its default, the method last chosen on the device).
  */
 const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
   {
@@ -290,6 +303,13 @@ const units = (devices: boolean, worktrees: boolean): ReadonlyArray<Unit> => [
       { path: ["autoResumeLimitedThreads"], value: true, default: false },
       { path: ["snoozeLimitedThreads"], value: true, default: false },
       { path: ["defaultAutoPull"], value: true, default: false },
+    ],
+  },
+  {
+    name: "branch naming",
+    keys: [
+      { path: ["branchNamingMode"], value: "custom", default: "static" },
+      { path: ["branchNameInstructions"], value: T3_BRANCH_INSTRUCTIONS, default: "" },
     ],
   },
   {
@@ -449,11 +469,11 @@ const names = (paths: ReadonlyArray<{ readonly path: string }>) =>
  * A key is written only while the file does not have it and its value differs from T3's own default
  * (T3 writes its file sparsely, so an absent key means the default); what the user set stays,
  * whatever it is. Written: the Pi provider instance, device access, new threads in worktrees,
- * background activity, the commit and pull request writing style, thread resume and snooze, auto
- * pull and storage cleanup ({@link T3_STORAGE_CLEANUP}); the context meter, model choices, Pi
- * launch settings and per-device client settings are never written. Device access only where
- * {@link deviceHost} finds Xcode or an Android SDK, and only while the options and the config's
- * `pi.t3` allow it; worktrees likewise.
+ * background activity, the commit and pull request writing style, the branch naming rule
+ * ({@link T3_BRANCH_INSTRUCTIONS}), thread resume and snooze, auto pull and storage cleanup
+ * ({@link T3_STORAGE_CLEANUP}); the context meter, model choices, Pi launch settings and per-device
+ * client settings are never written. Device access only where {@link deviceHost} finds Xcode or an
+ * Android SDK, and only while the options and the config's `pi.t3` allow it; worktrees likewise.
  *
  * Nothing is written without T3's home folder (T3 Code is not installed), with `pi.enable` off, or
  * with `pi.t3.scope` `project`. A file that does not decode as a JSON object fails with a

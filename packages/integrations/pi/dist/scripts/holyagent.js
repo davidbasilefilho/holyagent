@@ -25107,7 +25107,7 @@ var init_pi_install = __esm(() => {
 
 import { stat as stat3 } from "fs/promises";
 import { join as join18 } from "path";
-var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, label2 = "t3 settings", restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false)), writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
+var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 = "t3 settings", restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false)), writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 })))), t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join18(homeDirectory(env), ".t3"), t3SettingsFile = (env) => join18(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
   {
@@ -25186,6 +25186,13 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, label2 = "t3 settings", restore
     ]
   },
   {
+    name: "branch naming",
+    keys: [
+      { path: ["branchNamingMode"], value: "custom", default: "static" },
+      { path: ["branchNameInstructions"], value: T3_BRANCH_INSTRUCTIONS, default: "" }
+    ]
+  },
+  {
     name: "storage cleanup",
     keys: [
       { path: ["storageCleanup", "worktreeOnMerge"], value: true, default: false },
@@ -25245,6 +25252,7 @@ var init_t3_settings = __esm(() => {
     worktreeSettledAfterDays: 14
   };
   T3_WRITING_INSTRUCTIONS = "Write as the author, in the first person or a neutral voice, about what the change does and why. " + "Keep AI agents, assistants, sessions and tools out of commit messages and pull request text, and " + "add no attribution trailers (no Co-authored-by or Generated-by lines).";
+  T3_BRANCH_INSTRUCTIONS = "Name each branch by the repository's own branch naming convention, as its AGENTS.md, CONTRIBUTING " + "guide or existing branch names show it. When the repository states none, use a short, lowercase, " + "hyphenated name under the `t3/` prefix.";
   deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
     const home = homeDirectory(env);
     if (platform === "darwin") {

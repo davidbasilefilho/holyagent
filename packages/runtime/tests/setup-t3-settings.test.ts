@@ -14,6 +14,7 @@ import { setup } from "../src/setup/steps.ts"
 import {
   installT3Settings,
   restoreSettings,
+  T3_BRANCH_INSTRUCTIONS,
   T3_WRITING_INSTRUCTIONS,
   t3SettingsFile,
   type T3SettingsOptions,
@@ -150,6 +151,10 @@ const THREADS = {
   snoozeLimitedThreads: true,
   defaultAutoPull: true,
 }
+const BRANCHES = {
+  branchNamingMode: "custom",
+  branchNameInstructions: T3_BRANCH_INSTRUCTIONS,
+}
 const CLEANUP = {
   storageCleanup: {
     worktreeOnMerge: true,
@@ -165,6 +170,7 @@ const ALL = {
   ...BACKGROUND,
   ...WRITING,
   ...THREADS,
+  ...BRANCHES,
   ...CLEANUP,
 }
 
@@ -197,6 +203,9 @@ describe("holyagent setup, T3 Code settings", () => {
       "newWorktreesStartFromOrigin",
       "sidebarAutoSettleOnMerge",
       "notificationMode",
+      "pullRequestMergeMethod",
+      "branchNamePrefix",
+      "projectSettingsOverrides",
     ])
       expect(written).not.toHaveProperty(key)
     // Nothing of the Pi instance beyond the driver and the switch: no launch settings.
@@ -233,6 +242,7 @@ describe("holyagent setup, T3 Code settings", () => {
       removeAgentCreditsOnMerge: true,
       snoozeLimitedThreads: true,
       defaultAutoPull: true,
+      ...BRANCHES,
       storageCleanup: {
         logsAfterDays: 90,
         worktreeOnMerge: true,
@@ -244,6 +254,24 @@ describe("holyagent setup, T3 Code settings", () => {
     expect(line).toContain("kept providerInstances.pi.enabled false")
     expect(line).toContain("background activity (backgroundActivity is set)")
     expect(line).toContain("source control writing (sourceControlWritingStyle is set)")
+  })
+
+  test("writes the branch naming rule on its own, each key only where unset", async () => {
+    await machine()
+    await write(settingsFile(), { branchNamingMode: "semantic" })
+    await runSetup()
+    // The mode the user chose stays; the instructions, unset, are written beside it.
+    expect(await read(settingsFile())).toMatchObject({
+      branchNamingMode: "semantic",
+      branchNameInstructions: T3_BRANCH_INSTRUCTIONS,
+    })
+    await write(settingsFile(), { branchNameInstructions: "mine" })
+    const report = await runSetup()
+    expect(await read(settingsFile())).toMatchObject({
+      branchNamingMode: "custom",
+      branchNameInstructions: "mine",
+    })
+    expect(t3Lines(report)[0]).toContain('kept branchNameInstructions "mine"')
   })
 
   test("another driver's providerInstances.pi, or one disabled in its config, is left alone", async () => {
@@ -616,6 +644,16 @@ describe("holyagent setup --undo, T3 Code settings", () => {
     expect(await read(settingsFile())).toEqual({})
   })
 
+  test("removes the branch naming keys setup wrote, and keeps ones the user changed", async () => {
+    await machine()
+    await runSetup()
+    await write(settingsFile(), { ...ALL, branchNameInstructions: "mine" })
+    const line = t3Lines(await runSetup({ undo: true }))[0] ?? ""
+    expect(line).toContain('branchNamingMode "custom"')
+    expect(line).toContain('kept branchNameInstructions "mine" (setup wrote')
+    expect(await read(settingsFile())).toEqual({ branchNameInstructions: "mine" })
+  })
+
   test("undoes through the step's own entry", async () => {
     await machine()
     await install({ dryRun: false })
@@ -647,6 +685,17 @@ describe("holyagent doctor, T3 Code settings", () => {
     await runSetup()
     expect(t3Lines(await runDoctor())[0]).toStartWith("ok   t3 settings")
     await write(settingsFile(), { ...ALL, defaultAutoPull: false })
+    expect(t3Lines(await runDoctor())[0]).toStartWith("ok   t3 settings")
+  })
+
+  test("names the branch naming keys a file lacks", async () => {
+    await machine()
+    await runSetup()
+    const { branchNamingMode: _mode, branchNameInstructions: _text, ...rest } = ALL
+    await write(settingsFile(), rest)
+    const line = t3Lines(await runDoctor())[0] ?? ""
+    expect(line).toContain("lacks branchNamingMode, branchNameInstructions;")
+    await write(settingsFile(), { ...rest, branchNamingMode: "static", branchNameInstructions: "" })
     expect(t3Lines(await runDoctor())[0]).toStartWith("ok   t3 settings")
   })
 
