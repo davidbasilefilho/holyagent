@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-the-codex-provider-commit-for",
   "objective": "Assess the Codex provider commit for security issues: credential handling, outgoing requests, apply_patch file writes and the Luna Reserve usage call.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-provider.diff (worktree /home/user/holyagent-0.3.1-codex, commit 9d54902). Writer's account: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9krmo8-3qir.md.",
     "Trace: where the Codex access token comes from and where it is sent (only to OpenAI hosts? logged anywhere? written to disk?); apply_patch from model output to file writes (path traversal, symlinks, absolute paths, writes outside the project, deletion and move operations, partial application); context_management compaction items replayed (any injection or persistence concern); the Luna Reserve usage request (host, token use, response parsing with Schema, failure behaviour)."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_2628034d-c94/assignment-0mw9m7r8p-90gx",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T18:49:13.897Z"
+    "startedAt": "2026-11-09T18:49:13.897Z",
+    "finishedAt": "2026-11-09T18:55:36.434Z"
+  },
+  "result": "result: no blocking security finding. Tokens go only to chatgpt.com or Pi's own provider path, and apply_patch is contained lexically but not against symlinks. That adds no capability beyond the bash, write and edit tools the same roles already hold.\nchanged: none\nchecks: the built-in `/security-review` could not run (its shell step failed on `git log origin/HEAD...`: no `origin/HEAD` ref). This role has no Bash tool, so nothing was executed. I read the worktree sources under `/home/user/holyagent-0.3.1-codex/packages` directly. They match the diff, and the tree was not seen changing.\n\nblockers: none\n\nnotes (all non-blocking):\n1. **Symlink escape in apply_patch** (`runtime/src/pi/codex/apply-patch.ts:360-370`, sinks `integrations/pi/src/codex.ts:80-93`).\n   - `locate` checks containment lexically with `resolve` and `relative`, which correctly rejects absolute paths, `..`, and cross-drive paths on Windows.\n   - `readFile`, `writeFile`, `mkdir -p` and `rm` follow symlinks. A symlink inside the project that points outside it (an existing one, or one made earlier with bash) lets a patch write outside the project.\n   - Precondition: such a symlink exists. Impact: no more than bash, which the same roles have (`tools.ts:163`, `WRITE_TOOLS`). A `realpath` check on the parent directory would give a real boundary.\n   - Patches can also write under `.git/` or `.holyagent/`. That is also within what bash can do.\n2. **Not all-or-nothing.** The description says \"applied whole or not at all\" (`apply-patch.ts:26`, `:349-351`). Planning happens in memory, but the writes at `:412-416` run one by one, so an I/O failure partway leaves earlier files changed. The model is told something untrue.\n3. **Data loss on a same-path move.** `*** Update File: a` with `*** Move to: a` stages `next` and then `null` for the same path (`:404-408`). The file is deleted. This is a correctness bug, not a security one.\n4. **Token to chatgpt.com only, with no redirect pin.** The usage URL is a constant `https://chatgpt.com/backend-api/wham/usage` (`luna-reserve.ts:21`) with no config or env override (grep of src for `baseUrl`, `chatgpt.com` and `getApiKey` shows no other site). I could not confirm that Bun's `fetch` strips `Authorization` on a cross-origin redirect. `redirect: \"error\"` at `luna-reserve.ts:126` would remove the doubt.\n5. **Wrong-provider trigger.** `message_end` (`codex.ts:196-204`) does not check `ctx.model.provider`. If the user switches to another provider mid-session and that turn hits a usage-limit error, the Codex token is sent to chatgpt.com, and `reserve` is set to `true`. `toReserve` only rewrites Codex requests, so there is no leak beyond OpenAI.\n6. **Compaction replay.** The item comes from the TLS stream, is gated to the Codex provider (`codex.ts:160,176`), and is held in memory only. It is validated by schema, and by count and fingerprint before replay (`context-management.ts:108-112`). It is dropped on session start, compact or tree change, and on entering or leaving the reserve. Nothing is persisted.\n\nevidence:\nTokens reach only the intended hosts and apply_patch cannot write outside the project: the token is read at `codex.ts:184` and sent only in headers to the constant chatgpt.com URL (`luna-reserve.ts:101-137`). The `luna-reserve.ts`, `codex.ts` and `context-management.ts` sources contain no `console.*`, `process.env` or file writes, and errors never carry the token. `applyPatch` rejects lexical escapes (`apply-patch.ts:360-370`). A symlink escape remains (note 1), but it is not a new capability since bash, write and edit are already granted to the same roles, so I treat the criterion as met with the non-blocking caveat.\nfindings: see notes 1-6 above. None is blocking. Luna Reserve parsing uses `Schema.decodeUnknownOption`, which fails closed, and a 10s timeout (`luna-reserve.ts:47-63,24,128`). Failure means \"not offered\", or \"keep the reserve\" while it is in use (`codex.ts:192,209-211`).\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "No blocking finding; token hosts and apply_patch paths traced with file and line; six non-blocking notes.",
+    "criteria": [
+      {
+        "criterion": "Tokens reach only the intended hosts and apply_patch cannot write outside the project",
+        "support": "the token is read at `codex.ts:184` and sent only in headers to the constant chatgpt.com URL (`luna-reserve.ts:101-137`). The `luna-reserve.ts`, `codex.ts` and `context-management.ts` sources contain no `console.*`, `process.env` or file writes, and errors never carry the token. `applyPatch` rejects lexical escapes (`apply-patch.ts:360-370`). A symlink escape remains (note 1), but it is not a new capability since bash, write and edit are already granted to the same roles, so I treat the criterion as met with the non-blocking caveat."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see notes 1-6 above. None is blocking. Luna Reserve parsing uses `Schema.decodeUnknownOption`, which fails closed, and a 10s timeout (`luna-reserve.ts:47-63,24,128`). Failure means \"not offered\", or \"keep the reserve\" while it is in use (`codex.ts:192,209-211`)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T18:49:13.897Z"
 }
