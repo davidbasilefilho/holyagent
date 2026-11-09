@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mw9rc4gj-gk3c",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-just-bash-pi-bash-tool-correct",
+  "objective": "Make the just-bash Pi bash tool correct on Windows, so the working folder and PATH it hands back and carries between calls use Windows paths, and the host search-folder logic follows the platform it is given.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-bash, branch release/0.3.1/feat/just-bash at b68cd1c9 (PR davidbasilefilho/holyagent#106)",
+    "Windows CI log of d149c9c: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-106.txt (timestamps stripped). Failing tests: packages/integrations/pi/tests/bash.test.ts 'keep the folder and the variables from one call to the next, as a terminal does', '... of a call that ends with exit', 'overlapping calls each keep what they changed...', 'start again from Pi's folder when Pi passes another' (cwd comes back as /c/Users/... instead of C:\\Users\\...); packages/runtime/tests/pi/bash-shell.test.ts 'the host program gets the real PATH...' (echo $PATH shows /c/Users/.../bin instead of the Windows host folder), 'BUN_INSTALL and MISE_DATA_DIR move Bun's and mise's folders' and 'the call's PATH first, then the places a launcher's PATH may leave out, each once' (hostSearchFolders called with platform 'linux' drops POSIX folders on a Windows host, likely because the rooted check uses the host's node:path instead of the given platform's).",
+    "The codex mode-test failure in the same log is already fixed by the merged commit 2727856; leave it."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Decide from the code which representation each boundary needs: inside just-bash paths are POSIX-style; what goes back to Pi (cwd), to host programs and into saved session state must round-trip to real Windows paths. If a test's expectation is wrong for Windows rather than the code, fix the test and say why in the report.",
+    "Platform-dependent helpers take the platform as a parameter and use path.win32 or path.posix accordingly, so Linux CI can test the Windows branch with fixtures.",
+    "Add Linux-runnable tests that exercise the Windows conversion (drive letters, UNC or long paths if handled, PATH with ; delimiter) so this regression is caught without Windows CI.",
+    "Leave packages/integrations/pi/src/codex.ts and packages/runtime/src/pi/codex/ untouched.",
+    "Report in under 400 words; start each evidence line with the exact criterion text, a colon and the support inline; put long logs in a file in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "On Windows the cwd returned to Pi and carried to the next call is a Windows path, with tests that run on Linux through the platform parameter",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "On Windows host programs receive the real Windows PATH and the shell PATH maps the host folders consistently, with tests that run on Linux",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "hostSearchFolders filters rooted folders by the platform it is given, not the host's, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every test listed in the scope is either passing by construction on Windows or corrected with a stated reason; none is skipped",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi/bash",
+    "packages/integrations/pi/src/bash.ts",
+    "packages/runtime/tests/pi/bash-shell.test.ts",
+    "packages/integrations/pi/tests/bash.test.ts",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist/scripts",
+    "docs/pi/shell.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9qugeg-vovd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T21:12:35.731Z"
+  },
+  "createdAt": "2026-11-09T21:12:35.731Z"
+}
