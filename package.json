@@ -24,11 +24,14 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-code": "^2.0.0",
+    "@opentui/core": "^0.8.0",
+    "@opentui/solid": "^0.8.0",
     "@types/bun": "^1.0.0",
     "effect": "^4.0.0",
     "eslint-plugin-jsdoc": "^65.0.0",
     "lefthook": "^2.0.0",
-    "mise": "^2026.0.0"
+    "mise": "^2026.0.0",
+    "solid-js": "^1.0.0"
   },
   "pi": {
     "extensions": [

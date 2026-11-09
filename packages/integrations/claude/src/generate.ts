@@ -5,6 +5,8 @@ import { Effect } from "effect"
 import { bundleModule } from "../../../runtime/src/bundle.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
 import { DESIGN_CORE_PATH, skillFiles } from "../../../runtime/src/instructions/skills.ts"
+import { bundleSetupTui } from "../../../runtime/src/setup/tui/build.ts"
+import { TUI_BUNDLE, TUI_SOURCE } from "../../../runtime/src/setup/tui/files.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles, PLUGIN_NAME } from "./agents.ts"
 import {
@@ -232,6 +234,10 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       content: `# ${generatedNote(`${SOURCES}/empty-bunfig.toml`)}\n${toml}`,
     },
     { path: inPlugin("scripts/holyagent.js"), content: await bundle() },
+    {
+      path: inPlugin(`scripts/${TUI_BUNDLE}`),
+      content: await Effect.runPromise(bundleSetupTui(REPOSITORY, generatedNote(TUI_SOURCE))),
+    },
   ]
 }
 

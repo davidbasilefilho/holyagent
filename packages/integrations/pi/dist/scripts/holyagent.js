@@ -5928,6 +5928,12 @@ function structWithRest(ast, records) {
   }
   return new Objects(propertySignatures, indexSignatures, undefined, checks);
 }
+function tupleWithRest(ast, rest) {
+  if (ast.encoding) {
+    throw new Error("TupleWithRest does not support encodings");
+  }
+  return new Arrays(ast.isMutable, ast.elements, rest, undefined, ast.checks);
+}
 function getCandidateTypes(ast) {
   switch (ast._tag) {
     case "Null":
@@ -8303,6 +8309,12 @@ function makeTuple(ast, elements) {
 }
 function Tuple(elements) {
   return makeTuple(tuple(elements), elements);
+}
+function TupleWithRest(schema, rest) {
+  return make9(tupleWithRest(schema.ast, rest.map(getAST)), {
+    schema,
+    rest
+  });
 }
 function makeUnion(ast, members) {
   return make9(ast, {
@@ -25169,6 +25181,7 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
 })))), t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join18(homeDirectory(env), ".t3"), t3SettingsFile = (env) => join18(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
   {
     name: "Pi provider",
+    choice: "pi",
     keys: [
       { path: ["providerInstances", "pi", "driver"], value: "pi", default: undefined },
       { path: ["providerInstances", "pi", "enabled"], value: true, default: undefined }
@@ -25186,6 +25199,7 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
   ...devices ? [
     {
       name: "device access",
+      choice: "deviceAccess",
       keys: [
         { path: ["enableDeviceSupport"], value: true, default: false },
         { path: ["enableAgentDeviceAccess"], value: true, default: false }
@@ -25195,6 +25209,7 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
   ...worktrees ? [
     {
       name: "worktrees",
+      choice: "worktrees",
       keys: [{ path: ["defaultThreadEnvMode"], value: "worktree", default: null }]
     }
   ] : [],
@@ -25260,24 +25275,26 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
       }))
     ]
   }
-], wantedKeys = (existing, all, recorded = []) => {
+], unitOutcome = (existing, unit, recorded) => {
+  if (unit.whole !== undefined && existing[unit.whole] !== undefined && recorded.some(({ path }) => path[0] === unit.whole))
+    return { status: "own" };
+  const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
+  return reason !== undefined ? { status: "left", reason } : { status: "keys", keys: unit.keys.filter((key) => !equals(key.value, key.default)) };
+}, wantedKeys = (existing, all, recorded = []) => {
   const keys = [];
   const left = [];
   const own = [];
   for (const unit of all) {
-    if (unit.whole !== undefined && existing[unit.whole] !== undefined && recorded.some(({ path }) => path[0] === unit.whole)) {
+    const outcome = unitOutcome(existing, unit, recorded);
+    if (outcome.status === "own")
       own.push(unit.name);
-      continue;
-    }
-    const reason = unit.whole !== undefined && existing[unit.whole] !== undefined ? `${unit.whole} is set` : unit.refuse?.(existing);
-    if (reason !== undefined) {
-      left.push(`${unit.name} (${reason})`);
-      continue;
-    }
-    keys.push(...unit.keys.filter((key) => !equals(key.value, key.default)));
+    else if (outcome.status === "left")
+      left.push(`${unit.name} (${outcome.reason})`);
+    else
+      keys.push(...outcome.keys);
   }
   return { keys, left, own };
-}, decide, writeVerified, names = (paths) => paths.map((entry) => entry.path).join(", "), installT3Settings, undoT3Settings, checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
+}, decide, writeVerified, names = (paths) => paths.map((entry) => entry.path).join(", "), installT3Settings, previewT3Settings, undoT3Settings, checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [];
   const decided = yield* decide(env, cwd, options);
@@ -25350,14 +25367,16 @@ var init_t3_settings = __esm(() => {
       return {
         line: skipped(`${label2}: pi.t3.scope is "project", whose per-project overrides setup does not write yet; nothing written`)
       };
+    const host = config.pi.t3.deviceAccess ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
     const wantsDevices = (options.deviceAccess ?? true) && config.pi.t3.deviceAccess;
-    const host = wantsDevices ? yield* deviceHost(env, options.platform ?? process.platform) : undefined;
     const deviceNote = wantsDevices && host === undefined ? "device access left out: no Xcode or Android SDK found" : undefined;
     return {
       target: {
         file: t3SettingsFile(env),
-        units: units(host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
-        deviceNote
+        units: units(wantsDevices && host !== undefined, (options.worktrees ?? true) && config.pi.t3.worktrees),
+        deviceNote,
+        device: host,
+        worktreesAllowed: config.pi.t3.worktrees
       }
     };
   });
@@ -25413,6 +25432,32 @@ var init_t3_settings = __esm(() => {
     return [
       `${mark} ${label2} ${file}: ${parts.join("; ")}${added.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`
     ];
+  });
+  previewT3Settings = fn2("previewT3Settings")(function* (env, cwd, options) {
+    const decided = yield* decide(env, cwd, options);
+    if (decided === undefined)
+      return;
+    if ("line" in decided)
+      return { line: decided.line };
+    const { file, units: wanted, device, worktreesAllowed } = decided.target;
+    const before = yield* readJsonObjectSnapshot(file);
+    const recorded = yield* readRecorded(env, file).pipe(orElseSucceed2(() => []));
+    const units = wanted.map((unit) => {
+      const outcome = unitOutcome(before.value, unit, recorded);
+      const base = { name: unit.name, ...unit.choice === undefined ? {} : { choice: unit.choice } };
+      if (outcome.status === "own")
+        return { ...base, added: [], present: [], kept: [], own: true };
+      if (outcome.status === "left")
+        return { ...base, added: [], present: [], kept: [], left: outcome.reason };
+      const { entries } = applyDefaults(before.value, outcome.keys);
+      return {
+        ...base,
+        added: entries.filter((entry) => entry.status === "added").map((entry) => `${entry.path} ${show(entry.value)}`),
+        present: entries.filter((entry) => entry.status === "present").map((entry) => entry.path),
+        kept: entries.filter((entry) => entry.status === "kept").map((entry) => `${entry.path} ${show(entry.value)}`)
+      };
+    });
+    return { file, device, worktreesAllowed, units };
   });
   undoT3Settings = fn2("undoT3Settings")(function* (env, options) {
     const file = t3SettingsFile(env);
@@ -25534,7 +25579,11 @@ var init_steps = __esm(() => {
       ...options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun)),
       ...piUsed ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
       ...piUsed ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
-      ...piUsed && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, { dryRun: options.dryRun })) : [],
+      ...piUsed && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+        dryRun: options.dryRun,
+        ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
+        ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
+      })) : [],
       ...yield* onSettings((file) => mergeUserSettings({
         env,
         file,
@@ -25604,9 +25653,1453 @@ var init_doctor = __esm(() => {
   });
 });
 
-var CacheTtlFlag, ScopeFlag, printed = (report) => new Verbatim(`${report.lines.join(`
+var TUI_BUNDLE = "setup-tui.js";
+
+var TUI_MANIFEST_NAME = "holyagent-setup-tui", Dependencies, Entry, Lock;
+var init_lock2 = __esm(() => {
+  init_dist();
+  Dependencies = optional2(Record(String6, String6));
+  Entry = TupleWithRest(Tuple([
+    String6,
+    String6,
+    Struct({
+      dependencies: Dependencies,
+      optionalDependencies: Dependencies,
+      peerDependencies: Dependencies
+    })
+  ]), [Unknown2]);
+  Lock = Struct({
+    lockfileVersion: Number6,
+    configVersion: optional2(Number6),
+    packages: Record(String6, Unknown2)
+  });
+});
+
+var TUI_PACKAGES = {
+  "@opentui/core": "0.8.3",
+  "@opentui/solid": "0.8.3",
+  "solid-js": "1.9.18"
+}, TUI_LOCK = `{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "holyagent-setup-tui",
+      "dependencies": {
+        "@opentui/core": "0.8.3",
+        "@opentui/solid": "0.8.3",
+        "solid-js": "1.9.18"
+      }
+    }
+  },
+  "packages": {
+    "@babel/code-frame": [
+      "@babel/code-frame@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "js-tokens": "^4.0.0",
+          "picocolors": "^1.1.1"
+        }
+      },
+      "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="
+    ],
+    "@babel/compat-data": [
+      "@babel/compat-data@7.29.7",
+      "",
+      {},
+      "sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg=="
+    ],
+    "@babel/core": [
+      "@babel/core@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.7",
+          "@babel/helper-compilation-targets": "^7.29.7",
+          "@babel/helper-module-transforms": "^7.29.7",
+          "@babel/helpers": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/template": "^7.29.7",
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7",
+          "@jridgewell/remapping": "^2.3.5",
+          "convert-source-map": "^2.0.0",
+          "debug": "^4.1.0",
+          "gensync": "^1.0.0-beta.2",
+          "json5": "^2.2.3",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
+    ],
+    "@babel/generator": [
+      "@babel/generator@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/parser": "^7.29.13",
+          "@babel/types": "^7.29.11",
+          "@jridgewell/gen-mapping": "^0.3.12",
+          "@jridgewell/trace-mapping": "^0.3.28",
+          "jsesc": "^3.0.2"
+        }
+      },
+      "sha512-T5FRo+RzVHvGjWOuF1Ljc44b+NXAOazodHkGUHp4I3zCkQ4/sNVJm56h1S278LMR0bY5xBhztGziSbli8zObIw=="
+    ],
+    "@babel/helper-annotate-as-pure": [
+      "@babel/helper-annotate-as-pure@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-OoK6239jHPuSQOoS0kfTVKn0b/rVTk0seKq4Gd2UMLtmOVLjDC0ki3e+c90Trqv2gMfvJFqkiljrr568+qddiw=="
+    ],
+    "@babel/helper-compilation-targets": [
+      "@babel/helper-compilation-targets@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/compat-data": "^7.29.7",
+          "@babel/helper-validator-option": "^7.29.7",
+          "browserslist": "^4.24.0",
+          "lru-cache": "^5.1.1",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-8WxJ4/Vmes3ghacj8VOJy3NW8eyHiFY/4thU/LSBuBE470+igjR/j1ZTNn8fV5VdNrLx6iXUwig526UdOvfP0w=="
+    ],
+    "@babel/helper-create-class-features-plugin": [
+      "@babel/helper-create-class-features-plugin@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/helper-replace-supers": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.13",
+          "semver": "^6.3.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-fo8/Fr44/DMV71FQjk/HA0Npmu3bo5DFoWTCW1dhUR8Vx3NFfAVeEy0TbcBpt4e+hd2QhdmWgmspHo/9iWj8RA=="
+    ],
+    "@babel/helper-globals": [
+      "@babel/helper-globals@7.29.7",
+      "",
+      {},
+      "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
+    ],
+    "@babel/helper-member-expression-to-functions": [
+      "@babel/helper-member-expression-to-functions@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-j+7JYmk1JYDtACIGj0QJqqWZjoUpMoEikQGADMaHgCMCSDqd2+P32rfcibUNrGOMWrlzK1WJBdxrB3JJQZwWtg=="
+    ],
+    "@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
+    ],
+    "@babel/helper-module-transforms": [
+      "@babel/helper-module-transforms@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "^7.29.7",
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "@babel/traverse": "^7.29.13"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-/U96wOz+SCoZ7Da/8kjDGltcNY280JPQcRNPK0Hk3PTbdpaiBDQImtC6JsbVwb1HGMr3usZQU2WsWVjhYNmRzw=="
+    ],
+    "@babel/helper-optimise-call-expression": [
+      "@babel/helper-optimise-call-expression@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-+kmGVjcT9RGYzoDwdwEqEvGgKe3BYq+O1iGzjFubaNgZHwYHP6lsF2Yghf4kEuv9BV7tYDZ913aBW9am6YKong=="
+    ],
+    "@babel/helper-plugin-utils": [
+      "@babel/helper-plugin-utils@7.29.7",
+      "",
+      {},
+      "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="
+    ],
+    "@babel/helper-replace-supers": [
+      "@babel/helper-replace-supers@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/traverse": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-atfGXWSeCiF4DnKZIfmJfQRkSw9b9gNNXR1kqKjbhG4pGYCOnkp8OcTB8E3NXjBu8NpheSnOeNKz8KT7UNFTmQ=="
+    ],
+    "@babel/helper-skip-transparent-expression-wrappers": [
+      "@babel/helper-skip-transparent-expression-wrappers@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.13",
+          "@babel/types": "^7.29.11"
+        }
+      },
+      "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
+    ],
+    "@babel/helper-string-parser": [
+      "@babel/helper-string-parser@7.29.13",
+      "",
+      {},
+      "sha512-fWegr+WsEsiMVW4KUNdIIzzMTZSzNiqhy0//6+2MRi2d5NFNsL/AYwBQW8eBnRbTBVRnDVzjaJEUqKaCWjMMdQ=="
+    ],
+    "@babel/helper-validator-identifier": [
+      "@babel/helper-validator-identifier@7.29.7",
+      "",
+      {},
+      "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
+    ],
+    "@babel/helper-validator-option": [
+      "@babel/helper-validator-option@7.29.7",
+      "",
+      {},
+      "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
+    ],
+    "@babel/helpers": [
+      "@babel/helpers@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.11"
+        }
+      },
+      "sha512-laoRpD/kO/iA4CDlgJbixHekg7oPvWALK0PQyK3Ob2I2njZRvVAD77RfWCIImtqWCq6KijoBoZK7bp/HlTWASQ=="
+    ],
+    "@babel/parser": [
+      "@babel/parser@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.11"
+        },
+        "bin": "./bin/babel-parser.js"
+      },
+      "sha512-fJM50YYjlTiBhgdkGmC1tBpv+FMAyo4annf2X6Aks+0yRlaiVkYW/3f07xAfVVkYIoZ9fFZp+mEThUFnuybhkQ=="
+    ],
+    "@babel/plugin-syntax-jsx": [
+      "@babel/plugin-syntax-jsx@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A=="
+    ],
+    "@babel/plugin-syntax-typescript": [
+      "@babel/plugin-syntax-typescript@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
+    ],
+    "@babel/plugin-transform-modules-commonjs": [
+      "@babel/plugin-transform-modules-commonjs@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-transforms": "^7.29.7",
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-j0vCldybPC5b5dwCQOJ21uKtHzt7hxLygJTg9eF1ScfaikEDNfzn94XoW5Fi+seBR0nCyL23xaBFFkq7dTM8XQ=="
+    ],
+    "@babel/plugin-transform-typescript": [
+      "@babel/plugin-transform-typescript@7.29.9",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-create-class-features-plugin": "^7.29.7",
+          "@babel/helper-plugin-utils": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.7",
+          "@babel/plugin-syntax-typescript": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-FFwIwzU+7SCOuxxV4YtJql6T9981ZVTm+FHO5GhVsRqCTdy0WwrEZh3l42ARpXruJUDGOptdduHW6Zr7pNPLNg=="
+    ],
+    "@babel/preset-typescript": [
+      "@babel/preset-typescript@7.27.1",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.27.1",
+          "@babel/helper-validator-option": "^7.27.1",
+          "@babel/plugin-syntax-jsx": "^7.27.1",
+          "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+          "@babel/plugin-transform-typescript": "^7.27.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ=="
+    ],
+    "@babel/template": [
+      "@babel/template@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
+    ],
+    "@babel/traverse": [
+      "@babel/traverse@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.13",
+          "@babel/helper-globals": "^7.29.7",
+          "@babel/parser": "^7.29.13",
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.11",
+          "debug": "^4.3.1"
+        }
+      },
+      "sha512-0ve0xMlFA73dgY1oyJRY6RoW+/bncdcOQqg6jjYcVfXBK90OdLXjm9R6lmRetdZVrPjXkKIoMVBqYFPjcAlZ4Q=="
+    ],
+    "@babel/types": [
+      "@babel/types@7.29.11",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-string-parser": "^7.29.11",
+          "@babel/helper-validator-identifier": "^7.29.7"
+        }
+      },
+      "sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ=="
+    ],
+    "@jridgewell/gen-mapping": [
+      "@jridgewell/gen-mapping@0.3.13",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/sourcemap-codec": "^1.5.0",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
+    ],
+    "@jridgewell/remapping": [
+      "@jridgewell/remapping@2.3.5",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/gen-mapping": "^0.3.5",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
+    ],
+    "@jridgewell/resolve-uri": [
+      "@jridgewell/resolve-uri@3.1.2",
+      "",
+      {},
+      "sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw=="
+    ],
+    "@jridgewell/sourcemap-codec": [
+      "@jridgewell/sourcemap-codec@1.6.0",
+      "",
+      {},
+      "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
+    ],
+    "@jridgewell/trace-mapping": [
+      "@jridgewell/trace-mapping@0.3.31",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/resolve-uri": "^3.1.0",
+          "@jridgewell/sourcemap-codec": "^1.4.14"
+        }
+      },
+      "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
+    ],
+    "@opentui/core": [
+      "@opentui/core@0.8.3",
+      "",
+      {
+        "dependencies": {
+          "bun-ffi-structs": "0.3.1",
+          "diff": "9.0.0",
+          "marked": "17.0.1",
+          "string-width": "7.2.0"
+        },
+        "optionalDependencies": {
+          "@opentui/core-darwin-arm64": "0.8.3",
+          "@opentui/core-darwin-x64": "0.8.3",
+          "@opentui/core-linux-arm64": "0.8.3",
+          "@opentui/core-linux-arm64-musl": "0.8.3",
+          "@opentui/core-linux-x64": "0.8.3",
+          "@opentui/core-linux-x64-musl": "0.8.3",
+          "@opentui/core-win32-arm64": "0.8.3",
+          "@opentui/core-win32-x64": "0.8.3"
+        },
+        "peerDependencies": {
+          "web-tree-sitter": "0.25.10"
+        }
+      },
+      "sha512-6Ng2jyiZZhGUTNbF8wXmjztihdGdx7uZq8O5bBgG/2XaCANw/BJgSxYb/nVFtorzShE9JcjszRhzh8XNxQ3yuA=="
+    ],
+    "@opentui/core-darwin-arm64": [
+      "@opentui/core-darwin-arm64@0.8.3",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "arm64"
+      },
+      "sha512-9YaOiVlld+J/POWW0TnUe9kX5+/9B0iEszdTAfgHFqSkVz4ndnYnFJTCC9fnwLrS+WOCked+7M9sS2DXiPpFQw=="
+    ],
+    "@opentui/core-darwin-x64": [
+      "@opentui/core-darwin-x64@0.8.3",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "x64"
+      },
+      "sha512-rHW+b4mnUgdy7cs1jxFOQqd/C0n+sumjJaNVKIPKvk+EuVr+HM2pIdhFvOThnKWTyp2GlNZtIJNKCaAf+QxvkA=="
+    ],
+    "@opentui/core-linux-arm64": [
+      "@opentui/core-linux-arm64@0.8.3",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64"
+      },
+      "sha512-1GeV1UZqzMTfOUKuymGUhCHD5XTJC4w2eA+zPDs/jBVgv2NqPL7sofoBHLzkyhlxZpuptQR+vVPs4sW4T+7YVg=="
+    ],
+    "@opentui/core-linux-arm64-musl": [
+      "@opentui/core-linux-arm64-musl@0.8.3",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64",
+        "libc": "musl"
+      },
+      "sha512-U2IbCGI7sjUZoO8h8UizREHRDWk0u/bOAmJ0L46xB3uyMWKfNU9f8x5jQF4v6apMMmb56/TPl/PUoVR1sQg15A=="
+    ],
+    "@opentui/core-linux-x64": [
+      "@opentui/core-linux-x64@0.8.3",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64"
+      },
+      "sha512-DIhEmsACFqucaqSMYZqQKXi10WmGuO0TpmqEz9hScqktcRlNAPpsB5qmO6qCEyXxTIbfaVxxlABcq1Xn3eB0aQ=="
+    ],
+    "@opentui/core-linux-x64-musl": [
+      "@opentui/core-linux-x64-musl@0.8.3",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64",
+        "libc": "musl"
+      },
+      "sha512-MJoGBVxNtmaQSu8rvzHrJKjS0Fd/ER/Sf9NKD+ep8nPanlffJPhRbX0cT0gvkKhK3G2Od+RXUr/tlUqy0U69ow=="
+    ],
+    "@opentui/core-win32-arm64": [
+      "@opentui/core-win32-arm64@0.8.3",
+      "",
+      {
+        "os": "win32",
+        "cpu": "arm64"
+      },
+      "sha512-g0R4PrOI93z7KaWXFw/PdA6DGWDcaK9aH88ECmnsI9At1KZoEb+Jik137qEz7bGWKGOXtn+JaHsne3vipB3vwQ=="
+    ],
+    "@opentui/core-win32-x64": [
+      "@opentui/core-win32-x64@0.8.3",
+      "",
+      {
+        "os": "win32",
+        "cpu": "x64"
+      },
+      "sha512-yjpxLUXeBc1eMW3pr4Fl9tpNuA7a4JdcGNVved9zFD3HZ07mM2YVfreLJeDn4n61jXUJKM8XtXVWBZM8RHF4gg=="
+    ],
+    "@opentui/solid": [
+      "@opentui/solid@0.8.3",
+      "",
+      {
+        "dependencies": {
+          "@babel/core": "7.29.7",
+          "@babel/preset-typescript": "7.27.1",
+          "@opentui/core": "0.8.3",
+          "babel-plugin-module-resolver": "5.0.2",
+          "babel-preset-solid": "1.9.16",
+          "entities": "7.0.1",
+          "s-js": "^0.4.9"
+        },
+        "peerDependencies": {
+          "solid-js": "^1.9.12"
+        }
+      },
+      "sha512-bhilJzWY4/Mh/7xxJa6FDOXeGbThCr7IjA1Vbr+OVTkzidmJzgATInwemnrepcPefAm0117AoQlHgc8jlP3lXQ=="
+    ],
+    "ansi-regex": [
+      "ansi-regex@6.6.0",
+      "",
+      {},
+      "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
+    ],
+    "babel-plugin-jsx-dom-expressions": [
+      "babel-plugin-jsx-dom-expressions@0.40.11",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "7.18.6",
+          "@babel/plugin-syntax-jsx": "^7.18.6",
+          "@babel/types": "^7.20.7",
+          "html-entities": "2.3.3",
+          "parse5": "^7.1.2"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.20.12"
+        }
+      },
+      "sha512-k7TkOv7uVYnrq/bYyVvG5cWOC9IObAGfmyW3aMkG8l2sq2qt/5THkUBja69PMLEGGi8G+fXB2Fh7eS4OwZRBoQ=="
+    ],
+    "babel-plugin-module-resolver": [
+      "babel-plugin-module-resolver@5.0.2",
+      "",
+      {
+        "dependencies": {
+          "find-babel-config": "^2.1.1",
+          "glob": "^9.3.3",
+          "pkg-up": "^3.1.0",
+          "reselect": "^4.1.7",
+          "resolve": "^1.22.8"
+        }
+      },
+      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
+    ],
+    "babel-preset-solid": [
+      "babel-preset-solid@1.9.16",
+      "",
+      {
+        "dependencies": {
+          "babel-plugin-jsx-dom-expressions": "^0.40.11"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0",
+          "solid-js": "^1.9.16"
+        },
+        "optionalPeers": [
+          "solid-js"
+        ]
+      },
+      "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
+    ],
+    "baseline-browser-mapping": [
+      "baseline-browser-mapping@2.11.35",
+      "",
+      {
+        "bin": {
+          "baseline-browser-mapping": "dist/cli.cjs"
+        }
+      },
+      "sha512-GNk8KX52CHqeNKGk8+7tZnQab/2k1t/BgrUHPKNdijzpEhF1saPQZHVKb6m5loSAxB39gyrTYw34Qf9CQ3u1qQ=="
+    ],
+    "browserslist": [
+      "browserslist@4.29.5",
+      "",
+      {
+        "dependencies": {
+          "baseline-browser-mapping": "^2.11.33",
+          "caniuse-lite": "^1.0.30001819",
+          "electron-to-chromium": "^1.5.464",
+          "node-releases": "^2.0.60",
+          "update-browserslist-db": "^1.3.4"
+        },
+        "bin": {
+          "browserslist": "cli.js"
+        }
+      },
+      "sha512-khTmKu5NGYTotqcYo8Bew2k4RAE9PuXRSFRXG2lQBrCEQHyeQ/vX6gKMxfokwywBsLiXZMnHsmWMG1pnO8J7uQ=="
+    ],
+    "bun-ffi-structs": [
+      "bun-ffi-structs@0.3.1",
+      "",
+      {
+        "peerDependencies": {
+          "typescript": "^5"
+        }
+      },
+      "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
+    ],
+    "caniuse-lite": [
+      "caniuse-lite@1.0.30001823",
+      "",
+      {},
+      "sha512-TQ5s/djDjNk1axreUW+4rULH+BmdCMLiJkhaXnO5wqivG7tITkSUj4ItIdzqdZHKaXcHAV8dhH3JxOM7/7bwqw=="
+    ],
+    "convert-source-map": [
+      "convert-source-map@2.0.0",
+      "",
+      {},
+      "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
+    ],
+    "csstype": [
+      "csstype@3.2.3",
+      "",
+      {},
+      "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="
+    ],
+    "debug": [
+      "debug@4.4.3",
+      "",
+      {
+        "dependencies": {
+          "ms": "^2.1.3"
+        },
+        "peerDependencies": {
+          "supports-color": "*"
+        },
+        "optionalPeers": [
+          "supports-color"
+        ]
+      },
+      "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="
+    ],
+    "diff": [
+      "diff@9.0.0",
+      "",
+      {},
+      "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
+    ],
+    "electron-to-chromium": [
+      "electron-to-chromium@1.5.478",
+      "",
+      {},
+      "sha512-pftG+ma5Lm8O6/p45bhYT6StBN5ziQymaRzmCZwFl8DwWHKPPD93FdOmP1aqftcepolQYvrcyTLa17kE8Yf+jg=="
+    ],
+    "emoji-regex": [
+      "emoji-regex@10.6.0",
+      "",
+      {},
+      "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="
+    ],
+    "entities": [
+      "entities@7.0.1",
+      "",
+      {},
+      "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
+    ],
+    "es-errors": [
+      "es-errors@1.3.0",
+      "",
+      {},
+      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
+    ],
+    "escalade": [
+      "escalade@3.2.0",
+      "",
+      {},
+      "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
+    ],
+    "find-babel-config": [
+      "find-babel-config@2.1.2",
+      "",
+      {
+        "dependencies": {
+          "json5": "^2.2.3"
+        }
+      },
+      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
+    ],
+    "fs.realpath": [
+      "fs.realpath@1.0.0",
+      "",
+      {},
+      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
+    ],
+    "function-bind": [
+      "function-bind@1.1.2",
+      "",
+      {},
+      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
+    ],
+    "gensync": [
+      "gensync@1.0.0-beta.2",
+      "",
+      {},
+      "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="
+    ],
+    "get-east-asian-width": [
+      "get-east-asian-width@1.6.0",
+      "",
+      {},
+      "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
+    ],
+    "glob": [
+      "glob@9.3.5",
+      "",
+      {
+        "dependencies": {
+          "fs.realpath": "^1.0.0",
+          "minimatch": "^8.0.2",
+          "minipass": "^4.2.4",
+          "path-scurry": "^1.6.1"
+        }
+      },
+      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
+    ],
+    "hasown": [
+      "hasown@2.0.4",
+      "",
+      {
+        "dependencies": {
+          "function-bind": "^1.1.2"
+        }
+      },
+      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
+    ],
+    "is-core-module": [
+      "is-core-module@2.18.0",
+      "",
+      {
+        "dependencies": {
+          "hasown": "^2.0.4"
+        }
+      },
+      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
+    ],
+    "js-tokens": [
+      "js-tokens@4.0.0",
+      "",
+      {},
+      "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="
+    ],
+    "jsesc": [
+      "jsesc@3.1.0",
+      "",
+      {
+        "bin": {
+          "jsesc": "bin/jsesc"
+        }
+      },
+      "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="
+    ],
+    "json5": [
+      "json5@2.2.3",
+      "",
+      {
+        "bin": {
+          "json5": "lib/cli.js"
+        }
+      },
+      "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
+    ],
+    "marked": [
+      "marked@17.0.1",
+      "",
+      {
+        "bin": {
+          "marked": "bin/marked.js"
+        }
+      },
+      "sha512-boeBdiS0ghpWcSwoNm/jJBwdpFaMnZWRzjA6SkUMYb40SVaN1x7mmfGKp0jvexGcx+7y2La5zRZsYFZI6Qpypg=="
+    ],
+    "minipass": [
+      "minipass@4.2.8",
+      "",
+      {},
+      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
+    ],
+    "ms": [
+      "ms@2.1.3",
+      "",
+      {},
+      "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
+    ],
+    "node-releases": [
+      "node-releases@2.0.63",
+      "",
+      {},
+      "sha512-6li2QanLsAXpIH2R6j77MzRyvOyrvdTqlKtO4CgBdHGNvN99ZZfyxszHc5o5+IZBWD5u6Hzwg83JoGXmqZNG9Q=="
+    ],
+    "p-try": [
+      "p-try@2.2.0",
+      "",
+      {},
+      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
+    ],
+    "parse5": [
+      "parse5@7.3.0",
+      "",
+      {
+        "dependencies": {
+          "entities": "^6.0.0"
+        }
+      },
+      "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
+    ],
+    "path-parse": [
+      "path-parse@1.0.7",
+      "",
+      {},
+      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
+    ],
+    "path-scurry": [
+      "path-scurry@1.11.1",
+      "",
+      {
+        "dependencies": {
+          "lru-cache": "^10.2.0",
+          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
+        }
+      },
+      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
+    ],
+    "picocolors": [
+      "picocolors@1.1.1",
+      "",
+      {},
+      "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
+    ],
+    "pkg-up": [
+      "pkg-up@3.1.0",
+      "",
+      {
+        "dependencies": {
+          "find-up": "^3.0.0"
+        }
+      },
+      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
+    ],
+    "reselect": [
+      "reselect@4.1.8",
+      "",
+      {},
+      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
+    ],
+    "resolve": [
+      "resolve@1.22.14",
+      "",
+      {
+        "dependencies": {
+          "es-errors": "^1.3.0",
+          "is-core-module": "^2.18.0",
+          "path-parse": "^1.0.7",
+          "supports-preserve-symlinks-flag": "^1.0.0"
+        },
+        "bin": {
+          "resolve": "bin/resolve"
+        }
+      },
+      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
+    ],
+    "s-js": [
+      "s-js@0.4.9",
+      "",
+      {},
+      "sha512-RtpOm+cM6O0sHg6IA70wH+UC3FZcND+rccBZpBAHzlUgNO2Bm5BN+FnM8+OBxzXdwpKWFwX11JGF0MFRkhSoIQ=="
+    ],
+    "seroval": [
+      "seroval@1.6.12",
+      "",
+      {},
+      "sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg=="
+    ],
+    "seroval-plugins": [
+      "seroval-plugins@1.6.12",
+      "",
+      {
+        "peerDependencies": {
+          "seroval": "^1.0"
+        }
+      },
+      "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
+    ],
+    "solid-js": [
+      "solid-js@1.9.18",
+      "",
+      {
+        "dependencies": {
+          "csstype": "^3.1.0",
+          "seroval": "~1.6.11",
+          "seroval-plugins": "~1.6.8"
+        }
+      },
+      "sha512-CHGO5YFk6Y9m/1YSxVtKnXfrW7JD3Tmof8HmR4z6TmCPsS8efo8LnzIR8CQh3cUvffqYm6DWyBFfk8dQw1CNQQ=="
+    ],
+    "string-width": [
+      "string-width@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "emoji-regex": "^10.3.0",
+          "get-east-asian-width": "^1.0.0",
+          "strip-ansi": "^7.1.0"
+        }
+      },
+      "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="
+    ],
+    "strip-ansi": [
+      "strip-ansi@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "ansi-regex": "^6.2.2"
+        }
+      },
+      "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
+    ],
+    "supports-preserve-symlinks-flag": [
+      "supports-preserve-symlinks-flag@1.0.0",
+      "",
+      {},
+      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
+    ],
+    "update-browserslist-db": [
+      "update-browserslist-db@1.3.4",
+      "",
+      {
+        "dependencies": {
+          "escalade": "^3.2.0",
+          "picocolors": "^1.1.1"
+        },
+        "peerDependencies": {
+          "browserslist": ">= 4.21.0"
+        },
+        "bin": {
+          "update-browserslist-db": "cli.js"
+        }
+      },
+      "sha512-t8wonIOdQyOjtPd2VktlBu6QjTVTks6v8bSi7kd0r2Vll8TK1JYDZtRRdbmCHOAMphkZgrzK+L+vXK4pyZ8t4A=="
+    ],
+    "web-tree-sitter": [
+      "web-tree-sitter@0.25.10",
+      "",
+      {
+        "peerDependencies": {
+          "@types/emscripten": "^1.40.0"
+        },
+        "optionalPeers": [
+          "@types/emscripten"
+        ]
+      },
+      "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="
+    ],
+    "yallist": [
+      "yallist@3.1.1",
+      "",
+      {},
+      "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="
+    ],
+    "@babel/core/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-compilation-targets/lru-cache": [
+      "lru-cache@5.1.1",
+      "",
+      {
+        "dependencies": {
+          "yallist": "^3.0.2"
+        }
+      },
+      "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="
+    ],
+    "@babel/helper-compilation-targets/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-create-class-features-plugin/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "babel-plugin-jsx-dom-expressions/@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.18.6",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.18.6"
+        }
+      },
+      "sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA=="
+    ],
+    "babel-plugin-jsx-dom-expressions/html-entities": [
+      "html-entities@2.3.3",
+      "",
+      {},
+      "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
+    ],
+    "bun-ffi-structs/typescript": [
+      "typescript@5.9.3",
+      "",
+      {
+        "bin": {
+          "tsc": "bin/tsc",
+          "tsserver": "bin/tsserver"
+        }
+      },
+      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    ],
+    "glob/minimatch": [
+      "minimatch@8.0.7",
+      "",
+      {
+        "dependencies": {
+          "brace-expansion": "^2.0.1"
+        }
+      },
+      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
+    ],
+    "parse5/entities": [
+      "entities@6.0.1",
+      "",
+      {},
+      "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
+    ],
+    "path-scurry/lru-cache": [
+      "lru-cache@10.4.3",
+      "",
+      {},
+      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
+    ],
+    "path-scurry/minipass": [
+      "minipass@7.1.3",
+      "",
+      {},
+      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
+    ],
+    "pkg-up/find-up": [
+      "find-up@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "locate-path": "^3.0.0"
+        }
+      },
+      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
+    ],
+    "glob/minimatch/brace-expansion": [
+      "brace-expansion@2.1.7",
+      "",
+      {
+        "dependencies": {
+          "balanced-match": "^1.0.0"
+        }
+      },
+      "sha512-uZbew1NqdmPDTMJ8ah1y+b+9QEJrfkXFk3RcTQw3X0jW/xRUvFKsg1CfQdSYGdTbXZWExtU3J3ccxtnfw1Fi0g=="
+    ],
+    "pkg-up/find-up/locate-path": [
+      "locate-path@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-locate": "^3.0.0",
+          "path-exists": "^3.0.0"
+        }
+      },
+      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
+    ],
+    "glob/minimatch/brace-expansion/balanced-match": [
+      "balanced-match@1.0.2",
+      "",
+      {},
+      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate": [
+      "p-locate@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-limit": "^2.0.0"
+        }
+      },
+      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
+    ],
+    "pkg-up/find-up/locate-path/path-exists": [
+      "path-exists@3.0.0",
+      "",
+      {},
+      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate/p-limit": [
+      "p-limit@2.3.0",
+      "",
+      {
+        "dependencies": {
+          "p-try": "^2.0.0"
+        }
+      },
+      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
+    ]
+  }
+}
+`;
+
+import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
+import { userInfo as userInfo2 } from "os";
+import { basename as basename5, dirname as dirname5, join as join20, posix, win32 } from "path";
+import { pathToFileURL } from "url";
+var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win32 : posix, cacheHome = (env, platform = process.platform) => {
+  const home = homeDirectory(env);
+  const { join } = pathModule(platform);
+  if (platform === "win32")
+    return firstNonEmpty(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
+  const xdg = firstNonEmpty(env["XDG_CACHE_HOME"]);
+  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
+}, guardedFolders = (env, platform) => {
+  const { join } = pathModule(platform);
+  const holyagent = join(cacheHome(env, platform), "holyagent");
+  return [holyagent, join(holyagent, "setup-tui")];
+}, lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8), tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
+  ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
+  lockHash(lock)
+].join("_")), INSTALLED_MARKER = ".holyagent-installed", markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
+`, FORMAT_CHARACTERS, plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
+  const code = character.codePointAt(0) ?? 0;
+  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
+}).join(""), oneLine2 = (text) => plain(text.trim().split(`
+`)[0] ?? "").trim(), failureLine = (text) => {
+  const lines = text.split(`
+`).map((line) => plain(line).trim()).filter((line) => line !== "");
+  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
+}, unavailable = (what, cause) => new TuiUnavailable({
+  reason: plain(`${what}: ${oneLine2(cause instanceof Error ? cause.message : String(cause))}`)
+}), bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
+  const manifest = `${JSON.stringify({ name: TUI_MANIFEST_NAME, private: true, dependencies: packages }, undefined, 2)}
+`;
+  for (const [file, text] of [
+    ["package.json", manifest],
+    ["bun.lock", lock]
+  ])
+    yield* tryPromise2({
+      try: () => Bun.write(join20(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join20(directory, file)}`, cause)
+    });
+  const shell = yield* Shell;
+  const result = yield* shell.run("bun", [
+    "--no-env-file",
+    `--config=${EMPTY_BUNFIG}`,
+    "install",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ], { cwd: directory });
+  if (result.exitCode !== 0)
+    return yield* new TuiUnavailable({
+      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
+    });
+}), importFile = (path) => tryPromise2({
+  try: () => import(pathToFileURL(path).href),
+  catch: (cause) => unavailable(`cannot import ${path}`, cause)
+}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join20(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+  return;
+})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join20(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+  return;
+}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", fileSystem = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
+  if (create)
+    yield* fileSystem(`cannot create ${folder}`, () => mkdir5(folder, { recursive: true, mode: 448 }));
+  const found = yield* tryPromise2({
+    try: () => lstat5(folder),
+    catch: (cause) => cause
+  }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
+  if (found === undefined || uid === undefined)
+    return;
+  const refuse = (why) => new TuiUnavailable({
+    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
+  });
+  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat4(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
+  if (target.isSymbolicLink() || !target.isDirectory())
+    return yield* refuse("is not a plain directory");
+  if (target.uid !== uid)
+    return yield* refuse("belongs to another user");
+  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
+    return;
+  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
+    return;
+  return yield* refuse("can be written by others");
+}), namesPrivateGroup = (groupFile, gid, userName) => {
+  const entries = groupFile.split(`
+`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
+  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
+}, privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
+  const name = userName ?? (yield* try_2(() => userInfo2().username));
+  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
+  return namesPrivateGroup(text, gid, name);
+}).pipe(orElseSucceed2(() => false)), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm6(temporary, { force: true }))), remove = (path) => promise2(() => rm6(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
+  for (let attempt = 0;attempt < 3; attempt += 1) {
+    const moved = yield* exit2(fileSystem(`cannot move ${temporary}`, () => rename5(temporary, directory)));
+    if (moved._tag === "Success")
+      return;
+    if (yield* installed(directory, packages, lock))
+      return;
+    yield* remove(directory);
+  }
+  return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
+}), STALE_AFTER_MS, newestChange = (path) => gen2(function* () {
+  const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map5((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map5((names) => names.map((name) => join20(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join20(path, "node_modules"))];
+  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
+  return Math.max(...times);
+}), sweepStale = (directory, uid) => gen2(function* () {
+  const parent = dirname5(directory);
+  const prefix = `.${basename5(directory)}-`;
+  const cutoff = Date.now() - STALE_AFTER_MS;
+  const names = yield* tryPromise2(() => readdir2(parent));
+  yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
+    const path = join20(parent, name);
+    const found = yield* tryPromise2(() => lstat5(path));
+    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
+      yield* remove(path);
+  }).pipe(ignore2));
+}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join20(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+  yield* install(temporary, packages, lock);
+  if (!(yield* hasPackages(temporary, packages)))
+    return yield* new TuiUnavailable({
+      reason: `the install finished but ${directory} does not hold the expected package versions`
+    });
+  yield* writeFresh(join20(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* promote(temporary, directory, packages, lock);
+}), remove), loadSetupTui = (env, options = {}) => gen2(function* () {
+  const packages = options.packages ?? TUI_PACKAGES;
+  const lock = options.lock ?? TUI_LOCK;
+  const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
+  const source = options.bundle ?? join20(import.meta.dir, TUI_BUNDLE);
+  const install = options.install ?? bunInstall;
+  const importModule = options.importModule ?? importFile;
+  const uid = options.uid ?? process.getuid?.();
+  const text = yield* tryPromise2({
+    try: () => Bun.file(source).text(),
+    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
+  });
+  if (options.directory === undefined)
+    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname5(directory)])
+    yield* privateFolder(folder, uid, true);
+  yield* privateFolder(directory, uid, false);
+  if (!(yield* installed(directory, packages, lock))) {
+    if (options.notify !== undefined)
+      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
+`);
+    yield* installAtomically(directory, packages, lock, install, uid);
+  }
+  const target = join20(directory, TUI_BUNDLE);
+  yield* writeFresh(target, text);
+  yield* importModule(join20(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  const loaded = yield* importModule(target);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
+  return loaded;
+});
+var init_load2 = __esm(() => {
+  init_dist();
+  init_environment();
+  init_shell();
+  init_lock2();
+  TuiUnavailable = class TuiUnavailable extends TaggedError2("TuiUnavailable") {
+    get message() {
+      return this.reason;
+    }
+  };
+  FORMAT_CHARACTERS = /\p{Cf}/gu;
+  STALE_AFTER_MS = 60 * 60 * 1000;
+});
+
+var AppliedSchema, TuiOutcomeSchema;
+var init_types = __esm(() => {
+  init_dist();
+  AppliedSchema = Struct({
+    ok: Boolean3,
+    lines: ArraySchema(String6)
+  });
+  TuiOutcomeSchema = Union2([
+    Struct({ _tag: Literal2("Applied"), applied: AppliedSchema }),
+    Struct({ _tag: Literal2("Cancelled") }),
+    Struct({ _tag: Literal2("Interrupted") })
+  ]);
+});
+
+var DEFAULT_CHOICES, set = (value) => value !== undefined && value !== "", tuiFallbackReason = (options) => {
+  const { env, terminal } = options;
+  if (options.noTui)
+    return "--no-tui was passed";
+  if (options.choiceFlag)
+    return "a choice flag was passed, so it applies directly";
+  if (terminal === undefined || !terminal.stdin || !terminal.stdout)
+    return "stdin or stdout is not a terminal";
+  if (set(env["CI"]) && env["CI"] !== "false")
+    return "CI is set";
+  if (env["TERM"] === "dumb")
+    return "TERM is dumb";
+  return;
+}, t3Offer, offerOf = (preview) => ({
+  device: preview.device,
+  worktrees: preview.worktreesAllowed
+}), capitalized = (text) => text.charAt(0).toUpperCase() + text.slice(1), lineOf = (unit) => {
+  const name = capitalized(unit.name);
+  if (unit.own === true)
+    return { mark: "=", name, detail: "already written by setup" };
+  if (unit.left !== undefined)
+    return { mark: "~", name, detail: `left out: ${unit.left}` };
+  const kept = unit.kept.length === 0 ? [] : [`kept ${unit.kept.join(", ")} (yours wins)`];
+  const added = unit.added.length <= 2 ? unit.added.join(", ") : `${unit.added.length} keys, starting with ${(unit.added[0] ?? "").split(" ")[0]}`;
+  if (unit.added.length > 0)
+    return { mark: "+", name, detail: [added, ...kept].join("; ") };
+  if (kept.length > 0)
+    return { mark: "~", name, detail: kept.join("; ") };
+  return { mark: "=", name, detail: "already set" };
+}, choiceLine = (name, unit) => unit === undefined ? { mark: "-", name, detail: "off; nothing written" } : lineOf({ ...unit, name }), reviewOf = (preview, choices) => {
+  const unit = (choice) => preview.units.find((u) => u.choice === choice);
+  const pi = unit("pi");
+  return {
+    file: preview.file,
+    choices: [
+      ...pi === undefined ? [] : [lineOf({ ...pi, name: "Pi provider" })],
+      ...preview.device === undefined ? [] : [
+        choiceLine("Agent device access", choices.deviceAccess ? unit("deviceAccess") : undefined)
+      ],
+      ...preview.worktreesAllowed ? [
+        choiceLine("New threads in worktrees", choices.worktrees ? unit("worktrees") : undefined)
+      ] : []
+    ],
+    always: preview.units.filter((u) => u.choice === undefined).map(lineOf)
+  };
+}, fallback = (reason) => ({
+  kind: "line",
+  notes: [hint(`t3 tui: ${plain(reason)}; using the line-based setup`)]
+}), decodeOutcome, runInteractive, oneLine3 = (cause) => (cause instanceof Error ? cause.message : String(cause)).trim().split(`
+`)[0] ?? "";
+var init_session = __esm(() => {
+  init_dist();
+  init_identity();
+  init_pi_check();
+  init_t3_settings();
+  init_load2();
+  init_types();
+  DEFAULT_CHOICES = { worktrees: true, deviceAccess: true };
+  t3Offer = fn2("t3Offer")(function* (env, cwd, options) {
+    if (options.undo || options.scope !== "user" || inCloudSession(env))
+      return;
+    if (!(yield* piInUse(env)))
+      return;
+    const preview = yield* previewT3Settings(env, cwd, DEFAULT_CHOICES).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
+    return preview === undefined || "line" in preview ? undefined : preview;
+  });
+  decodeOutcome = decodeUnknownEffect2(TuiOutcomeSchema, { onExcessProperty: "error" });
+  runInteractive = fn2("runInteractive")(function* (options) {
+    const preview = yield* t3Offer(options.env, options.cwd, options);
+    if (preview === undefined)
+      return { kind: "line", notes: [] };
+    const reason = tuiFallbackReason(options);
+    if (reason !== undefined)
+      return fallback(reason);
+    const load = options.load ?? ((env, notify) => loadSetupTui(env, { notify }));
+    const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
+    if (loaded instanceof TuiUnavailable)
+      return fallback(`unavailable (${loaded.reason})`);
+    const input = {
+      env: options.env,
+      offer: offerOf(preview),
+      initial: DEFAULT_CHOICES,
+      dryRun: options.dryRun,
+      review: (choices) => runPromise2(previewT3Settings(options.env, options.cwd, choices).pipe(flatMap2((next) => next === undefined || ("line" in next) ? fail5(new Error("the T3 settings step has nothing to do any more")) : succeed6(reviewOf(next, choices))))),
+      apply: (choices, signal) => runPromise2(options.apply(choices), { signal })
+    };
+    return yield* tryPromise2({
+      try: () => loaded.runSetupTui(input),
+      catch: (cause) => cause
+    }).pipe(flatMap2(decodeOutcome), map5((outcome) => {
+      if (outcome._tag === "Applied") {
+        const applied = outcome.applied;
+        return { kind: "done", report: { lines: applied.lines, ok: applied.ok } };
+      }
+      return {
+        kind: "done",
+        report: outcome._tag === "Cancelled" ? { lines: [hint("setup cancelled; nothing was written")], ok: false } : {
+          lines: [
+            "! setup was interrupted while applying; run holyagent setup again to finish"
+          ],
+          ok: false
+        }
+      };
+    }), catch_2((cause) => succeed6(fallback(`failed to start (${oneLine3(cause)})`))));
+  });
+});
+
+var CacheTtlFlag, SwitchFlag, ScopeFlag, printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
-`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7]", DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]", SETUP_COMMANDS;
+`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--worktrees on|off] [--device-access on|off] [--no-tui]", switchFlag, DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]", SETUP_COMMANDS;
 var init_setup = __esm(() => {
   init_dist();
   init_doctor();
@@ -25615,14 +27108,22 @@ var init_setup = __esm(() => {
   init_settings2();
   init_shell();
   init_steps();
+  init_session();
   init_args();
   CacheTtlFlag = Literals(CACHE_TTLS);
+  SwitchFlag = Literals(["on", "off"]);
   ScopeFlag = Literals(SCOPES);
   resolveScope = fn2("resolveScope")(function* (flag, usage, cwd) {
     if (flag === undefined)
       return yield* installedScope(cwd);
     const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
     return { scope, source: "flag" };
+  });
+  switchFlag = fn2("switchFlag")(function* (args, name) {
+    const value = stringFlag(args, name);
+    if (value === undefined)
+      return;
+    return (yield* choiceFlag(SwitchFlag, name, value, SETUP_USAGE)) === "on";
   });
   SETUP_COMMANDS = [
     {
@@ -25638,39 +27139,70 @@ var init_setup = __esm(() => {
         "without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
         "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
         "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
-        "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged"
+        "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+        "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
+        "in a terminal, when the T3 part has work (Pi in use, scope user, T3 Code installed), setup shows an interactive screen for the two choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
+        "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps"
       ],
       flags: {
         scope: "string",
         undo: "boolean",
         "dry-run": "boolean",
         "subagent-cache-ttl": "string",
-        "skip-ctx7": "boolean"
+        "skip-ctx7": "boolean",
+        worktrees: "string",
+        "device-access": "string",
+        "no-tui": "boolean"
       },
       stateless: true,
       positionals: 0,
-      run: ({ args, env, cwd }) => gen2(function* () {
+      run: ({ args, env, cwd, emit, terminal, setupTui }) => gen2(function* () {
         const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
         if (resolved instanceof SetupFailure) {
           return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
         }
         const subagentCacheTtl = yield* choiceFlag(CacheTtlFlag, "subagent-cache-ttl", stringFlag(args, "subagent-cache-ttl") ?? "1h", SETUP_USAGE);
-        const report = yield* setup(env, {
+        const flagged = {
+          worktrees: yield* switchFlag(args, "worktrees"),
+          deviceAccess: yield* switchFlag(args, "device-access")
+        };
+        const apply = (choices, notes = []) => gen2(function* () {
+          const report = yield* setup(env, {
+            scope: resolved.scope,
+            undo: booleanFlag(args, "undo"),
+            cwd,
+            subagentCacheTtl,
+            dryRun: booleanFlag(args, "dry-run"),
+            skipCtx7: booleanFlag(args, "skip-ctx7"),
+            ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
+            ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }
+          });
+          return {
+            ...report,
+            lines: [
+              hint(`scope: ${describeScope(resolved)}`),
+              ...scopeNotices(resolved).map((notice) => hint(`scope: ${notice}`)),
+              ...notes,
+              ...report.lines
+            ]
+          };
+        }).pipe(provide4(Shell.live(env)));
+        const interactive = yield* runInteractive({
+          env,
+          cwd,
           scope: resolved.scope,
           undo: booleanFlag(args, "undo"),
-          cwd,
-          subagentCacheTtl,
           dryRun: booleanFlag(args, "dry-run"),
-          skipCtx7: booleanFlag(args, "skip-ctx7")
+          terminal,
+          noTui: booleanFlag(args, "no-tui"),
+          choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined,
+          ...setupTui === undefined ? {} : { load: setupTui },
+          notify: emit,
+          apply: (choices) => apply(choices)
         });
-        return printed({
-          ...report,
-          lines: [
-            hint(`scope: ${describeScope(resolved)}`),
-            ...scopeNotices(resolved).map((notice) => hint(`scope: ${notice}`)),
-            ...report.lines
-          ]
-        });
+        if (interactive.kind === "done")
+          return printed(interactive.report);
+        return printed(yield* apply(flagged, interactive.notes));
       }).pipe(provide4(Shell.live(env)))
     },
     {
@@ -25745,12 +27277,12 @@ var init_state = __esm(() => {
   ];
 });
 
-import { join as join20 } from "path";
+import { join as join21 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-}, toolPath = (directory, tool, target) => join20(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
+}, toolPath = (directory, tool, target) => join21(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
     return yield* new ToolMissing({ tool: options.tool, path });
@@ -25790,7 +27322,7 @@ var init_tools2 = __esm(() => {
     { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
     { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
   ];
-  BUNDLED_TOOLS = join20(import.meta.dir, "vendor");
+  BUNDLED_TOOLS = join21(import.meta.dir, "vendor");
   UnsupportedPlatform = class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
     get message() {
       return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;
@@ -25864,6 +27396,8 @@ var forWords = (command, words) => command.forHost === undefined ? command : { .
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
     tools: host.tools ?? BUNDLED_TOOLS,
+    terminal: host.terminal,
+    setupTui: host.setupTui,
     input: (schema) => readInput(host, schema, inline),
     inputBy: (pick) => readInputBy(host, pick, inline)
   };
@@ -25969,7 +27503,8 @@ var init_main = __esm(async () => {
     cwd: process.cwd(),
     env: process.env,
     stdin,
-    emit: (text) => write(process.stdout, text)
+    emit: (text) => write(process.stdout, text),
+    terminal: { stdin: Boolean(process.stdin.isTTY), stdout: Boolean(process.stdout.isTTY) }
   }).pipe(tap2((result) => write(process.stdout, result.stdout).pipe(andThen2(write(process.stderr, result.stderr)), andThen2(sync2(() => void (process.exitCode = result.code)))))));
 });
 

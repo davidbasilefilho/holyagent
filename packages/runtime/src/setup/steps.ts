@@ -125,6 +125,10 @@ export interface SetupOptions {
   readonly undo?: boolean
   /** The directory a `project` or `local` scope is found from, the process directory when absent. */
   readonly cwd?: string
+  /** Whether new T3 Code threads start in worktrees (see `installT3Settings`); `true` when absent. */
+  readonly worktrees?: boolean
+  /** Whether agents may use devices in T3 Code (see `installT3Settings`); `true` when absent. */
+  readonly deviceAccess?: boolean
 }
 
 /**
@@ -183,7 +187,11 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
     ...(piUsed && scope === "user"
       ? yield* asStep(
           "t3 settings",
-          installT3Settings(env, piOptions.cwd, { dryRun: options.dryRun }),
+          installT3Settings(env, piOptions.cwd, {
+            dryRun: options.dryRun,
+            ...(options.worktrees === undefined ? {} : { worktrees: options.worktrees }),
+            ...(options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }),
+          }),
         )
       : []),
     ...(yield* onSettings((file) =>

@@ -31,6 +31,8 @@ export interface BundleOptions {
   readonly note: string
   /** Modules that stay imports, as the host supplies them. */
   readonly external?: ReadonlyArray<string>
+  /** Bun build plugins, for sources that need a transform (the setup interface's Solid JSX). */
+  readonly plugins?: ReadonlyArray<Bun.BunPlugin>
 }
 
 /**
@@ -42,12 +44,18 @@ export interface BundleOptions {
  */
 export const bundleModule = (
   entrypoint: string,
-  { target, note, external = [] }: BundleOptions,
+  { target, note, external = [], plugins = [] }: BundleOptions,
 ): Effect.Effect<string, BundleFailed> => {
   const failed = (reason: string) => new BundleFailed({ entrypoint, reason })
   return Effect.tryPromise({
     try: () =>
-      Bun.build({ entrypoints: [entrypoint], target, format: "esm", external: [...external] }),
+      Bun.build({
+        entrypoints: [entrypoint],
+        target,
+        format: "esm",
+        external: [...external],
+        plugins: [...plugins],
+      }),
     catch: (cause) => failed(messagesOf(cause)),
   }).pipe(
     Effect.flatMap((result) => {

@@ -39,6 +39,7 @@ await Effect.runPromise(
     env: process.env,
     stdin,
     emit: (text) => write(process.stdout, text),
+    terminal: { stdin: Boolean(process.stdin.isTTY), stdout: Boolean(process.stdout.isTTY) },
   }).pipe(
     Effect.tap((result) =>
       write(process.stdout, result.stdout).pipe(
