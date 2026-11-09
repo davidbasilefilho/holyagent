@@ -36,6 +36,22 @@
     "startedAt": "2026-11-09T17:23:32.457Z",
     "finishedAt": "2026-11-09T17:26:21.091Z"
   },
-  "result": "result: The repair answers both findings with no new defects. No blockers.\nchanged: none (read-only).\nchecks: `bun test packages/integrations/pi/tests/temp-folder.test.ts` in `/home/user/holyagent-0.3.1-rmfix` -> exit 0, 3 pass, 0 fail, 104 ms. I did not run lint or the full verify gate, because oxlint is not installed with `--no-install`.\nblockers: none\nquestions: none\nnotes:\nThe first built-in `/code-review` run read the wrong tree (the main checkout), so I discarded it as unrelated. I reran it on `aff721ae...3bc6afd1` and it found no correctness bugs.\nRejected: adding EACCES and EMFILE to `TRANSIENT_CODES` (`temp-folder.ts` L4) is speculative. The test asserts that EACCES rethrows, so the change is outside this repair.\nRejected: waiting for the child process to exit instead of retrying is a different design that nobody asked for.\nOptional, non-blocking: the \"about 4.3 s\" comment at `temp-folder.ts` L10-13 is hard-coded and would go stale if a constant changes.\nOnly the retry loop in `removeTemporary` and its test were read and run. Real Windows handle behavior was not run.\n\nevidence:\nThe repair answers both findings without new defects:\nBudget: `temp-folder.ts` L6/L9 sets 20 attempts and a 50 ms base delay. The 19 sleeps total 50 × (1+2+3+4+5 + 14×5) = 4250 ms, so about 4.25 s and bounded.\nDelay cap: `Math.min(attempt, MAX_DELAY_STEPS)` at L32 caps each sleep at 250 ms.\nExact count: attempt 20 throws before sleeping (L31). `temp-folder.test.ts` L34 asserts `toHaveLength(MAX_ATTEMPTS)` and passes.\nTest speed: the test injects a 1 ms base, so the busy case takes about 85 ms (the whole file ran in 104 ms).\nfindings: no blocking findings. The optional comment and EACCES notes are above.\n",
+  "result": "result: The repair answers both findings with no new defects. No blockers.\nchanged: none (read-only).\nchecks: `bun test packages/integrations/pi/tests/temp-folder.test.ts` in `/home/user/holyagent-0.3.1-rmfix` -> exit 0, 3 pass, 0 fail, 104 ms. I did not run lint or the full verify gate, because oxlint is not installed with `--no-install`.\nblockers: none\nquestions: none\nnotes:\nThe first built-in `/code-review` run read the wrong tree (the main checkout), so I discarded it as unrelated. I reran it on `aff721ae...3bc6afd1` and it found no correctness bugs.\nRejected: adding EACCES and EMFILE to `TRANSIENT_CODES` (`temp-folder.ts` L4) is speculative. The test asserts that EACCES rethrows, so the change is outside this repair.\nRejected: waiting for the child process to exit instead of retrying is a different design that nobody asked for.\nOptional, non-blocking: the \"about 4.3 s\" comment at `temp-folder.ts` L10-13 is hard-coded and would go stale if a constant changes.\nOnly the retry loop in `removeTemporary` and its test were read and run. Real Windows handle behavior was not run.\n\nevidence:\nThe repair answers both findings without new defects: see the four supports below.\nBudget: `temp-folder.ts` L6/L9 sets 20 attempts and a 50 ms base delay. The 19 sleeps total 50 × (1+2+3+4+5 + 14×5) = 4250 ms, so about 4.25 s and bounded.\nDelay cap: `Math.min(attempt, MAX_DELAY_STEPS)` at L32 caps each sleep at 250 ms.\nExact count: attempt 20 throws before sleeping (L31). `temp-folder.test.ts` L34 asserts `toHaveLength(MAX_ATTEMPTS)` and passes.\nTest speed: the test injects a 1 ms base, so the busy case takes about 85 ms (the whole file ran in 104 ms).\nfindings: no blocking findings. The optional comment and EACCES notes are above.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Repair answers both findings: bounded ~4.25 s budget, capped delay, exact count asserted; test passes.",
+    "criteria": [
+      {
+        "criterion": "The repair answers both findings without new defects",
+        "support": "see the four supports below."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blocking findings. The optional comment and EACCES notes are above."
+      }
+    ]
+  },
   "createdAt": "2026-11-09T17:23:32.457Z"
 }
