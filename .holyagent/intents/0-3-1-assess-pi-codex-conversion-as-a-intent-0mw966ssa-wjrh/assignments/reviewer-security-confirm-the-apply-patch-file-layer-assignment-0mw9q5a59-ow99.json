@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mw9q5a59-ow99",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-apply-patch-file-layer",
+  "objective": "Confirm the apply_patch file-layer repair (link-loop cap, mode restore, link delete then add) keeps every write, delete and restore inside the project root.",
+  "state": "Running",
+  "scope": [
+    "Commit d5604d4 on release/0.3.1/feat/codex-provider in /home/user/holyagent-0.3.1-codex (range 956092de..d5604d4); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-filelayer-commit.diff",
+    "Previous findings this commit repairs: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os3gn-w3sc.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os3rf-7qip.md; repair report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9pye41-curp.md",
+    "The repair report notes: after a patch deletes a link and adds the same path, a later Update of that path in the same patch still resolves to the link's old target. Judge whether that is a defect and its severity."
+  ],
+  "constraints": [
+    "Read-only: make no edits and no git writes. Pass explicit SHA ranges (956092de..d5604d4) to any review command, and run commands in /home/user/holyagent-0.3.1-codex, not the main checkout.",
+    "This is a re-review of a repair: judge whether the previous findings are closed and whether the repair introduced new defects; do not reopen accepted design choices (Luna Reserve endpoint, effort cap, route table).",
+    "Testing is unit tests and fixtures only: never start pi or make live Codex, OpenAI or Kimi requests.",
+    "Report in under 400 words; start each evidence line with the criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "Each previous blocking security finding is closed by the repair, traced source to sink",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new path escape outside the project root via symlinks, link chains, dangling links, moves or deletes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Rollback cannot write or delete outside the project root",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover each closed finding and fail without the repair",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9pye41-curp"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T20:39:16.893Z"
+  },
+  "createdAt": "2026-11-09T20:39:16.893Z"
+}
