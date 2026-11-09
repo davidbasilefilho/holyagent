@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mw9txnn4-qcb1",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 20,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-merge-of-the-just-bash",
+  "objective": "Check that the merge of the just-bash branch into the fff branch builds to the committed output and passes the gates.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-fff at merge commit 48307c4e (release/0.3.1/feat/just-bash 1b9dee14 merged into release/0.3.1/feat/fff 3f1c135b, no conflicts)"
+  ],
+  "constraints": [
+    "Run `bun install --frozen-lockfile`, then `bunx --no-install mise run build`, then `git status --short`, then `bunx --no-install mise run verify`, all in that worktree.",
+    "Make no edits and no git writes; if the build changes files, report the paths and stop.",
+    "Never start pi or make live model requests.",
+    "Report in under 150 words: each command, exit code, counts and the git status output; start each evidence line with the exact criterion text, a colon and the support inline."
+  ],
+  "criteria": [
+    {
+      "text": "mise run build leaves the tree unchanged at 48307c4e",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run verify exits 0 at 48307c4e",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T22:25:19.601Z"
+  },
+  "createdAt": "2026-11-09T22:25:19.601Z"
+}
