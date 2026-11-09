@@ -8,7 +8,7 @@ import { Effect } from "effect"
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
 import { doctor } from "../src/setup/doctor.ts"
-import type { Scope } from "../src/setup/scope.ts"
+import { installedScope, type Scope, scopeNotices } from "../src/setup/scope.ts"
 import { setup } from "../src/setup/steps.ts"
 import { fakeShell, scratch } from "./setup-fixture.ts"
 
@@ -640,6 +640,81 @@ describe("the default scope is user unless the local settings enable the plugin"
     expect(doctored.stdout).toContain(`ok   settings: ${target.user}`)
   })
 
+  test("a tracked local file that enables the plugin leaves the scope at user and names itself", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    await $`git -C ${repo()} add -f .claude/settings.local.json`.quiet()
+    const notice = `~ scope: ${target.local} enables HolyAgent but git tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(notice)
+    expect(await readJson(target.local)).toEqual(enabled)
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+
+    const doctored = await cli(["doctor"], nested())
+    expect(doctored.stdout.split("\n").slice(0, 2)).toEqual(["ok   scope: user (default)", notice])
+  })
+
+  test("a folder that is not a git work tree never infers local", async () => {
+    // No repository: the scope looks in the working directory, where nothing says the file is the user's.
+    const file = join(nested(), ".claude", "settings.local.json")
+    await write(file, enabled)
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${file} enables HolyAgent but the folder is not a trusted git work tree, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+    expect(await readJson(file)).toEqual(enabled)
+    expect(await readJson(userFile())).toMatchObject({ includeGitInstructions: false })
+  })
+
+  test("a git top-level that cannot be trusted never infers local", async () => {
+    const elsewhere = join(home, "elsewhere")
+    await mkdir(elsewhere, { recursive: true })
+    const file = join(nested(), ".claude", "settings.local.json")
+    await write(file, enabled)
+    const resolved = await Effect.runPromise(
+      installedScope(nested()).pipe(
+        Effect.provide(
+          fakeShell({
+            commands: [],
+            respond: (line) =>
+              line === "git rev-parse --show-toplevel" ? { stdout: `${elsewhere}\n` } : undefined,
+          }).layer,
+        ),
+      ),
+    )
+    expect(resolved).toMatchObject({ scope: "user", source: "default" })
+    expect(scopeNotices(resolved)).toContain(
+      `${file} enables HolyAgent but the folder is not a trusted git work tree, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+  })
+
+  test("a git that cannot answer is treated as tracking the file", async () => {
+    const file = join(repo(), ".claude", "settings.local.json")
+    await write(file, enabled)
+    const resolved = await Effect.runPromise(
+      installedScope(nested()).pipe(
+        Effect.provide(
+          fakeShell({
+            commands: [],
+            respond: (line) =>
+              line === "git rev-parse --show-toplevel"
+                ? { stdout: `${repo()}\n` }
+                : line.startsWith("git ls-files")
+                  ? { exitCode: 128 }
+                  : undefined,
+          }).layer,
+        ),
+      ),
+    )
+    expect(resolved).toMatchObject({ scope: "user", source: "default" })
+  })
+
   test("an explicit false in the local file stops the search and uses user, saying so", async () => {
     const target = await initRepo()
     await write(files().local, disabled)
@@ -815,6 +890,15 @@ describe("the default scope is user unless the local settings enable the plugin"
       const lines = await piLines(await withPi())
       expect(lines.length).toBeGreaterThan(0)
       for (const line of lines) expect(line).toEndWith(" -l")
+    })
+
+    test("a tracked local file leaves the Pi packages global", async () => {
+      await initRepo()
+      await write(files().local, enabled)
+      await $`git -C ${repo()} add -f .claude/settings.local.json`.quiet()
+      const lines = await piLines(await withPi())
+      expect(lines.length).toBeGreaterThan(0)
+      for (const line of lines) expect(line).not.toEndWith(" -l")
     })
 
     test("a committed project file leaves the Pi packages global", async () => {

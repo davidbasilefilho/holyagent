@@ -63,8 +63,9 @@ export interface SettingsTarget {
 }
 
 /**
- * The folder `project` and `local` settings live in: its `.claude` folder, and a notice when it is
- * not the usual one.
+ * The folder `project` and `local` settings live in: its `.claude` folder, the `root` that holds
+ * it, whether that root is a `trusted` git work tree top-level, and a notice when it is not the
+ * usual one.
  */
 const claudeFolder = Effect.fn("claudeFolder")(function* (cwd: string) {
   const shell = yield* Shell
@@ -85,7 +86,7 @@ const claudeFolder = Effect.fn("claudeFolder")(function* (cwd: string) {
     : named === undefined
       ? `not inside a git repository; using ${cwd}`
       : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`
-  return { folder: join(root, ".claude"), notice }
+  return { folder: join(root, ".claude"), root, trusted, notice }
 })
 
 /** The settings file name of a `project` or `local` scope. */
@@ -143,8 +144,8 @@ export const projectSettingsFiles = Effect.fn("projectSettingsFiles")(function* 
 
 /**
  * The scope `setup` and `doctor` work on and why: `flag` when `--scope` named it, `inferred` when
- * the user's own `local` settings `file` enable the plugin, `default` (`user`) otherwise. A default
- * carries `notices`, extra report lines for what the search found.
+ * the user's own untracked `local` settings `file` enable the plugin, `default` (`user`) otherwise.
+ * A default carries `notices`, extra report lines for what the search found.
  */
 export type ResolvedScope =
   | { readonly scope: Scope; readonly source: "flag" }
@@ -168,23 +169,45 @@ const enablement = Effect.fn("enablement")(function* (folder: string, file: stri
 })
 
 /**
+ * Whether git has `file` in its index, for a `root` that is a trusted work tree. Fails closed: any
+ * answer but a clean "nothing listed" (git missing or failing, say) counts as tracked.
+ */
+const tracked = Effect.fn("tracked")(function* (root: string, file: string) {
+  const shell = yield* Shell
+  const listed = yield* shell.run("git", ["ls-files", "--cached", "--", relative(root, file)], {
+    cwd: root,
+  })
+  return listed.exitCode !== 0 || listed.stdout.trim() !== ""
+})
+
+/**
  * The scope `setup` and `doctor` use without `--scope`. Only the user's own uncommitted
  * `.claude/settings.local.json` moves it off `user`: when that file sets the plugin to `true`, the
- * scope is `local`. An explicit `false` there means the plugin is disabled for this project, so the
- * search stops and `user` is used with a notice saying so. A committed `.claude/settings.json` that
- * enables the plugin never selects a scope, because a cloned repository must not choose where setup
- * writes or which registry a Pi install reads; the notice names the file and `--scope project`. A
- * symlinked `local` or `project` file is not read, with a notice for `local`. A `local` file that
- * is not a JSON object fails with SetupFailure naming it; a bad `project` file is ignored.
+ * folder is a git work tree that `claudeFolder` trusts, and git does not track the file (it is not
+ * in the index), the scope is `local`. An enabled file in a folder that is not a trusted git work
+ * tree (a source archive, say) or that git tracks might have come with a cloned repository, so the
+ * scope stays `user` and a notice names the file and `--scope local`. An explicit `false` there
+ * means the plugin is disabled for this project, so the search stops and `user` is used with a
+ * notice saying so. A committed `.claude/settings.json` that enables the plugin never selects a
+ * scope, because a cloned repository must not choose where setup writes or which registry a Pi
+ * install reads; the notice names the file and `--scope project`. A symlinked `local` or `project`
+ * file is not read, with a notice for `local`. A `local` file that is not a JSON object fails with
+ * SetupFailure naming it; a bad `project` file is ignored.
  */
 export const installedScope = Effect.fn("installedScope")(function* (cwd: string) {
-  const { folder } = yield* claudeFolder(cwd)
+  const { folder, root, trusted } = yield* claudeFolder(cwd)
   const local = join(folder, fileName("local"))
   const project = join(folder, fileName("project"))
   const notices: Array<string> = []
   const found = yield* enablement(folder, local)
-  if (found === "enabled")
-    return { scope: "local", source: "inferred", file: local } satisfies ResolvedScope
+  if (found === "enabled") {
+    if (trusted && !(yield* tracked(root, local))) {
+      return { scope: "local", source: "inferred", file: local } satisfies ResolvedScope
+    }
+    notices.push(
+      `${local} enables HolyAgent but ${trusted ? "git tracks it" : "the folder is not a trusted git work tree"}, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+  }
   if (found === "disabled") {
     notices.push(
       `${PLUGIN_ID} is set to false in ${local}, so HolyAgent is disabled for this project; using user`,
