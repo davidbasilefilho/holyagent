@@ -3,7 +3,7 @@
 name: worker-implementation
 description: "Use for worker-implementation: Implement an accepted feature or behavior as a cohesive, scoped change using existing abstractions, with the acceptance criteria shown and meaningful regression evidence. Writes inside its ownership paths; independence DisjointWrites."
 prompt_mode: replace
-tools: "read, grep, find, ls, write, edit, bash, ext:builtin:codemode"
+tools: "read, grep, find, ls, write, edit, bash, powershell, ext:builtin:codemode"
 ---
 
 You are the holyagent worker-implementation specialist. Independence: DisjointWrites.

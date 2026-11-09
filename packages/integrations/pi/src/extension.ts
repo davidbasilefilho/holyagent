@@ -1,3 +1,4 @@
+import { statSync } from "node:fs"
 import nodePath, { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -35,12 +36,14 @@ import { providerEnv } from "../../../runtime/src/pi/provider.ts"
 import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
 import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
 import {
+  POWERSHELL_ENTRY,
   rootActiveTools,
   type ToolArgs,
   toolArgs,
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
+import { bunFlags } from "./bun-flags.ts"
 import { SPECIALIST_NAMES } from "./specialists.ts"
 
 /** The launch flag that tells the extension what the session is for: root, specialist or session. */
@@ -134,9 +137,9 @@ export const applyEnvironment = (
 
 /**
  * A specialist's prompt with `${HOLYAGENT_PI_ROOT}` replaced by the package folder, written with
- * `/` only so the shell takes it for a path (see {@link wrapperPath}). The agent files hold the
- * placeholder because the install folder is not known when they are built; the extension fills it
- * when the child starts.
+ * `/` only, as the model writes it into shell commands (a `\` escapes there). The agent files hold
+ * the placeholder because the install folder is not known when they are built; the extension fills
+ * it when the child starts.
  */
 export const fillPackageRoot = (
   prompt: string,
@@ -350,7 +353,7 @@ type Reason = "startup" | "reload" | "new" | "resume" | "fork" | "compact"
 const RECONCILED: ReadonlySet<Reason> = new Set(["resume", "compact"])
 
 /**
- * A `holyagent` command of the package's wrapper that did not start, ran out of time or exited
+ * A `holyagent` command of the package's bundled CLI that did not start, ran out of time or exited
  * non-zero.
  */
 class CommandFailed extends Data.TaggedError("CommandFailed")<{
@@ -524,7 +527,7 @@ export const refuseExcludedTool = (
 /** Where the extension finds what it runs. */
 export interface ExtensionOptions {
   /**
-   * The folder of the installed package, which holds `scripts/holyagent`; the extension's own by
+   * The folder of the installed package, which holds `scripts/holyagent.js`; the extension's own by
    * default.
    */
   readonly packageRoot?: string
@@ -545,18 +548,176 @@ export interface ExtensionOptions {
    * test passes `win32` to stand in for Windows.
    */
   readonly platformPath?: Pick<typeof nodePath, "join" | "sep">
+  /**
+   * The platform the package is installed on; the process's own by default. A test passes `win32`
+   * to stand in for Windows.
+   */
+  readonly platform?: NodeJS.Platform
+  /**
+   * Where Bun is looked up, the process's own environment and file system by default. A test passes
+   * its own to stand in for a machine with Bun in a given place.
+   */
+  readonly bunSearch?: BunSearch
+}
+
+/** What the lookup of Bun reads: an environment and tests for a file's existence and mode. */
+export interface BunSearch {
+  /** The environment with `PATH`, `BUN_INSTALL` and the home folder; the process's by default. */
+  readonly env?: Readonly<Record<string, string | undefined>>
+  /** Whether a regular file exists at the path; the file system's answer by default. */
+  readonly exists?: (path: string) => boolean
+  /**
+   * Whether the file at the path has an executable bit; the file system's answer by default. Asked
+   * of POSIX candidates only, since Windows has no such bit.
+   */
+  readonly executable?: (path: string) => boolean
+}
+
+/** The result of looking for Bun: the program to start, or where it was looked for. */
+export type BunLookup =
+  | { readonly found: true; readonly program: string }
+  | { readonly found: false; readonly looked: string }
+
+const isFile = (path: string): boolean =>
+  Effect.runSync(
+    Effect.try(() => statSync(path, { throwIfNoEntry: false })?.isFile() === true).pipe(
+      Effect.orElseSucceed(() => false),
+    ),
+  )
+
+const hasExecutableBit = (path: string): boolean =>
+  Effect.runSync(
+    Effect.try(() => ((statSync(path, { throwIfNoEntry: false })?.mode ?? 0) & 0o111) !== 0).pipe(
+      Effect.orElseSucceed(() => false),
+    ),
+  )
+
+// A folder a shell would search from anywhere: a rooted POSIX path, or a Windows drive or UNC path.
+// A relative one (`bin`, `./node_modules/.bin`) names a place under the working directory, which is
+// not where the program starts.
+const ABSOLUTE_FOLDER = { posix: /^\//, win32: /^(?:[a-zA-Z]:[\\/]|[\\/]{2})/ }
+
+/**
+ * Finds Bun in the order the `scripts/holyagent` wrapper does: on `PATH`, then `$BUN_INSTALL/bin`,
+ * then `~/.bun/bin` (the home folder is `USERPROFILE` on Windows, else `HOME`). On Windows Bun is
+ * `bun.exe`, and on `PATH` a `bun.cmd` shim (an npm global install) counts too, after the `bun.exe`
+ * of the same folder. An empty variable counts as unset, and a relative `PATH` entry (an empty one
+ * included) is skipped, since it would name a place under the working directory, which is not where
+ * Bun starts. On POSIX a file without an executable bit is skipped, as `command -v` does. `refusal`
+ * names why a program that exists cannot be started; such a program is passed over for the next
+ * one, and a miss then says why. The program is a full path, so no lookup in the working directory
+ * can pick a planted `bun`. A miss says where Bun was looked for.
+ */
+export const findBun = (
+  platform: NodeJS.Platform,
+  platformPath: Pick<typeof nodePath, "join">,
+  { env = process.env, exists = isFile, executable = hasExecutableBit }: BunSearch = {},
+  refusal: (program: string) => string | undefined = () => undefined,
+): BunLookup => {
+  const windows = platform === "win32"
+  const value = (name: string): string | undefined => {
+    const key = Object.keys(env).find((entry) =>
+      windows ? entry.toUpperCase() === name : entry === name,
+    )
+    const given = key === undefined ? undefined : env[key]
+    return given === "" ? undefined : given
+  }
+  const names = windows ? ["bun.exe", "bun.cmd"] : ["bun"]
+  const home = windows ? (value("USERPROFILE") ?? value("HOME")) : value("HOME")
+  const installs = [
+    ...new Set(
+      [
+        value("BUN_INSTALL"),
+        ...(home === undefined ? [] : [platformPath.join(home, ".bun")]),
+      ].flatMap((install) => (install === undefined ? [] : [platformPath.join(install, "bin")])),
+    ),
+  ]
+  const onPath = (value("PATH") ?? "")
+    .split(windows ? ";" : ":")
+    .map((folder) => (windows ? folder.replace(/^"(.*)"$/, "$1") : folder))
+    .filter((folder) => ABSOLUTE_FOLDER[windows ? "win32" : "posix"].test(folder))
+  const candidates = [
+    ...onPath.flatMap((folder) => names.map((name) => platformPath.join(folder, name))),
+    ...installs.map((folder) => platformPath.join(folder, names[0] ?? "bun")),
+  ]
+  const refused: Array<string> = []
+  const program = candidates.find((candidate) => {
+    if (!exists(candidate) || (!windows && !executable(candidate))) return false
+    const reason = refusal(candidate)
+    if (reason !== undefined) refused.push(`${candidate}: ${reason}`)
+    return reason === undefined
+  })
+  return program !== undefined
+    ? { found: true, program }
+    : {
+        found: false,
+        looked:
+          refused.length > 0
+            ? `Bun was found but cannot be started: ${refused.join("; ")}`
+            : `Bun was not found on PATH or in ${installs.length === 0 ? "BUN_INSTALL/bin or ~/.bun/bin (neither BUN_INSTALL nor the home folder is set)" : installs.join(" or ")}; install it from https://bun.sh`,
+      }
 }
 
 /**
- * The wrapper script of an installed package, written with `/` only. The shell reads a `$0` without
- * a `/` as a bare name and refuses it, which a Windows path (`C:\pkg\scripts\holyagent`) is; Git
- * for Windows' `sh` takes the `C:/pkg/scripts/holyagent` form. The path module is a parameter so a
- * test can stand in for Windows.
+ * The Bun arguments that run an installed package's bundled CLI: the flags the `scripts/holyagent`
+ * wrapper passes (see {@link bunFlags}), then `scripts/holyagent.js`. Without them Bun would read
+ * the project's `.env` and `bunfig.toml`, which the project could use to redirect the state folder
+ * or preload code. Bun is started directly, since the extension has to work where there is no `sh`
+ * (native Windows); the path module is a parameter so a test can stand in for Windows.
  */
-export const wrapperPath = (
+export const runtimeArgs = (
   packageRoot: string,
-  platformPath: Pick<typeof nodePath, "join" | "sep"> = nodePath,
-): string => toPosix(platformPath.join(packageRoot, "scripts", "holyagent"), platformPath.sep)
+  platformPath: Pick<typeof nodePath, "join"> = nodePath,
+): ReadonlyArray<string> => [
+  ...bunFlags(platformPath.join(packageRoot, "scripts", "empty-bunfig.toml")),
+  platformPath.join(packageRoot, "scripts", "holyagent.js"),
+]
+
+/**
+ * What `cmd.exe` reports as the exit code of a program it cannot find. Pi's `exec` starts a program
+ * without a shell, and on Windows Node refuses to start the `pi.cmd` that npm installs that way, so
+ * `pi` runs through `cmd.exe /c`.
+ */
+export const CMD_NOT_FOUND = 9009
+
+/** The argv of a `cmd.exe` launch, or why `cmd.exe` cannot be trusted to read it as separate words. */
+export type CmdLaunch =
+  | { readonly ok: true; readonly args: ReadonlyArray<string> }
+  | { readonly ok: false; readonly reason: string }
+
+// What no quoting can make safe: `cmd.exe` expands `%` and `^` and `!` inside quotes, Node's quoting
+// escapes a `"` as `\"`, which `cmd.exe` does not know, and a control character ends or splits the line.
+const UNQUOTABLE = /["%^!]|\p{Cc}/u
+// Metacharacters that only a quote makes literal. Node quotes an argument only when it holds a space,
+// a tab or a quote, so in any other argument these would be read as syntax.
+const BARE_SYNTAX = /[&|<>()]/
+
+/**
+ * The arguments that start `command args...` through `cmd.exe`, which only a shell can run for a
+ * `.cmd` shim. Pi's `exec` spawns without a shell and without `windowsVerbatimArguments`, so Node
+ * quotes each argument itself (in quotes when it holds a space, a tab or a quote, otherwise bare)
+ * and joins them with spaces; `cmd.exe` receives that line unchanged. One extra pair of quotes
+ * around the whole line cannot be passed through that quoting, which would escape the inner quotes
+ * as `\"`. The line instead starts with `call`, so it does not begin with a quote and `cmd.exe`
+ * strips none: `cmd.exe /d /s /c call "C:\a b\bun.cmd" --flag "C:\c d\x"`. Every word stays a
+ * separate argument. A word with a character that no quoting protects (see {@link UNQUOTABLE}), or
+ * with a `cmd.exe` operator while Node would leave it unquoted, is refused instead of started.
+ */
+export const cmdExeArguments = (command: string, args: ReadonlyArray<string>): CmdLaunch => {
+  for (const word of [command, ...args]) {
+    if (UNQUOTABLE.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`,
+      }
+    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`,
+      }
+  }
+  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] }
+}
 
 // A notice is built from text a project or Pi printed, so it loses its control characters.
 const oneLine = (text: string): string => printable(text).replace(/\s+/g, " ").trim()
@@ -616,9 +777,16 @@ export const createExtension =
     graceMs = STOP_GRACE_MS,
     env = process.env,
     platformPath = nodePath,
+    platform = process.platform,
+    bunSearch = {},
   }: ExtensionOptions = {}) =>
   (pi: ExtensionAPI): void => {
-    const wrapper = wrapperPath(packageRoot, platformPath)
+    const bundled = runtimeArgs(packageRoot, platformPath)
+    const windows = platform === "win32"
+    // Bun is looked up when first needed, since the extension may load before an install finishes;
+    // a miss is looked up again, a hit is kept until it is gone or cmd.exe cannot start it with a
+    // command's arguments.
+    let bun: string | undefined
     // The text the model reads names the package folder with `/` only, for the same reason.
     const root = toPosix(packageRoot, platformPath.sep)
     const isChild = () => childAgent(pi.getSessionName()) !== undefined
@@ -628,7 +796,7 @@ export const createExtension =
     const running = new Set<Promise<void>>()
 
     // Every program starts in the package's own folder, never the project's: on Windows a bare
-    // `sh` or `git` is looked up in the working directory first, where a project could plant one.
+    // `bun` or `git` is looked up in the working directory first, where a project could plant one.
     // The project is named in the arguments instead.
     //
     // A command that is stopped (the deadline, a sibling that failed, a newer collection or the
@@ -636,56 +804,95 @@ export const createExtension =
     // for a process that does not exit, so no process outlives the gather. On Windows a process still
     // running holds its working directory, here the project's. A start that throws is a failed
     // command too.
+    // On Windows `pi` and an npm-installed `bun.cmd` are `.cmd` shims, which only a shell starts.
+    const isShim = (command: string) => windows && (command === "pi" || /\.cmd$/i.test(command))
+    const launchOf = (command: string, args: ReadonlyArray<string>): CmdLaunch =>
+      isShim(command) ? cmdExeArguments(command, args) : { ok: true, args }
     const exec = (signal: AbortSignal, command: string, args: ReadonlyArray<string>) => {
       const failed = (reason: string) => new CommandFailed({ command: args.join(" "), reason })
+      const launch = launchOf(command, args)
+      const program = isShim(command) ? "cmd.exe" : command
       type Answer = Effect.Effect<ExecResult, CommandFailed>
-      return signal.aborted
-        ? Effect.fail(failed("it was stopped"))
-        : Effect.acquireUseRelease(
-            Effect.try({
-              try: () => {
-                const stop = new AbortController()
-                const settled = pi
-                  .exec(command, [...args], {
-                    cwd: packageRoot,
-                    signal: AbortSignal.any([signal, stop.signal]),
-                    timeout: COMMAND_TIMEOUT_MS,
-                  })
-                  .then<Answer, Answer>(
-                    (result) => Effect.succeed(result),
-                    (cause) => Effect.fail(failed(String(cause))),
-                  )
-                return { stop, settled }
-              },
-              catch: (cause) => failed(String(cause)),
-            }),
-            ({ settled }) =>
-              Effect.callback<ExecResult, CommandFailed>((resume) => {
-                void settled.then((answer) => resume(answer))
-                const stopped = () => resume(Effect.fail(failed("it was stopped")))
-                if (signal.aborted) stopped()
-                signal.addEventListener("abort", stopped, { once: true })
-                return Effect.sync(() => signal.removeEventListener("abort", stopped))
+      return !launch.ok
+        ? Effect.fail(failed(launch.reason))
+        : signal.aborted
+          ? Effect.fail(failed("it was stopped"))
+          : Effect.acquireUseRelease(
+              Effect.try({
+                try: () => {
+                  const stop = new AbortController()
+                  const settled = pi
+                    .exec(program, [...launch.args], {
+                      cwd: packageRoot,
+                      signal: AbortSignal.any([signal, stop.signal]),
+                      timeout: COMMAND_TIMEOUT_MS,
+                    })
+                    .then<Answer, Answer>(
+                      (result) => Effect.succeed(result),
+                      (cause) => Effect.fail(failed(String(cause))),
+                    )
+                  return { stop, settled }
+                },
+                catch: (cause) => failed(String(cause)),
               }),
-            ({ stop, settled }, exit) => {
-              // A command that answered has exited; any other end stops it and waits for its exit.
-              if (Exit.isSuccess(exit)) return Effect.void
-              stop.abort()
-              return exited(settled, graceMs)
-            },
-          )
+              ({ settled }) =>
+                Effect.callback<ExecResult, CommandFailed>((resume) => {
+                  void settled.then((answer) => resume(answer))
+                  const stopped = () => resume(Effect.fail(failed("it was stopped")))
+                  if (signal.aborted) stopped()
+                  signal.addEventListener("abort", stopped, { once: true })
+                  return Effect.sync(() => signal.removeEventListener("abort", stopped))
+                }),
+              ({ stop, settled }, exit) => {
+                // A command that answered has exited; any other end stops it and waits for its exit.
+                if (Exit.isSuccess(exit)) return Effect.void
+                stop.abort()
+                return exited(settled, graceMs)
+              },
+            )
     }
 
-    // The wrapper runs the package's bundled runtime with Bun, which enters the project first; its
-    // stdout is the command's output.
-    const holyagent = (signal: AbortSignal, project: string, ...args: ReadonlyArray<string>) =>
-      exec(signal, "sh", [wrapper, PI_PROJECT_FLAG, project, ...args]).pipe(
+    // Bun runs the package's bundled runtime, which enters the project first; its stdout is the
+    // command's output. A Bun that cmd.exe cannot start with these arguments (a shim, and a project
+    // path with a character no quoting protects) is passed over for the next one. A Bun that is gone
+    // when its start fails was found once and moved or removed since: it is looked up again, once.
+    const holyagent = (signal: AbortSignal, project: string, ...args: ReadonlyArray<string>) => {
+      const argv = [...bundled, PI_PROJECT_FLAG, project, ...args]
+      const attempt = (looked: boolean): Effect.Effect<ExecResult, CommandFailed> =>
+        Effect.suspend(() => {
+          if (bun === undefined || !launchOf(bun, argv).ok) {
+            const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
+              const launch = launchOf(candidate, argv)
+              return launch.ok ? undefined : launch.reason
+            })
+            if (!lookup.found)
+              return Effect.fail(
+                new CommandFailed({ command: args.join(" "), reason: lookup.looked }),
+              )
+            bun = lookup.program
+          }
+          const program = bun
+          const gone = () => !looked && !signal.aborted && !(bunSearch.exists ?? isFile)(program)
+          const again = Effect.suspend(() => {
+            bun = undefined
+            return attempt(true)
+          })
+          return exec(signal, program, argv).pipe(
+            Effect.matchEffect({
+              onFailure: (error) => (gone() ? again : Effect.fail(error)),
+              onSuccess: (result) =>
+                (result.code !== 0 || result.killed) && gone() ? again : Effect.succeed(result),
+            }),
+          )
+        })
+      return attempt(false).pipe(
         Effect.flatMap((result) =>
           result.code === 0 && !result.killed
             ? Effect.succeed(result.stdout)
             : Effect.fail(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) })),
         ),
       )
+    }
 
     // The top of the work tree holds the project's config; outside git the project folder does, and
     // so does its state. Only git's own answer that the folder is not in a repository means "not
@@ -813,8 +1020,8 @@ export const createExtension =
           )
         const collected = yield* Effect.gen(function* () {
           const located = yield* topOf(signal, project)
-          // The loader reads files with Bun, which Pi's Node does not have, so the wrapper loads
-          // it. The state folder does not depend on the config or on `status`, so it is asked
+          // The loader reads files with Bun, which Pi's Node does not have, so the bundled CLI
+          // loads it. The state folder does not depend on the config or on `status`, so it is asked
           // meanwhile; its failure counts only once the config says the extension is on.
           const attempt = yield* Effect.result(
             Effect.all(
@@ -919,8 +1126,12 @@ export const createExtension =
           Effect.map((result) => {
             // Pi's exec reports a program that did not start (a missing `pi`) as exit 1 with the
             // spawn error on standard error, which `pi auth check` would read as "not logged in".
+            // Under `cmd.exe` on Windows a missing `pi` is its exit code 9009 instead.
             const unstarted =
-              result.code === 1 && result.stdout === "" && SPAWN_FAILURE.test(result.stderr.trim())
+              (result.code === 1 &&
+                result.stdout === "" &&
+                SPAWN_FAILURE.test(result.stderr.trim())) ||
+              (windows && result.code === CMD_NOT_FOUND)
             unanswered ||= result.killed || unstarted
             return {
               exitCode: unstarted ? 127 : result.code,
@@ -965,7 +1176,8 @@ export const createExtension =
       void ended.then(() => running.delete(ended))
     }
 
-    // The root's tools: its active selection plus its own tools, minus its excluded ones. A
+    // The root's tools: its active selection plus its own tools, minus its excluded ones. On
+    // Windows its own tools include `powershell`, beside the default `bash` that needs Git Bash. A
     // failure is a notice, not an error that reaches Pi.
     const applyRootTools = (tools: NonNullable<Collected["tools"]>): Delivery | undefined =>
       Effect.runSync(
@@ -973,7 +1185,7 @@ export const createExtension =
           try: () =>
             pi.setActiveTools([
               ...rootActiveTools(
-                tools,
+                windows ? { ...tools, tools: [...tools.tools, POWERSHELL_ENTRY] } : tools,
                 pi.getActiveTools(),
                 pi.getAllTools().map(({ name }) => name),
               ),

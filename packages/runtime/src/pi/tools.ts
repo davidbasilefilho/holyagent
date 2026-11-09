@@ -5,11 +5,25 @@ import { type ProviderProfile, providerProfile, webChoice } from "./provider.ts"
 /** Pi's built-in tools that read: they replace `Read`, `Grep` and `Glob` for every role. */
 export const READ_TOOLS: ReadonlyArray<string> = ["read", "grep", "find", "ls"]
 
-/** Pi's built-in tools that write and run: the Write capability's `Write`, `Edit` and `Bash`. */
-export const WRITE_TOOLS: ReadonlyArray<string> = ["write", "edit", "bash"]
+/**
+ * Pi's built-in tools that write and run: the Write capability's `Write`, `Edit` and `Bash`, and
+ * `powershell`, which Pi offers beside `bash` on Windows (it fails on other systems, where a role
+ * has `bash`).
+ */
+export const WRITE_TOOLS: ReadonlyArray<string> = ["write", "edit", "bash", "powershell"]
 
-/** The tools a role needs to run commands but not to change files: the Shell capability. */
-export const SHELL_TOOLS: ReadonlyArray<string> = ["bash"]
+/**
+ * The tools a role needs to run commands but not to change files: the Shell capability, `bash` and
+ * Windows' `powershell`.
+ */
+export const SHELL_TOOLS: ReadonlyArray<string> = ["bash", "powershell"]
+
+/**
+ * The entry that adds Windows' `powershell` tool to the root's active tools. Pi's default selection
+ * has `bash` only, which needs Git Bash on Windows; the root keeps both there, so it has a shell on
+ * a machine without Git Bash. Other systems do not add it, where it cannot run.
+ */
+export const POWERSHELL_ENTRY = "+powershell"
 
 /**
  * The `--tools` entry that turns Pi's built-in `codemode` extension on beside the defaults (the
@@ -92,16 +106,17 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
  * Every role runs `codemode` (mode `only`, from `pi.codemode.mode`, written by `toolSettings`) with
  * `PI_CODEMODE_MAX_WORKERS` from `pi.codemode.maxWorkers` in `env`. The root keeps the default
  * selection (`read` and `bash`, the extension tools of the enabled packages, `todo`,
- * `ask_user_question`, the process and subagent tools) and adds `+codemode`. It excludes `write`
- * and `edit`, since it writes no files, and, while each is enabled, the computer-use tools and the
- * web choice's tools: `+codemode` keeps every enabled extension's tools, but the root delegates
- * research to the Librarian roles and visual inspection to the visual specialists, as the Claude
- * root does. A specialist gets an allowlist: the read tools, then what its route grants, then
- * `codemode`, and `--exclude-tools` repeats as a floor the write tools it must not have:
+ * `ask_user_question`, the process and subagent tools) and adds `+codemode`; on Windows the
+ * extension also adds {@link POWERSHELL_ENTRY}. It excludes `write` and `edit`, since it writes no
+ * files, and, while each is enabled, the computer-use tools and the web choice's tools: `+codemode`
+ * keeps every enabled extension's tools, but the root delegates research to the Librarian roles and
+ * visual inspection to the visual specialists, as the Claude root does. A specialist gets an
+ * allowlist: the read tools, then what its route grants, then `codemode`, and `--exclude-tools`
+ * repeats as a floor the write tools it must not have:
  *
- * - Write: `write`, `edit` and `bash`;
- * - Shell: `bash` (Worker.operations, Worker.validation, Reviewer.testing), and Reviewer.code, which
- *   reads diffs with `git`;
+ * - Write: `write`, `edit`, `bash` and `powershell`;
+ * - Shell: `bash` and `powershell` (Worker.operations, Worker.validation, Reviewer.testing), and
+ *   Reviewer.code, which reads diffs with `git`;
  * - Search: the web tools of the web choice, none when `pi.features.web` is `off`;
  * - VisualInspection: T3 Code's browser, render and device tools while `pi.features.mcp` is on, and
  *   the computer-use tools while `pi.features.computerUse` is on.

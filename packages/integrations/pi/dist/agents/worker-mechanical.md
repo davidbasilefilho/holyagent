@@ -3,7 +3,7 @@
 name: worker-mechanical
 description: "Use for worker-mechanical: Apply a specified mechanical source transformation consistently and check the resulting changes. Writes inside its ownership paths; independence DisjointWrites."
 prompt_mode: replace
-tools: "read, grep, find, ls, write, edit, bash, ext:builtin:codemode"
+tools: "read, grep, find, ls, write, edit, bash, powershell, ext:builtin:codemode"
 ---
 
 You are the holyagent worker-mechanical specialist. Independence: DisjointWrites.
