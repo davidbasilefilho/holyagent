@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mw9it65a-t41v",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-capability-registry-commit-on",
+  "objective": "Review the capability registry commit on release/0.3.1/feat/capabilities in /home/user/holyagent-0.3.1-cap against the merge-ready bar.",
+  "state": "Running",
+  "scope": [
+    "Range: git -C /home/user/holyagent-0.3.1-cap diff 5d2bed8..HEAD (one commit). The registry is packages/runtime/src/config/capabilities.ts; form detection is setup/form.ts; setup/doctor/TUI wiring in setup/ and cli/setup.ts; pi/tools.ts; integrations/pi/src/agents.ts.",
+    "Maintainer requirements (verbatim): \"everything should be modular and easily upgradeable btw\" and \"btw we shall support both headless use and normal use, that's the point of capabilities, to modularly support systems\". Scope: move the seven existing optional capabilities onto the registry with unchanged behavior and defaults; headless/normal detection with an override; a flag and a TUI row per capability; doctor health per capability; no version outside config/pi-packages.json; no new 0.3.1 capabilities.",
+    "Behavior changes the writer reported, judge each: headless machines (CI, cloud session, Linux without a display) no longer get computer-use and setup removes a listed package; doctor lines renamed (pi features -> pi base packages, pi form, pi capability <name>); the setup screen now opens whenever Pi is in use and pi.enable is on (skipped for --undo, cloud sessions and capability flags), not only when T3 has work; setup --undo leaves capability choices in config; a user-level computerUse false beats a project-level on.",
+    "Check that a 0.3.0 config decodes and behaves the same, that the setup screen never opens without a TTY or in scripted runs, that headless detection cannot misfire on a normal desktop (Windows, macOS, Wayland), Effect and Schema rules from .claude/CLAUDE.md, JSDoc, and that tests would fail without the change. Run the built-in /code-review on the range and classify its findings."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 400 words; mark each finding blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "Registry-driven behavior is correct and existing defaults and 0.3.0 configs behave unchanged except the stated changes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Headless detection and the setup screen trigger are safe on every supported platform and in non-interactive runs",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Tests cover the change and fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9hx5gc-m6us"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T17:13:54.526Z"
+  },
+  "createdAt": "2026-11-09T17:13:54.526Z"
+}
