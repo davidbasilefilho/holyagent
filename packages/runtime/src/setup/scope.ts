@@ -63,22 +63,10 @@ export interface SettingsTarget {
 }
 
 /**
- * The settings file of a scope. `user` is the file of `userFiles` (`CLAUDE_CONFIG_DIR`, else
- * `~/.claude`), with no process spawned. `project` and `local` live in `.claude` of the git
- * top-level of `cwd`, else of `cwd` itself when it is not inside a repository or git is missing.
- * The top-level counts only when it is `cwd` or an ancestor of it (compared as real paths) and
- * holds a `.git` entry, since a crafted `core.worktree` can make git name any directory, an
- * ancestor of `cwd` included; otherwise `cwd` is used and the notice says so, as it does outside a
- * repository. For `project` and `local`, a `.claude` folder or settings file that is a symlink
- * fails with SetupFailure, so a repository cannot redirect the write; `user` follows its links as
- * before.
+ * The folder `project` and `local` settings live in: its `.claude` folder, and a notice when it is
+ * not the usual one.
  */
-export const settingsFile = Effect.fn("settingsFile")(function* (
-  env: Env,
-  scope: Scope,
-  cwd: string,
-) {
-  if (scope === "user") return { file: userFiles(env).settings } satisfies SettingsTarget
+const claudeFolder = Effect.fn("claudeFolder")(function* (cwd: string) {
   const shell = yield* Shell
   const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd })
   const line = top.stdout.trim()
@@ -97,8 +85,32 @@ export const settingsFile = Effect.fn("settingsFile")(function* (
     : named === undefined
       ? `not inside a git repository; using ${cwd}`
       : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`
-  const folder = join(root, ".claude")
-  const file = join(folder, scope === "project" ? "settings.json" : "settings.local.json")
+  return { folder: join(root, ".claude"), notice }
+})
+
+/** The settings file name of a `project` or `local` scope. */
+const fileName = (scope: "project" | "local") =>
+  scope === "project" ? "settings.json" : "settings.local.json"
+
+/**
+ * The settings file of a scope. `user` is the file of `userFiles` (`CLAUDE_CONFIG_DIR`, else
+ * `~/.claude`), with no process spawned. `project` and `local` live in `.claude` of the git
+ * top-level of `cwd`, else of `cwd` itself when it is not inside a repository or git is missing.
+ * The top-level counts only when it is `cwd` or an ancestor of it (compared as real paths) and
+ * holds a `.git` entry, since a crafted `core.worktree` can make git name any directory, an
+ * ancestor of `cwd` included; otherwise `cwd` is used and the notice says so, as it does outside a
+ * repository. For `project` and `local`, a `.claude` folder or settings file that is a symlink
+ * fails with SetupFailure, so a repository cannot redirect the write; `user` follows its links as
+ * before.
+ */
+export const settingsFile = Effect.fn("settingsFile")(function* (
+  env: Env,
+  scope: Scope,
+  cwd: string,
+) {
+  if (scope === "user") return { file: userFiles(env).settings } satisfies SettingsTarget
+  const { folder, notice } = yield* claudeFolder(cwd)
+  const file = join(folder, fileName(scope))
   for (const path of [folder, file]) {
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
@@ -131,31 +143,67 @@ export const projectSettingsFiles = Effect.fn("projectSettingsFiles")(function* 
 
 /**
  * The scope `setup` and `doctor` work on and why: `flag` when `--scope` named it, `inferred` when
- * the HolyAgent plugin is enabled in `file`, `default` (`user`) when it is enabled nowhere.
+ * the user's own `local` settings `file` enable the plugin, `default` (`user`) otherwise. A default
+ * carries `notices`, extra report lines for what the search found.
  */
 export type ResolvedScope =
   | { readonly scope: Scope; readonly source: "flag" }
-  | { readonly scope: Scope; readonly source: "inferred"; readonly file: string }
-  | { readonly scope: "user"; readonly source: "default" }
+  | { readonly scope: "local"; readonly source: "inferred"; readonly file: string }
+  | { readonly scope: "user"; readonly source: "default"; readonly notices: ReadonlyArray<string> }
+
+/** What a settings file says about the plugin, read for scope inference only. */
+type Enablement = "enabled" | "disabled" | "unset" | "symlink"
 
 /**
- * The scope the HolyAgent plugin is installed at, from where `enabledPlugins` has the plugin id set
- * to `true`: Claude Code reads `local` over `project` over `user`, so the files are read in that
- * order and the first that enables the plugin wins. The files are those of {@link settingsFile}, so
- * a symlinked `project` or `local` target fails with SetupFailure as it does for a write, and a
- * file read that is not a JSON object fails naming the file. The plugin enabled nowhere gives
- * `user` as the `default`.
+ * Whether the settings file in `folder` sets the plugin id in `enabledPlugins` to true (`enabled`),
+ * to false (`disabled`) or neither (`unset`). A symlinked folder or file is not read (`symlink`): a
+ * repository must not steer the scope through a link, and inference needs no write. A file that is
+ * not a JSON object fails with SetupFailure naming it.
  */
-export const installedScope = Effect.fn("installedScope")(function* (env: Env, cwd: string) {
-  for (const scope of ["local", "project", "user"] as const) {
-    const { file } = yield* settingsFile(env, scope, cwd)
-    const plugins = (yield* readJsonObject(file))["enabledPlugins"]
-    if (isJsonObject(plugins) && plugins[PLUGIN_ID] === true) {
-      return { scope, source: "inferred", file } satisfies ResolvedScope
+const enablement = Effect.fn("enablement")(function* (folder: string, file: string) {
+  if ((yield* isSymlink(folder)) || (yield* isSymlink(file))) return "symlink" as const
+  const plugins = (yield* readJsonObject(file))["enabledPlugins"]
+  const value = isJsonObject(plugins) ? plugins[PLUGIN_ID] : undefined
+  return (value === true ? "enabled" : value === false ? "disabled" : "unset") satisfies Enablement
+})
+
+/**
+ * The scope `setup` and `doctor` use without `--scope`. Only the user's own uncommitted
+ * `.claude/settings.local.json` moves it off `user`: when that file sets the plugin to `true`, the
+ * scope is `local`. An explicit `false` there means the plugin is disabled for this project, so the
+ * search stops and `user` is used with a notice saying so. A committed `.claude/settings.json` that
+ * enables the plugin never selects a scope, because a cloned repository must not choose where setup
+ * writes or which registry a Pi install reads; the notice names the file and `--scope project`. A
+ * symlinked `local` or `project` file is not read, with a notice for `local`. A `local` file that
+ * is not a JSON object fails with SetupFailure naming it; a bad `project` file is ignored.
+ */
+export const installedScope = Effect.fn("installedScope")(function* (cwd: string) {
+  const { folder } = yield* claudeFolder(cwd)
+  const local = join(folder, fileName("local"))
+  const project = join(folder, fileName("project"))
+  const notices: Array<string> = []
+  const found = yield* enablement(folder, local)
+  if (found === "enabled")
+    return { scope: "local", source: "inferred", file: local } satisfies ResolvedScope
+  if (found === "disabled") {
+    notices.push(
+      `${PLUGIN_ID} is set to false in ${local}, so HolyAgent is disabled for this project; using user`,
+    )
+  } else {
+    if (found === "symlink") notices.push(`${local} is a symlink and was not read; using user`)
+    const shared = yield* enablement(folder, project).pipe(
+      Effect.orElseSucceed(() => "unset" as const),
+    )
+    if (shared === "enabled") {
+      notices.push(`the repository enables HolyAgent in ${project}; --scope project targets it`)
     }
   }
-  return { scope: "user", source: "default" } satisfies ResolvedScope
+  return { scope: "user", source: "default", notices } satisfies ResolvedScope
 })
+
+/** The extra report lines of a resolved scope: what the search found beyond the scope itself. */
+export const scopeNotices = (resolved: ResolvedScope): ReadonlyArray<string> =>
+  resolved.source === "default" ? resolved.notices : []
 
 /** The text that says which scope was used and where it came from, for a `scope:` report line. */
 export const describeScope = (resolved: ResolvedScope): string => {
@@ -165,6 +213,6 @@ export const describeScope = (resolved: ResolvedScope): string => {
     case "inferred":
       return `${resolved.scope} (inferred: ${PLUGIN_ID} is enabled in ${resolved.file})`
     case "default":
-      return `user (default: ${PLUGIN_ID} is not enabled in any settings file)`
+      return "user (default)"
   }
 }

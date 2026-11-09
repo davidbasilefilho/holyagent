@@ -556,9 +556,11 @@ describe("--scope as a command flag", () => {
   })
 })
 
-describe("the default scope follows where the plugin is enabled", () => {
+describe("the default scope is user unless the local settings enable the plugin", () => {
   const enabled = { enabledPlugins: { "holyagent@holyagent": true } }
+  const disabled = { enabledPlugins: { "holyagent@holyagent": false } }
   const files = () => ({ local: localFile(), project: projectFile(), user: userFile() })
+  const DEFAULT = "~ scope: user (default)"
   /** The repository is a real one, so the project and local files sit in its top-level. */
   const initRepo = async () => {
     await $`git init -q ${repo()}`.quiet()
@@ -571,61 +573,104 @@ describe("the default scope follows where the plugin is enabled", () => {
   }
 
   test.each([
-    ["local", ["local"]],
-    ["project", ["project"]],
-    ["user", ["user"]],
-    ["local", ["local", "project", "user"]],
-    ["project", ["project", "user"]],
-    ["local", ["local", "user"]],
-  ] as const)("setup uses %s when the plugin is enabled in %p", async (expected, where) => {
+    [["local"]],
+    [["local", "project"]],
+    [["local", "user"]],
+    [["local", "project", "user"]],
+  ] as const)("setup uses local when the plugin is enabled in %p", async (where) => {
     const target = await initRepo()
     for (const scope of where) await write(files()[scope], enabled)
     const result = await cli(["setup", "--skip-ctx7"], nested())
     expect(result.code).toBe(0)
     expect(result.stdout.split("\n")[0]).toBe(
-      `~ scope: ${expected} (inferred: holyagent@holyagent is enabled in ${target[expected]})`,
+      `~ scope: local (inferred: holyagent@holyagent is enabled in ${target.local})`,
     )
-    expect(result.stdout).toContain(`${target[expected]}\n`)
-    for (const scope of ["local", "project", "user"] as const) {
-      if (scope !== expected && !where.some((name) => name === scope)) {
-        expect(await exists(target[scope])).toBe(false)
-      }
-    }
-    expect(await readJson(target[expected])).toMatchObject({ includeGitInstructions: false })
+    expect(result.stdout).not.toContain("--scope project targets it")
+    expect(await readJson(target.local)).toMatchObject({ includeGitInstructions: false })
+    if (!where.some((name) => name === "project")) expect(await exists(target.project)).toBe(false)
+    if (!where.some((name) => name === "user")) expect(await exists(target.user)).toBe(false)
   })
 
-  test("setup falls back to user and says so when the plugin is enabled nowhere", async () => {
+  test.each([
+    ["nowhere", {}],
+    ["the user settings only", { user: enabled }],
+    [
+      "another plugin, or not true, in the local file",
+      { local: { enabledPlugins: { "other@holyagent": true } } },
+    ],
+  ] as const)(
+    "setup uses user, with no extra line, when the plugin is enabled in %s",
+    async (_name, where) => {
+      const target = await initRepo()
+      for (const [scope, value] of Object.entries(where)) {
+        await write(files()[scope as keyof ReturnType<typeof files>], value)
+      }
+      const result = await cli(["setup", "--skip-ctx7"], nested())
+      expect(result.code).toBe(0)
+      const lines = result.stdout.split("\n")
+      expect(lines[0]).toBe(DEFAULT)
+      expect(lines[1]).not.toStartWith("~ scope:")
+      expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+      expect(await exists(target.project)).toBe(false)
+      expect(await readJson(target.local).catch(() => ({}))).not.toHaveProperty(
+        "includeGitInstructions",
+      )
+    },
+  )
+
+  test("a committed project file that enables the plugin leaves the scope at user and names itself", async () => {
     const target = await initRepo()
+    await write(files().project, enabled)
     const result = await cli(["setup", "--skip-ctx7"], nested())
     expect(result.code).toBe(0)
-    expect(result.stdout.split("\n")[0]).toBe(
-      "~ scope: user (default: holyagent@holyagent is not enabled in any settings file)",
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: the repository enables HolyAgent in ${target.project}; --scope project targets it`,
     )
-    expect(await exists(target.user)).toBe(true)
-    expect(await exists(target.project)).toBe(false)
+    expect(await readJson(target.project)).toEqual(enabled)
     expect(await exists(target.local)).toBe(false)
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+
+    const doctored = await cli(["doctor"], nested())
+    expect(doctored.stdout.split("\n").slice(0, 2)).toEqual([
+      "ok   scope: user (default)",
+      `~ scope: the repository enables HolyAgent in ${target.project}; --scope project targets it`,
+    ])
+    expect(doctored.stdout).toContain(`ok   settings: ${target.user}`)
   })
 
-  test("an entry that is not true, or for another plugin, does not count", async () => {
+  test("an explicit false in the local file stops the search and uses user, saying so", async () => {
     const target = await initRepo()
-    await write(files().local, { enabledPlugins: { "holyagent@holyagent": false } })
-    await write(files().project, { enabledPlugins: { "other@holyagent": true } })
+    await write(files().local, disabled)
+    await write(files().project, enabled)
     await write(files().user, enabled)
-    const result = await cli(["setup", "--skip-ctx7", "--dry-run"], nested())
-    expect(result.stdout.split("\n")[0]).toBe(
-      `~ scope: user (inferred: holyagent@holyagent is enabled in ${target.user})`,
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: holyagent@holyagent is set to false in ${target.local}, so HolyAgent is disabled for this project; using user`,
     )
+    expect(result.stdout).not.toContain("--scope project targets it")
+    expect(await readJson(target.local)).toEqual(disabled)
+    expect(await readJson(target.project)).toEqual(enabled)
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+
+    const doctored = await cli(["doctor"], nested())
+    expect(doctored.stdout.split("\n")[0]).toBe("ok   scope: user (default)")
+    expect(doctored.stdout.split("\n")[1]).toBe(lines[1])
   })
 
-  test("--undo works on the inferred scope", async () => {
+  test("--undo works on the inferred local scope", async () => {
     const target = await initRepo()
-    await write(files().project, {})
-    await cli(["setup", "--scope", "project", "--skip-ctx7"], nested())
+    await write(files().local, {})
+    await cli(["setup", "--scope", "local", "--skip-ctx7"], nested())
     const undone = await cli(["setup", "--undo"], nested())
     expect(undone.code).toBe(0)
-    expect(undone.stdout.split("\n")[0]).toContain(`scope: project (inferred:`)
-    expect(undone.stdout).toContain(target.project)
-    expect(await readJson(target.project)).toEqual({})
+    expect(undone.stdout.split("\n")[0]).toContain("scope: local (inferred:")
+    expect(undone.stdout).toContain(target.local)
+    expect(await readJson(target.local)).toEqual({})
   })
 
   test("an explicit --scope overrides the inferred one, in setup and in doctor", async () => {
@@ -642,41 +687,142 @@ describe("the default scope follows where the plugin is enabled", () => {
     expect(doctored.stdout).toContain(target.project)
   })
 
-  test("doctor checks the settings of the inferred scope and names it", async () => {
+  test("--scope project targets the committed file, with no notice about it", async () => {
     const target = await initRepo()
     await write(files().project, enabled)
-    const result = await cli(["doctor"], nested())
-    expect(result.stdout.split("\n")[0]).toBe(
-      `ok   scope: project (inferred: holyagent@holyagent is enabled in ${target.project})`,
-    )
-    expect(result.stdout).toContain(`FAIL settings: ${target.project} lacks`)
+    const result = await cli(["setup", "--scope", "project", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe("~ scope: project (from --scope)")
+    expect(lines[1]).not.toStartWith("~ scope:")
+    expect(await readJson(target.project)).toMatchObject({ includeGitInstructions: false })
+    expect(await exists(target.user)).toBe(false)
   })
 
-  test("doctor falls back to user and says so", async () => {
-    await initRepo()
+  test("doctor checks the settings of the inferred local scope and names it", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
     const result = await cli(["doctor"], nested())
     expect(result.stdout.split("\n")[0]).toBe(
-      "ok   scope: user (default: holyagent@holyagent is not enabled in any settings file)",
+      `ok   scope: local (inferred: holyagent@holyagent is enabled in ${target.local})`,
     )
+    expect(result.stdout).toContain(`FAIL settings: ${target.local} lacks`)
   })
 
-  test.each([
-    ["local", () => localFile()],
-    ["project", () => projectFile()],
-    ["user", () => userFile()],
-  ] as const)(
-    "a %s settings file that does not decode is an error naming it",
-    async (name, path) => {
+  test("a local settings file that does not decode is an error naming it", async () => {
+    const target = await initRepo()
+    await mkdir(dirname(target.local), { recursive: true })
+    await writeFile(target.local, "{ not json")
+    const setupResult = await cli(["setup", "--skip-ctx7"], nested())
+    expect(setupResult.code).toBe(1)
+    expect(setupResult.stdout).toStartWith(`! scope: ${target.local} is not a JSON object`)
+    const doctorResult = await cli(["doctor"], nested())
+    expect(doctorResult.code).toBe(1)
+    expect(doctorResult.stdout).toStartWith(`FAIL scope: ${target.local} is not a JSON object`)
+    expect(await Bun.file(target.local).text()).toBe("{ not json")
+  })
+
+  test("a project file that does not decode cannot fail a bare run, and the user file is the settings step's to report", async () => {
+    const target = await initRepo()
+    await mkdir(dirname(target.project), { recursive: true })
+    await writeFile(target.project, "{ not json")
+    const bare = await cli(["setup", "--skip-ctx7"], nested())
+    expect(bare.code).toBe(0)
+    expect(bare.stdout.split("\n")[0]).toBe(DEFAULT)
+    expect(await Bun.file(target.project).text()).toBe("{ not json")
+
+    await writeFile(target.user, "{ not json")
+    const broken = await cli(["setup", "--skip-ctx7"], nested())
+    expect(broken.code).toBe(1)
+    expect(broken.stdout.split("\n")[0]).toBe(DEFAULT)
+    expect(broken.stdout).toContain("! user settings: ")
+    expect(await Bun.file(target.user).text()).toBe("{ not json")
+  })
+
+  describe.skipIf(process.platform === "win32")("symlinks", () => {
+    test("a bare run with a symlinked .claude folder installs for the user and says the folder was not read", async () => {
       const target = await initRepo()
-      await mkdir(dirname(path()), { recursive: true })
-      await writeFile(path(), "{ not json")
-      const setupResult = await cli(["setup", "--skip-ctx7"], nested())
-      expect(setupResult.code).toBe(1)
-      expect(setupResult.stdout).toStartWith(`! scope: ${target[name]} is not a JSON object`)
-      const doctorResult = await cli(["doctor"], nested())
-      expect(doctorResult.code).toBe(1)
-      expect(doctorResult.stdout).toStartWith(`FAIL scope: ${target[name]} is not a JSON object`)
-      expect(await Bun.file(target[name]).text()).toBe("{ not json")
-    },
-  )
+      const linked = join(home, "linked")
+      await write(join(linked, "settings.local.json"), enabled)
+      await write(join(linked, "settings.json"), enabled)
+      await symlink(linked, join(repo(), ".claude"))
+      const result = await cli(["setup", "--skip-ctx7"], nested())
+      expect(result.code).toBe(0)
+      const lines = result.stdout.split("\n")
+      expect(lines[0]).toBe(DEFAULT)
+      expect(lines[1]).toBe(`~ scope: ${target.local} is a symlink and was not read; using user`)
+      expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+      expect(await readJson(join(linked, "settings.local.json"))).toEqual(enabled)
+
+      const doctored = await cli(["doctor"], nested())
+      expect(doctored.stdout.split("\n")[0]).toBe("ok   scope: user (default)")
+      expect(doctored.stdout).not.toContain("is a symlink; refusing")
+    })
+
+    test("a symlinked local file is not followed, and writing through it is still refused", async () => {
+      const target = await initRepo()
+      const victim = join(home, "victim.json")
+      await write(victim, enabled)
+      await mkdir(dirname(target.local), { recursive: true })
+      await symlink(victim, target.local)
+      const bare = await cli(["setup", "--skip-ctx7"], nested())
+      expect(bare.code).toBe(0)
+      expect(bare.stdout.split("\n")[0]).toBe(DEFAULT)
+      expect(await exists(target.user)).toBe(true)
+
+      const named = await cli(["setup", "--scope", "local", "--skip-ctx7"], nested())
+      expect(named.code).toBe(1)
+      expect(named.stdout).toContain("is a symlink; refusing to write through it")
+      expect(await readJson(victim)).toEqual(enabled)
+    })
+
+    test("a symlinked .claude folder is still refused for the scope that writes into it", async () => {
+      await initRepo()
+      const linked = join(home, "linked")
+      await mkdir(linked, { recursive: true })
+      await symlink(linked, join(repo(), ".claude"))
+      for (const scope of ["project", "local"]) {
+        const result = await cli(["setup", "--scope", scope, "--skip-ctx7"], nested())
+        expect(result.code).toBe(1)
+        expect(result.stdout).toContain("is a symlink; refusing to write through it")
+      }
+      expect(await readdir(linked)).toEqual([])
+    })
+  })
+
+  describe.skipIf(process.platform === "win32")("the Pi packages follow the same scope", () => {
+    /** A `pi` on PATH, so the dry run reaches the install lines; it is never run. */
+    const withPi = async () => {
+      const bin = join(home, "bin")
+      await mkdir(bin, { recursive: true })
+      await writeFile(join(bin, "pi"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+      return { HOLYAGENT_HOST: "pi", PATH: `${bin}:${process.env.PATH}` }
+    }
+    const piLines = async (extra: Record<string, string | undefined>) => {
+      const result = await Effect.runPromise(
+        run(["setup", "--dry-run", "--skip-ctx7"], {
+          cwd: nested(),
+          env: { HOME: home, CLAUDE_CONFIG_DIR: join(home, "claude"), ...extra },
+          stdin: Effect.fail(new StdinMissing({ reason: "no stdin in this test" })),
+        }),
+      )
+      return result.stdout.split("\n").filter((line) => line.includes("would install with pi "))
+    }
+
+    test("local scope installs with -l when the local file enables the plugin", async () => {
+      await initRepo()
+      await write(files().local, enabled)
+      const lines = await piLines(await withPi())
+      expect(lines.length).toBeGreaterThan(0)
+      for (const line of lines) expect(line).toEndWith(" -l")
+    })
+
+    test("a committed project file leaves the Pi packages global", async () => {
+      await initRepo()
+      await write(files().project, enabled)
+      const lines = await piLines(await withPi())
+      expect(lines.length).toBeGreaterThan(0)
+      for (const line of lines) expect(line).not.toEndWith(" -l")
+    })
+  })
 })

@@ -54,7 +54,7 @@ describe("holyagent setup and doctor as commands", () => {
     const second = await cli(flags)
     expect(second.code).toBe(0)
     expect(second.stdout.split("\n").filter((line) => /^[+!~-] /.test(line))).toEqual([
-      `~ scope: user (inferred: holyagent@holyagent is enabled in ${settings()})`,
+      "~ scope: user (default)",
       "- ctx7: skipped by flag",
     ])
     expect(second.stdout).toEndWith("no changes\n")
@@ -64,13 +64,8 @@ describe("holyagent setup and doctor as commands", () => {
     await Bun.write(settings(), "[1]")
     const result = await cli(["setup", "--skip-ctx7"])
     expect(result.code).toBe(1)
-    expect(result.stdout).toContain(`! scope: ${settings()} is not a JSON object`)
+    expect(result.stdout).toContain("! user settings: ")
     expect(await Bun.file(settings()).text()).toBe("[1]")
-
-    // With the scope named, the search is skipped and the settings step reports the file.
-    const named = await cli(["setup", "--scope", "user", "--skip-ctx7"])
-    expect(named.code).toBe(1)
-    expect(named.stdout).toContain("! user settings: ")
   })
 
   test("setup in a cloud session skips ctx7 and still merges the settings", async () => {
