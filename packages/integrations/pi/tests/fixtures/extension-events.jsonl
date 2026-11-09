@@ -1,0 +1,17 @@
+{"holyagentFixture":{"package":"@earendil-works/pi-coding-agent","piVersion":"1.5.0","name":"extension-events","source":"extension-api","description":"The events the extension registers handlers for: session_start (every reason), before_agent_start, message_end, tool_call, session_compact and session_shutdown."}}
+{"type":"session_start","reason":"startup"}
+{"type":"session_start","reason":"reload"}
+{"type":"session_start","reason":"new"}
+{"type":"session_start","reason":"resume"}
+{"type":"session_start","reason":"fork"}
+{"type":"before_agent_start","messageType":"user","prompt":"Review the change.","systemPrompt":"Pi's own system prompt."}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Report: the change is correct; no findings."}],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":1700000000001}}
+{"type":"message_end","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":1700000000001}}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"cut"}],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"length","timestamp":1700000000001}}
+{"type":"tool_call","toolCallId":"call-agent-ok","toolName":"Agent","input":{"subagent_type":"reviewer-code","prompt":"Review the change."}}
+{"type":"tool_call","toolCallId":"call-agent-general","toolName":"Agent","input":{"subagent_type":"general-purpose","prompt":"Do anything."}}
+{"type":"tool_call","toolCallId":"call-workflow-ok","toolName":"SubagentWorkflow","input":{"script":"export const meta = { name: 'w', description: 'd' }\nreturn await agent('review', { agentType: 'reviewer-code' })"}}
+{"type":"tool_call","toolCallId":"call-workflow-open","toolName":"SubagentWorkflow","input":{"script":"export const meta = { name: 'w', description: 'd' }\nreturn await agent('anything', { label: 'x' })"}}
+{"type":"tool_call","toolCallId":"call-bash","toolName":"bash","input":{"command":"ls"}}
+{"type":"session_compact","reason":"threshold","willRetry":false,"fromExtension":false}
+{"type":"session_shutdown","reason":"quit"}

@@ -92,10 +92,28 @@ Dependencies change only through the updater, `scripts/update-dependencies.ts`, 
 - the external GitHub Actions in `.github/`: the tag becomes its full commit SHA, and the `# vX.Y.Z` comment follows;
 - the vendored ripgrep and fd in `packages/integrations/claude/src/vendor.ts`: the version and both SHA-256 hashes of every target, recomputed from the downloaded archives. Before a hash is pinned, the archive is compared with the SHA-256 its release publishes (ripgrep's `<archive>.sha256` file, or for fd, which publishes no file, the `digest` in GitHub's release API for the asset), and a difference or a missing checksum stops the update with the tree unchanged. Then the programs are installed from those downloads and `scripts/vendor.ts` removes what no pin names;
 - the mise tools in `mise.toml` that are pinned to a version (`bun`, whose stable base the `postinstall` hook upgrades to canary; `node = "lts"` is a channel and stays);
-- the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` (the provider and the reused extensions), each set to the newest stable, non-deprecated release no higher than the registry's `latest`, never moved down. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in that table: it moves with `bun.lock` when `bun update` runs, within its caret range, and a user's own Pi install is theirs. The updater does not re-record the CI fixtures, so a move of the host or of a Pi pin shows up as a failing replay until they are re-recorded by hand;
+- the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` (the provider and the reused extensions), each set to the newest stable, non-deprecated release no higher than the registry's `latest`, never moved down. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in that table: it moves with `bun.lock` when `bun update` runs, within its caret range, and a user's own Pi install is theirs. The updater does not re-record the CI fixtures, so a move of the host or of a Pi pin shows up as a failing replay until they are re-recorded ([Re-recording the Pi fixtures](#re-recording-the-pi-fixtures));
 - the ranges of every `package.json` (the root and the workspace packages, never `node_modules`), followed by `bun update` and `bun install` for the lockfile.
 
 The commit permalinks in `docs/pi/` are research references and stay as written. Tags and commits are read with `git ls-remote`, package releases from the npm registry and fd's release digests from the GitHub API, which allows a limited number of requests an hour without a token. A `uses:` line the updater cannot read (no commit SHA, or a comment other than `# vX.Y.Z`) is listed as skipped, as is a mise tool it has no source for. Every download and file is read and checked before the first file is written; a failure of the vendor step or of `bun update` after that leaves the tree half moved, so revert it with git and run the updater again. `mise run deps:update -- --dry-run` prints `current -> next` for every pin and writes nothing, `mise run deps:update` applies the moves, and `mise run deps:check` exits non-zero when a pin is behind. After an update, run `mise run build` and `mise run verify`; a pin whose update breaks a gate is fixed in code or reverted and reported, not left half-moved.
+
+### Re-recording the Pi fixtures
+
+`packages/integrations/pi/tests/contract.test.ts` pins the Pi events the integration consumes (the JSON-mode run stream with `agent_settled` and the tool execution events, the extension's `session_start`, `before_agent_start`, `message_end`, `tool_call`, `session_compact` and `session_shutdown` events, and the `extension_ui_request` messages of RPC mode) to the Pi host version the fixtures were recorded for. The fixtures are JSONL files in `packages/integrations/pi/tests/fixtures/`, each starting with a header line that names the Pi package and version. They are not recorded from a Pi run: `fixtures/record.ts` builds every event from Pi's exported types with `satisfies`, so `mise run check` fails when an update renames or retypes a field the event spells out. The `before_agent_start` and `session_compact` events are written against a `Pick` of their type, so only the picked fields are covered. Each group is checked differently:
+
+- The `extension-events` fixture runs through the extension's own handlers, where `message_end` reaches `failedFinalMessage`.
+- The JSON-mode run streams (ending in `agent_settled`, with the tool execution events) are read through `failedFinalMessage` and `assignmentStatusOf` by a reader local to the test, because the real reader lives in `@tintinweb/pi-subagents`; the test checks the outcome and Assignment status that reader's result implies.
+- The `extension_ui_request` messages of RPC mode are pinned by type and field shape only, because the extension has no UI consumer yet.
+
+Nothing starts Pi.
+
+`mise run deps:update` can move the host with `bun.lock`, and then the contract test fails with a message that says to re-record. To record again:
+
+1. Run `bun packages/integrations/pi/tests/fixtures/record.ts`. It writes every file for the installed host's version.
+2. Read the diff of `packages/integrations/pi/tests/fixtures/`. Only the version in the headers should move; any other change is an event Pi changed.
+3. Run `mise run check` and `mise run test`. A type error in `record.ts`, or a failing consumer assertion, is a change in Pi that the integration must be adapted to, which is a code change and not a re-record. Edit `record.ts` to the new Pi types first, then record.
+
+The test also fails when a fixture file differs from what `record.ts` writes, so do not edit the JSONL by hand.
 
 ## Lint and format rules
 
