@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "confirm-the-fff-integration-works-as",
   "objective": "Confirm the fff integration works as specified against the real pi-fff package and meets the merge-ready bar.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit e2cacd11 on release/0.3.1/feat/fff in /home/user/holyagent-0.3.1-fff (range e6f334c7..e2cacd11); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9rpdzt-cwur.md",
     "Requirement: @ff-labs/pi-fff 0.11.0 at an exact pin in override mode, so its tools replace Pi find and grep and Pi prompt guidance stays consistent; a capability with headless and normal forms, switchable and modular; the Claude plugin keeps bundled ripgrep and fd.",
@@ -62,7 +62,45 @@
     "agentId": "workflow:wf_fd9334c0-993/assignment-0mw9s9fck-0tru",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T21:38:29.492Z"
+    "startedAt": "2026-11-09T21:38:29.492Z",
+    "finishedAt": "2026-11-09T21:55:12.530Z"
+  },
+  "result": "result: no blockers. Build and verify pass at e2cacd11, and the integration matches what pi-fff 0.11.0 reads and registers. I read the package from the npm tarball because Pi packages are not in `bun.lock`. The Pi runtime behavior I could only read, not run.\n\nchanged: none (read-only). `bun install --frozen-lockfile` made no changes.\n\nchecks:\n- `bunx --no-install mise run build` -> 0, `git status` clean afterwards.\n- `bunx --no-install mise run verify` -> 0, 3028 pass, 0 fail, no type errors.\n- `bunx --no-install mise run deps:check` -> 1, only 4 unrelated pins behind (mise-action, fd, billion-context, pi-computer-use). pi-fff is not flagged.\n\nbuilt-in /code-review, six findings:\n- Rejected: `toolArgs` takes no platform. The root's exclusions are the union with the defaults' (`rootExclusions` in `extension.ts`), so the platform could not change them.\n- Rejected: the requirements tree is untouched. `requirements/root/search.md` and `specialist/working.md` name no Pi tool. The kimi edit is wording only.\n- Rejected: doctor and `checkCapability` take an injectable `platform`.\n- Optional: project scope skips `pi-fff.json` with a `-` line, and `docs/pi/search.md` documents the skip. See the first note below for the consequence.\n- Optional: the `FFF_OVERRIDE_TOOLS` list is not tied to the pin. A comment or a pin-table note would do.\n- Optional: the musl/glibc point is speculative, and fff-node chooses the build at runtime.\n\nnotes (optional):\n- `rootExclude` names only `grep`, `find` and `multi_grep`. pi-fff registers and activates `ffgrep`, `fffind` and `fff-multi-grep` in three cases:\n  - pi-fff's default mode (project-scope setup, or a user override of `mode`);\n  - `--fff-mode` or `PI_FFF_MODE` overriding the file;\n  - override mode when the cwd is opted out of indexing (`keepBuiltins` in `index.ts`, e.g. a session launched from `/`).\n  In those cases the root gets tools its search rule forbids, and the `tool_call` gate does not refuse them. Add those three names to `FFF_OVERRIDE_TOOLS`.\n- Root exclusion if pi-fff registers late: the `tool_call` gate refuses `grep`, `find` and `multi_grep` for the root regardless of order. `held.excluded` starts from the defaults, and the root's active-tool list is applied after pi-fff's synchronous `session_start`. If Pi runs the handlers in the other order, the root could list those tools but never call them.\n- Specialist tool names: children load all extensions, since the agent files have no `extensions:` key. `inScope()` in pi-subagents 0.23.1 keeps `grep` and `find` by their built-in names, even though the `ext:` allowlist excludes pi-fff. fff's tools therefore reach specialists under those names, and `multi_grep` does not, as the writer said. I could not confirm that Pi's registry makes the extension's tool win over the built-in.\n- Instruction text: kimi-k3.1 and gpt-6 agree with fff on or off. Roles with bash are told to use `holyagent rg`, so only the no-bash roles actually use fff.\n- A supported host whose native binding failed to install is not detected. That is acceptable as documented. pi-fff reports the failure at session start.\n- User-level off should not be final. `FINAL_OFF` covers settings that grant access, and fff grants none.\n\nevidence:\nWith fff on, Pi loads pi-fff in override mode and its tools replace find and grep for specialists, and the root keeps its own search; with fff off, Pi keeps its own tools: pi-fff `src/index.ts` `OVERRIDE_TOOL_NAMES` and `src/config.ts` match `FFF_OVERRIDE_SETTINGS` and `FFF_OVERRIDE_TOOLS`. `tests/pi/tools.test.ts` and `tests/setup-pi-settings.test.ts` cover on and off. Residual caveats are in notes.\nThe integration matches what pi-fff 0.11.0 actually reads and registers: `piDataDir()` is `PI_CODING_AGENT_DIR` or `~/.pi/agent`, equal to `piAgentDirectory`. Only the key `mode` is written, and the config rejects unknown keys. The `override` mode value matches the package. The file is read from the agent directory only.\nEvery instruction set's search guidance for Pi is consistent with the tools present: rg over kimi-k3.1, gpt-6 and the generated agent files finds no remaining \"pi's grep\" wording.\nChanged behavior has tests that fail without the change, and no test is weakened: the removed test lines are count and height adjustments for the new capability row, and `tools.test.ts` adds on/off tests.\nRepository rules hold: Effect, Schema at boundaries, JSDoc, exact pin through the pin table: `pi-packages.json` has `\"@ff-labs/pi-fff\": \"0.11.0\"`, `deps:check` does not flag it, and the new exports have JSDoc.\nGates: mise run build leaves the tree unchanged and mise run verify exits 0 at e2cacd11: build 0 with clean status, verify 0 with 3028 pass and 0 fail. Logs are `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rbuild.log` and `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rverify.log`.\nfindings: no blockers. The six built-in findings are classified above, plus the optional note on fff-named tools reaching the root.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "No blockers; integration matches pi-fff 0.11.0; build clean, verify 3028 pass; root-exclusion names go to the final repair.",
+    "criteria": [
+      {
+        "criterion": "With fff on, Pi loads pi-fff in override mode and its tools replace find and grep for specialists, and the root keeps its own search; with fff off, Pi keeps its own tools",
+        "support": "pi-fff `src/index.ts` `OVERRIDE_TOOL_NAMES` and `src/config.ts` match `FFF_OVERRIDE_SETTINGS` and `FFF_OVERRIDE_TOOLS`. `tests/pi/tools.test.ts` and `tests/setup-pi-settings.test.ts` cover on and off. Residual caveats are in notes."
+      },
+      {
+        "criterion": "The integration matches what pi-fff 0.11.0 actually reads and registers",
+        "support": "`piDataDir()` is `PI_CODING_AGENT_DIR` or `~/.pi/agent`, equal to `piAgentDirectory`. Only the key `mode` is written, and the config rejects unknown keys. The `override` mode value matches the package. The file is read from the agent directory only."
+      },
+      {
+        "criterion": "Every instruction set's search guidance for Pi is consistent with the tools present",
+        "support": "rg over kimi-k3.1, gpt-6 and the generated agent files finds no remaining \"pi's grep\" wording."
+      },
+      {
+        "criterion": "Changed behavior has tests that fail without the change, and no test is weakened",
+        "support": "the removed test lines are count and height adjustments for the new capability row, and `tools.test.ts` adds on/off tests."
+      },
+      {
+        "criterion": "Repository rules hold: Effect, Schema at boundaries, JSDoc, exact pin through the pin table",
+        "support": "`pi-packages.json` has `\"@ff-labs/pi-fff\": \"0.11.0\"`, `deps:check` does not flag it, and the new exports have JSDoc."
+      },
+      {
+        "criterion": "Gates: mise run build leaves the tree unchanged and mise run verify exits 0 at e2cacd11",
+        "support": "build 0 with clean status, verify 0 with 3028 pass and 0 fail. Logs are `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rbuild.log` and `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rverify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers. The six built-in findings are classified above, plus the optional note on fff-named tools reaching the root."
+      }
+    ]
   },
   "createdAt": "2026-11-09T21:38:29.492Z"
 }
