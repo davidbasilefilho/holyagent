@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mw8tir3m-3cll",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Worker.implementation",
+  "slug": "add-recorded-style-fixtures-of-t3-code-s",
+  "objective": "Add recorded-style fixtures of T3 Code's pi --mode rpc traffic and a contract test that replays them, so CI shows that a specialist completion arriving after agent_settled starts a new root turn and that the extension's dialogs use only the RPC UI T3 renders.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3rpc, branch release/0.3.0/test/pi-t3-rpc-fixtures. Research to rely on (read both before starting): /home/user/holyagent/.git/holyagent/reports/assignment-0mw8td52p-27ab.md (Pi 1.5.0 extension API: ctx.mode, hasUI, RPC ui methods, session_tree, setActiveTools, trust, setModel) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tdgpq-hfsl.md (T3 Code pi driver: T3_PI_RUNTIME_MODE, T3_MCP_URL, the mcp__t3-code__ tool names and mcp__t3_code__ hidden aliases, which ui requests T3 renders, the bridge extension re-adding tools in reconcileDiscovery).",
+    "Existing contract harness: packages/integrations/pi/tests/contract.test.ts and packages/integrations/pi/tests/fixtures (record.ts and the jsonl fixtures, with docs/development.md describing them). Follow its format and its re-record note for deps:update.",
+    "Add fixtures (synthesized from Pi 1.5.0 src/modes/rpc types and T3's adapter as the research cites; mark them synthesized in the fixture header the way the existing ones are marked) for: a T3 RPC session start with T3_PI_RUNTIME_MODE set; extension_ui_request select, confirm, input, editor, notify and setStatus with their responses; and a background specialist completion that arrives after agent_settled and starts a new root turn (T3 Intent requirement 7, pi-subagents new-turn trigger).",
+    "The test replays them through the same harness against the pinned Pi host types, asserting the event shapes the integration consumes and that no extension_ui_request uses a method T3 ignores (setWidget, setTitle, set_editor_text) or custom."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path.",
+    "Keep fixtures small and readable; never start pi or T3."
+  ],
+  "criteria": [
+    {
+      "text": "The fixtures cover a T3 session start, the six T3-rendered UI requests with responses, and a completion after agent_settled starting a new root turn, each marked synthesized with its source",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The contract test replays them inside the existing bun test run and fails when a shape it consumes changes or a T3-ignored UI method appears",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The change stays inside the Assignment scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/tests/t3-rpc.test.ts",
+    "packages/integrations/pi/tests/fixtures/t3",
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T05:25:58.066Z"
+  },
+  "createdAt": "2026-11-09T05:25:58.066Z"
+}
