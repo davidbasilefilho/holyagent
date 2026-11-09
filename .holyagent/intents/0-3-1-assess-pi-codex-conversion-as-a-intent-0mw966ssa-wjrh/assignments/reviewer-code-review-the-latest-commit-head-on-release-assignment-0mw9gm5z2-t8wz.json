@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw9gm5z2-t8wz",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 18,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-latest-commit-head-on-release",
+  "objective": "Review the latest commit (HEAD) on release/0.3.1/chore/bump-version in /home/user/holyagent-0.3.1-bump: a shared Windows-aware timeout for tests that start the CLI, and a stall diagnostic in the pi project-flag test.",
+  "state": "Running",
+  "scope": [
+    "Run git -C /home/user/holyagent-0.3.1-bump show HEAD. Files: packages/runtime/tests/fixtures.ts (PROCESS_TIMEOUT_MS, 120 s on win32 and 30 s elsewhere), pipe.test.ts, version.test.ts, pi extension.test.ts, pi.test.ts, session-context.test.ts (CHILD_DEADLINE_MS and PIPE_GRACE_MS: kills a stalled child and fails with its arguments and partial output) and claude hooks.test.ts.",
+    "Purpose: the Windows runner intermittently stalls cold CLI starts; the maintainer asked to raise the timeout. Check that no assertion or test body weakened, that the diagnostic cannot fail a healthy run on Linux or macOS (13.5 s per child against a 30 s test) and kills its child cleanly, and that the bun fmt re-indentation hides no change."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 300 words; mark each finding blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "No assertion is weakened and the diagnostic cannot fail a healthy run",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The shared constant is used consistently by every changed test",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9ggcj5-tluh",
+    "assignment-0mw9g64x8-8aht"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T16:12:28.478Z"
+  },
+  "createdAt": "2026-11-09T16:12:28.478Z"
+}
