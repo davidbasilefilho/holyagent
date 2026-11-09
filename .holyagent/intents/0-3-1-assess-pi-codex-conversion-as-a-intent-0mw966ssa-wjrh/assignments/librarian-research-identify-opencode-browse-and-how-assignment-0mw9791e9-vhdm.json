@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw9791e9-vhdm",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 11,
+  "roleTask": "Librarian.research",
+  "slug": "identify-opencode-browse-and-how",
+  "objective": "Identify 'opencode browse' and how HolyAgent can integrate it into Pi beside computer use and T3's in-app browser, as one screen capability.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"it would need to cover computer use, browser use (via opencode browse, 0.3.1 should integrate it), and in-app browser\".",
+    "opencode browse: find it from authoritative sources (npm, GitHub, opencode docs at opencode.ai, sst/opencode or anomalyco/opencode repositories, pi.dev packages): what it is (an opencode tool, plugin or a standalone CLI or MCP server), how it drives a browser (Playwright, CDP, its own Chromium), what tools or commands it exposes (navigate, click, type, screenshot, read DOM or accessibility tree), install method, platforms, license, latest version and date, and whether it can run outside opencode (as a CLI, library or MCP server Pi could call, or an existing Pi package wrapping it).",
+    "Existing pieces to fit with: computer use is @amaster.ai/pi-computer-use 0.1.36 (pinned in packages/runtime/src/config/pi-packages.json of worktree /home/user/holyagent-0.3.0-t3branch; docs/pi/t3-code.md has a computer-use section); T3's in-app browser is exposed through the mcp__t3-code__* preview and HTML render tools HolyAgent keeps (packages/integrations/pi/src/t3.ts and packages/runtime/src/pi/tools.ts in /home/user/holyagent-0.3.0-t3host; report /home/user/holyagent/.git/holyagent/reports/assignment-0mw8tdgpq-hfsl.md). Say which of the three should serve which need (desktop apps, web pages in a real browser, the page the user sees in T3) and where they overlap.",
+    "Also note whether the pre-installed Chromium at /opt/pw-browsers/chromium in cloud sessions is usable by it."
+  ],
+  "constraints": [
+    "Read-only: change no files, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi, opencode or the tool, or make a live model request.",
+    "Separate sourced facts (URL or path:line, version, date fetched) from inference.",
+    "Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "opencode browse is identified with sources, its tools and how Pi could call it stated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "How it, pi-computer-use and the T3 in-app browser divide the work is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "opencode-browse",
+    "fit"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:50:19.473Z"
+  },
+  "createdAt": "2026-11-09T11:50:19.473Z"
+}
