@@ -15100,6 +15100,9 @@ var PROVIDERS, providerProfile = (config) => PROVIDERS[config.pi.provider], rout
   const { id } = providerProfile(config);
   const { model, thinking } = config.pi.routes[key];
   return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` };
+}, ROOT_MODEL_PAIR, rootModelSettings = (config) => {
+  const { provider, model, thinking } = routeModel(config, "root");
+  return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking };
 }, subagentModel = ({ provider, model }) => `${provider}/${model}`, WEB_KIT_TOOLS, webChoice = (profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" && profile.webTools.length > 0 ? { source: "provider", tools: profile.webTools } : { source: "pi-web-kit", tools: WEB_KIT_TOOLS };
 var init_provider = __esm(() => {
   init_pi_packages2();
@@ -15113,6 +15116,7 @@ var init_provider = __esm(() => {
       toolsFile: "~/.pi/providers/kimi-coding/config.json"
     }
   };
+  ROOT_MODEL_PAIR = ["defaultProvider", "defaultModel"];
   WEB_KIT_TOOLS = ["web_search", "web_fetch"];
 });
 
@@ -24793,11 +24797,13 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
     return project ? join17(cwd, ".pi", name) : join17(home, ".pi", name);
   }
   return project || !logical.startsWith("~/") ? undefined : join17(home, logical.slice(2));
-}, planFor = (env, cwd, scope, config) => {
+}, keyName = ({ path }) => path.join("."), inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf)), routeLeaves = (config) => leaves(rootModelSettings(config)), planFor = (env, cwd, scope, config) => {
   const byFile = new Map;
   for (const patch of toolSettings(config)) {
     byFile.set(patch.file, [...byFile.get(patch.file) ?? [], ...leaves(patch.content)]);
   }
+  const route = routeLeaves(config);
+  byFile.set(PI_SETTINGS_FILE, [...byFile.get(PI_SETTINGS_FILE) ?? [], ...route]);
   const targets = [];
   const unplaced = [];
   for (const [logical, all] of byFile) {
@@ -24810,13 +24816,14 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
       file,
       global: scope === "user" ? undefined : locate2(env, cwd, "user", logical),
       all,
+      route: logical === PI_SETTINGS_FILE ? route : [],
       defaults: PACKAGE_DEFAULTS.get(logical)
     });
   }
   return { targets, unplaced };
 }, resolveTarget, refuseLinks, planAt = (env, cwd, scope) => loadPiConfig(env, cwd, scope).pipe(map5((config) => config.pi.enable ? planFor(env, cwd, scope, config) : undefined), orElseSucceed2(() => {
   return;
-})), label = "tool settings", mergeTarget, installPiToolSettings, undoPiToolSettings, fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``, checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
+})), label = "tool settings", mergeTarget, installPiToolSettings, undoPiToolSettings, fixFor = (scope) => scope === "user" ? "run `holyagent setup`" : `run \`holyagent setup --scope ${scope}\``, routeLine, checkPiToolSettings = (env, cwd, scope) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [];
   const plan = yield* planAt(env, cwd, scope);
@@ -24827,9 +24834,11 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
     lines.push(...yield* gen2(function* () {
       yield* refuseLinks(cwd, scope, planned.file, "write");
       const target = yield* resolveTarget(planned);
-      const existing = yield* readJsonObject(target.file);
-      const missing = applyDefaults(existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
-      return missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)];
+      const missing = applyDefaults(target.existing, target.keys).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
+      return [
+        ...missing.length === 0 ? [] : [hint(`${label} ${target.file} lacks ${missing.join(", ")}; ${fixFor(scope)}`)],
+        ...yield* routeLine(planned, target.existing)
+      ];
     }).pipe(catchTag2("SetupFailure", (error) => succeed6([
       hint(`${label}: ${error.message}; fix the file, then ${fixFor(scope)}`)
     ]))));
@@ -24852,6 +24861,7 @@ var init_pi_settings = __esm(() => {
       PI_SETTINGS_FILE,
       {
         codemode: { mode: "on" },
+        defaultThinkingLevel: "medium",
         "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true }
       }
     ],
@@ -24869,14 +24879,20 @@ var init_pi_settings = __esm(() => {
   ];
   resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
     const global = target.global === undefined ? undefined : yield* readJsonObject(target.global);
-    const setGlobally = (key) => global !== undefined && applyDefaults(global, [key]).entries[0]?.status !== "added";
+    const existing = yield* readJsonObject(target.file);
+    const setIn = (content, key) => content !== undefined && applyDefaults(content, [key]).entries[0]?.status !== "added";
+    const setGlobally = (key) => setIn(global, key);
     const isDefault = ({ path, value }) => target.defaults !== undefined && equals(valueAt3(target.defaults, path), value);
-    const free = target.all.filter((key) => !setGlobally(key));
+    const pairHeld = target.all.some((key) => inPair(key) && (setIn(existing, key) || setGlobally(key)));
+    const leftWithPair = (key) => pairHeld && inPair(key) && !setIn(existing, key) && !setGlobally(key);
+    const free = target.all.filter((key) => !setGlobally(key) && !leftWithPair(key));
     return {
       file: target.file,
+      existing,
       keys: free.filter((key) => !isDefault(key)),
-      atDefault: free.filter(isDefault).map(({ path }) => path.join(".")),
-      atGlobal: target.all.filter(setGlobally).map(({ path }) => path.join("."))
+      atDefault: free.filter(isDefault).map(keyName),
+      atGlobal: target.all.filter(setGlobally).map(keyName),
+      atPair: target.all.filter(leftWithPair).map(keyName)
     };
   });
   refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
@@ -24897,8 +24913,7 @@ var init_pi_settings = __esm(() => {
     const { file } = planned;
     yield* refuseLinks(options.cwd, options.scope, file, "write");
     const target = yield* resolveTarget(planned);
-    const existing = yield* readJsonObject(file);
-    const { merged, entries } = applyDefaults(existing, target.keys);
+    const { merged, entries } = applyDefaults(target.existing, target.keys);
     const added = entries.filter((entry) => entry.status === "added");
     const kept = entries.filter((entry) => entry.status === "kept");
     const present = entries.filter((entry) => entry.status === "present");
@@ -24917,6 +24932,9 @@ var init_pi_settings = __esm(() => {
       ...present.length === 0 ? [] : [`already set: ${present.map((entry) => entry.path).join(", ")}`],
       ...kept.map((entry) => `kept ${entry.path} ${show(entry.value)} (HolyAgent sets ${show(entry.wanted)}; yours wins)`),
       ...target.atGlobal.length === 0 ? [] : [`left out, set in your global file: ${target.atGlobal.join(", ")}`],
+      ...target.atPair.length === 0 ? [] : [
+        `left out, the other of ${ROOT_MODEL_PAIR.join(" and ")} is yours: ${target.atPair.join(", ")}`
+      ],
       ...target.atDefault.length === 0 ? [] : [`left out, the package default: ${target.atDefault.join(", ")}`]
     ];
     const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
@@ -24947,7 +24965,15 @@ var init_pi_settings = __esm(() => {
         let result = yield* readJsonObject(file);
         const removed = [];
         const kept = [];
-        for (const { path, value } of recorded) {
+        const pairChanged = recorded.some((leaf) => inPair(leaf) && valueAt3(result, leaf.path) !== undefined && !equals(valueAt3(result, leaf.path), leaf.value));
+        for (const leaf of recorded) {
+          const { path, value } = leaf;
+          if (pairChanged && inPair(leaf)) {
+            const current = valueAt3(result, path);
+            if (current !== undefined)
+              kept.push(`${path.join(".")} ${show(current)} (setup wrote ${show(value)}${equals(current, value) ? "; kept with its changed pair" : ""})`);
+            continue;
+          }
           const [next, removal] = take(result, path, 0, value);
           result = next;
           if (removal.status === "removed")
@@ -24971,6 +24997,37 @@ var init_pi_settings = __esm(() => {
       }).pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))));
     }
     return lines;
+  });
+  routeLine = fn2("checkRootModel")(function* (planned, existing) {
+    if (planned.route.length === 0)
+      return [];
+    const global = planned.global === undefined ? undefined : yield* readJsonObject(planned.global);
+    const states = planned.route.map((leaf) => {
+      const { path, value } = leaf;
+      const current = valueAt3(existing, path) ?? valueAt3(global, path);
+      const atDefault = planned.defaults !== undefined && equals(valueAt3(planned.defaults, path), value);
+      return {
+        key: keyName(leaf),
+        pair: inPair(leaf),
+        wanted: value,
+        current,
+        status: current === undefined ? atDefault ? "set" : "unset" : equals(current, value) ? "set" : "overridden"
+      };
+    });
+    const pairHeld = states.some((state) => state.pair && state.current !== undefined);
+    const yours = states.filter((state) => state.status === "overridden").map((state) => `${state.key} ${show(state.current)} is yours (the route sets ${show(state.wanted)})`);
+    const alone = states.filter((state) => pairHeld && state.pair && state.status === "unset").map((state) => `${state.key} is unset, so Pi picks it (the route sets ${show(state.wanted)})`);
+    if (yours.length + alone.length > 0) {
+      return [
+        hint(`root model ${planned.file}: ${[...yours, ...alone].join(", ")}${yours.length > 0 ? "; Pi follows yours" : ""}`)
+      ];
+    }
+    if (states.some((state) => state.status === "unset"))
+      return [];
+    const [provider, model, thinking] = planned.route.map(({ value }) => String(value));
+    return [
+      pass("root model", `${provider}/${model}:${thinking} set in Pi's settings (${planned.file})`)
+    ];
   });
 });
 
