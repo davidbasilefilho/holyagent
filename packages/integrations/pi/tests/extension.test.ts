@@ -72,7 +72,11 @@ const RUNTIME = runtimeArgs(PACKAGE_ROOT)
 // A machine with Bun on its PATH, and a Windows one: the program the extension starts is the
 // full path it found, never a bare `bun`.
 const BUN = "/stub/bin/bun"
-const BUN_SEARCH: BunSearch = { env: { PATH: "/stub/bin" }, exists: (path) => path === BUN }
+const BUN_SEARCH: BunSearch = {
+  env: { PATH: "/stub/bin" },
+  exists: (path) => path === BUN,
+  executable: () => true,
+}
 const WINDOWS_BUN = "C:\\stub\\bin\\bun.exe"
 const WINDOWS_SEARCH: BunSearch = {
   env: { Path: "C:\\stub\\bin" },
@@ -1349,10 +1353,14 @@ describe("with the built package and a project that is not a git repository", ()
 })
 
 describe("finding Bun", () => {
-  /** A machine whose files are exactly `files`; `asked` records every path looked at. */
+  /**
+   * A machine whose files are exactly `files`, all executable but `plain`; `asked` records every
+   * path looked at.
+   */
   const machine = (
     env: Record<string, string | undefined>,
     files: ReadonlyArray<string>,
+    plain: ReadonlyArray<string> = [],
   ): BunSearch & { readonly asked: Array<string> } => {
     const asked: Array<string> = []
     return {
@@ -1362,6 +1370,7 @@ describe("finding Bun", () => {
         asked.push(path)
         return files.includes(path)
       },
+      executable: (path) => !plain.includes(path),
     }
   }
   const found = (lookup: ReturnType<typeof findBun>) => (lookup.found ? lookup.program : undefined)
@@ -1394,6 +1403,53 @@ describe("finding Bun", () => {
     const search = machine({ PATH: ":/a::", HOME: "/home/me" }, [])
     findBun("linux", { join }, search)
     expect(search.asked).toEqual(["/a/bun", "/home/me/.bun/bin/bun"])
+  })
+
+  test("a relative PATH entry is not searched: it would name a place under the working directory", () => {
+    const search = machine({ PATH: "bin:./node_modules/.bin:../x:/a", HOME: "/home/me" }, [
+      "bin/bun",
+      "node_modules/.bin/bun",
+      "../x/bun",
+      "/a/bun",
+    ])
+    expect(found(findBun("linux", { join }, search))).toBe("/a/bun")
+    expect(search.asked).toEqual(["/a/bun"])
+    const none = machine({ PATH: "bin:.", HOME: "/home/me" }, ["bin/bun", "bun"])
+    expect(found(findBun("linux", { join }, none))).toBeUndefined()
+    expect(none.asked).toEqual(["/home/me/.bun/bin/bun"])
+    const windows = machine(
+      { Path: 'bin;.\\x;C:bun;\\rooted;"rel";C:\\ok;\\\\srv\\share;D:/fwd' },
+      ["bin\\bun.exe", "x\\bun.exe", "C:bun\\bun.exe", "C:\\ok\\bun.exe"],
+    )
+    expect(found(findBun("win32", win32, windows))).toBe("C:\\ok\\bun.exe")
+    expect(windows.asked).toEqual(["C:\\ok\\bun.exe"])
+  })
+
+  test("on POSIX a file without an executable bit is skipped, wherever it is found", () => {
+    const search = machine(posix, ["/a/bun", "/b/bun", "/opt/bun/bin/bun"], ["/a/bun"])
+    expect(found(findBun("linux", { join }, search))).toBe("/b/bun")
+    const onlyPlain = machine(
+      posix,
+      ["/a/bun", "/opt/bun/bin/bun", "/home/me/.bun/bin/bun"],
+      ["/a/bun", "/opt/bun/bin/bun"],
+    )
+    expect(found(findBun("linux", { join }, onlyPlain))).toBe("/home/me/.bun/bin/bun")
+    const nothing = machine(posix, ["/a/bun"], ["/a/bun"])
+    expect(found(findBun("linux", { join }, nothing))).toBeUndefined()
+    // Windows has no executable bit to ask for.
+    const windows = machine({ Path: "C:\\a" }, ["C:\\a\\bun.exe"], ["C:\\a\\bun.exe"])
+    expect(found(findBun("win32", win32, windows))).toBe("C:\\a\\bun.exe")
+  })
+
+  test("a program the caller refuses is passed over, and a miss names why", () => {
+    const refusal = (program: string) => (program.includes("bad") ? `no ${program}` : undefined)
+    const search = machine({ PATH: "/bad:/good", HOME: "/home/me" }, ["/bad/bun", "/good/bun"])
+    expect(found(findBun("linux", { join }, search, refusal))).toBe("/good/bun")
+    const none = machine({ PATH: "/bad", HOME: "/home/me" }, ["/bad/bun"])
+    const lookup = findBun("linux", { join }, none, refusal)
+    expect(lookup.found ? "" : lookup.looked).toBe(
+      "Bun was found but cannot be started: /bad/bun: no /bad/bun",
+    )
   })
 
   test("nothing found says where Bun was looked for", () => {
@@ -1525,6 +1581,105 @@ describe("finding Bun", () => {
     })
     expect(api.calls.some((call) => call.command === "cmd.exe")).toBe(false)
     expect(delivered?.message?.content ?? "").toContain("as an operator")
+  })
+
+  test("a bun.cmd cmd.exe cannot start is passed over for the next Bun", async () => {
+    const WIN = { packageRoot: "C:\\pkg", platformPath: win32, platform: "win32" } as const
+    // The shim of a folder with an operator and no space comes first; the next one is safe.
+    const second = await run(healthy("/missing"), {
+      ...WIN,
+      bunSearch: machine({ Path: "C:\\a&b;C:\\npm" }, ["C:\\a&b\\bun.cmd", "C:\\npm\\bun.cmd"]),
+    })
+    const started = second.api.calls.filter((call) => call.args.includes("C:\\npm\\bun.cmd"))
+    expect(started.length).toBeGreaterThan(0)
+    expect(second.api.calls.some((call) => call.args.includes("C:\\a&b\\bun.cmd"))).toBe(false)
+    // So is the one on PATH for the bun.exe of the install folder, which no quoting concerns.
+    const installed = await run(healthy("/missing"), {
+      ...WIN,
+      bunSearch: machine({ Path: "C:\\a&b", USERPROFILE: "C:\\Users\\me" }, [
+        "C:\\a&b\\bun.cmd",
+        "C:\\Users\\me\\.bun\\bin\\bun.exe",
+      ]),
+    })
+    expect(
+      installed.api.calls.some((call) => call.command === "C:\\Users\\me\\.bun\\bin\\bun.exe"),
+    ).toBe(true)
+    expect(
+      installed.api.calls.some(
+        (call) => call.command === "cmd.exe" && call.args[4]?.includes("bun"),
+      ),
+    ).toBe(false)
+    // A shim that cmd.exe can start only for some projects is passed over for those alone.
+    const project = "D:\\50%"
+    const mixed = await run(healthy(project), {
+      ...WIN,
+      cwd: project,
+      bunSearch: machine({ Path: "C:\\npm", USERPROFILE: "C:\\Users\\me" }, [
+        "C:\\npm\\bun.cmd",
+        "C:\\Users\\me\\.bun\\bin\\bun.exe",
+      ]),
+    })
+    expect(
+      mixed.api.calls.some((call) => call.command === "C:\\Users\\me\\.bun\\bin\\bun.exe"),
+    ).toBe(true)
+  })
+
+  test("when no Bun can be started the failure names the reason of each", async () => {
+    const { api, delivered } = await run(healthy("/missing"), {
+      packageRoot: "C:\\pkg",
+      platformPath: win32,
+      platform: "win32",
+      bunSearch: machine({ Path: "C:\\a&b;C:\\c|d" }, ["C:\\a&b\\bun.cmd", "C:\\c|d\\bun.cmd"]),
+    })
+    expect(api.calls.some((call) => call.args.includes(RUNTIME[2] ?? ""))).toBe(false)
+    const text = delivered?.message?.content ?? ""
+    for (const part of [
+      "cannot be started",
+      "C:\\a&b\\bun.cmd",
+      "C:\\c|d\\bun.cmd",
+      "as an operator",
+    ])
+      expect(text).toContain(part)
+    expect(text).not.toContain("not found")
+  })
+
+  test("a cached Bun that is gone is looked up again, once", async () => {
+    const files = ["/usr/bin/bun"]
+    const inner = healthy("/missing")
+    const responder: Responder = (call) =>
+      call.command.endsWith("/bun")
+        ? files.includes(call.command)
+          ? inner({ ...call, command: BUN }, call.args.slice(RUNTIME.length + 2))
+          : { code: 1, stderr: `spawn ${call.command} ENOENT` }
+        : inner(call, [])
+    const search = machine({ PATH: "/usr/bin", BUN_INSTALL: "/opt/bun" }, files)
+    const lookups = () => search.asked.filter((path) => path === "/usr/bin/bun").length
+    let before = 0
+    const { api, delivered } = await run(responder, {
+      bunSearch: { ...search, exists: (path) => search.exists?.(path) ?? false },
+      afterwards: async (api) => {
+        expect(api.calls.some((call) => call.command === "/usr/bin/bun")).toBe(true)
+        before = api.calls.length
+        // Bun moves from PATH to $BUN_INSTALL while the session runs.
+        files.splice(0, files.length, "/opt/bun/bin/bun")
+        await api.emit("session_start", { reason: "reload" })
+      },
+    })
+    const after = api.calls.slice(before)
+    expect(after.some((call) => call.command === "/opt/bun/bin/bun")).toBe(true)
+    // Each command that failed to start on the old path ran again on the new one, and none twice.
+    const gone = after.filter((call) => call.command === "/usr/bin/bun")
+    expect(gone.length).toBeGreaterThan(0)
+    expect(new Set(gone.map((call) => call.args.join(" "))).size).toBe(gone.length)
+    for (const call of gone)
+      expect(
+        after.some(
+          (other) =>
+            other.command === "/opt/bun/bin/bun" && other.args.join(" ") === call.args.join(" "),
+        ),
+      ).toBe(true)
+    expect(delivered?.message?.customType).not.toBe(NOTICE_MESSAGE)
+    expect(lookups()).toBeGreaterThan(1)
   })
 
   test("with no Bun the command fails with where it looked, and nothing is started", async () => {

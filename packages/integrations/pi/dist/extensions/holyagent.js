@@ -2906,6 +2906,7 @@ var result = (self) => matchEager(self, {
   onFailure: fail2,
   onSuccess: succeed2
 });
+var matchCauseEffect = /* @__PURE__ */ dual(2, (self, options) => new OnSuccessAndFailureImpl(self, options.onSuccess.length !== 1 ? (a) => options.onSuccess(a) : options.onSuccess, options.onFailure.length !== 1 ? (cause) => options.onFailure(cause) : options.onFailure));
 var OnSuccessAndFailureProto = /* @__PURE__ */ makePrimitiveProto({
   op: "OnSuccessAndFailure",
   [evaluate]: evaluateCont
@@ -2941,6 +2942,13 @@ var MatchImpl = /* @__PURE__ */ makeMatch("Match", function(cause, fiber) {
   const handlers = this.payload;
   return fiber.succeedWith(continuationMarksStack ? handlers.onFailure(error.success) : internalCall(() => handlers.onFailure(error.success)));
 });
+var matchEffect = /* @__PURE__ */ dual(2, (self, options) => matchCauseEffect(self, {
+  onFailure: (cause) => {
+    const error = findRecoverableError(cause);
+    return isFailure2(error) ? failCause(error.failure) : options.onFailure(error.success);
+  },
+  onSuccess: options.onSuccess
+}));
 var match3 = /* @__PURE__ */ dual(2, (self, options) => new MatchImpl(self, options));
 var matchEager = /* @__PURE__ */ dual(2, (self, options) => {
   if (effectIsExit(self)) {
@@ -3512,6 +3520,7 @@ var mapError2 = mapError;
 var orDie2 = orDie;
 var orElseSucceed2 = orElseSucceed;
 var timeoutOrElse2 = timeoutOrElse;
+var matchEffect2 = matchEffect;
 var acquireUseRelease2 = acquireUseRelease;
 var forkChild2 = forkChild;
 var runPromise2 = runPromise;
@@ -16513,7 +16522,11 @@ var refuseExcludedTool = (event, excluded) => excluded.some((pattern) => toolMat
   reason: `The root may not use ${event.toolName}. Delegate the work to a specialist that has it.`
 } : undefined;
 var isFile = (path) => runSync2(try_2(() => statSync(path, { throwIfNoEntry: false })?.isFile() === true).pipe(orElseSucceed2(() => false)));
-var findBun = (platform, platformPath, { env = process.env, exists = isFile } = {}) => {
+var hasExecutableBit = (path) => runSync2(try_2(() => ((statSync(path, { throwIfNoEntry: false })?.mode ?? 0) & 73) !== 0).pipe(orElseSucceed2(() => false)));
+var ABSOLUTE_FOLDER = { posix: /^\//, win32: /^(?:[a-zA-Z]:[\\/]|[\\/]{2})/ };
+var findBun = (platform, platformPath, { env = process.env, exists = isFile, executable = hasExecutableBit } = {}, refusal = () => {
+  return;
+}) => {
   const windows = platform === "win32";
   const value = (name) => {
     const key = Object.keys(env).find((entry) => windows ? entry.toUpperCase() === name : entry === name);
@@ -16528,15 +16541,23 @@ var findBun = (platform, platformPath, { env = process.env, exists = isFile } = 
       ...home === undefined ? [] : [platformPath.join(home, ".bun")]
     ].flatMap((install) => install === undefined ? [] : [platformPath.join(install, "bin")]))
   ];
-  const onPath = (value("PATH") ?? "").split(windows ? ";" : ":").map((folder) => windows ? folder.replace(/^"(.*)"$/, "$1") : folder).filter((folder) => folder !== "");
+  const onPath = (value("PATH") ?? "").split(windows ? ";" : ":").map((folder) => windows ? folder.replace(/^"(.*)"$/, "$1") : folder).filter((folder) => ABSOLUTE_FOLDER[windows ? "win32" : "posix"].test(folder));
   const candidates = [
     ...onPath.flatMap((folder) => names.map((name) => platformPath.join(folder, name))),
     ...installs.map((folder) => platformPath.join(folder, names[0] ?? "bun"))
   ];
-  const program = candidates.find((candidate) => exists(candidate));
+  const refused = [];
+  const program = candidates.find((candidate) => {
+    if (!exists(candidate) || !windows && !executable(candidate))
+      return false;
+    const reason = refusal(candidate);
+    if (reason !== undefined)
+      refused.push(`${candidate}: ${reason}`);
+    return reason === undefined;
+  });
   return program !== undefined ? { found: true, program } : {
     found: false,
-    looked: `Bun was not found on PATH or in ${installs.length === 0 ? "BUN_INSTALL/bin or ~/.bun/bin (neither BUN_INSTALL nor the home folder is set)" : installs.join(" or ")}; install it from https://bun.sh`
+    looked: refused.length > 0 ? `Bun was found but cannot be started: ${refused.join("; ")}` : `Bun was not found on PATH or in ${installs.length === 0 ? "BUN_INSTALL/bin or ~/.bun/bin (neither BUN_INSTALL nor the home folder is set)" : installs.join(" or ")}; install it from https://bun.sh`
   };
 };
 var runtimeArgs = (packageRoot, platformPath = nodePath) => [
@@ -16604,11 +16625,12 @@ var createExtension = ({
   const isChild = () => childAgent(pi.getSessionName()) !== undefined;
   let held;
   const running = new Set;
+  const isShim = (command) => windows && (command === "pi" || /\.cmd$/i.test(command));
+  const launchOf = (command, args) => isShim(command) ? cmdExeArguments(command, args) : { ok: true, args };
   const exec = (signal, command, args) => {
     const failed = (reason) => new CommandFailed({ command: args.join(" "), reason });
-    const shimmed = windows && (command === "pi" || /\.cmd$/i.test(command));
-    const launch = shimmed ? cmdExeArguments(command, args) : { ok: true, args };
-    const program = shimmed ? "cmd.exe" : command;
+    const launch = launchOf(command, args);
+    const program = isShim(command) ? "cmd.exe" : command;
     return !launch.ok ? fail5(failed(launch.reason)) : signal.aborted ? fail5(failed("it was stopped")) : acquireUseRelease2(try_2({
       try: () => {
         const stop = new AbortController;
@@ -16634,15 +16656,31 @@ var createExtension = ({
       return exited(settled, graceMs);
     });
   };
-  const holyagent = (signal, project, ...args) => suspend2(() => {
-    if (bun === undefined) {
-      const lookup = findBun(platform, platformPath, bunSearch);
-      if (!lookup.found)
-        return fail5(new CommandFailed({ command: args.join(" "), reason: lookup.looked }));
-      bun = lookup.program;
-    }
-    return exec(signal, bun, [...bundled, PI_PROJECT_FLAG, project, ...args]);
-  }).pipe(flatMap2((result) => result.code === 0 && !result.killed ? succeed5(result.stdout) : fail5(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) }))));
+  const holyagent = (signal, project, ...args) => {
+    const argv = [...bundled, PI_PROJECT_FLAG, project, ...args];
+    const attempt = (looked) => suspend2(() => {
+      if (bun === undefined || !launchOf(bun, argv).ok) {
+        const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
+          const launch = launchOf(candidate, argv);
+          return launch.ok ? undefined : launch.reason;
+        });
+        if (!lookup.found)
+          return fail5(new CommandFailed({ command: args.join(" "), reason: lookup.looked }));
+        bun = lookup.program;
+      }
+      const program = bun;
+      const gone = () => !looked && !signal.aborted && !(bunSearch.exists ?? isFile)(program);
+      const again = suspend2(() => {
+        bun = undefined;
+        return attempt(true);
+      });
+      return exec(signal, program, argv).pipe(matchEffect2({
+        onFailure: (error) => gone() ? again : fail5(error),
+        onSuccess: (result) => (result.code !== 0 || result.killed) && gone() ? again : succeed5(result)
+      }));
+    });
+    return attempt(false).pipe(flatMap2((result) => result.code === 0 && !result.killed ? succeed5(result.stdout) : fail5(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) }))));
+  };
   const topOf = (signal, project) => exec(signal, "git", ["-C", project, "rev-parse", "--show-toplevel"]).pipe(flatMap2((result) => {
     const top = result.stdout.trim();
     if (result.code === 0 && !result.killed && top !== "")

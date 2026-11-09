@@ -560,12 +560,17 @@ export interface ExtensionOptions {
   readonly bunSearch?: BunSearch
 }
 
-/** What the lookup of Bun reads: an environment and a test for a file's existence. */
+/** What the lookup of Bun reads: an environment and tests for a file's existence and mode. */
 export interface BunSearch {
   /** The environment with `PATH`, `BUN_INSTALL` and the home folder; the process's by default. */
   readonly env?: Readonly<Record<string, string | undefined>>
   /** Whether a regular file exists at the path; the file system's answer by default. */
   readonly exists?: (path: string) => boolean
+  /**
+   * Whether the file at the path has an executable bit; the file system's answer by default. Asked
+   * of POSIX candidates only, since Windows has no such bit.
+   */
+  readonly executable?: (path: string) => boolean
 }
 
 /** The result of looking for Bun: the program to start, or where it was looked for. */
@@ -580,18 +585,34 @@ const isFile = (path: string): boolean =>
     ),
   )
 
+const hasExecutableBit = (path: string): boolean =>
+  Effect.runSync(
+    Effect.try(() => ((statSync(path, { throwIfNoEntry: false })?.mode ?? 0) & 0o111) !== 0).pipe(
+      Effect.orElseSucceed(() => false),
+    ),
+  )
+
+// A folder a shell would search from anywhere: a rooted POSIX path, or a Windows drive or UNC path.
+// A relative one (`bin`, `./node_modules/.bin`) names a place under the working directory, which is
+// not where the program starts.
+const ABSOLUTE_FOLDER = { posix: /^\//, win32: /^(?:[a-zA-Z]:[\\/]|[\\/]{2})/ }
+
 /**
  * Finds Bun in the order the `scripts/holyagent` wrapper does: on `PATH`, then `$BUN_INSTALL/bin`,
  * then `~/.bun/bin` (the home folder is `USERPROFILE` on Windows, else `HOME`). On Windows Bun is
  * `bun.exe`, and on `PATH` a `bun.cmd` shim (an npm global install) counts too, after the `bun.exe`
- * of the same folder. An empty variable counts as unset, and an empty `PATH` entry is skipped,
- * since it would name the working directory. The program is a full path, so no lookup in the
- * working directory can pick a planted `bun`. A miss says where Bun was looked for.
+ * of the same folder. An empty variable counts as unset, and a relative `PATH` entry (an empty one
+ * included) is skipped, since it would name a place under the working directory, which is not where
+ * Bun starts. On POSIX a file without an executable bit is skipped, as `command -v` does. `refusal`
+ * names why a program that exists cannot be started; such a program is passed over for the next
+ * one, and a miss then says why. The program is a full path, so no lookup in the working directory
+ * can pick a planted `bun`. A miss says where Bun was looked for.
  */
 export const findBun = (
   platform: NodeJS.Platform,
   platformPath: Pick<typeof nodePath, "join">,
-  { env = process.env, exists = isFile }: BunSearch = {},
+  { env = process.env, exists = isFile, executable = hasExecutableBit }: BunSearch = {},
+  refusal: (program: string) => string | undefined = () => undefined,
 ): BunLookup => {
   const windows = platform === "win32"
   const value = (name: string): string | undefined => {
@@ -614,17 +635,26 @@ export const findBun = (
   const onPath = (value("PATH") ?? "")
     .split(windows ? ";" : ":")
     .map((folder) => (windows ? folder.replace(/^"(.*)"$/, "$1") : folder))
-    .filter((folder) => folder !== "")
+    .filter((folder) => ABSOLUTE_FOLDER[windows ? "win32" : "posix"].test(folder))
   const candidates = [
     ...onPath.flatMap((folder) => names.map((name) => platformPath.join(folder, name))),
     ...installs.map((folder) => platformPath.join(folder, names[0] ?? "bun")),
   ]
-  const program = candidates.find((candidate) => exists(candidate))
+  const refused: Array<string> = []
+  const program = candidates.find((candidate) => {
+    if (!exists(candidate) || (!windows && !executable(candidate))) return false
+    const reason = refusal(candidate)
+    if (reason !== undefined) refused.push(`${candidate}: ${reason}`)
+    return reason === undefined
+  })
   return program !== undefined
     ? { found: true, program }
     : {
         found: false,
-        looked: `Bun was not found on PATH or in ${installs.length === 0 ? "BUN_INSTALL/bin or ~/.bun/bin (neither BUN_INSTALL nor the home folder is set)" : installs.join(" or ")}; install it from https://bun.sh`,
+        looked:
+          refused.length > 0
+            ? `Bun was found but cannot be started: ${refused.join("; ")}`
+            : `Bun was not found on PATH or in ${installs.length === 0 ? "BUN_INSTALL/bin or ~/.bun/bin (neither BUN_INSTALL nor the home folder is set)" : installs.join(" or ")}; install it from https://bun.sh`,
       }
 }
 
@@ -754,7 +784,8 @@ export const createExtension =
     const bundled = runtimeArgs(packageRoot, platformPath)
     const windows = platform === "win32"
     // Bun is looked up when first needed, since the extension may load before an install finishes;
-    // a miss is looked up again, a hit is kept.
+    // a miss is looked up again, a hit is kept until it is gone or cmd.exe cannot start it with a
+    // command's arguments.
     let bun: string | undefined
     // The text the model reads names the package folder with `/` only, for the same reason.
     const root = toPosix(packageRoot, platformPath.sep)
@@ -773,12 +804,14 @@ export const createExtension =
     // for a process that does not exit, so no process outlives the gather. On Windows a process still
     // running holds its working directory, here the project's. A start that throws is a failed
     // command too.
+    // On Windows `pi` and an npm-installed `bun.cmd` are `.cmd` shims, which only a shell starts.
+    const isShim = (command: string) => windows && (command === "pi" || /\.cmd$/i.test(command))
+    const launchOf = (command: string, args: ReadonlyArray<string>): CmdLaunch =>
+      isShim(command) ? cmdExeArguments(command, args) : { ok: true, args }
     const exec = (signal: AbortSignal, command: string, args: ReadonlyArray<string>) => {
       const failed = (reason: string) => new CommandFailed({ command: args.join(" "), reason })
-      // On Windows `pi` and an npm-installed `bun.cmd` are `.cmd` shims, which only a shell starts.
-      const shimmed = windows && (command === "pi" || /\.cmd$/i.test(command))
-      const launch: CmdLaunch = shimmed ? cmdExeArguments(command, args) : { ok: true, args }
-      const program = shimmed ? "cmd.exe" : command
+      const launch = launchOf(command, args)
+      const program = isShim(command) ? "cmd.exe" : command
       type Answer = Effect.Effect<ExecResult, CommandFailed>
       return !launch.ok
         ? Effect.fail(failed(launch.reason))
@@ -820,25 +853,46 @@ export const createExtension =
     }
 
     // Bun runs the package's bundled runtime, which enters the project first; its stdout is the
-    // command's output.
-    const holyagent = (signal: AbortSignal, project: string, ...args: ReadonlyArray<string>) =>
-      Effect.suspend(() => {
-        if (bun === undefined) {
-          const lookup = findBun(platform, platformPath, bunSearch)
-          if (!lookup.found)
-            return Effect.fail(
-              new CommandFailed({ command: args.join(" "), reason: lookup.looked }),
-            )
-          bun = lookup.program
-        }
-        return exec(signal, bun, [...bundled, PI_PROJECT_FLAG, project, ...args])
-      }).pipe(
+    // command's output. A Bun that cmd.exe cannot start with these arguments (a shim, and a project
+    // path with a character no quoting protects) is passed over for the next one. A Bun that is gone
+    // when its start fails was found once and moved or removed since: it is looked up again, once.
+    const holyagent = (signal: AbortSignal, project: string, ...args: ReadonlyArray<string>) => {
+      const argv = [...bundled, PI_PROJECT_FLAG, project, ...args]
+      const attempt = (looked: boolean): Effect.Effect<ExecResult, CommandFailed> =>
+        Effect.suspend(() => {
+          if (bun === undefined || !launchOf(bun, argv).ok) {
+            const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
+              const launch = launchOf(candidate, argv)
+              return launch.ok ? undefined : launch.reason
+            })
+            if (!lookup.found)
+              return Effect.fail(
+                new CommandFailed({ command: args.join(" "), reason: lookup.looked }),
+              )
+            bun = lookup.program
+          }
+          const program = bun
+          const gone = () => !looked && !signal.aborted && !(bunSearch.exists ?? isFile)(program)
+          const again = Effect.suspend(() => {
+            bun = undefined
+            return attempt(true)
+          })
+          return exec(signal, program, argv).pipe(
+            Effect.matchEffect({
+              onFailure: (error) => (gone() ? again : Effect.fail(error)),
+              onSuccess: (result) =>
+                (result.code !== 0 || result.killed) && gone() ? again : Effect.succeed(result),
+            }),
+          )
+        })
+      return attempt(false).pipe(
         Effect.flatMap((result) =>
           result.code === 0 && !result.killed
             ? Effect.succeed(result.stdout)
             : Effect.fail(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) })),
         ),
       )
+    }
 
     // The top of the work tree holds the project's config; outside git the project folder does, and
     // so does its state. Only git's own answer that the folder is not in a repository means "not
