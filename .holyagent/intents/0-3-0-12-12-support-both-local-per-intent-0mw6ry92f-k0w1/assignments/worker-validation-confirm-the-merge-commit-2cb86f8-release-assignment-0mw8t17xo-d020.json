@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw8t17xo-d020",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "confirm-the-merge-commit-2cb86f8-release",
+  "objective": "Confirm the merge commit 2cb86f8 (release/0.3.0/fix/pi-windows-launch into release/0.3.0/feat/installed-scope-default) builds clean and passes the gates.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-scope at 2cb86f8. The merge brings in the two Pi test files from 6c86fe3."
+  ],
+  "constraints": [
+    "Run bun install --frozen-lockfile first, because node_modules is not shared between worktrees.",
+    "Run bunx --no-install mise run build, then git status --porcelain: any changed path means the merged dist is stale; report the paths and do not revert or commit them.",
+    "Run bunx --no-install mise run verify and give the exit code and test counts.",
+    "Make no git writes and no source edits.",
+    "Report in under 150 words; put long logs in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give the path."
+  ],
+  "criteria": [
+    {
+      "text": "mise run build leaves git status clean at 2cb86f8",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "mise run verify exits 0 at 2cb86f8",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:12:20.076Z"
+  },
+  "createdAt": "2026-11-09T05:12:20.076Z"
+}
