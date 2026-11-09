@@ -89,6 +89,7 @@ var dual = function(arity, body) {
 var identity = (a) => a;
 var constant = (value) => () => value;
 var constTrue = /* @__PURE__ */ constant(true);
+var constFalse = /* @__PURE__ */ constant(false);
 var constUndefined = /* @__PURE__ */ constant(undefined);
 var constVoid = constUndefined;
 function memoize(f) {
@@ -697,6 +698,20 @@ var toJson = (input) => {
     return "[toJSON threw]";
   }
 };
+var toStringUnknown = (u, whitespace = 2) => {
+  if (typeof u === "string") {
+    return u;
+  }
+  try {
+    return typeof u === "object" ? formatJson(u, {
+      space: whitespace
+    }) : format(u, {
+      space: whitespace
+    });
+  } catch {
+    return String(u);
+  }
+};
 var BaseProto = {
   toJSON() {
     return toJson(this);
@@ -989,6 +1004,7 @@ var causeAddInterrupts = (self, interrupts) => {
   }
   return reasons.length === self.reasons.length ? self : new CauseImpl(reasons);
 };
+var causeEmpty = /* @__PURE__ */ new CauseImpl([]);
 var causeFail = (error) => new CauseImpl([new Fail(error)]);
 
 class Die extends ReasonBase {
@@ -1334,6 +1350,7 @@ var Number2 = /* @__PURE__ */ make((self, that) => {
     return 1;
   return self < that ? -1 : 1;
 });
+var mapInput = /* @__PURE__ */ dual(2, (self, f) => make((b1, b2) => self(f(b1), f(b2))));
 var isLessThan = (O) => dual(2, (self, that) => O(self, that) === -1);
 var isGreaterThan = (O) => dual(2, (self, that) => O(self, that) === 1);
 var isLessThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== 1);
@@ -2005,6 +2022,9 @@ var TracerEnabled = /* @__PURE__ */ Reference("effect/References/TracerEnabled",
   fiberCached: true,
   defaultValue: constTrue
 });
+var CurrentLogAnnotations = /* @__PURE__ */ Reference("effect/References/CurrentLogAnnotations", {
+  defaultValue: () => ({})
+});
 var CurrentLogLevel = /* @__PURE__ */ Reference("effect/References/CurrentLogLevel", {
   fiberCached: true,
   defaultValue: () => "Info"
@@ -2012,6 +2032,12 @@ var CurrentLogLevel = /* @__PURE__ */ Reference("effect/References/CurrentLogLev
 var MinimumLogLevel = /* @__PURE__ */ Reference("effect/References/MinimumLogLevel", {
   fiberCached: true,
   defaultValue: () => "Info"
+});
+var UnhandledLogLevel = /* @__PURE__ */ Reference("effect/References/UnhandledLogLevel", {
+  defaultValue: () => "Error"
+});
+var CurrentLogSpans = /* @__PURE__ */ Reference("effect/References/CurrentLogSpans", {
+  defaultValue: () => []
 });
 
 class Interrupt extends ReasonBase {
@@ -2902,6 +2928,26 @@ var catchIf = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate
 var mapError = /* @__PURE__ */ dual(2, (self, f) => catchCause(self, (cause) => failCause(causeMap(cause, f))));
 var orDie = (self) => catch_(self, die);
 var orElseSucceed = /* @__PURE__ */ dual(2, (self, f) => catch_(self, (error) => sync(() => f(error))));
+var ignoreCauseLogger = (log) => log === "Unhandled" ? (...message) => withFiber((fiber) => {
+  const level = fiber.getRef(UnhandledLogLevel);
+  return level === undefined ? void_ : logWithLevel(level)(...message);
+}) : logWithLevel(log === true ? undefined : log);
+var ignore = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => {
+  if (!options?.log) {
+    return matchEffect(self, {
+      onFailure: (_) => void_,
+      onSuccess: (_) => void_
+    });
+  }
+  const logEffect = ignoreCauseLogger(options.log);
+  return matchCauseEffect(self, {
+    onFailure(cause) {
+      const error = findRecoverableError(cause);
+      return isFailure2(error) ? failCause(error.failure) : options.message === undefined ? logEffect(cause) : logEffect(options.message, cause);
+    },
+    onSuccess: (_) => void_
+  });
+});
 var result = (self) => matchEager(self, {
   onFailure: fail2,
   onSuccess: succeed2
@@ -3445,6 +3491,37 @@ class UnknownError extends (/* @__PURE__ */ TaggedError("UnknownError")) {
     });
   }
 }
+var ConsoleRef = /* @__PURE__ */ Reference("effect/Console", {
+  defaultValue: () => globalThis.console
+});
+var logLevelToOrder = (level) => {
+  switch (level) {
+    case "All":
+      return Number.MIN_SAFE_INTEGER;
+    case "Fatal":
+      return 50000;
+    case "Error":
+      return 40000;
+    case "Warn":
+      return 30000;
+    case "Info":
+      return 20000;
+    case "Debug":
+      return 1e4;
+    case "Trace":
+      return 0;
+    case "None":
+      return Number.MAX_SAFE_INTEGER;
+  }
+};
+var LogLevelOrder = /* @__PURE__ */ mapInput(Number2, logLevelToOrder);
+var isLogLevelGreaterThan = /* @__PURE__ */ isGreaterThan(LogLevelOrder);
+var CurrentLoggers = /* @__PURE__ */ Reference("effect/Logger/CurrentLoggers", {
+  defaultValue: () => new Set([defaultLogger, tracerLogger])
+});
+var LogToStderr = /* @__PURE__ */ Reference("effect/Logger/LogToStderr", {
+  defaultValue: constFalse
+});
 var LoggerTypeId = "~effect/Logger";
 var LoggerProto = {
   [LoggerTypeId]: {
@@ -3454,6 +3531,55 @@ var LoggerProto = {
   pipe() {
     return pipeArguments(this, arguments);
   }
+};
+var loggerMake = (log) => {
+  const self = Object.create(LoggerProto);
+  self.log = log;
+  return self;
+};
+var formatLabel = (key) => key.replace(/[\s="]/g, "_");
+var formatLogSpan = (self, now) => {
+  const label = formatLabel(self[0]);
+  return `${label}=${now - self[1]}ms`;
+};
+var logWithLevel = (level) => (...message) => {
+  let cause = undefined;
+  for (let i = 0, len = message.length;i < len; i++) {
+    const msg = message[i];
+    if (isCause(msg)) {
+      if (cause) {
+        message.splice(i, 1);
+      } else {
+        message = message.slice(0, i).concat(message.slice(i + 1));
+      }
+      cause = cause ? causeFromReasons(cause.reasons.concat(msg.reasons)) : msg;
+      i--;
+    }
+  }
+  if (cause === undefined) {
+    cause = causeEmpty;
+  }
+  return withFiber((fiber) => {
+    const logLevel = level ?? fiber.cache.logLevel;
+    if (isLogLevelGreaterThan(fiber.cache.minimumLogLevel, logLevel)) {
+      return void_;
+    }
+    const clock = fiber.getRef(ClockRef);
+    const loggers = fiber.getRef(CurrentLoggers);
+    if (loggers.size > 0) {
+      const date = new Date(clock.currentTimeMillisUnsafe());
+      for (const logger of loggers) {
+        logger.log({
+          cause,
+          fiber,
+          date,
+          logLevel,
+          message
+        });
+      }
+    }
+    return void_;
+  });
 };
 var colors = {
   bold: "1",
@@ -3477,6 +3603,54 @@ var logLevelColors = {
   Error: [colors.red],
   Fatal: [colors.bgBrightRed, colors.black]
 };
+var defaultDateFormat = (date) => `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}.${date.getMilliseconds().toString().padStart(3, "0")}`;
+var defaultLogger = /* @__PURE__ */ loggerMake(({
+  cause,
+  date,
+  fiber,
+  logLevel,
+  message
+}) => {
+  const message_ = Array.isArray(message) ? message.slice() : [message];
+  if (cause.reasons.length > 0) {
+    message_.push(causePretty(cause));
+  }
+  const now = date.getTime();
+  const spans = fiber.getRef(CurrentLogSpans);
+  let spanString = "";
+  for (const span of spans) {
+    spanString += ` ${formatLogSpan(span, now)}`;
+  }
+  const annotations = fiber.getRef(CurrentLogAnnotations);
+  if (Object.keys(annotations).length > 0) {
+    message_.push(annotations);
+  }
+  const console2 = fiber.getRef(ConsoleRef);
+  const log = fiber.getRef(LogToStderr) ? console2.error : console2.log;
+  log(`[${defaultDateFormat(date)}] ${logLevel.toUpperCase()} (#${fiber.id})${spanString}:`, ...message_);
+});
+var tracerLogger = /* @__PURE__ */ loggerMake(({
+  cause,
+  fiber,
+  logLevel,
+  message
+}) => {
+  const clock = fiber.getRef(ClockRef);
+  const annotations = fiber.getRef(CurrentLogAnnotations);
+  const span = fiber.cache.span;
+  if (span === undefined || span._tag === "ExternalSpan" || span.status._tag === "Ended")
+    return;
+  const attributes = {};
+  for (const [key, value] of Object.entries(annotations)) {
+    assignProperty(attributes, key, value);
+  }
+  attributes["effect.fiberId"] = fiber.id;
+  attributes["effect.logLevel"] = logLevel.toUpperCase();
+  if (cause.reasons.length > 0) {
+    attributes["effect.cause"] = causePretty(cause);
+  }
+  span.event(toStringUnknown(Array.isArray(message) && message.length === 1 ? message[0] : message), clock.currentTimeNanosUnsafe(), attributes);
+});
 function interruptChildrenPatch() {
   fiberMiddleware.interruptChildren ??= fiberInterruptChildren;
 }
@@ -3518,6 +3692,7 @@ var catchCause2 = catchCause;
 var catchIf2 = catchIf;
 var mapError2 = mapError;
 var orDie2 = orDie;
+var ignore2 = ignore;
 var orElseSucceed2 = orElseSucceed;
 var timeoutOrElse2 = timeoutOrElse;
 var matchEffect2 = matchEffect;
@@ -16288,6 +16463,8 @@ var POWERSHELL_ENTRY = "+powershell";
 var CODEMODE_ENTRY = "+codemode";
 var CODEMODE_TOOL = "codemode";
 var CODEMODE_MAX_WORKERS_ENV = "PI_CODEMODE_MAX_WORKERS";
+var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
 var T3_PREFIX = "mcp__t3*code__";
 var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}preview_*`,
@@ -16296,6 +16473,10 @@ var T3_VISUAL_TOOLS = [
   `${T3_PREFIX}html_preview`,
   `${T3_PREFIX}device_*`
 ];
+var T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
+var T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
+var isDeactivatedT3Tool = (name) => T3_TOOL.test(name) && !T3_VISUAL.some((pattern) => pattern.test(name));
+var deactivatedT3Tools = (registered) => registered.filter(isDeactivatedT3Tool);
 var COMPUTER_USE_TOOLS = ["computer_use_*"];
 var build = (tools, excludeTools, noMcp, maxWorkers) => ({
   tools,
@@ -16337,8 +16518,7 @@ var toolArgs = (config, key, profile = providerProfile(config)) => {
   const unique = [...new Set(tools)];
   return build([...unique, CODEMODE_TOOL], WRITE_TOOLS.filter((tool) => !unique.includes(tool)), noMcp, maxWorkers);
 };
-var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-var toolMatches = (pattern, name) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`).test(name);
+var toolMatches = (pattern, name) => patternRegExp(pattern).test(name);
 var rootActiveTools = (args, active, registered) => {
   const added = args.tools.flatMap((entry) => {
     const name = entry.startsWith("+") ? entry.slice(1) : entry;
@@ -16362,6 +16542,23 @@ var bunFlags = (bunfig) => [
 ];
 
 var SPECIALIST_NAMES = ROUTES.map((route) => route.agent);
+
+var T3_RUNTIME_MODE_ENV = "T3_PI_RUNTIME_MODE";
+var T3_MCP_URL_ENV = "T3_MCP_URL";
+var T3_FULL_ACCESS = "full-access";
+var T3_STATUS_KEY = "holyagent";
+var T3_ACCESS_STATUS = "HolyAgent needs Full access: switch this thread's access mode";
+var T3_ACCESS_NOTICE = "this T3 Code thread is below Full access, so every HolyAgent tool call asks for approval and background specialists can stall. Switch the thread's access mode to Full access in the composer; T3 Code restarts the session.";
+var present = (value) => value !== undefined && value.trim() !== "";
+var isT3Session = (context, env) => (present(env[T3_RUNTIME_MODE_ENV]) || present(env[T3_MCP_URL_ENV])) && context.mode === "rpc";
+var belowFullAccess = (env) => {
+  const mode = env[T3_RUNTIME_MODE_ENV];
+  return present(mode) && mode.trim() !== T3_FULL_ACCESS;
+};
+var refuseDeactivatedT3Tool = (event) => isDeactivatedT3Tool(event.toolName) ? {
+  block: true,
+  reason: `The root may not use ${event.toolName}: HolyAgent keeps T3 Code's orchestration, thread and schedule tools off and delegates through its own specialists.`
+} : undefined;
 
 var ROLE_FLAG = "holyagent-role";
 var CONTEXT_MESSAGE = "holyagent-context";
@@ -16406,7 +16603,7 @@ var refuseNonSpecialist = (event) => {
 };
 var WORKFLOW_SPECIALISTS = new Set(SPECIALIST_NAMES);
 var INLINE_WORKFLOW_INPUTS = new Set(["script", "args"]);
-var present = (value) => typeof value === "string" && value.trim() !== "";
+var present2 = (value) => typeof value === "string" && value.trim() !== "";
 var refuseNonSpecialistWorkflow = (event) => {
   if (event.toolName !== WORKFLOW_TOOL)
     return succeed5(undefined);
@@ -16417,9 +16614,9 @@ var refuseNonSpecialistWorkflow = (event) => {
   });
   if (Object.keys(event.input).some((key) => !INLINE_WORKFLOW_INPUTS.has(key)))
     return succeed5(refuse("A workflow is run only from an inline `script` and its `args`, with no other input."));
-  if (present(scriptPath) || !present(script) && present(name))
+  if (present2(scriptPath) || !present2(script) && present2(name))
     return succeed5(refuse("A workflow is run only from an inline `script`; a `scriptPath` or a saved `name` cannot be checked."));
-  if (!present(script))
+  if (!present2(script))
     return succeed5(refuse("No inline `script` given."));
   return workflowRefusal(script, WORKFLOW_SPECIALISTS, "pi").pipe(map4((why) => why === undefined ? undefined : refuse(`The workflow script is refused: it ${why}.`)));
 };
@@ -16804,12 +17001,32 @@ var createExtension = ({
     running.add(ended);
     ended.then(() => running.delete(ended));
   };
-  const applyRootTools = (tools) => runSync2(try_2({
-    try: () => pi.setActiveTools([
-      ...rootActiveTools(windows ? { ...tools, tools: [...tools.tools, POWERSHELL_ENTRY] } : tools, pi.getActiveTools(), pi.getAllTools().map(({ name }) => name))
-    ]),
+  const applyRootTools = (tools, t3) => runSync2(try_2({
+    try: () => {
+      const registered = pi.getAllTools().map(({ name }) => name);
+      const added = windows ? { ...tools, tools: [...tools.tools, POWERSHELL_ENTRY] } : tools;
+      const selection = t3 ? {
+        ...added,
+        excludeTools: [...added.excludeTools, ...deactivatedT3Tools(registered)]
+      } : added;
+      pi.setActiveTools([...rootActiveTools(selection, pi.getActiveTools(), registered)]);
+    },
     catch: (cause) => notice(`the root's tools were not applied: ${String(cause)}`)
   }).pipe(as2(undefined), catch_2((failure) => succeed5(failure))));
+  const holdT3ToolsOff = () => {
+    if (held?.t3Root !== true)
+      return;
+    runSync2(try_2(() => {
+      const active = pi.getActiveTools();
+      const drifted = deactivatedT3Tools(active);
+      if (drifted.length > 0)
+        pi.setActiveTools(active.filter((name) => !drifted.includes(name)));
+    }).pipe(ignore2));
+  };
+  const warnBelowFullAccess = (ctx) => {
+    runSync2(try_2(() => ctx.ui.setStatus(T3_STATUS_KEY, T3_ACCESS_STATUS)).pipe(ignore2));
+    return notice(T3_ACCESS_NOTICE);
+  };
   const gather = (taken, ctx, reason) => {
     taken.current?.abort();
     const own = new AbortController;
@@ -16838,8 +17055,14 @@ var createExtension = ({
         taken.started = true;
         if (result?.config !== undefined)
           startProviderCheck(taken, result.config);
-        if (result?.tools !== undefined)
-          taken.setupNotice = applyRootTools(result.tools);
+        if (result?.tools !== undefined) {
+          const notApplied = applyRootTools(result.tools, taken.t3);
+          taken.t3Gate = taken.t3;
+          taken.t3Root = taken.t3 && notApplied === undefined;
+          taken.setupNotice = notApplied;
+          if (taken.t3 && belowFullAccess(env))
+            taken.setupNotice = joinNotices(taken.setupNotice, warnBelowFullAccess(ctx));
+        }
       }
       if (result?.homeNotice !== undefined)
         taken.setupNotice = joinNotices(taken.setupNotice, result.homeNotice);
@@ -16863,6 +17086,9 @@ var createExtension = ({
       rootPrompt: false,
       excluded: runSync2(startingExclusions),
       started: false,
+      t3: isT3Session(ctx, env),
+      t3Gate: false,
+      t3Root: false,
       probe: undefined,
       readiness: undefined,
       setupNotice: undefined
@@ -16900,6 +17126,13 @@ ${event.systemPrompt}` : undefined;
   };
   pi.on("before_agent_start", noticeOnce("setupNotice"));
   pi.on("before_agent_start", noticeOnce("readiness"));
+  pi.on("before_agent_start", () => {
+    holdT3ToolsOff();
+    return;
+  });
+  pi.on("session_tree", () => {
+    holdT3ToolsOff();
+  });
   pi.on("message_end", (event) => {
     if (!isChild())
       return;
@@ -16907,7 +17140,7 @@ ${event.systemPrompt}` : undefined;
     return message === undefined ? undefined : { message };
   });
   pi.registerToolRenderer(workflowRenderers);
-  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : refuseExcludedTool(event, held?.excluded ?? []) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
+  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : refuseExcludedTool(event, held?.excluded ?? []) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
   pi.on("session_shutdown", () => release());
 };
 var extension_default = createExtension();
