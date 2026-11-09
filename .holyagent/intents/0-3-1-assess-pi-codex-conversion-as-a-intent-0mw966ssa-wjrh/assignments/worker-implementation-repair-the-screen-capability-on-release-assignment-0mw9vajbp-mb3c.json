@@ -1,0 +1,99 @@
+{
+  "id": "assignment-0mw9vajbp-mb3c",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 21,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-screen-capability-on-release",
+  "objective": "Repair the screen capability on release/0.3.1/feat/screen from its code, security and audit reviews, and build its headless form on a pinned Playwright MCP server.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-screen, branch release/0.3.1/feat/screen, head c6a2ac71 (the committed screen capability plus merges of fff and the integration branch). The original work is described in the report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9trshx-cnhq.md; the review reports are /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0jpx-7whl.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0k14-hk7i.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0kb6-ydwu.md (audit). Read them first.",
+    "Intent requirements quoted: capabilities have headless and normal forms; the screen capability uses a headless Playwright Chromium in a cloud or CI session and the paired real browser and desktop computer use on a desktop; setup and doctor detect the system and pick the form, and a capability whose needs are missing is reported, not silently dropped. Computer use is a screen capability an Assignment carries, granting pi-computer-use, browser use (opencode browse) and the in-app browser (T3 preview tools where T3 hosts the session), routed to GPT-6.1 Terra at least medium. Every third-party package sits at an exact pin moved only by mise run deps:update. New default: the headless form registers the Playwright MCP server (@playwright/mcp) at an exact pin in pi-packages.json that deps:update moves, launched headless and isolated through npx with the public npm registry passed explicitly, using the Chromium the environment provides (its executable path when one is preinstalled, such as /opt/pw-browsers/chromium); the normal form keeps @opencode/browse with a paired real browser plus pi-computer-use. Specialist agent files list only the screen tools of the form in use, and a headless specialist is told it has a headless browser and no desktop.",
+    "Pick the @playwright/mcp pin as its newest stable release (npm view @playwright/mcp version, through the public registry); check its CLI flags (headless, isolated, executable path, browser) from its README or --help without launching a browser against any site. Find out its MCP tool names (they are prefixed browser_) for the agent files."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The headless form registers @playwright/mcp at an exact pin in pi-packages.json, launched headless and isolated, with the preinstalled Chromium path when present; deps:check does not flag that pin; setup and doctor pick the headless form in a cloud or CI session, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every npx launch of a screen MCP server passes the public npm registry explicitly, so a project .npmrc cannot redirect the package source, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "In the headless form, specialist screen agent files list only the headless browser tools and no computer-use or browse tools, and the specialist instructions say it has a headless browser and no desktop, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "T3 preview tools are granted only when T3 hosts the session, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup and doctor report browse not installed separately from installed but not paired, using what the package exposes; an unreadable browser tokens file gives a doctor line instead of failing the setup step; the browse need checks node at least 22.19; with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "When MCP is off, the screen MCP servers are not registered and setup or doctor says so, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The AgentMismatch test fails if the check that refuses a screen Assignment on a non-screen agent is removed",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/pi/screen.md describes both forms, the pins and the reported states",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run build leaves the tree unchanged and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The report names the unrequested additions of the original work (the specialist registry and warm-reuse split by screen) without removing them",
+      "blocking": false,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/pi",
+    "packages/integrations/claude/dist",
+    "packages/integrations/claude/src",
+    "scripts/dependency-pins.ts",
+    "docs",
+    "requirements"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9trshx-cnhq",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T23:03:20.149Z"
+  },
+  "createdAt": "2026-11-09T23:03:20.149Z"
+}
