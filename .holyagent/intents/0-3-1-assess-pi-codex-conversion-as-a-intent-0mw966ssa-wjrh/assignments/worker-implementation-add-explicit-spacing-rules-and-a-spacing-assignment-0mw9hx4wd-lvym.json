@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-explicit-spacing-rules-and-a-spacing",
   "objective": "Add explicit spacing rules and a spacing check on captures to the GPT-6 instruction family, so GPT-built interfaces stop shipping cramped or misaligned padding and gaps, and list the family in docs/development.md.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-gpt6, branch release/0.3.1/feat/gpt-6-instructions; the family was added in the last commit (git show HEAD --stat).",
     "Maintainer (verbatim), with a screenshot of a page a GPT model built: \"gpt models always mess up padding and spacing in some places like this\", then \"fix it\". The screenshot (/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/images/2.png, read it) shows: a card that sits flush against the heading's underline rule above it and the column divider beside it; no gap between the card's bottom and the section edge and rule below; card text starting further in than the heading above it, so the column has two left edges; and an em dash wrapped to the start of a line in the intro paragraph.",
@@ -57,7 +57,41 @@
     "agentId": "workflow:wf_b9a53b77-5d3/assignment-0mw9hx4wd-lvym",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T16:48:59.917Z"
+    "startedAt": "2026-11-09T16:48:59.917Z",
+    "finishedAt": "2026-11-09T17:13:01.089Z"
+  },
+  "result": "result: GPT-6 spacing rules and capture check added; gpt-6 listed in docs/development.md; build and verify exit 0.\n\nchanged (all under /home/user/holyagent-0.3.1-gpt6):\npackages/runtime/src/instructions/gpt-6/guide.md: M1 source row, a \"Rendered output\" section with O26 (the maintainer's quote and screenshot findings), and a Gaps line. No GPT-6 source in assignment-0mw97j4zi-5mk4.md bears on spacing; the guide says so.\npackages/runtime/src/instructions/gpt-6/design-core/core.md: new \"Spacing and alignment\" section with the five rules, each with its reason. The capture-check sentence is added to the capture-checklist paragraph. The platform skills inherit both through the design-core marker.\npackages/runtime/src/instructions/gpt-6/roles/worker-visual/method.md\npackages/runtime/src/instructions/gpt-6/roles/reviewer-visual/captures.md\npackages/runtime/src/instructions/gpt-6/skills/visual-judging/SKILL.md: the root's visual-acceptance text lives here. It adds a spacing check to the final pass.\ndocs/development.md: gpt-6 added at the directory tree, the families.ts list and the guide.md list. Line 163 is the Pi `PI_FAMILY` text, not a family list, so I left it.\n\nCheck sentence added (core.md): \"Before visual work is reported done, the worker and the reviewer also measure the padding and gaps on those captures against the spacing rules and name each place where content touches a rule, border or edge, or say that they found none.\"\n\nRequirements-tree tracing: no requirements, coverage.ts or other family files changed. The additions are guide-sourced (O26 citations), as the family already does, and all tests pass.\n\nchecks:\n`bunx --no-install mise run build` -> 0; generated output unchanged.\n`bunx --no-install mise run verify` -> 0; 2711 pass, 0 fail, 87 files. The first run failed the format check on guide.md. I fixed it with `bun fmt` on that file and re-ran both gates.\n`git status` shows only the six files above.\n\nblockers: none\nquestions: none\nnotes:\nYour brief says the card text starts further in than the heading. In the screenshot both start at the same x, and the card has no inner padding. The padding rule covers the visible defect; the column-edge rule is worded generally.\nFurther improvement, not done: the same rules could go into a requirements file for every family.\n\nevidence:\nThe GPT-6 guide carries a cited spacing point and the visual worker, visual reviewer, design core and root visual-acceptance text carry the spacing rules and the capture check: guide.md O26; design-core/core.md \"Spacing and alignment\" and the check sentence; worker-visual/method.md; reviewer-visual/captures.md; skills/visual-judging/SKILL.md.\nOnly the gpt-6 family and docs/development.md change: `git status --short` lists six files, all within the ownership paths.\nmise run build and mise run verify exit 0: build exit 0; verify exit 0 with 2711 pass, 0 fail (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log).\nchecks-run: the build and verify commands above.\nchanged-paths: the six files listed under changed.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6-spacing.diff\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Spacing rules and capture check in guide, design core, visual roles and visual-judging; docs list gpt-6; build and verify exit 0 (2711 pass).",
+    "criteria": [
+      {
+        "criterion": "The GPT-6 guide carries a cited spacing point and the visual worker, visual reviewer, design core and root visual-acceptance text carry the spacing rules and the capture check",
+        "support": "guide.md O26; design-core/core.md \"Spacing and alignment\" and the check sentence; worker-visual/method.md; reviewer-visual/captures.md; skills/visual-judging/SKILL.md."
+      },
+      {
+        "criterion": "Only the gpt-6 family and docs/development.md change",
+        "support": "`git status --short` lists six files, all within the ownership paths."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 with 2711 pass, 0 fail (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the build and verify commands above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the six files listed under changed."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/gpt6-spacing.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T16:48:59.917Z"
 }
