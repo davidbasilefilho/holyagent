@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-check-the-branch-name-handling-of-the",
   "objective": "Re-check the branch-name handling of the cloud-session checkout repair.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0vv-klze.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v14z-rjm5.md (artifact) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v1e0-v4vz.md (security); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw999emo-eac9.md. Review only the repair commit 323dfb1 in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r1.diff) and say whether each earlier finding is closed."
   ],
@@ -32,7 +32,25 @@
     "agentId": "workflow:wf_349d5eb8-b1f/assignment-0mw99k5qr-cyi6",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:54:57.555Z"
+    "startedAt": "2026-11-09T12:54:57.555Z",
+    "finishedAt": "2026-11-09T13:00:54.155Z"
+  },
+  "result": "result: The branch-name criterion is met, and I found no blockers. The reflog and `origin/HEAD` names now reach the notice only through the allowlist. Security finding 1 is closed. Finding 2 is closed in effect, though I did not run the code.\n\n`/security-review` failed to run again: the skill's `git log origin/HEAD...` fails because `origin/HEAD` is unresolved in this checkout. It covered nothing, so I reviewed commit 323dfb1 by hand from `cloud-r1.diff` and `/home/user/holyagent-0.3.0-cloudbranch/packages/runtime/src/cli/status.ts`. I have no shell, so I ran no tests. The repair report says `cloud-checkout.test.ts` passes 8 of 8 and `mise run verify` exits 0, and I did not re-run them.\n\n**Security findings**\n1. **Closed.** Both name sources now go through `returnBranch` and `safeBranch` (`status.ts` lines 13-16 and 45-55).\n   - `safeBranch` requires `^[A-Za-z0-9][A-Za-z0-9._/-]*$` and then `git check-ref-format --branch` echoing the same name. The regex is ASCII-only, so shell metacharacters, backticks, `#`, C1 and bidi characters, and a leading `-` or `+` are rejected.\n   - A name that fails falls back to the remote default, which is checked the same way, and then to the literal `main`.\n   - The notice never prints the current branch. The \"moved\" text is fixed, and the model-facing text interpolates only the vetted name at line 82.\n2. **Closed in effect.** The reflog regex is now `(\\S+) to (\\S+)` and every candidate passes through the allowlist. The lines are still not size-capped, but nothing exploitable follows from that.\n\n**Earlier code and artifact findings**\n**Code finding 1 (notice named `main` after clone and `checkout -b`):** closed. `startBranch` tries the move's destination first, then its source.\n**Code finding 2 (no test with a commit on `main` first):** closed. `session()` now seeds a commit on `main` before `checkout -b`, and the new test asserts `git switch claude/quiet-fox`.\n**`git switch -c` contradiction (code finding 4, artifact finding 1):** closed in both `identity.md` files, the `version-control.md` Branches lines and R-BRANCH.\n**Artifact findings 2-4:** closed as requested. The `docs/usage.md` panel-list claim and the `docs/decisions.md` figures (+54,746 lines, 31 commits) now carry an \"observed 2026-11-09\" source, which is self-attested and I cannot verify it. The `AGENTS.md` reason is added.\n**Artifact findings 5-6:** closed. `docs/hooks.md` has the new bullet, and a checkout moved to another named branch now triggers the notice.\n\n**Sound**\n**git calls:** every call is a fixed argument vector through the Bun `$` args array. The only interpolated argument, `refs/heads/${name}`, cannot read as an option. `check-ref-format` only receives names that start with an alphanumeric.\n**Failures:** `gitMaybe` maps any failure to `undefined`, so no git failure escapes, and nothing blocks.\n**Gates:** the cloud and linked-worktree gates are unchanged.\n\nnotes: the repair's own ride-along limit (a `switch -c work` on a clone already on the assigned branch gives no notice) is a usability gap, not a security one.\n\nevidence:\nBranch names from the reflog and origin/HEAD reach the notice only through the allowlist, and the git calls stay safe: `status.ts` lines 7-16, 45-55 and 76-82 read in the diff. Both sources go through `safeBranch` (ASCII allowlist plus `check-ref-format --branch`), and the git calls use a fixed argv. I ran no tests, and the repair report claims 8 of 8 pass.\nfindings: security 1 closed and 2 closed in effect (above); code 1, 2 and 4 closed; artifact 1-6 closed. `/security-review` did not run (`origin/HEAD` unresolved).\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Re-review closes every earlier finding with file lines; leftovers are optional",
+    "criteria": [
+      {
+        "criterion": "Branch names from the reflog and origin/HEAD reach the notice only through the allowlist, and the git calls stay safe",
+        "support": "`status.ts` lines 7-16, 45-55 and 76-82 read in the diff. Both sources go through `safeBranch` (ASCII allowlist plus `check-ref-format --branch`), and the git calls use a fixed argv. I ran no tests, and the repair report claims 8 of 8 pass."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "security 1 closed and 2 closed in effect (above); code 1, 2 and 4 closed; artifact 1-6 closed. `/security-review` did not run (`origin/HEAD` unresolved)."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:54:57.555Z"
 }
