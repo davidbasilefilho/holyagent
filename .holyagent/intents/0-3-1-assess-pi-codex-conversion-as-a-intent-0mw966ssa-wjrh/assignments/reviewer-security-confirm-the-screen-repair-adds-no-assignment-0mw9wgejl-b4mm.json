@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-screen-repair-adds-no",
   "objective": "Confirm the screen repair adds no privilege, supply-chain or data-exposure defect and closes the earlier security suspicions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair commit 91d9eb07 on release/0.3.1/feat/screen in /home/user/holyagent-0.3.1-screen (range c6a2ac71..91d9eb07); source diff without generated dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-repair-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9vajbp-mb3c.md. Review only this repair; the earlier findings it answers are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0jpx-7whl.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0k14-hk7i.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0kb6-ydwu.md (audit).",
     "Requirements the repair implements: the headless screen form (cloud or CI) registers @playwright/mcp at an exact pin moved by deps:update, launched headless and isolated through npx with the public npm registry passed explicitly, using the preinstalled Chromium when present; the normal form keeps @opencode/browse with a paired real browser plus pi-computer-use. Specialist agent files list only the screen tools of the form in use, and a headless specialist is told it has no desktop. T3 preview tools only where T3 hosts the session. Setup and doctor separate not-installed from not-paired, report an unreadable pairing file without failing, check node >= 22.19, and say when MCP is off.",
@@ -40,7 +40,29 @@
     "agentId": "workflow:wf_789cee0b-154/assignment-0mw9wgejl-b4mm",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T23:35:53.505Z"
+    "startedAt": "2026-11-09T23:35:53.505Z",
+    "finishedAt": "2026-11-09T23:41:54.499Z"
+  },
+  "result": "result: No validated vulnerability found in 91d9eb07. The earlier `.npmrc` suspicion is only partly closed: the registry redirect is closed, but local `node_modules`/npx-cache substitution and other `.npmrc` keys are not ruled out. The built-in `/security-review` could not run (`fatal: ambiguous argument 'origin/HEAD...'`, since `origin/HEAD` does not exist), so I reviewed the repair diff and the worktree sources by reading. No Bash, so nothing was run and no tests were executed. The npm and Pi behaviors below are from memory, not confirmed in this environment.\n\nchanged: none\nchecks: none run\nblockers: none\n\nquestions: none\n\nnotes (suspicions, not validated; none introduced by the repair):\n1. **npx local substitution (PLAUSIBLE).**\n   - The repair passes `--registry=` and `--@scope:registry=` to `npx` (`npxServerArgs`, `capabilities.ts`), which closes the repo-`.npmrc` registry redirect for fetches.\n   - From memory, npm exec runs a project-local `node_modules/@playwright/mcp` or `@opencode/browse` without fetching when its version matches the pin.\n   - From memory, a project `.npmrc` can also set `script-shell` or `cache`. A pre-seeded `_npx/<hash>` is reused without an integrity check.\n   - Source: a hostile repository's committed `node_modules` or `.npmrc`. Sink: the stdio MCP server process, started by npx, in a session with browser control.\n   - Precondition: Pi starts the server in the project directory. I could not confirm this, because Pi's MCP extension is not installed here.\n   - Suggested fix: start the server from a neutral cwd such as an empty temp directory, or pass `--prefix`/`--cache` explicitly.\n2. **`PLAYWRIGHT_BROWSERS_PATH` accepts a relative value.** It would resolve against the project cwd. The variable comes from the user's environment, not from a repository, so no repository file can supply the binary.\n\nSound by reading:\n- **Chromium discovery** (`setup/chromium.ts`):\n  - It trusts only `PLAYWRIGHT_MCP_EXECUTABLE_PATH`, `PLAYWRIGHT_BROWSERS_PATH` and `/opt/pw-browsers`.\n  - It only checks that the path exists.\n  - Playwright MCP reads the same variable itself.\n  - The repair adds no `--no-sandbox`.\n- **T3 gate:**\n  - `refuseT3PreviewOutsideT3` fails closed: it blocks unless `held.t3 === true`.\n  - It applies only to screen agents.\n  - It runs before the other refusals.\n- **Headless selection** (`CI` truthy, `CLAUDE_CODE_REMOTE=true`, no display):\n  - `agentFor` adds a suffix only when `assignment.screen === true`, so a non-screen agent's tools are unchanged.\n  - `-headless-screen` is narrower than the normal form: Playwright isolated, with no desktop control.\n  - The form comes from the process environment or the agent name, never from repository content.\n- **Profile-folder scan** (`findBrowseExtension`):\n  - It is read only, and every error reads as nothing found.\n  - Profile names come from `Local State` in the user's own browser directory; writing there already means a compromised user.\n  - Output is only the browser, profile name and an enabled flag. No secrets.\n- **Setup and doctor:**\n  - `node --version` runs with `cwd` set to the user's home directory.\n  - Nothing runs `npx` or `browse`.\n  - An unreadable pairing file becomes a hint line in setup and a failure in doctor.\n- **Pin:** `@playwright/mcp` is an exact version in `pi-packages.json` and no new dependency range was added. I did not confirm that the updater moves it.\n\nevidence:\n- Each validated vulnerability the repair introduces or leaves open is reported with source, sink and a concrete scenario, or none is found: none validated; the one plausible gap is note 1, and the other traced points are listed under \"Sound by reading\".\n- The earlier .npmrc registry-redirect suspicion is closed or its remaining gap is stated: registry redirect closed by `--registry=` and `--@scope:registry=` (`capabilities.ts`, `npxServerArgs`). Remaining gap: local `node_modules`, `_npx` cache and `script-shell`/`cache` in `.npmrc`, stated in note 1.\n- findings: note 1 (PLAUSIBLE) and note 2; no validated vulnerability. Source read: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-repair-commit.diff and the worktree at /home/user/holyagent-0.3.1-screen.\n",
+  "acceptance": {
+    "revision": 21,
+    "rationale": "No blockers; earlier findings closed with file evidence; build and verify green on 91d9eb07",
+    "criteria": [
+      {
+        "criterion": "Each validated vulnerability the repair introduces or leaves open is reported with source, sink and a concrete scenario, or none is found",
+        "support": "none validated; the one plausible gap is note 1, and the other traced points are listed under \"Sound by reading\"."
+      },
+      {
+        "criterion": "The earlier .npmrc registry-redirect suspicion is closed or its remaining gap is stated",
+        "support": "registry redirect closed by `--registry=` and `--@scope:registry=` (`capabilities.ts`, `npxServerArgs`). Remaining gap: local `node_modules`, `_npx` cache and `script-shell`/`cache` in `.npmrc`, stated in note 1."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "note 1 (PLAUSIBLE) and note 2; no validated vulnerability. Source read: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-repair-commit.diff and the worktree at /home/user/holyagent-0.3.1-screen."
+      }
+    ]
   },
   "createdAt": "2026-11-09T23:35:53.505Z"
 }
