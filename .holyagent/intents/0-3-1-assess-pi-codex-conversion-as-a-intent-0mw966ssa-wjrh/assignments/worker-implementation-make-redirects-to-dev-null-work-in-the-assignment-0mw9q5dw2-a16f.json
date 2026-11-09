@@ -1,0 +1,72 @@
+{
+  "id": "assignment-0mw9q5dw2-a16f",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "make-redirects-to-dev-null-work-in-the",
+  "objective": "Make redirects to /dev/null work in the just-bash Pi bash tool and remove the duplicated cmd.exe quoting code.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-bash, branch release/0.3.1/feat/just-bash at fd3d8763",
+    "Previous report with the notes: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9os41y-etgw.md"
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Leave packages/integrations/pi/src/codex.ts and packages/runtime/src/pi/codex/ untouched; another branch owns them.",
+    "Report in under 400 words; start each evidence line with the exact criterion text, a colon and the support inline; put long logs in a file in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "Commands redirecting to /dev/null (cmd >/dev/null, cmd 2>/dev/null, cmd &>/dev/null, and a host program redirected the same way) succeed and discard the output, and reading /dev/null yields empty input, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "cmdExeArguments has one definition in packages/runtime/src/pi/bash/cmd.ts that every caller imports, with existing tests passing",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "exit inside a function does not report that function's local variables as session state, with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi/bash",
+    "packages/integrations/pi/src/bash.ts",
+    "packages/runtime/tests/pi",
+    "packages/integrations/pi/tests/bash.test.ts",
+    "packages/integrations/pi/dist/scripts",
+    "packages/integrations/claude/dist/scripts",
+    "docs/pi/shell.md",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests/extension.test.ts",
+    "packages/integrations/pi/dist/extensions/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9os41y-etgw",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T20:39:21.746Z"
+  },
+  "createdAt": "2026-11-09T20:39:21.746Z"
+}
