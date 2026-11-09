@@ -13,7 +13,7 @@ A violation of any other rule is judged by this definition:
 
 A number is binding only where a platform guideline fixes it; every other number is a default, marked `(default)`, that the design may override with a stated reason.
 
-Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Before visual work is reported done, the worker and the reviewer also measure the padding and gaps on those captures against the spacing rules and name each place where content touches a rule, border or edge, or say that they found none. <!-- O26 --> Check your own work as it takes shape, from captures wherever the environment can produce them. Report only checks actually run, and name each check not run.
+Apply the skill's capture checklist on the final captures: the worker before reporting, the reviewer in its findings and the root in its own final pass. Before visual work is reported done, the worker also measures the padding and gaps on those captures against the spacing rules (in pixels or computed styles on a web, mobile or desktop render, in character cells on a terminal frame), repairs what it finds, captures again and names each place where content still touches a rule, border or edge, or says none remain. The reviewer compares the same captures and any measurements the worker recorded against the spacing rules and names each visible contact or missing padding by its location, or says it found none; it gives no number it did not read from a capture or a record. <!-- O26 --> Check your own work as it takes shape, from captures wherever the environment can produce them. Report only checks actually run, and name each check not run.
 
 ### Direction before code
 
@@ -68,7 +68,7 @@ Models tend to ship cramped or misaligned spacing that a glance at the whole pag
 - Give every container (card, panel, button, field, cell) padding on all sides, so text and media never touch its edge.
 - Keep a gap between every block and the rules, dividers, borders and section edges around it, below and beside it as well as above, so nothing sits flush against a line.
 - Let the content of a column share one left edge and one right edge: headings, text and the outer edges of cards line up, and an element that starts further in or out than its neighbours has a reason the design states. Two edges in one column read as a mistake.
-- Begin no line with a dash or other closing punctuation (an em or en dash, comma, period, colon, or a closing quote or bracket). Rewrap or reword the text so the mark stays with the word before it, because a mark that wraps to a line start reads as a break.
+- Let no wrapped line begin with a dash or other closing punctuation (an em or en dash, comma, period, colon, or a closing quote or bracket). Join the mark to the word before it with a non-breaking join or the platform's text-wrap control, or reword, because a mark that wraps to a line start reads as a break. A dash that opens a line on purpose, such as an attribution, is fine.
 
 ### Quality floor, unannounced
 

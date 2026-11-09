@@ -6,7 +6,7 @@ Every Assignment goes through the CLI: <!-- O2: three outcome steps, since their
 
 1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief. A brief that names a package file (a skill to read) gives its literal absolute path.
 2. Run the prompt as an `agent()` in your inline workflow script (one Assignment is a one-entry workflow); without a workflow tool, launch it with the host's agent tool in the background. Record the agent that runs it with `assignment record <id> --agent <agent-id>` right after the launch (`--failed` when the launch failed), unless the launcher already recorded it and says so.
-3. On its completion notice, `assignment close <id> --outcome <o>` passes the report verbatim on stdin, never retyped or summarized; add `--accept "<rationale>"` once its evidence holds.
+3. On its completion notice (for a workflow, after `assignment reports` wrote the report files), `assignment close <id> --outcome <o>` passes the report verbatim on stdin from its report file, never retyped or summarized; add `--accept "<rationale>"` once its evidence holds.
 
 Send an evidence gap back to the same specialist through the host's resume control, then close again; a workflow agent cannot be resumed, so its gap is a new draft with `followUpOf`.
 
