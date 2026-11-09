@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw8tdgpq-hfsl",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 11,
+  "roleTask": "Librarian.research",
+  "slug": "establish-from-t3-code-s-own-source-and",
+  "objective": "Establish from T3 Code's own source and documentation how its Pi provider drives pi, so HolyAgent can detect T3, warn below Full access, and limit itself to the UI T3 renders.",
+  "state": "Running",
+  "scope": [
+    "T3 Code is the open-source app by Ping (github.com/pingdotgg/t3code); read its Pi provider driver (the providerInstances driver named pi) and its docs at the newest release tag. HolyAgent's plan is docs/pi/t3-code.md in /home/user/holyagent-0.3.0-scope; read it first so you answer what it leaves open.",
+    "Answer with a source URL and line or quoted excerpt for each:",
+    "1. The exact pi command line and environment T3 starts (mode rpc or json, flags, env vars such as T3CODE_HOME or any T3-specific marker an extension could read).",
+    "2. How T3 maps its access modes (Full access, Supervised, any other) onto pi: flags, settings, RPC messages, or nothing.",
+    "3. Which extension_ui_request methods T3 renders (select, confirm, input, editor, notify, setStatus, setWidget, setTitle, custom) and what it does with the rest.",
+    "4. Whether T3 exposes the tools it provides to pi (names, prefix) and how (an extension, MCP, or RPC tools).",
+    "5. Where T3 keeps per-project settings, and whether branch naming and the merge method are per-project keys (their names and defaults)."
+  ],
+  "constraints": [
+    "Read-only. Separate sourced facts from inference, and say when a point has no source.",
+    "Report in under 600 words; put long excerpts in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the five questions is answered with a source URL and line or excerpt, or marked unsourced",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The report names the T3 Code version or commit read",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "answers",
+    "version"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:21:51.326Z"
+  },
+  "createdAt": "2026-11-09T05:21:51.326Z"
+}
