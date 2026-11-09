@@ -1,0 +1,13 @@
+{"holyagentFixture":{"package":"@earendil-works/pi-coding-agent","piVersion":"1.5.0","name":"json-run-error","source":"json-mode","description":"A provider failure: the final message stops on error, auto_retry_end reports failure, and the run still settles with aborted false."}}
+{"type":"session","version":3,"id":"0198a2b0-0000-7000-8000-000000000001","timestamp":"2026-01-01T00:00:00.000Z","cwd":"/work/project"}
+{"type":"agent_start"}
+{"type":"turn_start"}
+{"type":"message_start","message":{"role":"user","content":"Review the change.","timestamp":1700000000000}}
+{"type":"message_end","message":{"role":"user","content":"Review the change.","timestamp":1700000000000}}
+{"type":"message_start","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"pending","timestamp":1700000000001}}
+{"type":"message_end","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"error","timestamp":1700000000001,"errorMessage":"provider overloaded"}}
+{"type":"turn_end","message":{"role":"assistant","content":[],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"error","timestamp":1700000000001,"errorMessage":"provider overloaded"},"toolResults":[]}
+{"type":"agent_end","messages":[{"role":"user","content":"Review the change.","timestamp":1700000000000},{"role":"assistant","content":[],"api":"openai-completions","provider":"kimi-coding","model":"k3.1-pro","usage":{"input":120,"output":40,"cacheRead":0,"cacheWrite":0,"totalTokens":160,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"error","timestamp":1700000000001,"errorMessage":"provider overloaded"}],"willRetry":false}
+{"type":"auto_retry_start","attempt":1,"maxAttempts":1,"delayMs":2000,"errorMessage":"provider overloaded"}
+{"type":"auto_retry_end","success":false,"attempt":1,"finalError":"provider overloaded"}
+{"type":"agent_settled","aborted":false}

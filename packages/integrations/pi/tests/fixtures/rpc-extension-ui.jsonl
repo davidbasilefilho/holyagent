@@ -1,0 +1,7 @@
+{"holyagentFixture":{"package":"@earendil-works/pi-coding-agent","piVersion":"1.5.0","name":"rpc-extension-ui","source":"rpc-mode","description":"The extension_ui_request messages of RPC mode that T3 Code renders: the four dialogs, notify and setStatus."}}
+{"type":"extension_ui_request","id":"ui-select","method":"select","title":"Pick a model","options":["k3.1-pro","k3.1-flash"],"timeout":30000}
+{"type":"extension_ui_request","id":"ui-confirm","method":"confirm","title":"Allow the write?","message":"The specialist wants to write README.md.","timeout":30000}
+{"type":"extension_ui_request","id":"ui-input","method":"input","title":"Branch name","placeholder":"release/0.3.0/feat/x"}
+{"type":"extension_ui_request","id":"ui-editor","method":"editor","title":"Edit the Intent","prefill":"Objective: "}
+{"type":"extension_ui_request","id":"ui-notify","method":"notify","message":"holyagent: provider not ready","notifyType":"warning"}
+{"type":"extension_ui_request","id":"ui-status","method":"setStatus","statusKey":"holyagent","statusText":"1 running"}
