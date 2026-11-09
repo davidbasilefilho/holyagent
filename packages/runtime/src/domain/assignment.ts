@@ -94,6 +94,12 @@ export const AssignmentDraft = Schema.Struct({
     Schema.withDecodingDefaultKey(Effect.succeed([])),
   ),
   followUpOf: Schema.optionalKey(AssignmentId),
+  /**
+   * Whether the Assignment carries the screen capability: its specialist gets the computer-use,
+   * browser-use and T3 preview tools, and under Codex runs on GPT-6.1 Terra at medium or above.
+   * Absent for an Assignment that does not.
+   */
+  screen: Schema.optionalKey(Schema.Boolean),
 })
 /** A decoded Assignment draft. */
 export type AssignmentDraft = typeof AssignmentDraft.Type
@@ -114,6 +120,7 @@ const fields = {
   dependencies: Schema.Array(AssignmentId),
   independentFrom: Schema.Array(AssignmentId),
   followUpOf: Schema.optionalKey(AssignmentId),
+  screen: Schema.optionalKey(Schema.Boolean),
   specialist: Schema.optionalKey(Specialist),
   result: Schema.optionalKey(Text),
   acceptance: Schema.optionalKey(Acceptance),
@@ -207,6 +214,8 @@ export const createAssignment = (
       dependencies: draft.dependencies,
       independentFrom: draft.independentFrom,
       ...(draft.followUpOf === undefined ? {} : { followUpOf: draft.followUpOf }),
+      // Kept only when set, so an Assignment without the capability is stored as it always was.
+      ...(draft.screen === true ? { screen: true } : {}),
       createdAt: creation.now,
     }
     return { assignment, assignments: [assignment] } satisfies Change & { assignment: Assignment }

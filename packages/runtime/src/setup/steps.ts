@@ -4,6 +4,7 @@ import { Effect, Option } from "effect"
 
 import { CAPABILITIES } from "../config/capabilities.ts"
 import { inCloudSession } from "../vcs/identity.ts"
+import { reportBrowserUse } from "./browser-use.ts"
 import { applyCapabilityChoices } from "./capabilities.ts"
 import { type Env, homeDirectory, userFiles } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
@@ -144,18 +145,20 @@ export interface SetupOptions {
 /**
  * Sets up HolyAgent for the current user: ctx7, the capability choices of the run (written to the
  * HolyAgent config, {@link applyCapabilityChoices}), the Pi packages the config enables in the form
- * in force, the Pi tool settings and, at scope `user`, T3 Code's server settings ({@link
- * installPiPackages}, {@link installPiToolSettings} and {@link installT3Settings}; all only when Pi
- * is in use, never in a cloud session), and the recommended keys of the settings of the chosen
- * scope (`user` unless set). Every step checks its own result first, and a step that fails does not
- * stop the next one, except that when the capability choices cannot be saved the Pi packages, tool
- * settings and T3 steps are not run, so no package changes without the config that explains it. On
- * a dry run nothing is installed or written, and the lines say what would be. In a claude.ai cloud
- * session ctx7 is skipped, and the settings are still merged. With `undo` only settings change: the
- * values setup recorded adding are removed from the chosen scope's file and from the Pi tool
- * settings files ({@link undoPiToolSettings}) and T3's ({@link undoT3Settings}); ctx7 and the Pi
- * packages stay installed. A `project` or `local` target that is a symlink is refused with a `!`
- * line and nothing is written to the settings.
+ * in force, the Pi tool settings, a report on browser use (the form, the unmet needs and whether a
+ * browser is paired with browse; it changes nothing, {@link reportBrowserUse}) and, at scope `user`,
+ * T3 Code's server settings ({@link installPiPackages}, {@link installPiToolSettings} and
+ * {@link installT3Settings}; all only when Pi is in use, never in a cloud session), and the
+ * recommended keys of the settings of the chosen scope (`user` unless set). Every step checks its
+ * own result first, and a step that fails does not stop the next one, except that when the
+ * capability choices cannot be saved the Pi packages, tool settings and T3 steps are not run, so no
+ * package changes without the config that explains it. On a dry run nothing is installed or
+ * written, and the lines say what would be. In a claude.ai cloud session ctx7 is skipped, and the
+ * settings are still merged. With `undo` only settings change: the values setup recorded adding are
+ * removed from the chosen scope's file and from the Pi tool settings files ({@link
+ * undoPiToolSettings}) and T3's ({@link undoT3Settings}); ctx7 and the Pi packages stay installed.
+ * A `project` or `local` target that is a symlink is refused with a `!` line and nothing is written
+ * to the settings.
  */
 export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptions) {
   const scope = options.scope ?? "user"
@@ -234,6 +237,7 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
       : []),
     ...(piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : []),
     ...(piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : []),
+    ...(piSteps ? yield* asStep("browser use", reportBrowserUse(env, piOptions)) : []),
     // T3 Code's server settings are the user's own, so the step runs at scope user only.
     ...(piSteps && scope === "user"
       ? yield* asStep(

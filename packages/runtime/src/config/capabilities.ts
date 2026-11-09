@@ -1,6 +1,6 @@
 import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../pi/bash/guardrails.ts"
 import { FFF_NATIVE_HOSTS, FFF_OVERRIDE_SETTINGS, FFF_TOOLS } from "../pi/fff/settings.ts"
-import type { PiPackageName } from "./pi-packages.ts"
+import { PI_PACKAGE_VERSIONS, type PiPackageName } from "./pi-packages.ts"
 import type { PiProvider } from "./schema.ts"
 
 /**
@@ -13,9 +13,9 @@ export const CAPABILITY_FORMS = ["headless", "normal"] as const
 export type CapabilityForm = (typeof CAPABILITY_FORMS)[number]
 
 /**
- * An MCP server a capability adds to Pi's own MCP extension. No capability adds one yet: the later
- * capabilities of this release fill {@link FormContent.mcpServers}, and setup does not read it
- * before then.
+ * An MCP server a capability adds to Pi's own MCP extension. The HolyAgent extension registers it
+ * (`pi.registerMcpServer`) in the sessions that use it, so it always runs at the pin of the build
+ * and writes no file of the user's.
  */
 export interface McpServer {
   /** The name the server is registered under. */
@@ -30,10 +30,7 @@ export interface McpServer {
 export interface FormContent {
   /** The Pi packages the form loads; their versions are the pins of `pi-packages.json`. */
   readonly packages: ReadonlyArray<PiPackageName>
-  /**
-   * The MCP servers the form adds; empty for every capability until the later capabilities of this
-   * release.
-   */
+  /** The MCP servers the form adds, registered by the extension; empty for most capabilities. */
   readonly mcpServers: ReadonlyArray<McpServer>
 }
 
@@ -57,8 +54,11 @@ export type SystemNeed =
       readonly fix: string
     }
 
-/** What doctor checks of an enabled capability: its system needs, and that its packages are listed. */
-export type HealthProbe = "needs" | "packages"
+/**
+ * What doctor checks of an enabled capability: its system needs, that its packages are listed, and
+ * (`pairing`) that a browser is paired with the browser extension its MCP server drives.
+ */
+export type HealthProbe = "needs" | "packages" | "pairing"
 
 /**
  * One JSON settings file that setup writes by merging, never by replacing: `content` holds the keys
@@ -121,10 +121,14 @@ export interface CapabilityDefinition {
     readonly headless: FormContent | FormUnavailable
     readonly normal: FormContent | FormUnavailable
   }
-  /** The tool patterns it decides: the root excludes `rootExclude`, visual specialists get `visual`. */
+  /**
+   * The tool patterns it decides: the root excludes `rootExclude`, visual specialists get `visual`,
+   * and a specialist launched for an Assignment that carries the screen capability gets `screen`.
+   */
   readonly tools: {
     readonly rootExclude: ReadonlyArray<string>
     readonly visual: ReadonlyArray<string>
+    readonly screen: ReadonlyArray<string>
   }
   /** The package settings setup writes while it is on and offered in the form. */
   readonly settings: ReadonlyArray<SettingsPatch>
@@ -174,22 +178,46 @@ export const PI_FFF_FILE = "~/.pi/agent/pi-fff.json"
 export const T3_PREFIX = "mcp__t3*code__"
 
 /**
- * The T3 Code tools of the visual roles, as patterns on the tool names Pi gives them: the
- * integrated browser (`preview_*`, `t3_preview_*`), the page renders (`html_render`,
- * `html_preview`) and the devices (`device_*`). They arrive only through Pi's built-in MCP
- * extension, so they exist only under T3 Code's bridge or after the user registered T3's MCP
- * server, and only while `pi.features.mcp` is on.
+ * The T3 Code tools that show a page in T3, as patterns on the tool names Pi gives them: the
+ * integrated browser (`preview_*`, `t3_preview_*`) and the page renders (`html_render`,
+ * `html_preview`). A screen Assignment gets these (see {@link CapabilityDefinition.tools}).
  */
-export const T3_VISUAL_TOOLS: ReadonlyArray<string> = [
+export const T3_PREVIEW_TOOLS: ReadonlyArray<string> = [
   `${T3_PREFIX}preview_*`,
   `${T3_PREFIX}t3_preview_*`,
   `${T3_PREFIX}html_render`,
   `${T3_PREFIX}html_preview`,
-  `${T3_PREFIX}device_*`,
 ]
+
+/**
+ * The T3 Code tools of the visual roles: {@link T3_PREVIEW_TOOLS} and the devices (`device_*`).
+ * They arrive only through Pi's built-in MCP extension, so they exist only under T3 Code's bridge
+ * or after the user registered T3's MCP server, and only while `pi.features.mcp` is on.
+ */
+export const T3_VISUAL_TOOLS: ReadonlyArray<string> = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`]
 
 /** The computer-use tools of `@amaster.ai/pi-computer-use`, which all carry this prefix. */
 export const COMPUTER_USE_TOOLS: ReadonlyArray<string> = ["computer_use_*"]
+
+/**
+ * The npm package of opencode browse, the MCP server of the `browser-use` capability. It is pinned
+ * in `pi-packages.json` with the Pi packages, so the updater moves it, but Pi does not install it:
+ * the MCP server runs it through `npx` at that exact release.
+ */
+export const BROWSE_PACKAGE = "@opencode/browse" as const satisfies PiPackageName
+
+/** The name opencode browse is registered under; Pi names its tools `mcp__browse__<tool>`. */
+export const BROWSE_SERVER = "browse"
+
+/** The tools of opencode browse's MCP server, as one pattern on the names Pi gives them. */
+export const BROWSE_TOOLS: ReadonlyArray<string> = [`mcp__${BROWSE_SERVER}__*`]
+
+/** The `browse` MCP server at the pinned release: `npx -y @opencode/browse@<pin> mcp`. */
+export const BROWSE_MCP_SERVER: McpServer = {
+  name: BROWSE_SERVER,
+  command: "npx",
+  args: ["-y", `${BROWSE_PACKAGE}@${PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]}`, "mcp"],
+}
 
 /** The same packages in both forms, with no MCP server. */
 const sameForm = <const P extends ReadonlyArray<PiPackageName>>(packages: P) =>
@@ -214,7 +242,7 @@ export const CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@tintinweb/pi-subagents"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }],
     health: ["needs", "packages"],
   },
@@ -227,7 +255,7 @@ export const CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["billion-context"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     // Billion Context's own subagents stay off: `@tintinweb/pi-subagents` runs the specialists. This
     // is the one setting the package's README gives for it ("Pi built-in subagents", README lines
     // 566-582; line 582: "context compression remains enabled").
@@ -243,7 +271,7 @@ export const CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@juicesharp/rpiv-todo"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"],
   },
@@ -257,7 +285,7 @@ export const CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@juicesharp/rpiv-ask-user-question"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"],
   },
@@ -270,7 +298,7 @@ export const CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@aliou/pi-processes"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"],
   },
@@ -286,7 +314,7 @@ export const CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS },
+    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS, screen: T3_PREVIEW_TOOLS },
     settings: [],
     health: ["needs"],
   },
@@ -309,8 +337,44 @@ export const CAPABILITIES = [
         content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } },
       },
     ],
-    tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
+    tools: {
+      rootExclude: COMPUTER_USE_TOOLS,
+      visual: COMPUTER_USE_TOOLS,
+      screen: COMPUTER_USE_TOOLS,
+    },
     health: ["needs", "packages"],
+  },
+  {
+    // opencode browse (`@opencode/browse`): a stdio MCP server that drives the user's own browser
+    // through the browse extension. It starts no browser (the package forbids `executablePath` and
+    // has no launch code), so it needs a graphical session with a browser paired to it, and the
+    // headless form is not offered. The extension registers the server only in the sessions of
+    // screen specialists (`screen.ts` of the Pi integration), so no other process starts it.
+    name: "browser-use",
+    feature: "browserUse",
+    description:
+      "Lets screen specialists drive the user's real browser through opencode browse (@opencode/browse)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [
+      { kind: "display" },
+      {
+        kind: "command",
+        command: "npx",
+        fix: "install Node.js 22.19 or newer from https://nodejs.org, which ships npx",
+      },
+    ],
+    forms: {
+      headless: {
+        unavailable:
+          "browse drives the browser of a graphical session through its extension and starts none itself, and this machine has no graphical session",
+      },
+      normal: { packages: [], mcpServers: [BROWSE_MCP_SERVER] },
+    },
+    tools: { rootExclude: BROWSE_TOOLS, visual: [], screen: BROWSE_TOOLS },
+    settings: [],
+    health: ["needs", "pairing"],
   },
   {
     // Part of the Codex provider (`pi/codex/luna-reserve.ts`): it has no package, no tool and no
@@ -325,7 +389,7 @@ export const CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs"],
   },
@@ -342,7 +406,7 @@ export const CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs"],
   },
@@ -368,7 +432,7 @@ export const CAPABILITIES = [
       },
     ],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [
       {
         file: BILLION_CONTEXT_FILE,
@@ -396,7 +460,7 @@ export const CAPABILITIES = [
     needs: [],
     nativeHosts: FFF_NATIVE_HOSTS,
     forms: sameForm(["@ff-labs/pi-fff"]),
-    tools: { rootExclude: FFF_TOOLS, visual: [] },
+    tools: { rootExclude: FFF_TOOLS, visual: [], screen: [] },
     settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
     health: ["needs", "packages"],
   },

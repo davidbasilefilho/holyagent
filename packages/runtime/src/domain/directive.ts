@@ -1,7 +1,7 @@
 import { type Assignment, relatedIds } from "./assignment.ts"
 import type { AgentHost } from "./host.ts"
 import { firstOverlap } from "./paths.ts"
-import { type Effort, isReviewer, type Model, routeFor } from "./route.ts"
+import { agentFor, type Effort, isReviewer, type Model, routeFor } from "./route.ts"
 import type { Registry, SpecialistEntry } from "./specialists.ts"
 
 /** Tunables of warm reuse. */
@@ -87,6 +87,10 @@ const STAGES: ReadonlyArray<readonly [string, (entry: SpecialistEntry, c: Candid
       (entry, c) => !entry.running && entry.roleTask === c.assignment.roleTask,
     ],
     [
+      "specialist with the same screen capability",
+      (entry, c) => (entry.screen === true) === (c.assignment.screen === true),
+    ],
+    [
       "specialist with the same model and effort",
       (entry, c) => entry.model === c.model && entry.effort === c.effort,
     ],
@@ -126,12 +130,13 @@ const compareEntries = (assignment: Assignment) => (a: SpecialistEntry, b: Speci
   (a.agentId < b.agentId ? -1 : 1)
 
 /**
- * Decides how to run an Assignment. It continues an idle specialist of the same role task, model
- * and effort (an identical configuration keeps the cache prefix) that finished inside the cache
- * window and whose context is relevant: a follow-up of its own Assignment, overlapping paths, or
- * shared related Assignments. A Reviewer, or any Assignment that names independentFrom, never
- * continues a specialist that worked on or reviewed those Assignments, and no Assignment continues
- * a specialist a workflow launched. Otherwise it spawns.
+ * Decides how to run an Assignment. It continues an idle specialist of the same role task, screen
+ * capability (the tools a specialist has are those of its agent file), model and effort (an
+ * identical configuration keeps the cache prefix) that finished inside the cache window and whose
+ * context is relevant: a follow-up of its own Assignment, overlapping paths, or shared related
+ * Assignments. A Reviewer, or any Assignment that names independentFrom, never continues a
+ * specialist that worked on or reviewed those Assignments, and no Assignment continues a specialist
+ * a workflow launched. Otherwise it spawns.
  */
 export const directiveFor = (
   assignment: Assignment,
@@ -153,7 +158,7 @@ export const directiveFor = (
     if (pool.length === 0)
       return {
         action: "spawn",
-        agent: route.agent,
+        agent: agentFor(route, assignment.screen),
         model: route.model,
         effort: route.effort,
         reason: `no ${name}`,
@@ -164,7 +169,7 @@ export const directiveFor = (
   if (best === undefined)
     return {
       action: "spawn",
-      agent: route.agent,
+      agent: agentFor(route, assignment.screen),
       model: route.model,
       effort: route.effort,
       reason: "no specialist with relevant context",

@@ -94,3 +94,33 @@ export const fakeShell = (options: {
   )
   return { layer, calls, lines: () => calls.map((call) => call.line) }
 }
+
+/** A token as opencode browse stores it: 43 base64url characters. */
+const BROWSE_TOKEN = "A".repeat(43)
+
+/** When the fixture browser was last seen, in milliseconds since the epoch. */
+export const BROWSE_LAST_SEEN = 1_700_000_000_000
+/** How doctor and setup print {@link BROWSE_LAST_SEEN}. */
+export const BROWSE_LAST_SEEN_TEXT = "2023-11-14T22:13:20.000Z"
+
+/**
+ * Makes opencode browse look paired in a home directory: one browser, `Chrome`, in the file browse
+ * keeps under `.local/share/browse`, where it looks when no variable relocates it.
+ */
+export const writeBrowsePairing = async (home: string): Promise<string> => {
+  const file = join(home, ".local", "share", "browse", "browser-tokens.json")
+  await mkdir(join(home, ".local", "share", "browse"), { recursive: true })
+  await writeFile(
+    file,
+    JSON.stringify({
+      Default: {
+        token: BROWSE_TOKEN,
+        pairedAt: 1_699_000_000_000,
+        lastSeen: BROWSE_LAST_SEEN,
+        id: "chrome-laptop",
+        name: "Chrome",
+      },
+    }),
+  )
+  return file
+}

@@ -138,6 +138,11 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
  * - VisualInspection: T3 Code's browser, render and device tools while `pi.features.mcp` is on, and
  *   the computer-use tools while `pi.features.computerUse` is on.
  *
+ * With `screen` (an Assignment that carries the screen capability) a specialist also gets the
+ * `screen` tools of each enabled capability, whatever its role: the computer-use tools, opencode
+ * browse's and, while `pi.features.mcp` is on, T3 Code's preview and render tools. Without it none
+ * of them is granted beyond what VisualInspection gives. The root takes no `screen`.
+ *
  * A specialist's allowlist never names `todo`, `ask_user_question` or the process tools: the root
  * alone has them. Tools registered `model-only` (`ask_user_question`) stay directly callable under
  * mode `only`. With `pi.features.mcp` off every process starts with `--no-mcp`. The profile
@@ -147,6 +152,7 @@ export const toolArgs = (
   config: Config,
   key: RouteKey,
   profile: ProviderProfile = providerProfile(config),
+  options: { readonly screen?: boolean } = {},
 ): ToolArgs => {
   const { features } = config.pi
   const enabled = enabledCapabilities(features, { provider: config.pi.provider })
@@ -174,6 +180,7 @@ export const toolArgs = (
     ...(has(capabilities, "VisualInspection")
       ? enabled.flatMap((capability) => capability.tools.visual)
       : []),
+    ...(options.screen === true ? enabled.flatMap((capability) => capability.tools.screen) : []),
   ]
   const unique = [...new Set(tools)]
   return build(

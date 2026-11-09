@@ -226,6 +226,21 @@ export const routeFor = (roleTask: RoleTask): Route => ({
   ...SPECS[roleTask],
 })
 
+/**
+ * The end of the agent name of a specialist launched for an Assignment that carries the screen
+ * capability: `worker-implementation-screen`. The Pi package ships one such agent file for each
+ * specialist, with the screen tools added to its own, since a launcher can grant tools only through
+ * the agent file.
+ */
+export const SCREEN_AGENT_SUFFIX = "-screen"
+
+/**
+ * The agent name a specialist is launched as: the route's own, or with {@link SCREEN_AGENT_SUFFIX}
+ * for an Assignment that carries the screen capability.
+ */
+export const agentFor = (route: Route, screen: boolean | undefined): string =>
+  screen === true ? `${route.agent}${SCREEN_AGENT_SUFFIX}` : route.agent
+
 /** The 18 routes, in the order of {@link RoleTask}. */
 export const ROUTES: ReadonlyArray<Route> = RoleTask.literals.map(routeFor)
 

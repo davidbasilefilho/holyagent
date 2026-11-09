@@ -74,7 +74,7 @@ const env = (extra: Record<string, string> = {}) => ({
 
 const withPi = () =>
   fakeShell({
-    commands: ["bun", "ctx7", "pi", "node"],
+    commands: ["bun", "ctx7", "pi", "node", "npx"],
     respond: (line) =>
       line === "pi --version"
         ? { stdout: `${PI_HOST_VERSION}\n` }

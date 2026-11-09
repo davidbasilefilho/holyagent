@@ -17,6 +17,7 @@ import { piPackages } from "../config/packages.ts"
 import { piPackageSource } from "../config/pi-packages.ts"
 import type { Config } from "../config/schema.ts"
 import { stateDirectory } from "../state/layout.ts"
+import { BROWSE_PAIR_FIX, describePairing, readBrowsePairing } from "./browse.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice, hasDisplay } from "./form.ts"
@@ -360,7 +361,7 @@ const checkBasePackages = (
 }
 
 /** The reason a system need is not met on this machine, or `undefined` when it is. */
-const unmetNeed = (env: Env, need: SystemNeed) =>
+export const unmetNeed = (env: Env, need: SystemNeed) =>
   Effect.gen(function* () {
     if (need.kind === "display")
       return hasDisplay(env)
@@ -375,10 +376,10 @@ const unmetNeed = (env: Env, need: SystemNeed) =>
  * the capability does not offer, or a host its native library does not cover, is a `~` line saying
  * why and that nothing is expected (never a failure, since a headless machine is not broken, nor is
  * one without a native build, where Pi keeps its own tools). Otherwise the probes of its `health`
- * run: `needs` checks each system need ({@link
- * SystemNeed}), `packages` that each package of the
+ * run: `needs` checks each system need ({@link SystemNeed}) and `packages` that each package of the
  * form is listed at its pin in the files that count; every problem is named in one `FAIL` line, and
- * a healthy capability is one `ok` line with its form and whom it applies to.
+ * a healthy capability is one `ok` line with its form and whom it applies to. The `pairing` probe
+ * has a line of its own ({@link checkPairing}).
  */
 export const checkCapability = (
   env: Env,
@@ -421,6 +422,34 @@ export const checkCapability = (
   })
 
 /**
+ * Doctor's line on the pairing of a capability that probes it (opencode browse's `pairing` health
+ * probe), or none for a capability without the probe or in a form it does not offer. A browser
+ * paired with browse is an `ok` line naming it: its extension is installed and paired. None is a
+ * `~` line with the way to pair one, not a failure: the first run of a machine is in that state
+ * until the person adds the extension to their browser, and browse cannot tell an uninstalled
+ * extension from an unpaired one before a browser connects. A pairing file that cannot be read is a
+ * `FAIL` line.
+ */
+export const checkPairing = (
+  env: Env,
+  capability: CapabilityDefinition,
+  form: CapabilityForm,
+  platform?: string,
+) =>
+  Effect.gen(function* () {
+    if (!capability.health.includes("pairing")) return []
+    if (unavailableIn(capability, form, platform) !== undefined) return []
+    const name = `pi capability ${capability.name} pairing`
+    const found = yield* readBrowsePairing(env).pipe(
+      Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
+    )
+    if (found instanceof SetupFailure) return [fail(name, found.message)]
+    return found.state === "paired"
+      ? [pass(name, describePairing(found))]
+      : [hint(`${name}: ${describePairing(found)}; ${BROWSE_PAIR_FIX}`)]
+  })
+
+/**
  * Doctor's lines on the capabilities: the form in force ({@link describeForm}), then one line for
  * each enabled capability of the config in registry order ({@link checkCapability}). A disabled
  * capability has no line.
@@ -437,9 +466,15 @@ const checkCapabilities = (
     const files = piPresenceFiles(env, cwd, scope)
     const lines = yield* Effect.forEach(
       enabledCapabilities(config.pi.features, { provider: config.pi.provider }),
-      (capability) => checkCapability(env, scope, capability, choice.form, listed, files),
+      (capability) =>
+        Effect.gen(function* () {
+          return [
+            yield* checkCapability(env, scope, capability, choice.form, listed, files),
+            ...(yield* checkPairing(env, capability, choice.form)),
+          ]
+        }),
     )
-    return [pass("pi form", describeForm(choice)), ...lines]
+    return [pass("pi form", describeForm(choice)), ...lines.flat()]
   })
 
 /**

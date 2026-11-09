@@ -4,13 +4,18 @@ import { join } from "node:path"
 import { Effect, Schema } from "effect"
 
 import {
+  BROWSE_TOOLS,
   CAPABILITIES,
   type CapabilityDefinition,
   capabilityPackages,
+  COMPUTER_USE_TOOLS,
   enabledCapabilities,
   FEATURE_DEFAULTS,
   FEATURE_PACKAGES,
+  formContent,
   managedCapabilityPackages,
+  T3_PREVIEW_TOOLS,
+  T3_VISUAL_TOOLS,
   unavailableIn,
 } from "../../src/config/capabilities.ts"
 import { piPackages } from "../../src/config/packages.ts"
@@ -40,7 +45,7 @@ const SYNTHETIC: CapabilityDefinition = {
     headless: { packages: ["pi-web-kit"], mcpServers: [] },
     normal: { packages: ["billion-context", "pi-web-kit"], mcpServers: [] },
   },
-  tools: { rootExclude: [], visual: [] },
+  tools: { rootExclude: [], visual: [], screen: [] },
   settings: [],
   health: ["packages"],
 }
@@ -101,13 +106,14 @@ describe("the capability registry", () => {
     expect(file).toEqual(written)
     const config = await Effect.runPromise(Schema.decodeUnknownEffect(Config)(written))
     // Only the keys a later release added (the Codex provider's Luna Reserve and context_management,
-    // the just-bash shell and fff) take their default.
+    // the just-bash shell, fff and browser use) take their default.
     expect(config.pi.features).toEqual({
       ...written.pi.features,
       lunaReserve: true,
       contextManagement: true,
       justBash: true,
       fff: true,
+      browserUse: true,
     })
     const unknown = Schema.decodeUnknownEffect(ConfigFile, { onExcessProperty: "error" })({
       pi: { features: { notACapability: true } },
@@ -287,5 +293,61 @@ describe("registry-driven tool settings", () => {
     expect(toolSettings(withFeatures({ computerUse: false }))).not.toContainEqual(patch)
     expect(files(withFeatures({ subagents: false }))).not.toContain("~/.pi/agent/subagents.json")
     expect(files(DEFAULT_CONFIG, "headless")).toContain("~/.pi/agent/subagents.json")
+  })
+})
+
+describe("the browser-use capability entry", () => {
+  const entry = CAPABILITIES.find((capability) => capability.name === "browser-use")
+
+  test("is on by default for the specialists, and offers browse's MCP server in the normal form only", () => {
+    expect(entry).toMatchObject({
+      feature: "browserUse",
+      defaultOn: true,
+      applicability: "specialists",
+      skills: [],
+      settings: [],
+    })
+    expect(entry?.forms.normal).toEqual({
+      packages: [],
+      mcpServers: [
+        { name: "browse", command: "npx", args: ["-y", "@opencode/browse@0.0.15", "mcp"] },
+      ],
+    })
+    expect(entry === undefined ? undefined : formContent(entry, "headless")).toBeUndefined()
+    expect(entry?.forms.headless).toHaveProperty("unavailable")
+    expect(DEFAULT_CONFIG.pi.features.browserUse).toBe(true)
+  })
+
+  test("needs a graphical session and npx, and probes its needs and its pairing", () => {
+    expect(
+      entry?.needs.map((need) => (need.kind === "display" ? "display" : need.command)),
+    ).toEqual(["display", "npx"])
+    expect(entry?.health).toEqual(["needs", "pairing"])
+  })
+
+  test("grants browse's tools to a screen Assignment and keeps them from the root and the visual roles", () => {
+    expect(entry?.tools).toEqual({
+      rootExclude: ["mcp__browse__*"],
+      visual: [],
+      screen: ["mcp__browse__*"],
+    })
+  })
+
+  test("loads no Pi package in either form: the server runs through npx at the pin", () => {
+    for (const form of ["headless", "normal"] as const)
+      expect(capabilityPackages({ browserUse: true }, form)).toEqual([])
+    expect(managedCapabilityPackages()).not.toContain("@opencode/browse")
+  })
+
+  test("only computer use, browse and T3's preview tools are granted by the screen capability", () => {
+    expect(
+      CAPABILITIES.filter((capability) => capability.tools.screen.length > 0).map(
+        (capability) => capability.name,
+      ),
+    ).toEqual(["mcp", "computer-use", "browser-use"])
+    expect(CAPABILITIES.flatMap((capability) => capability.tools.screen).toSorted()).toEqual(
+      [...T3_PREVIEW_TOOLS, ...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS].toSorted(),
+    )
+    for (const tool of T3_PREVIEW_TOOLS) expect(T3_VISUAL_TOOLS).toContain(tool)
   })
 })

@@ -7,7 +7,7 @@ import type { Assignment } from "../domain/assignment.ts"
 import { PI_WORKFLOW_AGENT_PREFIX } from "../domain/directive.ts"
 import { InsufficientAcceptance } from "../domain/errors.ts"
 import { CLAUDE_WORDS, type HostWords, PI_WORDS } from "../domain/host.ts"
-import { routeFor } from "../domain/route.ts"
+import { agentFor, routeFor } from "../domain/route.ts"
 import {
   decodePiJournal,
   type ExpectedCall,
@@ -227,12 +227,15 @@ const PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[
 export const dispatchedAssignment = (prompt: string): string | undefined =>
   PROMPT_LINE.exec(prompt.split("\n", 1)[0] ?? "")?.[1]
 
+const SCREEN_LINE =
+  "Screen capability: this Assignment carries it, so the computer-use, browser-use (mcp__browse__*) and T3 preview tools are yours where this machine provides them. Report a tool that is missing instead of working around it."
+
 /**
  * The Assignment as the specialist reads it, in a fixed order: the role line (the marker
- * {@link dispatchedAssignment} reads back), objective, scope, constraints, ownership paths,
- * acceptance criteria, required evidence and the closing line that asks for the `evidence:` block
- * {@link acceptanceFrom} reads. It is the text of the brief file, which the root never reads or
- * re-emits: it sends {@link dispatchPrompt}.
+ * {@link dispatchedAssignment} reads back), objective, scope, constraints, ownership paths, the
+ * screen capability when it carries one, acceptance criteria, required evidence and the closing
+ * line that asks for the `evidence:` block {@link acceptanceFrom} reads. It is the text of the brief
+ * file, which the root never reads or re-emits: it sends {@link dispatchPrompt}.
  */
 export const renderPrompt = (assignment: Assignment, agent: string): string =>
   [
@@ -241,6 +244,7 @@ export const renderPrompt = (assignment: Assignment, agent: string): string =>
     ...section("Scope", assignment.scope),
     ...section("Constraints", assignment.constraints),
     ...section("Ownership paths (write only here)", assignment.ownershipPaths),
+    ...(assignment.screen === true ? [SCREEN_LINE] : []),
     ...section(
       "Acceptance criteria",
       assignment.criteria.map(
@@ -343,9 +347,10 @@ export const journalResults = (journal: string, source: string) =>
  * The key an Assignment's dispatched call has in a `@tintinweb/pi-subagents` workflow journal: the
  * prompt that {@link dispatchPrompt} prints for the pi host (`agent` is the namespaced agent it
  * names, `briefPath` the brief file it points at), the Assignment id as the label, the route's
- * agent (the Claude slug without its namespace, which the Pi package ships under that name), and
- * the model and effort as the dispatch printed them (`launch`, see `launchesOf`). The script passes
- * no isolation, gate, resume or schema.
+ * agent (the Claude slug without its namespace, which the Pi package ships under that name, and
+ * with `-screen` for an Assignment that carries the screen capability), and the model and effort as
+ * the dispatch printed them (`launch`, see `launchesOf`). The script passes no isolation, gate,
+ * resume or schema.
  */
 export const dispatchedCall = (
   assignment: Assignment,
@@ -358,7 +363,7 @@ export const dispatchedCall = (
     prompt: dispatchPrompt(assignment, agent, briefPath, PI_WORDS),
     label: assignment.id,
     model: launch.model,
-    agentType: routeFor(assignment.roleTask).agent,
+    agentType: agentFor(routeFor(assignment.roleTask), assignment.screen),
     effort: launch.effort,
   }),
 })

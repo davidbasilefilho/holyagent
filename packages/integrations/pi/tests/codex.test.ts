@@ -42,7 +42,7 @@ const WRITERS = [
   "worker-integration",
   "worker-debugging",
   "worker-visual",
-]
+].flatMap((agent) => [agent, `${agent}-screen`])
 
 const settings = (config: Config): CodexSettings => {
   const found = codexSettings(config)

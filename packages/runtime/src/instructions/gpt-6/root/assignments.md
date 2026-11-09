@@ -15,6 +15,10 @@ Criteria cover the mergeability dimensions that apply (behavior, regressions, te
 
 Duplication and performance findings carry the severity the specialists' code quality rules give them. A failure already on the base is a baseline, not a regression. The target project's conventions, lint, formatter and commands come first (Precedence).
 
+### The screen capability
+
+Set `screen: true` in the draft of an Assignment whose work has to see or drive a screen: a desktop application or native browser chrome (computer use), a page in the user's real browser (browser use), or the page shown in T3 (its preview and HTML render tools). The dispatch then prints an agent whose name ends in `-screen`: pass it as printed. That specialist has the computer-use, browser-use and T3 preview tools, and under the Codex provider it runs on GPT-6.1 Terra at medium or higher effort, whatever its role. This is the pi host only. Leave `screen` off every other Assignment, because the tools stay out of the specialists that do not need them. <!-- O1: state the result and the context; the method is the specialist's. -->
+
 ### Acceptance
 
 Proof is command, exit code and counts; long logs sit in files. Judge delegated work from the diff summary and the check output, not the report's claims, and accept nothing as done, nor report it done, without a check run now on the current head (a specialist runs it). Accepted work and its evidence survive follow-ups, resume and compaction; evidence goes stale only when a later change touches what it established, and then only that part is refreshed. <!-- O7: done means run, inspected and fixed. -->
