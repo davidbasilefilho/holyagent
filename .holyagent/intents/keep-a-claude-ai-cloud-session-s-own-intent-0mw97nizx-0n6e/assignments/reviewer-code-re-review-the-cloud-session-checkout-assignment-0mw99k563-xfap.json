@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw99k563-xfap",
+  "intentId": "intent-0mw97nizx-0n6e",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-cloud-session-checkout",
+  "objective": "Re-review the cloud-session checkout repair for correctness.",
+  "state": "Running",
+  "scope": [
+    "The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0vv-klze.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v14z-rjm5.md (artifact) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v1e0-v4vz.md (security); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw999emo-eac9.md. Review only the repair commit 323dfb1 in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r1.diff) and say whether each earlier finding is closed.",
+    "Run only bun test packages/runtime/tests/cloud-checkout.test.ts packages/runtime/tests/sessioncontext.test.ts."
+  ],
+  "constraints": [
+    "Read-only: no edits and no git writes.",
+    "Do not check out other commits in any checkout; read the range with git diff and git show.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier code finding is closed, or reported open with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The repair introduces no regression in session start, status or the notice",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "tests"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw999emo-eac9"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:54:56.811Z"
+  },
+  "createdAt": "2026-11-09T12:54:56.811Z"
+}
