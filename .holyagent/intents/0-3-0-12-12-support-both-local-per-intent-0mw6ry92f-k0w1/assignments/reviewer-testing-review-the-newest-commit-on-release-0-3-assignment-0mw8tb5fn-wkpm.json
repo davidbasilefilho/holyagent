@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw8tb5fn-wkpm",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.testing",
+  "slug": "review-the-newest-commit-on-release-0-3",
+  "objective": "Review the newest commit on release/0.3.0/feat/installed-scope-default, which rebuilds the setup of two alias tests in packages/runtime/tests/setup-scope.test.ts so they still prove their case on windows-latest.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-scope; review git diff HEAD~1 HEAD (also in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/scope-win-fix.diff).",
+    "On Windows CI, \"a tracked local file of another letter case never infers local\" found local because git add of a case variant on NTFS added nothing, and \"a tracked top-level entry that is the .claude folder by identity never infers local\" failed because writing .claude. lands in .claude. The fix adds index entries with git hash-object and update-index --cacheinfo and asserts the index holds them.",
+    "Check: each test still asserts user scope and would fail if the product check regressed; the new index assertions prevent a vacuous pass; nothing in the setup is invalid on Windows (path separators, NTFS name rules, core.protectNTFS on update-index)."
+  ],
+  "constraints": [
+    "Read-only; you may run bun test on that file in that worktree.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The review states whether either test lost coverage or could pass vacuously, with path:line",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The review states whether the new setup is valid on Windows",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8t536r-96bv"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:20:03.395Z"
+  },
+  "createdAt": "2026-11-09T05:20:03.395Z"
+}
