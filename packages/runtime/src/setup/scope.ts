@@ -169,30 +169,61 @@ const enablement = Effect.fn("enablement")(function* (folder: string, file: stri
 })
 
 /**
- * Whether git has `file` in its index, for a `root` that is a trusted work tree. Fails closed: any
- * answer but a clean "nothing listed" (git missing or failing, say) counts as tracked.
+ * Why a settings `file` of the trusted work tree `root` may have come with the repository, or
+ * undefined when git leaves it to the user: no index entry names it or the `.claude` folder above
+ * it, and `folder` is no other repository's work tree. Fails closed: when git cannot answer
+ * (missing or failing, say), the reason says so and the file is not taken for the user's.
+ *
+ * The index entries are listed for the folder as a whole, not for the file alone, because a
+ * repository can commit `.claude` as a submodule (a gitlink entry, whose checkout holds the file
+ * while `git ls-files` for the file prints nothing) and, on a case-insensitive file system, a
+ * tracked `Settings.Local.json` is read as the file though the literal name misses it. The pathspec
+ * ignores case and the names are compared without it.
+ *
+ * Known limit: an archive that ships its own `.git` with an index that omits the file still counts
+ * as untracked, since the index is all git has to say. Pass `--scope` to choose a scope then.
  */
-const tracked = Effect.fn("tracked")(function* (root: string, file: string) {
+const repositoryControl = Effect.fn("repositoryControl")(function* (
+  root: string,
+  folder: string,
+  file: string,
+) {
   const shell = yield* Shell
-  const listed = yield* shell.run("git", ["ls-files", "--cached", "--", relative(root, file)], {
-    cwd: root,
-  })
-  return listed.exitCode !== 0 || listed.stdout.trim() !== ""
+  const name = relative(root, file).split(sep).join("/")
+  const folderName = relative(root, folder).split(sep).join("/")
+  const listed = yield* shell.run(
+    "git",
+    ["ls-files", "--cached", "-z", "--", `:(icase,literal)${folderName}`],
+    { cwd: root },
+  )
+  if (listed.exitCode !== 0) return "git could not say whether it tracks it"
+  const entries = listed.stdout.split("\0").map((entry) => entry.toLowerCase())
+  if (entries.includes(name.toLowerCase())) return "git tracks it"
+  if (entries.includes(folderName.toLowerCase())) return `git tracks ${folderName} itself`
+  const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd: folder })
+  const named = top.stdout.trim()
+  if (top.exitCode !== 0 || named === "") return "git could not say whether it tracks it"
+  const [there, here] = [yield* real(named), yield* real(root)]
+  return there !== undefined && there === here
+    ? undefined
+    : `${folderName} is inside another git repository`
 })
 
 /**
  * The scope `setup` and `doctor` use without `--scope`. Only the user's own uncommitted
  * `.claude/settings.local.json` moves it off `user`: when that file sets the plugin to `true`, the
- * folder is a git work tree that `claudeFolder` trusts, and git does not track the file (it is not
- * in the index), the scope is `local`. An enabled file in a folder that is not a trusted git work
- * tree (a source archive, say) or that git tracks might have come with a cloned repository, so the
- * scope stays `user` and a notice names the file and `--scope local`. An explicit `false` there
- * means the plugin is disabled for this project, so the search stops and `user` is used with a
- * notice saying so. A committed `.claude/settings.json` that enables the plugin never selects a
- * scope, because a cloned repository must not choose where setup writes or which registry a Pi
- * install reads; the notice names the file and `--scope project`. A symlinked `local` or `project`
- * file is not read, with a notice for `local`. A `local` file that is not a JSON object fails with
- * SetupFailure naming it; a bad `project` file is ignored.
+ * folder is a git work tree that `claudeFolder` trusts, and the file is untracked (see
+ * `repositoryControl`: no index entry for the file or `.claude`, in any letter case, and `.claude`
+ * is no other repository), the scope is `local`. An enabled file in a folder that is not a trusted
+ * git work tree (a source archive, say) or that git tracks might have come with a cloned
+ * repository, so the scope stays `user` and a notice names the file and `--scope local`. An archive
+ * that ships its own `.git` with an index that omits the file still counts as untracked. An
+ * explicit `false` there means the plugin is disabled for this project, so the search stops and
+ * `user` is used with a notice saying so. A committed `.claude/settings.json` that enables the
+ * plugin never selects a scope, because a cloned repository must not choose where setup writes or
+ * which registry a Pi install reads; the notice names the file and `--scope project`. A symlinked
+ * `local` or `project` file is not read, with a notice for `local`. A `local` file that is not a
+ * JSON object fails with SetupFailure naming it; a bad `project` file is ignored.
  */
 export const installedScope = Effect.fn("installedScope")(function* (cwd: string) {
   const { folder, root, trusted } = yield* claudeFolder(cwd)
@@ -201,11 +232,14 @@ export const installedScope = Effect.fn("installedScope")(function* (cwd: string
   const notices: Array<string> = []
   const found = yield* enablement(folder, local)
   if (found === "enabled") {
-    if (trusted && !(yield* tracked(root, local))) {
+    const reason = trusted
+      ? yield* repositoryControl(root, folder, local)
+      : "the folder is not a trusted git work tree"
+    if (reason === undefined) {
       return { scope: "local", source: "inferred", file: local } satisfies ResolvedScope
     }
     notices.push(
-      `${local} enables HolyAgent but ${trusted ? "git tracks it" : "the folder is not a trusted git work tree"}, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+      `${local} enables HolyAgent but ${reason}, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
     )
   }
   if (found === "disabled") {

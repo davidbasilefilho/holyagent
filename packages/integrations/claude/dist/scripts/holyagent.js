@@ -13764,12 +13764,24 @@ var enablement = fn2("enablement")(function* (folder, file) {
   const value = isJsonObject2(plugins) ? plugins[PLUGIN_ID] : undefined;
   return value === true ? "enabled" : value === false ? "disabled" : "unset";
 });
-var tracked = fn2("tracked")(function* (root, file) {
+var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) {
   const shell = yield* Shell;
-  const listed = yield* shell.run("git", ["ls-files", "--cached", "--", relative4(root, file)], {
-    cwd: root
-  });
-  return listed.exitCode !== 0 || listed.stdout.trim() !== "";
+  const name = relative4(root, file).split(sep6).join("/");
+  const folderName = relative4(root, folder).split(sep6).join("/");
+  const listed = yield* shell.run("git", ["ls-files", "--cached", "-z", "--", `:(icase,literal)${folderName}`], { cwd: root });
+  if (listed.exitCode !== 0)
+    return "git could not say whether it tracks it";
+  const entries = listed.stdout.split("\x00").map((entry) => entry.toLowerCase());
+  if (entries.includes(name.toLowerCase()))
+    return "git tracks it";
+  if (entries.includes(folderName.toLowerCase()))
+    return `git tracks ${folderName} itself`;
+  const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd: folder });
+  const named = top.stdout.trim();
+  if (top.exitCode !== 0 || named === "")
+    return "git could not say whether it tracks it";
+  const [there, here] = [yield* real(named), yield* real(root)];
+  return there !== undefined && there === here ? undefined : `${folderName} is inside another git repository`;
 });
 var installedScope = fn2("installedScope")(function* (cwd) {
   const { folder, root, trusted } = yield* claudeFolder(cwd);
@@ -13778,10 +13790,11 @@ var installedScope = fn2("installedScope")(function* (cwd) {
   const notices = [];
   const found = yield* enablement(folder, local);
   if (found === "enabled") {
-    if (trusted && !(yield* tracked(root, local))) {
+    const reason = trusted ? yield* repositoryControl(root, folder, local) : "the folder is not a trusted git work tree";
+    if (reason === undefined) {
       return { scope: "local", source: "inferred", file: local };
     }
-    notices.push(`${local} enables HolyAgent but ${trusted ? "git tracks it" : "the folder is not a trusted git work tree"}, so it is not taken for your own uncommitted file; using user; --scope local targets it`);
+    notices.push(`${local} enables HolyAgent but ${reason}, so it is not taken for your own uncommitted file; using user; --scope local targets it`);
   }
   if (found === "disabled") {
     notices.push(`${PLUGIN_ID} is set to false in ${local}, so HolyAgent is disabled for this project; using user`);

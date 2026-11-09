@@ -713,6 +713,104 @@ describe("the default scope is user unless the local settings enable the plugin"
       ),
     )
     expect(resolved).toMatchObject({ scope: "user", source: "default" })
+    expect(scopeNotices(resolved)).toEqual([
+      `${file} enables HolyAgent but git could not say whether it tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    ])
+  })
+
+  test("a .claude index entry of its own never infers local", async () => {
+    // A gitlink lists as the folder itself; the file's own pathspec would print nothing.
+    const file = join(repo(), ".claude", "settings.local.json")
+    await write(file, enabled)
+    const resolved = await Effect.runPromise(
+      installedScope(nested()).pipe(
+        Effect.provide(
+          fakeShell({
+            commands: [],
+            respond: (line) =>
+              line === "git rev-parse --show-toplevel"
+                ? { stdout: `${repo()}\n` }
+                : line.startsWith("git ls-files")
+                  ? { stdout: ".claude\0" }
+                  : undefined,
+          }).layer,
+        ),
+      ),
+    )
+    expect(scopeNotices(resolved)).toEqual([
+      `${file} enables HolyAgent but git tracks .claude itself, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    ])
+  })
+
+  test("a .claude committed as a submodule never infers local", async () => {
+    const target = await initRepo()
+    const identity = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
+    const inner = join(home, "inner")
+    await mkdir(inner, { recursive: true })
+    await $`git init -q ${inner}`.quiet()
+    await write(join(inner, "settings.local.json"), enabled)
+    await $`git -C ${inner} add .`.quiet()
+    await $`git -C ${inner} ${identity} commit -q -m inner`.quiet()
+    await $`git -C ${repo()} -c protocol.file.allow=always submodule add -q ${inner} .claude`.quiet()
+    // The superproject has no entry for the file itself, only the gitlink.
+    expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
+      "",
+    )
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${target.local} enables HolyAgent but git tracks .claude itself, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+  })
+
+  test("a .claude inside another git repository never infers local", async () => {
+    const target = await initRepo()
+    await write(files().local, enabled)
+    // Untracked in the outer repository: the nested repository's files are not in its index.
+    await $`git init -q ${join(repo(), ".claude")}`.quiet()
+    expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
+      "",
+    )
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${target.local} enables HolyAgent but .claude is inside another git repository, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+    expect(await readJson(target.user)).toMatchObject({ includeGitInstructions: false })
+  })
+
+  test("a tracked local file of another letter case never infers local", async () => {
+    const target = await initRepo()
+    // The literal name is untracked; where the file system ignores case it is the same file.
+    await write(files().local, enabled)
+    await write(join(repo(), ".claude", "Settings.Local.json"), enabled)
+    await $`git -C ${repo()} add -f .claude/Settings.Local.json`.quiet()
+    expect(await $`git -C ${repo()} ls-files --cached -- .claude/settings.local.json`.text()).toBe(
+      "",
+    )
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.code).toBe(0)
+    const lines = result.stdout.split("\n")
+    expect(lines[0]).toBe(DEFAULT)
+    expect(lines[1]).toBe(
+      `~ scope: ${target.local} enables HolyAgent but git tracks it, so it is not taken for your own uncommitted file; using user; --scope local targets it`,
+    )
+  })
+
+  test("a tracked project file next to an untracked local file still infers local", async () => {
+    const target = await initRepo()
+    await write(files().project, {})
+    await $`git -C ${repo()} add -f .claude/settings.json`.quiet()
+    await write(files().local, enabled)
+    const result = await cli(["setup", "--skip-ctx7"], nested())
+    expect(result.stdout.split("\n")[0]).toBe(
+      `~ scope: local (inferred: holyagent@holyagent is enabled in ${target.local})`,
+    )
   })
 
   test("an explicit false in the local file stops the search and uses user, saying so", async () => {
