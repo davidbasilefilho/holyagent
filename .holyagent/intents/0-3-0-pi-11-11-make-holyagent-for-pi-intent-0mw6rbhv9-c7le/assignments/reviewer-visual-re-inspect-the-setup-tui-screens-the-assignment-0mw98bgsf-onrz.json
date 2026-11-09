@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw98bgsf-onrz",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.visual",
+  "slug": "re-inspect-the-setup-tui-screens-the",
+  "objective": "Re-inspect the setup TUI screens the round-1 repair changed and confirm each earlier visual finding is closed.",
+  "state": "Running",
+  "scope": [
+    "The repair is commit 0130a8b2 on release/0.3.0/feat/setup-tui in /home/user/holyagent-0.3.0-tui. The findings it addressed are in /home/user/holyagent/.git/holyagent/briefs/assignment-0mw96v3mr-d6nb.md; the writer's report, with the capture names per finding, is /home/user/holyagent/.git/holyagent/reports/assignment-0mw96v3mr-d6nb.md. Captures are text frames in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/ (and pty raw output in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/w/pty/).",
+    "Read the terminal design skill at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/tui-design/SKILL.md and judge against its checklist and capture list.",
+    "Judge only what the repair touched: the result screens, review scrolling, path wrapping, failure next steps, dry-run wording, the ASCII-locale pty frames, the hint line and the disabled token. List the final captures you judged so the root can make its own pass on them."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Mark each finding material or preference per the skill; a finding needs the capture name and what is wrong in it.",
+    "Report in under 400 words; long notes go to no file (read-only) or to a scratchpad file if you have a shell."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the six earlier visual findings is confirmed closed or reported open with the capture that shows it",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No new material discrepancy appears in the changed screens at 80x24, 40x20 and 120x40",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The final captures judged are listed by file name",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "captures"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw96v3mr-d6nb"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:20:12.351Z"
+  },
+  "createdAt": "2026-11-09T12:20:12.351Z"
+}
