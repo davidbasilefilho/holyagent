@@ -1,0 +1,101 @@
+{
+  "id": "assignment-0mw9n3pas-ln21",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "run-the-pi-bash-tool-on-just-bash-with",
+  "objective": "Run the Pi bash tool on just-bash with host passthrough for commands just-bash lacks, TypeScript-first JavaScript-fallback execution, and Billion Context's bash guardrails turned off, as its own module and capability.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-bash, branch release/0.3.1/feat/just-bash (stacked on release/0.3.1/feat/codex-provider at ce16cb6; the capability registry is in packages/runtime/src/config/capabilities.ts).",
+    "Binding requirements, verbatim:",
+    "  Maintainer (verbatim, 2026-11-09): \"didn't we agree on using just-bash as the bash tool backend\", \"we should also support the just-bash's ts/js capabilities (ts as first option, js as fallback)\". No earlier record of that choice was found in the original request, the repository, its issues or the Intents.",
+    "  Decided (maintainer, 2026-11-09, after research showed just-bash 3.6.0 is a simulated shell that cannot run host executables): \"use just-bash and allow the executables on PATH and other relevant places (cross-platform)\". The Pi bash tool runs on just-bash (through Pi 1.5.0 BashOperations); commands it does not implement resolve to real executables on PATH and other relevant locations, on Linux, macOS and Windows, so git, bun, bunx, mise, gh, node and the holyagent CLI keep working; just-bash TypeScript execution is offered first and JavaScript is the fallback.",
+    "  Decided (maintainer, verbatim, 2026-11-09): \"about the shadowed commands, prefer them instead of the ones in PATH\". Where just-bash implements a command itself (rg, grep, sed, find, tar, diff, awk, jq, ls, xargs and the rest), its built-in runs, and the host executable of the same name is not registered; only commands just-bash lacks pass through to the host.",
+    "  Maintainer (verbatim, 2026-11-09): \"start the spike\", \"also, billion context's bash safeguards should be turned off if possible\". The just-bash spike starts now. Billion Context tool guardrails on the bash tool (default timeout, output cap, repeat detection) are turned off by HolyAgent where Billion Context offers a setting for it; where it does not, the plan says so.",
+    "  Maintainer (verbatim, 2026-11-09): \"everything should be modular and easily upgradeable btw\". Each 0.3.1 piece (just-bash backend, host passthrough, TS/JS execution, Codex provider, auto-review, context_management, fff, opencode browse, the screen capability and the capability system) is its own module behind a narrow interface, can be turned off on its own, and every third-party package or binary it uses sits at an exact pin moved only through mise run deps:update, so upgrading one never requires editing the others.",
+    "  Maintainer (verbatim, 2026-11-09): \"continue until mergeable or blocked\", \"btw we shall support both headless use and normal use, that's the point of capabilities, to modularly support systems\". Capabilities are the module system: each declares what it needs from the system (a display, a desktop session, a paired browser, a network, an OS) and has a headless and a normal form where both make sense (for example the screen capability uses a headless Playwright Chromium in a cloud or CI session and the paired real browser and desktop computer use on a desktop); setup and doctor detect the system and pick the form, and a capability whose needs are missing is reported, not silently dropped.",
+    "  Default (root judgement from spike assignment-0mw96w93p-53j2, revisitable): the just-bash backend runs each shell in a Bun Worker so cancel and Pi's timeout terminate it even in a pure shell loop; it mounts an in-memory /usr/bin and /bin of stubs for host passthrough with the shell PATH set to those and the real PATH given to child processes only; it sets defenseInDepth excludeViolationTypes finalization_registry so ReadWriteFs writes work under Bun; it raises the command, loop, work-unit and js timeout limits; it saves cwd and env even when the command runs exit; it offers host-<name> aliases for host programs a built-in shadows; Windows maps a mount per drive. Billion Context guardrails are turned off by setting BILI_GUARDRAIL_BASH_TIMEOUT=0, BILI_GUARDRAIL_MAX_OUTPUT_BYTES=0 and BILI_GUARDRAIL_REPETITION=0 for the Pi process.",
+    "Read first: the spike report /home/user/holyagent/.git/holyagent/reports/assignment-0mw96w93p-53j2.md (it built and measured this design locally; follow its findings and defaults: a Bun Worker per shell, stub /usr/bin and /bin mounts, defenseInDepth excludeViolationTypes finalization_registry, raised limits, saving cwd and env on exit, host-<name> aliases, a Windows mount per drive) and the Billion Context conflict report /home/user/holyagent/.git/holyagent/reports/assignment-0mw96qjlf-o4zi.md (guardrail settings: BILI_GUARDRAIL_BASH_TIMEOUT=0, BILI_GUARDRAIL_MAX_OUTPUT_BYTES=0, BILI_GUARDRAIL_REPETITION=0, passed through the extension environment).",
+    "Seams: pi/tools.ts SHELL_TOOLS and toolArgs; integrations/pi/src/extension.ts applyEnvironment and settingsFor (environment from rootArgs.env, CACHE_RETENTION_ENV pattern); Pi 1.5.0 BashOperations for plugging a bash backend; config/capabilities.ts for a code-execution capability entry (default on, headless and normal forms); just-bash added as a dependency at an exact pin moved by mise run deps:update (see scripts/update-dependencies.ts and scripts/dependency-ranges.test.ts for how pins and ranges are kept; if the updater must learn the pin, teach it).",
+    "Cross-platform: Linux, macOS and Windows path and executable resolution (PATHEXT on Windows); Windows and macOS are checked in CI, so write tests that run on all three.",
+    "Docs: a docs/pi page for the shell backend and the capability, and the guardrail setting."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Do not edit packages/runtime/src/pi/codex; another change may still repair it.",
+    "Report in under 450 words; list the capability entry, config keys, the pin and anything that differs from the spike's defaults and why."
+  ],
+  "criteria": [
+    {
+      "text": "The Pi bash tool runs on just-bash; just-bash built-ins win; commands it lacks run the host executable on Linux, macOS and Windows",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "TypeScript execution is offered first with JavaScript as the fallback",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Billion Context's bash guardrails are off through its environment settings",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "It is a capability entry that can be turned off on its own, and turning it off restores Pi's own bash",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "just-bash sits at an exact pin moved by mise run deps:update",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Tests cover passthrough, built-in precedence, cancellation and timeout, TS/JS execution and the guardrail env, each failing without the change",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi/tools.ts",
+    "packages/runtime/src/pi/bash",
+    "packages/runtime/src/config",
+    "packages/runtime/src/setup",
+    "packages/runtime/tests",
+    "packages/integrations/pi",
+    "packages/integrations/claude/dist",
+    "scripts",
+    "docs/pi",
+    "docs/usage.md",
+    "package.json",
+    "bun.lock",
+    "mise.toml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T19:14:04.372Z"
+  },
+  "createdAt": "2026-11-09T19:14:04.372Z"
+}
