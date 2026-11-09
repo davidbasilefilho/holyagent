@@ -2,6 +2,8 @@ import { cells, clip, pad, wrap, wrapItems } from "./text.ts"
 import { glyphs, type Look, type Tone } from "./theme.ts"
 import type { Applied, Choices, Offer, Review, ReviewLine } from "./types.ts"
 
+const CAPABILITY_ROW = "capability:"
+
 /** One run of text in one tone; the screen draws it as a span. */
 export interface Segment {
   readonly text: string
@@ -11,8 +13,8 @@ export interface Segment {
 /** One screen line. */
 export type Line = ReadonlyArray<Segment>
 
-/** A row of the choose screen. */
-export type RowId = "pi" | "deviceAccess" | "worktrees"
+/** A row of the choose screen: a T3 row, or `capability:<pi.features key>`. */
+export type RowId = "pi" | "deviceAccess" | "worktrees" | `capability:${string}`
 
 /** The screens, in the order a run goes through them. */
 export type Screen = "choose" | "review" | "applying" | "done"
@@ -52,17 +54,34 @@ export interface Key {
 /** An action of the review screen. */
 export type ReviewAction = "apply" | "back" | "cancel"
 
-const LABELS: Readonly<Record<RowId, string>> = {
+const LABELS = {
   pi: "Pi provider",
   deviceAccess: "Agent device access",
   worktrees: "New threads in worktrees",
-}
+} as const
 
-/** The rows the machine allows: the Pi provider, the device row only with a host, worktrees. */
+/** The capability a row switches, or `undefined` for a T3 row. */
+const capabilityOf = (row: RowId, offer: Offer) =>
+  row.startsWith(CAPABILITY_ROW)
+    ? offer.capabilities.find(
+        (capability) => capability.feature === row.slice(CAPABILITY_ROW.length),
+      )
+    : undefined
+
+const labelOf = (row: RowId, offer: Offer): string =>
+  row === "pi" || row === "deviceAccess" || row === "worktrees"
+    ? LABELS[row]
+    : (capabilityOf(row, offer)?.name ?? row)
+
+/**
+ * The rows the machine allows: with T3 work, the Pi provider, the device row only with a host and
+ * worktrees; then one row for each capability.
+ */
 export const rowsOf = (offer: Offer): ReadonlyArray<RowId> => [
-  "pi",
-  ...(offer.device === undefined ? [] : (["deviceAccess"] as const)),
-  ...(offer.worktrees ? (["worktrees"] as const) : []),
+  ...(offer.t3 ? (["pi"] as const) : []),
+  ...(offer.t3 && offer.device !== undefined ? (["deviceAccess"] as const) : []),
+  ...(offer.t3 && offer.worktrees ? (["worktrees"] as const) : []),
+  ...offer.capabilities.map((capability): RowId => `${CAPABILITY_ROW}${capability.feature}`),
 ]
 
 /** The state a run starts in. */
@@ -96,12 +115,16 @@ const stepOf = (key: Key): -1 | 1 | 0 =>
 const wrapped = (index: number, step: number, length: number) =>
   (((index + step) % length) + length) % length
 
-const toggled = (choices: Choices, row: RowId): Choices =>
-  row === "deviceAccess"
-    ? { ...choices, deviceAccess: !choices.deviceAccess }
-    : row === "worktrees"
-      ? { ...choices, worktrees: !choices.worktrees }
-      : choices
+const toggled = (choices: Choices, row: RowId): Choices => {
+  if (row === "deviceAccess") return { ...choices, deviceAccess: !choices.deviceAccess }
+  if (row === "worktrees") return { ...choices, worktrees: !choices.worktrees }
+  if (!row.startsWith(CAPABILITY_ROW)) return choices
+  const feature = row.slice(CAPABILITY_ROW.length)
+  return {
+    ...choices,
+    capabilities: { ...choices.capabilities, [feature]: choices.capabilities[feature] !== true },
+  }
+}
 
 const pagedBy = (state: State, key: Key, scroll: Scroll): State | undefined => {
   if (key.ctrl) return undefined
@@ -217,17 +240,33 @@ const blank: Line = []
 const hintLines = (text: string, width: number): ReadonlyArray<Line> =>
   wrap(text, width).map((part) => [segment(part, "hint")])
 
-const hintOf = (row: RowId, offer: Offer): string =>
-  row === "pi"
-    ? "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose."
-    : row === "deviceAccess"
-      ? `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.`
-      : "New T3 Code threads start in their own git worktree instead of the local checkout."
+const hintOf = (row: RowId, offer: Offer): string => {
+  if (row === "pi")
+    return "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose."
+  if (row === "deviceAccess")
+    return `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.`
+  if (row === "worktrees")
+    return "New T3 Code threads start in their own git worktree instead of the local checkout."
+  const capability = capabilityOf(row, offer)
+  if (capability === undefined) return ""
+  return capability.unavailable === undefined
+    ? `${capability.description}.`
+    : `${capability.description}. Not offered in this form: ${capability.unavailable}; the choice is kept in the config.`
+}
+
+/** Whether a row is switched on in the choices; the Pi provider row is fixed, so it never is. */
+const isOn = (row: RowId, choices: Choices): boolean =>
+  row === "deviceAccess"
+    ? choices.deviceAccess
+    : row === "worktrees"
+      ? choices.worktrees
+      : row.startsWith(CAPABILITY_ROW) &&
+        choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
 
 const checkbox = (row: RowId, choices: Choices): { box: string; word: string } =>
   row === "pi"
     ? { box: "[x]", word: "fixed" }
-    : (row === "deviceAccess" ? choices.deviceAccess : choices.worktrees)
+    : isOn(row, choices)
       ? { box: "[x]", word: "enabled" }
       : { box: "[ ]", word: "disabled" }
 
@@ -246,34 +285,37 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
     const { box, word } = checkbox(row, state.choices)
     return `${box} ${word}`
   })
+  const labels = rows.map((row) => labelOf(row, offer))
   const valueWidth = Math.max(...values.map(cells))
   const labelWidth = Math.min(
-    Math.max(...rows.map((row) => cells(LABELS[row]))),
+    Math.max(...labels.map(cells)),
     Math.max(4, width - 2 - 2 - valueWidth),
   )
-  const body = rows.map((row, index): Line => {
+  const rowLine = (row: RowId, index: number): Line => {
     const focused = index === state.focus
-    const label = pad(clip(LABELS[row], labelWidth, g.ellipsis), labelWidth)
+    const label = pad(clip(labels[index] ?? "", labelWidth, g.ellipsis), labelWidth)
     const value = values[index] ?? ""
     if (focused) return [segment(`${g.focus} ${label}  ${value}`, "focus")]
     return [
       segment(`  ${label}  `, "argument"),
-      segment(
-        value,
-        row === "pi" ||
-          !(row === "deviceAccess" ? state.choices.deviceAccess : state.choices.worktrees)
-          ? "disabled"
-          : "enabled",
-      ),
+      segment(value, row === "pi" || !isOn(row, state.choices) ? "disabled" : "enabled"),
     ]
-  })
+  }
+  const group = (title: string, from: number, to: number): ReadonlyArray<Line> =>
+    to <= from
+      ? []
+      : [
+          ...heading(title, width),
+          ...rows.slice(from, to).map((row, index) => rowLine(row, from + index)),
+          blank,
+        ]
+  const t3Count = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length
   const focused = rows[state.focus]
   return [
     ...keyLines([`${g.arrows} or j/k focus`, "Space toggle", "Enter review", "Esc cancel"], width),
     blank,
-    ...heading("T3 Code", width),
-    ...body,
-    blank,
+    ...group("T3 Code", 0, t3Count),
+    ...group(`Capabilities, ${offer.form} form`, t3Count, rows.length),
     ...(focused === undefined ? [] : hintLines(hintOf(focused, offer), width)),
   ]
 }
@@ -418,20 +460,25 @@ const reviewLayout = (state: State, context: Context): Layout => {
     }
   }
   const { review } = state
+  const capabilities = review.capabilities ?? []
   const nameWidth = Math.max(
-    ...[...review.choices, ...review.always].map((line) => cells(line.name)),
+    ...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)),
   )
   const entries = (lines: ReadonlyArray<ReviewLine>) =>
     lines.flatMap((line) => reviewEntry(line, nameWidth, width))
-  const body: ReadonlyArray<Line> = [
-    ...wrap(review.file, width - 2).map((part): Line => [segment(`  ${part}`, "hint")]),
-    blank,
-    ...heading("Your choices", width),
-    ...entries(review.choices),
-    blank,
-    ...heading("Always applied", width),
-    ...entries(review.always),
+  const section = (title: string, lines: ReadonlyArray<ReviewLine>): ReadonlyArray<Line> =>
+    lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank]
+  const t3 = [
+    ...(review.file === undefined
+      ? []
+      : [
+          ...wrap(review.file, width - 2).map((part): Line => [segment(`  ${part}`, "hint")]),
+          blank,
+        ]),
+    ...section("Your choices", review.choices),
+    ...section("Always applied", review.always),
   ]
+  const body: ReadonlyArray<Line> = [...section("Capabilities", capabilities), ...t3].slice(0, -1)
   const actions = actionLines()
   // The title takes one line, and the line above the actions holds the scroll indicator, if any.
   const build = (scrolling: boolean): Layout & { readonly fits: boolean } => {

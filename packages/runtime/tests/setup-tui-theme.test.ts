@@ -230,8 +230,8 @@ describe("showSetup on a terminal that is silent about its background", () => {
     })
     const input = {
       env: { TERM: "xterm-256color" },
-      offer: { device: undefined, worktrees: true },
-      initial: { worktrees: true, deviceAccess: false },
+      offer: { t3: true, device: undefined, worktrees: true, capabilities: [], form: "normal" },
+      initial: { worktrees: true, deviceAccess: false, capabilities: {} },
       dryRun: false,
       review: () => Promise.reject(new Error("unused")),
       apply: () => new Promise<never>(() => undefined),

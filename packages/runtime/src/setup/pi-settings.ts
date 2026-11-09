@@ -1,7 +1,8 @@
-import { join, relative, resolve, sep } from "node:path"
+import { join, resolve } from "node:path"
 
 import { Effect, Equal } from "effect"
 
+import type { CapabilityForm } from "../config/capabilities.ts"
 import type { Config } from "../config/schema.ts"
 import { PROVIDERS, ROOT_MODEL_PAIR, rootModelSettings } from "../pi/provider.ts"
 import {
@@ -20,11 +21,11 @@ import {
   readJsonObject,
   writeJsonObject,
 } from "./json-file.ts"
-import { loadPiConfig, piAgentDirectory, piInUse } from "./pi-check.ts"
+import { type CapabilityChoices, loadPiConfig, piAgentDirectory, piInUse } from "./pi-check.ts"
 import type { PiInstallOptions } from "./pi-install.ts"
 import { addRecorded, clearRecorded, readRecorded } from "./record.ts"
 import { hint, pass, show, skipped } from "./report.ts"
-import { isSymlink, type Scope } from "./scope.ts"
+import { refuseLinks, type Scope } from "./scope.ts"
 import { take } from "./settings.ts"
 
 /**
@@ -146,9 +147,15 @@ interface Plan {
   readonly unplaced: ReadonlyArray<string>
 }
 
-const planFor = (env: Env, cwd: string, scope: Scope, config: Config): Plan => {
+const planFor = (
+  env: Env,
+  cwd: string,
+  scope: Scope,
+  config: Config,
+  form: CapabilityForm | undefined,
+): Plan => {
   const byFile = new Map<string, Array<Default>>()
-  for (const patch of toolSettings(config)) {
+  for (const patch of toolSettings(config, undefined, form)) {
     byFile.set(patch.file, [...(byFile.get(patch.file) ?? []), ...leaves(patch.content)])
   }
   const route = routeLeaves(config)
@@ -220,36 +227,19 @@ const resolveTarget = Effect.fn("resolveToolSettingsTarget")(function* (target: 
 })
 
 /**
- * Refuses a symlinked `.pi` folder, folder below it or settings file at project and local scope, so
- * a repository cannot redirect a write (or an `--undo`) to a file outside the project, as the
- * Claude settings step does for `.claude`. Scope `user` follows its links, as before.
- */
-const refuseLinks = Effect.fn("refuseProjectLinks")(function* (
-  cwd: string,
-  scope: Scope,
-  file: string,
-  action: string,
-) {
-  if (scope === "user") return
-  const parts = relative(cwd, file).split(sep)
-  for (let depth = 1; depth <= parts.length; depth++) {
-    const path = join(cwd, ...parts.slice(0, depth))
-    if (yield* isSymlink(path)) {
-      return yield* new SetupFailure({
-        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`,
-      })
-    }
-  }
-})
-
-/**
  * The plan for a scope from the HolyAgent config that scope reads ({@link loadPiConfig}), or
  * `undefined` with `pi.enable` off or a config that cannot be loaded (the Pi package step and
  * doctor's Pi checks already report that).
  */
-const planAt = (env: Env, cwd: string, scope: Scope) =>
-  loadPiConfig(env, cwd, scope).pipe(
-    Effect.map((config) => (config.pi.enable ? planFor(env, cwd, scope, config) : undefined)),
+const planAt = (
+  env: Env,
+  cwd: string,
+  scope: Scope,
+  form?: CapabilityForm,
+  choices?: CapabilityChoices,
+) =>
+  loadPiConfig(env, cwd, scope, choices).pipe(
+    Effect.map((config) => (config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined)),
     Effect.orElseSucceed(() => undefined),
   )
 
@@ -338,7 +328,7 @@ export const installPiToolSettings = Effect.fn("installPiToolSettings")(function
   env: Env,
   options: PiInstallOptions,
 ) {
-  const plan = yield* planAt(env, options.cwd, options.scope)
+  const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices)
   if (plan === undefined) return []
   const lines: Array<string> = []
   for (const target of plan.targets) {
@@ -505,10 +495,10 @@ const routeLine = Effect.fn("checkRootModel")(function* (planned: Target, existi
  * scope, the same conditions as the Pi checks. A key the user set to another value is not missing.
  * Reads files only.
  */
-export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope) =>
+export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope, form?: CapabilityForm) =>
   Effect.gen(function* () {
     if (!(yield* piInUse(env))) return []
-    const plan = yield* planAt(env, cwd, scope)
+    const plan = yield* planAt(env, cwd, scope, form)
     if (plan === undefined) return []
     const lines: Array<string> = []
     for (const planned of plan.targets) {

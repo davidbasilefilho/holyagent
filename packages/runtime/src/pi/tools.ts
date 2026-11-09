@@ -1,3 +1,15 @@
+import {
+  BILLION_CONTEXT_FILE,
+  type CapabilityForm,
+  COMPUTER_USE_TOOLS,
+  enabledCapabilities,
+  PI_SETTINGS_FILE,
+  type SettingsPatch,
+  SUBAGENTS_ONLY_SPECIALISTS,
+  SUBAGENTS_SETTINGS_FILE,
+  T3_PREFIX,
+  T3_VISUAL_TOOLS,
+} from "../config/capabilities.ts"
 import type { Config, RouteKey } from "../config/schema.ts"
 import { type Capability, routeFor } from "../domain/route.ts"
 import { type ProviderProfile, providerProfile, webChoice } from "./provider.ts"
@@ -45,28 +57,9 @@ const escapeRegExp = (text: string): string => text.replace(/[.+?^${}()|[\]\\]/g
 const patternRegExp = (pattern: string): RegExp =>
   new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`)
 
-/**
- * The prefix of T3 Code's tools as a pattern. Pi names an MCP tool `mcp__<server>__<tool>` with
- * every character but letters, digits and `_` of the server name turned into `_`, so a server the
- * user registers as `t3-code` gives `mcp__t3_code__...`, while T3's own bridge uses
- * `mcp__t3-code__...`; the `*` matches both.
- */
-const T3_PREFIX = "mcp__t3*code__"
-
-/**
- * The T3 Code tools of the visual roles, as patterns on the tool names Pi gives them: the
- * integrated browser (`preview_*`, `t3_preview_*`), the page renders (`html_render`,
- * `html_preview`) and the devices (`device_*`). They arrive only through Pi's built-in MCP
- * extension, so they exist only under T3 Code's bridge or after the user registered T3's MCP
- * server, and only while `pi.features.mcp` is on.
- */
-export const T3_VISUAL_TOOLS: ReadonlyArray<string> = [
-  `${T3_PREFIX}preview_*`,
-  `${T3_PREFIX}t3_preview_*`,
-  `${T3_PREFIX}html_render`,
-  `${T3_PREFIX}html_preview`,
-  `${T3_PREFIX}device_*`,
-]
+// The T3 Code tools of the visual roles and the computer-use tools live in the capability registry,
+// which decides who gets them; they are re-exported here for the callers that name them.
+export { COMPUTER_USE_TOOLS, T3_VISUAL_TOOLS }
 
 // Compiled once: the `tool_call` gate asks for every call of a T3 session.
 const T3_TOOL = patternRegExp(`${T3_PREFIX}*`)
@@ -84,9 +77,6 @@ export const isDeactivatedT3Tool = (name: string): boolean =>
 /** The names among `registered` that {@link isDeactivatedT3Tool} names, in their order. */
 export const deactivatedT3Tools = (registered: ReadonlyArray<string>): ReadonlyArray<string> =>
   registered.filter(isDeactivatedT3Tool)
-
-/** The computer-use tools of `@amaster.ai/pi-computer-use`, which all carry this prefix. */
-export const COMPUTER_USE_TOOLS: ReadonlyArray<string> = ["computer_use_*"]
 
 /** The tool arguments of one Pi process. */
 export interface ToolArgs {
@@ -154,13 +144,14 @@ export const toolArgs = (
   profile: ProviderProfile = providerProfile(config),
 ): ToolArgs => {
   const { features } = config.pi
+  const enabled = enabledCapabilities(features)
   const noMcp = !features.mcp
   const { maxWorkers } = config.pi.codemode
   if (key === "root") {
     const excluded = [
       "write",
       "edit",
-      ...(features.computerUse ? COMPUTER_USE_TOOLS : []),
+      ...enabled.flatMap((capability) => capability.tools.rootExclude),
       ...webChoice(profile, features.web).tools,
     ]
     return build([CODEMODE_ENTRY], excluded, noMcp, maxWorkers)
@@ -172,10 +163,7 @@ export const toolArgs = (
     ...(has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : []),
     ...(has(capabilities, "Search") ? webChoice(profile, features.web).tools : []),
     ...(has(capabilities, "VisualInspection")
-      ? [
-          ...(features.mcp ? T3_VISUAL_TOOLS : []),
-          ...(features.computerUse ? COMPUTER_USE_TOOLS : []),
-        ]
+      ? enabled.flatMap((capability) => capability.tools.visual)
       : []),
   ]
   const unique = [...new Set(tools)]
@@ -228,65 +216,37 @@ export const allToolArgs = (
     ]),
   ) as Record<RouteKey, ToolArgs>
 
-/**
- * One JSON settings file that setup writes by merging, never by replacing: `content` holds the keys
- * to set, and every other key of the file stays. `file` starts with `~/`, the user's home, or with
- * `~/.pi/agent/`, which is `PI_CODING_AGENT_DIR` when that is set.
- */
-export interface SettingsPatch {
-  /** The file, as a path under the user's home. */
-  readonly file: string
-  /** The keys to merge into it, deeply. */
-  readonly content: Readonly<Record<string, unknown>>
+// The package settings files and the settings of each capability live in the capability registry;
+// the files are re-exported here for the callers that name them.
+export {
+  BILLION_CONTEXT_FILE,
+  PI_SETTINGS_FILE,
+  type SettingsPatch,
+  SUBAGENTS_ONLY_SPECIALISTS,
+  SUBAGENTS_SETTINGS_FILE,
 }
-
-/** Billion Context's settings file; `BILI_CONFIG_FILE` can relocate it, and setup then writes there. */
-export const BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json"
-
-/**
- * Pi's agent-directory settings file: the codemode mode and the options of
- * `@amaster.ai/pi-computer-use`.
- */
-export const PI_SETTINGS_FILE = "~/.pi/agent/settings.json"
-
-/**
- * The settings file of `@tintinweb/pi-subagents`: the package reads `subagents.json` from Pi's
- * agent directory (`getAgentDir()`, which is `PI_CODING_AGENT_DIR` when set) as its global
- * defaults.
- */
-export const SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json"
-
-/**
- * The package settings that let only the specialists launch: `disableDefaultAgents` leaves out the
- * package's own `general-purpose`, `Explore` and `Plan`, and `fallbackSubagent: "none"` makes a
- * `subagent_type` that names no enabled agent fail instead of falling back to `general-purpose`
- * (whose tool set is not a specialist's).
- */
-export const SUBAGENTS_ONLY_SPECIALISTS = {
-  disableDefaultAgents: true,
-  fallbackSubagent: "none",
-} as const
 
 /**
  * What setup writes so the decided tool settings hold, as data; it writes nothing itself. Empty
- * with `pi.enable` off. A switched-off feature adds nothing, since its package is not loaded:
+ * with `pi.enable` off. A switched-off capability adds nothing, since its package is not loaded,
+ * and neither does one the `form` does not offer (the headless form has no computer use):
  *
  * - The provider's web tools, enabled in the provider extension's settings, while the web choice is
  *   the provider's (they are off by default);
  * - The codemode mode (`pi.codemode.mode`, `only` by default) in Pi's settings, since no command-line
  *   argument sets it;
- * - The package's `subagents.json` ({@link SUBAGENTS_ONLY_SPECIALISTS}) while `pi.features.subagents`
- *   is on, so only the 18 specialists the package ships can launch;
- * - Billion Context's own `acp_delegate` subagents off while context compression stays on, because
- *   `@tintinweb/pi-subagents` runs the specialists. This is the one setting the package's README
- *   gives for it, "Pi built-in subagents": merge `{"pi":{"subagents":false}}` into
- *   `billion-context.json` (README lines 566-582; line 582: "context compression remains
- *   enabled");
- * - The computer-use confirmations off, the decided "full access, no prompts".
+ * - The `settings` of each enabled capability in the registry (`CAPABILITIES`), in its order: the
+ *   subagents package's `subagents.json` ({@link SUBAGENTS_ONLY_SPECIALISTS}), so only the 18
+ *   specialists the package ships can launch; Billion Context's own `acp_delegate` subagents off
+ *   while context compression stays on; the computer-use confirmations off, the decided "full
+ *   access, no prompts".
+ *
+ * The form defaults to `normal`.
  */
 export const toolSettings = (
   config: Config,
   profile: ProviderProfile = providerProfile(config),
+  form: CapabilityForm = "normal",
 ): ReadonlyArray<SettingsPatch> => {
   const { enable, features } = config.pi
   if (!enable) return []
@@ -303,21 +263,6 @@ export const toolSettings = (
           },
         ]
       : []),
-    ...(features.subagents
-      ? [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }]
-      : []),
-    ...(features.contextCompression
-      ? [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }]
-      : []),
-    ...(features.computerUse
-      ? [
-          {
-            file: PI_SETTINGS_FILE,
-            content: {
-              "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false },
-            },
-          },
-        ]
-      : []),
+    ...enabledCapabilities(features, { form }).flatMap((capability) => capability.settings),
   ]
 }

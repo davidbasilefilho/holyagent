@@ -1,17 +1,43 @@
 import { Schema } from "effect"
 
-/** The two setup choices the interface offers; the Pi provider is fixed and not one of them. */
+/**
+ * The setup choices the interface offers: the two T3 choices (the Pi provider is fixed and not one
+ * of them) and a switch for each capability, by its `pi.features` key.
+ */
 export interface Choices {
   readonly worktrees: boolean
   readonly deviceAccess: boolean
+  /** Each offered capability's switch, by `pi.features` key. */
+  readonly capabilities: Readonly<Record<string, boolean>>
+}
+
+/** One capability row of the choose screen. */
+export interface CapabilityOffer {
+  /** The `pi.features` key the row switches. */
+  readonly feature: string
+  /** The capability's name, the row's label. */
+  readonly name: string
+  /** What the capability gives. */
+  readonly description: string
+  /**
+   * Why the form in force does not offer it, or `undefined`; it can still be switched in the
+   * config.
+   */
+  readonly unavailable: string | undefined
 }
 
 /** What the machine allows, which decides the rows: the device row needs a host. */
 export interface Offer {
+  /** Whether the T3 part of setup has work: the Pi provider row and the T3 review sections show. */
+  readonly t3: boolean
   /** What lets agents use devices here (Xcode or an Android SDK), or `undefined`: no device row. */
   readonly device: string | undefined
   /** Whether the worktree row is offered. */
   readonly worktrees: boolean
+  /** The capability rows, in registry order; none when the config cannot be read or Pi is off. */
+  readonly capabilities: ReadonlyArray<CapabilityOffer>
+  /** The form in force, as a phrase for the capability heading (`headless (detected: CI is set)`). */
+  readonly form: string
 }
 
 /** One line of the review: what setup does with a group of T3 settings keys. */
@@ -24,8 +50,13 @@ export interface ReviewLine {
 
 /** What the review screen lists for the current choices. */
 export interface Review {
-  /** The T3 settings file setup writes. */
-  readonly file: string
+  /** The T3 settings file setup writes; `undefined` when the T3 part has no work. */
+  readonly file: string | undefined
+  /**
+   * What each capability switch does: turned on, turned off, unchanged or not offered in the form;
+   * none when absent.
+   */
+  readonly capabilities?: ReadonlyArray<ReviewLine>
   /** The groups the choices switch (the Pi provider, device access, worktrees). */
   readonly choices: ReadonlyArray<ReviewLine>
   /** The groups setup always applies. */

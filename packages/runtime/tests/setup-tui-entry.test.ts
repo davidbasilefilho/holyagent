@@ -13,8 +13,8 @@ const { showSetup } = await import("../src/setup/tui/entry.tsx")
 const input = (signals: Array<AbortSignal> = []): TuiInput => ({
   // COLORFGBG names the background, so the interface starts without waiting for the terminal.
   env: { TERM: "xterm-256color", COLORFGBG: "15;0" },
-  offer: { device: undefined, worktrees: true },
-  initial: { worktrees: true, deviceAccess: false },
+  offer: { t3: true, device: undefined, worktrees: true, capabilities: [], form: "normal" },
+  initial: { worktrees: true, deviceAccess: false, capabilities: {} },
   dryRun: false,
   review: (choices): Promise<Review> => Promise.resolve(reviewOf(PREVIEW, choices)),
   apply: (_choices, signal) => {

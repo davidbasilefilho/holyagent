@@ -3384,6 +3384,142 @@ var wrapItems = (items, width, separator) => {
   return line === "" ? lines : [...lines, line];
 };
 
+var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
+var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
+var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
+var SUBAGENTS_ONLY_SPECIALISTS = {
+  disableDefaultAgents: true,
+  fallbackSubagent: "none"
+};
+var T3_PREFIX = "mcp__t3*code__";
+var T3_VISUAL_TOOLS = [
+  `${T3_PREFIX}preview_*`,
+  `${T3_PREFIX}t3_preview_*`,
+  `${T3_PREFIX}html_render`,
+  `${T3_PREFIX}html_preview`,
+  `${T3_PREFIX}device_*`
+];
+var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var sameForm = (packages) => ({
+  headless: { packages, mcpServers: [] },
+  normal: { packages, mcpServers: [] }
+});
+var CAPABILITIES = [
+  {
+    name: "subagents",
+    feature: "subagents",
+    description: "Runs the 18 specialists as subagents (@tintinweb/pi-subagents)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@tintinweb/pi-subagents"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "context-compression",
+    feature: "contextCompression",
+    description: "Compresses the context of long sessions (Billion Context)",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["billion-context"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "todo",
+    feature: "todo",
+    description: "Gives the root a todo list tool (@juicesharp/rpiv-todo)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@juicesharp/rpiv-todo"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "ask",
+    feature: "ask",
+    description: "Lets the root ask the user a question mid-run (@juicesharp/rpiv-ask-user-question)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@juicesharp/rpiv-ask-user-question"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "processes",
+    feature: "processes",
+    description: "Gives the root tools for background processes (@aliou/pi-processes)",
+    skills: [],
+    applicability: "root",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm(["@aliou/pi-processes"]),
+    tools: { rootExclude: [], visual: [] },
+    settings: [],
+    health: ["needs", "packages"]
+  },
+  {
+    name: "mcp",
+    feature: "mcp",
+    description: "Pi's built-in MCP extension, which brings T3 Code's browser, render and device tools",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS },
+    settings: [],
+    health: ["needs"]
+  },
+  {
+    name: "computer-use",
+    feature: "computerUse",
+    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [{ kind: "display" }],
+    forms: {
+      headless: { unavailable: "it drives a graphical session and this machine has none" },
+      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
+    },
+    settings: [
+      {
+        file: PI_SETTINGS_FILE,
+        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+      }
+    ],
+    tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
+    health: ["needs", "packages"]
+  }
+];
+var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]));
+var formContent = (capability, form) => {
+  const entry = capability.forms[form];
+  return "unavailable" in entry ? undefined : entry;
+};
+var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
+  const [first] = formContent(capability, "normal")?.packages ?? [];
+  return first === undefined ? [] : [[capability.feature, first]];
+}));
+
+var inCi = (env) => {
+  const value = env["CI"]?.trim().toLowerCase();
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
+
 var TERMINAL_THEME = {
   heading: "#7aa2f7",
   option: "#7dcfff",
@@ -3416,7 +3552,7 @@ var colorEnabled = (env, tty) => {
     return false;
   if (set(env["FORCE_COLOR"]) && env["FORCE_COLOR"] !== "0")
     return true;
-  if (set(env["CI"]) && env["CI"] !== "false")
+  if (inCi(env))
     return false;
   return tty;
 };
@@ -3441,15 +3577,19 @@ var lookFor = (env, background = "dark") => ({
 });
 var glyphs = (look) => look.unicode ? { focus: "\u276F", dot: "\xB7", ellipsis: "\u2026", arrows: "\u2191/\u2193" } : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down" };
 
+var CAPABILITY_ROW = "capability:";
 var LABELS = {
   pi: "Pi provider",
   deviceAccess: "Agent device access",
   worktrees: "New threads in worktrees"
 };
+var capabilityOf = (row, offer) => row.startsWith(CAPABILITY_ROW) ? offer.capabilities.find((capability) => capability.feature === row.slice(CAPABILITY_ROW.length)) : undefined;
+var labelOf = (row, offer) => row === "pi" || row === "deviceAccess" || row === "worktrees" ? LABELS[row] : capabilityOf(row, offer)?.name ?? row;
 var rowsOf = (offer) => [
-  "pi",
-  ...offer.device === undefined ? [] : ["deviceAccess"],
-  ...offer.worktrees ? ["worktrees"] : []
+  ...offer.t3 ? ["pi"] : [],
+  ...offer.t3 && offer.device !== undefined ? ["deviceAccess"] : [],
+  ...offer.t3 && offer.worktrees ? ["worktrees"] : [],
+  ...offer.capabilities.map((capability) => `${CAPABILITY_ROW}${capability.feature}`)
 ];
 var initialState = (choices) => ({
   screen: "choose",
@@ -3467,7 +3607,19 @@ var isQuit = (key) => isCancel(key) || !key.ctrl && key.name === "q";
 var isEnter = (key) => key.name === "return" || key.name === "enter";
 var stepOf = (key) => key.ctrl ? 0 : key.name === "up" || key.name === "k" ? -1 : key.name === "down" || key.name === "j" ? 1 : 0;
 var wrapped = (index, step, length) => ((index + step) % length + length) % length;
-var toggled = (choices, row) => row === "deviceAccess" ? { ...choices, deviceAccess: !choices.deviceAccess } : row === "worktrees" ? { ...choices, worktrees: !choices.worktrees } : choices;
+var toggled = (choices, row) => {
+  if (row === "deviceAccess")
+    return { ...choices, deviceAccess: !choices.deviceAccess };
+  if (row === "worktrees")
+    return { ...choices, worktrees: !choices.worktrees };
+  if (!row.startsWith(CAPABILITY_ROW))
+    return choices;
+  const feature = row.slice(CAPABILITY_ROW.length);
+  return {
+    ...choices,
+    capabilities: { ...choices.capabilities, [feature]: choices.capabilities[feature] !== true }
+  };
+};
 var pagedBy = (state, key, scroll) => {
   if (key.ctrl)
     return;
@@ -3546,8 +3698,20 @@ var keyLines = (items, width) => wrapItems(items, width, KEY_GAP).map((text) => 
 var heading = (text, width) => wrap(text.toUpperCase(), width).map((part) => [segment(part, "heading")]);
 var blank = [];
 var hintLines = (text, width) => wrap(text, width).map((part) => [segment(part, "hint")]);
-var hintOf = (row, offer) => row === "pi" ? "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose." : row === "deviceAccess" ? `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.` : "New T3 Code threads start in their own git worktree instead of the local checkout.";
-var checkbox = (row, choices) => row === "pi" ? { box: "[x]", word: "fixed" } : (row === "deviceAccess" ? choices.deviceAccess : choices.worktrees) ? { box: "[x]", word: "enabled" } : { box: "[ ]", word: "disabled" };
+var hintOf = (row, offer) => {
+  if (row === "pi")
+    return "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose.";
+  if (row === "deviceAccess")
+    return `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.`;
+  if (row === "worktrees")
+    return "New T3 Code threads start in their own git worktree instead of the local checkout.";
+  const capability = capabilityOf(row, offer);
+  if (capability === undefined)
+    return "";
+  return capability.unavailable === undefined ? `${capability.description}.` : `${capability.description}. Not offered in this form: ${capability.unavailable}; the choice is kept in the config.`;
+};
+var isOn = (row, choices) => row === "deviceAccess" ? choices.deviceAccess : row === "worktrees" ? choices.worktrees : row.startsWith(CAPABILITY_ROW) && choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true;
+var checkbox = (row, choices) => row === "pi" ? { box: "[x]", word: "fixed" } : isOn(row, choices) ? { box: "[x]", word: "enabled" } : { box: "[ ]", word: "disabled" };
 var FIXED = { page: 1, max: 0 };
 var chooseLines = (state, context) => {
   const { rows, offer, width, look } = context;
@@ -3556,26 +3720,32 @@ var chooseLines = (state, context) => {
     const { box, word } = checkbox(row, state.choices);
     return `${box} ${word}`;
   });
+  const labels = rows.map((row) => labelOf(row, offer));
   const valueWidth = Math.max(...values.map(cells));
-  const labelWidth = Math.min(Math.max(...rows.map((row) => cells(LABELS[row]))), Math.max(4, width - 2 - 2 - valueWidth));
-  const body = rows.map((row, index) => {
+  const labelWidth = Math.min(Math.max(...labels.map(cells)), Math.max(4, width - 2 - 2 - valueWidth));
+  const rowLine = (row, index) => {
     const focused = index === state.focus;
-    const label = pad(clip(LABELS[row], labelWidth, g.ellipsis), labelWidth);
+    const label = pad(clip(labels[index] ?? "", labelWidth, g.ellipsis), labelWidth);
     const value = values[index] ?? "";
     if (focused)
       return [segment(`${g.focus} ${label}  ${value}`, "focus")];
     return [
       segment(`  ${label}  `, "argument"),
-      segment(value, row === "pi" || !(row === "deviceAccess" ? state.choices.deviceAccess : state.choices.worktrees) ? "disabled" : "enabled")
+      segment(value, row === "pi" || !isOn(row, state.choices) ? "disabled" : "enabled")
     ];
-  });
+  };
+  const group = (title, from, to) => to <= from ? [] : [
+    ...heading(title, width),
+    ...rows.slice(from, to).map((row, index) => rowLine(row, from + index)),
+    blank
+  ];
+  const t3Count = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length;
   const focused = rows[state.focus];
   return [
     ...keyLines([`${g.arrows} or j/k focus`, "Space toggle", "Enter review", "Esc cancel"], width),
     blank,
-    ...heading("T3 Code", width),
-    ...body,
-    blank,
+    ...group("T3 Code", 0, t3Count),
+    ...group(`Capabilities, ${offer.form} form`, t3Count, rows.length),
     ...focused === undefined ? [] : hintLines(hintOf(focused, offer), width)
   ];
 };
@@ -3679,17 +3849,19 @@ var reviewLayout = (state, context) => {
     };
   }
   const { review } = state;
-  const nameWidth = Math.max(...[...review.choices, ...review.always].map((line) => cells(line.name)));
+  const capabilities = review.capabilities ?? [];
+  const nameWidth = Math.max(...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)));
   const entries = (lines) => lines.flatMap((line) => reviewEntry(line, nameWidth, width));
-  const body = [
-    ...wrap(review.file, width - 2).map((part) => [segment(`  ${part}`, "hint")]),
-    blank,
-    ...heading("Your choices", width),
-    ...entries(review.choices),
-    blank,
-    ...heading("Always applied", width),
-    ...entries(review.always)
+  const section = (title, lines) => lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank];
+  const t3 = [
+    ...review.file === undefined ? [] : [
+      ...wrap(review.file, width - 2).map((part) => [segment(`  ${part}`, "hint")]),
+      blank
+    ],
+    ...section("Your choices", review.choices),
+    ...section("Always applied", review.always)
   ];
+  const body = [...section("Capabilities", capabilities), ...t3].slice(0, -1);
   const actions = actionLines();
   const build = (scrolling) => {
     const top = [...keys(scrolling), blank, ...heading_];
