@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-tracked-file-check-of-the-scope",
   "objective": "Make the tracked-file check of the scope inference compare files by identity, so a tracked name that the file system folds onto settings.local.json is caught.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-scope, branch release/0.3.0/feat/installed-scope-default, head 6c1c321 (committed; your edits are a new change on top).",
     "Residual from security review: packages/runtime/src/setup/scope.ts:200-201 compares tracked entry names under .claude with JavaScript toLowerCase, so only ASCII case variants are caught. On APFS or HFS+ a tracked .claude/ſettings.local.json (U+017F folds to s) or a name with ignorable code points, and on Windows a tracked settings.local.json. or a trailing space, open the same file the user would write. Keep the name comparison, and add an identity check: for every tracked entry under .claude that exists on disk, stat it (without following symlinks) and treat the local file as tracked when its device and inode (or the file identity Bun or node:fs gives on Windows) equal those of .claude/settings.local.json. Test the identity path with a hard link tracked under another name, which reproduces the aliasing on any file system."
@@ -59,7 +59,45 @@
     "agentId": "workflow:wf_d03511d3-778/assignment-0mw8s3phz-nmro",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:46:16.535Z"
+    "startedAt": "2026-11-09T04:46:16.535Z",
+    "finishedAt": "2026-11-09T04:49:37.523Z"
+  },
+  "result": "result: `repositoryControl` now also treats the local file as tracked when any tracked `.claude` entry has its device and inode. The name comparison stays as it was.\n\nchanged:\n- /home/user/holyagent-0.3.0-scope/packages/runtime/src/setup/scope.ts\n- /home/user/holyagent-0.3.0-scope/packages/runtime/tests/setup-scope.test.ts\n- /home/user/holyagent-0.3.0-scope/packages/integrations/claude/dist/scripts/holyagent.js (regenerated)\n- /home/user/holyagent-0.3.0-scope/packages/integrations/pi/dist/scripts/holyagent.js (regenerated)\n\nchecks:\n- `bun install --frozen-lockfile` -> 0.\n- `bunx --no-install mise run build` -> 0. The only changes are the two regenerated dist files, which carry the scope.ts change.\n- `bunx --no-install mise run verify` -> 0. Type-check, lint (211 files, no problems) and format check pass, and tests are 2383 pass, 0 fail across 77 files. The first verify run failed the format check on scope.ts, so I ran `bun fmt` on it, rebuilt and reran. The formatter also reflowed the `installedScope` JSDoc paragraph, which is why that comment shows more changed lines than the sentence I added.\n- Regression proof: with the identity loop disabled, the new test fails (1 fail). With it restored, `setup-scope.test.ts` passes, 64 tests.\n- The full verify log is at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log.\n\nblockers: none\nquestions: none\n\nnotes:\n- The identity lookup is `lstat(path, { bigint: true })`, so symlinks are not followed and `dev:ino` is compared as bigint. On Windows this relies on Node's `ino` for NTFS, which I did not run.\n- A folded name (U+017F, a trailing dot or space) is only caught where the tracked entry exists on disk under that name. I tested the identity path only with a hard link, as the brief asked, not with real folding on APFS or Windows.\n- An unreadable tracked entry (stat fails) is skipped, not treated as tracked. That matches the \"exists on disk\" wording of the brief.\n\nevidence:\nA tracked entry under .claude that is the same file as settings.local.json, by device and inode, never infers local, with a hard-link test: new test \"a tracked entry that is the same file as the local file never infers local\" in packages/runtime/tests/setup-scope.test.ts. It fails with the identity check disabled and passes with it.\nAn ordinary untracked local file beside other tracked .claude files still infers local: the existing test \"a tracked project file next to an untracked local file still infers local\" still passes (64/64 in setup-scope.test.ts).\nmise run build leaves no unexplained changes and mise run verify exits 0: build exit 0, with only the two dist files changed; verify exit 0, 2383 pass and 0 fail.\nThe change stays inside the Assignment scope and ownership paths: `git status` shows only the two ownership files plus the two regenerated dist files.\nchecks-run: `bun install --frozen-lockfile` 0; `mise run build` 0; `mise run verify` 0, 2383 pass and 0 fail; `bun fmt` on scope.ts; targeted test fail-without-fix and pass-with-fix.\nchanged-paths: the four paths listed under `changed`.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/identity-check.diff\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Hard-link regression test fails without the identity check and passes with it; verify 2383/0; scope limited to owned paths plus regenerated dist.",
+    "criteria": [
+      {
+        "criterion": "A tracked entry under .claude that is the same file as settings.local.json, by device and inode, never infers local, with a hard-link test",
+        "support": "new test \"a tracked entry that is the same file as the local file never infers local\" in packages/runtime/tests/setup-scope.test.ts. It fails with the identity check disabled and passes with it."
+      },
+      {
+        "criterion": "An ordinary untracked local file beside other tracked .claude files still infers local",
+        "support": "the existing test \"a tracked project file next to an untracked local file still infers local\" still passes (64/64 in setup-scope.test.ts)."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0, with only the two dist files changed; verify exit 0, 2383 pass and 0 fail."
+      },
+      {
+        "criterion": "The change stays inside the Assignment scope and ownership paths",
+        "support": "`git status` shows only the two ownership files plus the two regenerated dist files."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun install --frozen-lockfile` 0; `mise run build` 0; `mise run verify` 0, 2383 pass and 0 fail; `bun fmt` on scope.ts; targeted test fail-without-fix and pass-with-fix."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the four paths listed under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/identity-check.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:46:16.535Z"
 }
