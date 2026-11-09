@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mw9biju1-jh8s",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Worker.implementation",
+  "slug": "make-cachehome-and-the-folders-built",
+  "objective": "Make cacheHome and the folders built from it in packages/runtime/src/setup/tui/load.ts join paths with the separator of the platform argument, so the setup-tui-load test passes on the Windows CI runner.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-tui, branch release/0.3.0/feat/setup-tui (head 9c7448e).",
+    "Failure on the windows CI job (run 42627041951): packages/runtime/tests/setup-tui-load.test.ts:102 expects cacheHome({HOME:'/home/a',XDG_CACHE_HOME:'relative'},'linux') to be '/home/a/.cache' and receives '\\home\\a\\.cache', because load.ts uses the host's node:path join while the function takes the platform as an argument.",
+    "Fix: pick node:path posix or win32 by the platform argument wherever load.ts builds a path from a platform-dependent function (cacheHome, guardedFolders, tuiDirectory and any other such helper), and judge an absolute XDG_CACHE_HOME with that same path module. Behavior at the real process.platform must not change.",
+    "Add or extend a test that fails on Linux without the fix, for example calling cacheHome or tuiDirectory with 'win32' and asserting backslash-joined output, so the regression is caught off Windows too."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Do not weaken or delete the existing assertions.",
+    "Report in under 300 words; put long logs in the scratchpad."
+  ],
+  "criteria": [
+    {
+      "text": "Paths from cacheHome, guardedFolders and tuiDirectory use the separator of the platform argument",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A test fails on Linux without the fix and passes with it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Only load.ts, its tests and generated build output change",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/tui/load.ts",
+    "packages/runtime/tests/setup-tui-load.test.ts",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T13:49:41.737Z"
+  },
+  "createdAt": "2026-11-09T13:49:41.737Z"
+}
