@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mw94x3k2-3wq5",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 12,
+  "roleTask": "Librarian.research",
+  "slug": "establish-how-holyagent-can-ship-an",
+  "objective": "Establish how HolyAgent can ship an @opentui/solid 0.8.x setup TUI given how its CLI is built and run, so the TUI works from both the Claude plugin and the Pi package on macOS, Linux and Windows.",
+  "state": "Running",
+  "scope": [
+    "HolyAgent repo (read-only): /home/user/holyagent-0.3.0-t3branch. How the CLI is built and shipped: packages/integrations/claude/src/generate.ts and packages/integrations/pi/src/generate.ts (bundling packages/runtime into dist/scripts/holyagent.js), the wrapper dist/scripts/holyagent and bun-flags.ts, the Claude plugin layout (is there any node_modules at runtime?), packages/integrations/pi/package.json (dependencies installed by pi install npm:...), packages/runtime/src/cli/setup.ts (the setup command and its flags), bunfig.toml and mise.toml.",
+    "OpenTUI (github.com/sst/opentui or its current home; npm @opentui/core and @opentui/solid at the newest 0.8.x): how @opentui/core loads its native renderer (bun:ffi dlopen of a per-platform package such as @opentui/core-darwin-arm64, embedded asset, or WASM), whether Bun.build can bundle it into one JS file and with what (an asset, a plugin, external), the Solid JSX transform it needs (bun plugin, babel preset, tsconfig jsxImportSource) and whether that works in a bun build bundle, its headless test renderer API, and its Bun version requirement.",
+    "Answer: which shipping options work (A: bundle everything into holyagent.js with the native library as an embedded file; B: keep OpenTUI external and resolve it from an installed package such as the Pi package node_modules, with a plain line-based fallback when it is absent; C: install it on first use with bun add into a cache; any other), with the evidence for each and the trade-offs for size, offline use, Windows and the dependency updater (mise run deps:update moves package.json caret ranges and bun.lock)."
+  ],
+  "constraints": [
+    "Read-only. Separate sourced facts from inference.",
+    "Report in under 600 words; put long excerpts in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The report states how @opentui/core loads its native code and whether it can be bundled by Bun.build, with sources",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The report states how HolyAgent builds and runs its CLI from the plugin and the Pi package, with path:line, and which shipping options work",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "answers",
+    "versions"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T10:45:03.170Z"
+  },
+  "createdAt": "2026-11-09T10:45:03.170Z"
+}
