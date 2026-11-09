@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw8szysv-rf81",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.testing",
+  "slug": "review-commit-6c86fe3-on-release-0-3-0",
+  "objective": "Review commit 6c86fe3 on release/0.3.0/fix/pi-windows-launch, which pins the platform and path module of the Pi extension and contract tests so they pass on windows-latest, for lost coverage or weakened assertions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-win; review git diff 2ae0549 6c86fe3 (also in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win-fix.diff).",
+    "The windows CI job failed 103 Pi tests because the harness left the platform unset; the fix passes platform linux and the posix path module wherever stubs are POSIX-shaped, and keeps explicit win32 tests.",
+    "Check: every behaviour the tests asserted before is still asserted; the Windows launch paths (bun.exe, bun.cmd via cmd.exe, driveless entries, powershell) stay covered by explicit win32 tests; nothing now depends on the runner's real platform in a way that hides a Windows-only product defect."
+  ],
+  "constraints": [
+    "Read-only; you may run bun test on the two files in that worktree.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The review states whether any assertion was weakened or any covered behaviour lost, with path:line",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The review states whether the Windows launch behaviour remains covered by explicit win32 tests",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8sj414-07fi"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T05:11:21.583Z"
+  },
+  "createdAt": "2026-11-09T05:11:21.583Z"
+}
