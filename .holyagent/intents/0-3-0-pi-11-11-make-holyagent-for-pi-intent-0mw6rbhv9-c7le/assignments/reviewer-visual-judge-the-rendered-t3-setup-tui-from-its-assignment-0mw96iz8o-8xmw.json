@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.visual",
   "slug": "judge-the-rendered-t3-setup-tui-from-its",
   "objective": "Judge the rendered T3 setup TUI from its captures against the tui-design checklist and the Intent's style and row requirements.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Captures: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/ (105 files named <state>-<cols>x<rows>.txt, text frames plus colour-span listings, at 80x24, 40x20 and 120x40, plus pty-{256,truecolor,16,nocolor,ascii}-80x24.txt and help-setup.txt). Capture script: /home/user/holyagent-0.3.0-tui/scripts/capture-setup-tui.ts. Source: /home/user/holyagent-0.3.0-tui/packages/runtime/src/setup/tui/.",
     "Style (Intent requirement 30): no tuiparts; @opentui/solid 0.8.x; holycodex v0.16.12 Tokyo Night tokens (heading #7aa2f7, option #7dcfff, argument #a9b1d6, focus #7dcfff bold, enabled #9ece6a, disabled #a9b1d6, success #73daca, warning #e0af68, error #f7768e, hint #737aa2), colour policy (NO_COLOR, TERM=dumb, FORCE_COLOR, CI, TTY), title 'HolyAgent  ·  setup', a key hint line, uppercase section headings, '❯ ' focus marker, '[x]'/'[ ]' checkboxes, a hint line for the focused row, keys up/down or j/k, space toggles, Enter reviews, Esc or Ctrl-C cancels. Rows: Pi provider fixed on while pi.enable; agent device access only where deviceHost and starts selected; new threads in worktrees starts selected; the always-applied keys get no row and are listed on the review screen.",
@@ -44,7 +44,37 @@
     "agentId": "workflow:wf_45422cce-dee/assignment-0mw96iz8o-8xmw",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T11:30:03.624Z"
+    "startedAt": "2026-11-09T11:30:03.624Z",
+    "finishedAt": "2026-11-09T11:39:03.087Z"
+  },
+  "result": "result: Findings below. No blocker. I read all 105 captures and the tui-design skill and judged them against its checklist. The two material items are the truncated result screen and the unexplained ASCII-locale pty capture. Review-screen truncation at 40x20 is a third, smaller one. Everything else on the stated style and rows passes.\n\n**observations**\nRows are correct. Pi is \"fixed\" with `[x]`. Device access disappears under `no-device-host`. Both toggles start on. Space on the Pi row is ignored (`pi-fixed-space-ignored`). j/k and focus wrap work (`focus-wrap-j-k`).\nTokens match the brief (title bold #7aa2f7, hint #7dcfff, focus bold #7dcfff, enabled #9ece6a, hint text #737aa2). Headings are uppercase and the title reads \"HolyAgent  ·  setup\".\nNO_COLOR keeps bold only, and the markers and words (`[ ] disabled`, `fixed`, `+ - = ~ !`) carry state without colour.\nASCII locale uses `>`, `-`, `up/down` and `...` throughout (`ascii-locale*`).\nResize reflows both screens (`resize-to-narrow*`, `resize-to-wide`). Wide characters are cell-correct (`review-wide-characters-40x20`). Esc, Ctrl-C and cancel-from-review each return `Cancelled`.\nDisabled rows (`device-off`, `both-off`) pass at all sizes. At 40x20 the widest row is 39 columns.\n\n**findings (material)**\n1. The result screen truncates the failure cause instead of wrapping it, though most of the screen is empty.\n   - At 80x24 `apply-failure` cuts the line to \"…changed while setup was wo…\". At 40x20 the reason is gone, leaving \"! t3 settings: /home/user/.t3/userdata/…\".\n   - The headline is cut to \"…the lines…\" (`apply-failure-40x20`), and `apply-success-40x20` drops the \"added …\" and \"already set\" outcomes.\n   - Why material: the user cannot read what failed or what was written, and the skill says an error must state what happened.\n2. `pty-ascii-80x24` (real renderer, LANG=C) still emits `·`, `↑/↓` and `❯`. The harness capture `ascii-locale-80x24` shows ASCII.\n   - `theme.ts:53` honours LC_ALL, then LC_CTYPE, then LANG. The most likely cause is an inherited UTF-8 LC_ALL in the pty run, but the capture records no env, so I cannot confirm it.\n   - Why material: the ASCII-locale guarantee is unproven on the real renderer. Worker.operations should rerun it with LC_ALL and LC_CTYPE unset.\n3. `review-40x20` (and `review-dry-run-40x20`, `resize-to-narrow-review`) shows \"… 2 more\", which hides \"Branch naming\" and \"Storage cleanup\". The \"=\" and \"~\" status of those rows is the one thing they report.\n   - At 80x24 and 120x40 the details are also cut mid-key with `…` (`review-80x24` rows 08–09, 13–15, 17).\n   - Why material: the Intent says every always-applied key is listed on the review screen, and there is no way to scroll or expand.\n4. `focus-device-40x20` breaks the Xcode path mid-word (\"…/Develo\" / \"per).\"). That makes the path unreadable.\n5. `review-failed-*` and `apply-error-*` state the problem (\"is not a JSON object\", \"the process was killed\") but give no recovery step.\n6. `apply-success-dry-run-80x24` and the `review-dry-run` captures keep \"Setup finished.\" and \"added …\" wording on a dry run. The heading says \"(DRY RUN)\", but the lines read as past-tense writes.\n\n**optional (preference)**\n`pty-16` (TERM=xterm) emits 24-bit SGR (`38;2;…`), so the 16-colour tier is not honoured. The writer already noted that OpenTUI picks the tier.\nThe hint line omits j/k, which only the help text mentions.\nThe disabled and fixed value uses #737aa2 when unfocused, not the #a9b1d6 token.\n#737aa2 on dark is about 4:1, below 4.5.\nThe `+`, `=`, `-` and `~` markers have no legend.\nEsc on the review screen cancels everything, although Back exists.\nThere is no `?` or `q`, which the skill lists but the Intent does not.\nThe result hint \"Enter close   Esc close\" is redundant.\n\n**not checked**\nLight background and image frames are not in the captures.\nTerminal restoration after exit is a behaviour check and was not run.\nResult screens have no NO_COLOR or ASCII-locale capture.\n\n**captures** (all under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-captures/`, at 80x24, 40x20 and 120x40 unless noted)\nChoice screen: `initial`, `focus-pi`, `focus-device`, `focus-worktrees`, `focus-wrap-j-k`, `pi-fixed-space-ignored`, `device-off`, `worktrees-off`, `both-off`, `no-device-host`, `no-device-host-focus-worktrees`.\nReview screen: `review`, `review-choices-off`, `review-dry-run`, `review-loading`, `review-failed`, `review-back-action`, `review-cancel-action`, `review-wide-characters`.\nCancel and apply: `cancel-escape`, `cancel-ctrl-c`, `cancel-from-review`, `applying`, `applying-interrupted`, `apply-success`, `apply-failure`, `apply-error`, `apply-success-dry-run`.\nAccessibility variants: `no-color`, `no-color-review`, `ascii-locale`, `ascii-locale-review`.\n80x24 only: `resize-to-narrow`, `resize-to-narrow-review`, `resize-to-wide`, `pty-{256,truecolor,16,nocolor,ascii}`, `help-setup.txt`.\n\nevidence:\nRead the tui-design skill and judged every listed state and size against its checklist: I read SKILL.md and all 105 captures; the checklist gaps are listed under \"not checked\".\nEach material finding names the capture, what is wrong and why it is material: findings 1–6 above name the capture, the defect and the reason.\nobservations: see the observations section.\nfindings: material items 1–6; optional items listed apart.\ncaptures: see the captures section.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Findings carry capture or path:line, scenario and reason; verdict stated",
+    "criteria": [
+      {
+        "criterion": "Read the tui-design skill and judged every listed state and size against its checklist",
+        "support": "I read SKILL.md and all 105 captures; the checklist gaps are listed under \"not checked\"."
+      },
+      {
+        "criterion": "Each material finding names the capture, what is wrong and why it is material",
+        "support": "findings 1–6 above name the capture, the defect and the reason."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "observations",
+        "support": "see the observations section."
+      },
+      {
+        "label": "findings",
+        "support": "material items 1–6; optional items listed apart."
+      },
+      {
+        "label": "captures",
+        "support": "see the captures section."
+      }
+    ]
   },
   "createdAt": "2026-11-09T11:30:03.624Z"
 }
