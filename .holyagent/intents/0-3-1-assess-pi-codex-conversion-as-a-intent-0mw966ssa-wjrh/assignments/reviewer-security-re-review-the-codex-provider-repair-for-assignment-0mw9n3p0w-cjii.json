@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-the-codex-provider-repair-for",
   "objective": "Re-review the Codex provider repair for the apply_patch symlink containment, rollback and the Luna Reserve request changes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/codex-repair.diff (worktree /home/user/holyagent-0.3.1-codex, commit eb8adb2). Previous security review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7r8p-90gx.md.",
     "Check that a target whose real path (or nearest existing ancestor's) leaves the project is refused before any write, including new files under a symlinked folder, moves and deletes; that rollback restores earlier writes without following a link out of the project; that time-of-check gaps are no worse than Pi's own write tool; and that the usage request now refuses redirects and only fires for Codex turns."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_f51116ee-ed4/assignment-0mw9n3p0w-cjii",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T19:14:04.016Z"
+    "startedAt": "2026-11-09T19:14:04.016Z",
+    "finishedAt": "2026-11-09T19:19:41.689Z"
+  },
+  "result": "result: One blocking finding. The new symlink check can be bypassed through a dangling relative link, so apply_patch can still write outside the project in that case. The token and redirect parts are sound.\n\nchanged: none\n\nchecks: The built-in `/security-review` failed again, with the same missing `origin/HEAD` error. This role has no Bash tool, so I ran no tests. I read the worktree sources (`/home/user/holyagent-0.3.1-codex`) against the diff, and the tree did not change while I read it.\n\nblockers:\n1. **Dangling-link bypass in `realPath`** (`packages/integrations/pi/src/codex.ts:83-96`, called from `apply-patch.ts:378-391`).\n   - When `realpath(path)` fails as missing and `readlink(path)` succeeds, the code follows the link target with `resolve(dirname(path), target)`. That resolves `..` lexically against the unresolved parent, not the real one.\n   - Source: a patch path such as `a/l`. Example: `proj/a` is a link to `/outside/dir`, and `/outside/dir/l` is a dangling link to `../x`.\n   - The check computes `proj/x`, which is inside, and passes. `Bun.write` then follows `a` and `l` and creates `/outside/x`.\n   - Variant: a project reached through a symlink, with a dangling link such as `../r/s/t/p/z`.\n   - Precondition: an existing out-of-project link plus a dangling relative link, which needs bash or an earlier setup. This is not a new capability beyond bash, but it breaks the criterion's \"cannot\".\n   - Fix: resolve `realPath(dirname(path))` first and resolve the target against that real parent.\n\nSound:\nExisting targets: `realpath` is checked against `realCwd`.\nNew files under a symlinked folder: they resolve through the nearest existing ancestor.\nMoves: `moveTo` is located before any write (`apply-patch.ts:425`).\nDeletes: a link pointing outside the project is refused. `Bun.file().delete()` removes the link itself.\nRollback: it rewrites only the already-validated paths. A deleted symlink comes back as a regular file, which is non-blocking.\nTime-of-check gap: the check runs at plan time and not again at write time. Pi's own `write` has no check, so this is no worse.\nToken: `redirect: \"error\"` is set (`luna-reserve.ts:129`). The URL is a fixed constant, and `message_end` now requires a Codex turn.\nNon-blocking: `before_agent_start` (`codex.ts:239`) is not gated on the provider. It still sends the token only to chatgpt.com.\n\nevidence:\napply_patch cannot write, move or delete outside the project through a symlink, and the token reaches only the intended host: the token half holds, as `luna-reserve.ts:21,126-129` and `codex.ts:222-231` show. The symlink half fails in the one case described in blocker 1.\nfindings: blocker 1, and the non-blocking notes on `before_agent_start` and the rollback of a deleted symlink.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "One blocking dangling-link containment bypass traced source to sink (codex.ts:83-96); token half sound.",
+    "criteria": [
+      {
+        "criterion": "apply_patch cannot write, move or delete outside the project through a symlink, and the token reaches only the intended host",
+        "support": "the token half holds, as `luna-reserve.ts:21,126-129` and `codex.ts:222-231` show. The symlink half fails in the one case described in blocker 1."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "blocker 1, and the non-blocking notes on `before_agent_start` and the rollback of a deleted symlink."
+      }
+    ]
   },
   "createdAt": "2026-11-09T19:14:04.016Z"
 }
