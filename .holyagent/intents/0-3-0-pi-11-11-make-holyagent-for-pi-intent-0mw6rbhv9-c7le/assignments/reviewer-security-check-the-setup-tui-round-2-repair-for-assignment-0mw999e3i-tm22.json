@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "check-the-setup-tui-round-2-repair-for",
   "objective": "Check the setup TUI round-2 repair for security issues in its cache, sweep and marker changes.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r2.diff (commit e1beb56 in /home/user/holyagent-0.3.0-tui). The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bh2g-iu59.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bhbo-gj8f.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bgsf-onrz.md (visual); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0le-38a4.md.",
     "Trace sweepStale (deletes folders: symlinks, other users' folders, races with a concurrent install), the cache-home check, the marker binding to the lock hash and the extended plain()."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_27e78b45-d7b/assignment-0mw999e3i-tm22",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:46:35.166Z"
+    "startedAt": "2026-11-09T12:46:35.166Z",
+    "finishedAt": "2026-11-09T12:54:23.299Z"
+  },
+  "result": "result: No new vulnerability in the sweep, cache-home check, marker binding or `plain()`. I have two Low notes and three Info notes, none blocking.\n\n**Built-in review:** `/security-review` failed to start. It runs `git diff origin/HEAD...`, and this checkout has no `origin/HEAD`, so it covered nothing. I reviewed `tui-r2.diff` (commit e1beb56) by hand, plus the full `load.ts` in `/home/user/holyagent-0.3.0-tui/packages/runtime/src/setup/tui/`. I did not run anything, and I did not read `app.tsx` or the abort path.\n\n**Sweep (`load.ts:335-355`): sound.**\nThe parent it scans is `<cache home>/holyagent/setup-tui`. In production `loadSetupTui` has already made it a plain directory of the current uid with no group or other write bit (`load.ts:424-427`), and the sweep runs after those checks. No other user can plant or rename entries there.\n`lstat` does not follow links, so a symlink named `.<name>-x` fails `isDirectory()` and is never removed or followed. `rm -r` removes links without following them.\nOnly entries matching `uid` (or any entry on Windows, where the folder is per-user) and older than one hour are removed.\nThe whole sweep is wrapped in `Effect.ignore`, so a read or remove failure cannot stop the install or turn into a deletion elsewhere.\nRunning as root against a user's cache is refused earlier as \"belongs to another user\", so the sweep never runs there.\nThe `lstat`-then-`rm` gap needs an attacker with the same uid, who can already do everything.\n**Low (availability only):** a concurrent install that has been silent for over an hour could be swept by another run, for example after a laptop suspend. The first run then fails at the marker write or the rename and falls back to the line-based setup. No integrity impact.\n\n**Cache-home check (`load.ts:255-288`, called at 422-423): sound.**\nIt uses `lstat`. It refuses a symlink, a non-directory, another uid's folder, or one writable by group or others unless the sticky bit is set.\nA sticky folder owned by the user is safe: others cannot rename or delete the user's `holyagent` folder inside it. If another user pre-creates `holyagent` there, the 0700 owner check refuses it.\nA missing home passes the check and is then created with mode 0700.\n**Low (usability):** a `~/.cache` that is a symlink, for example to another disk, is now refused and falls back to the line-based setup. The message tells the user to set `XDG_CACHE_HOME`. This is not a vulnerability.\n**Info:** the ancestors of the cache home are not checked. That is the same trust level as before.\n**Info:** the `refuse` text in `privateFolder` is not passed through `plain()`. It only interpolates paths from the user's own environment.\n\n**Marker binding (`load.ts:80-81`, 222-230): sound.**\nThe marker is compared as an exact string, which includes the sha256 prefix (8 hex characters) of the lock.\nThe lock is embedded at build time and the attacker does not control it, so the 32-bit truncation is not a collision risk.\nThe folder name already carried the same hash, so the binding is redundant and does no harm.\nThe marker is not an integrity proof. Protection against tampering still rests on the 0700 folder, as in round 1.\n\n**`plain()` (`load.ts:120-134`): sound.**\n`\\p{Cf}` covers the bidi controls, zero-width characters, the soft hyphen, the BOM, U+2060-2064 and the U+E0000 tag characters.\nIf removing Cf characters joins an ESC with a following `[...m`, the C0/C1 filter that runs afterwards still drops the ESC and the C1 introducers. So no escape sequence can be rebuilt.\n**Info:** U+2028 and U+2029 (Zl, Zp) and variation selectors are not stripped. They do not reorder text or drive the terminal.\n\nevidence:\nNo new vulnerability in the sweep, cache-home check, marker binding or escape stripping, or each is reported with file and line: None blocking. `load.ts:335-355` sweep (Low: an install silent for over an hour can be swept), `load.ts:255-288` cache home (Low: a symlinked `~/.cache` is refused), `load.ts:80-81` and `222-230` marker (redundant with the folder name), `load.ts:120-134` `plain()` (Info: U+2028/2029 remain). The built-in `/security-review` could not run because `origin/HEAD` is missing.\nfindings: No blockers. Two Low and three Info items, listed above.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Re-review evidence cites code lines, pty runs, tests and captures on e1beb56",
+    "criteria": [
+      {
+        "criterion": "No new vulnerability in the sweep, cache-home check, marker binding or escape stripping, or each is reported with file and line",
+        "support": "None blocking. `load.ts:335-355` sweep (Low: an install silent for over an hour can be swept), `load.ts:255-288` cache home (Low: a symlinked `~/.cache` is refused), `load.ts:80-81` and `222-230` marker (redundant with the folder name), `load.ts:120-134` `plain()` (Info: U+2028/2029 remain). The built-in `/security-review` could not run because `origin/HEAD` is missing."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "No blockers. Two Low and three Info items, listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:46:35.166Z"
 }
