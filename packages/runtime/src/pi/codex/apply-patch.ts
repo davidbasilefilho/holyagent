@@ -1,4 +1,4 @@
-import { isAbsolute, relative, resolve, sep } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
 import { Data, Effect } from "effect"
 
@@ -74,9 +74,18 @@ export class PatchFileError extends Data.TaggedError("PatchFileError")<{
 export type PatchError = PatchSyntaxError | PatchPathError | PatchContextError | PatchFileError
 
 /**
+ * What sits at a path itself, a final symbolic link not followed: a file with its exact bytes, or a
+ * link with the target it holds. A write that fails is put back from it.
+ */
+export type Snapshot =
+  | { readonly kind: "file"; readonly bytes: Uint8Array }
+  | { readonly kind: "link"; readonly target: string }
+
+/**
  * The file system a patch is applied to, with absolute paths. `read` answers `undefined` for a file
- * that does not exist; `write` creates the folders above the file; `remove` deletes the file;
- * `real` resolves symbolic links. The extension supplies one over the disk, a test an in-memory
+ * that does not exist; `write` creates the folders above the file; `remove` deletes the file, or
+ * only the link when the path is one; `real` resolves symbolic links; `snapshot` and `restore` save
+ * and put back what sits at a path. The extension supplies one over the disk, a test an in-memory
  * one.
  */
 export interface PatchFs {
@@ -90,8 +99,12 @@ export interface PatchFs {
   readonly read: (path: string) => Effect.Effect<string | undefined, PatchFileError>
   /** Writes a file's whole text, creating its folders. */
   readonly write: (path: string, text: string) => Effect.Effect<void, PatchFileError>
-  /** Deletes a file. */
+  /** Deletes a file; for a symbolic link, the link and not its target. */
   readonly remove: (path: string) => Effect.Effect<void, PatchFileError>
+  /** What sits at the path itself, or `undefined` when nothing does; a final link is not followed. */
+  readonly snapshot: (path: string) => Effect.Effect<Snapshot | undefined, PatchFileError>
+  /** Puts back what `snapshot` saved at the path, byte for byte, a link as a link. */
+  readonly restore: (path: string, saved: Snapshot) => Effect.Effect<void, PatchFileError>
 }
 
 /** One changed region of an updated file: the lines it replaces and the lines that replace them. */
@@ -359,13 +372,15 @@ const isBelow = (root: string, file: string): boolean => {
 /**
  * Applies a patch in Codex's format below `cwd`. Every path must be relative and stay below `cwd`,
  * also once symbolic links are resolved (`PatchFs.real`), so a link inside the project cannot carry
- * a write out of it. The whole patch is planned in memory first, reading each file once and seeing
- * the effect of the operations before it, so a bad hunk, a missing file or a bad path fails before
- * any file changes; the writes then run in the order of the patch. If one of them fails, the files
- * already written are put back as they were (folders the writes created stay), so the patch is
- * applied whole or not at all. Add overwrites an existing file; delete and update need the file to
- * exist; an update's `Move to` writes the new path and removes the old one, and a `Move to` that
- * names the file's own path is a plain update.
+ * a write out of it; a file is known by its resolved path, so two names of one file are one file.
+ * Deleting a link unlinks the link alone, so it may point out of the project. The whole patch is
+ * planned in memory first, reading each file once and seeing the effect of the operations before
+ * it, so a bad hunk, a missing file or a bad path fails before any file changes; the writes then
+ * run in the order of the patch. If one of them fails, the files already written are put back as
+ * they were, bytes and links included (folders the writes created stay), so the patch is applied
+ * whole or not at all. Add overwrites an existing file; delete and update need the file to exist;
+ * an update's `Move to` writes the new path and removes the old one, and a `Move to` that names the
+ * file's own path is a plain update.
  */
 export const applyPatch = (
   text: string,
@@ -375,22 +390,35 @@ export const applyPatch = (
   Effect.gen(function* () {
     const operations = yield* parsePatch(text)
     const realCwd = yield* fs.real(cwd)
-    const locate = (path: string) => {
+    const lexical = (path: string) => {
       const file = resolve(cwd, path)
       return path === "" || isAbsolute(path) || !isBelow(cwd, file)
         ? Effect.fail(new PatchPathError({ path }))
-        : fs
-            .real(file)
-            .pipe(
-              Effect.flatMap((real) =>
-                isBelow(realCwd, real)
-                  ? Effect.succeed(file)
-                  : Effect.fail(new PatchPathError({ path })),
-              ),
-            )
+        : Effect.succeed(file)
     }
-    // The planned content of each touched file, in the order first touched: its text, or `null`
-    // once deleted.
+    const inside = (path: string, real: string) =>
+      isBelow(realCwd, real) ? Effect.succeed(real) : Effect.fail(new PatchPathError({ path }))
+    // The resolved path of a file the patch names, which is also its key in `planned`: a symbolic
+    // link or a change of case in the name does not make it another file.
+    const locate = (path: string) =>
+      lexical(path).pipe(
+        Effect.flatMap(fs.real),
+        Effect.flatMap((real) => inside(path, real)),
+      )
+    // What a delete (or the removal after a move) takes away. A symbolic link is itself, not its
+    // target, so it is known by its resolved folder and its own name and may point out of the
+    // project: unlinking it touches nothing outside.
+    const locateEntry = (path: string) =>
+      Effect.gen(function* () {
+        const file = yield* lexical(path)
+        const entry = yield* fs
+          .real(dirname(file))
+          .pipe(Effect.flatMap((folder) => inside(path, join(folder, basename(file)))))
+        const saved = yield* fs.snapshot(entry)
+        return saved?.kind === "link" ? entry : yield* locate(path)
+      })
+    // The planned content of each touched file by resolved path, in the order first touched: its
+    // text, or `null` once deleted.
     const planned = new Map<string, string | null>()
     const load = (file: string, path: string) =>
       Effect.gen(function* () {
@@ -403,20 +431,34 @@ export const applyPatch = (
             : Effect.succeed(content),
         ),
       )
+    // Whether a delete finds the file: planned and not yet deleted, or on disk (a link counts,
+    // dangling or not). Nothing is read, so a link's target is never opened.
+    const exists = (file: string, path: string) =>
+      Effect.gen(function* () {
+        const known = planned.get(file)
+        return known !== undefined ? known !== null : (yield* fs.snapshot(file)) !== undefined
+      }).pipe(
+        Effect.flatMap((found) =>
+          found
+            ? Effect.void
+            : Effect.fail(new PatchFileError({ path, reason: "Failed to read file to update" })),
+        ),
+      )
     const stage = (file: string, content: string | null) => {
       planned.set(file, content)
     }
     const changes: Array<PatchResult["changes"][number]> = []
     for (const operation of operations) {
-      const file = yield* locate(operation.path)
       if (operation.kind === "add") {
-        stage(file, operation.text)
+        stage(yield* locate(operation.path), operation.text)
         changes.push({ status: "A", path: operation.path })
       } else if (operation.kind === "delete") {
-        yield* load(file, operation.path)
-        stage(file, null)
+        const entry = yield* locateEntry(operation.path)
+        yield* exists(entry, operation.path)
+        stage(entry, null)
         changes.push({ status: "D", path: operation.path })
       } else {
+        const file = yield* locate(operation.path)
         const next = yield* updatedText(
           operation.path,
           yield* load(file, operation.path),
@@ -424,16 +466,17 @@ export const applyPatch = (
         )
         const target = operation.moveTo === undefined ? file : yield* locate(operation.moveTo)
         stage(target, next)
-        // A move to the file's own path leaves the file in place: only a real move removes the old one.
-        if (target !== file) stage(file, null)
+        // A move to the file's own path leaves the file in place: only a real move removes the old
+        // one, and a link that was the old name goes alone, not the file it led to.
+        if (target !== file) stage(yield* locateEntry(operation.path), null)
         changes.push({ status: "M", path: operation.moveTo ?? operation.path })
       }
     }
     // What each write replaced, in the order of the writes, so a failure can put it back.
-    const written: Array<{ readonly file: string; readonly before: string | undefined }> = []
+    const written: Array<{ readonly file: string; readonly before: Snapshot | undefined }> = []
     const writeAll = Effect.gen(function* () {
       for (const [file, content] of planned) {
-        const before = yield* fs.read(file)
+        const before = yield* fs.snapshot(file)
         // A file the patch created and then moved or deleted was never on disk: nothing to remove.
         if (content === null && before === undefined) continue
         // Recorded before the attempt: a write that fails halfway may have left the file changed.
@@ -446,9 +489,9 @@ export const applyPatch = (
       Effect.forEach(written.toReversed(), ({ file, before }) =>
         (before === undefined
           ? fs
-              .read(file)
+              .snapshot(file)
               .pipe(Effect.flatMap((now) => (now === undefined ? Effect.void : fs.remove(file))))
-          : fs.write(file, before)
+          : fs.restore(file, before)
         ).pipe(
           Effect.as([] as ReadonlyArray<string>),
           Effect.catch(() => Effect.succeed([file])),

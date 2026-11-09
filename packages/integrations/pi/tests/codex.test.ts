@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readFile, readlink, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -240,6 +240,78 @@ describe("the apply_patch tool", () => {
         expect(await Bun.file(join(outside, "deeper", "new.txt")).exists()).toBe(false)
         expect(await Bun.file(join(outside, "missing.txt")).exists()).toBe(false)
         expect(await readFile(join(outside, "victim.txt"), "utf8")).toBe("safe\n")
+      })
+    })
+
+    test("a dangling relative link inside a linked folder carries no write out of the project", async () => {
+      await inFolders(async (folder, outside) => {
+        // The link `l` sits in the outside folder, so its `..` climbs from there, not from the project.
+        await mkdir(join(outside, "dir"))
+        await symlink("../x", join(outside, "dir", "l"))
+        await symlink("l", join(outside, "dir", "chain"))
+        await symlink(join(outside, "dir"), join(folder, "a"))
+        for (const path of ["a/l", "a/chain"])
+          await expect(attempt(folder, patch(`*** Add File: ${path}`, "+x"))).rejects.toThrow(
+            "file references must be relative",
+          )
+        expect(await Bun.file(join(outside, "x")).exists()).toBe(false)
+      })
+    })
+
+    test("a dangling link in a project reached through a link is read against the real folder", async () => {
+      await inFolders(async (_folder, outside) => {
+        // The project is outside/real/proj, entered as outside/alias; `../alias/z` from the real
+        // folder is outside/real/alias/z, beyond the project, though it looks like a path inside.
+        await mkdir(join(outside, "real", "proj"), { recursive: true })
+        await symlink(join(outside, "real", "proj"), join(outside, "alias"))
+        await symlink("../alias/z", join(outside, "real", "proj", "d"))
+        await expect(
+          attempt(join(outside, "alias"), patch("*** Add File: d", "+x")),
+        ).rejects.toThrow("file references must be relative")
+        expect(await Bun.file(join(outside, "real", "alias", "z")).exists()).toBe(false)
+        expect(await Bun.file(join(outside, "alias", "z")).exists()).toBe(false)
+        // A dangling link that ends inside the project is followed.
+        await symlink("inner.txt", join(outside, "real", "proj", "ok"))
+        await attempt(join(outside, "alias"), patch("*** Add File: ok", "+x"))
+        expect(await readFile(join(outside, "real", "proj", "inner.txt"), "utf8")).toBe("x\n")
+      })
+    })
+
+    test("deleting a link that leads out of the project unlinks it and leaves the target", async () => {
+      await inFolders(async (folder, outside) => {
+        await writeFile(join(outside, "victim.txt"), "safe\n")
+        await symlink(join(outside, "victim.txt"), join(folder, "to-victim"))
+        await symlink(join(outside, "missing.txt"), join(folder, "to-nothing"))
+        await attempt(folder, patch("*** Delete File: to-victim", "*** Delete File: to-nothing"))
+        expect(await readFile(join(outside, "victim.txt"), "utf8")).toBe("safe\n")
+        for (const name of ["to-victim", "to-nothing"])
+          await expect(lstat(join(folder, name))).rejects.toThrow()
+      })
+    })
+
+    test("a write that fails puts a deleted link back as a link and a non-UTF-8 file back byte for byte", async () => {
+      await inFolders(async (folder, outside) => {
+        const bytes = new Uint8Array([0x6f, 0x6e, 0x65, 0x0a, 0xff, 0xfe, 0x80, 0x0a])
+        await writeFile(join(folder, "raw.bin"), bytes)
+        await symlink(join(outside, "victim.txt"), join(folder, "to-victim"))
+        await mkdir(join(folder, "dir"))
+        await expect(
+          attempt(
+            folder,
+            patch(
+              "*** Delete File: to-victim",
+              "*** Update File: raw.bin",
+              "@@",
+              "-one",
+              "+1",
+              // A folder cannot be written as a file.
+              "*** Add File: dir",
+              "+x",
+            ),
+          ),
+        ).rejects.toThrow()
+        expect(new Uint8Array(await readFile(join(folder, "raw.bin")))).toEqual(bytes)
+        expect(await readlink(join(folder, "to-victim"))).toBe(join(outside, "victim.txt"))
       })
     })
 
@@ -535,6 +607,41 @@ describe("Luna Reserve in the session", () => {
     expect(await emit("before_provider_request", { payload: request("gpt-6-luna", []) })).toEqual([
       undefined,
     ])
+  })
+
+  test("a resumed or forked session keeps the reserve, and a new one leaves it", async () => {
+    for (const [reason, kept] of [
+      ["resume", true],
+      ["fork", true],
+      ["new", false],
+    ] as const) {
+      const { emit } = start(
+        { current: settings(WITH_BILLION) },
+        { fetcher: () => status(RESERVE_BANNER)() },
+      )
+      await emit("message_end", limit)
+      await emit("session_start", { reason })
+      const sent = await emit("before_provider_request", { payload: request("gpt-6-luna", []) })
+      expect(sent[0] === undefined).toBe(!kept)
+    }
+  })
+
+  test("a run on another provider does not ask the backend whether the reserve is still offered", async () => {
+    let calls = 0
+    const fetcher: Fetch = async () => {
+      calls += 1
+      return status(RESERVE_BANNER)()
+    }
+    const { emit } = start({ current: settings(WITH_BILLION) }, { fetcher })
+    await emit("message_end", limit)
+    expect(calls).toBe(1)
+    await emit(
+      "before_agent_start",
+      { prompt: "continue" },
+      { provider: "kimi-coding", contextWindow: 1 },
+    )
+    await emit("before_agent_start", { prompt: "continue" })
+    expect(calls).toBe(2)
   })
 
   test("requests that go to the reserve ask for no more than high effort, and keep a lower one", async () => {

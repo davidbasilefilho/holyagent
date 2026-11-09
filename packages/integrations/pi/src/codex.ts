@@ -1,5 +1,5 @@
 // Bun has no `realpath` or `readlink`, so those two stay on node:fs; the file reads and writes use Bun.
-import { readlink, realpath } from "node:fs/promises"
+import { readlink, realpath, symlink } from "node:fs/promises"
 import { basename, dirname, join, resolve } from "node:path"
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
@@ -15,6 +15,7 @@ import {
   applyPatch,
   PatchFileError,
   type PatchFs,
+  type Snapshot,
 } from "../../../runtime/src/pi/codex/apply-patch.ts"
 import {
   compactThreshold,
@@ -78,8 +79,10 @@ const fileFailure = (path: string) => (cause: unknown) =>
 const isMissing = (error: PatchFileError): boolean => /ENOENT|ENOTDIR/.test(error.reason)
 
 // The path with its links resolved. A path that is not there yet is its nearest existing ancestor,
-// resolved, and the rest; a link whose target is missing still decides where a write lands, so it
-// is followed by hand.
+// resolved, and the rest. A link whose target is missing still decides where a write lands, so it
+// is followed by hand: its target is read against the folder the link really sits in (the
+// resolved parent, not the written one, since `..` climbs from where a link is), and the result
+// is resolved in turn, which follows a chain of links one by one.
 const realPath = (path: string): Effect.Effect<string, PatchFileError> =>
   Effect.tryPromise({ try: () => realpath(path), catch: fileFailure(path) }).pipe(
     Effect.catch((error) =>
@@ -88,10 +91,27 @@ const realPath = (path: string): Effect.Effect<string, PatchFileError> =>
             Effect.matchEffect({
               onFailure: () =>
                 realPath(dirname(path)).pipe(Effect.map((parent) => join(parent, basename(path)))),
-              onSuccess: (target) => realPath(resolve(dirname(path), target)),
+              onSuccess: (target) =>
+                realPath(dirname(path)).pipe(
+                  Effect.flatMap((parent) => realPath(resolve(parent, target))),
+                ),
             }),
           )
         : Effect.fail(error),
+    ),
+  )
+
+// What sits at the path itself: a link with its target, else the file's exact bytes, else nothing.
+const snapshotOf = (path: string): Effect.Effect<Snapshot | undefined, PatchFileError> =>
+  Effect.tryPromise({ try: () => readlink(path), catch: fileFailure(path) }).pipe(
+    Effect.map((target): Snapshot => ({ kind: "link", target })),
+    Effect.catch(() =>
+      Effect.tryPromise({ try: () => Bun.file(path).bytes(), catch: fileFailure(path) }).pipe(
+        Effect.map((bytes): Snapshot => ({ kind: "file", bytes })),
+        Effect.catch((error) =>
+          isMissing(error) ? Effect.succeed(undefined) : Effect.fail(error),
+        ),
+      ),
     ),
   )
 
@@ -106,9 +126,18 @@ export const nodePatchFs: PatchFs = {
     Effect.tryPromise({ try: () => Bun.write(path, text), catch: fileFailure(path) }).pipe(
       Effect.asVoid,
     ),
+  // Deleting a link unlinks the link and leaves its target.
   remove: (path) =>
     Effect.tryPromise({ try: () => Bun.file(path).delete(), catch: fileFailure(path) }),
   real: realPath,
+  snapshot: snapshotOf,
+  restore: (path, saved) =>
+    saved.kind === "link"
+      ? Effect.tryPromise({ try: () => symlink(saved.target, path), catch: fileFailure(path) })
+      : Effect.tryPromise({
+          try: () => Bun.write(path, saved.bytes),
+          catch: fileFailure(path),
+        }).pipe(Effect.asVoid),
 }
 
 /** What the Codex module needs from the extension that hosts it. */
@@ -144,7 +173,7 @@ const asReserveFailure = (): UsageStatusUnavailable =>
  *   whether Luna Reserve is offered and opens it; each later run asks whether ordinary usage is
  *   back and closes it.
  * - `session_start`, `session_compact` and `session_tree`: forget the compaction, since Pi's history
- *   changed under it.
+ *   changed under it; a new session also leaves the reserve.
  */
 export const registerCodex = (pi: ExtensionAPI, host: CodexHost): void => {
   const fs = host.fs ?? nodePatchFs
@@ -173,10 +202,14 @@ export const registerCodex = (pi: ExtensionAPI, host: CodexHost): void => {
   const forget = () => {
     compaction = NO_COMPACTION
   }
-  // A new session starts on the regular model: the reserve of the one before does not carry over.
-  pi.on("session_start", () => {
+  // The history behind the compaction is another one on every start. The reserve is a state of the
+  // account, not of a session, so only a new session starts on the regular model; a resumed or
+  // forked one keeps it (and `before_agent_start` closes it once ordinary usage is back), because
+  // dropping it would send the next turn to the exhausted model. A reload builds this module anew,
+  // so it starts on the regular model and the usage limit sends it back to the reserve.
+  pi.on("session_start", (event) => {
     forget()
-    reserve = false
+    if (event.reason === "new") reserve = false
   })
   pi.on("session_compact", forget)
   pi.on("session_tree", forget)
@@ -237,7 +270,9 @@ export const registerCodex = (pi: ExtensionAPI, host: CodexHost): void => {
   })
 
   pi.on("before_agent_start", async (_event, ctx) => {
-    if (host.settings()?.lunaReserve !== true || !reserve) return undefined
+    // The check sends Codex's token, so it runs only for a run that is about to use Codex.
+    if (host.settings()?.lunaReserve !== true || !reserve || !isCodexProvider(ctx.model?.provider))
+      return undefined
     // Only a clear "no longer offered" closes the reserve; a failed check keeps it, so a bad
     // connection never flips a session between the two.
     if ((await offered(ctx)) === false) {

@@ -10,26 +10,33 @@ import {
   PatchFileError,
   type PatchFs,
   seekSequence,
+  type Snapshot,
 } from "../../src/pi/codex/apply-patch.ts"
 
 const CWD = resolve("/work/project")
 const at = (path: string) => resolve(CWD, path)
 
 /**
- * An in-memory file system that records the order of its writes and removals. `links` maps a folder
- * of the project to where it really leads, as a symbolic link does; the first write to a path of
- * `failing` fails and leaves the file as it was.
+ * An in-memory file system that records the order of its writes and removals. `links` maps a path
+ * of the project to where it really leads, as a symbolic link does; `fileLinks` names those that
+ * are links themselves (they hold no file, and removing one leaves its target); the first write to
+ * a path of `failing` fails and leaves the file as it was.
  */
 const memory = (
   files: Readonly<Record<string, string>> = {},
   options: {
     readonly links?: Readonly<Record<string, string>>
+    readonly fileLinks?: ReadonlyArray<string>
     readonly failing?: ReadonlyArray<string>
   } = {},
 ) => {
   const store = new Map(Object.entries(files).map(([path, text]) => [at(path), text]))
   const log: Array<string> = []
   const links = Object.entries(options.links ?? {}).map(([from, to]) => [at(from), to] as const)
+  // The links that are present, by the path of the link, with the target each holds.
+  const present = new Map(
+    (options.fileLinks ?? []).map((name) => [at(name), options.links?.[name] ?? ""] as const),
+  )
   // Each path fails once, on its first write.
   const failing = (options.failing ?? []).map(at)
   const fs: PatchFs = {
@@ -55,14 +62,32 @@ const memory = (
             log.push(`write ${path}`)
           }),
     remove: (path) =>
-      store.has(path)
+      store.has(path) || present.has(path)
         ? Effect.sync(() => {
             store.delete(path)
+            present.delete(path)
             log.push(`remove ${path}`)
           })
         : Effect.fail(new PatchFileError({ path, reason: "no such file" })),
+    snapshot: (path) => {
+      const target = present.get(path)
+      const text = store.get(path)
+      return Effect.succeed<Snapshot | undefined>(
+        target !== undefined
+          ? { kind: "link", target }
+          : text === undefined
+            ? undefined
+            : { kind: "file", bytes: new TextEncoder().encode(text) },
+      )
+    },
+    restore: (path, saved) =>
+      Effect.sync(() => {
+        if (saved.kind === "link") present.set(path, saved.target)
+        else store.set(path, new TextDecoder().decode(saved.bytes))
+        log.push(`write ${path}`)
+      }),
   }
-  return { fs, store, log, text: (path: string) => store.get(at(path)) }
+  return { fs, store, log, present, text: (path: string) => store.get(at(path)) }
 }
 
 const patch = (...lines: ReadonlyArray<string>) =>
@@ -381,7 +406,72 @@ describe("applyPatch", () => {
   test("a link that stays inside the project is followed without complaint", async () => {
     const { fs, text } = memory({}, { links: { alias: at("real") } })
     await run(patch("*** Add File: alias/file.txt", "+x"), fs)
-    expect(text("alias/file.txt")).toBe("x\n")
+    expect(text("real/file.txt")).toBe("x\n")
+  })
+
+  test("two names of one file through a link are one file in the plan", async () => {
+    const links = { alias: at("real") }
+    const first = memory({ "real/a.txt": "one\ntwo\n" }, { links })
+    await run(
+      patch(
+        "*** Update File: real/a.txt",
+        "@@",
+        "-one",
+        "+1",
+        "*** Update File: alias/a.txt",
+        "@@",
+        "-two",
+        "+2",
+      ),
+      first.fs,
+    )
+    expect(first.text("real/a.txt")).toBe("1\n2\n")
+
+    // A move to the other name of the same file is a plain update, not a delete of the file.
+    const moved = memory({ "real/a.txt": "one\n" }, { links })
+    await run(
+      patch("*** Update File: real/a.txt", "*** Move to: alias/a.txt", "@@", "-one", "+1"),
+      moved.fs,
+    )
+    expect(moved.text("real/a.txt")).toBe("1\n")
+
+    const deleted = memory({ "real/a.txt": "one\n" }, { links })
+    await run(
+      patch("*** Update File: real/a.txt", "@@", "-one", "+1", "*** Delete File: alias/a.txt"),
+      deleted.fs,
+    )
+    expect(deleted.store.has(at("real/a.txt"))).toBe(false)
+    expect(deleted.log).toEqual([`remove ${at("real/a.txt")}`])
+  })
+
+  test("deletes a link that leads out of the project by unlinking it, and puts it back as a link", async () => {
+    const outside = resolve("/elsewhere/victim.txt")
+    const unlinked = memory({}, { links: { "out.txt": outside }, fileLinks: ["out.txt"] })
+    await run(patch("*** Delete File: out.txt"), unlinked.fs)
+    expect(unlinked.log).toEqual([`remove ${at("out.txt")}`])
+    expect(unlinked.present.has(at("out.txt"))).toBe(false)
+
+    const { fs, present, log } = memory(
+      { "c.txt": "keep\n" },
+      { links: { "out.txt": outside }, fileLinks: ["out.txt"], failing: ["c.txt"] },
+    )
+    const error = await fails(
+      patch("*** Delete File: out.txt", "*** Update File: c.txt", "@@", "-keep", "+changed"),
+      fs,
+    )
+    expect(error).toMatchObject({ _tag: "PatchFileError", reason: "disk full" })
+    expect(present.get(at("out.txt"))).toBe(outside)
+    expect(log).toEqual([
+      `remove ${at("out.txt")}`,
+      `write ${at("c.txt")}`,
+      `write ${at("out.txt")}`,
+    ])
+
+    // Updating or adding through the same link still writes outside, so it is refused.
+    const through = memory({}, { links: { "out.txt": outside }, fileLinks: ["out.txt"] })
+    expect((await fails(patch("*** Add File: out.txt", "+x"), through.fs))._tag).toBe(
+      "PatchPathError",
+    )
   })
 
   test("a write that fails puts back the files already written, so the patch is whole or not at all", async () => {
@@ -425,9 +515,10 @@ describe("applyPatch", () => {
     const failingFs: PatchFs = {
       ...fs,
       write: (path, text) =>
-        path === at("b.txt") || (path === at("a.txt") && text === "one\n")
+        path === at("b.txt")
           ? Effect.fail(new PatchFileError({ path, reason: "read-only" }))
           : fs.write(path, text),
+      restore: (path) => Effect.fail(new PatchFileError({ path, reason: "read-only" })),
     }
     const error = await fails(
       patch(
