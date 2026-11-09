@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-fff-integration-adds-no",
   "objective": "Confirm the fff integration adds no supply-chain, settings-file or path-exposure defect.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit e2cacd11 on release/0.3.1/feat/fff in /home/user/holyagent-0.3.1-fff (range e6f334c7..e2cacd11); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9rpdzt-cwur.md",
     "Requirement: @ff-labs/pi-fff 0.11.0 at an exact pin in override mode, so its tools replace Pi find and grep and Pi prompt guidance stays consistent; a capability with headless and normal forms, switchable and modular; the Claude plugin keeps bundled ripgrep and fd.",
@@ -46,7 +46,33 @@
     "agentId": "workflow:wf_fd9334c0-993/assignment-0mw9s9fmw-apeq",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T21:38:29.864Z"
+    "startedAt": "2026-11-09T21:38:29.864Z",
+    "finishedAt": "2026-11-09T21:55:12.855Z"
+  },
+  "result": "result: no blocker found. The built-in `/security-review` failed to run, and I could not read the installed package or run any test.\nchanged: none\nchecks:\n- Built-in `/security-review`: the Skill call errored on `git log origin/HEAD...` (\"unknown revision\"), so it covered nothing. I reviewed `fff-commit.diff` and the worktree source by hand.\n- No Bash tool, so no `bun install` and no tests. `node_modules/@ff-labs` is absent from the worktree.\n- I read `@ff-labs/pi-fff` 0.11.0 `README.md` and `package.json` from unpkg. `src/index.ts` came from GitHub `main`, not the 0.11.0 tag.\n\nblockers: none\n\nFindings (no blockers):\n1. Non-blocking, validated from the README and `index.ts`: pi-fff defaults `followSymlinks` to true and indexes `$HOME` when pi starts there. Pi's rg and fd do not follow directory symlinks by default.\n   - In a hostile repo, a link such as `docs -> ~/.ssh` becomes searchable under a workspace-relative path.\n   - Pi's `grep` and `find` already accept any absolute `path`, so no file becomes reachable that was not before. Only the default behaviour differs.\n   - Decision for the root: whether setup should also write `followSymlinks: false` to `pi-fff.json`. This would break worktree and stow layouts.\n2. Suspicion: I could not read how pi-fff's auxiliary finders handle an out-of-workspace `path` (`routePathConstraint`). I found nothing that widens reach, but I did not verify it.\n3. Open point, root exclusion: pi-fff calls `setActiveTools` with every tool it registers, which can re-add `grep`, `find` and `multi_grep` to the root. The `tool_call` gate (`refuseExcludedTool`, `extension.ts:1506`) blocks them by name, so the exclusion holds.\n   - If pi-fff stays on `ffgrep` and `fffind` (cwd is `$HOME` or `/`, with home scanning off), those names are not excluded, so the root can use them. That breaks its `holyagent rg` rule but is not a security issue.\n4. Open point, specialist tool names: all 19 agent files list `grep, find`, and override mode registers exactly those names. `multi_grep` gets activated for specialists without being listed. That is the same capability as `grep`, so there is no new reach.\n5. Open point, user-level off: `fff` is not in `FINAL_OFF`, so a repo's `.holyagent/config.json` can turn it back on. The package is pinned and the other package-installing capabilities are not final either. Not a blocker.\n6. Low: `pi remove npm:@ff-labs/pi-fff` on `--fff off` or an unsupported host would also remove a copy the user installed themselves. This is the generic managed-package behaviour.\n7. Transitive packages are not locked: Pi installs with npm and no lockfile. `fff-node` and `fff-bun` are pinned exactly in pi-fff's `package.json`. I did not check the native `fff-bin-*` packages.\n\nSound:\n- `pi-packages.json` holds `\"@ff-labs/pi-fff\": \"0.11.0\"`, and `piPackageSource` builds `npm:<name>@<pin>`. The same source is used for install and doctor.\n- Settings are written only to the user-scope file `<agent dir>/pi-fff.json`; `locate` returns `undefined` for project and local scope.\n- Writes go through `mergeTarget`, which skips a key whose value is already equal. A key the user set stays, and only newly added keys are recorded.\n- Revert and undo remove only recorded keys whose value still equals `override`.\n- At project scope, `refuseLinks` guards every write and edit. At user scope it returns immediately, as for the existing files.\n\nevidence:\nThe package is pinned exactly and setup installs only that version: `packages/runtime/src/config/pi-packages.json` and `config/pi-packages.ts:14`; `setup/pi-install.ts:136` runs `install` with that source. Transitive packages are unlocked (finding 7).\nSetup's write and revert of pi-fff.json touch only what HolyAgent recorded, at user scope, behind the existing link refusal: `setup/pi-settings.ts` `locate` (127), `mergeTarget` (282-306), `revertFile` (349-391, recorded and equal values only) and `scope.ts:72-88`.\nfff's tools expose no files outside what Pi's own find and grep could reach: holds for reach, since Pi's tools take any absolute path. Symlink default (finding 1) and auxiliary-finder path handling (finding 2) are unverified.\nfindings: items 1-7 above.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "No blockers; exact pin, recorded-only revert at user scope; symlink-follow default goes to the final repair.",
+    "criteria": [
+      {
+        "criterion": "The package is pinned exactly and setup installs only that version",
+        "support": "`packages/runtime/src/config/pi-packages.json` and `config/pi-packages.ts:14`; `setup/pi-install.ts:136` runs `install` with that source. Transitive packages are unlocked (finding 7)."
+      },
+      {
+        "criterion": "Setup's write and revert of pi-fff.json touch only what HolyAgent recorded, at user scope, behind the existing link refusal",
+        "support": "`setup/pi-settings.ts` `locate` (127), `mergeTarget` (282-306), `revertFile` (349-391, recorded and equal values only) and `scope.ts:72-88`."
+      },
+      {
+        "criterion": "fff's tools expose no files outside what Pi's own find and grep could reach",
+        "support": "holds for reach, since Pi's tools take any absolute path. Symlink default (finding 1) and auxiliary-finder path handling (finding 2) are unverified."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1-7 above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T21:38:29.864Z"
 }
