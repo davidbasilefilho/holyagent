@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw97aak2-3sei",
+  "intentId": "intent-0mw94kj67-lb5f",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-merged-head-of-worktree",
+  "objective": "Check that the merged head of worktree /home/user/holyagent-0.3.0-judge builds to an unchanged tree and passes the full gates.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-judge, current HEAD (the integration branch merged in without conflicts). Run everything there."
+  ],
+  "constraints": [
+    "Run `bun install --frozen-lockfile` first; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes and no edits under .git/ or .holyagent/. If the build changes tracked files, report `git status --short` and write `git diff` to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-judge-build.diff; leave the tree as the build left it.",
+    "Write logs only to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-judge-build.log and v-judge-verify.log.",
+    "Never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Report in under 150 words; start each evidence line with the criterion text, then a colon."
+  ],
+  "criteria": [
+    {
+      "text": "bunx --no-install mise run build exits 0 and leaves git status clean",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "build",
+    "verify"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:51:18.002Z"
+  },
+  "createdAt": "2026-11-09T11:51:18.002Z"
+}
