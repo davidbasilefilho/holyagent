@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-cloud-session-checkout-change",
   "objective": "Review the cloud-session checkout change for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The change is commit 2dedb01 on release/0.3.0/fix/cloud-session-branch in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as the file /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r0.diff). Its goal: in a claude.ai cloud session the session panel shows the primary checkout's branch and diff with a Create PR button, so the root keeps the primary checkout on the platform-assigned branch at its start and works in worktrees; session start and holyagent status add a notice when that checkout is detached; docs explain the panel and that the label cannot be renamed. The writer's report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bm41-hhjx.md.",
     "Judge also: the existing Branches rule in root identity.md and version-control.md still says to start each branch with git switch -c <name> <start>, which moves the primary checkout in a cloud session and contradicts the new rule; say whether that must change and how, given the root core's character budget (sessioncontext.test.ts has about 75 characters of slack).",
@@ -45,7 +45,37 @@
     "agentId": "workflow:wf_352521d4-e12/assignment-0mw98v0vv-klze",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:35:24.859Z"
+    "startedAt": "2026-11-09T12:35:24.859Z",
+    "finishedAt": "2026-11-09T12:45:58.222Z"
+  },
+  "result": "result: One blocker. The detached-HEAD notice can name `main` instead of the assigned branch, and no test covers that case. The `git switch -c` contradiction in `identity.md` must change.\n\n**Built-in /code-review:** I ran it with args `HEAD~1...HEAD`, but it reviewed the primary checkout (`/home/user/holyagent`), not this worktree. All 8 findings concern a design-skills change (`web-design`, `design-core`, `docs/attributions.md`, a 0.2.2 bump) that is not in 2dedb01. I rejected all 8 as outside the range. The skill text was the built-in's.\n\n**Findings**\n\n1. **Blocker (behavior, `packages/runtime/src/cli/status.ts`, `returnBranch`):**\n   - It picks the oldest `checkout: moving from <branch> to …` line whose source branch still exists. For a platform start of clone, then `checkout -b claude/x`, the HEAD reflog is `moving from main to claude/x` then `clone: from …`. The oldest source is `main`, so the notice says `git switch main`, not the assigned branch.\n   - I reproduced this in a scratch repo: clone, `checkout -b claude/x`, one commit, `checkout --detach`.\n   - The test passes only because `initRepo` leaves `main` unborn, so `checkout -b` writes no reflog line and the first reflog entry is the detach.\n   - Fix: take the oldest move whose destination (`moving from A to B`) is an existing local branch. That gives `claude/x`, and a detach goes to a sha, so it is skipped.\n\n2. **Blocker (tests):** No case has a commit on `main` before `checkout -b`. Add one that expects `git switch claude/quiet-fox`. Calls to `seed` before the `git checkout -b` would do it.\n\n3. **Detection logic:** Otherwise correct.\n   - `--git-dir` equal to `--git-common-dir` is silent for linked worktrees. A branch checkout is silent through `symbolic-ref`.\n   - Local sessions are silent because only exactly `CLAUDE_CODE_REMOTE=true` counts as cloud.\n   - Every git failure yields `undefined`, and no error escapes into session start or status. A git too old for `--path-format` leaves the notice off.\n   - The hook merges the notice on all three branches.\n   - Optional: a mid-rebase or bisect detach would show the notice. Optional: no test for a git failure or for the no-state-folder hook paths.\n\n4. **Contradiction (blocker, behavior):** `claude-5.5/root/identity.md` line 10, and the same text in `kimi-k3.1/root/identity.md` line 27, tell the root on an assigned branch to \"first create the conventional branch (`git switch -c <name> <start>` …)\". That moves the primary checkout, which the new rule forbids. The `version-control.md` Branches line says the same.\n   - `identity.md` is in `ROOT_CORE`. The new bullet lives only in `version-control.md`, which is not in the core, so a root that is not the holyagent agent gets only the contradicting text.\n   - Recommended `identity.md` wording: \"first create the conventional branch in a worktree (`git worktree add -b <name> <path> <start>`, name and start both set by the stack plan), then commit and push only there.\" That adds about 28 characters, inside the roughly 75 of slack.\n   - Recommended `version-control.md` wording: change the Branches example to `git worktree add -b <name> <path> <start>`, with plain `git switch -c` only outside a cloud session. Drop the duplicate example from the new bullet so the net length is neutral.\n   - Apply it to the kimi files too, and regenerate the dist files.\n\n**Tests:** `bun test packages/runtime/tests/cloud-checkout.test.ts packages/runtime/tests/sessioncontext.test.ts` exited 0 with 33 pass and 0 fail. Without the code the tests would fail, but they miss finding 1. I read the code and did not run the full gates.\n\nevidence:\nThe detached-HEAD detection is correct for a cloud primary checkout and silent for branch checkouts, linked worktrees and local sessions, with no failure mode that breaks session start or status: Fails on the return branch. `status.ts` `returnBranch` names `main` after a clone and `checkout -b` (scratch reproduction). The other cases and the failure handling are correct.\nTests cover the behavior and fail without it: `cloud-checkout.test.ts` covers detached, branch, linked worktree and non-cloud, but not a commit on `main` before `checkout -b`. 33 pass.\nThe git switch -c contradiction is judged with a recommended wording: It must change in `identity.md` (claude-5.5 line 10, kimi line 27) and in the `version-control.md` Branches line. Wording is under finding 4.\nfindings: items 1–4 above; the built-in review's 8 findings were rejected as outside the range.\ntests: `bun test packages/runtime/tests/cloud-checkout.test.ts packages/runtime/tests/sessioncontext.test.ts` exited 0, 33 pass.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Findings carry file lines and a reproduction; they start the repair",
+    "criteria": [
+      {
+        "criterion": "The detached-HEAD detection is correct for a cloud primary checkout and silent for branch checkouts, linked worktrees and local sessions, with no failure mode that breaks session start or status",
+        "support": "Fails on the return branch. `status.ts` `returnBranch` names `main` after a clone and `checkout -b` (scratch reproduction). The other cases and the failure handling are correct."
+      },
+      {
+        "criterion": "Tests cover the behavior and fail without it",
+        "support": "`cloud-checkout.test.ts` covers detached, branch, linked worktree and non-cloud, but not a commit on `main` before `checkout -b`. 33 pass."
+      },
+      {
+        "criterion": "The git switch -c contradiction is judged with a recommended wording",
+        "support": "It must change in `identity.md` (claude-5.5 line 10, kimi line 27) and in the `version-control.md` Branches line. Wording is under finding 4."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1–4 above; the built-in review's 8 findings were rejected as outside the range."
+      },
+      {
+        "label": "tests",
+        "support": "`bun test packages/runtime/tests/cloud-checkout.test.ts packages/runtime/tests/sessioncontext.test.ts` exited 0, 33 pass."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:35:24.859Z"
 }
