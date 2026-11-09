@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-last-gpt-6-spacing-repair",
   "objective": "Re-review the last GPT-6 spacing repair: the visual reviewer's source of measurements and the terminal fix for a line starting with a dash.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/diff-0mw9jrl2w.diff (files /home/user/holyagent-0.3.1-gpt6/packages/runtime/src/instructions/gpt-6/roles/reviewer-visual/captures.md and design-core/core.md). It answers non-blocking notes 1 and 3 of /home/user/holyagent/.git/holyagent/reports/assignment-0mw9jjliv-rezg.md.",
     "Check both notes are closed and the wording stays consistent with worker-visual/method.md and skills/visual-judging/SKILL.md."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_2b5a684c-a35/assignment-0mw9jxcqi-jwe1",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:45:09.306Z"
+    "startedAt": "2026-11-09T17:45:09.306Z",
+    "finishedAt": "2026-11-09T17:48:56.690Z"
+  },
+  "result": "result: both notes are closed with no new blocking defects. I read the diff and the four files, and ran no checks because I have no shell.\n\nFindings:\nNote 1, closed. `reviewer-visual/captures.md:7` now names the source: \"the measurements the worker's report lists for the final captures (read them from the report or brief you are given; without them, judge from the captures alone)\". `worker-visual/method.md:3` says \"record the measurements in the report\", so the two agree.\nNote 3, closed. `design-core/core.md:71` now says \"in a terminal frame, where no such join exists, reword or move the break\".\nNon-blocking, `design-core/core.md:16`: it says \"a capture or a record\", while `captures.md:7` and `method.md:3` say \"report\". Replace \"record\" with \"report\" for consistency.\nNon-blocking, `skills/visual-judging/SKILL.md:23` and `root/dispatch.md`: the root is not told to pass the worker's report or its measurements into the Reviewer.visual brief. The reviewer falls back safely to judging from the captures alone.\n\nevidence:\nBoth notes are closed without new defects: met. Note 1 is closed at `/home/user/holyagent-0.3.1-gpt6/packages/runtime/src/instructions/gpt-6/roles/reviewer-visual/captures.md:7`, consistent with `roles/worker-visual/method.md:3` and `skills/visual-judging/SKILL.md:23`. Note 3 is closed at `design-core/core.md:71` in the same tree.\nfindings: no blocking findings; two non-blocking, as listed above.\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Both notes closed, consistent with method.md and visual-judging; two non-blocking wording notes.",
+    "criteria": [
+      {
+        "criterion": "Both notes are closed without new defects",
+        "support": "met. Note 1 is closed at `/home/user/holyagent-0.3.1-gpt6/packages/runtime/src/instructions/gpt-6/roles/reviewer-visual/captures.md:7`, consistent with `roles/worker-visual/method.md:3` and `skills/visual-judging/SKILL.md:23`. Note 3 is closed at `design-core/core.md:71` in the same tree."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blocking findings; two non-blocking, as listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:45:09.306Z"
 }
