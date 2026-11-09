@@ -42,7 +42,7 @@ The steps, both install scopes, the official installer and what `holyagent docto
 | The macOS permission walkthrough for computer use, and an adapter for rpiv tools that need `custom()` (the todo panel does not show under T3)                    | Planned | [t3-code.md](t3-code.md#dialogs-and-status-only)                                                                   |
 | Cache-hit measurement against the 95% target for the Kimi provider and Billion Context                                                                           | Planned | [caching-and-subagents.md](caching-and-subagents.md#cache-target)                                                  |
 
-Pages that are not listed as built (the approval, auto-mode and Claude parity pages) are plans and research.
+The approval page is research behind the decision that the package loads no gate, and the auto-mode page records that decision, which ships. The Claude parity page maps each Claude rule to its Pi carrier; those carriers ship, and a row or point the page marks as open or not built is not built.
 
 ## The decisions for 0.3.0
 

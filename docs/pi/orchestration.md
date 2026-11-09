@@ -1,6 +1,6 @@
 # Orchestration on Pi: workflows, codemode and the launcher for Intents and Assignments
 
-**Status: the launcher (the 18 specialists as `@tintinweb/pi-subagents` package agents, with the extension glue) and the runtime changes under Pi ship in 0.3.0 ([Decision for 0.3.0](#decision-for-030), [The runtime under Pi](#the-runtime-under-pi)). Decided and not built: the codemode settings, of which only `PI_CODEMODE_MAX_WORKERS` is applied (the extension sets it on the root; `holyagent setup` does not write `codemode.mode`), and the recorded-fixture CI ([Codemode in 0.3.0](#codemode-in-030), [CI and Windows](#ci-and-windows)). The sections after them are research on Pi's primitives and are not shipped behaviour.**
+**Status: the launcher (the 18 specialists as `@tintinweb/pi-subagents` package agents, with the extension glue) and the runtime changes under Pi ship in 0.3.0 ([Decision for 0.3.0](#decision-for-030), [The runtime under Pi](#the-runtime-under-pi)). The Pi fixtures and the contract and T3 replay tests are built and run in `mise run verify` ([CI and Windows](#ci-and-windows)). Decided and not built: the codemode settings, of which only `PI_CODEMODE_MAX_WORKERS` is applied (the extension sets it on the root; `holyagent setup` does not write `codemode.mode`) ([Codemode in 0.3.0](#codemode-in-030)). The sections after them are research on Pi's primitives and are not shipped behaviour.**
 
 Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (the plan pins 1.5.0; see [README.md](README.md#version-risk)). Sourced facts carry a link. Everything marked "Inference:" is design reasoning, not Pi behaviour. The Claude Code and HolyAgent side of the mapping (dynamic workflows, Intents, Assignments, the 18 Role.task identities) comes from the task brief, not from Pi.
 
@@ -73,7 +73,7 @@ To be verified when the integration is built:
 
 ## CI and Windows
 
-**Status: decided for 0.3.0.**
+**Status: built for 0.3.0: the fixtures and tests are in `packages/integrations/pi/tests` and run with the other tests; no job was added.**
 
 - **Recorded fixtures, not a real Pi.** CI replays recorded Pi events for the pinned Pi version. `mise run deps:update` moves the Pi package pins and, through `bun update`, the Pi host used for development and tests within its caret range (a user's own Pi install is theirs); it does not re-record the fixtures, so a move that changes Pi's events shows up as a failing replay until they are re-recorded by hand ([installation.md](installation.md#the-pin)). A real Pi process would need Node 22.19 and network access, which the plan avoids in CI.
 - **Inside the existing jobs.** The Pi tests run inside the existing `check` and `windows` jobs, so no job is added or renamed and the rulesets' required check names do not change ([development.md](../development.md)). The `check` job's generated-output freshness check covers the Pi package.
@@ -159,5 +159,5 @@ These were the options before the decision. [Decision for 0.3.0](#decision-for-0
 
 - No resumable workflow runtime: HolyAgent would need its own result cache keyed by run and node (Inference; Pi's documented persistence is the session transcript and `store()`).
 - The tool surface changes between releases (1.0.1 to 1.4.0 in three weeks, [npm registry metadata](https://registry.npmjs.org/@earendil-works/pi-coding-agent)). Decided: Pi and every reused extension are pinned, and recorded fixtures replay the RPC/JSON events HolyAgent consumes ([CI and Windows](#ci-and-windows)).
-- RPC and JSON modes cannot show the built-in project-trust prompt, so children inherit the parent's project trust and pass `--approve` when the parent session trusted the project (full access, see [auto-mode.md](auto-mode.md) and [installation.md](installation.md#global-and-project-local-installs)).
+- RPC and JSON modes cannot show the built-in project-trust prompt. Specialists run in-process in the root's Pi, so they need no `--approve` and share whatever trust the root's session has (full access, see [auto-mode.md](auto-mode.md) and [installation.md](installation.md#global-and-project-local-installs)).
 - Pi has no built-in notion of "blocked on user decision" beyond extension dialogs; the host must answer `extension_ui_request` records or the run stalls until its timeout.
