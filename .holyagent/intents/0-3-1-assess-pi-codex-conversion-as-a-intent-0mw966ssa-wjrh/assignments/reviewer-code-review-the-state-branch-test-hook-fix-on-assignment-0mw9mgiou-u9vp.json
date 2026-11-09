@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw9mgiou-u9vp",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-state-branch-test-hook-fix-on",
+  "objective": "Review the state-branch test hook fix on release/0.3.1/test/state-start-timeout (HEAD) in /home/user/holyagent-0.3.1-statefix.",
+  "state": "Running",
+  "scope": [
+    "Run git -C /home/user/holyagent-0.3.1-statefix show HEAD. Diagnosis: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9m7rhx-8sde.md (afterEach registered before setDefaultTimeout kept Bun's 5 s hook default; the Windows test body took ~25 s and cleanup ran past 5 s).",
+    "Check the diagnosis against Bun's documented hook timeout behaviour and the scratch reproduction it names, that the new hook is bounded and its message names the slow cleanup, that the race does not leave cleanup running into the next test in a harmful way, and that no assertion changed. Run the file's tests."
+  ],
+  "constraints": [
+    "Do not check out other commits in any checkout and make no edits.",
+    "Report in under 200 words; mark findings blocking or non-blocking with file and line."
+  ],
+  "criteria": [
+    {
+      "text": "The fix addresses the diagnosed cause without weakening the test",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9m7rhx-8sde"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T18:56:02.718Z"
+  },
+  "createdAt": "2026-11-09T18:56:02.718Z"
+}
