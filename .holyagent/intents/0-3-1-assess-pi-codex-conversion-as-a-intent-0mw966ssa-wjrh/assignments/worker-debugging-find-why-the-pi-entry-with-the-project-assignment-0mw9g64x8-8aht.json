@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "find-why-the-pi-entry-with-the-project",
   "objective": "Find why the pi entry with the project flag sometimes hangs on the Windows CI runner, and fix the cause.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-bump, branch release/0.3.1/chore/bump-version (head f1ea0d9, version 0.3.1).",
     "Failing test: packages/integrations/pi/tests/session-context.test.ts, 'the project flag of the runtime bundle > the entry runs the CLI command after the flag, in the folder the flag names'. It spawns  and then , awaiting stdout, stderr and exit.",
@@ -61,7 +61,41 @@
     "agentId": "workflow:wf_43b280bc-12a/assignment-0mw9g64x8-8aht",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T16:00:00.620Z"
+    "startedAt": "2026-11-09T16:00:00.620Z",
+    "finishedAt": "2026-11-09T16:07:56.709Z"
+  },
+  "result": "result: The cause is not found, and I did not fix it. I changed the test to report where a stalled run stalls. That is diagnostics only and does not stop the stall. On Windows the child `bun` was alive at the limit (log line \"killed 1 dangling process\"). I could not find why.\n\nchanged: /home/user/holyagent-0.3.1-bump/packages/integrations/pi/tests/session-context.test.ts. The build left no other changes.\n\n**Confirmed from the code and logs**\nThe hang is a stalled child process, not a pipe held open by a grandchild. win97 and win99 print \"killed 1 dangling process\" at the moment of the timeout.\nIn the entry path there is no deadlock I could find.\n  - `pi-entry.ts` does `process.chdir`, then `Bun.argv.splice`, then imports `cli/main.ts`.\n  - The test passes `--input`, so stdin is never read.\n  - Each command runs two `git rev-parse` calls (`vcs/process.ts`, via Bun Shell `$`), then takes the local state lock (`state/lock.ts`). The two spawns run one after the other, so nothing contends for the lock.\nOther CLI tests stall the same way on Windows.\n  - `version.test.ts` runs `bun main.ts --version`, with no git, state or stdin read. It timed out in job 129213135347.\n  - `stdin.test.ts` \"finishes a command that waits on stdin\" took 29889 ms in win96 and 13867 ms in win99, against about 3600 ms in win78.\n  - So the stall is not specific to the project flag or to state handling.\n`cli/main.ts` runs unbundled in the tests. A cold start opens about 660 files on Linux: about 520 from `effect` and about 140 from the runtime.\n\n**Hypotheses (not confirmed)**\n1. Cold start of the unbundled import graph stalls on the Windows runner, for example through Defender scanning or disk contention. This is the most likely. The test starts two cold processes with no retry, and the suite takes 530 to 650 s there.\n2. Bun on Windows mishandles `process.stdin` for a non-pipe stdin. `main.ts` line 42 touches `process.stdin` eagerly. I could not reproduce it on Linux, where an open fifo stdin did not keep the process alive.\n3. A state-lock wait. The lock waits are 30 s and 60 s (`WAITS`) and `UNREADABLE_STALE_MS` is 30 s. A delete-pending lock file left by an earlier process would show up as exactly these 30 s stalls. This is only a fit to the timings.\n\nConfidence in any one of these is low, at most about one third.\n\n**What I changed**\nEach spawn now has a 20 s deadline (`CHILD_DEADLINE_MS`) and a 2 s pipe grace (`PIPE_GRACE_MS`). A child still alive at the deadline is killed and the test fails with the arguments, partial stdout and stderr, and whether a pipe stayed open after the exit. Without it a stall is just \"timed out\". The same two spawns and assertions remain, and the 30 s timeout is unchanged. I confirmed on Linux that Bun's `timeout` option sets `signalCode`.\n\nI made no source change and added no Linux regression check, because I could not reproduce the stall on Linux.\n\n**Next check**\nRerun the Windows job once the new message exists. A message with no output means the child never got going, which points to hypothesis 1 or 2. A message with output but no exit points to the exit path. To confirm hypothesis 1, set a temporary `console.error(Date.now())` at the top of `pi-entry.ts` and compare startup time across runs.\n\n**Notes**\nIf hypothesis 1 holds, spawning the bundled `scripts/holyagent.js`, which the pi package ships, would remove the cold-start cost from this test and from `version.test.ts`. I did not do it, because it changes what the test covers.\n\n**Checks**\n`bun test packages/integrations/pi/tests/session-context.test.ts`: exit 0, 15 pass.\n`bunx --no-install mise run build`: exit 0, no unexplained changes in `git status`.\n`bunx --no-install mise run verify`: exit 0, 2703 pass, 0 fail.\n\nevidence:\nThe hang's cause is identified with file and line evidence, or the report says what evidence is missing: Not identified. The evidence above shows the child is alive and the stall is shared with `version.test.ts` and `stdin.test.ts`. A Windows run is missing: it needs the new failure message, or timing from the child.\nThe fix addresses that cause without weakening the test: No cause fix. The test keeps both spawns and all assertions, and the timeout is unchanged. Only the diagnostic deadline was added.\nmise run build and mise run verify exit 0: build exit 0; verify exit 0 (2703 pass, 0 fail). Logs are `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/hang-build.log` and `hang-verify.log` in the same folder.\nchecks-run: as listed under Checks.\nchanged-paths: /home/user/holyagent-0.3.1-bump/packages/integrations/pi/tests/session-context.test.ts\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/hang-fix.diff\n",
+  "acceptance": {
+    "revision": 18,
+    "rationale": "cause not found but the evidence and missing Windows data are stated; diagnostics only, verify exit 0",
+    "criteria": [
+      {
+        "criterion": "The hang's cause is identified with file and line evidence, or the report says what evidence is missing",
+        "support": "Not identified. The evidence above shows the child is alive and the stall is shared with `version.test.ts` and `stdin.test.ts`. A Windows run is missing: it needs the new failure message, or timing from the child."
+      },
+      {
+        "criterion": "The fix addresses that cause without weakening the test",
+        "support": "No cause fix. The test keeps both spawns and all assertions, and the timeout is unchanged. Only the diagnostic deadline was added."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 (2703 pass, 0 fail). Logs are `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/hang-build.log` and `hang-verify.log` in the same folder."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "as listed under Checks."
+      },
+      {
+        "label": "changed-paths",
+        "support": "/home/user/holyagent-0.3.1-bump/packages/integrations/pi/tests/session-context.test.ts"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/hang-fix.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T16:00:00.620Z"
 }
