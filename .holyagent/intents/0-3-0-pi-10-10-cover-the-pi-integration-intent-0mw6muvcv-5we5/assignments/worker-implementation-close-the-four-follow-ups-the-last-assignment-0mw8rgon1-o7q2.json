@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mw8rgon1-o7q2",
+  "intentId": "intent-0mw6muvcv-5we5",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-four-follow-ups-the-last",
+  "objective": "Close the four follow-ups the last review found in the extension's Bun lookup, so a usable Bun is never passed over and a found path is the one that runs.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-win, branch release/0.3.0/fix/pi-windows-launch, head b511fe3 (committed; your edits are a new change on top).",
+    "1. packages/integrations/pi/src/extension.ts:635-638 (cmdExeArguments): when the Bun found is a bun.cmd shim and cmd.exe refuses the command line (a project path with ( ) & | < > and no space, or any % ^ !), every holyagent call fails, although ~/.bun/bin/bun.exe may exist. When a candidate cannot be started safely, try the next candidate in the lookup order, and fail naming the reason only when none can.",
+    "2. extension.ts:826-832: a found Bun path is cached for the session; when spawning it fails because the file is gone (ENOENT), clear the cache and look again once.",
+    "3. extension.ts:614-620: relative PATH entries (bin, ./node_modules/.bin) are checked against the process cwd but the spawn runs in packageRoot; skip relative PATH entries, as a shell would not search them safely, and make the doc comment's claim true.",
+    "4. extension.ts:576: on POSIX, skip a PATH candidate without the executable bit, as command -v in the wrapper does.",
+    "Test each under stubbed platform and file system. Leave item 5 (both BUN_INSTALL and ~/.bun searched) and the bun-flags machinery as they are."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path.",
+    "The generated packages/integrations/claude/dist and packages/integrations/pi/dist are rewritten by mise run build; include those regenerated files in your changed paths, though they are not listed in your ownership paths."
+  ],
+  "criteria": [
+    {
+      "text": "A Bun candidate cmd.exe cannot start safely is passed over for the next one, and the failure names the reason only when none can start, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A cached Bun path that is gone is looked up again once, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Relative PATH entries are not searched, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A POSIX candidate without the executable bit is skipped, with a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify exits 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "No test is weakened or removed to pass; every new behavior has a test that fails without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The change stays inside the Assignment's scope and ownership paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests/extension.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw8qq0x5-zx8p",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:28:22.333Z"
+  },
+  "createdAt": "2026-11-09T04:28:22.333Z"
+}
