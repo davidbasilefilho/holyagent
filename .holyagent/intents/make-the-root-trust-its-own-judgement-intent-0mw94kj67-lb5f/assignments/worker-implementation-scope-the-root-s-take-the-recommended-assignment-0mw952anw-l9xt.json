@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "scope-the-root-s-take-the-recommended",
   "objective": "Scope the root's 'take the recommended option instead of asking' rule so it never covers an approval the rules reserve, in the requirement and both model family instruction sets.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-judge (branch release/0.3.0/feat/root-own-judgement). Its newest commit made the root decide by its own judgement and ask the user only as a fallback; the review of that commit found one blocking gap.",
     "Blocking finding to repair: the sentence \"A question whose recommended option you would take anyway is not asked: take that option and record it as a default.\" (claude-5.5/root/asking.md line ~6, kimi-k3.1/root/asking.md line ~15, and the matching clause of R-NOASK in packages/runtime/src/instructions/requirements/root/asking.md) is unscoped. Every question carries a recommended option, so read literally it lets a model skip the approvals the rules reserve (merge, publish, force-push, protected or platform-assigned branch pushes, credentials, destructive steps) by taking its own recommendation. Scope it so reserved approvals are always asked or parked, in all three files, and keep the requirement consistent with itself.",
@@ -63,7 +63,45 @@
     "agentId": "workflow:wf_c13fc9b3-d2e/assignment-0mw952anw-l9xt",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T10:49:05.660Z"
+    "startedAt": "2026-11-09T10:49:05.660Z",
+    "finishedAt": "2026-11-09T10:53:40.739Z"
+  },
+  "result": "result: The \"take the recommended option\" rule now excludes reserved approvals in R-NOASK, the Claude file and the Kimi file. The reserved approvals are asked, or parked when the user is away.\n\nchanged (all under /home/user/holyagent-0.3.0-judge):\n- packages/runtime/src/instructions/requirements/root/asking.md\n- packages/runtime/src/instructions/claude-5.5/root/asking.md\n- packages/runtime/src/instructions/kimi-k3.1/root/asking.md\n- packages/integrations/claude/dist/agents/holyagent.md (generated)\n- packages/integrations/pi/dist/extensions/holyagent.js (generated)\n\nchecks:\n- `bunx --no-install mise run build` -> 0. It changed only the two generated dist files.\n- `bunx --no-install mise run verify` -> 0. Type-check clean, lint clean, format check clean (537 files), tests 2471 pass, 0 fail (log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log).\n- Coverage table: no change needed, since the `R-NOASK` coverage phrase is still in both family files.\n\nblockers: none\nquestions: none\n\nnotes:\n- Besides the three files you named, I changed one sentence of R-REASK, which was not asked. It said to apply the recommended default whenever the user is away, which contradicted R-NOASK. It now says to park a reserved approval instead.\n- I did not measure the context-budget headroom as a number. The relevant tests in `packages/integrations/claude/tests/hooks.test.ts` check `CONTEXT_BUDGET` (9400) and pass. The Claude `asking.md` is about 350 characters longer than at HEAD. I did not check whether that file counts toward the budget, so the headroom is unconfirmed.\n\nevidence:\nThe recommended-option rule excludes every approval the rules reserve, in R-NOASK and both family files: R-NOASK has \"That never covers an approval the rules reserve for the user (R-OUTWARD, R-GIT and R-BRANCH list them)\". Claude `asking.md` line 6 and Kimi `asking.md` line 15 carry the same exclusion, with the list (merging, publishing, deploying, credentials, security settings, messaging third parties, destructive steps, force-pushing, pushing to the base, default, protected or platform-assigned branch) and a pointer to Identity and Version control. The diff is in the diff-file.\nThe judgement-first loosening for routine and research-settled choices is unchanged in meaning: the opening paragraph, the \"unnecessary when settled\" list, \"research narrowed\" and the common-questions list are retained. The only changes are the merge, the exclusion and the dropped Kimi routine line.\nThe duplicated statement is merged, the Kimi routine line folded, and a pointer to the reserved approvals added: the \"act and record it\" sentence now appears once, in the opening paragraph, in both family files. The Kimi \"Routine choices...\" sentence is removed. Each family file points to Identity and Version control, and R-NOASK points to R-OUTWARD, R-GIT and R-BRANCH.\nmise run build leaves no unexplained changes and mise run verify exits 0, within the context budget: build exit 0 with only the two generated dist files changed. Verify exit 0 with 2471 pass and 0 fail.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/judge-repair.diff\nverify: `bunx --no-install mise run verify` -> exit 0, 2471 pass, 0 fail; log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\ncontext-budget: the CONTEXT_BUDGET (9400) tests in `packages/integrations/claude/tests/hooks.test.ts` pass within the verify run. I did not take a numeric measurement.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Exclusion in all three files quoted; build and verify exit 0 with 2471 pass; diff file given",
+    "criteria": [
+      {
+        "criterion": "The recommended-option rule excludes every approval the rules reserve, in R-NOASK and both family files",
+        "support": "R-NOASK has \"That never covers an approval the rules reserve for the user (R-OUTWARD, R-GIT and R-BRANCH list them)\". Claude `asking.md` line 6 and Kimi `asking.md` line 15 carry the same exclusion, with the list (merging, publishing, deploying, credentials, security settings, messaging third parties, destructive steps, force-pushing, pushing to the base, default, protected or platform-assigned branch) and a pointer to Identity and Version control. The diff is in the diff-file."
+      },
+      {
+        "criterion": "The judgement-first loosening for routine and research-settled choices is unchanged in meaning",
+        "support": "the opening paragraph, the \"unnecessary when settled\" list, \"research narrowed\" and the common-questions list are retained. The only changes are the merge, the exclusion and the dropped Kimi routine line."
+      },
+      {
+        "criterion": "The duplicated statement is merged, the Kimi routine line folded, and a pointer to the reserved approvals added",
+        "support": "the \"act and record it\" sentence now appears once, in the opening paragraph, in both family files. The Kimi \"Routine choices...\" sentence is removed. Each family file points to Identity and Version control, and R-NOASK points to R-OUTWARD, R-GIT and R-BRANCH."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0, within the context budget",
+        "support": "build exit 0 with only the two generated dist files changed. Verify exit 0 with 2471 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/judge-repair.diff"
+      },
+      {
+        "label": "verify",
+        "support": "`bunx --no-install mise run verify` -> exit 0, 2471 pass, 0 fail; log at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log"
+      },
+      {
+        "label": "context-budget",
+        "support": "the CONTEXT_BUDGET (9400) tests in `packages/integrations/claude/tests/hooks.test.ts` pass within the verify run. I did not take a numeric measurement."
+      }
+    ]
   },
   "createdAt": "2026-11-09T10:49:05.660Z"
 }
