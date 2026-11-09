@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "ship-ff-labs-pi-fff-0-11-0-with-the-pi",
   "objective": "Ship @ff-labs/pi-fff 0.11.0 with the Pi integration in override mode, as a capability with headless and normal forms, so its tools replace Pi's find and grep.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-fff, branch release/0.3.1/feat/fff cut from release/0.3.1/feat/just-bash at e6f334c7",
     "Requirement (Intent default, revisitable): the Pi integration adds @ff-labs/pi-fff (0.11.0, MIT, in-process fff Node binding) at an exact pin in override mode, so its tools replace Pi find and grep and Pi prompt guidance stays consistent; the Claude plugin keeps the bundled ripgrep and fd (docs/decisions.md:53 records why fff was dropped there; leave that decision as it is and add a sentence that it applies to the Claude plugin only).",
@@ -92,7 +92,53 @@
     "agentId": "workflow:wf_53bbedde-34d/assignment-0mw9rpdzt-cwur",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T21:22:54.617Z"
+    "startedAt": "2026-11-09T21:22:54.617Z",
+    "finishedAt": "2026-11-09T21:38:07.066Z"
+  },
+  "result": "result: fff capability added (`pi.features.fff`, `@ff-labs/pi-fff` 0.11.0 pinned, override mode written to `pi-fff.json`); build exits 0 and verify exits 0 with 3028 pass, 0 fail.\n\nchanged: `packages/runtime/src/config/{capabilities.ts,packages.ts,pi-packages.json}`, `packages/runtime/src/pi/{fff/settings.ts,tools.ts}`, `packages/runtime/src/setup/{pi-check.ts,pi-settings.ts}`, `packages/runtime/src/instructions/kimi-k3.1/{root/search.md,specialist/working.md}`, 13 test files under `packages/runtime/tests` (config, pi, setup-*), `docs/{README,decisions,usage}.md`, `docs/pi/{README,configuration,extensions}.md`, new `docs/pi/search.md`, `packages/integrations/{pi,claude}/dist/**` (build output). `bun.lock` is unchanged: Pi packages are not in it.\n\nchecks:\n- `bunx --no-install mise run build` -> 0. Tree shows only source edits plus regenerated dist.\n- `bunx --no-install mise run verify` -> 0 (check, lint, fmt, test: 3028 pass, 0 fail).\n- `mise run deps:check` -> exit status not captured (`tail` masked it). Output lists 4 pins behind: mise-action, fd, billion-context, pi-computer-use. `@ff-labs/pi-fff` is not flagged. Those four were behind before this change.\n\nblockers: none\n\nquestions:\n- `fff` is not added to `FINAL_OFF` in `config/load.ts`, because it grants no access. The `setup --fff` flag takes the generic refusal path but nothing locks it. Should a user-level `false` be final for it?\n- It is on by default, as the Intent says. An existing install gets the package at its next `setup`, and doctor fails until then.\n\nnotes:\n- Override mode comes from a global `pi-fff.json` (`mode: override`). The package reads only that file, so setup writes it at user scope only. A user's own `mode` stays (\"yours wins\").\n- Platform check: `nativeHosts` is a new registry field, and an uncovered host makes the capability unavailable in both forms. fff-node's library covers darwin/linux/win32 on x64 and arm64, plus android-arm64. Setup, doctor and the setup screen use the host platform by default; `platform` is injectable in `piPackages`, `toolSettings`, `enabledCapabilities` and `checkCapability`.\n- The root now excludes `grep`, `find` and `multi_grep` while fff is on (`rootExclude`). The package activates every tool it registers, so without this the root would gain them against its `holyagent rg`/`fd` search rule.\n- Instruction text: dropped \"pi's\" before `grep` and `find` in the two Kimi search texts.\n- Not confirmed (no run allowed): whether each in-process specialist session starts its own fff index; the root exclusion if pi-fff registers its tools after HolyAgent's session start; a supported host whose binding failed to install is not detected.\n- Not done: `multi_grep` for specialists (needs an `ext:pi-fff/multi_grep` entry in `agents.ts`).\n- `pi/bash` and `bash.ts` are untouched. Nothing was edited under `.git/` or `.holyagent/`.\n\nevidence:\n@ff-labs/pi-fff is pinned at exactly 0.11.0 in the Pi package pin table, and `mise run deps:check` accepts it: `packages/runtime/src/config/pi-packages.json` has `\"@ff-labs/pi-fff\": \"0.11.0\"`. `deps:check` does not list it among the behind pins. The command exits non-zero only for the four unrelated pins above.\nWith the capability on, Pi loads pi-fff in override mode so its tools replace Pi find and grep; with it off, Pi keeps its own find and grep, with tests: `tests/config/capabilities.test.ts` (\"the fff capability\"), `tests/pi/tools.test.ts` (toolSettings and root exclusion on/off), `tests/setup-pi-settings.test.ts` (\"fff\": writes `mode: override`, reverts it when off) and `tests/setup-capabilities.test.ts` (off removes the package and the key). All pass in verify.\nThe capability is in the registry with headless and normal forms, is toggled by `setup --fff on|off` with the existing user-lock refusal, and doctor reports it, with tests: `capabilities.ts` entry `fff`; `tests/setup-capabilities.test.ts` flag round trip; `tests/setup-pi.test.ts` doctor line `ok pi capability fff: ...`. The user-lock part is the generic refusal, with no lock registered for fff (see questions).\nA platform without the native binding reports the capability unavailable and falls back to Pi's tools, with a test: `tests/setup-pi.test.ts` (checkCapability on `freebsd-x64` gives the `~ ... not offered` line) and `tests/config/capabilities.test.ts` (no package and no setting on unsupported hosts).\ndocs/pi lists the capability, its switch and its fallback, and docs/decisions.md says the ripgrep and fd decision is for the Claude plugin: `docs/pi/search.md`, `configuration.md`, `README.md`, `docs/decisions.md`.\nGates: mise run build leaves no unexplained changes and mise run verify exits 0: build exit 0, verify exit 0 with 3028 pass and 0 fail; log in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\nchecks-run: build (0), verify (0, 3028 pass), `deps:check` (exit status not captured; four unrelated pins behind).\nchanged-paths: listed under changed.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff.diff`\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "fff capability with pin, override setting, platform fallback, root exclusion and docs, all tested; build 0, verify 3028 pass; review follows.",
+    "criteria": [
+      {
+        "criterion": "@ff-labs/pi-fff is pinned at exactly 0.11.0 in the Pi package pin table, and `mise run deps:check` accepts it",
+        "support": "`packages/runtime/src/config/pi-packages.json` has `\"@ff-labs/pi-fff\": \"0.11.0\"`. `deps:check` does not list it among the behind pins. The command exits non-zero only for the four unrelated pins above."
+      },
+      {
+        "criterion": "With the capability on, Pi loads pi-fff in override mode so its tools replace Pi find and grep; with it off, Pi keeps its own find and grep, with tests",
+        "support": "`tests/config/capabilities.test.ts` (\"the fff capability\"), `tests/pi/tools.test.ts` (toolSettings and root exclusion on/off), `tests/setup-pi-settings.test.ts` (\"fff\": writes `mode: override`, reverts it when off) and `tests/setup-capabilities.test.ts` (off removes the package and the key). All pass in verify."
+      },
+      {
+        "criterion": "The capability is in the registry with headless and normal forms, is toggled by `setup --fff on|off` with the existing user-lock refusal, and doctor reports it, with tests",
+        "support": "`capabilities.ts` entry `fff`; `tests/setup-capabilities.test.ts` flag round trip; `tests/setup-pi.test.ts` doctor line `ok pi capability fff: ...`. The user-lock part is the generic refusal, with no lock registered for fff (see questions)."
+      },
+      {
+        "criterion": "A platform without the native binding reports the capability unavailable and falls back to Pi's tools, with a test",
+        "support": "`tests/setup-pi.test.ts` (checkCapability on `freebsd-x64` gives the `~ ... not offered` line) and `tests/config/capabilities.test.ts` (no package and no setting on unsupported hosts)."
+      },
+      {
+        "criterion": "docs/pi lists the capability, its switch and its fallback, and docs/decisions.md says the ripgrep and fd decision is for the Claude plugin",
+        "support": "`docs/pi/search.md`, `configuration.md`, `README.md`, `docs/decisions.md`."
+      },
+      {
+        "criterion": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0, verify exit 0 with 3028 pass and 0 fail; log in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build (0), verify (0, 3028 pass), `deps:check` (exit status not captured; four unrelated pins behind)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed under changed."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T21:22:54.617Z"
 }
