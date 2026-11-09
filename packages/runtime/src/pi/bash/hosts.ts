@@ -1,5 +1,5 @@
 import { accessSync, constants, readdirSync, statSync } from "node:fs"
-import { delimiter, join, win32 } from "node:path"
+import { posix, win32 } from "node:path"
 
 import { Effect } from "effect"
 
@@ -20,6 +20,13 @@ export const variable = (
   return value === "" ? undefined : value
 }
 
+/**
+ * The path functions of a platform: Windows' for `win32`, POSIX' for every other system. A path
+ * built or split for a platform that is not the host's (a test, a remote shell) must not use the
+ * host's own `node:path`, whose separator and `join` are the host's.
+ */
+export const pathFor = (platform: NodeJS.Platform) => (platform === "win32" ? win32 : posix)
+
 // A folder a program is looked up in from anywhere: rooted on POSIX, a drive or UNC path on Windows.
 // A relative `PATH` entry names a place below the working directory, where a project could plant a
 // program, so it is never searched.
@@ -30,7 +37,7 @@ const isRooted = (folder: string, platform: NodeJS.Platform): boolean =>
 
 const splitPath = (value: string, platform: NodeJS.Platform): ReadonlyArray<string> =>
   value
-    .split(platform === "win32" ? ";" : delimiter)
+    .split(pathFor(platform).delimiter)
     .map((folder) => (platform === "win32" ? folder.replace(/^"(.*)"$/, "$1") : folder))
     .filter((folder) => isRooted(folder, platform))
 
@@ -49,7 +56,7 @@ export const hostSearchFolders = (
   const home = windows
     ? (variable(env, "USERPROFILE", platform) ?? variable(env, "HOME", platform))
     : variable(env, "HOME", platform)
-  const joined = windows ? win32.join : join
+  const joined = pathFor(platform).join
   const under = (base: string | undefined, ...parts: ReadonlyArray<string>) =>
     base === undefined ? [] : [joined(base, ...parts)]
   const bunInstall = variable(env, "BUN_INSTALL", platform)
@@ -70,7 +77,7 @@ export const hostSearchFolders = (
         ...under(home, ".local", "bin"),
         ...under(
           variable(env, "MISE_DATA_DIR", platform) ??
-            (home === undefined ? undefined : join(home, ".local", "share", "mise")),
+            (home === undefined ? undefined : posix.join(home, ".local", "share", "mise")),
           "shims",
         ),
         ...under(home, ".cargo", "bin"),
@@ -105,7 +112,7 @@ export const pathFolders = (
 
 /** `PATH` for a host program: {@link hostSearchFolders} joined the way the platform joins `PATH`. */
 export const hostPathValue = (env: Env, platform: NodeJS.Platform = process.platform): string =>
-  hostSearchFolders(env, platform).join(platform === "win32" ? ";" : delimiter)
+  hostSearchFolders(env, platform).join(pathFor(platform).delimiter)
 
 /** The extensions Windows runs as programs, in the order it prefers them, lowercase. */
 export const programExtensions = (env: Env): ReadonlyArray<string> =>
@@ -173,7 +180,7 @@ export const scanHostPrograms = (
         const named = programName(entry, platform, extensions)
         if (named === undefined || found.has(named.name)) continue
         const best = here.get(named.name)
-        const path = windows ? win32.join(folder, entry) : join(folder, entry)
+        const path = pathFor(platform).join(folder, entry)
         if ((best === undefined || named.rank < best.rank) && isRunnable(path, windows))
           here.set(named.name, { path, rank: named.rank })
       }

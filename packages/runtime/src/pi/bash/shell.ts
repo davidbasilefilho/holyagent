@@ -1,6 +1,6 @@
 import { statSync } from "node:fs"
 import { constants as osConstants } from "node:os"
-import { delimiter, posix } from "node:path"
+import { posix } from "node:path"
 
 import { Data, Effect, Stream } from "effect"
 import {
@@ -29,6 +29,7 @@ import {
   hostPathValue,
   hostSearchFolders,
   pathFolders,
+  pathFor,
   programExtensions,
   scanHostPrograms,
   variable,
@@ -304,7 +305,7 @@ const machinePath = (
     own.every((entry, step) => entries[index + step] === entry),
   )
   const kept = at < 0 ? entries : [...entries.slice(0, at), ...entries.slice(at + own.length)]
-  const separator = platform === "win32" ? ";" : delimiter
+  const separator = pathFor(platform).delimiter
   return pathFolders(
     kept
       .filter((folder) => folder !== "")
@@ -314,6 +315,49 @@ const machinePath = (
   )
     .filter((folder, index, all) => all.indexOf(folder) === index)
     .join(separator)
+}
+
+/** What a run left, as the `end` frame carries it. */
+export interface EndState {
+  /** The folder the run ended in, as the machine spells it (`C:\proj` on Windows). */
+  readonly cwd: string
+  /** The variables the run changed; `PATH`, if it changed, as the machine's. */
+  readonly changes: EnvChanges
+}
+
+/**
+ * The state a run left, in the machine's spelling, which is what goes back to Pi and into the next
+ * call: `cwd` is the shell's path (`/c/proj`) turned into the host's (`C:\proj`), and a `PATH` that
+ * is not the one the run started with is reported as the host's folders, without the shell's own
+ * (see {@link machinePath}). `before` and `after` are the shell's variables at the start and the
+ * end, `startPath` the `PATH` the shell started with and `pathKey` the name the request spelled it
+ * by.
+ */
+export const endState = (input: {
+  readonly before: Readonly<Record<string, string>>
+  readonly after: Readonly<Record<string, string>>
+  readonly cwd: string
+  readonly startPath: string
+  readonly pathKey: string | undefined
+  readonly drives: ReadonlySet<string>
+  readonly platform: NodeJS.Platform
+}): EndState => {
+  const changes = envChanges(input.before, input.after)
+  const finalPath = input.after["PATH"]
+  return {
+    cwd: toHostPath(input.cwd, input.drives, input.platform),
+    // `PATH` is the shell's own (see `runShell`), so a change of it is reported as the machine's.
+    changes:
+      finalPath === undefined || finalPath === input.startPath
+        ? changes
+        : {
+            ...changes,
+            set: {
+              ...changes.set,
+              [input.pathKey ?? "PATH"]: machinePath(finalPath, input.drives, input.platform),
+            },
+          },
+  }
 }
 
 // A program a signal ended has no exit code: the shell's convention is 128 plus the signal number.
@@ -574,23 +618,14 @@ export const runShell = (
     // After `exit` just-bash reports the state the run started with, so the state recorded before
     // the `exit` stands in for it.
     const left = exit.exited()
-    const finalEnv = left?.env ?? result.env
-    const changes = envChanges(before, finalEnv)
-    const finalPath = finalEnv["PATH"]
-    options.emit({
-      type: "end",
-      exitCode: result.exitCode,
-      cwd: toHostPath(left?.cwd ?? result.env["PWD"] ?? cwd, drives, platform),
-      // `PATH` is the shell's own (see `startPath`), so a change of it is reported as the machine's.
-      changes:
-        finalPath === undefined || finalPath === startPath
-          ? changes
-          : {
-              ...changes,
-              set: {
-                ...changes.set,
-                [pathKey ?? "PATH"]: machinePath(finalPath, drives, platform),
-              },
-            },
+    const ended = endState({
+      before,
+      after: left?.env ?? result.env,
+      cwd: left?.cwd ?? result.env["PWD"] ?? cwd,
+      startPath,
+      pathKey,
+      drives,
+      platform,
     })
+    options.emit({ type: "end", exitCode: result.exitCode, ...ended })
   })

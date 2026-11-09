@@ -6,7 +6,8 @@ import { dirname, join, parse } from "node:path"
 import type { BashOperations, ExtensionAPI } from "@earendil-works/pi-coding-agent"
 
 import { BASH_GUIDELINES } from "../../../runtime/src/pi/bash/guidelines.ts"
-import { afterCall, NO_STATE } from "../../../runtime/src/pi/bash/state.ts"
+import { toVirtualPath } from "../../../runtime/src/pi/bash/paths.ts"
+import { afterCall, NO_STATE, startFolder } from "../../../runtime/src/pi/bash/state.ts"
 import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import {
   type BashHost,
@@ -42,6 +43,10 @@ const host = (overrides: Partial<BashHost> = {}): BashHost => ({
   launch: launchShell,
   ...overrides,
 })
+
+// What `pwd` prints for a host folder: inside the shell every path is the shell's own, so `C:\\x` is
+// `/c/x` on Windows. What goes back to Pi and into the next call is the host's path (see below).
+const inShell = (path: string): string => toVirtualPath(path)
 
 const environment = (): NodeJS.ProcessEnv => ({ PATH: HOST_DIR, HOME: work })
 
@@ -105,7 +110,7 @@ describe("the bash tool's operations on just-bash", () => {
       await call(operations, "cd kept && export KEPT=yes && X=local")
       const next = await call(operations, 'pwd; echo "$KEPT:$X"')
       // Variables a call sets stay set, exported or not (just-bash reports the shell's variables).
-      expect(next.text).toBe(`${join(work, "kept")}\nyes:local\n`)
+      expect(next.text).toBe(`${inShell(join(work, "kept"))}\nyes:local\n`)
       await call(operations, "unset KEPT")
       expect((await call(operations, 'echo "[$KEPT]"')).text).toBe("[]\n")
     },
@@ -119,7 +124,7 @@ describe("the bash tool's operations on just-bash", () => {
       const operations = createJustBashOperations(host())
       expect((await call(operations, "cd exited && export EXITED=yes && exit 2")).exitCode).toBe(2)
       expect((await call(operations, 'pwd; echo "$EXITED"')).text).toBe(
-        `${join(work, "exited")}\nyes\n`,
+        `${inShell(join(work, "exited"))}\nyes\n`,
       )
     },
     PROCESS_TIMEOUT_MS,
@@ -136,7 +141,7 @@ describe("the bash tool's operations on just-bash", () => {
       await call(operations, "cd overlap && export FAST=1")
       await slow
       expect((await call(operations, 'pwd; echo "$FAST $SLOW"')).text).toBe(
-        `${join(work, "overlap")}\n1 1\n`,
+        `${inShell(join(work, "overlap"))}\n1 1\n`,
       )
     },
     PROCESS_TIMEOUT_MS,
@@ -149,7 +154,7 @@ describe("the bash tool's operations on just-bash", () => {
       const operations = createJustBashOperations(host())
       await call(operations, "cd moved")
       const other = await call(operations, "pwd", { cwd: dirname(work) })
-      expect(other.text).toBe(`${dirname(work)}\n`)
+      expect(other.text).toBe(`${inShell(dirname(work))}\n`)
     },
     PROCESS_TIMEOUT_MS,
   )
@@ -308,6 +313,23 @@ describe("the state after a call", () => {
     // One that did move wins, and so does one that follows another folder Pi passed.
     expect(afterCall(moved, "/p", "/p", "/p/new", none).cwd).toBe("/p/new")
     expect(afterCall(moved, "/q", "/q", "/q", none)).toEqual({ cwd: "/q", from: "/q", delta: {} })
+  })
+})
+
+describe("the state after a call, on Windows", () => {
+  test("the folder carried is the host's path, and is used again only while Pi passes the same one", () => {
+    // The shell reports `C:\\proj\\src` (the host's spelling, as `runShell` ends a call), not `/c/proj/src`.
+    const after = afterCall(NO_STATE, "C:\\proj", "C:\\proj", "C:\\proj\\src", {
+      set: {},
+      unset: [],
+    })
+    expect(after.cwd).toBe("C:\\proj\\src")
+    const exists = (path: string) => path === "C:\\proj\\src"
+    expect(startFolder(after, "C:\\proj", exists)).toBe("C:\\proj\\src")
+    expect(startFolder(after, "D:\\other", exists)).toBe("D:\\other")
+    expect(startFolder(after, "C:\\proj", () => false)).toBe("C:\\proj")
+    // What the shell is then asked to start in is the same folder in the shell's spelling.
+    expect(toVirtualPath(startFolder(after, "C:\\proj", exists), "win32")).toBe("/c/proj/src")
   })
 })
 

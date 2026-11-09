@@ -71531,7 +71531,7 @@ var parseRequest = (text) => decodeRequest(text).pipe(mapError2((error) => new P
 
 import { statSync as statSync3 } from "fs";
 import { constants as osConstants } from "os";
-import { delimiter as delimiter2, posix as posix4 } from "path";
+import { posix as posix5 } from "path";
 
 init_chunk_353VO5TF();
 init_chunk_SRB6FXRH();
@@ -90003,19 +90003,20 @@ var watchExit = (start) => {
 };
 
 import { accessSync, constants as constants2, readdirSync as readdirSync2, statSync as statSync2 } from "fs";
-import { delimiter, join as join4, win32 as win322 } from "path";
+import { posix as posix4, win32 as win322 } from "path";
 var variable = (env, name, platform = process.platform) => {
   const key = platform === "win32" ? Object.keys(env).find((entry) => entry.toUpperCase() === name.toUpperCase()) : name;
   const value = key === undefined ? undefined : env[key];
   return value === "" ? undefined : value;
 };
+var pathFor = (platform) => platform === "win32" ? win322 : posix4;
 var ROOTED = { posix: /^\//, win32: /^(?:[a-zA-Z]:[\\/]|[\\/]{2})/ };
 var isRooted = (folder, platform) => ROOTED[platform === "win32" ? "win32" : "posix"].test(folder);
-var splitPath = (value, platform) => value.split(platform === "win32" ? ";" : delimiter).map((folder) => platform === "win32" ? folder.replace(/^"(.*)"$/, "$1") : folder).filter((folder) => isRooted(folder, platform));
+var splitPath = (value, platform) => value.split(pathFor(platform).delimiter).map((folder) => platform === "win32" ? folder.replace(/^"(.*)"$/, "$1") : folder).filter((folder) => isRooted(folder, platform));
 var hostSearchFolders = (env, platform = process.platform) => {
   const windows = platform === "win32";
   const home = windows ? variable(env, "USERPROFILE", platform) ?? variable(env, "HOME", platform) : variable(env, "HOME", platform);
-  const joined = windows ? win322.join : join4;
+  const joined = pathFor(platform).join;
   const under = (base, ...parts) => base === undefined ? [] : [joined(base, ...parts)];
   const bunInstall = variable(env, "BUN_INSTALL", platform);
   const extra = windows ? [
@@ -90031,7 +90032,7 @@ var hostSearchFolders = (env, platform = process.platform) => {
     ...under(bunInstall, "bin"),
     ...under(home, ".bun", "bin"),
     ...under(home, ".local", "bin"),
-    ...under(variable(env, "MISE_DATA_DIR", platform) ?? (home === undefined ? undefined : join4(home, ".local", "share", "mise")), "shims"),
+    ...under(variable(env, "MISE_DATA_DIR", platform) ?? (home === undefined ? undefined : posix4.join(home, ".local", "share", "mise")), "shims"),
     ...under(home, ".cargo", "bin"),
     "/opt/homebrew/bin",
     "/home/linuxbrew/.linuxbrew/bin",
@@ -90052,7 +90053,7 @@ var hostSearchFolders = (env, platform = process.platform) => {
   });
 };
 var pathFolders = (value, platform = process.platform) => splitPath(value ?? "", platform);
-var hostPathValue = (env, platform = process.platform) => hostSearchFolders(env, platform).join(platform === "win32" ? ";" : delimiter);
+var hostPathValue = (env, platform = process.platform) => hostSearchFolders(env, platform).join(pathFor(platform).delimiter);
 var programExtensions = (env) => (variable(env, "PATHEXT", "win32") ?? ".COM;.EXE;.BAT;.CMD").split(";").filter((extension) => extension.startsWith(".")).map((extension) => extension.toLowerCase());
 var COMMAND_NAME = /^[A-Za-z0-9_][A-Za-z0-9._+@-]*$/;
 var readNames = (folder) => runSync2(try_2(() => readdirSync2(folder)).pipe(orElseSucceed2(() => [])));
@@ -90081,7 +90082,7 @@ var scanHostPrograms = (folders, platform = process.platform, extensions = []) =
       if (named === undefined || found.has(named.name))
         continue;
       const best = here.get(named.name);
-      const path = windows ? win322.join(folder, entry) : join4(folder, entry);
+      const path = pathFor(platform).join(folder, entry);
       if ((best === undefined || named.rank < best.rank) && isRunnable(path, windows))
         here.set(named.name, { path, rank: named.rank });
     }
@@ -90308,8 +90309,22 @@ var machinePath = (value, drives, platform) => {
   const own = SHELL_PATH.split(":");
   const at = entries.findIndex((_, index) => own.every((entry, step) => entries[index + step] === entry));
   const kept = at < 0 ? entries : [...entries.slice(0, at), ...entries.slice(at + own.length)];
-  const separator = platform === "win32" ? ";" : delimiter2;
+  const separator = pathFor(platform).delimiter;
   return pathFolders(kept.filter((folder) => folder !== "").map((folder) => toHostPath(folder, drives, platform)).join(separator), platform).filter((folder, index, all) => all.indexOf(folder) === index).join(separator);
+};
+var endState = (input) => {
+  const changes = envChanges(input.before, input.after);
+  const finalPath = input.after["PATH"];
+  return {
+    cwd: toHostPath(input.cwd, input.drives, input.platform),
+    changes: finalPath === undefined || finalPath === input.startPath ? changes : {
+      ...changes,
+      set: {
+        ...changes.set,
+        [input.pathKey ?? "PATH"]: machinePath(finalPath, input.drives, input.platform)
+      }
+    }
+  };
 };
 var exitCodeOf = (code, signal) => code ?? 128 + (typeof signal === "number" ? signal : signal === null ? 0 : osConstants.signals[signal] ?? 0);
 var runHost = (path, args, ctx, run) => gen2(function* () {
@@ -90411,7 +90426,7 @@ var runShell = (request, options) => gen2(function* () {
   const cwd = toVirtualPath(request.cwd, platform);
   shellEnv["PWD"] = cwd;
   const before = { ...shellEnv };
-  const isHostProgram = (name) => plan.passthrough.has(name) || name.includes("/") && programKind(toHostPath(posix4.resolve(cwd, name), drives, platform), platform, extensions) === "native";
+  const isHostProgram = (name) => plan.passthrough.has(name) || name.includes("/") && programKind(toHostPath(posix5.resolve(cwd, name), drives, platform), platform, extensions) === "native";
   const run = {
     streaming: isSingleHostCommand(request.command, isHostProgram),
     env: request.env,
@@ -90474,21 +90489,16 @@ var runShell = (request, options) => gen2(function* () {
     for (const chunk of emittedOrder(run.log, stdout, stderr) ?? [stdout, stderr])
       emitData(options.emit, chunk);
   const left = exit.exited();
-  const finalEnv = left?.env ?? result.env;
-  const changes = envChanges(before, finalEnv);
-  const finalPath = finalEnv["PATH"];
-  options.emit({
-    type: "end",
-    exitCode: result.exitCode,
-    cwd: toHostPath(left?.cwd ?? result.env["PWD"] ?? cwd, drives, platform),
-    changes: finalPath === undefined || finalPath === startPath ? changes : {
-      ...changes,
-      set: {
-        ...changes.set,
-        [pathKey ?? "PATH"]: machinePath(finalPath, drives, platform)
-      }
-    }
+  const ended = endState({
+    before,
+    after: left?.env ?? result.env,
+    cwd: left?.cwd ?? result.env["PWD"] ?? cwd,
+    startPath,
+    pathKey,
+    drives,
+    platform
   });
+  options.emit({ type: "end", exitCode: result.exitCode, ...ended });
 });
 
 var main = () => {

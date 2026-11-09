@@ -10,6 +10,7 @@ import { withNullDevice } from "../../src/pi/bash/devices.ts"
 import {
   hostPathValue,
   hostSearchFolders,
+  pathFor,
   programExtensions,
   programName,
   scanHostPrograms,
@@ -25,6 +26,7 @@ import {
 import type { ShellFrame } from "../../src/pi/bash/protocol.ts"
 import {
   emittedOrder,
+  endState,
   envChanges,
   HOST_PREFIX,
   hostLaunch,
@@ -164,6 +166,26 @@ describe("where host programs are looked for", () => {
     expect(folders).toContain("/mise/shims")
   })
 
+  test("the folders follow the platform they are asked for, not the host's path rules", () => {
+    expect(pathFor("win32").delimiter).toBe(";")
+    expect(pathFor("linux").delimiter).toBe(":")
+    expect(pathFor("darwin").join("/h", ".bun", "bin")).toBe("/h/.bun/bin")
+    const posix = hostSearchFolders(
+      { PATH: "/a:/b/c", HOME: "/h", BUN_INSTALL: "/bun", MISE_DATA_DIR: "/mise" },
+      "linux",
+    )
+    expect(posix.slice(0, 2)).toEqual(["/a", "/b/c"])
+    expect(posix).toContain("/bun/bin")
+    expect(posix).toContain("/mise/shims")
+    expect(posix.some((folder) => folder.includes("\\"))).toBe(false)
+    expect(
+      hostPathValue({ PATH: "/a:relative:/b", HOME: "/h" }, "linux").startsWith("/a:/b:"),
+    ).toBe(true)
+    // A POSIX path is not rooted for Windows, nor a drive path for POSIX.
+    expect(hostSearchFolders({ Path: "/a;C:\\a" }, "win32")[0]).toBe("C:\\a")
+    expect(hostSearchFolders({ PATH: "C:\\a:/b" }, "linux").slice(0, 1)).toEqual(["/b"])
+  })
+
   test("the extra folders are rooted too: a relative HOME or BUN_INSTALL names no folder", () => {
     const folders = hostSearchFolders(
       { PATH: "/a", HOME: "home", BUN_INSTALL: ".", MISE_DATA_DIR: "mise" },
@@ -279,6 +301,89 @@ describe("TypeScript first, JavaScript as the fallback", () => {
   })
 })
 
+describe("the state a run leaves, on Windows", () => {
+  const drives = new Set(["c", "d"])
+  const start = `${SHELL_PATH}:/c/tools:/d/bin`
+
+  test("the folder goes back to Pi as a Windows path, and maps back to the shell's for the next call", () => {
+    const ended = endState({
+      before: { PATH: start },
+      after: { PATH: start },
+      cwd: "/c/Users/me/proj",
+      startPath: start,
+      pathKey: "Path",
+      drives,
+      platform: "win32",
+    })
+    expect(ended.cwd).toBe("C:\\Users\\me\\proj")
+    expect(toVirtualPath(ended.cwd, "win32")).toBe("/c/Users/me/proj")
+    const root = endState({
+      before: {},
+      after: {},
+      cwd: "/d",
+      startPath: start,
+      pathKey: undefined,
+      drives,
+      platform: "win32",
+    })
+    expect(root.cwd).toBe("D:\\")
+    // Outside the mounted drives the shell's own path stays, as does any path elsewhere.
+    for (const [cwd, kept] of [
+      ["/usr/bin", "/usr/bin"],
+      ["/e/other", "/e/other"],
+    ] as const)
+      expect(
+        endState({
+          before: {},
+          after: {},
+          cwd,
+          startPath: start,
+          pathKey: undefined,
+          drives,
+          platform: "win32",
+        }).cwd,
+      ).toBe(kept)
+  })
+
+  test("a PATH the run changed is reported in the machine's spelling, under the name the request used", () => {
+    const after = { PATH: `${start}:/c/new tools:relative:/usr/bin:/c/tools` }
+    const ended = endState({
+      before: { PATH: start },
+      after,
+      cwd: "/c",
+      startPath: start,
+      pathKey: "Path",
+      drives,
+      platform: "win32",
+    })
+    expect(ended.changes.set).toEqual({ Path: "C:\\tools;D:\\bin;C:\\new tools" })
+    expect(ended.changes.unset).toEqual([])
+  })
+
+  test("a PATH left as it started is not reported, and on another system paths pass unchanged", () => {
+    const same = endState({
+      before: { PATH: start, A: "1" },
+      after: { PATH: start, A: "2" },
+      cwd: "/c/x",
+      startPath: start,
+      pathKey: "Path",
+      drives,
+      platform: "linux",
+    })
+    expect(same).toEqual({ cwd: "/c/x", changes: { set: { A: "2" }, unset: [] } })
+    const moved = endState({
+      before: { PATH: "/usr/bin:/bin:/a" },
+      after: { PATH: "/usr/bin:/bin:/a:/b:rel" },
+      cwd: "/h",
+      startPath: "/usr/bin:/bin:/a",
+      pathKey: undefined,
+      drives: new Set(),
+      platform: "linux",
+    })
+    expect(moved.changes.set).toEqual({ PATH: "/a:/b" })
+  })
+})
+
 describe("the shell runs commands", () => {
   test(
     "a command just-bash lacks runs the host's program, with its exit code and output",
@@ -311,7 +416,10 @@ describe("the shell runs commands", () => {
       const seen = await shell(`${HOST} -e "console.log(process.env.PATH)"`)
       expect(seen.text.split(delimiter)).toContain(HOST_DIR)
       expect(seen.text.trim().startsWith(SHELL_PATH)).toBe(false)
-      expect((await shell("echo $PATH")).text.trim()).toBe(`${SHELL_PATH}:${HOST_DIR}`)
+      // Inside the shell every path is the shell's: `C:\\bun` is `/c/bun` on Windows.
+      expect((await shell("echo $PATH")).text.trim()).toBe(
+        `${SHELL_PATH}:${toVirtualPath(HOST_DIR)}`,
+      )
       expect((await shell("which git cat")).text).toBe("/usr/bin/git\n/usr/bin/cat\n")
     },
     PROCESS_TIMEOUT_MS,
