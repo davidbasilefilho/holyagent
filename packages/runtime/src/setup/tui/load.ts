@@ -1,4 +1,4 @@
-import { lstat, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readdir, rename, rm, writeFile } from "node:fs/promises"
 import { basename, dirname, join } from "node:path"
 import { pathToFileURL } from "node:url"
 
@@ -42,6 +42,10 @@ const guardedFolders = (env: Env, platform: string): ReadonlyArray<string> => {
   return [holyagent, join(holyagent, "setup-tui")]
 }
 
+/** A short hash of a lockfile's text, which names an install folder and binds its marker. */
+const lockHash = (lock: string): string =>
+  new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8)
+
 /**
  * The folder one set of packages is installed in: below the cache home, named by the exact versions
  * and a short hash of the lockfile they install from, so a newer HolyAgent, or a lock that moved a
@@ -59,7 +63,7 @@ export const tuiDirectory = (
       ...Object.entries(packages)
         .toSorted(([a], [b]) => (a < b ? -1 : 1))
         .map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
-      new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8),
+      lockHash(lock),
     ].join("_"),
   )
 
@@ -69,9 +73,12 @@ export const tuiDirectory = (
  */
 export const INSTALLED_MARKER = ".holyagent-installed"
 
-/** The text of {@link INSTALLED_MARKER} for a set of packages. */
-export const markerText = (packages: Readonly<Record<string, string>>): string =>
-  `${JSON.stringify(packages)}\n`
+/**
+ * The text of {@link INSTALLED_MARKER} for a set of packages and the lockfile they were installed
+ * from, so a folder installed from another lock does not pass for this one.
+ */
+export const markerText = (packages: Readonly<Record<string, string>>, lock: string): string =>
+  `${JSON.stringify({ packages, lock: lockHash(lock) })}\n`
 
 /** The steps that touch the network, the disk and the module loader, replaceable in tests. */
 export interface LoaderSteps {
@@ -107,13 +114,19 @@ export interface LoaderOptions extends Partial<LoaderSteps> {
   readonly notify?: (text: string) => Effect.Effect<void>
 }
 
+// Unicode format characters (category Cf): the bidi controls (U+202A-U+202E, U+2066-U+2069, U+200E,
+// U+200F, U+061C) that reorder a line, zero-width characters (U+200B-U+200D) and the like, which
+// make a text read other than it is written.
+const FORMAT_CHARACTERS = /\p{Cf}/gu
+
 /**
- * Text with escape sequences, control characters and line breaks removed: what a tool such as Bun,
- * or a registry behind it, printed is shown to the user only as plain characters, so it cannot
- * recolour the terminal or move the cursor.
+ * Text with escape sequences, control characters, line breaks and invisible format characters (bidi
+ * controls, zero-width characters) removed: what a tool such as Bun, or a registry behind it,
+ * printed is shown to the user only as plain characters, so it cannot recolour the terminal, move
+ * the cursor or reorder what the line says.
  */
 export const plain = (text: string): string =>
-  Array.from(Bun.stripANSI(text))
+  Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, ""))
     .filter((character) => {
       const code = character.codePointAt(0) ?? 0
       return code > 0x1f && (code < 0x7f || code > 0x9f)
@@ -204,13 +217,15 @@ const hasPackages = (directory: string, packages: Readonly<Record<string, string
     installedVersion(directory, name).pipe(Effect.map((found) => found === version)),
   ).pipe(Effect.map((all) => all.every(Boolean)))
 
-// A folder counts as installed only with the marker an install writes last, holding these
-// packages, and every package in place at its version.
-const installed = (directory: string, packages: Readonly<Record<string, string>>) =>
+// A folder counts as installed only with the marker an install writes last, naming these packages
+// and this lock, and every package in place at its version.
+const installed = (directory: string, packages: Readonly<Record<string, string>>, lock: string) =>
   Effect.tryPromise(() => Bun.file(join(directory, INSTALLED_MARKER)).text()).pipe(
     Effect.orElseSucceed(() => undefined),
     Effect.flatMap((marker) =>
-      marker === markerText(packages) ? hasPackages(directory, packages) : Effect.succeed(false),
+      marker === markerText(packages, lock)
+        ? hasPackages(directory, packages)
+        : Effect.succeed(false),
     ),
   )
 
@@ -223,6 +238,8 @@ const isSetupTuiModule = (value: unknown): value is SetupTuiModule =>
 const fileSystem = <A>(what: string, run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (cause) => unavailable(what, cause) })
 
+const STICKY = 0o1000
+
 const errorCode = (error: unknown) =>
   typeof error === "object" && error !== null && "code" in error ? error.code : undefined
 
@@ -230,9 +247,17 @@ const errorCode = (error: unknown) =>
  * Makes sure `folder` is a directory only the current user can change, creating it with mode 0700
  * (where the OS has modes) when it is missing: it must not be a symbolic link, must belong to `uid`
  * and must not be writable by group or others, or whoever can write there could plant the code that
- * setup then runs. Not checked where there is no `uid` (Windows).
+ * setup then runs. The cache home (`home`) is the user's own folder and holds more than
+ * HolyAgent's, so it is not asked to be 0700: group or other write access is accepted there only
+ * with the sticky bit, which keeps others from renaming what is inside. Not checked where there is
+ * no `uid` (Windows).
  */
-const privateFolder = (folder: string, uid: number | undefined, create: boolean) =>
+const privateFolder = (
+  folder: string,
+  uid: number | undefined,
+  create: boolean,
+  home: boolean = false,
+) =>
   Effect.gen(function* () {
     if (create)
       yield* fileSystem(`cannot create ${folder}`, () =>
@@ -251,12 +276,15 @@ const privateFolder = (folder: string, uid: number | undefined, create: boolean)
     if (found === undefined || uid === undefined) return
     const refuse = (why: string) =>
       new TuiUnavailable({
-        reason: `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`,
+        reason: home
+          ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours`
+          : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`,
       })
     if (found.isSymbolicLink() || !found.isDirectory())
       return yield* refuse("is not a plain directory")
     if (found.uid !== uid) return yield* refuse("belongs to another user")
-    if ((found.mode & 0o022) !== 0) return yield* refuse("can be written by others")
+    if ((found.mode & 0o022) !== 0 && !(home && (found.mode & STICKY) !== 0))
+      return yield* refuse("can be written by others")
   })
 
 /** Writes `text` to `target` without following a link planted there: a new file, then a rename. */
@@ -281,6 +309,7 @@ const promote = (
   temporary: string,
   directory: string,
   packages: Readonly<Record<string, string>>,
+  lock: string,
 ) =>
   Effect.gen(function* () {
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -288,27 +317,64 @@ const promote = (
         fileSystem(`cannot move ${temporary}`, () => rename(temporary, directory)),
       )
       if (moved._tag === "Success") return
-      if (yield* installed(directory, packages)) return
+      if (yield* installed(directory, packages, lock)) return
       yield* remove(directory)
     }
     return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` })
   })
 
+/** How old a temporary install folder is before it counts as left behind by a dead run. */
+const STALE_AFTER_MS = 60 * 60 * 1000
+
+/**
+ * Removes the temporary install folders (`.<name>-*`) beside `directory` that an install killed
+ * before its cleanup left behind: plain directories of `uid` not touched for
+ * {@link STALE_AFTER_MS}, so a run that is installing now keeps its own. Best effort: whatever
+ * cannot be read or removed stays, and the install goes on.
+ */
+const sweepStale = (directory: string, uid: number | undefined) =>
+  Effect.gen(function* () {
+    const parent = dirname(directory)
+    const prefix = `.${basename(directory)}-`
+    const cutoff = Date.now() - STALE_AFTER_MS
+    const names = yield* Effect.tryPromise(() => readdir(parent))
+    yield* Effect.forEach(
+      names.filter((name) => name.startsWith(prefix)),
+      (name) =>
+        Effect.gen(function* () {
+          const path = join(parent, name)
+          const found = yield* Effect.tryPromise(() => lstat(path))
+          if (
+            found.isDirectory() &&
+            (uid === undefined || found.uid === uid) &&
+            found.mtimeMs < cutoff
+          )
+            yield* remove(path)
+        }).pipe(Effect.ignore),
+    )
+  }).pipe(Effect.ignore)
+
 /**
  * Installs into a fresh folder beside `directory` and renames it into place, so `directory` is
  * either absent or complete: an interrupted install, or a half-written file, never shows up there,
  * and two first runs at once each install on their own and the first rename wins. The marker is
- * written last, and the temporary folder is removed whatever happens.
+ * written last, and the temporary folder is removed whatever happens; folders an earlier run left
+ * behind (killed, power loss) are swept first.
  */
 const installAtomically = (
   directory: string,
   packages: Readonly<Record<string, string>>,
   lock: string,
   install: LoaderSteps["install"],
+  uid: number | undefined,
 ) =>
   Effect.acquireUseRelease(
-    fileSystem(`cannot create a folder beside ${directory}`, () =>
-      mkdtemp(join(dirname(directory), `.${basename(directory)}-`)),
+    sweepStale(directory, uid).pipe(
+      Effect.andThen(
+        fileSystem(`cannot create a folder beside ${directory}`, () =>
+          mkdtemp(join(dirname(directory), `.${basename(directory)}-`)),
+        ),
+      ),
     ),
     (temporary) =>
       Effect.gen(function* () {
@@ -317,8 +383,8 @@ const installAtomically = (
           return yield* new TuiUnavailable({
             reason: `the install finished but ${directory} does not hold the expected package versions`,
           })
-        yield* writeFresh(join(temporary, INSTALLED_MARKER), markerText(packages))
-        yield* promote(temporary, directory, packages)
+        yield* writeFresh(join(temporary, INSTALLED_MARKER), markerText(packages, lock))
+        yield* promote(temporary, directory, packages, lock)
       }),
     remove,
   )
@@ -330,11 +396,12 @@ const installAtomically = (
  * plugin) and the packages it runs on are installed on first use, from the lockfile subset the
  * build embedded ({@link TUI_LOCK}), into a per-user cache folder ({@link tuiDirectory}). The cache
  * folders are created private (mode 0700) and are refused when they are another user's or writable
- * by others. An install goes into a temporary folder that is renamed into place with a completion
- * marker, so a folder without the marker counts as absent. The bundle is copied next to the
- * installed `node_modules`, where its imports resolve, without following a link planted at its
- * path; Solid's preload (which makes Bun load Solid's browser build) is imported, and then the
- * bundle. Any step that fails, offline included, is a {@link TuiUnavailable} naming it.
+ * by others, and so is the cache home itself unless it is a sticky folder of the user's. An install
+ * goes into a temporary folder that is renamed into place with a completion marker, so a folder
+ * without the marker counts as absent. The bundle is copied next to the installed `node_modules`,
+ * where its imports resolve, without following a link planted at its path; Solid's preload (which
+ * makes Bun load Solid's browser build) is imported, and then the bundle. Any step that fails,
+ * offline included, is a {@link TuiUnavailable} naming it.
  */
 export const loadSetupTui = (
   env: Env,
@@ -352,17 +419,19 @@ export const loadSetupTui = (
       try: () => Bun.file(source).text(),
       catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause),
     })
+    if (options.directory === undefined)
+      yield* privateFolder(cacheHome(env, process.platform), uid, false, true)
     for (const folder of options.directory === undefined
       ? guardedFolders(env, process.platform)
       : [dirname(directory)])
       yield* privateFolder(folder, uid, true)
     yield* privateFolder(directory, uid, false)
-    if (!(yield* installed(directory, packages))) {
+    if (!(yield* installed(directory, packages, lock))) {
       if (options.notify !== undefined)
         yield* options.notify(
           `~ t3 tui: installing the setup interface into ${directory} (first run only)\n`,
         )
-      yield* installAtomically(directory, packages, lock, install)
+      yield* installAtomically(directory, packages, lock, install, uid)
     }
     const target = join(directory, TUI_BUNDLE)
     yield* writeFresh(target, text)

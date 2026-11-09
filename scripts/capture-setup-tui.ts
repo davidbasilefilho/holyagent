@@ -51,6 +51,17 @@ const FAILURE: Applied = {
   ],
 }
 
+// What a real dry run reports when a settings file cannot be read: nothing is written, so no line
+// says "added", and the next step is the dry run, not a change of the file.
+const DRY_FAILURE: Applied = {
+  ok: false,
+  lines: [
+    "~ scope: user (default)",
+    "! t3 settings: /home/user/.t3/userdata/settings.json is not a JSON object: Expected property name or '}' in JSON at position 1",
+    "+ user settings /home/user/.claude/settings.json: dry run: would add 10, nothing written",
+  ],
+}
+
 interface Scene {
   readonly name: string
   readonly options?: Partial<Parameters<typeof mount>[0]>
@@ -92,7 +103,8 @@ const SCENES: ReadonlyArray<Scene> = [
   {
     name: "review-dry-run-end",
     options: { dryRun: true },
-    keys: ["enter", "pagedown", "pagedown"],
+    // More presses than pages: the last page is where scrolling stops.
+    keys: ["enter", "pagedown", "pagedown", "pagedown", "pagedown", "pagedown"],
   },
   { name: "review-back-action", keys: ["enter", "down"] },
   { name: "review-cancel-action", keys: ["enter", "down", "down"] },
@@ -127,7 +139,7 @@ const SCENES: ReadonlyArray<Scene> = [
   },
   {
     name: "apply-failure-dry-run",
-    options: { dryRun: true, apply: () => Promise.resolve(FAILURE) },
+    options: { dryRun: true, apply: () => Promise.resolve(DRY_FAILURE) },
     keys: ["enter", "enter"],
   },
   {

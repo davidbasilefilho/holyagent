@@ -8,6 +8,7 @@ import {
   rm,
   stat,
   symlink,
+  utimes,
   writeFile,
 } from "node:fs/promises"
 import { dirname, join } from "node:path"
@@ -55,7 +56,11 @@ const EXPECTED_DIRECTORY = (root: string) =>
 const POSIX = process.platform !== "win32"
 
 /** Puts the packages in a folder as an install would, at the given versions, marker last. */
-const installTo = async (folder: string, versions: Record<string, string>) => {
+const installTo = async (
+  folder: string,
+  versions: Record<string, string>,
+  lock: string = TUI_LOCK,
+) => {
   for (const [name, version] of Object.entries(versions)) {
     await mkdir(join(folder, "node_modules", name), { recursive: true })
     await writeFile(
@@ -63,7 +68,7 @@ const installTo = async (folder: string, versions: Record<string, string>) => {
       JSON.stringify({ name, version }),
     )
   }
-  await writeFile(join(folder, INSTALLED_MARKER), markerText(PACKAGES))
+  await writeFile(join(folder, INSTALLED_MARKER), markerText(PACKAGES, lock))
 }
 
 const bundleFile = async (text = "export const runSetupTui = () => Promise.resolve({})") => {
@@ -197,7 +202,9 @@ describe("loading the interface", () => {
     expect(dirname(installs[0]?.[0] ?? "")).toBe(dirname(target))
     expect(installs[0]?.[1]).toEqual(PACKAGES)
     expect(installs[0]?.[2]).toBe("the lock")
-    expect(await readFile(join(target, INSTALLED_MARKER), "utf8")).toBe(markerText(PACKAGES))
+    expect(await readFile(join(target, INSTALLED_MARKER), "utf8")).toBe(
+      markerText(PACKAGES, "the lock"),
+    )
     expect((await readdir(dirname(target))).toSorted()).toEqual(["cache", "source"])
     expect(notices).toHaveLength(1)
     expect(notices[0]).toContain(`installing the setup interface into ${target} (first run only)`)
@@ -385,7 +392,9 @@ describe("an install that is interrupted, raced or planted", () => {
       importModule: () => Effect.succeed(MODULE),
     })
     expect(installs).toBe(1)
-    expect(await readFile(join(target, INSTALLED_MARKER), "utf8")).toBe(markerText(PACKAGES))
+    expect(await readFile(join(target, INSTALLED_MARKER), "utf8")).toBe(
+      markerText(PACKAGES, TUI_LOCK),
+    )
     expect(await readdir(target)).not.toContain("half-written.js")
   })
 
@@ -394,7 +403,7 @@ describe("an install that is interrupted, raced or planted", () => {
     await installTo(target, PACKAGES)
     await writeFile(
       join(target, INSTALLED_MARKER),
-      markerText({ ...PACKAGES, "solid-js": "1.0.0" }),
+      markerText({ ...PACKAGES, "solid-js": "1.0.0" }, TUI_LOCK),
     )
     let installs = 0
     await loaded({
@@ -406,6 +415,58 @@ describe("an install that is interrupted, raced or planted", () => {
       importModule: () => Effect.succeed(MODULE),
     })
     expect(installs).toBe(1)
+  })
+
+  test("a marker for another lock does not count: the same packages are installed again from this one", async () => {
+    const { bundle, target } = await stage()
+    await installTo(target, PACKAGES, "another lock")
+    let installs = 0
+    await loaded({
+      packages: PACKAGES,
+      lock: "this lock",
+      bundle,
+      directory: target,
+      install: (folder, packages) =>
+        Effect.sync(() => void (installs += 1)).pipe(
+          Effect.andThen(Effect.promise(() => installTo(folder, packages, "this lock"))),
+        ),
+      importModule: () => Effect.succeed(MODULE),
+    })
+    expect(installs).toBe(1)
+    expect(await readFile(join(target, INSTALLED_MARKER), "utf8")).toBe(
+      markerText(PACKAGES, "this lock"),
+    )
+    expect(markerText(PACKAGES, "this lock")).not.toBe(markerText(PACKAGES, "another lock"))
+  })
+
+  test("sweeps the temporary folders an earlier run left, and keeps a recent one and other folders", async () => {
+    const { bundle, target } = await stage()
+    const parent = dirname(target)
+    const old = new Date(Date.now() - 2 * 60 * 60 * 1000)
+    const leftovers = [".versions-AbC123", ".versions-Zz9999"]
+    await mkdir(parent, { recursive: true, mode: 0o700 })
+    await chmod(parent, 0o700)
+    for (const name of [...leftovers, ".versions-recent", ".other-AbC123", "plain"]) {
+      await mkdir(join(parent, name, "node_modules"), { recursive: true })
+      await writeFile(join(parent, name, "node_modules", "file"), "x")
+    }
+    for (const name of [...leftovers, ".other-AbC123"]) await utimes(join(parent, name), old, old)
+    let installs = 0
+    await loaded({
+      packages: PACKAGES,
+      bundle,
+      directory: target,
+      install: (folder, packages) =>
+        Effect.sync(() => void (installs += 1)).pipe(Effect.andThen(fullInstall(folder, packages))),
+      importModule: () => Effect.succeed(MODULE),
+    })
+    expect(installs).toBe(1)
+    expect((await readdir(parent)).toSorted()).toEqual([
+      ".other-AbC123",
+      ".versions-recent",
+      "plain",
+      "versions",
+    ])
   })
 
   test("two first runs at once: the first rename wins and the second uses it without a mess", async () => {
@@ -468,6 +529,75 @@ describe("an install that is interrupted, raced or planted", () => {
       )
     },
   )
+
+  describe.skipIf(!POSIX)("the cache home itself", () => {
+    // The folder every cache folder sits in: XDG_CACHE_HOME, as the real load resolves it.
+    const home = () => join(directory, "cache-home")
+    const attempt = async (options: { uid?: number } = {}) => {
+      const bundle = await bundleFile("export const runSetupTui = 1")
+      let installs = 0
+      const run = loadSetupTui(
+        { XDG_CACHE_HOME: home() },
+        {
+          packages: PACKAGES,
+          bundle,
+          ...options,
+          install: (folder, packages) =>
+            Effect.sync(() => void (installs += 1)).pipe(
+              Effect.andThen(fullInstall(folder, packages)),
+            ),
+          importModule: () => Effect.succeed(MODULE),
+        },
+      ).pipe(Effect.provide(fakeShell({ commands: ["bun"] }).layer))
+      const outcome = await Effect.runPromise(Effect.result(run))
+      return { outcome, installs: () => installs }
+    }
+
+    test("a group-writable cache home is refused, with nothing installed", async () => {
+      await mkdir(home(), { recursive: true })
+      await chmod(home(), 0o775)
+      const { outcome, installs } = await attempt()
+      expect(outcome._tag).toBe("Failure")
+      expect(outcome._tag === "Failure" ? outcome.failure.message : "").toContain(
+        `the cache home ${home()} can be written by others`,
+      )
+      expect(installs()).toBe(0)
+      expect(await readdir(home())).toEqual([])
+    })
+
+    test("a world-writable cache home with the sticky bit, a user-only one and a missing one are fine", async () => {
+      await mkdir(home(), { recursive: true })
+      await chmod(home(), 0o1777)
+      expect((await attempt()).outcome._tag).toBe("Success")
+      await rm(home(), { recursive: true, force: true })
+      await mkdir(home(), { recursive: true })
+      await chmod(home(), 0o755)
+      expect((await attempt()).outcome._tag).toBe("Success")
+      await rm(home(), { recursive: true, force: true })
+      expect((await attempt()).outcome._tag).toBe("Success")
+    })
+
+    test("a cache home that is a link is refused", async () => {
+      await mkdir(join(directory, "elsewhere"), { recursive: true, mode: 0o700 })
+      await symlink(join(directory, "elsewhere"), home(), "dir")
+      const { outcome, installs } = await attempt()
+      expect(outcome._tag === "Failure" ? outcome.failure.message : "").toContain(
+        `the cache home ${home()} is not a plain directory`,
+      )
+      expect(installs()).toBe(0)
+      expect(await readdir(join(directory, "elsewhere"))).toEqual([])
+    })
+
+    test("a cache home that belongs to another user is refused", async () => {
+      await mkdir(home(), { recursive: true })
+      await chmod(home(), 0o755)
+      const { outcome, installs } = await attempt({ uid: (process.getuid?.() ?? 0) + 1 })
+      expect(outcome._tag === "Failure" ? outcome.failure.message : "").toContain(
+        `the cache home ${home()} belongs to another user`,
+      )
+      expect(installs()).toBe(0)
+    })
+  })
 
   test.skipIf(!POSIX)("refuses a cache folder that belongs to another user", async () => {
     const { bundle, target } = await stage()
@@ -569,6 +699,26 @@ describe("what the install is held to", () => {
     expect(plain("日本語 ünï ✓")).toBe("日本語 ünï ✓")
   })
 
+  test("plain removes bidi controls and other format characters that change how a line reads", () => {
+    // An embedding that flips the text after it, an isolate, zero-width characters, a joiner, a
+    // BOM and the Arabic letter mark: none is drawn, and all of them can reorder or hide text.
+    expect(
+      plain("error: \u202Efdp.exe\u202C \u2066x\u2069 a\u200Bb\u200Cc\u200Dd\u200Ee\u200Ff"),
+    ).toBe("error: fdp.exe x abcdef")
+    expect(plain("\uFEFFok\u061C\u00ADdone\u2060")).toBe("okdone")
+  })
+
+  test("a failure's reason carries no bidi control either", async () => {
+    const shell = fakeShell({
+      commands: ["bun"],
+      respond: () => ({ exitCode: 1, stderr: "error: \u202Egnp.exe\u200B failed\n" }),
+    })
+    const failure = await Effect.runPromise(
+      bunInstall(join(directory, "cache"), PACKAGES).pipe(Effect.flip, Effect.provide(shell.layer)),
+    )
+    expect(failure.message).toBe("bun install failed (exit 1): error: gnp.exe failed")
+  })
+
   test("an import error's text is plain too", async () => {
     const failure = await Effect.runPromise(
       importFile(join(directory, "nothing\u001B[31m.js")).pipe(Effect.flip),
@@ -634,7 +784,7 @@ describe("the real install and import steps", () => {
       join(target, "node_modules"),
       "dir",
     )
-    await writeFile(join(target, INSTALLED_MARKER), markerText(TUI_PACKAGES))
+    await writeFile(join(target, INSTALLED_MARKER), markerText(TUI_PACKAGES, TUI_LOCK))
     const bundle = join(import.meta.dir, "../../integrations/claude/dist/scripts", TUI_BUNDLE)
     const module = await loaded({ bundle, directory: target })
     expect(typeof module.runSetupTui).toBe("function")

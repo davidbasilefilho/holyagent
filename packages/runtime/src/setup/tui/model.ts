@@ -371,19 +371,38 @@ const reviewLayout = (state: State, context: Context): Layout => {
       width,
     )
   if (state.failure !== undefined) {
-    return {
-      lines: [
-        ...keys(false),
-        blank,
-        ...heading_,
-        ...wrap(state.failure, width - 2).map((part): Line => [segment(`  ${part}`, "error")]),
-        blank,
-        ...hintLines(REVIEW_RECOVERY, width),
-        blank,
-        ...actionLines(),
-      ],
-      scroll: FIXED,
+    const cause = wrap(state.failure, width - 2).map((part): Line => [
+      segment(`  ${part}`, "error"),
+    ])
+    const recovery = hintLines(REVIEW_RECOVERY, width)
+    const actions = actionLines()
+    // The recovery hint and the actions are what the person needs, so they always show; the cause
+    // takes the lines left and scrolls when it is longer.
+    const build = (spaced: boolean) => {
+      const gap: ReadonlyArray<Line> = spaced ? [blank] : []
+      const layout = (scrolling: boolean) => {
+        const top = [...keys(scrolling), ...gap, ...heading_]
+        const bottom = [...gap, ...recovery, ...gap, ...actions]
+        const page = pageOf(cause, context.height - 1 - top.length - bottom.length, state.scroll)
+        return {
+          lines: [
+            ...top,
+            ...page.shown,
+            ...(page.indicator === undefined ? [] : [page.indicator]),
+            ...bottom,
+          ],
+          scroll: page.scroll,
+          fits: page.indicator === undefined,
+          shown: page.shown.length,
+        }
+      }
+      const plain = layout(false)
+      return plain.fits ? plain : layout(true)
     }
+    // The blank separators go first when the screen is too short to leave the cause three lines.
+    const spaced = build(true)
+    const chosen = spaced.shown >= Math.min(3, cause.length) ? spaced : build(false)
+    return { lines: chosen.lines, scroll: chosen.scroll }
   }
   if (state.review === undefined) {
     return {

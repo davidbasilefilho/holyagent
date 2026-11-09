@@ -396,6 +396,69 @@ describe("the setup interface, wrapping", () => {
   })
 })
 
+describe("the setup interface, a review that cannot be read on a small screen", () => {
+  const CAUSE = `${"settings.json cannot be read because its text is not a JSON object, ".repeat(6)}ENDMARK`
+  const failed = async (width: number, height: number, dryRun = false) => {
+    const screen = await shown({
+      width,
+      height,
+      dryRun,
+      review: () => Promise.reject(new Error(CAUSE)),
+    })
+    await screen.keys("enter")
+    return screen
+  }
+
+  for (const [width, height, dryRun] of [
+    [80, 24, false],
+    [40, 20, false],
+    [40, 20, true],
+    [40, 14, false],
+    [40, 12, false],
+    [30, 16, false],
+  ] as const) {
+    test(`at ${width}x${height}${dryRun ? " (dry run)" : ""} the recovery hint and both actions stay in view, with a long cause`, async () => {
+      const screen = await failed(width, height, dryRun)
+      const lines = screen.lines()
+      expect(lines.length).toBeLessThanOrEqual(height)
+      expect(lines.join(" ").replace(/\s+/g, " ")).toContain(
+        "Fix the cause, then choose Back and review again, or choose Cancel and run holyagent setup later.",
+      )
+      expect(lines.find(ROW("❯"))).toBe("❯ Back")
+      expect(lines.filter((line) => line !== "").at(-1)).toBe("  Cancel")
+      // Where the cause fits whole there is nothing to scroll.
+      expect(lines.join("\n").includes("Lines 1-")).toBe(height < 24)
+      for (const line of lines) expect(cells(line)).toBeLessThanOrEqual(width)
+    })
+  }
+
+  test("the cause scrolls with Page Down and ends in view while the actions stay", async () => {
+    const screen = await failed(40, 14)
+    expect(screen.lines().join(" ")).not.toContain("ENDMARK")
+    for (let page = 0; page < 20; page += 1) await screen.keys("pagedown")
+    const lines = screen.lines()
+    expect(lines.join(" ")).toContain("ENDMARK")
+    expect(lines.join("\n")).toMatch(/PgUp for earlier$/m)
+    expect(lines.find(ROW("❯"))).toBe("❯ Back")
+    expect(lines.filter((line) => line !== "").at(-1)).toBe("  Cancel")
+    await screen.keys("enter")
+    expect(screen.lines()).toContain("T3 CODE")
+  })
+
+  test("a short cause shows whole, as before, with no scroll line", async () => {
+    const screen = await shown({
+      width: 40,
+      height: 20,
+      review: () => Promise.reject(new Error("settings.json is not a JSON object")),
+    })
+    await screen.keys("enter")
+    const text = screen.lines().join("\n")
+    expect(text).toContain("settings.json is not a JSON")
+    expect(text).not.toContain("Lines 1-")
+    expect(text).not.toContain("PgUp")
+  })
+})
+
 describe("the setup interface, a review longer than the screen", () => {
   const reading = async (width: number, height: number) => {
     const screen = await shown({ width, height })

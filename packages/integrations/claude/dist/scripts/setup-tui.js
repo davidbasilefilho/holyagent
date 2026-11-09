@@ -2990,7 +2990,7 @@ import { setProp as _$setProp } from "@opentui/solid";
 import { createElement as _$createElement } from "@opentui/solid";
 import { RGBA } from "@opentui/core";
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 
 var segmenter = new Intl.Segmenter;
 var cells = (text) => Bun.stringWidth(text);
@@ -3309,19 +3309,35 @@ var reviewLayout = (state, context) => {
     "Esc cancel"
   ], width);
   if (state.failure !== undefined) {
-    return {
-      lines: [
-        ...keys(false),
-        blank,
-        ...heading_,
-        ...wrap(state.failure, width - 2).map((part) => [segment(`  ${part}`, "error")]),
-        blank,
-        ...hintLines(REVIEW_RECOVERY, width),
-        blank,
-        ...actionLines()
-      ],
-      scroll: FIXED
+    const cause = wrap(state.failure, width - 2).map((part) => [
+      segment(`  ${part}`, "error")
+    ]);
+    const recovery = hintLines(REVIEW_RECOVERY, width);
+    const actions = actionLines();
+    const build = (spaced) => {
+      const gap = spaced ? [blank] : [];
+      const layout = (scrolling) => {
+        const top = [...keys(scrolling), ...gap, ...heading_];
+        const bottom = [...gap, ...recovery, ...gap, ...actions];
+        const page = pageOf(cause, context.height - 1 - top.length - bottom.length, state.scroll);
+        return {
+          lines: [
+            ...top,
+            ...page.shown,
+            ...page.indicator === undefined ? [] : [page.indicator],
+            ...bottom
+          ],
+          scroll: page.scroll,
+          fits: page.indicator === undefined,
+          shown: page.shown.length
+        };
+      };
+      const plain = layout(false);
+      return plain.fits ? plain : layout(true);
     };
+    const spaced = build(true);
+    const chosen = spaced.shown >= Math.min(3, cause.length) ? spaced : build(false);
+    return { lines: chosen.lines, scroll: chosen.scroll };
   }
   if (state.review === undefined) {
     return {
@@ -3440,6 +3456,7 @@ var SetupApp = (props) => {
   const rows = rowsOf(props.input.offer);
   const [state, setState] = createSignal(initialState(props.input.initial));
   const abort = new AbortController;
+  onCleanup(() => abort.abort());
   let ticket = 0;
   const context = () => ({
     rows,
@@ -3550,18 +3567,26 @@ var SetupApp = (props) => {
 };
 
 // packages/runtime/src/setup/tui/entry.tsx
-var session = (input) => acquireUseRelease2(tryPromise2(() => createCliRenderer({
-  exitOnCtrlC: false,
-  useMouse: false,
-  clearOnShutdown: true
-})), (renderer) => callback2((resume) => {
+var showSetup = (acquire, input) => acquireUseRelease2(acquire, (renderer) => callback2((resume) => {
   const finish = (outcome) => resume(succeed4(outcome));
+  const destroyed = () => finish({
+    _tag: "Interrupted"
+  });
+  if (renderer.isDestroyed)
+    return destroyed();
+  renderer.once("destroy", destroyed);
   runFork2(tryPromise2(() => render(() => _$createComponent2(SetupApp, {
     input,
     done: finish
   }), renderer)).pipe(catch_2((cause) => sync2(() => resume(die2(cause))))));
+  return sync2(() => renderer.off("destroy", destroyed));
 }), (renderer) => sync2(() => renderer.destroy()).pipe(andThen2(tryPromise2(() => renderer.closed)), ignore2));
-var runSetupTui = (input) => runPromise2(session(input));
+var runSetupTui = (input) => runPromise2(showSetup(tryPromise2(() => createCliRenderer({
+  exitOnCtrlC: false,
+  useMouse: false,
+  clearOnShutdown: true
+})), input));
 export {
-  runSetupTui
+  runSetupTui,
+  showSetup
 };

@@ -1,7 +1,7 @@
 import { RGBA } from "@opentui/core"
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { Effect } from "effect"
-import { createMemo, createSignal, For, Show } from "solid-js"
+import { createMemo, createSignal, For, onCleanup, Show } from "solid-js"
 
 import {
   type Command,
@@ -58,6 +58,9 @@ export const SetupApp = (props: SetupAppProps) => {
   const rows = rowsOf(props.input.offer)
   const [state, setState] = createSignal<State>(initialState(props.input.initial))
   const abort = new AbortController()
+  // The renderer is destroyed (a hangup, a signal, the end of the run) with an apply possibly still
+  // going: stop it, as Ctrl-C does.
+  onCleanup(() => abort.abort())
   let ticket = 0
 
   const context = (): Context => ({
