@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mw999e3i-tm22",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 13,
+  "roleTask": "Reviewer.security",
+  "slug": "check-the-setup-tui-round-2-repair-for",
+  "objective": "Check the setup TUI round-2 repair for security issues in its cache, sweep and marker changes.",
+  "state": "Running",
+  "scope": [
+    "Read /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r2.diff (commit e1beb56 in /home/user/holyagent-0.3.0-tui). The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bh2g-iu59.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bhbo-gj8f.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bgsf-onrz.md (visual); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0le-38a4.md.",
+    "Trace sweepStale (deletes folders: symlinks, other users' folders, races with a concurrent install), the cache-home check, the marker binding to the lock hash and the extended plain()."
+  ],
+  "constraints": [
+    "Read-only.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "No new vulnerability in the sweep, cache-home check, marker binding or escape stripping, or each is reported with file and line",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw98v0le-38a4"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T12:46:35.166Z"
+  },
+  "createdAt": "2026-11-09T12:46:35.166Z"
+}
