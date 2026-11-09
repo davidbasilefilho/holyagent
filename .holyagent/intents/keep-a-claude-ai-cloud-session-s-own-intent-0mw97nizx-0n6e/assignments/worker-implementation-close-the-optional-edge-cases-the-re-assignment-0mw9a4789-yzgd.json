@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-optional-edge-cases-the-re",
   "objective": "Close the optional edge cases the re-reviews left on the cloud-session checkout notice.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /home/user/holyagent-0.3.0-cloudbranch (branch release/0.3.0/fix/cloud-session-branch, head 323dfb1). The items are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k563-xfap.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw99k5gu-yh66.md.",
     "1. packages/runtime/src/cli/status.ts: symbolic-ref --short returns heads/<name> when a tag of the same name exists, so the notice fires wrongly; read the plain symbolic-ref HEAD output and strip refs/heads/. Test with a same-named tag.",
@@ -72,7 +72,9 @@
     "agentId": "workflow:wf_b07fc68f-377/assignment-0mw9a4789-yzgd",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T13:10:32.601Z"
+    "startedAt": "2026-11-09T13:10:32.601Z",
+    "finishedAt": "2026-11-09T13:16:28.268Z"
   },
+  "result": "result: All four items done; both new tests fail on the old status.ts and pass on the new one.\nchanged:\n/home/user/holyagent-0.3.0-cloudbranch/packages/runtime/src/cli/status.ts\n/home/user/holyagent-0.3.0-cloudbranch/packages/runtime/src/vcs/errors.ts\n/home/user/holyagent-0.3.0-cloudbranch/packages/runtime/tests/cloud-checkout.test.ts\n/home/user/holyagent-0.3.0-cloudbranch/docs/hooks.md\n/home/user/holyagent-0.3.0-cloudbranch/packages/integrations/claude/dist/scripts/holyagent.js (build output)\n/home/user/holyagent-0.3.0-cloudbranch/packages/integrations/pi/dist/scripts/holyagent.js (build output)\n\nchecks:\n`bun install --frozen-lockfile` -> 0, no changes\n`bunx --no-install mise run build` -> 0. The tree changed only in the two dist `holyagent.js` files, which come from the `status.ts` and `errors.ts` edits. `pi/dist/extensions/holyagent.js` was not touched.\n`bunx --no-install mise run verify` -> 0, 2531 pass, 0 fail, 82 files. Type-check and lint are clean, and the format check passes.\n`bun test packages/runtime/tests/cloud-checkout.test.ts` -> 10 pass. With the old `status.ts` restored, 2 fail (the two new tests) and 8 pass.\n\nblockers: none\nquestions: none\nnotes:\n`vcs/git.ts` `currentBranch` (line 85) may use `--short` the same way and have the same same-named-tag issue. I did not check or change it.\nI added no test for the DetachedHead hint wording.\n\nevidence:\nA same-named tag no longer makes the notice fire, with a test: `status.ts` now reads plain `symbolic-ref -q HEAD` and strips `refs/heads/`. The test \"is not shown on the start branch when a tag has the same name\" fails on the old code and passes now.\nNo notice when the checkout is already on the fallback branch after a rejected start branch, with a test: `status.ts` returns silent when `current === branch`. The test \"is not shown when the start branch is refused and the checkout is on the branch it would name\" fails on the old code and passes now.\nThe DetachedHead hint no longer steers a cloud session to git switch -c in the primary checkout: `errors.ts:125-126` now says to use a git worktree in a cloud session and `git switch -c <name>` otherwise.\ndocs/hooks.md states the git commands accurately and the known limit: line 28 now lists `rev-parse`, `symbolic-ref`, `reflog`, `show-ref` and `check-ref-format`, and states the `git switch -c` limit. `docs/usage.md` is untouched.\nmise run build leaves no unexplained changes and mise run verify exits 0: build exit 0 with only the two dist files changed; verify exit 0 with 2531 pass.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-edge.diff\ngates: build exit 0; verify exit 0, 2531 pass / 0 fail\ntests: `packages/runtime/tests/cloud-checkout.test.ts`, 10 pass, 2 new\n",
   "createdAt": "2026-11-09T13:10:32.601Z"
 }
