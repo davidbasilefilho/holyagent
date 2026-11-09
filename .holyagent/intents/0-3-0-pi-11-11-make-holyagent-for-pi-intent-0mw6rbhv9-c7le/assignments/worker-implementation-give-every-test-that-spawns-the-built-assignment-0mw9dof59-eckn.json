@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "give-every-test-that-spawns-the-built",
   "objective": "Give every test that spawns the built runtime bundle or CLI as a child process an explicit timeout, so Windows CI stops failing them at Bun's 5 s default.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-docs, branch release/0.3.0/docs/t3-first-pi-docs (head 62e7ea1).",
     "Windows CI timed out at exactly 5000 ms on two different such tests in consecutive runs: packages/runtime/tests/version.test.ts:9 ('--version prints the version of the root package.json', job 129213135347) and packages/integrations/pi/tests/session-context.test.ts:158 ('the project flag of the runtime bundle > the entry runs the CLI command after the flag…', job 129226565670). Both passed on other runs of the same code, and the Windows runner takes 2.5-15 s on many spawn-heavy tests (logs: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win97.log and win96b.log). Process start of the bundle on the Windows runner is close to 5 s.",
@@ -57,7 +57,41 @@
     "agentId": "workflow:wf_35b8a638-5d4/assignment-0mw9dof59-eckn",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T14:50:14.829Z"
+    "startedAt": "2026-11-09T14:50:14.829Z",
+    "finishedAt": "2026-11-09T14:56:18.226Z"
+  },
+  "result": "result: Every test that spawns the bundle or CLI now has a timeout above 5 s (30 s). `mise run build` and `mise run verify` both exit 0.\n\nchanged:\n/home/user/holyagent-0.3.0-docs/packages/runtime/tests/version.test.ts\n/home/user/holyagent-0.3.0-docs/packages/runtime/tests/pipe.test.ts\n/home/user/holyagent-0.3.0-docs/packages/integrations/pi/tests/session-context.test.ts\n/home/user/holyagent-0.3.0-docs/packages/integrations/pi/tests/pi.test.ts\n/home/user/holyagent-0.3.0-docs/packages/integrations/pi/tests/extension.test.ts\n/home/user/holyagent-0.3.0-docs/packages/integrations/claude/tests/hooks.test.ts\n\n**Tests given a timeout (all 30_000):**\nPer-test timeout as the last argument:\n  - version.test.ts: `--version prints the version of the root package.json`.\n  - pipe.test.ts: both tests.\n  - session-context.test.ts: `the entry runs the CLI command after the flag…`.\n  - pi.test.ts: `test.each` `the bundle answers config and otherwise is the CLI` (both launchers).\n  - extension.test.ts: the 3 tests in `with the built package and a real project` and the 4 in `…a project that is not a git repository`.\nFile default:\n  - hooks.test.ts gets `setDefaultTimeout(30_000)` with an `afterAll` reset to 5_000. This is the runtime tests' file-level pattern.\n  - I used the file default because about 75 of its 82 tests spawn the bundle, so per-test arguments would have touched nearly every test.\n\n**Already covered, left alone:**\nstdin.test.ts and brief.test.ts already set a file default of 60_000 and 30_000.\ncli.test.ts, with the entry-point spawn test, already has a win32 default of 60_000.\nhook-locks.test.ts already has 90_000 and 60_000.\nplugin.test.ts already has `VALIDATE_TIMEOUT` (30_000).\n\nchecks:\n`bunx --no-install mise run build` -> 0, built 39 plugin files and 37 Pi package files, no tree changes beyond the 6 test files.\n`bunx --no-install mise run verify` -> 0: type-check clean on 241 files, lint clean on 242 files, 2703 pass, 0 fail across 87 files.\nFmt is part of verify and passed.\n\nblockers: none\nquestions: none\nnotes:\nThe `loads under Node` test in pi.test.ts spawns node on the extension bundle. It is not the runtime bundle or CLI, so I left it without a timeout.\nThe slow Windows tests in `scripts/bump-version.test.ts` (12 s) are outside the ownership paths. They already pass there.\n\nevidence:\nEvery test that spawns the bundle or CLI has an explicit timeout above 5 s, by the repository's per-test timeout convention: see the tests listed above. Diff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/assignment-0mw9dof59-eckn.diff\nNo assertion or test body changes: the diff removes only the closing `})`/`)` lines that gained a timeout argument and the old `bun:test` import line that gained `setDefaultTimeout`. Every other change is an addition.\nmise run build and mise run verify exit 0: build exit 0 and verify exit 0 (2703 pass, 0 fail), logs in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log` and `verify.log`.\nchecks-run: the two mise commands above, both exit 0.\nchanged-paths: the 6 files listed under `changed`.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/assignment-0mw9dof59-eckn.diff\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "diff adds only timeout arguments, one setDefaultTimeout and a comment, no assertion touched; build and verify exit 0",
+    "criteria": [
+      {
+        "criterion": "Every test that spawns the bundle or CLI has an explicit timeout above 5 s, by the repository's per-test timeout convention",
+        "support": "see the tests listed above. Diff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/assignment-0mw9dof59-eckn.diff"
+      },
+      {
+        "criterion": "No assertion or test body changes",
+        "support": "the diff removes only the closing `})`/`)` lines that gained a timeout argument and the old `bun:test` import line that gained `setDefaultTimeout`. Every other change is an addition."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0 and verify exit 0 (2703 pass, 0 fail), logs in `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log` and `verify.log`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the two mise commands above, both exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the 6 files listed under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/assignment-0mw9dof59-eckn.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T14:50:14.829Z"
 }
