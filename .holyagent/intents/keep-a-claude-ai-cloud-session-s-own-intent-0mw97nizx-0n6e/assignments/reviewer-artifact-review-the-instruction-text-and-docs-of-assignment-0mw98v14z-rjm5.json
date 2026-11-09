@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-instruction-text-and-docs-of",
   "objective": "Review the instruction text and docs of the cloud-session checkout change.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The change is commit 2dedb01 on release/0.3.0/fix/cloud-session-branch in /home/user/holyagent-0.3.0-cloudbranch (git diff HEAD~1 HEAD; without generated output as the file /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/cloud-r0.diff). Its goal: in a claude.ai cloud session the session panel shows the primary checkout's branch and diff with a Create PR button, so the root keeps the primary checkout on the platform-assigned branch at its start and works in worktrees; session start and holyagent status add a notice when that checkout is detached; docs explain the panel and that the label cannot be renamed. The writer's report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bm41-hhjx.md.",
     "Judge also: the existing Branches rule in root identity.md and version-control.md still says to start each branch with git switch -c <name> <start>, which moves the primary checkout in a cloud session and contradicts the new rule; say whether that must change and how, given the root core's character budget (sessioncontext.test.ts has about 75 characters of slack).",
@@ -44,7 +44,33 @@
     "agentId": "workflow:wf_352521d4-e12/assignment-0mw98v14z-rjm5",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:35:25.188Z"
+    "startedAt": "2026-11-09T12:35:25.188Z",
+    "finishedAt": "2026-11-09T12:45:58.585Z"
+  },
+  "result": "result: Two blocking gaps remain: the `git switch -c` contradiction is unresolved, and one docs claim has no source.\n\n**Findings**\n1. Blocking, contradiction. R-BRANCH (`requirements/root/identity.md:7`), `claude-5.5/root/identity.md:10` and `kimi-k3.1/root/identity.md:27` tell the root, on an assigned branch, to run `git switch -c <name> <start>`. The `Branches` bullets in `claude-5.5/root/version-control.md:10` and `kimi-k3.1/root/version-control.md:16` give the same command. In a cloud session, run in the primary checkout, that command is the move R-CLOUD-CHECKOUT forbids.\n   - Core text is read first and is the more specific instruction, so the new bullet likely loses to it.\n   - The new bullet also leaves the command twice, the second in a bullet that tells the reader the opposite.\n   - So it must change, not stay as an exception.\n2. Blocking, unsourced claim. `docs/usage.md:268` says \"The PRs the root opens do not belong to that branch; they appear in the panel's list of PRs.\" Nothing in the diff or report supports it. Remove it or cite the source.\n3. `docs/decisions.md:67` gives \"31 commits ahead of `main`\" and \"+54,746 lines\" with no source. Cite the incident or drop the numbers.\n4. `AGENTS.md:11` adds \"the assigned branch, which starts at `main`\" without a reason. The rule's reason is the session panel, and `AGENTS.md` pairs each rule with its reason. The \"starts at `main`\" claim is also unverified. Suggested edit: add \"(in a cloud session, the assigned branch, because the session panel shows its diff)\".\n5. Non-blocking, stale doc. The `docs/hooks.md` `session-start` section was not updated for the new notice, though the hook summary in `hook.ts` was.\n6. Non-blocking, gap. The notice fires only on a detached HEAD. A `git switch -c` on the primary checkout, the exact thing finding 1 describes, leaves a named branch, so no notice appears. `docs/usage.md` states the scope accurately, but the gap is worth a note.\n\n**Recommended wording (finding 1)**\nRequirements: in R-BRANCH change \"creating it\" to \"creating it (in a cloud session in a worktree, R-CLOUD-CHECKOUT)\".\nBoth `identity.md` files: replace \"first create the conventional branch (`git switch -c <name> <start>`, both set by the stack plan)\" with \"create the conventional branch in a worktree (`git worktree add -b <name> <path> <start>`, name and start set by the stack plan)\". The claude-5.5 file already says \"check `git branch --show-current`\", so keep that check but run it in the primary checkout. This costs about 35 characters (the old command stays outside cloud sessions only in `version-control.md`), inside the roughly 75 characters of slack. Re-run the `sessioncontext.test.ts` budget tests to confirm.\nBoth `version-control.md` files: in `Branches`, write \"`git switch -c <name> <start>` outside a cloud session (inside one, see R-CLOUD-CHECKOUT)\". The new bullet then owns the worktree command once.\n\n**Criteria**\nR-CLOUD-CHECKOUT is stated once, translated per family, and covered in coverage.ts: gap. The id is defined once in `requirements/root/version-control.md:2`, translated in both family files, and has coverage entries in both families (`coverage.ts:114` and `:329`, phrases present). The two family texts are identical, which is acceptable. The gap is the unresolved contradiction in finding 1. I did not run the tests, because I have no shell.\ndocs/usage.md, docs/decisions.md and AGENTS.md state the panel behaviour accurately and consistently with the rule: gap (findings 2 to 4). Otherwise they match the code and each other.\nThe `git switch -c` contradiction is judged with a recommended wording: met (finding 1).\n\nevidence:\nR-CLOUD-CHECKOUT is stated once in the requirements tree, translated faithfully per family guide, and covered in coverage.ts: gap. `requirements/root/version-control.md:2`, `coverage.ts:114` and `:329`, `claude-5.5/root/identity.md:10`, `kimi-k3.1/root/identity.md:27`.\ndocs/usage.md, docs/decisions.md and AGENTS.md state the panel behaviour accurately and consistently with the rule: gap. `docs/usage.md:268`, `docs/decisions.md:67`, `AGENTS.md:11`.\nThe git switch -c contradiction is judged with a recommended wording: met. Finding 1 and the recommended wording above.\nfindings: items 1 to 6 above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Findings carry file lines and a reproduction; they start the repair",
+    "criteria": [
+      {
+        "criterion": "R-CLOUD-CHECKOUT is stated once in the requirements tree, translated faithfully per family guide, and covered in coverage.ts",
+        "support": "gap. `requirements/root/version-control.md:2`, `coverage.ts:114` and `:329`, `claude-5.5/root/identity.md:10`, `kimi-k3.1/root/identity.md:27`."
+      },
+      {
+        "criterion": "docs/usage.md, docs/decisions.md and AGENTS.md state the panel behaviour accurately and consistently with the rule",
+        "support": "gap. `docs/usage.md:268`, `docs/decisions.md:67`, `AGENTS.md:11`."
+      },
+      {
+        "criterion": "The git switch -c contradiction is judged with a recommended wording",
+        "support": "met. Finding 1 and the recommended wording above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1 to 6 above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:35:25.188Z"
 }
