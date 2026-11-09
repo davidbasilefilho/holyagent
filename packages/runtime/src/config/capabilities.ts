@@ -1,5 +1,5 @@
 import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../pi/bash/guardrails.ts"
-import { FFF_NATIVE_HOSTS, FFF_OVERRIDE_SETTINGS, FFF_OVERRIDE_TOOLS } from "../pi/fff/settings.ts"
+import { FFF_NATIVE_HOSTS, FFF_OVERRIDE_SETTINGS, FFF_TOOLS } from "../pi/fff/settings.ts"
 import type { PiPackageName } from "./pi-packages.ts"
 import type { PiProvider } from "./schema.ts"
 
@@ -382,7 +382,7 @@ export const CAPABILITIES = [
   {
     // `@ff-labs/pi-fff` in override mode: its `grep` and `find` take the place of Pi's. Its native
     // library covers `FFF_NATIVE_HOSTS` only; elsewhere the capability is not offered and Pi keeps its
-    // own tools. The root does not use the tools (`FFF_OVERRIDE_TOOLS`); the specialists' `grep` and
+    // own tools. The root does not use the tools (`FFF_TOOLS`); the specialists' `grep` and
     // `find` are the package's. The override is a key of the package's own file, which setup takes
     // back out when the capability goes off so that a package the user installs later is not
     // switched into override mode.
@@ -396,7 +396,7 @@ export const CAPABILITIES = [
     needs: [],
     nativeHosts: FFF_NATIVE_HOSTS,
     forms: sameForm(["@ff-labs/pi-fff"]),
-    tools: { rootExclude: FFF_OVERRIDE_TOOLS, visual: [] },
+    tools: { rootExclude: FFF_TOOLS, visual: [] },
     settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
     health: ["needs", "packages"],
   },

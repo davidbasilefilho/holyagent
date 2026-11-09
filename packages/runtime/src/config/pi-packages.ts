@@ -6,7 +6,9 @@ export type PiPackageName = keyof typeof pins
 /**
  * The exact release of every Pi package HolyAgent can enable, by npm name. `pi-packages.json` is
  * the one source of these versions: `mise run deps:update` rewrites it to the newest stable
- * release, and `mise run deps:check` fails when one is behind.
+ * release, and `mise run deps:check` fails when one is behind. A move of the `@ff-labs/pi-fff` pin
+ * must recheck what `pi/fff/settings.ts` reads from the package: its tool names, settings keys and
+ * native hosts.
  */
 export const PI_PACKAGE_VERSIONS: Readonly<Record<PiPackageName, string>> = pins
 

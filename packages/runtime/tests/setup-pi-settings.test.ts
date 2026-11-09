@@ -118,8 +118,11 @@ const COMPUTER_USE = {
 }
 const KIMI = { tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: true } } }
 const SUBAGENTS = { disableDefaultAgents: true, fallbackSubagent: "none" }
-/** `@ff-labs/pi-fff`'s file with the override mode that puts its tools in place of Pi's. */
-const PI_FFF = { mode: "override" }
+/**
+ * `@ff-labs/pi-fff`'s file with the override mode that puts its tools in place of Pi's, and the
+ * directory links left unfollowed, which Pi's own `rg` and `fd` do not follow either.
+ */
+const PI_FFF = { mode: "override", followSymlinks: false }
 const BILLION_SUBAGENTS = { pi: { subagents: false } }
 /** What setup writes into Billion Context's file: the subagents setting and the guardrails off. */
 const BILLION = { ...BILLION_SUBAGENTS, ...BILLION_CONTEXT_GUARDRAILS_FILE }
@@ -385,13 +388,16 @@ describe("holyagent setup, Pi tool settings", () => {
 
   describe("fff", () => {
     const off = { pi: { features: { fff: false } } }
+    const ADDED = () => `+ tool settings ${piFff()}: added mode "override", followSymlinks false`
+    const REMOVED = () =>
+      `- tool settings ${piFff()}: removed mode "override", followSymlinks false`
 
-    test("puts pi-fff in override mode in Pi's agent folder, beside what the file holds", async () => {
+    test("puts pi-fff in override mode with directory links unfollowed in Pi's agent folder, beside what the file holds", async () => {
       await installed()
       await write(piFff(), { enableHomeDirScanning: false })
       const report = await runSetup(withPi())
       expect(await read(piFff())).toEqual({ enableHomeDirScanning: false, ...PI_FFF })
-      expect(toolLines(report)).toContain(`+ tool settings ${piFff()}: added mode "override"`)
+      expect(toolLines(report)).toContain(ADDED())
     })
 
     test("follows PI_CODING_AGENT_DIR, which is where the package reads the file", async () => {
@@ -406,9 +412,9 @@ describe("holyagent setup, Pi tool settings", () => {
       await installed()
       await write(piFff(), { mode: "tools-only" })
       const report = await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ mode: "tools-only" })
+      expect(await read(piFff())).toEqual({ mode: "tools-only", followSymlinks: false })
       expect(toolLines(report)).toContain(
-        `~ tool settings ${piFff()}: kept mode "tools-only" (HolyAgent sets "override"; yours wins)`,
+        `+ tool settings ${piFff()}: added followSymlinks false; kept mode "tools-only" (HolyAgent sets "override"; yours wins)`,
       )
     })
 
@@ -418,13 +424,39 @@ describe("holyagent setup, Pi tool settings", () => {
       await runSetup(withPi())
       expect(await exists(piFff())).toBe(false)
       await setConfig({})
-      await write(piFff(), { followSymlinks: false })
+      await write(piFff(), { enableHomeDirScanning: false })
       await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ followSymlinks: false, ...PI_FFF })
+      expect(await read(piFff())).toEqual({ enableHomeDirScanning: false, ...PI_FFF })
       await setConfig(off)
       const report = await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ followSymlinks: false })
-      expect(toolLines(report)).toContain(`- tool settings ${piFff()}: removed mode "override"`)
+      expect(await read(piFff())).toEqual({ enableHomeDirScanning: false })
+      expect(toolLines(report)).toContain(REMOVED())
+    })
+
+    test("keeps a followSymlinks the user chose, and takes out only the keys it wrote", async () => {
+      await installed()
+      await write(piFff(), { followSymlinks: true })
+      const report = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ followSymlinks: true, mode: "override" })
+      expect(toolLines(report)).toContain(
+        `+ tool settings ${piFff()}: added mode "override"; kept followSymlinks true (HolyAgent sets false; yours wins)`,
+      )
+      await setConfig(off)
+      const reverted = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ followSymlinks: true })
+      expect(toolLines(reverted)).toContain(`- tool settings ${piFff()}: removed mode "override"`)
+    })
+
+    test("leaves a value the user changed after setup, and removes the one still at what setup wrote", async () => {
+      await installed()
+      await runSetup(withPi())
+      await write(piFff(), { mode: "override", followSymlinks: true })
+      await setConfig(off)
+      const report = await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ followSymlinks: true })
+      expect(toolLines(report)).toContain(
+        `- tool settings ${piFff()}: removed mode "override"; kept followSymlinks true (setup wrote false)`,
+      )
     })
 
     test("leaves an override the user had before setup, whatever the capability does", async () => {
@@ -453,7 +485,7 @@ describe("holyagent setup, Pi tool settings", () => {
       await runSetup(withPi())
       const real = await runSetup(withPi(), { undo: true })
       expect((await exists(piFff())) && (await read(piFff()))).toEqual({})
-      expect(toolLines(real)).toContain(`- tool settings ${piFff()}: removed mode "override"`)
+      expect(toolLines(real)).toContain(REMOVED())
     })
   })
 
@@ -488,7 +520,7 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
       expect(toolLines(report)).toEqual([
         `- tool settings ${billion()}: removed ${GUARDRAILS}`,
-        `- tool settings ${piFff()}: removed mode "override"`,
+        `- tool settings ${piFff()}: removed mode "override", followSymlinks false`,
       ])
       // Nothing else is written or touched with Pi off, and a second run has nothing to revert.
       expect(toolLines(await runSetup(withPi()))).toEqual([])
@@ -739,7 +771,7 @@ describe("holyagent doctor, Pi tool settings", () => {
         billion(),
         "pi.subagents, guardrails.bashTimeout, guardrails.maxOutputBytes, guardrails.repetition",
       ),
-      lacking(piFff(), "mode"),
+      lacking(piFff(), "mode, followSymlinks"),
     ])
   })
 

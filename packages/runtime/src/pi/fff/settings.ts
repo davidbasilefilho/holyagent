@@ -5,21 +5,41 @@
  */
 
 /**
- * The keys of the package's `pi-fff.json` that put it in `override` mode: it then registers its
- * tools under the names of Pi's own `grep` and `find` (and adds `multi_grep`), so they replace
- * Pi's. The package's default, `tools-and-ui`, adds `fffind`, `ffgrep` and `fff-multi-grep` beside
- * Pi's tools. The file is read from Pi's agent directory only (`PI_CODING_AGENT_DIR` honored); a
- * project file is not read, and `--fff-mode` or `PI_FFF_MODE` outrank it.
+ * The keys of the package's `pi-fff.json` that setup writes:
+ *
+ * - `mode: "override"` puts it in `override` mode: it then registers its tools under the names of
+ *   Pi's own `grep` and `find` (and adds `multi_grep`), so they replace Pi's. The package's
+ *   default, `tools-and-ui`, adds `fffind`, `ffgrep` and `fff-multi-grep` beside Pi's tools.
+ * - `followSymlinks: false` keeps its index inside the real tree. The package follows directory links
+ *   by default, which Pi's own `rg` and `fd` do not, so a link in a repository (`docs -> ~/.ssh`)
+ *   would become searchable under a workspace path. A user's own value stays, and the package's
+ *   `--fff-follow-symlinks` flag and `FFF_FOLLOW_SYMLINKS` outrank the file.
+ *
+ * The file is read from Pi's agent directory only (`PI_CODING_AGENT_DIR` honored); a project file
+ * is not read, and `--fff-mode` or `PI_FFF_MODE` outrank `mode`.
  */
-export const FFF_OVERRIDE_SETTINGS = { mode: "override" } as const
+export const FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false } as const
 
 /**
- * The tools that `override` mode registers, which the root does not use: its search rule names
- * `holyagent rg` and `holyagent fd`. Pi's default selection leaves `grep` and `find` out of the
- * root's active tools, but the package activates every tool it registers, so the root excludes them
- * to keep what it had.
+ * Every tool name `@ff-labs/pi-fff` registers at the pin of `pi-packages.json` (0.11.0,
+ * `OVERRIDE_TOOL_NAMES` and `FFF_TOOL_NAMES` of `src/index.ts`); a pin move must recheck the list,
+ * {@link FFF_OVERRIDE_SETTINGS} and {@link FFF_NATIVE_HOSTS} against the package. The root does not
+ * use any of them: its search rule names `holyagent rg` and `holyagent fd`. Pi's default selection
+ * leaves `grep` and `find` out of the root's active tools, but the package activates every tool it
+ * registers, so the root excludes them to keep what it had. Override mode registers `grep`, `find`
+ * and `multi_grep`; the package's default mode, the `--fff-mode` flag or `PI_FFF_MODE` over the
+ * file, and override mode with the working directory opted out of indexing register `ffgrep`,
+ * `fffind` and `fff-multi-grep` instead, so both sets are excluded, whichever mode ends up in
+ * force.
  */
-export const FFF_OVERRIDE_TOOLS: ReadonlyArray<string> = ["grep", "find", "multi_grep"]
+export const FFF_TOOLS: ReadonlyArray<string> = [
+  "grep",
+  "find",
+  "multi_grep",
+  "ffgrep",
+  "fffind",
+  "fff-multi-grep",
+]
 
 /**
  * The hosts (`<process.platform>-<process.arch>`) that `@ff-labs/fff-node` ships a native library

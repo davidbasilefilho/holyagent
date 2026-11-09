@@ -10644,10 +10644,17 @@ var init_guardrails = __esm(() => {
   };
 });
 
-var FFF_OVERRIDE_SETTINGS, FFF_OVERRIDE_TOOLS, FFF_NATIVE_HOSTS;
+var FFF_OVERRIDE_SETTINGS, FFF_TOOLS, FFF_NATIVE_HOSTS;
 var init_settings = __esm(() => {
-  FFF_OVERRIDE_SETTINGS = { mode: "override" };
-  FFF_OVERRIDE_TOOLS = ["grep", "find", "multi_grep"];
+  FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false };
+  FFF_TOOLS = [
+    "grep",
+    "find",
+    "multi_grep",
+    "ffgrep",
+    "fffind",
+    "fff-multi-grep"
+  ];
   FFF_NATIVE_HOSTS = [
     "darwin-arm64",
     "darwin-x64",
@@ -10853,7 +10860,7 @@ var init_capabilities = __esm(() => {
       needs: [],
       nativeHosts: FFF_NATIVE_HOSTS,
       forms: sameForm(["@ff-labs/pi-fff"]),
-      tools: { rootExclude: FFF_OVERRIDE_TOOLS, visual: [] },
+      tools: { rootExclude: FFF_TOOLS, visual: [] },
       settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
       health: ["needs", "packages"]
     }

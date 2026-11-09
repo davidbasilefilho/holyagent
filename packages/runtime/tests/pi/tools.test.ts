@@ -37,8 +37,9 @@ const NO_WEB_PROVIDER: ProviderProfile = { ...PROVIDERS["kimi-coding-global"], w
 
 const READ = ["read", "grep", "find", "ls"]
 const MOONSHOT = ["moonshot_search", "moonshot_fetch"]
-// What the fff capability's override mode registers under Pi's own names; the root has none of them.
-const FFF_TOOLS = ["grep", "find", "multi_grep"]
+// What @ff-labs/pi-fff registers, under Pi's own names in override mode and under its own otherwise
+// (the default mode, --fff-mode, PI_FFF_MODE, a working directory it does not index); the root has none.
+const FFF_TOOLS = ["grep", "find", "multi_grep", "ffgrep", "fffind", "fff-multi-grep"]
 const WEB_KIT = ["web_search", "web_fetch"]
 // Pi offers `powershell` beside `bash` on Windows; a role has both or neither.
 const SHELLS = ["bash", "powershell"]
@@ -144,7 +145,7 @@ describe("toolArgs for the root", () => {
         "--tools",
         "+codemode",
         "--exclude-tools",
-        "write,edit,computer_use_*,grep,find,multi_grep,moonshot_search,moonshot_fetch",
+        "write,edit,computer_use_*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
       ],
     })
   })
@@ -350,15 +351,23 @@ describe("toolSettings", () => {
         whileOn: "contextCompression",
         revertWhenOff: true,
       },
-      { file: PI_FFF_FILE, content: { mode: "override" }, revertWhenOff: true },
+      {
+        file: PI_FFF_FILE,
+        content: { mode: "override", followSymlinks: false },
+        revertWhenOff: true,
+      },
     ])
   })
 
-  test("fff puts pi-fff in override mode while it is on and its native library covers the host", () => {
+  test("fff puts pi-fff in override mode, without directory links followed, while it is on and its native library covers the host", () => {
     const patches = (config: Config, platform?: string) =>
       toolSettings(config, undefined, "normal", platform).filter((p) => p.file === PI_FFF_FILE)
     expect(patches(DEFAULT_CONFIG, "linux-x64")).toEqual([
-      { file: PI_FFF_FILE, content: { mode: "override" }, revertWhenOff: true },
+      {
+        file: PI_FFF_FILE,
+        content: { mode: "override", followSymlinks: false },
+        revertWhenOff: true,
+      },
     ])
     expect(patches(withFeatures({ fff: false }), "linux-x64")).toEqual([])
     expect(patches(DEFAULT_CONFIG, "freebsd-x64")).toEqual([])

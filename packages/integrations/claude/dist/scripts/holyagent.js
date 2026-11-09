@@ -12537,8 +12537,15 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
-var FFF_OVERRIDE_SETTINGS = { mode: "override" };
-var FFF_OVERRIDE_TOOLS = ["grep", "find", "multi_grep"];
+var FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false };
+var FFF_TOOLS = [
+  "grep",
+  "find",
+  "multi_grep",
+  "ffgrep",
+  "fffind",
+  "fff-multi-grep"
+];
 var FFF_NATIVE_HOSTS = [
   "darwin-arm64",
   "darwin-x64",
@@ -12735,7 +12742,7 @@ var CAPABILITIES = [
     needs: [],
     nativeHosts: FFF_NATIVE_HOSTS,
     forms: sameForm(["@ff-labs/pi-fff"]),
-    tools: { rootExclude: FFF_OVERRIDE_TOOLS, visual: [] },
+    tools: { rootExclude: FFF_TOOLS, visual: [] },
     settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
     health: ["needs", "packages"]
   }
