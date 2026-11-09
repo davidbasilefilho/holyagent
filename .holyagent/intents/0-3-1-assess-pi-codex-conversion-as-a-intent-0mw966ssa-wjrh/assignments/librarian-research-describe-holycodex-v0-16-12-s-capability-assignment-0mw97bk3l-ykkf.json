@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mw97bk3l-ykkf",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 14,
+  "roleTask": "Librarian.research",
+  "slug": "describe-holycodex-v0-16-12-s-capability",
+  "objective": "Describe holycodex v0.16.12's capability system exactly, and map it onto HolyAgent's Pi integration and config, so a matching capability system can be planned.",
+  "state": "Running",
+  "scope": [
+    "Maintainer (verbatim): \"in the same way holycodex 0.16.12 has capabilities, we should. most should be default enabled\".",
+    "holycodex is the maintainer's earlier project; tag v0.16.12 (commit a56aa72, 2026-10-03). A prior report read its source: /home/user/holyagent/.git/holyagent/reports/assignment-0mw6zi93r-m1x2.md (read it for the repository location). From the source at v0.16.12, with file and symbol: the list of capabilities and what each grants or turns on (tools, MCP servers, skills, prompts, model routing), each default (enabled or not), how a user or project turns one on or off (config keys, flags, TUI), how capabilities attach to agents or tasks (per role, per task, global), dependencies between capabilities, how missing prerequisites are reported, and any doctor or setup handling.",
+    "HolyAgent side: the current config schema and Pi feature switches (pi.features, pi.web, pi.enable and others) in /home/user/holyagent-0.3.0-t3branch/packages/runtime/src/config/ and the Pi packages and tool settings (packages/runtime/src/config/pi-packages.json, packages/runtime/src/pi/). Map each holycodex capability to its HolyAgent counterpart (existing feature switch, planned 0.3.1 piece such as the screen capability, just-bash TS/JS, fff, opencode browse, Billion Context, Codex auto-review), or mark it as having none."
+  ],
+  "constraints": [
+    "Read-only: change no files, make no git writes, write nothing under .git/ or .holyagent/.",
+    "Never run pi, holycodex or any agent, or make a live model request.",
+    "Separate sourced facts (file and symbol at v0.16.12) from inference.",
+    "Report in under 550 words."
+  ],
+  "criteria": [
+    {
+      "text": "holycodex v0.16.12 capabilities are listed with what each grants, its default and how it is toggled, from source",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each is mapped to a HolyAgent counterpart or marked as having none",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "holycodex",
+    "mapping"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-09T11:52:17.026Z"
+  },
+  "createdAt": "2026-11-09T11:52:17.026Z"
+}
