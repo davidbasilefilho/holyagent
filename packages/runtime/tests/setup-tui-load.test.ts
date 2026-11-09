@@ -11,7 +11,7 @@ import {
   utimes,
   writeFile,
 } from "node:fs/promises"
-import { dirname, join } from "node:path"
+import { dirname, join, posix } from "node:path"
 
 import { Effect } from "effect"
 
@@ -46,7 +46,7 @@ afterEach(() => remove())
 const PACKAGES = { "@opentui/core": "1.0.0", "@opentui/solid": "1.0.1", "solid-js": "2.0.0" }
 // The first eight hex digits of the SHA-256 of the lock text "lock".
 const EXPECTED_DIRECTORY = (root: string) =>
-  join(
+  posix.join(
     root,
     "holyagent",
     "setup-tui",
@@ -102,18 +102,26 @@ describe("where the interface is installed", () => {
     expect(cacheHome({ HOME: "/home/a", XDG_CACHE_HOME: "relative" }, "linux")).toBe(
       "/home/a/.cache",
     )
-    expect(cacheHome({ HOME: "/home/a", XDG_CACHE_HOME: "" }, "darwin")).toBe(
-      join("/home/a", ".cache"),
-    )
-    expect(cacheHome({ HOME: "/Users/a" }, "darwin")).toBe(join("/Users/a", ".cache"))
+    expect(cacheHome({ HOME: "/home/a", XDG_CACHE_HOME: "" }, "darwin")).toBe("/home/a/.cache")
+    expect(cacheHome({ HOME: "/Users/a" }, "darwin")).toBe("/Users/a/.cache")
   })
 
   test("uses LOCALAPPDATA on Windows, else AppData/Local of the home directory", () => {
     expect(cacheHome({ LOCALAPPDATA: "C:\\Users\\a\\AppData\\Local" }, "win32")).toBe(
       "C:\\Users\\a\\AppData\\Local",
     )
-    expect(cacheHome({ HOME: "C:\\Users\\a" }, "win32")).toBe(
-      join("C:\\Users\\a", "AppData", "Local"),
+    expect(cacheHome({ HOME: "C:\\Users\\a" }, "win32")).toBe("C:\\Users\\a\\AppData\\Local")
+  })
+
+  test("joins with the separator of the platform it is asked about, not the host's", () => {
+    expect(cacheHome({ HOME: "C:\\Users\\a" }, "win32")).toBe("C:\\Users\\a\\AppData\\Local")
+    const at = (platform: string, env: Record<string, string>) =>
+      tuiDirectory(env, { "solid-js": "1.9.16" }, platform, "lock")
+    expect(at("win32", { LOCALAPPDATA: "C:\\L" })).toMatch(
+      /^C:\\L\\holyagent\\setup-tui\\solid-js-1\.9\.16_[0-9a-f]{8}$/,
+    )
+    expect(at("linux", { XDG_CACHE_HOME: "/c" })).toMatch(
+      /^\/c\/holyagent\/setup-tui\/solid-js-1\.9\.16_[0-9a-f]{8}$/,
     )
   })
 

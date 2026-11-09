@@ -1,6 +1,6 @@
 import { lstat, mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
 import { userInfo } from "node:os"
-import { basename, dirname, join } from "node:path"
+import { basename, dirname, join, posix, win32 } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { Data, Effect } from "effect"
@@ -22,6 +22,10 @@ export class TuiUnavailable extends Data.TaggedError("TuiUnavailable")<{
   }
 }
 
+// The path module whose separator `platform` uses, so a path built for another platform than the
+// host's is still written the way that platform writes it.
+const pathModule = (platform: string) => (platform === "win32" ? win32 : posix)
+
 /**
  * HolyAgent's per-user cache folder: `LOCALAPPDATA` on Windows (else `AppData/Local` of the home
  * directory), `XDG_CACHE_HOME` elsewhere when it is an absolute path, else `.cache` of the home
@@ -29,6 +33,7 @@ export class TuiUnavailable extends Data.TaggedError("TuiUnavailable")<{
  */
 export const cacheHome = (env: Env, platform: string = process.platform): string => {
   const home = homeDirectory(env)
+  const { join } = pathModule(platform)
   if (platform === "win32")
     return firstNonEmpty(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local")
   const xdg = firstNonEmpty(env["XDG_CACHE_HOME"])
@@ -39,6 +44,7 @@ export const cacheHome = (env: Env, platform: string = process.platform): string
 
 /** The folders below the cache home that hold HolyAgent's setup interface, outermost first. */
 const guardedFolders = (env: Env, platform: string): ReadonlyArray<string> => {
+  const { join } = pathModule(platform)
   const holyagent = join(cacheHome(env, platform), "holyagent")
   return [holyagent, join(holyagent, "setup-tui")]
 }
@@ -58,7 +64,7 @@ export const tuiDirectory = (
   platform: string = process.platform,
   lock: string = TUI_LOCK,
 ): string =>
-  join(
+  pathModule(platform).join(
     guardedFolders(env, platform)[1] ?? "",
     [
       ...Object.entries(packages)
