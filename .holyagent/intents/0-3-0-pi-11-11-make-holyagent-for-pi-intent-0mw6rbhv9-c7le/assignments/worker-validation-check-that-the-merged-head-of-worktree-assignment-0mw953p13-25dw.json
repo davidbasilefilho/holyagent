@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mw953p13-25dw",
+  "intentId": "intent-0mw6rbhv9-c7le",
+  "intentRevision": 12,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-merged-head-of-worktree",
+  "objective": "Check that the merged head of worktree /home/user/holyagent-0.3.0-t3branch builds to an unchanged tree and passes the full gates.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.0-t3branch, current HEAD (a merge-forward of the lower stack branches, made without conflicts). Run everything there."
+  ],
+  "constraints": [
+    "Run `bun install --frozen-lockfile` first; node_modules is not shared between worktrees and the prepare step installing lefthook hooks is expected.",
+    "Make no git writes and no edits under .git/ or .holyagent/. If the build changes tracked files, report `git status --short` and `git diff --stat`, write `git diff` to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3branch-build.diff, then restore nothing yourself: leave the tree as the build left it.",
+    "Write logs only to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/v-t3branch-build.log and v-t3branch-verify.log (unique names: other worktrees validate at the same time).",
+    "Testing is unit tests and fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "bunx --no-install mise run build exits 0 and leaves git status clean",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "bunx --no-install mise run verify exits 0",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "build",
+    "verify"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-09T10:50:10.936Z"
+  },
+  "createdAt": "2026-11-09T10:50:10.936Z"
+}
