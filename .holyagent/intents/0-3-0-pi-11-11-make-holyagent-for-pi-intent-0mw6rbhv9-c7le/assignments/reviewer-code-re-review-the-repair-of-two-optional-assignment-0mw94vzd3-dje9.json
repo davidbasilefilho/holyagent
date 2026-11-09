@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-repair-of-two-optional",
   "objective": "Re-review the repair of two optional findings on the T3 tool filter (t3Root set only after a successful apply; T3 patterns compiled once).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-t3host, newest commit; diff in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3host-nits.diff. Previous review: /home/user/holyagent/.git/holyagent/reports/assignment-0mw8u28kl-48kw.md findings 1 and 2."
   ],
@@ -35,7 +35,29 @@
     "agentId": "workflow:wf_cc31cad4-180/assignment-0mw94vzd3-dje9",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T10:44:11.079Z"
+    "startedAt": "2026-11-09T10:44:11.079Z",
+    "finishedAt": "2026-11-09T10:48:02.002Z"
+  },
+  "result": "result: Findings 1 and 2 are closed and the repair broke nothing. `bun test packages/integrations/pi packages/runtime/tests/pi` exited 0 with 462 pass and 0 fail (log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3nits-rereview.log`).\n\nblockers: none\n\nfindings (range d949869...a6988f4; built-in `/code-review` ran, its text was the built-in's):\n1. Previous finding 1 is closed. `extension.ts:1288-1290` now sets `t3Root` only when `applyRootTools` returns no notice, so a failed apply leaves drift correction off (`holdT3ToolsOff`, line 1235). A new test at `tests/extension.test.ts:~3408` covers the throwing `setActiveTools` path and asserts that:\n   - there is no drift correction;\n   - the `tool_call` gate still blocks `mcp__t3-code__delegate_task`.\n2. Previous finding 2 is closed. `tools.ts:71-82` builds `T3_TOOL` and `T3_VISUAL` once at module load. `toolMatches` goes through the shared `patternRegExp`, so its behaviour is unchanged. `escapeRegExp` moved above its first use with no semantic change.\n\nBuilt-in review claims:\n- `extension.ts:1290`, a failed start leaves the root's tools unapplied for the session. Optional, not blocking. It follows from the repair that finding 1 asked for. The failure is only a thrown `setActiveTools`, and it is reported as a `setupNotice`. The `tool_call` gate still refuses every deactivated T3 tool, and the test pins this as intended.\n- `extension.ts:1289`, `t3Gate` is armed only when `result.tools` is defined. Rejected. Child sessions return no tools by design and must not be gated. This was already true before the repair, and the prior review checked it with a test.\n- `tools.ts:43`, duplicated regex logic in the `dist/scripts` files. Rejected. These are generated bundles, not hand-written copies. They were regenerated in this commit, and the escape set is unchanged from the base.\n\nverdict: merge-ready. I did not run `mise run verify`, only the targeted tests above.\n\nevidence:\nThe review states whether findings 1 and 2 are closed and whether the repair broke anything, with path:line: finding 1 closed (`extension.ts:1288-1290`, test in `tests/extension.test.ts`); finding 2 closed (`tools.ts:71-82`); no regressions, 462 pass and 0 fail.\nfindings: two optional notes above, none blocking.\nverdict: merge-ready; `bun test` exited 0.\n",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "Both previous findings closed with path:line, 462 tests pass, no blockers",
+    "criteria": [
+      {
+        "criterion": "The review states whether findings 1 and 2 are closed and whether the repair broke anything, with path:line",
+        "support": "finding 1 closed (`extension.ts:1288-1290`, test in `tests/extension.test.ts`); finding 2 closed (`tools.ts:71-82`); no regressions, 462 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "two optional notes above, none blocking."
+      },
+      {
+        "label": "verdict",
+        "support": "merge-ready; `bun test` exited 0."
+      }
+    ]
   },
   "createdAt": "2026-11-09T10:44:11.079Z"
 }
