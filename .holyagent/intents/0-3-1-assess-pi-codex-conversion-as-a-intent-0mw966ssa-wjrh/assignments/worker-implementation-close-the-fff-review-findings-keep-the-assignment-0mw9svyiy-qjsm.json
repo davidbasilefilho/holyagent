@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-fff-review-findings-keep-the",
   "objective": "Close the fff review findings: keep the root off every fff tool name and stop fff from following directory links by default.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-fff at e2cacd11",
     "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fck-0tru.md (root exclusion misses ffgrep, fffind and fff-multi-grep in pi-fff's default mode, with --fff-mode or PI_FFF_MODE, and in override mode when the cwd is opted out of indexing; FFF_OVERRIDE_TOOLS not tied to the pin) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9s9fmw-apeq.md (finding 1: pi-fff follows directory symlinks by default where Pi's rg and fd do not)",
@@ -78,7 +78,49 @@
     "agentId": "workflow:wf_97b202a5-ed2/assignment-0mw9svyiy-qjsm",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T21:56:00.779Z"
+    "startedAt": "2026-11-09T21:56:00.779Z",
+    "finishedAt": "2026-11-09T22:13:29.244Z"
+  },
+  "result": "result: Both fff findings are closed. The root now excludes all six fff tool names, and setup writes `followSymlinks: false` beside `mode: \"override\"`. Build and verify both exit 0.\n\nchanged (all under /home/user/holyagent-0.3.1-fff):\n- docs/pi/search.md\n- packages/runtime/src/config/capabilities.ts\n- packages/runtime/src/config/pi-packages.ts\n- packages/runtime/src/pi/fff/settings.ts\n- packages/runtime/tests/pi/tools.test.ts\n- packages/runtime/tests/setup-capabilities.test.ts\n- packages/runtime/tests/setup-pi-settings.test.ts\n- packages/integrations/pi/tests/extension.test.ts\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/scripts/setup-tui.js\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/claude/dist/scripts/setup-tui.js\n\nThe five `dist/` files are regenerated build output; `mise run build` changed nothing else.\n\nchecks:\n- `bun install --frozen-lockfile` -> 0\n- `bunx --no-install mise run build` -> 0\n- `bunx --no-install mise run verify` -> 0, 3030 pass, 0 fail, no type or lint errors, format clean\n\nblockers: none\nquestions: none\n\nnotes:\n- Key check: pi-fff 0.11.0's `pi-fff.schema.json` and `src/config.ts` read `followSymlinks` (boolean, default true).\n- I renamed `FFF_OVERRIDE_TOOLS` to `FFF_TOOLS` in `packages/runtime/src/pi/fff/settings.ts` and extended it to six names. The `tool_call` gate takes its list from `toolArgs`, so it covers all six without a code change in `extension.ts`.\n- Setup reports a kept user value as `added mode \"override\"; kept followSymlinks true (HolyAgent sets false; yours wins)`.\n- Doctor now reports a missing `followSymlinks` alongside `mode`.\n- The \"root exclusion if pi-fff registers late\" point in `docs/pi/search.md` is still unconfirmed.\n\nevidence:\nThe root's exclusion and tool_call gate cover grep, find, multi_grep, ffgrep, fffind and fff-multi-grep, with tests: `FFF_TOOLS` in `packages/runtime/src/pi/fff/settings.ts`. `tests/pi/tools.test.ts` asserts the `excludeTools` list and the argv, on and off. `extension.test.ts` (\"the root's excluded tools\") refuses all six, including from a codemode script, and lifts them for a specialist.\nSetup writes the symlink-following setting off with override mode, records it, keeps a user's own value and reverts only what it wrote, with tests: `FFF_OVERRIDE_SETTINGS` in `settings.ts`. `setup-pi-settings.test.ts` covers write, a kept user value, revert only of unchanged keys, and `--undo`. `tools.test.ts` and `setup-capabilities.test.ts` cover the patch content.\nThe fff tool names sit next to the pin with a note that a pin move must recheck them: the `FFF_TOOLS` JSDoc, and a note on `PI_PACKAGE_VERSIONS` in `config/pi-packages.ts`.\ndocs/pi/search.md describes both settings: its \"The switch is a key\", \"Directory links are not followed\" and \"The root keeps its search rule\" entries.\nGates: mise run build leaves no unexplained changes and mise run verify exits 0: build 0 (only the dist files above), verify 0 with 3030 pass and 0 fail. Final logs are `build.log` and `verify5.log` in the scratchpad.\nchecks-run: the commands under `checks` above.\nchanged-paths: the list under `changed`.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-fixes.diff\n",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Six tool names excluded and gated, followSymlinks false recorded and reverted, tested; verify 3030 pass.",
+    "criteria": [
+      {
+        "criterion": "The root's exclusion and tool_call gate cover grep, find, multi_grep, ffgrep, fffind and fff-multi-grep, with tests",
+        "support": "`FFF_TOOLS` in `packages/runtime/src/pi/fff/settings.ts`. `tests/pi/tools.test.ts` asserts the `excludeTools` list and the argv, on and off. `extension.test.ts` (\"the root's excluded tools\") refuses all six, including from a codemode script, and lifts them for a specialist."
+      },
+      {
+        "criterion": "Setup writes the symlink-following setting off with override mode, records it, keeps a user's own value and reverts only what it wrote, with tests",
+        "support": "`FFF_OVERRIDE_SETTINGS` in `settings.ts`. `setup-pi-settings.test.ts` covers write, a kept user value, revert only of unchanged keys, and `--undo`. `tools.test.ts` and `setup-capabilities.test.ts` cover the patch content."
+      },
+      {
+        "criterion": "The fff tool names sit next to the pin with a note that a pin move must recheck them",
+        "support": "the `FFF_TOOLS` JSDoc, and a note on `PI_PACKAGE_VERSIONS` in `config/pi-packages.ts`."
+      },
+      {
+        "criterion": "docs/pi/search.md describes both settings",
+        "support": "its \"The switch is a key\", \"Directory links are not followed\" and \"The root keeps its search rule\" entries."
+      },
+      {
+        "criterion": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build 0 (only the dist files above), verify 0 with 3030 pass and 0 fail. Final logs are `build.log` and `verify5.log` in the scratchpad."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the commands under `checks` above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the list under `changed`."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-fixes.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T21:56:00.779Z"
 }
