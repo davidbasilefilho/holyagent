@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-setup-tui-round-2-repair",
   "objective": "Re-review the setup TUI round-2 repair commit e1beb56 for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review git diff HEAD~1 HEAD in /home/user/holyagent-0.3.0-tui (head e1beb56; without generated output as /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/tui-r2.diff). The previous findings are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bh2g-iu59.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bhbo-gj8f.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw98bgsf-onrz.md (visual); the repair report is /home/user/holyagent/.git/holyagent/reports/assignment-0mw98v0le-38a4.md.",
     "Check: the destroy handler settles the outcome exactly once and the process exits on SIGHUP/SIGTERM; sweepStale only removes the run's own stale temp folders; the cache-home check and marker change do not break an existing valid install; the small-size failure layout.",
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_27e78b45-d7b/assignment-0mw999dte-ir29",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T12:46:34.802Z"
+    "startedAt": "2026-11-09T12:46:34.802Z",
+    "finishedAt": "2026-11-09T12:54:22.868Z"
+  },
+  "result": "result: Both criteria met; no blockers. The round-2 items are correct, and the setup-tui tests pass (120 pass, 0 fail). Three items are optional.\n\n**Built-in `/code-review` (high) on `e1beb56~1...e1beb56`.** It returned 7 findings. I read the cited code for each:\nCache home refused when group-writable (`load.ts:296`): optional. A 0775 `~/.cache` now falls back to the line-based setup with a clear reason. The repair report says this was the brief's intent, and the security review's Low finding asked for the check. Whether to exempt private-group homes is for the root.\nSymlinked cache home refused (`load.ts:284`): optional, same fallback. The unreleased feature exists only on `release/0.3.0/feat/setup-tui` (not on `main`, no tag), so no shipped install breaks.\nSweep judges staleness by the folder's top-level mtime (`load.ts:342`): optional. A live install running over an hour could be swept; the failure is a clean TuiUnavailable, which falls back to the line-based setup.\nSweep ignores folders from other versions or locks (`load.ts:338`): rejected. The brief asked for the run's own folders only, and `.<name>-` cannot match another install's temp folder.\nSweep lacks an ownership check on Windows and runs sequentially (`load.ts:342`): rejected. It uses `lstat`, so symlinks are skipped, and requires the same uid where uid exists. The parent is the per-user cache, and the sweep is best effort.\nMarker binding is redundant with the folder name (`load.ts:82`): rejected. The security review asked for it, and no migration is needed for an unreleased feature.\n`plain` strips `\\p{Cf}` but not U+2028/U+2029 (`load.ts:127`): optional. The comment says \"line breaks removed\", but U+2028/2029 pass the filter. They are not terminal controls. Stripping the ZWJ is the intended trade-off.\n`layout` is built two to three times per render (`model.ts:387`): rejected. The cost is negligible, and tests cover the sizes down to 40x12.\n\n**Own review of the round-2 items:**\n**Exit on hangup and SIGTERM, outcome settles once:** correct. `showSetup` (`entry.tsx`) resumes with `Interrupted` on the renderer's `destroy` event, and also if the renderer is already destroyed. `resume` is idempotent, so a `done` plus a later `destroy` settles once. The listener is removed in the callback's cleanup. `app.tsx` aborts the apply on cleanup. I ran my own pty script against the built `claude/dist/scripts/setup-tui.js`. After closing the pty master (SIGHUP) the process exited with status 0 and `Interrupted`. After SIGTERM it did the same.\n**`sweepStale`:** correct. It only removes plain directories (`lstat`, so no symlinks) named `.<own basename>-*`, owned by the user where a uid exists, with an mtime over 1 hour old. It runs before `mkdtemp`, so it cannot hit its own folder, and `Effect.ignore` keeps it best effort.\n**Cache-home check:** correct as specified. It runs only without `options.directory`, and a missing home passes. The folders below it are still created 0700. A user-owned, non-writable-by-others, non-symlinked home is unaffected; the two cases above are the optional ones.\n**Marker binding:** correct. `installed`, `promote` and `installAtomically` all pass the lock hash, and previous markers simply reinstall once.\n**Small-size failure layout:** correct. The recovery hint and actions always show, the cause pages, and the blank separators drop first. At 40x12 and 30x16 the tests assert height and width limits. Below about 40x12 it clips, which the repair report states.\n**Regressions:** none. `session.ts` and the flags are untouched, and the fallback path is intact.\n\nNot run: the full suite, which the brief excluded. The sweep's behavior on a real hour-old folder was read, not run. The `/code-review` skill run used my `e1beb56` range; the worktree was left unchanged.\n\nevidence:\nThe round-2 items (exit on hangup and SIGTERM, temp sweep, cache-home check, marker binding, bidi strip, small-size failure layout) are correct, or each defect is reported with file and line: correct, as above. The pty runs gave exit 0 and `Interrupted` for both signals (`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rv/sig.py`). The optional notes are at `load.ts:296`, `load.ts:284`, `load.ts:342` and `load.ts:127`.\nNo regression in the setup flow, flags or line-based fallback: none found; `session.ts` is unchanged and the setup-tui tests pass (120/0).\nfindings: the `/code-review` classification above, with no blockers.\ntests: `bun test packages/runtime/tests/setup-tui` exit 0, 120 pass, 0 fail, 4 files.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Re-review evidence cites code lines, pty runs, tests and captures on e1beb56",
+    "criteria": [
+      {
+        "criterion": "The round-2 items (exit on hangup and SIGTERM, temp sweep, cache-home check, marker binding, bidi strip, small-size failure layout) are correct, or each defect is reported with file and line",
+        "support": "correct, as above. The pty runs gave exit 0 and `Interrupted` for both signals (`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rv/sig.py`). The optional notes are at `load.ts:296`, `load.ts:284`, `load.ts:342` and `load.ts:127`."
+      },
+      {
+        "criterion": "No regression in the setup flow, flags or line-based fallback",
+        "support": "none found; `session.ts` is unchanged and the setup-tui tests pass (120/0)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "the `/code-review` classification above, with no blockers."
+      },
+      {
+        "label": "tests",
+        "support": "`bun test packages/runtime/tests/setup-tui` exit 0, 120 pass, 0 fail, 4 files."
+      }
+    ]
   },
   "createdAt": "2026-11-09T12:46:34.802Z"
 }
