@@ -36,6 +36,7 @@ import { providerEnv } from "../../../runtime/src/pi/provider.ts"
 import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
 import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
 import {
+  deactivatedT3Tools,
   POWERSHELL_ENTRY,
   rootActiveTools,
   type ToolArgs,
@@ -45,6 +46,14 @@ import {
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { SPECIALIST_NAMES } from "./specialists.ts"
+import {
+  belowFullAccess,
+  isT3Session,
+  refuseDeactivatedT3Tool,
+  T3_ACCESS_NOTICE,
+  T3_ACCESS_STATUS,
+  T3_STATUS_KEY,
+} from "./t3.ts"
 
 /** The launch flag that tells the extension what the session is for: root, specialist or session. */
 export const ROLE_FLAG = "holyagent-role"
@@ -458,6 +467,13 @@ interface Held {
   started: boolean
   /** Stops the provider checks of the session. */
   probe: AbortController | undefined
+  /** True when the session runs under T3 Code (see {@link isT3Session}). */
+  t3: boolean
+  /**
+   * True once the start applied the root's tools under T3 Code: T3's tools the root keeps off are
+   * then held off after drift and refused when called.
+   */
+  t3Root: boolean
   /** The notice the provider checks produced, until the next run delivers it. */
   readiness: Delivery | undefined
   /**
@@ -1177,25 +1193,60 @@ export const createExtension =
     }
 
     // The root's tools: its active selection plus its own tools, minus its excluded ones. On
-    // Windows its own tools include `powershell`, beside the default `bash` that needs Git Bash. A
-    // failure is a notice, not an error that reaches Pi.
-    const applyRootTools = (tools: NonNullable<Collected["tools"]>): Delivery | undefined =>
+    // Windows its own tools include `powershell`, beside the default `bash` that needs Git Bash.
+    // Under T3 Code the tools of T3 the root keeps off (see isDeactivatedT3Tool) go too, as exact
+    // names. A failure is a notice, not an error that reaches Pi.
+    const applyRootTools = (
+      tools: NonNullable<Collected["tools"]>,
+      t3: boolean,
+    ): Delivery | undefined =>
       Effect.runSync(
         Effect.try({
-          try: () =>
-            pi.setActiveTools([
-              ...rootActiveTools(
-                windows ? { ...tools, tools: [...tools.tools, POWERSHELL_ENTRY] } : tools,
-                pi.getActiveTools(),
-                pi.getAllTools().map(({ name }) => name),
-              ),
-            ]),
+          try: () => {
+            const registered = pi.getAllTools().map(({ name }) => name)
+            const added = windows ? { ...tools, tools: [...tools.tools, POWERSHELL_ENTRY] } : tools
+            const selection = t3
+              ? {
+                  ...added,
+                  excludeTools: [...added.excludeTools, ...deactivatedT3Tools(registered)],
+                }
+              : added
+            pi.setActiveTools([...rootActiveTools(selection, pi.getActiveTools(), registered)])
+          },
           catch: (cause) => notice(`the root's tools were not applied: ${String(cause)}`),
         }).pipe(
           Effect.as<Delivery | undefined>(undefined),
           Effect.catch((failure) => Effect.succeed(failure)),
         ),
       )
+
+    // T3 Code's bridge adds tools back in its own handlers (it never removes one), so the root's
+    // set can drift from what the start applied. Only a drift is corrected, and only by taking the
+    // deactivated T3 tools out of what is active now: a call that changes nothing keeps the
+    // provider's tool list byte-stable for the prompt cache, and the tools T3 added for itself
+    // (`tool_search`) and the user's own changes stay. The `tool_call` gate refuses what remains.
+    const holdT3ToolsOff = (): void => {
+      if (held?.t3Root !== true) return
+      Effect.runSync(
+        Effect.try(() => {
+          const active = pi.getActiveTools()
+          const drifted = deactivatedT3Tools(active)
+          if (drifted.length > 0)
+            pi.setActiveTools(active.filter((name) => !drifted.includes(name)))
+        }).pipe(Effect.ignore),
+      )
+    }
+
+    // The thread's access mode is below Full access: every tool call of the extension asks T3 Code
+    // for approval. T3 drops a notification outside an active turn, so the warning goes out as the
+    // setup notice, which the next run delivers once, and as the status T3 shows near the composer.
+    // A status that cannot be set (a stale context) is not an error: the notice stands.
+    const warnBelowFullAccess = (ctx: ExtensionContext): Delivery => {
+      Effect.runSync(
+        Effect.try(() => ctx.ui.setStatus(T3_STATUS_KEY, T3_ACCESS_STATUS)).pipe(Effect.ignore),
+      )
+      return notice(T3_ACCESS_NOTICE)
+    }
 
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
     // reads it, and a session that ended has nothing to be told. The root's tools and provider
@@ -1227,7 +1278,12 @@ export const createExtension =
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
-          if (result?.tools !== undefined) taken.setupNotice = applyRootTools(result.tools)
+          if (result?.tools !== undefined) {
+            taken.t3Root = taken.t3
+            taken.setupNotice = applyRootTools(result.tools, taken.t3)
+            if (taken.t3 && belowFullAccess(env))
+              taken.setupNotice = joinNotices(taken.setupNotice, warnBelowFullAccess(ctx))
+          }
         }
         if (result?.homeNotice !== undefined)
           taken.setupNotice = joinNotices(taken.setupNotice, result.homeNotice)
@@ -1251,6 +1307,8 @@ export const createExtension =
         rootPrompt: false,
         excluded: Effect.runSync(startingExclusions),
         started: false,
+        t3: isT3Session(ctx, env),
+        t3Root: false,
         probe: undefined,
         readiness: undefined,
         setupNotice: undefined,
@@ -1323,6 +1381,15 @@ export const createExtension =
     pi.on("before_agent_start", noticeOnce("setupNotice"))
     pi.on("before_agent_start", noticeOnce("readiness"))
 
+    // After the start's collection has applied the root's tools (the handler above awaits it).
+    pi.on("before_agent_start", () => {
+      holdT3ToolsOff()
+      return undefined
+    })
+    pi.on("session_tree", () => {
+      holdT3ToolsOff()
+    })
+
     // Only a specialist the package launched is held to a complete report.
     pi.on("message_end", (event) => {
       if (!isChild()) return undefined
@@ -1341,6 +1408,7 @@ export const createExtension =
       held?.gatesOff === true
         ? undefined
         : (refuseExcludedTool(event, held?.excluded ?? []) ??
+          (held?.t3Root === true ? refuseDeactivatedT3Tool(event) : undefined) ??
           Effect.runPromise(
             refuseNonSpecialistWorkflow(event).pipe(
               Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),

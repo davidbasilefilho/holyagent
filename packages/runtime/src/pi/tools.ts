@@ -63,6 +63,20 @@ export const T3_VISUAL_TOOLS: ReadonlyArray<string> = [
   `${T3_PREFIX}device_*`,
 ]
 
+/**
+ * Whether the root keeps no use for a registered tool under T3 Code: it is one of T3's own tools
+ * (either spelling of the server name, see {@link T3_PREFIX}) outside the {@link T3_VISUAL_TOOLS}
+ * families. T3's orchestration, thread, schedule and pending-request tools duplicate what HolyAgent
+ * does through its specialists, so the root has them neither active nor callable.
+ */
+export const isDeactivatedT3Tool = (name: string): boolean =>
+  toolMatches(`${T3_PREFIX}*`, name) &&
+  !T3_VISUAL_TOOLS.some((pattern) => toolMatches(pattern, name))
+
+/** The names among `registered` that {@link isDeactivatedT3Tool} names, in their order. */
+export const deactivatedT3Tools = (registered: ReadonlyArray<string>): ReadonlyArray<string> =>
+  registered.filter(isDeactivatedT3Tool)
+
 /** The computer-use tools of `@amaster.ai/pi-computer-use`, which all carry this prefix. */
 export const COMPUTER_USE_TOOLS: ReadonlyArray<string> = ["computer_use_*"]
 
