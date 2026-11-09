@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-remaining-optional-review",
   "objective": "Close the remaining optional review findings on the just-bash shell so /dev/null never reaches the host device and exit, setup revert and Windows tests behave as documented.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-bash, branch release/0.3.1/feat/just-bash at d149c9c (PR davidbasilefilho/holyagent#106, pushed)",
     "Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9qmod2-hygi.md (code, optional items) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9qmonh-9wkm.md (security, suspicions 1 and 2)"
@@ -87,7 +87,33 @@
     "agentId": "workflow:wf_03700566-b55/assignment-0mw9qugeg-vovd",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T20:58:51.400Z"
+    "startedAt": "2026-11-09T20:58:51.400Z",
+    "finishedAt": "2026-11-09T21:12:05.461Z"
+  },
+  "result": "result: all seven non-blocking items are closed, except the native-read item, which did not reproduce on just-bash 3.6.0. `build` and `verify` both exit 0.\n\nchanged:\n`packages/runtime/src/pi/bash/devices.ts`\n`packages/runtime/src/pi/bash/exit.ts`\n`packages/runtime/src/setup/pi-settings.ts`\n`packages/runtime/tests/pi/bash-shell.test.ts`\n`packages/runtime/tests/setup-pi-settings.test.ts`\n`docs/pi/shell.md`\n`packages/integrations/pi/dist/scripts/just-bash.js`\n`packages/integrations/pi/dist/scripts/holyagent.js`\n`packages/integrations/claude/dist/scripts/holyagent.js`\n\nchecks:\n`bunx --no-install mise run build` exits 0, and the status shows only the files above, with no unexplained changes.\n`bunx --no-install mise run verify` exits 0 with 3007 pass, 0 fail across 101 files. Type-check, lint and format are clean. The log is `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\nAgainst the base code, the `/dev/null` unit test, the two new `exit` tests and the setup test fail.\n\nblockers: none\n\nquestions: none\n\nnotes:\n**Native read:** the finding does not reproduce. just-bash runs its own command lookup (`exists` and `stat` of `/bin/cat`) between a file test and the read, which breaks the `exists`, `stat`, `readFile` sequence. I ran `cat`, `sed`, `diff`, `grep` and `[[ ]]` variants against the real shell, and all returned the bytes. I made no code change and added a regression test.\n**`/dev/null`:** every call on it is answered in memory or refused, whatever the spelling.\n  - **Handled in memory:** writes, `cp` to it, `chmod` and `utimes` are dropped, and a read is empty.\n  - **Refused with `EPERM`/`EEXIST`/`ENOTDIR`/`EINVAL`:** `rm`, `mv` to or from it, `mkdir`, `readdir`, `readlink`, `ln` and `ln -s` of it.\n  - **Side effect:** `rm -f /dev/null` fails silently, because just-bash's `rm -f` swallows errors, and the device stays.\n  - **Fix needed for `cp`:** I added an `identity` to the device's stat, because without it `cp` could not tell the device from the source file.\n  - **Not covered:** a symlink to `/dev/null` made by something other than the shell. I wrote this limit into the docs.\n  - **Safety:** the shell-level tests could delete `/dev/null` as root against the old code, so I ran the red-before check only on the fake-file-system unit test. `/dev/null` is intact.\n**`exit`:** it now records nothing when `$$` differs from `$BASHPID`, so a subshell or `$(...)` `exit` cannot replace the parent's state. `declare` and `typeset` count as local only inside a function.\n**Setup revert:** with `pi.enable` off, `installPiToolSettings` now reverts the recorded guardrails. A config that fails to load still gives no lines.\n**Windows:** the builtin-only `/dev/null` tests now run there, and only the host-program tests are skipped. I could not run Windows.\n\nevidence:\nGates: mise run build leaves no unexplained changes and mise run verify exits 0: `bunx --no-install mise run build` exit 0 with only the files above modified; `bunx --no-install mise run verify` exit 0, 3007 pass, 0 fail.\nchecks-run: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 3007 pass, 0 fail, 101 files; log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\nchanged-paths: the nine paths listed under `changed:`, all inside the ownership paths.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/change.diff`\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Optional findings closed with red-before tests (native read did not reproduce, regression test added); build 0, verify 3007 pass; review follows.",
+    "criteria": [
+      {
+        "criterion": "Gates: mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "`bunx --no-install mise run build` exit 0 with only the files above modified; `bunx --no-install mise run verify` exit 0, 3007 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 3007 pass, 0 fail, 101 files; log at `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the nine paths listed under `changed:`, all inside the ownership paths."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/change.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T20:58:51.400Z"
 }
