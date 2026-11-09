@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mw8r45wa-kf7z",
+  "intentId": "intent-0mw6ry92f-k0w1",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-installed-scope-branch-as-it",
+  "objective": "Review the installed-scope branch as it now stands (range 172bdf9..1991d0c in /home/user/holyagent-0.3.0-scope) against the maintainer's decision and the previous review's findings.",
+  "state": "Running",
+  "scope": [
+    "Maintainer's decision (binding): without --scope, an enabled holyagent@holyagent in .claude/settings.local.json makes both the Claude Code and the Pi steps local; otherwise both run at user. A committed .claude/settings.json that enables the plugin never moves either off user; setup and doctor print one line saying the repository enables HolyAgent and that --scope project targets it. An explicit --scope always wins.",
+    "Previous findings: a symlinked .claude made a bare run fail even for a user install (blocking); an explicit false at a higher scope was ignored; docs/components.md:64, docs/decisions.md:57, docs/pi/installation.md:59 and docs/usage.md:166 were stale; setup --undo without --scope could land on another scope after removing the enabling entry.",
+    "Review `git diff 172bdf9..1991d0c` and the code it touches; judge the decision's implementation on every path (setup, doctor, --undo, --fix, Pi steps), the tests, and the docs."
+  ],
+  "constraints": [
+    "Read-only: no edits, no git writes.",
+    "Testing is unit tests and fixtures only: never start pi, T3 Code or a Kimi request.",
+    "Mark each finding blocking or non-blocking with path:line and a concrete failure scenario.",
+    "Report in under 500 words; put long output in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Every blocking finding names path:line and a concrete failure scenario",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The review states for each previous finding whether it is closed, and whether the range is merge-ready",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings",
+    "verdict"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw8qq14e-no4k"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T04:18:38.170Z"
+  },
+  "createdAt": "2026-11-09T04:18:38.170Z"
+}
