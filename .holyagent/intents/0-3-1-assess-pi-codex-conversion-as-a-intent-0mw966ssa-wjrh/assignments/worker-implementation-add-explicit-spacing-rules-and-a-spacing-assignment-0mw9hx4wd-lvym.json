@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mw9hx4wd-lvym",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 19,
+  "roleTask": "Worker.implementation",
+  "slug": "add-explicit-spacing-rules-and-a-spacing",
+  "objective": "Add explicit spacing rules and a spacing check on captures to the GPT-6 instruction family, so GPT-built interfaces stop shipping cramped or misaligned padding and gaps, and list the family in docs/development.md.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-gpt6, branch release/0.3.1/feat/gpt-6-instructions; the family was added in the last commit (git show HEAD --stat).",
+    "Maintainer (verbatim), with a screenshot of a page a GPT model built: \"gpt models always mess up padding and spacing in some places like this\", then \"fix it\". The screenshot (/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/images/2.png, read it) shows: a card that sits flush against the heading's underline rule above it and the column divider beside it; no gap between the card's bottom and the section edge and rule below; card text starting further in than the heading above it, so the column has two left edges; and an em dash wrapped to the start of a line in the intro paragraph.",
+    "Add to packages/runtime/src/instructions/gpt-6/guide.md a spacing point citing this maintainer observation (and any GPT-6 source in /home/user/holyagent/.git/holyagent/reports/assignment-0mw97j4zi-5mk4.md that bears on it), and carry rules into the GPT-6 files that drive visual work: the worker-visual and reviewer-visual roles, the design core (gpt-6/design-core), and the root's visual-acceptance text (gpt-6/root and gpt-6/skills, wherever the visual-judging translation lives). Rules, stated as outcomes with the reason: one spacing scale used throughout; padding inside every container on all sides; a gap between every block and the rules, dividers, borders and section edges around it; the edges of a column's content share one line; no line begins with a dash or other closing punctuation. And a check: before visual work is reported done, the worker and reviewer measure padding and gaps on the final captures and name each place where content touches a rule, border or edge.",
+    "Keep the GPT-6 family's style (outcome paragraphs, host-neutral wording, <!-- O.. --> citations). Edit only the gpt-6 family; the requirements tree and other families stay as they are. If the repository's tests require that every family rule trace to the requirements tree, satisfy them the way the family already does (a guide-sourced addition), and say how in the report.",
+    "Add gpt-6 wherever docs/development.md lists the instruction families (the previous worker found lines 17-18, 82, 84, 163)."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Do not check out other commits in any checkout.",
+    "Report in under 300 words; list each file edited and quote the check sentence you added."
+  ],
+  "criteria": [
+    {
+      "text": "The GPT-6 guide carries a cited spacing point and the visual worker, visual reviewer, design core and root visual-acceptance text carry the spacing rules and the capture check",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Only the gpt-6 family and docs/development.md change",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build and mise run verify exit 0",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/gpt-6",
+    "docs/development.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9hdj9q-me5q",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-09T16:48:59.917Z"
+  },
+  "createdAt": "2026-11-09T16:48:59.917Z"
+}
