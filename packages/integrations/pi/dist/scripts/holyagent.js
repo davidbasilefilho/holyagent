@@ -10425,7 +10425,7 @@ var init_errors2 = __esm(() => {
     NothingToCommit: "Check the paths; commit only after the files changed.",
     StagedOutsideScope: "Unstage them with `git restore --staged <path>` or name them in the commit.",
     RemoteMismatch: "Set origin to the GitHub repository (`git remote add origin <url>`) and retry.",
-    DetachedHead: "Check out or create a branch with `git switch -c <name>`."
+    DetachedHead: "Check out a branch: in a cloud session, work in a git worktree (`git worktree add -b <name> <path>`), not the primary checkout; otherwise `git switch -c <name>`."
   };
 });
 
@@ -16867,12 +16867,14 @@ var REFLOG_MOVE, SAFE_BRANCH, safeBranch = (name) => SAFE_BRANCH.test(name) ? gi
 `);
   if (dirs?.length !== 2 || dirs[0] !== dirs[1])
     return;
-  const current = yield* gitMaybe(["symbolic-ref", "--short", "-q", "HEAD"]);
+  const current = (yield* gitMaybe(["symbolic-ref", "-q", "HEAD"]))?.replace(/^refs\/heads\//, "");
   const start = yield* startBranch;
   if (current !== undefined && (start === undefined || current === start))
     return;
-  const moved = current === undefined ? "is on a detached HEAD" : "moved off the branch it started on";
   const branch = yield* returnBranch(start);
+  if (current === branch)
+    return;
+  const moved = current === undefined ? "is on a detached HEAD" : "moved off the branch it started on";
   return `The primary checkout of this cloud session ${moved}, so the session panel shows its diff against the assigned branch as a stray change and offers a PR for it. Return it with \`git switch ${branch}\`, and do work and review checkouts in a git worktree.`;
 }).pipe(provide4(call.vcs)) : succeed6(undefined);
 var init_status = __esm(() => {

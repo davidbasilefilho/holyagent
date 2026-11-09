@@ -73,12 +73,17 @@ export const cloudCheckoutNotice = (
           "--git-common-dir",
         ]))?.split("\n")
         if (dirs?.length !== 2 || dirs[0] !== dirs[1]) return undefined
-        const current = yield* gitMaybe(["symbolic-ref", "--short", "-q", "HEAD"])
+        // Not `--short`: with a tag of the same name it prints `heads/<name>`.
+        const current = (yield* gitMaybe(["symbolic-ref", "-q", "HEAD"]))?.replace(
+          /^refs\/heads\//,
+          "",
+        )
         const start = yield* startBranch
         if (current !== undefined && (start === undefined || current === start)) return undefined
+        const branch = yield* returnBranch(start)
+        if (current === branch) return undefined
         const moved =
           current === undefined ? "is on a detached HEAD" : "moved off the branch it started on"
-        const branch = yield* returnBranch(start)
         return `The primary checkout of this cloud session ${moved}, so the session panel shows its diff against the assigned branch as a stray change and offers a PR for it. Return it with \`git switch ${branch}\`, and do work and review checkouts in a git worktree.`
       }).pipe(Effect.provide(call.vcs))
     : Effect.succeed(undefined)
