@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "find-why-the-windows-ci-test-starting",
   "objective": "Find why the Windows CI test 'starting the state in a large tree > six commands that start at once all succeed while the state worktree is still being checked out' fails at about 30 s, and make it reliable on Windows without weakening what it proves.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-statefix, branch release/0.3.1/test/state-start-timeout (cut from release/0.3.1/integration at bb412cc).",
     "Observed: on the Windows runner (push run of release/0.3.1/integration at bb412cc, job log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/winint.log around line 1753) the test failed after 29865 ms with no assertion output. The file sets setDefaultTimeout(60_000) on win32, so a ~30 s cutoff comes from somewhere else: an inner deadline in the test or its helpers, a child-process timeout, or a lock or wait timeout in the state-branch code (packages/runtime/tests/state-branch.test.ts:1323; packages/runtime/tests/fixtures.ts has PROCESS_TIMEOUT_MS, 120 s on win32). The same test passed on the previous push (dc53c48). Six cold CLI starts at once on Windows are slow (each unbundled start loads ~660 files).",
@@ -58,7 +58,41 @@
     "agentId": "workflow:wf_2628034d-c94/assignment-0mw9m7rhx-8sde",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T18:49:14.229Z"
+    "startedAt": "2026-11-09T18:49:14.229Z",
+    "finishedAt": "2026-11-09T18:55:36.088Z"
+  },
+  "result": "result: The ~30 s failure was the `afterEach(cleanup)` hook timing out at Bun's 5 s hook default. It was not a test deadline, a child-process timeout or a product timeout. I fixed it in the test file; the Windows CI run has not been re-run.\n\n**Root cause:** `packages/runtime/tests/state-branch.test.ts:27` registered `afterEach(cleanup)` before `setDefaultTimeout(60_000)` at line 32.\nBun reads a hook's default timeout when the hook is registered, so the hook kept the 5 s default.\nThe test body ran about 25 s on Windows (six in-process `holy` runs on a 3000-file tree), and removing the scratch trees then ran past 5 s. 25 s plus 5 s gives the observed 29865 ms and \"a beforeEach/afterEach hook timed out for this test\".\nThe test's own 120 s timeout never applied. The log supports this timing: the previous test ended at 18:25:34.35 and this one failed at 18:26:04.22.\nI reproduced the hook behavior with Bun 1.4.4 in the scratchpad (`h3.test.ts`, `h4.test.ts` under `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/exp`).\n  - Hook registered before `setDefaultTimeout(60_000)`: fails at 2 s test plus 5 s hook (7.01 s) with the same message.\n  - Registered after: passes.\nThe previous push passed (dc53c48) only because that cleanup happened to finish within 5 s.\n\n**Fix:** In `state-branch.test.ts`, I moved the `setDefaultTimeout` block above the hook and replaced `afterEach(cleanup)` with `afterEach(removeScratch, PROCESS_TIMEOUT_MS + 5_000)`.\n`removeScratch` races `cleanup()` against a `PROCESS_TIMEOUT_MS` timer (120 s on Windows, 30 s elsewhere).\nIf it expires, it throws \"removing the scratch directories took longer than N ms\", so the failure names what was slow.\nIt is the only change; the test's assertions and its 120 s timeout are untouched. No product code changed. The 30 s `short` lock limit in `lock.ts` is unrelated.\nI did not run a red-then-green test on the seam: the defect is in Bun's hook registration order, so the scratchpad reproduction stands in for it. I did not run the timeout message itself.\n\n**Wider note:** Ten other test files use `afterEach(cleanup)` with the default 5 s hook (for example `state-mode.test.ts`, `vcs.test.ts`). They only matter if a cleanup there grows large; I left them alone.\n\nI edited the file with a Python script and `sed` instead of Edit and Write, so the import order is slightly irregular. `fmt:check` passes.\n\nchanged: /home/user/holyagent-0.3.1-statefix/packages/runtime/tests/state-branch.test.ts\n\nchecks:\n`bunx --no-install mise run build` -> exit 0; the tree has only the one modified file afterwards.\n`bunx --no-install mise run verify` -> exit 0; type-check has no errors in 251 files, lint has no problems in 252 files, 664 files are formatted, tests 2800 pass and 0 fail across 93 files.\n\nblockers: none\nquestions: none\n\nevidence:\nThe root cause of the ~30 s failure is identified with file and line: `packages/runtime/tests/state-branch.test.ts:27` (`afterEach(cleanup)` registered before `setDefaultTimeout` at line 32, so the hook kept the 5 s default); reproduced in the scratchpad `h3.test.ts` and `h4.test.ts`.\nThe fix keeps the test's assertions and makes a timeout name what it waited for: the `removeScratch` hook in `state-branch.test.ts` throws \"removing the scratch directories took longer than N ms\"; the test body is unchanged.\nmise run build and mise run verify exit 0: build exit 0; verify exit 0 with 2800 pass and 0 fail.\nchecks-run: `mise run build` exit 0; `mise run verify` exit 0 (2800 pass, 0 fail).\nchanged-paths: `packages/runtime/tests/state-branch.test.ts`\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/statefix.diff`\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "Root cause: afterEach registered before setDefaultTimeout keeps 5 s hook default (state-branch.test.ts:27), reproduced in scratch; hook now bounded by PROCESS_TIMEOUT_MS with a named message; verify exit 0.",
+    "criteria": [
+      {
+        "criterion": "The root cause of the ~30 s failure is identified with file and line",
+        "support": "`packages/runtime/tests/state-branch.test.ts:27` (`afterEach(cleanup)` registered before `setDefaultTimeout` at line 32, so the hook kept the 5 s default); reproduced in the scratchpad `h3.test.ts` and `h4.test.ts`."
+      },
+      {
+        "criterion": "The fix keeps the test's assertions and makes a timeout name what it waited for",
+        "support": "the `removeScratch` hook in `state-branch.test.ts` throws \"removing the scratch directories took longer than N ms\"; the test body is unchanged."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build exit 0; verify exit 0 with 2800 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run build` exit 0; `mise run verify` exit 0 (2800 pass, 0 fail)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "`packages/runtime/tests/state-branch.test.ts`"
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/statefix.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T18:49:14.229Z"
 }
