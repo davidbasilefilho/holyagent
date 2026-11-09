@@ -121,7 +121,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-NOASK": {
       section: "root/asking.md",
-      phrase: "A question is unnecessary when its answer would not change what you do",
+      phrase: "Your own judgement decides first and the user is the fallback",
     },
     "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
     "R-MERGEWAIT": {
@@ -332,7 +332,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-NOASK": {
       section: "root/asking.md",
-      phrase: "A question is unnecessary when its answer would not change what you do",
+      phrase: "Your own judgement decides first and the user is the fallback",
     },
     "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
     "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
