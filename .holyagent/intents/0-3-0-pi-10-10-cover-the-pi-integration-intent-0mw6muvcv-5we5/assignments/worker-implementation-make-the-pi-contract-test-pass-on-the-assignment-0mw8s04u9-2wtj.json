@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-pi-contract-test-pass-on-the",
   "objective": "Make the Pi contract test pass on the Windows launch branch after the merge 7f387aa, where it still stubs the old sh wrapper launch.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.0-win, branch release/0.3.0/fix/pi-windows-launch, head 7f387aa (a merge of the T3 settings branch, which carries packages/integrations/pi/tests/contract.test.ts, into the Windows launch branch; committed).",
     "bunx --no-install mise run verify fails 3 tests in packages/integrations/pi/tests/contract.test.ts (lines 216, 231, 254, the extension-events block): Expected to contain: status / Received: [] and Expected: holyagent-context / Received: holyagent-notice. The contract test was written before this branch changed the extension to find Bun (PATH, BUN_INSTALL, ~/.bun/bin) and run it on scripts/holyagent.js with the shared Bun flags instead of sh scripts/holyagent, so its stub Pi exec and environment most likely no longer match the launch. Confirm the cause from the failure, then update the contract test stub the way packages/integrations/pi/tests/extension.test.ts stubs the new launch (its BUN_SEARCH or machine helpers, or the exported helpers), so the fixtures again exercise the same handlers and assertions. Keep every assertion; change only how the test stands up the extension.",
@@ -53,7 +53,41 @@
     "agentId": "workflow:wf_00cf149b-573/assignment-0mw8s04u9-2wtj",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T04:43:29.794Z"
+    "startedAt": "2026-11-09T04:43:29.794Z",
+    "finishedAt": "2026-11-09T04:46:38.822Z"
+  },
+  "result": "result: Cause confirmed as the stub, not an extension behavior change. The contract test stub answered only `sh <wrapper> <flag> …`, while the extension now starts the found Bun directly. Every holyagent call got `{code:2}`, so `ran` stayed empty. I updated only how the test stands up the extension.\n\nchanged:\n- /home/user/holyagent-0.3.0-win/packages/integrations/pi/tests/contract.test.ts\n\nWhat changed in that file:\n- The `WRAPPER` constant and its `toPosix` import are gone.\n- I added `RUNTIME = runtimeArgs(PACKAGE_ROOT)`, `BUN = \"/stub/bin/bun\"` and a `BUN_SEARCH` stub, the same shapes extension.test.ts uses.\n- The stub now matches `command === BUN`, `args[0] === \"--no-env-file\"` and `args[RUNTIME.length] === PI_PROJECT_FLAG`, and reads the subcommand at `RUNTIME.length + 2`.\n- `createExtension` is passed `bunSearch: BUN_SEARCH`.\n\nI changed no assertions, no fixtures and nothing in the extension.\n\nchecks:\n- `bun install --frozen-lockfile` -> exit 0, no changes.\n- `bun test packages/integrations/pi/tests/contract.test.ts` -> 20 pass, 0 fail.\n- `bunx --no-install mise run build` -> exit 0, `git status` shows only the contract test modified.\n- `bunx --no-install mise run verify` -> exit 0, 2438 pass, 0 fail across 79 files. Its first run failed the format check on my edit. I ran `mise exec -- bun fmt` on that one file and reran build and verify, which gave the results above.\n- Logs: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n\nblockers: none\nquestions: none\nnotes: I made the edit with a one-off script rather than Edit. The result is the same diff.\n\nevidence:\nThe three contract tests pass with their assertions unchanged: contract.test.ts passes 20 of 20 and the full verify run has 0 failures. The diff touches only the stub and imports, no assertions.\nOnly the test harness of contract.test.ts changes: the diff touches only the imports, the Bun constants and the stub's `answer` and `createExtension` call, in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/contract-fix.diff.\nmise run build leaves no unexplained changes and mise run verify exits 0: build exit 0 with only the contract test modified, verify exit 0 with 2438 pass and 0 fail.\nchecks-run: `bun install --frozen-lockfile` (0), `bun test` on the contract test (20 pass), `mise run build` (0), `mise run verify` (0, 2438 pass).\nchanged-paths: packages/integrations/pi/tests/contract.test.ts\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/contract-fix.diff\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Stub cause confirmed; harness-only change; verify exit 0 with 2438 tests",
+    "criteria": [
+      {
+        "criterion": "The three contract tests pass with their assertions unchanged",
+        "support": "contract.test.ts passes 20 of 20 and the full verify run has 0 failures. The diff touches only the stub and imports, no assertions."
+      },
+      {
+        "criterion": "Only the test harness of contract.test.ts changes",
+        "support": "the diff touches only the imports, the Bun constants and the stub's `answer` and `createExtension` call, in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/contract-fix.diff."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify exits 0",
+        "support": "build exit 0 with only the contract test modified, verify exit 0 with 2438 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun install --frozen-lockfile` (0), `bun test` on the contract test (20 pass), `mise run build` (0), `mise run verify` (0, 2438 pass)."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/pi/tests/contract.test.ts"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/contract-fix.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T04:43:29.794Z"
 }
