@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "widen-the-pi-tests-temporary-folder",
   "objective": "Widen the Pi tests' temporary-folder removal retry budget and tighten its test bound, the two non-blocking review findings on the Windows cleanup fix.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-rmfix, branch release/0.3.1/test/windows-temp-cleanup; the helper is packages/integrations/pi/tests/temp-folder.ts, its test temp-folder.test.ts (git show HEAD).",
     "Finding 1: the retry budget is about 0.9 s (10 attempts x 100 ms); a slow Windows runner can hold a folder longer. Raise it to a few seconds total (for example 20 attempts with a delay that grows, capped), keeping it bounded and keeping the injectable remover and delay so tests stay fast.",
@@ -54,7 +54,41 @@
     "agentId": "workflow:wf_86c3c820-448/assignment-0mw9it6no-e9pm",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T17:13:55.188Z"
+    "startedAt": "2026-11-09T17:13:55.188Z",
+    "finishedAt": "2026-11-09T17:22:55.630Z"
+  },
+  "result": "result: Retry budget raised to 20 attempts with growing, capped delay; the test now asserts the exact attempt count.\nchanged: packages/integrations/pi/tests/temp-folder.ts, packages/integrations/pi/tests/temp-folder.test.ts\nchecks: `bun install --frozen-lockfile` -> 0 (no changes); `bunx --no-install mise run build` -> 0, tree has only the two edits; `bunx --no-install mise run verify` -> 0, 2706 tests across 88 files. A first verify run failed the format check on the helper; I ran `bun fmt` on that file and re-ran both gates.\nblockers: none\nquestions: none\nnotes: Delay is `retryDelayMs * min(attempt, 5)`, so the default 50 ms base waits 50, 100, 150, 200, then 250 ms per retry. Over 19 retries that is about 4.3 s. Tests pass base 1 ms and stay fast. `MAX_ATTEMPTS` is now exported with JSDoc.\nevidence:\nThe retry budget totals a few seconds and stays bounded: packages/integrations/pi/tests/temp-folder.ts, `MAX_ATTEMPTS = 20`, delay capped at 5 steps of 50 ms, about 4.3 s total.\nThe test asserts the exact attempt count: temp-folder.test.ts \"gives up\" test uses `expect(calls).toHaveLength(MAX_ATTEMPTS)`.\nmise run build and mise run verify exit 0: build=0, verify=0, 2706 tests pass.\nchecks-run: see checks above; logs at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log and /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log.\nchanged-paths: the two files listed under changed.\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rmfix.diff\n",
+  "acceptance": {
+    "revision": 19,
+    "rationale": "20 attempts with capped growing delay (~4.3 s), exact attempt count asserted; build and verify exit 0.",
+    "criteria": [
+      {
+        "criterion": "The retry budget totals a few seconds and stays bounded",
+        "support": "packages/integrations/pi/tests/temp-folder.ts, `MAX_ATTEMPTS = 20`, delay capped at 5 steps of 50 ms, about 4.3 s total."
+      },
+      {
+        "criterion": "The test asserts the exact attempt count",
+        "support": "temp-folder.test.ts \"gives up\" test uses `expect(calls).toHaveLength(MAX_ATTEMPTS)`."
+      },
+      {
+        "criterion": "mise run build and mise run verify exit 0",
+        "support": "build=0, verify=0, 2706 tests pass."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see checks above; logs at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log and /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the two files listed under changed."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rmfix.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-09T17:13:55.188Z"
 }
