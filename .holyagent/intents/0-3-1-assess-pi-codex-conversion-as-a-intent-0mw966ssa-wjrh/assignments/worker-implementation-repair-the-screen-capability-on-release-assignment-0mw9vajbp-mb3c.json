@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-screen-capability-on-release",
   "objective": "Repair the screen capability on release/0.3.1/feat/screen from its code, security and audit reviews, and build its headless form on a pinned Playwright MCP server.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-screen, branch release/0.3.1/feat/screen, head c6a2ac71 (the committed screen capability plus merges of fff and the integration branch). The original work is described in the report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9trshx-cnhq.md; the review reports are /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0jpx-7whl.md (code), /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0k14-hk7i.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9v0kb6-ydwu.md (audit). Read them first.",
     "Intent requirements quoted: capabilities have headless and normal forms; the screen capability uses a headless Playwright Chromium in a cloud or CI session and the paired real browser and desktop computer use on a desktop; setup and doctor detect the system and pick the form, and a capability whose needs are missing is reported, not silently dropped. Computer use is a screen capability an Assignment carries, granting pi-computer-use, browser use (opencode browse) and the in-app browser (T3 preview tools where T3 hosts the session), routed to GPT-6.1 Terra at least medium. Every third-party package sits at an exact pin moved only by mise run deps:update. New default: the headless form registers the Playwright MCP server (@playwright/mcp) at an exact pin in pi-packages.json that deps:update moves, launched headless and isolated through npx with the public npm registry passed explicitly, using the Chromium the environment provides (its executable path when one is preinstalled, such as /opt/pw-browsers/chromium); the normal form keeps @opencode/browse with a paired real browser plus pi-computer-use. Specialist agent files list only the screen tools of the form in use, and a headless specialist is told it has a headless browser and no desktop.",
@@ -94,7 +94,69 @@
     "agentId": "workflow:wf_6680a37c-e76/assignment-0mw9vajbp-mb3c",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T23:03:20.149Z"
+    "startedAt": "2026-11-09T23:03:20.149Z",
+    "finishedAt": "2026-11-09T23:35:20.680Z"
+  },
+  "result": "result: Repaired the screen capability from the code, security and audit reviews. The headless form now registers `@playwright/mcp` at an exact pin. `mise run build` is idempotent and `mise run verify` exits 0. No browser, Pi, T3 or Kimi was started.\n\nchanged (all in `/home/user/holyagent-0.3.1-screen`):\n- Runtime source:\n  - `packages/runtime/src/config/{capabilities.ts,pi-packages.json}`\n  - `src/domain/{route,directive}.ts`\n  - `src/cli/{assignment,config,report}.ts`\n  - `src/pi/tools.ts`\n  - `src/setup/{browse,browser-use,pi-check}.ts`\n  - new `src/setup/chromium.ts`\n- Pi and Claude sources: `packages/integrations/pi/src/{agents,codex,extension,screen,specialists}.ts` and `packages/integrations/claude/src/agents.ts`.\n- Generated output under `packages/integrations/{claude,pi}/dist`: 36 new `*-headless-screen.md` agent files, plus the changed `*-screen.md` files and bundles.\n- Tests: 14 existing test files updated and new `packages/runtime/tests/setup-chromium.test.ts`.\n- Docs: `docs/pi/{screen,configuration,providers}.md`, `docs/development.md`, `docs/usage.md`.\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0, and a second run changed nothing.\n- `bunx --no-install mise run verify` -> exit 0. Type-check, lint and format are clean; 3262 pass, 0 fail across 106 test files. Log: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log`.\n- Mutation check: replacing the `AgentMismatch` condition in `recordLaunch` with `false` makes 2 tests in `screen.test.ts` fail. I restored it.\n- `mise run deps:check` -> exit 1 on 5 pins. `@playwright/mcp` is not flagged. The other four are the Pi packages `billion-context`, `@amaster.ai/pi-computer-use` and `@opencode/browse` (0.0.15 vs 0.0.16), the vendored `fd` and the `jdx/mise-action` pin. `deps:update` would fix them but was out of scope.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- **Pin.** `@playwright/mcp` 0.0.85 was the npm `latest`. Launch is `--headless --isolated --browser chromium` plus `--executable-path <chromium>` when one is found, such as `/opt/pw-browsers/chromium`. I read the flags from its README.\n- **New agent files.** The headless form needs its own agent files, because Pi reads a specialist's tools only from the agent file and the form is a machine property. Each specialist now has three files: plain, `-screen` and `-headless-screen`.\n- **Unrequested additions of the original work, kept as asked.**\n  - The 36 `-screen` agent files (now 72 with the headless variants).\n  - `SpecialistEntry.screen` plus the screen-capability stage in warm-reuse selection (`directive.ts`).\n  - The Claude-host refusal of screen dispatch.\n  - T3 preview tools granted without a host check, now fixed.\n- **Other additions of mine.**\n  - A notice to a screen specialist when no MCP server was registered.\n  - `Effect.try` in `findChromium` for the directory listing.\n- **Doctor and setup** now spawn `node --version` once more per capability for the Node need.\n- **Unconfirmed.**\n  - `npx` could still prefer a project-local `node_modules` copy over the registry. The registry flags only fix where a download comes from.\n  - I did not test `--browser chromium` with `--executable-path` against a real launch.\n\nevidence:\nThe headless form registers @playwright/mcp at an exact pin in pi-packages.json, launched headless and isolated, with the preinstalled Chromium path when present; deps:check does not flag that pin; setup and doctor pick the headless form in a cloud or CI session, with tests: `pi-packages.json` has `\"@playwright/mcp\": \"0.0.85\"`. Tests: `capabilities.test.ts` (server args, `--headless --isolated`, `chromiumFlag`), `setup-chromium.test.ts` (6), `extension.test.ts` (\"headless screen specialist registers ... with the machine's Chromium\"), `setup-browse.test.ts` (doctor and setup headless form), `screen.test.ts` (dispatch under `CI=1` and `CLAUDE_CODE_REMOTE` picks the headless agent). `deps:check` exit 1 lists no `@playwright/mcp` line.\nEvery npx launch of a screen MCP server passes the public npm registry explicitly, so a project .npmrc cannot redirect the package source, with a test: `npxServerArgs` in `capabilities.ts` puts `--registry=https://registry.npmjs.org/` and `--@scope:registry=...` before `-y`. Test: `capabilities.test.ts` \"every npx launch of a screen MCP server passes the public registry\".\nIn the headless form, specialist screen agent files list only the headless browser tools and no computer-use or browse tools, and the specialist instructions say it has a headless browser and no desktop, with tests: `pi.test.ts` \"a headless screen specialist lists the headless browser's tools ... and its prompt says it has no desktop\" covers all 18 roles, including the visual ones. `screen.test.ts` covers the brief line (`HEADLESS_SCREEN_LINE`) and `tools.test.ts` covers `toolArgs(form: \"headless\")`.\nT3 preview tools are granted only when T3 hosts the session, with a test: `refuseT3PreviewOutsideT3` in `screen.ts`, wired into the `tool_call` gate in `extension.ts`. Tests: `extension.test.ts` \"T3's preview tools for a screen specialist\" and `screen.test.ts` \"T3's preview tools\".\nSetup and doctor report browse not installed separately from installed but not paired, using what the package exposes; an unreadable browser tokens file gives a doctor line instead of failing the setup step; the browse need checks node at least 22.19; with tests: `browse.ts` scans browser profiles for the extension ids (as browse's own setup does). The three states, the FAIL line for an unreadable pairing file and the node 22.19 check are tested in `setup-browse.test.ts`. The unreadable file is simulated with a NUL-byte path, since chmod does not bind root.\nWhen MCP is off, the screen MCP servers are not registered and setup or doctor says so, with a test: `screenServers` returns none while `pi.features.mcp` is off, and `toolArgs` grants no `mcp__` tool. Tests: `setup-browse.test.ts` (doctor and setup lines), `extension.test.ts` (none registered, specialist told), `tools.test.ts`, `screen.test.ts`.\nThe AgentMismatch test fails if the check that refuses a screen Assignment on a non-screen agent is removed: `screen.test.ts` \"recording the launch of a screen Assignment\" (3 tests). The mutation check above made 2 of them fail.\ndocs/pi/screen.md describes both forms, the pins and the reported states: rewritten, with sections \"The MCP servers and their pins\", \"Forms\" and \"Reported states\". The headless server's tool names are listed there too.\nmise run build leaves the tree unchanged and mise run verify passes: build twice gave the same `git status` hash; verify exit 0, 3262 pass, 0 fail.\nThe report names the unrequested additions of the original work (the specialist registry and warm-reuse split by screen) without removing them: see the notes above; nothing was removed.\nchecks-run: see checks above.\nchanged-paths: see changed above.\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-repair.diff`\n",
+  "acceptance": {
+    "revision": 21,
+    "rationale": "Build idempotent, verify 3262 pass, mutation check shown; each criterion has tests",
+    "criteria": [
+      {
+        "criterion": "The headless form registers @playwright/mcp at an exact pin in pi-packages.json, launched headless and isolated, with the preinstalled Chromium path when present; deps:check does not flag that pin; setup and doctor pick the headless form in a cloud or CI session, with tests",
+        "support": "`pi-packages.json` has `\"@playwright/mcp\": \"0.0.85\"`. Tests: `capabilities.test.ts` (server args, `--headless --isolated`, `chromiumFlag`), `setup-chromium.test.ts` (6), `extension.test.ts` (\"headless screen specialist registers ... with the machine's Chromium\"), `setup-browse.test.ts` (doctor and setup headless form), `screen.test.ts` (dispatch under `CI=1` and `CLAUDE_CODE_REMOTE` picks the headless agent). `deps:check` exit 1 lists no `@playwright/mcp` line."
+      },
+      {
+        "criterion": "Every npx launch of a screen MCP server passes the public npm registry explicitly, so a project .npmrc cannot redirect the package source, with a test",
+        "support": "`npxServerArgs` in `capabilities.ts` puts `--registry=https://registry.npmjs.org/` and `--@scope:registry=...` before `-y`. Test: `capabilities.test.ts` \"every npx launch of a screen MCP server passes the public registry\"."
+      },
+      {
+        "criterion": "In the headless form, specialist screen agent files list only the headless browser tools and no computer-use or browse tools, and the specialist instructions say it has a headless browser and no desktop, with tests",
+        "support": "`pi.test.ts` \"a headless screen specialist lists the headless browser's tools ... and its prompt says it has no desktop\" covers all 18 roles, including the visual ones. `screen.test.ts` covers the brief line (`HEADLESS_SCREEN_LINE`) and `tools.test.ts` covers `toolArgs(form: \"headless\")`."
+      },
+      {
+        "criterion": "T3 preview tools are granted only when T3 hosts the session, with a test",
+        "support": "`refuseT3PreviewOutsideT3` in `screen.ts`, wired into the `tool_call` gate in `extension.ts`. Tests: `extension.test.ts` \"T3's preview tools for a screen specialist\" and `screen.test.ts` \"T3's preview tools\"."
+      },
+      {
+        "criterion": "Setup and doctor report browse not installed separately from installed but not paired, using what the package exposes; an unreadable browser tokens file gives a doctor line instead of failing the setup step; the browse need checks node at least 22.19; with tests",
+        "support": "`browse.ts` scans browser profiles for the extension ids (as browse's own setup does). The three states, the FAIL line for an unreadable pairing file and the node 22.19 check are tested in `setup-browse.test.ts`. The unreadable file is simulated with a NUL-byte path, since chmod does not bind root."
+      },
+      {
+        "criterion": "When MCP is off, the screen MCP servers are not registered and setup or doctor says so, with a test",
+        "support": "`screenServers` returns none while `pi.features.mcp` is off, and `toolArgs` grants no `mcp__` tool. Tests: `setup-browse.test.ts` (doctor and setup lines), `extension.test.ts` (none registered, specialist told), `tools.test.ts`, `screen.test.ts`."
+      },
+      {
+        "criterion": "The AgentMismatch test fails if the check that refuses a screen Assignment on a non-screen agent is removed",
+        "support": "`screen.test.ts` \"recording the launch of a screen Assignment\" (3 tests). The mutation check above made 2 of them fail."
+      },
+      {
+        "criterion": "docs/pi/screen.md describes both forms, the pins and the reported states",
+        "support": "rewritten, with sections \"The MCP servers and their pins\", \"Forms\" and \"Reported states\". The headless server's tool names are listed there too."
+      },
+      {
+        "criterion": "mise run build leaves the tree unchanged and mise run verify passes",
+        "support": "build twice gave the same `git status` hash; verify exit 0, 3262 pass, 0 fail."
+      },
+      {
+        "criterion": "The report names the unrequested additions of the original work (the specialist registry and warm-reuse split by screen) without removing them",
+        "support": "see the notes above; nothing was removed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see checks above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "see changed above."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/screen-repair.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-09T23:03:20.149Z"
 }
