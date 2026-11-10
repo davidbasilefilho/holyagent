@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwami7ix-2xtw",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commit-cb82345-browser-use-as-the",
+  "objective": "Assess commit cb82345 (browser-use as the headless screen server) for security vulnerabilities.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-browser-use, branch release/0.3.2/feat/browser-use. The change is commit cb82345 (review `git diff becf69e cb82345`; the full diff is also at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/browser-use-change.diff). Head b0ba7eb1 only adds a clean merge of the integration branch (a test-file change in bash-atomics).",
+    "Requirement: the screen capability's headless form runs `uvx --no-config --default-index https://pypi.org/simple --from browser-use==1.0.0 browser-use --cli-mcp` against a headless Chromium that HolyAgent launches (new `holyagent browser-server` CLI command registered as the Pi MCP server, packages/runtime/src/pi/browser-launch.ts, packages/runtime/src/cli/browser-server.ts) with --remote-debugging-port on a free 127.0.0.1 port and a fresh temporary profile; BU_CDP_URL, ANONYMIZED_TELEMETRY=0 and temporary state dirs in the server env; cleanup of Chromium and temp dirs on server exit, Chromium exit, signals and failed start; specialists get only mcp__browser_use__browser_exec and mcp__browser_use__browser_screenshot (browser_login off, root excluded); a PyPI pin table (packages/runtime/src/config/pypi-packages.json) moved by deps:update/deps:check via the PyPI JSON API skipping prereleases and yanked releases (scripts/dependency-pins.ts, scripts/update-dependencies.ts); @playwright/mcp removed; the normal form (opencode browse plus pi-computer-use) unchanged; each capability can be turned off.",
+    "Writer's own notes to weigh: HOLYAGENT_CHROMIUM_PATH replaces PLAYWRIGHT_MCP_EXECUTABLE_PATH; a SIGKILLed session leaves Chromium and its temp dir behind; UV_INDEX / UV_FIND_LINKS and similar env vars from the person's environment are not scrubbed (only uv config files via --no-config); --no-sandbox is added only when running as root.",
+    "Trace in particular: the new browser-server CLI command (can its inputs make it run another program?), the DevTools port (bound to 127.0.0.1 only; can another local user or a page reach it?), --no-sandbox, what environment reaches the uvx child (secrets, UV_* redirection of the package source), the PyPI updater's trust in the JSON API response, temp directory creation and removal (symlink or race issues), and whether browser_login or other browser-use tools can reach specialists or the root. Read the diff file above; you have no shell."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-browser-use; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi, uvx, browser-use or a live Chromium, and make no live Kimi, Codex or OpenAI request; unit tests only.",
+    "Report blocking findings with file:line and a concrete failure scenario; mark each finding blocking or non-blocking. Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "No validated vulnerability introduced by the change remains unreported, each finding traced from source to sink",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwalrxst-09n9"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T11:45:07.738Z"
+  },
+  "createdAt": "2026-11-10T11:45:07.738Z"
+}
