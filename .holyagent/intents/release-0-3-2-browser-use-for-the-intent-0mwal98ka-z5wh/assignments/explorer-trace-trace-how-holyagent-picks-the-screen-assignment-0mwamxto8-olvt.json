@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mwamxto8-olvt",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Explorer.trace",
+  "slug": "trace-how-holyagent-picks-the-screen",
+  "objective": "Trace how HolyAgent picks the screen capability's form (normal, headless) and how it detects and grants T3 Code's browser preview tools, to tell whether a session inside T3 Code can get the headless browser server instead of, or beside, the T3 browser.",
+  "state": "Running",
+  "scope": [
+    "Read in /home/user/holyagent-0.3.2-fff (stable tree; its headless form still names the Playwright MCP server, which the browser-use branch replaces one for one) and, for the browser-use registration only, /home/user/holyagent-0.3.2-browser-use/packages/integrations/pi/src/screen.ts and packages/runtime/src/config/capabilities.ts (that tree is being edited; read, do not rely on line numbers).",
+    "Answer: 1. Where and how the form is chosen (setup time or session time; signals such as display, CI, cloud, a config key). 2. How T3 Code is detected (env vars, host flag) and which tools a screen specialist gets in T3 (T3 preview and HTML render tools; refuseT3PreviewOutsideT3 in screen.ts). 3. In a T3 Code session, can the headless server be registered and granted to screen specialists, together with or instead of the T3 tools? Give the code path with file:line. 4. Any existing doc (docs/pi/screen.md, docs on T3) describing the T3 browser and how its preview tools reach it (an MCP server, an API, CDP)."
+  ],
+  "constraints": [
+    "Read only; make no edits and no git writes.",
+    "Report in under 400 words, with file:line for each claim."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the four questions is answered with file:line evidence or marked not found",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-10T11:57:16.280Z"
+  },
+  "createdAt": "2026-11-10T11:57:16.280Z"
+}
