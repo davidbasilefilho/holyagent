@@ -12898,7 +12898,7 @@ var init_dist2 = __esm(() => {
   NUMERIC_LIKE_PATTERN = /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i;
 });
 
-var version = "0.3.1";
+var version = "0.3.2";
 var init_package = () => {};
 
 var SpecialistEntry, union2 = (a, b) => [
