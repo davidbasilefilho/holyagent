@@ -35,6 +35,7 @@
     "Default (root judgement, 2026-11-10, revisitable; from the auto-review security review): auto-review is a security control that repository content and the model cannot weaken. A project-level .holyagent/config.json cannot turn auto-review off or replace or extend its policy (only the user's own config can), a malformed config keeps it on, its settings are fixed for the session, and it applies whenever the active model is served by the Codex provider. Inside the project root, writes to .git, .holyagent and the agent configuration folders (.pi, .codex, .claude) are reviewed, as Codex's sandbox keeps them read-only; paths are normalized as Pi's tools do (a leading @, ~, file:// URLs) and resolved through existing links before the root check. A tool that is neither known read-only nor annotated read-only is reviewed. Commands with brace expansion, and programs or flags that run other programs or write files, are outside the safe set."
   ],
   "revision": 22,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "0.3.1 released as holyagent-0.3.1 (PR #111); the parked atomics test fix moves to 0.3.2",
   "createdAt": "2026-11-09T11:20:35.387Z"
 }
