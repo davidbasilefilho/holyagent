@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwa30955-ouwl",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 22,
+  "roleTask": "Reviewer.code",
+  "slug": "confirm-the-cleanup-of-the-js-exec-fix",
+  "objective": "Confirm the cleanup of the js-exec fix closes the review's optional items without weakening the tests.",
+  "state": "Running",
+  "scope": [
+    "Cleanup commit on release/0.3.1/fix/js-exec-fallback in /home/user/holyagent-0.3.1-jsexec (range 9c916dd4..HEAD); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/jsexec-polish-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mwa2uwg9-04ju.md; previous review /home/user/holyagent/.git/holyagent/reports/assignment-0mwa2oc1c-pga3.md."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Work only inside /home/user/holyagent-0.3.1-jsexec; never check out a branch or commit in any other checkout.",
+    "Run bun test packages/runtime/tests/pi/bash-atomics.test.ts and bunx --no-install mise run verify in the worktree (after bun install --frozen-lockfile); give exit codes and counts.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "The cleanup keeps the tests meaningful and portable to Windows, and introduces no regression",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwa2uwg9-04ju"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T02:39:17.322Z"
+  },
+  "createdAt": "2026-11-10T02:39:17.322Z"
+}
