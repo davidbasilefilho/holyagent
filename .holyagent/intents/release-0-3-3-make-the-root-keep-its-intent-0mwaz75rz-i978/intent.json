@@ -1,0 +1,15 @@
+{
+  "id": "intent-0mwaz75rz-i978",
+  "slug": "release-0-3-3-make-the-root-keep-its",
+  "objective": "Release 0.3.3: make the root keep its Intents and Assignments handoff-ready, so another agent or host can continue the work from the state branch alone.",
+  "requirements": [
+    "Maintainer (verbatim, 2026-11-10): \"I want you to keep an agent in charge of doing intents and docs and send the stuff to them, so it keeps up-to-date. I expect my weekly limits to end soon I after the 13th I won't have my claude sub anymore and I'll use other agents. that agent can check out other branches and prs readonly. in fact should this be a root directive? have you been keeping everything up-to-date sufficiently? intents, assignments need to be detailed to continue work elsewhere\"",
+    "Maintainer decision (2026-11-10, chosen over a new scribe specialist role and over a this-session-only fix): a root directive in every model family's root instructions (claude-5.5, gpt-6, kimi-k3.1, via the requirements tree, the family translations and the coverage table). Under it: (1) in the branch state mode the root pushes holyagent/state after each Assignment close and each merge, and before it ends a turn, not only together with work-branch pushes; (2) the Intent in use carries a status-and-open-items requirement, updated at every merge, at every new blocker and before the final report, listing what merged (PR links), what is open (PRs and their CI state), the next concrete step, non-blocking residuals, and what was never tried against the real services, detailed enough that an agent with no session context continues from it; (3) a holyagent CLI command prints a self-contained handoff summary from the state alone (open Intents with requirements, their Assignments with state, objective and outcome, the recorded branches and PRs, and the open items), for another agent or host to read first.",
+    "The handoff reader may be a different host or model (for example Pi with Kimi or GPT), so the summary and the instruction text name no Claude-only tool.",
+    "Release 0.3.3 follows the repository's release-branch model: release/0.3.3/integration cut from main after the 0.3.2 release merges, the first PR carries mise run bump:patch as its own commit, only the integration branch opens the PR into main. Target: merged before 2026-11-13.",
+    "Testing rules carried: never run pi; never make live Kimi, Codex or OpenAI requests; unit tests and fixtures only. Standing authority: squash-merge reviewed green PRs, including the release PR into main; continue until mergeable or blocked."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-10T17:40:27.263Z"
+}
