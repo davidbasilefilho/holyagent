@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-optional-review-notes-on-the",
   "objective": "Close the optional review notes on the fff follow-links change: the missing tests and one doc clause.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-fff (branch release/0.3.2/feat/fff-follow-links, head 631dd560, which merges the 0.3.2 integration branch). The change under repair is commit b7bc4f2: setup no longer writes followSymlinks: false; a recorded followSymlinks: false (FFF_RETIRED_SETTINGS appended to REVERTABLE in packages/runtime/src/setup/pi-settings.ts) is removed only when the record names it and it still equals false.",
     "Add tests in packages/runtime/tests/setup-pi-settings.test.ts (or where the neighbouring cases live) for: (a) the recorded retired key is removed when the fff capability is turned off; (b) it is removed when pi.enable is off; (c) --dry-run reports the removal but writes nothing; (d) a recorded key the person changed to true after setup stays, with the existing 'kept ... (setup wrote false)' style report line. Each must fail if the cleanup or its guard is removed; if one of them shows a real bug, fix the code and say so.",
@@ -54,7 +54,41 @@
     "agentId": "workflow:wf_1518a61d-824/assignment-0mwami6wr-hl4j",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T11:45:06.939Z"
+    "startedAt": "2026-11-10T11:45:06.939Z",
+    "finishedAt": "2026-11-10T11:52:01.723Z"
+  },
+  "result": "result: Added the four tests and the docs clause. The tests exposed no code bug, and I made no source change.\nchanged:\n- /home/user/holyagent-0.3.2-fff/packages/runtime/tests/setup-pi-settings.test.ts\n- /home/user/holyagent-0.3.2-fff/docs/pi/search.md\nchecks:\n- `bun install --frozen-lockfile` -> exit 0.\n- `bunx --no-install mise run build` -> exit 0. `git status` afterwards shows only the two changed files, so there are no generated-output changes.\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean (308 files), lint clean (309 files), 3405 pass and 0 fail across 113 files. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n- `bun test packages/runtime/tests/setup-pi-settings.test.ts` -> 68 pass, 0 fail.\n- Mutation checks, each reverted afterwards (`git status` shows only the two changed files):\n  - Removing the `FFF_RETIRED_SETTINGS` entry from `REVERTABLE` in `pi-settings.ts` made 5 tests fail: the four new ones and the existing \"while the capability stays on\" test.\n  - Removing the value guard in `take` (`settings.ts`) made the new \"changed to true\" test fail, along with 3 existing guard tests.\nblockers: none\nquestions: none\nnotes:\n- The new tests sit in a nested `describe(\"the followSymlinks false that 0.3.1 wrote\")` under `fff`. Each starts from a file recorded as 0.3.1 left it: `mode` override plus `followSymlinks` false.\n- Every report line the tests assert also includes the override removal or the `kept` clause. That is why the line reads `removed mode \"override\", followSymlinks false` rather than the retired key alone.\nevidence:\nTests cover the retired key under capability off, pi.enable off, dry-run and a value changed to true: the four tests are in `setup-pi-settings.test.ts`, one per case.\n- Capability off: \"is taken out when the capability is turned off, with the override\".\n- pi.enable off: \"is taken out when pi.enable is off\".\n- Dry run: \"is reported by a dry run, which writes neither the file nor the record\". It checks the `would remove ... (dry run, nothing written)` line, an unchanged file, and a following real run that still removes both keys.\n- Changed to true: \"stays when the person changed it to true after setup, and the report says so\". It asserts `kept followSymlinks true (setup wrote false)`.\n- All four fail under the mutations above.\ndocs/pi/search.md says how to keep links unfollowed after upgrading from 0.3.1: `docs/pi/search.md` line 9 now ends \"...so someone who wants links left unfollowed after upgrading from 0.3.1 sets `followSymlinks: false` again by hand after that upgrade setup run.\"\nmise run build leaves no unexplained changes and mise run verify passes: build exit 0 with only the two changed files in `git status`; verify exit 0 with 3405 pass and 0 fail.\nchecks-run: the install, build, verify, focused-test and mutation runs listed under checks.\nchanged-paths: /home/user/holyagent-0.3.2-fff/packages/runtime/tests/setup-pi-settings.test.ts, /home/user/holyagent-0.3.2-fff/docs/pi/search.md\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-notes.diff\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Four tests added, mutation-checked; doc clause; verify 3405 pass",
+    "criteria": [
+      {
+        "criterion": "Tests cover the retired key under capability off, pi.enable off, dry-run and a value changed to true",
+        "support": "the four tests are in `setup-pi-settings.test.ts`, one per case."
+      },
+      {
+        "criterion": "docs/pi/search.md says how to keep links unfollowed after upgrading from 0.3.1",
+        "support": "`docs/pi/search.md` line 9 now ends \"...so someone who wants links left unfollowed after upgrading from 0.3.1 sets `followSymlinks: false` again by hand after that upgrade setup run.\""
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify passes",
+        "support": "build exit 0 with only the two changed files in `git status`; verify exit 0 with 3405 pass and 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the install, build, verify, focused-test and mutation runs listed under checks."
+      },
+      {
+        "label": "changed-paths",
+        "support": "/home/user/holyagent-0.3.2-fff/packages/runtime/tests/setup-pi-settings.test.ts, /home/user/holyagent-0.3.2-fff/docs/pi/search.md"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/fff-notes.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-10T11:45:06.939Z"
 }
