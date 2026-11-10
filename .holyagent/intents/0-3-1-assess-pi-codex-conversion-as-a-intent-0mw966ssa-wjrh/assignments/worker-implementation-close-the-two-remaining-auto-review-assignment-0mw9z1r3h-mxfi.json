@@ -1,0 +1,87 @@
+{
+  "id": "assignment-0mw9z1r3h-mxfi",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 22,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-two-remaining-auto-review",
+  "objective": "Close the two remaining auto-review bypasses and the open optional items of the auto-review and screen reviews, as the last repair round before the 0.3.1 auto-review PR.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-autoreview, branch release/0.3.1/feat/auto-review, head c580abb0 (it carries the merged screen capability too). Findings: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ygj4s-zz8e.md (security, two blockers plus residuals) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ygiuj-u3ox.md (code, optional items); screen optional items are in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9wgea6-ne4s.md, /home/user/holyagent/.git/holyagent/reports/assignment-0mw9wgejl-b4mm.md and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9xiyfa-hsit.md. Your earlier report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9xp81h-vbzh.md.",
+    "An earlier run of this same task was cut off by a machine restart and left uncommitted edits in the worktree (git status shows 17 modified files in auto-review, screen, classify, transcript, apply-patch, load, capabilities, setup and their tests). Read git diff first, keep what is correct and complete, finish the rest; do not discard the edits. The build and verify were not yet run on them.",
+    "New default to implement (verbatim from the Intent): auto-review is a security control that repository content and the model cannot weaken. A project-level .holyagent/config.json cannot turn auto-review off or replace or extend its policy (only the user's own config can), a malformed config keeps it on, its settings are fixed for the session, and it applies whenever the active model is served by the Codex provider. Inside the project root, writes to .git, .holyagent and the agent configuration folders (.pi, .codex, .claude) are reviewed, as Codex's sandbox keeps them read-only; paths are normalized as Pi's tools do (a leading @, ~, file:// URLs) and resolved through existing links before the root check. A tool that is neither known read-only nor annotated read-only is reviewed. Commands with brace expansion, and programs or flags that run other programs or write files, are outside the safe set.",
+    "Testing rule: unit tests with synthesized fixtures only; never start pi or make a network or model request."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The classifier reads apply_patch file headers with the same rule as parsePatch (indented headers included), so a patch into a protected folder or outside the root is reviewed, with a test that fails without the fix",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "On win32 the root check expands a leading tilde-backslash and maps Git-Bash drive paths as Pi does, and protected folder names match Windows aliases (trailing dots or spaces, 8.3 short names such as GIT~1), with tests that pin the platform",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "HolyAgent's own state-only tools that run no command and spawn no agent carry readOnlyHint so they are not reviewed, while subagent, workflow and code-execution tools stay reviewed, with a test",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup refuses or warns when the auto-review switch is set at project or local scope and points to user scope, with a test; the capabilities.ts description comment matches the provider-keyed gate",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The approval-marker scrub also removes zero-width and other invisible characters inside the marker, and .agents is a protected folder, with tests",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Screen polish: the doctor check passes its platform to unmetNeed (pi-check.ts); the screen description and report line say which form the machine has instead of where this machine provides them; screen MCP servers launched through npx start from a neutral working directory so a project node_modules cannot substitute the package; the no-server notice is not repeated on each registration; each with a test where behaviour changes",
+      "blocking": false,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/pi/providers.md and docs/pi/screen.md match the changes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "mise run build leaves the tree unchanged and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime",
+    "packages/integrations/pi",
+    "packages/integrations/claude/dist",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mw9yp1k3-swzd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T00:48:28.781Z"
+  },
+  "createdAt": "2026-11-10T00:48:28.781Z"
+}
