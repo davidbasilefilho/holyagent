@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mwaxf88d-zp1x",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.audit",
+  "slug": "check-the-doc-commit-3e0b2546-against",
+  "objective": "Check the doc commit 3e0b2546 against its requirement: lines that state a current pin name the new 0.3.2 pins, and read-at statements keep their version.",
+  "state": "Running",
+  "scope": [
+    "Diff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/deps-docs-commit.diff (three docs files in /home/user/holyagent-0.3.2-deps). Current pins (packages/runtime/src/config/pi-packages.json in that worktree): @opencode/browse 0.0.16, @tintinweb/pi-subagents 0.23.2, @amaster.ai/pi-computer-use 0.1.38, billion-context 0.1.213.",
+    "Kept as read-at statements by the writer: docs/pi/screen.md:44; packages/runtime/src/setup/browse.ts:137; packages/runtime/src/setup/pi-settings.ts:51-52; docs/pi/caching-and-subagents.md:39, :49; docs/pi/extensions.md:47, :102; docs/pi/t3-code.md:128; docs/pi/orchestration.md:11. Read each kept line in the worktree and say whether it reads as a record of the version a source was read or audited at (correct to keep) or as the current pin (should change)."
+  ],
+  "constraints": [
+    "Make no edits; review only.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "Lines that state a current pin name the new pins and read-at statements keep their version",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwaxa1xu-tfxm"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-10T16:50:44.461Z"
+  },
+  "createdAt": "2026-11-10T16:50:44.461Z"
+}
