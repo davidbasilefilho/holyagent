@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-a46163b-t3-marker-for",
   "objective": "Re-review a46163b (T3 marker for specialists and launcher tidy-ups).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-browser-use, branch release/0.3.2/feat/browser-use, head a46163b. Review only `git diff 99a42e1 a46163b` (also at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/bu-final.diff).",
     "It closes these earlier non-blocking findings: (a) the T3 gate (isT3Session needs Pi mode rpc) did not hold in specialists, which pi-subagents runs in-process in print mode, so a T3-hosted specialist registered browser-use and refuseT3PreviewOutsideT3 refused T3's preview tools; the fix is hostedByT3 in packages/integrations/pi/src/t3.ts: the root decides with isT3Session on every session_start and writes or deletes HOLYAGENT_T3_HOSTED in the shared process env (also clearing a stale value from outside), and specialists read only that marker; (b) a bare Chromium command name now resolves through PATH; (c) the uvx env allowlist keeps XDG_CACHE_HOME, XDG_DATA_HOME, UV_PYTHON_INSTALL_DIR; (d) the DevTools timeout names the profile; (e) win32 stopGroup skips taskkill for an exited child; (f) docs call the allowlist defense in depth."
@@ -41,7 +41,33 @@
     "agentId": "workflow:wf_23a5f957-173/assignment-0mwanx8km-0jc3",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T12:24:48.550Z"
+    "startedAt": "2026-11-10T12:24:48.550Z",
+    "finishedAt": "2026-11-10T12:26:59.899Z"
+  },
+  "result": "result: a46163b closes findings (a)-(f) with no blocking findings. The marker is right for the root, its specialists and a session without T3. Each fix has a test that fails without it.\n\nBuilt-in /code-review (medium, 99a42e1...a46163b) ran from the skill listing. Its skill text was not checked against a shadowing command. It returned 7 claims; I read the code for each and none is blocking.\n\nchanged: none (read-only; the worktree is clean)\n\nchecks:\n- `bun test` on t3, extension, browser-launch and setup-chromium test files -> exit 0, 403 pass, 0 fail\n- `mise run check` -> exit 0, no type errors in 312 files\n- `mise run lint` -> exit 0, no problems in 313 files\n- `mise run fmt:check` -> exit 0, 731 files formatted\n- Not run: `mise run build` (it writes), the full `verify`, and anything that starts pi, uvx or Chromium.\n- The dist bundles in the diff mention hostedByT3 and the marker, so they look regenerated.\n- Not checked: that pi-subagents runs specialists in-process in print mode. I took it from the t3.ts comment and the test comments.\n\nblockers: none\n\nfindings (all non-blocking):\n1. Rejected: the claim that a specialist outside T3 could wrongly drop browser-use if `HOLYAGENT_T3_HOSTED` leaks in from outside. Every root rewrites or deletes the variable at `session_start` (packages/integrations/pi/src/t3.ts:62-66, called at extension.ts:1508), so a value from outside is cleared before any specialist reads it. A separate-process child inherits the root's real value. Only a child run with no root at all could read a stale value from a user shell, and nothing launches that.\n2. Optional: `hostedByT3` writes to the env it is given (t3.ts:63-65) although its name reads like a predicate. The doc comment says it writes. A name such as `recordT3Host` would be clearer.\n3. Optional: a configured value with no path separator now goes through PATH lookup (packages/runtime/src/setup/chromium.ts:99), so a bare name that exists only in the current directory is now reported missing. This matches shell behaviour and is tested. A Windows drive-relative value like `C:chrome.exe` takes the PATH route, which is an edge case.\n4. Optional: the win32 `stopGroup` guard (packages/runtime/src/pi/browser-launch.ts:353) tests `exitCode === null`. It does not test `signalCode`, and a child that dies between the check and `taskkill` still races. This narrows the pid-reuse window as intended.\n5. Rejected: the claim that adding `XDG_CACHE_HOME`, `XDG_DATA_HOME` and `UV_PYTHON_INSTALL_DIR` to the allowlist (browser-launch.ts:145) weakens the protection. `PATH` is already inherited, which is a stronger vector. The comment and docs now describe the list as defense in depth.\n6. Rejected: the claim that the screen.ts and extension.ts comments are misleading. They now match the marker design.\n\nevidence:\nThe fixes close the findings without regressions, and the T3 marker is right for the root, its specialists and a session without T3: The root sets the marker only when `isT3Session` holds (rpc mode plus T3 variables) and deletes it otherwise (t3.ts:57-67). A specialist reads only `=== \"1\"` (t3.ts:62). Tests: t3.test.ts \"hostedByT3\" covers root true with the marker written, a stale marker cleared in print, json and tui, and a specialist ignoring T3's own variables. The extension tests cover a specialist in print mode under a T3 root (no browser_use, preview tools allowed) and a specialist under a non-T3 root with T3 variables set (browser_use registered, preview tools blocked). The fixes for (b) through (f) are in chromium.ts:82-99, browser-launch.ts:145-147 and :229-236, :353 and the docs; the full suite and checks above pass.\nTests cover each fix and would fail without it: By reading the code, each new test breaks without its fix. (a) A print-mode specialist would register browser_use without `hostedByT3`. (b) The bare-name tests, including the real-`PATH` test that reads the given env, fail without the lookup. (c) The allowlist test asserts the three new variables pass through. (d) The DevTools test asserts the profile directory and the \"never wrote DevToolsActivePort\" wording. (e) A new win32 test asserts no kill when `exitCode` is 0. The wording of (f) is not tested, which is acceptable for docs.\nchecks-run: `bun test` on the 4 test files (403 pass, 0 fail, exit 0); `mise run check`, `mise run lint` and `mise run fmt:check` all exit 0 as listed above; `mise run build`, the full `verify` and anything that starts pi, uvx or Chromium were not run.\nfindings: no blockers; four optional or edge notes (2, 3, 4 and a PATH-key note for chromium.ts:87) and three rejected built-in claims (1, 5, 6) above.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "No blockers; notes optional",
+    "criteria": [
+      {
+        "criterion": "The fixes close the findings without regressions, and the T3 marker is right for the root, its specialists and a session without T3",
+        "support": "The root sets the marker only when `isT3Session` holds (rpc mode plus T3 variables) and deletes it otherwise (t3.ts:57-67). A specialist reads only `=== \"1\"` (t3.ts:62). Tests: t3.test.ts \"hostedByT3\" covers root true with the marker written, a stale marker cleared in print, json and tui, and a specialist ignoring T3's own variables. The extension tests cover a specialist in print mode under a T3 root (no browser_use, preview tools allowed) and a specialist under a non-T3 root with T3 variables set (browser_use registered, preview tools blocked). The fixes for (b) through (f) are in chromium.ts:82-99, browser-launch.ts:145-147 and :229-236, :353 and the docs; the full suite and checks above pass."
+      },
+      {
+        "criterion": "Tests cover each fix and would fail without it",
+        "support": "By reading the code, each new test breaks without its fix. (a) A print-mode specialist would register browser_use without `hostedByT3`. (b) The bare-name tests, including the real-`PATH` test that reads the given env, fail without the lookup. (c) The allowlist test asserts the three new variables pass through. (d) The DevTools test asserts the profile directory and the \"never wrote DevToolsActivePort\" wording. (e) A new win32 test asserts no kill when `exitCode` is 0. The wording of (f) is not tested, which is acceptable for docs."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun test` on the 4 test files (403 pass, 0 fail, exit 0); `mise run check`, `mise run lint` and `mise run fmt:check` all exit 0 as listed above; `mise run build`, the full `verify` and anything that starts pi, uvx or Chromium were not run."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers; four optional or edge notes (2, 3, 4 and a PATH-key note for chromium.ts:87) and three rejected built-in claims (1, 5, 6) above."
+      }
+    ]
   },
   "createdAt": "2026-11-10T12:24:48.550Z"
 }
