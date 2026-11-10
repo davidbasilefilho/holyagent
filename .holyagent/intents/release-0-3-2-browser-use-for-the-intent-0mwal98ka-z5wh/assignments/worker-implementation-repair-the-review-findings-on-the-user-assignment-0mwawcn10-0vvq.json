@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-findings-on-the-user",
   "objective": "Repair the review findings on the user-installed ripgrep and fd change.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-unbundle (branch release/0.3.2/feat/user-installed-search-tools, head 86e6d051; the change under repair is b36e708). Items:",
     "A first attempt at this repair stopped partway (usage limit) and left uncommitted edits in the worktree: 28 files modified (docs, mise.toml, errors.ts, tools.ts, search-tools.ts, shell.ts, doctor.ts, steps.ts, the three family root/search.md, the updater scripts and tests, and regenerated dist); the diff is saved at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ub-rep-partial.diff. Start by reading `git diff` in the worktree, keep what is right, finish every item below, and check each item against the criteria; the specialist/working.md instruction files and the requirements/ copies were not touched yet.",
@@ -82,7 +82,57 @@
     "agentId": "workflow:wf_07a6eb77-966/assignment-0mwawcn10-0vvq",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T16:20:44.055Z"
+    "startedAt": "2026-11-10T16:20:44.055Z",
+    "finishedAt": "2026-11-10T16:26:30.236Z"
+  },
+  "result": "result: all six items done on top of the partial edits; `mise run build` and `mise run verify` both exit 0.\nchanged: README.md docs/components.md docs/decisions.md docs/development.md docs/pi/installation.md docs/requirements.md docs/usage.md mise.toml packages/integrations/claude/src/agents.ts packages/integrations/claude/tests/plugin.test.ts packages/integrations/claude/dist/agents/holyagent.md packages/integrations/claude/dist/scripts/holyagent.js packages/integrations/pi/dist/extensions/holyagent.js packages/integrations/pi/dist/scripts/holyagent.js packages/runtime/src/cli/errors.ts packages/runtime/src/cli/tools.ts packages/runtime/src/instructions/{claude-5.5,gpt-6,kimi-k3.1}/root/search.md packages/runtime/src/setup/{doctor,search-tools,shell,steps}.ts packages/runtime/tests/{setup-search-tools,tools}.test.ts scripts/dependency-pins.ts scripts/dependency-pins.test.ts scripts/update-dependencies.ts scripts/update-dependencies.test.ts\nchecks:\n- `bun install --frozen-lockfile` -> exit 0.\n- `bunx --no-install mise run build` -> exit 0; 39 Claude and 139 Pi files built. The only changed paths are the ones listed above, dist included.\n- `bunx --no-install mise run verify` -> exit 0; type-check 310 files, lint 311 files, format 729 files, tests 3449 pass, 1 skip, 0 fail. The skip is the Windows-only `.exe` test.\n- `mise install` of both aqua tools, then `mise exec -- rg --version` -> ripgrep 15.2.0, and `fd --version` -> fd 10.5.2.\n- Logs: scratchpad/build.log and scratchpad/verify.log.\nblockers: none\nquestions: none\nnotes:\n- The explicit aqua names only worked here on Linux. macOS and Windows were not run. The registry already puts aqua first for both bare names, so the windows CI job already ran this backend.\n- `mise tool` reports a sha256 check for ripgrep and none for fd on Linux. docs/decisions.md says exactly that and says fd then rests on the HTTPS download from the upstream release.\n- `findCommand` leaves the unrestricted lookup (`includeBunBin`) as before. Only the search tools use `strict`.\n- I applied one decisions.md edit with python, not Edit.\n- Optional idea: a `holyagent doctor` line that shows the versions found.\nevidence:\n- docs/components.md no longer promises the same answer everywhere, and docs/decisions.md says versions may differ: components.md:49 now says \"one search interface\" and that versions can differ per machine. decisions.md:53 says versions can differ between machines, accepted because the common options are used and the bundled binaries were costly to maintain.\n- The search-tool lookup ignores relative PATH entries, rejects a result in the working directory and accepts only .exe on Windows, with tests: `strictWhich` and `StrictLookup` in packages/runtime/src/setup/shell.ts; `locateTool` in search-tools.ts takes the cwd and is used by `runTool`, doctor and setup.\n  - The tests are in packages/runtime/tests/tools.test.ts. The POSIX test runs `PATH=.:<bin>` with a planted rg in the cwd and it resolves the absolute one or reports ToolMissing; entries `''`, `::`, a relative folder and the cwd itself are covered.\n  - The injected-which cases refuse `rg.cmd`, `rg.bat` and a bare `rg` on win32, accept `.exe` in any case, and refuse a result inside the cwd.\n  - A `skipIf(win32)` test resolves a real .exe (bun.exe) on PATH for the windows job.\n- mise.toml names a checksum-verifying backend for ripgrep and fd that the updater moves, or the report says why not: `\"aqua:BurntSushi/ripgrep\" = \"15.2.0\"` and `\"aqua:sharkdp/fd\" = \"10.5.2\"`, with MISE_SOURCES in scripts/update-dependencies.ts keyed by those names. The quoted-key parse and rewrite are in scripts/dependency-pins.ts, with tests in dependency-pins.test.ts and update-dependencies.test.ts. The checksum caveat for fd is in notes.\n- The fallback wording is one and the same in the error hint, docs and instructions: \"the system grep or find\" appears in the ToolMissing hint (errors.ts), components.md, requirements.md, decisions.md, the three family root/search.md files, the requirements copies and specialist/working.md, and the agents.ts comments. The \"fdfind on Debian\" detail is gone from the instruction files. The requirements/ copies and specialist/working.md already carried the final wording, so they needed no change and coverage.ts still passes.\n- README, decisions, Pi installation docs and the winget commands are corrected: README.md:52 now says \"builds with or needs\". decisions.md:53 states the fd checksum reason (no checksum file; the digest came from GitHub's release API, not reachable from every environment). docs/pi/installation.md has the rg/fd lines in the setup and doctor bullets, linking to components.md#ripgrep-and-fd. winget is two commands in INSTALL_COMMANDS and in the docs; `installAdvice` ends with \"then open a new terminal so PATH picks them up\".\n- Stale comments are fixed and the search-tool helpers are merged: plugin.test.ts:792 and shell.ts (EMPTY_BUNFIG comment) no longer say \"bundled\". `checkSearchTools` and `reportSearchTools` are now one `searchToolLines(cwd, format)` with `doctorToolLine` and `setupToolLine`.\n- mise run build leaves no unexplained changes and mise run verify passes: build exit 0 and verify exit 0 (counts above), and the changed-path list matches `git status`.\n- checks-run: the commands and exit codes are in the checks section above.\n- changed-paths: the list in `changed` above, 29 files.\n- diff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ub-rep-final.diff (git diff after the build; no new untracked files).\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Six items evidenced; verify 3449 pass",
+    "criteria": [
+      {
+        "criterion": "docs/components.md no longer promises the same answer everywhere, and docs/decisions.md says versions may differ",
+        "support": "components.md:49 now says \"one search interface\" and that versions can differ per machine. decisions.md:53 says versions can differ between machines, accepted because the common options are used and the bundled binaries were costly to maintain."
+      },
+      {
+        "criterion": "The search-tool lookup ignores relative PATH entries, rejects a result in the working directory and accepts only .exe on Windows, with tests",
+        "support": "`strictWhich` and `StrictLookup` in packages/runtime/src/setup/shell.ts; `locateTool` in search-tools.ts takes the cwd and is used by `runTool`, doctor and setup.; The tests are in packages/runtime/tests/tools.test.ts. The POSIX test runs `PATH=.:<bin>` with a planted rg in the cwd and it resolves the absolute one or reports ToolMissing; entries `''`, `::`, a relative folder and the cwd itself are covered.; The injected-which cases refuse `rg.cmd`, `rg.bat` and a bare `rg` on win32, accept `.exe` in any case, and refuse a result inside the cwd.; A `skipIf(win32)` test resolves a real .exe (bun.exe) on PATH for the windows job."
+      },
+      {
+        "criterion": "mise.toml names a checksum-verifying backend for ripgrep and fd that the updater moves, or the report says why not",
+        "support": "`\"aqua:BurntSushi/ripgrep\" = \"15.2.0\"` and `\"aqua:sharkdp/fd\" = \"10.5.2\"`, with MISE_SOURCES in scripts/update-dependencies.ts keyed by those names. The quoted-key parse and rewrite are in scripts/dependency-pins.ts, with tests in dependency-pins.test.ts and update-dependencies.test.ts. The checksum caveat for fd is in notes."
+      },
+      {
+        "criterion": "The fallback wording is one and the same in the error hint, docs and instructions",
+        "support": "\"the system grep or find\" appears in the ToolMissing hint (errors.ts), components.md, requirements.md, decisions.md, the three family root/search.md files, the requirements copies and specialist/working.md, and the agents.ts comments. The \"fdfind on Debian\" detail is gone from the instruction files. The requirements/ copies and specialist/working.md already carried the final wording, so they needed no change and coverage.ts still passes."
+      },
+      {
+        "criterion": "README, decisions, Pi installation docs and the winget commands are corrected",
+        "support": "README.md:52 now says \"builds with or needs\". decisions.md:53 states the fd checksum reason (no checksum file; the digest came from GitHub's release API, not reachable from every environment). docs/pi/installation.md has the rg/fd lines in the setup and doctor bullets, linking to components.md#ripgrep-and-fd. winget is two commands in INSTALL_COMMANDS and in the docs; `installAdvice` ends with \"then open a new terminal so PATH picks them up\"."
+      },
+      {
+        "criterion": "Stale comments are fixed and the search-tool helpers are merged",
+        "support": "plugin.test.ts:792 and shell.ts (EMPTY_BUNFIG comment) no longer say \"bundled\". `checkSearchTools` and `reportSearchTools` are now one `searchToolLines(cwd, format)` with `doctorToolLine` and `setupToolLine`."
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify passes",
+        "support": "build exit 0 and verify exit 0 (counts above), and the changed-path list matches `git status`."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the commands and exit codes are in the checks section above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the list in `changed` above, 29 files."
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ub-rep-final.diff (git diff after the build; no new untracked files)."
+      }
+    ]
   },
   "createdAt": "2026-11-10T16:20:44.055Z"
 }
