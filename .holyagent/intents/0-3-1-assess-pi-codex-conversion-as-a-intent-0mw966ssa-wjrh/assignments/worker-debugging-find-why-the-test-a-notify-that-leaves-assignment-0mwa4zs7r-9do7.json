@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "find-why-the-test-a-notify-that-leaves",
   "objective": "Find why the test 'a notify that leaves the awaited value in place does not end the wait' in packages/runtime/tests/pi/bash-atomics.test.ts hung until the 5 s timeout on the main-branch Linux CI run, and fix the cause.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-atomics, local branch release/0.3.2/fix/atomics-test-hang at origin/main bb680814 (release 0.3.1). CI log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/main-check.log (search 'bash-atomics'). The test passed in the PR runs and locally; it failed once on main.",
     "Code: packages/runtime/src/pi/bash/atomics.ts (stableWaitAsync, installStableWaitAsync) and the test file. History: the fix came from /home/user/holyagent/.git/holyagent/reports/assignment-0mwa1c8xm-m5ze.md; a cleanup (/home/user/holyagent/.git/holyagent/reports/assignment-0mwa2uwg9-04ju.md) changed the tests to take the engine's waitAsync from a fresh node:vm realm (runInNewContext('Atomics.waitAsync')) per call. Hypotheses to test, not conclusions: a waitAsync promise from a fresh vm realm whose context is collected or not drained by the main event loop never settles; or a race in stableWaitAsync's re-arm (between a spurious wake and the re-wait) that also affects production. Determine which, with evidence.",
@@ -60,7 +60,45 @@
     "agentId": "workflow:wf_c11b2161-0db/assignment-0mwa4zs7r-9do7",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T03:34:54.615Z"
+    "startedAt": "2026-11-10T03:34:54.615Z",
+    "finishedAt": "2026-11-10T03:58:58.846Z"
+  },
+  "result": "result: The hang was in the test, not in production code. Each call took `Atomics.waitAsync` from a fresh `node:vm` realm, and the Bun canary's JavaScriptCore can garbage-collect that realm while a wait on it is pending. A collected realm's wait never settles. The test now keeps one realm alive for the whole run, and the test file passes 240 of 240 runs under GC pressure and CPU load.\nchanged: packages/runtime/tests/pi/bash-atomics.test.ts (no change to atomics.ts or the pi dist; the build left the tree unchanged)\nchecks:\n- `bun install --frozen-lockfile` -> 0\n- `bunx --no-install mise run build` -> 0; `git status` shows only the one test file\n- `bunx --no-install mise run verify` -> 0; 3398 pass / 0 fail, 113 files. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/a-verify.log\n- Baseline red: `bun test --preload gc-preload.ts` (a 2 ms `Bun.gc(true)` interval) on the old test file, canary Bun -> the target test, or the timeout test, hit the 5000 ms timeout in 3 of 3 runs\n- After the fix: 4 parallel loops x 60 runs = 240 runs, with the same GC preload and 4 busy-loop CPU hogs -> 0 failures\n- Mutation: wrapper replaced by the identity function and the install removed -> 2 fail / 1 pass (the notify test and the shell-install test), so they still fail without the wrapper. atomics.ts restored; `git diff` shows no change to it.\nblockers: none\nquestions: none\nnotes:\n- The Bun on PATH is stable 1.4.4+38afee6c8, and it never reproduced the hang in 120 plain loop runs plus the stress scripts. The hang needs the canary that mise uses (/root/.local/share/mise/installs/bun/1.4.4/bin/bun, 1.4.4-canary.1+7ca0042d3). The CI run used canary 2596ac5d3. The failing CI run was the first and only one on main, and the full suite makes GC runs likely mid-test.\n- stableWaitAsync has no race of its own. Its re-arm check and the engine's value check run synchronously on one thread. Production waits go through main-realm functions, which survive GC: 0 of 100 hung with the main realm.\n- I made the edit with a python one-off, not Edit. It changed only the test file.\n- I added no test for the GC behavior itself. It is an engine bug, and a test that depends on GC timing would itself be flaky.\nevidence:\nThe hang is reproduced or its mechanism is shown with evidence, and the cause is named with file and line: The cause is the old packages/runtime/tests/pi/bash-atomics.test.ts:17-19, `runInNewContext(\"Atomics.waitAsync\")` per call, so nothing kept the realm alive.\n  - Scratchpad repros, run with the mise canary Bun:\n    - `exp/repro.ts vm gc` -> \"notified 0 ended false\"; the waiter vanished after `Bun.gc`.\n    - `exp/repro.ts main gc` -> ended true.\n    - `exp/repro2.ts fresh` -> 79 of 100 hung; `exp/repro2.ts keep` -> 0 of 100.\n    - `exp/stress.ts vm 100 gc 5` -> 57 of 100 hung.\n    - `exp/stress.ts main` -> 0 hung.\n  - The old test file with a GC preload timed out at 5000 ms in 3 of 3 runs.\n  - All scripts are in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/exp/.\nThe fix removes the cause, and the bash-atomics tests pass in a loop of at least 200 runs, including under parallel CPU load: bash-atomics.test.ts:17-22 now has a module-level `createContext({})` realm and `runInContext(\"Atomics.waitAsync\", realm)`. 240 of 240 runs passed with the GC preload and 4 CPU hogs, using the canary Bun.\nNo test is weakened, skipped or given a longer timeout to hide a hang, and the tests still fail without the waitAsync wrapper: no assertion or timeout changed, and the engine's function still comes from a separate realm. The identity-wrapper mutation gave 2 fail / 1 pass.\nmise run build leaves the tree unchanged and mise run verify passes: build exit 0 with only the test file modified; verify exit 0 with 3398 pass / 0 fail.\nchecks-run: see checks above.\nchanged-paths: packages/runtime/tests/pi/bash-atomics.test.ts\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/atomics-hang.diff\n",
+  "acceptance": {
+    "revision": 22,
+    "rationale": "Hang reproduced 3/3 with GC preload and 57-79% in repro scripts; cause shown; 240/240 after; mutation keeps tests meaningful; verify 3398 pass",
+    "criteria": [
+      {
+        "criterion": "The hang is reproduced or its mechanism is shown with evidence, and the cause is named with file and line",
+        "support": "The cause is the old packages/runtime/tests/pi/bash-atomics.test.ts:17-19, `runInNewContext(\"Atomics.waitAsync\")` per call, so nothing kept the realm alive.; Scratchpad repros, run with the mise canary Bun: `exp/repro.ts vm gc` -> \"notified 0 ended false\"; the waiter vanished after `Bun.gc`.; `exp/repro.ts main gc` -> ended true.; `exp/repro2.ts fresh` -> 79 of 100 hung; `exp/repro2.ts keep` -> 0 of 100.; `exp/stress.ts vm 100 gc 5` -> 57 of 100 hung.; `exp/stress.ts main` -> 0 hung.; The old test file with a GC preload timed out at 5000 ms in 3 of 3 runs.; All scripts are in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/exp/."
+      },
+      {
+        "criterion": "The fix removes the cause, and the bash-atomics tests pass in a loop of at least 200 runs, including under parallel CPU load",
+        "support": "bash-atomics.test.ts:17-22 now has a module-level `createContext({})` realm and `runInContext(\"Atomics.waitAsync\", realm)`. 240 of 240 runs passed with the GC preload and 4 CPU hogs, using the canary Bun."
+      },
+      {
+        "criterion": "No test is weakened, skipped or given a longer timeout to hide a hang, and the tests still fail without the waitAsync wrapper",
+        "support": "no assertion or timeout changed, and the engine's function still comes from a separate realm. The identity-wrapper mutation gave 2 fail / 1 pass."
+      },
+      {
+        "criterion": "mise run build leaves the tree unchanged and mise run verify passes",
+        "support": "build exit 0 with only the test file modified; verify exit 0 with 3398 pass / 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see checks above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/tests/pi/bash-atomics.test.ts"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/atomics-hang.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-10T03:34:54.615Z"
 }
