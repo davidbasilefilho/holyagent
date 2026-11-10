@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  CHROMIUM_EXECUTABLE_VARIABLE,
   findChromium,
-  PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE,
   PREINSTALLED_BROWSERS,
 } from "../src/setup/chromium.ts"
 
@@ -79,9 +79,10 @@ describe("the Chromium a machine provides for the headless browser", () => {
     expect(find({ PLAYWRIGHT_BROWSERS_PATH: "" }, files)).toBe(`${PREINSTALLED_BROWSERS}/chromium`)
   })
 
-  test("the path the person set for the server wins, existing or not", () => {
+  test("the path the person set wins, existing or not, and HOLYAGENT_CHROMIUM_PATH is its variable", () => {
+    expect(CHROMIUM_EXECUTABLE_VARIABLE).toBe("HOLYAGENT_CHROMIUM_PATH")
     expect(
-      find({ [PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE]: "/mine/chrome" }, [
+      find({ [CHROMIUM_EXECUTABLE_VARIABLE]: "/mine/chrome" }, [
         `${PREINSTALLED_BROWSERS}/chromium`,
       ]),
     ).toBe("/mine/chrome")

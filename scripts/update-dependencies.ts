@@ -14,6 +14,7 @@ import {
 import {
   type Hashes,
   newestAllowedRelease,
+  newestPypiRelease,
   newestTag,
   nextPackageRange,
   nextPiVersion,
@@ -104,7 +105,7 @@ export class Usage extends Data.TaggedError("Usage")<{ readonly args: ReadonlyAr
 export type Mode = "apply" | "dry-run" | "check"
 
 /** The kinds of pin the updater moves. */
-export type PinKind = "action" | "vendor" | "mise" | "package" | "pi"
+export type PinKind = "action" | "vendor" | "mise" | "package" | "pi" | "pypi"
 
 /** One pin: where it is, what it is now and what it would become. */
 export interface Pin {
@@ -130,6 +131,8 @@ export interface Survey {
   readonly packages: ReadonlyMap<string, ReadonlyArray<PackageDependency>>
   /** The exact version every Pi package of `pi-packages.json` should have, by npm name. */
   readonly piPackages: ReadonlyMap<string, string>
+  /** The exact version every PyPI package of `pypi-packages.json` should have, by PyPI name. */
+  readonly pypiPackages: ReadonlyMap<string, string>
 }
 
 const strict = { onExcessProperty: "error" } as const
@@ -144,6 +147,12 @@ const Packument = open({
   "dist-tags": open({ latest: Schema.String }),
   versions: Schema.Record(Schema.String, open({ deprecated: Schema.optionalKey(Schema.Unknown) })),
 })
+const PypiProject = open({
+  releases: Schema.Record(
+    Schema.String,
+    Schema.Array(open({ yanked: Schema.optionalKey(Schema.Boolean) })),
+  ),
+})
 const GithubRelease = open({
   assets: Schema.Array(
     open({ name: Schema.String, digest: Schema.optionalKey(Schema.NullOr(Schema.String)) }),
@@ -151,6 +160,7 @@ const GithubRelease = open({
 })
 
 const REGISTRY = "https://registry.npmjs.org"
+const PYPI = "https://pypi.org"
 
 /** How long a registry request may take, from the request to the last byte of the answer. */
 export const REGISTRY_TIMEOUT_MS = 60_000
@@ -182,6 +192,9 @@ export const VENDOR_PINS = "packages/integrations/claude/src/vendor.ts"
 
 /** The file that holds the exact version of every Pi package HolyAgent enables. */
 export const PI_PACKAGE_PINS = "packages/runtime/src/config/pi-packages.json"
+
+/** The file that holds the exact version of every PyPI package HolyAgent runs. */
+export const PYPI_PACKAGE_PINS = "packages/runtime/src/config/pypi-packages.json"
 
 const readText = (root: string, file: string) =>
   Effect.tryPromise({
@@ -249,6 +262,41 @@ export const releaseOf = (
             source,
             cause: `no stable, non-deprecated release at or below ${latest}`,
           }),
+        )
+      : release
+  })
+
+/**
+ * The release a PyPI package moves to, from the JSON API of the index at `index` (the base URL, so
+ * a test can serve a fixture): the newest stable release that has an installable file, so
+ * prereleases (`rc`, `a`, `b`, `dev`), post releases and yanked releases are skipped. A project
+ * that takes longer than `timeoutMs` to answer fails with a `SourceError`.
+ */
+export const pypiReleaseOf = (
+  name: string,
+  index: string = PYPI,
+  timeoutMs: number = REGISTRY_TIMEOUT_MS,
+) =>
+  Effect.gen(function* () {
+    const source = `${index}/pypi/${name}/json`
+    const response = yield* Effect.tryPromise({
+      try: () => fetch(source, { signal: AbortSignal.timeout(timeoutMs) }),
+      catch: (cause) => new SourceError({ source, cause }),
+    })
+    if (!response.ok)
+      return yield* Effect.fail(new SourceError({ source, cause: `answered ${response.status}` }))
+    const body = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<unknown>,
+      catch: (cause) => new SourceError({ source, cause }),
+    })
+    const project = yield* Schema.decodeUnknownEffect(
+      PypiProject,
+      strict,
+    )(body).pipe(Effect.mapError((cause) => new SourceError({ source, cause })))
+    const release = newestPypiRelease(project.releases)
+    return release === undefined
+      ? yield* Effect.fail(
+          new SourceError({ source, cause: "no stable release that is not yanked" }),
         )
       : release
   })
@@ -454,11 +502,40 @@ export const surveyPiPackages = (root: string, registry: string = REGISTRY) =>
     return { pins, latest }
   })
 
+const readPypiPins = (root: string) =>
+  readText(root, PYPI_PACKAGE_PINS).pipe(
+    Effect.flatMap((text) =>
+      Schema.decodeUnknownEffect(
+        Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)),
+        strict,
+      )(text).pipe(Effect.mapError((cause) => new FileError({ file: PYPI_PACKAGE_PINS, cause }))),
+    ),
+  )
+
+/**
+ * The exact PyPI pins of `pypi-packages.json`, each looked up in the index's JSON API (see
+ * {@link pypiReleaseOf}) and never moved down. `index` is the index base URL, so a test can serve a
+ * fixture.
+ */
+export const surveyPypiPackages = (root: string, index: string = PYPI) =>
+  Effect.gen(function* () {
+    const table = yield* readPypiPins(root)
+    const releases = yield* resolveAll(Object.keys(table), (name) => pypiReleaseOf(name, index))
+    const pins: Array<Pin> = []
+    const latest = new Map<string, string>()
+    for (const [name, current] of Object.entries(table)) {
+      const next = nextPiVersion(current, releases.get(name) ?? current)
+      latest.set(name, next)
+      pins.push({ kind: "pypi", name, file: PYPI_PACKAGE_PINS, current, next })
+    }
+    return { pins, latest }
+  })
+
 /**
  * Looks at every pin without writing anything: the external actions of the workflows (a tag
  * resolved to its commit), the vendored ripgrep and fd, the mise tools, the ranges of every
- * `package.json` and the exact versions of the Pi packages. Each pin moves to the newest stable
- * release; a prerelease is never chosen.
+ * `package.json`, the exact versions of the Pi packages and those of the PyPI packages. Each pin
+ * moves to the newest stable release; a prerelease is never chosen.
  */
 export const survey = (root: string) =>
   Effect.gen(function* () {
@@ -467,14 +544,23 @@ export const survey = (root: string) =>
     const mise = yield* surveyMise(root)
     const packages = yield* surveyPackages(root)
     const pi = yield* surveyPiPackages(root)
+    const pypi = yield* surveyPypiPackages(root)
     return {
-      pins: [...actions.pins, ...vendored.pins, ...mise.pins, ...packages.pins, ...pi.pins],
+      pins: [
+        ...actions.pins,
+        ...vendored.pins,
+        ...mise.pins,
+        ...packages.pins,
+        ...pi.pins,
+        ...pypi.pins,
+      ],
       skipped: [...actions.skipped, ...mise.skipped],
       actions: actions.latest,
       vendored: vendored.latest,
       mise: mise.latest,
       packages: packages.ranges,
       piPackages: pi.latest,
+      pypiPackages: pypi.latest,
     } satisfies Survey
   })
 
@@ -662,6 +748,12 @@ export const renderPiPins = (root: string, versions: Survey["piPackages"]) =>
     Effect.map((table) => renderPiPackages(withPiPackageVersions(table, versions))),
   )
 
+/** The text of `pypi-packages.json` with the versions of a survey set; nothing is written. */
+export const renderPypiPins = (root: string, versions: Survey["pypiPackages"]) =>
+  readPypiPins(root).pipe(
+    Effect.map((table) => renderPiPackages(withPiPackageVersions(table, versions))),
+  )
+
 const writeRanges = (root: string, packages: Survey["packages"]) =>
   renderRanges(root, packages).pipe(
     Effect.flatMap((rendered) =>
@@ -671,8 +763,8 @@ const writeRanges = (root: string, packages: Survey["packages"]) =>
 
 /**
  * Writes the moves a survey found. Everything that can fail on the network or on a file is done
- * first: the new texts of the workflows, `mise.toml`, the manifests, the Pi package pins and the
- * vendored pins are computed, and every moved archive is downloaded and checked against its
+ * first: the new texts of the workflows, `mise.toml`, the manifests, the Pi and PyPI package pins
+ * and the vendored pins are computed, and every moved archive is downloaded and checked against its
  * release's published SHA-256. Only then is anything written, so a failed download leaves the tree
  * unchanged. The moved programs are installed from the archives already downloaded,
  * `scripts/vendor.ts` (the `vendor` task) removes what no pin names, and `bun update` then
@@ -692,6 +784,7 @@ export const applySurvey = (root: string, found: Survey) =>
     const mise = rewriteMiseTools(yield* readText(root, "mise.toml"), found.mise)
     const ranges = yield* renderRanges(root, found.packages)
     const piPins = yield* renderPiPins(root, found.piPackages)
+    const pypiPins = yield* renderPypiPins(root, found.pypiPackages)
     const moved = found.pins.filter((pin) => pin.kind === "vendor" && isBehind(pin))
     let vendor = yield* readText(root, VENDOR_PINS)
     const archives: Array<Downloaded> = []
@@ -709,6 +802,7 @@ export const applySurvey = (root: string, found: Survey) =>
     yield* writeText(root, "mise.toml", mise)
     for (const [file, text] of ranges) yield* writeText(root, file, text)
     yield* writeText(root, PI_PACKAGE_PINS, piPins)
+    yield* writeText(root, PYPI_PACKAGE_PINS, pypiPins)
     if (moved.length > 0) {
       yield* writeText(root, VENDOR_PINS, vendor)
       for (const { asset, archive } of archives)

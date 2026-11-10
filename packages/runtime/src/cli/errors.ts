@@ -129,6 +129,8 @@ const HINTS: Readonly<Record<string, string>> = {
     "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
   ToolMissing:
     "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
+  BrowserLaunchFailed:
+    "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
   StateModeRefused:
     "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
   StateLocked: "Another process holds the state lock; retry in a moment.",

@@ -60,7 +60,7 @@ if (BROWSER_USE === undefined) throw new Error("the registry has no browser-use 
 
 // `node --version` answers with `node`, which the capability's Node.js need reads.
 const shell = (
-  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx"],
+  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx", "uvx"],
   node: string = "v22.19.0",
 ) =>
   fakeShell({
@@ -370,20 +370,29 @@ describe("holyagent doctor on browse", () => {
     expect(lines(silent)[0]).toContain("did not report a version for --version")
   })
 
-  test("the headless form is offered: the Playwright server, needing node 18 and no display", async () => {
-    const result = await run("headless", {})
-    expect(lines(result)).toEqual([
+  test("the headless form is offered: the browser-use server, needing uvx and a Chromium and no node, npx or display", async () => {
+    const chromium = { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" }
+    const ok = await run("headless", chromium, ["bun", "ctx7", "pi", "uvx"])
+    expect(lines(ok)).toEqual([
       "ok   pi capability browser-use: headless form, specialists, nothing to install",
     ])
-    // Playwright's own floor is lower than browse's.
-    const node18 = await run("headless", {}, undefined, "v18.0.0")
-    expect(lines(node18)).toEqual([
-      "ok   pi capability browser-use: headless form, specialists, nothing to install",
-    ])
-    const node16 = await run("headless", {}, undefined, "v16.20.0")
-    expect(lines(node16)[0]).toStartWith(
-      "FAIL pi capability browser-use: needs Node.js 18.0.0 or newer, but /fake/bin/node is 16.20.0",
+  })
+
+  test("a missing uvx is a failing need with its fix, and so is a missing Chromium", async () => {
+    const chromium = { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" }
+    const noUvx = await run("headless", chromium, ["bun", "ctx7", "pi", "node", "npx"])
+    expect(lines(noUvx)[0]).toBe(
+      "FAIL pi capability browser-use: needs uvx on PATH; install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs",
     )
+    expect(noUvx.ok).toBe(false)
+    const noChromium = await run("headless", { PLAYWRIGHT_BROWSERS_PATH: join(home, "none") })
+    expect(lines(noChromium)[0]).toStartWith(
+      "FAIL pi capability browser-use: needs a Chromium; set HOLYAGENT_CHROMIUM_PATH to a Chromium executable",
+    )
+    expect(noChromium.ok).toBe(false)
+    // Neither is a need of the normal form.
+    const normal = await run("normal", { DISPLAY: ":0" }, ["bun", "ctx7", "pi", "node", "npx"])
+    expect(lines(normal)[0]).toStartWith("ok   pi capability browser-use: normal form")
   })
 
   test("with the MCP extension off the servers are not registered, and doctor says so", async () => {
@@ -392,7 +401,7 @@ describe("holyagent doctor on browse", () => {
     expect(lines(normal)).toContain(
       "~ pi capability browser-use: pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
     )
-    const headless = await run("headless", {})
+    const headless = await run("headless", { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" })
     expect(lines(headless)).toContain(
       "~ pi capability browser-use: pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
     )
@@ -475,8 +484,9 @@ describe("holyagent setup on browse", () => {
     expect(await report("normal")).toEqual([
       "~ browser-use: normal form; pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
     ])
-    expect(await report("headless", { PLAYWRIGHT_BROWSERS_PATH: join(home, "none") })).toEqual([
+    expect(await report("headless", { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" })).toEqual([
       "~ browser-use: headless form; pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
+      "= browser-use: the headless browser is the Chromium at /fake/chromium",
     ])
   })
 
@@ -513,19 +523,37 @@ describe("holyagent setup on browse", () => {
       )
   })
 
-  test("headless form: registers the Playwright server headless and isolated, and reads no pairing", async () => {
+  test("headless form: registers the browser-use server through browser-server, and reads no pairing", async () => {
     await writeBrowsePairing(home)
-    const lines = await report("headless", { PLAYWRIGHT_BROWSERS_PATH: join(home, "none") })
-    expect(lines).toHaveLength(1)
-    expect(lines[0]).toStartWith(
-      "= browser-use: headless form; the extension registers `npx --registry=https://registry.npmjs.org/ --@playwright:registry=https://registry.npmjs.org/ -y @playwright/mcp@",
+    const lines = await report("headless", { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" })
+    expect(lines).toEqual([
+      "= browser-use: headless form; the extension registers `uvx --no-config --default-index https://pypi.org/simple --from browser-use==1.0.0 browser-use --cli-mcp` for screen specialists through `holyagent browser-server`, which starts the headless browser and stops it with the server and writes no file for it",
+      "= browser-use: the headless browser is the Chromium at /fake/chromium",
+    ])
+  })
+
+  test("headless form: a missing Chromium or uvx is reported beside the form, with its fix", async () => {
+    const lines = await report("headless", { PLAYWRIGHT_BROWSERS_PATH: join(home, "none") }, [
+      "bun",
+      "ctx7",
+      "pi",
+    ])
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toStartWith("= browser-use: headless form; the extension registers `uvx ")
+    expect(lines).toContain(
+      "~ browser-use: needs uvx on PATH; install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs",
     )
-    expect(lines[0]).toContain("--headless --isolated --browser chromium")
+    expect(
+      lines.some((line) =>
+        line.startsWith("~ browser-use: needs a Chromium; set HOLYAGENT_CHROMIUM_PATH"),
+      ),
+    ).toBe(true)
   })
 
   test("headless form: names the Chromium the machine provides, and none when it has none", async () => {
     const browsers = join(home, "pw-browsers")
-    expect(await report("headless", { PLAYWRIGHT_BROWSERS_PATH: browsers })).toHaveLength(1)
+    const none = await report("headless", { PLAYWRIGHT_BROWSERS_PATH: browsers })
+    expect(none.some((line) => line.includes("the headless browser is the Chromium"))).toBe(false)
     await write(join(browsers, "chromium"), "")
     const lines = await report("headless", { PLAYWRIGHT_BROWSERS_PATH: browsers })
     expect(lines).toContain(

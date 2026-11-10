@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -3897,7 +3897,7 @@ describe("the MCP servers of the screen capability", () => {
       expect(
         (await registered(`${name}#a1b2c3d4`)).map((server) => server.name),
         name,
-      ).toEqual([name.endsWith("-headless-screen") ? "playwright" : "browse"])
+      ).toEqual([name.endsWith("-headless-screen") ? "browser_use" : "browse"])
   })
 
   test("the root and the specialists without the capability register none, so no other process starts the server", async () => {
@@ -3907,33 +3907,18 @@ describe("the MCP servers of the screen capability", () => {
     expect(await registered("my chat#1")).toEqual([])
   })
 
-  test("a headless screen specialist registers the Playwright server headless and isolated, with the machine's Chromium when there is one", async () => {
-    const browsers = await mkdtemp(join(tmpdir(), "holyagent-chromium-"))
-    try {
-      // The server comes from the agent file's form, whatever the machine's environment says.
-      const bare = await registered("worker-visual-headless-screen#a1b2c3d4", {
-        env: { ...DISPLAY, PLAYWRIGHT_BROWSERS_PATH: browsers },
-      })
-      expect(bare).toHaveLength(1)
-      expect(bare[0]?.name).toBe("playwright")
-      const args = (bare[0]?.config as { args: Array<string> }).args
-      expect(args.slice(0, 2)).toEqual([
-        "--registry=https://registry.npmjs.org/",
-        "--@playwright:registry=https://registry.npmjs.org/",
-      ])
-      expect(args.join(" ")).toContain("--headless --isolated --browser chromium")
-      expect(args).not.toContain("--executable-path")
-      await writeFile(join(browsers, "chromium"), "")
-      const preinstalled = await registered("worker-visual-headless-screen#a1b2c3d4", {
-        env: { PLAYWRIGHT_BROWSERS_PATH: browsers },
-      })
-      expect((preinstalled[0]?.config as { args: Array<string> }).args.slice(-2)).toEqual([
-        "--executable-path",
-        join(browsers, "chromium"),
-      ])
-    } finally {
-      await rm(browsers, { recursive: true, force: true })
-    }
+  test("a headless screen specialist registers holyagent's browser-server, which runs the browser-use server, from the home folder", async () => {
+    const [server] = await registered("worker-visual-headless-screen#a1b2c3d4", {
+      env: { ...DISPLAY, HOME: "/home/neutral" },
+    })
+    expect(server?.name).toBe("browser_use")
+    // Pi's configuration takes a fixed command: Bun on the bundled runtime, whose command starts
+    // the Chromium and the server, with the flags that keep the project's .env and bunfig out.
+    expect(server?.config).toEqual({
+      command: BUN,
+      args: [...RUNTIME, "browser-server"],
+      cwd: "/home/neutral",
+    })
   })
 
   test("browser use switched off registers none, and the specialist is told", async () => {
@@ -4031,7 +4016,7 @@ describe("T3's preview tools for a screen specialist", () => {
       env: {},
       startOnly: true,
     })
-    expect(await screen.api.emit("tool_call", call("mcp__playwright__browser_navigate"))).toEqual([
+    expect(await screen.api.emit("tool_call", call("mcp__browser_use__browser_exec"))).toEqual([
       undefined,
     ])
   })

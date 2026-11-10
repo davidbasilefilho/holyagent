@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { Effect } from "effect"
 
-import { PLAYWRIGHT_MCP_SERVER } from "../../../runtime/src/config/capabilities.ts"
+import { BROWSER_USE_MCP_SERVER } from "../../../runtime/src/config/capabilities.ts"
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
 import {
   HEADLESS_SCREEN_AGENT_SUFFIX,
@@ -68,26 +68,12 @@ describe("the servers a screen specialist registers", () => {
     expect(screenServers(DEFAULTS, "normal")).toEqual([BROWSE])
   })
 
-  test("the headless form offers the Playwright server at its pin: headless, isolated, on Chromium", () => {
-    const { chromiumFlag: _flag, ...server } = PLAYWRIGHT_MCP_SERVER
-    expect(screenServers(DEFAULTS, "headless")).toEqual([server])
-    expect(server.args.slice(0, 2)).toEqual([
-      ...REGISTRY,
-      "--@playwright:registry=https://registry.npmjs.org/",
-    ])
-    expect(server.args).toContain("--headless")
-    expect(server.args).toContain("--isolated")
-    expect(server.args.join(" ")).toContain("--browser chromium")
-  })
-
-  test("the machine's Chromium becomes the server's executable path, and its absence leaves the server's own", () => {
-    const [server] = screenServers(DEFAULTS, "headless", "/opt/pw-browsers/chromium")
-    expect(server?.args.slice(-2)).toEqual(["--executable-path", "/opt/pw-browsers/chromium"])
-    expect(screenServers(DEFAULTS, "headless", undefined)[0]?.args).not.toContain(
-      "--executable-path",
-    )
-    // Browse launches no browser, so it takes no executable path.
-    expect(screenServers(DEFAULTS, "normal", "/opt/pw-browsers/chromium")).toEqual([BROWSE])
+  test("the headless form offers the browser-use server at its pin, through uvx with no uv config and the public index", () => {
+    expect(screenServers(DEFAULTS, "headless")).toEqual([BROWSER_USE_MCP_SERVER])
+    const { args, command, launchesChromium } = BROWSER_USE_MCP_SERVER
+    expect([command, launchesChromium]).toEqual(["uvx", true])
+    expect(args.slice(0, 3)).toEqual(["--no-config", "--default-index", "https://pypi.org/simple"])
+    expect(args.slice(-4)).toEqual(["--from", "browser-use==1.0.0", "browser-use", "--cli-mcp"])
   })
 
   test("a switched-off capability adds none, and neither does the MCP extension being off", () => {
@@ -95,9 +81,7 @@ describe("the servers a screen specialist registers", () => {
     expect(screenServers(withFeatures({ browserUse: false }), "headless")).toEqual([])
     // Pi's MCP extension runs the servers: with `--no-mcp` there is nothing to register them with.
     expect(screenServers(withFeatures({ mcp: false }), "normal")).toEqual([])
-    expect(
-      screenServers(withFeatures({ mcp: false }), "headless", "/opt/pw-browsers/chromium"),
-    ).toEqual([])
+    expect(screenServers(withFeatures({ mcp: false }), "headless")).toEqual([])
   })
 
   test("the other capabilities add none: only browse has a server", () => {
@@ -131,7 +115,7 @@ describe("T3's preview tools", () => {
   test("the gate leaves every other tool, and every other session, alone", () => {
     for (const toolName of [
       "mcp__browse__execute",
-      "mcp__playwright__browser_navigate",
+      "mcp__browser_use__browser_exec",
       "bash",
       "mcp__t3-code__device_list",
     ])
@@ -143,6 +127,8 @@ describe("T3's preview tools", () => {
 
 describe("registering them", () => {
   const NEUTRAL = "/home/user"
+  // The launcher the extension supplies: Bun on the bundled runtime's `browser-server` command.
+  const LAUNCH = () => ({ command: "/bin/bun", args: ["holyagent.js", "browser-server"] })
   const recorder = (fail?: (name: string) => Error | undefined) => {
     const calls: Array<{ name: string; config: unknown }> = []
     return {
@@ -157,7 +143,9 @@ describe("registering them", () => {
 
   test("a screen specialist registers each server as a stdio command", () => {
     const { calls, register } = recorder()
-    expect(registerScreenServers(register, "worker-visual-screen", [BROWSE], NEUTRAL)).toEqual({
+    expect(
+      registerScreenServers(register, "worker-visual-screen", [BROWSE], NEUTRAL, LAUNCH),
+    ).toEqual({
       registered: ["browse"],
       failures: [],
     })
@@ -176,6 +164,7 @@ describe("registering them", () => {
       "worker-visual-screen",
       [BROWSE, { name: "other", command: "node", args: ["server.js"] }],
       NEUTRAL,
+      LAUNCH,
     )
     expect(calls.map(({ name, config }) => [name, (config as { cwd?: string }).cwd])).toEqual([
       ["browse", NEUTRAL],
@@ -183,10 +172,44 @@ describe("registering them", () => {
     ])
   })
 
+  test("a server that launches a Chromium is registered as the launcher's command, in the neutral folder", () => {
+    const { calls, register } = recorder()
+    expect(
+      registerScreenServers(
+        register,
+        "worker-visual-headless-screen",
+        [BROWSER_USE_MCP_SERVER],
+        NEUTRAL,
+        LAUNCH,
+      ),
+    ).toEqual({ registered: ["browser_use"], failures: [] })
+    expect(calls).toEqual([
+      {
+        name: "browser_use",
+        config: { command: "/bin/bun", args: ["holyagent.js", "browser-server"], cwd: NEUTRAL },
+      },
+    ])
+  })
+
+  test("a launcher that cannot be built fails that server with its reason", () => {
+    const { calls, register } = recorder()
+    const result = registerScreenServers(
+      register,
+      "worker-visual-headless-screen",
+      [BROWSE, BROWSER_USE_MCP_SERVER],
+      NEUTRAL,
+      () => {
+        throw new Error("Bun was not found")
+      },
+    )
+    expect(result).toEqual({ registered: ["browse"], failures: ["browser_use: Bun was not found"] })
+    expect(calls.map(({ name }) => name)).toEqual(["browse"])
+  })
+
   test("any other session registers nothing", () => {
     for (const agent of [undefined, "worker-visual", "reviewer-code", "general-purpose"]) {
       const { calls, register } = recorder()
-      expect(registerScreenServers(register, agent, [BROWSE], NEUTRAL)).toEqual({
+      expect(registerScreenServers(register, agent, [BROWSE], NEUTRAL, LAUNCH)).toEqual({
         registered: [],
         failures: [],
       })
@@ -206,6 +229,7 @@ describe("registering them", () => {
         { name: "second", command: "b", args: ["x"] },
       ],
       NEUTRAL,
+      LAUNCH,
     )
     expect(result).toEqual({ registered: ["second"], failures: ["first: invalid name"] })
     expect(calls).toEqual([{ name: "second", config: { command: "b", args: ["x"] } }])

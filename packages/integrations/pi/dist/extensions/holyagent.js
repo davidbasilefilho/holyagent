@@ -14069,47 +14069,6 @@ var workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS, host = "claude"
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed5(reason)));
 
-var CODEX_PROVIDER_ID = "openai-codex";
-var SOL = "gpt-6.1-sol";
-var TERRA = "gpt-6.1-terra";
-var LUNA = "gpt-6-luna";
-var choice = (model, thinking) => ({ model, thinking });
-var CODEX_ROUTES = {
-  root: choice(SOL, "high"),
-  "Explorer.map": choice(LUNA, "low"),
-  "Explorer.lookup": choice(LUNA, "low"),
-  "Explorer.trace": choice(TERRA, "medium"),
-  "Librarian.lookup": choice(LUNA, "low"),
-  "Librarian.research": choice(TERRA, "medium"),
-  "Worker.mechanical": choice(LUNA, "medium"),
-  "Worker.implementation": choice(TERRA, "high"),
-  "Worker.integration": choice(TERRA, "medium"),
-  "Worker.operations": choice(LUNA, "medium"),
-  "Worker.validation": choice(LUNA, "low"),
-  "Worker.debugging": choice(TERRA, "xhigh"),
-  "Worker.visual": choice(TERRA, "high"),
-  "Reviewer.visual": choice(TERRA, "high"),
-  "Reviewer.code": choice(TERRA, "high"),
-  "Reviewer.testing": choice(TERRA, "medium"),
-  "Reviewer.audit": choice(LUNA, "high"),
-  "Reviewer.security": choice(TERRA, "xhigh"),
-  "Reviewer.artifact": choice(TERRA, "medium")
-};
-var SCREEN_MINIMUM_THINKING = "medium";
-var THINKING_RANK = {
-  off: 0,
-  minimal: 1,
-  low: 2,
-  medium: 3,
-  high: 4,
-  xhigh: 5,
-  max: 6
-};
-var screenRoute = (row) => {
-  const higher = THINKING_RANK[row.thinking] >= THINKING_RANK[SCREEN_MINIMUM_THINKING] ? row.thinking : SCREEN_MINIMUM_THINKING;
-  return choice(TERRA, higher);
-};
-
 var BILLION_CONTEXT_GUARDRAILS_OFF = {
   BILI_GUARDRAIL_BASH_TIMEOUT: "0",
   BILI_GUARDRAIL_MAX_OUTPUT_BYTES: "0",
@@ -14148,12 +14107,17 @@ var pi_packages_default = {
   "@amaster.ai/pi-computer-use": "0.1.36",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.15",
-  "@playwright/mcp": "0.0.85"
+  "@opencode/browse": "0.0.15"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 var piPackageSource = (name) => `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`;
+
+var pypi_packages_default = {
+  "browser-use": "1.0.0"
+};
+
+var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
 
 var CAPABILITY_FORMS = ["headless", "normal"];
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
@@ -14189,18 +14153,31 @@ var BROWSE_MCP_SERVER = {
   command: "npx",
   args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
 };
-var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
-var PLAYWRIGHT_SERVER = "playwright";
-var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
-var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
-var PLAYWRIGHT_MCP_SERVER = {
-  name: PLAYWRIGHT_SERVER,
-  command: "npx",
-  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
-  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+var BROWSER_USE_PACKAGE = "browser-use";
+var BROWSER_USE_SERVER = "browser_use";
+var BROWSER_USE_TOOLS = [
+  `mcp__${BROWSER_USE_SERVER}__browser_exec`,
+  `mcp__${BROWSER_USE_SERVER}__browser_screenshot`
+];
+var BROWSER_USE_ALL_TOOLS = [`mcp__${BROWSER_USE_SERVER}__*`];
+var PYPI_INDEX = "https://pypi.org/simple";
+var uvxServerArgs = (name, rest) => [
+  "--no-config",
+  "--default-index",
+  PYPI_INDEX,
+  "--from",
+  `${name}==${PYPI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
+var BROWSER_SERVER_COMMAND = "browser-server";
+var BROWSER_USE_MCP_SERVER = {
+  name: BROWSER_USE_SERVER,
+  command: "uvx",
+  args: uvxServerArgs(BROWSER_USE_PACKAGE, ["browser-use", "--cli-mcp"]),
+  launchesChromium: true
 };
 var BROWSE_MINIMUM_NODE = [22, 19, 0];
-var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var CHROMIUM_FIX = "set HOLYAGENT_CHROMIUM_PATH to a Chromium executable, or put a Playwright Chromium build in the folder PLAYWRIGHT_BROWSERS_PATH names (PLAYWRIGHT_BROWSERS_PATH=<folder> uvx playwright install chromium)";
 var nodeNeed = (minimum) => ({
   kind: "node",
   minimum,
@@ -14317,34 +14294,43 @@ var CAPABILITIES = [
   {
     name: "browser-use",
     feature: "browserUse",
-    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the browser-use MCP server (browser-use) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
-    needs: [
-      {
-        kind: "command",
-        command: "npx",
-        fix: "install Node.js from https://nodejs.org, which ships npx"
-      }
-    ],
+    needs: [],
     forms: {
       headless: {
         packages: [],
-        mcpServers: [PLAYWRIGHT_MCP_SERVER],
-        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
+        mcpServers: [BROWSER_USE_MCP_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: "uvx",
+            fix: "install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs"
+          },
+          { kind: "chromium", fix: CHROMIUM_FIX }
+        ]
       },
       normal: {
         packages: [],
         mcpServers: [BROWSE_MCP_SERVER],
-        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        needs: [
+          {
+            kind: "command",
+            command: "npx",
+            fix: "install Node.js from https://nodejs.org, which ships npx"
+          },
+          { kind: "display" },
+          nodeNeed(BROWSE_MINIMUM_NODE)
+        ],
         pairing: true
       }
     },
     tools: {
-      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      rootExclude: [...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS],
       visual: [],
-      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+      screen: [...BROWSE_TOOLS, ...BROWSER_USE_TOOLS]
     },
     settings: [],
     health: ["needs"]
@@ -14458,6 +14444,47 @@ var unavailableIn = (capability, form, platform = hostPlatform()) => {
   return capability.nativeHosts === undefined || capability.nativeHosts.includes(platform) ? undefined : `its native library does not cover ${platform}, only ${capability.nativeHosts.join(", ")}`;
 };
 var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form, options.platform) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider));
+
+var CODEX_PROVIDER_ID = "openai-codex";
+var SOL = "gpt-6.1-sol";
+var TERRA = "gpt-6.1-terra";
+var LUNA = "gpt-6-luna";
+var choice = (model, thinking) => ({ model, thinking });
+var CODEX_ROUTES = {
+  root: choice(SOL, "high"),
+  "Explorer.map": choice(LUNA, "low"),
+  "Explorer.lookup": choice(LUNA, "low"),
+  "Explorer.trace": choice(TERRA, "medium"),
+  "Librarian.lookup": choice(LUNA, "low"),
+  "Librarian.research": choice(TERRA, "medium"),
+  "Worker.mechanical": choice(LUNA, "medium"),
+  "Worker.implementation": choice(TERRA, "high"),
+  "Worker.integration": choice(TERRA, "medium"),
+  "Worker.operations": choice(LUNA, "medium"),
+  "Worker.validation": choice(LUNA, "low"),
+  "Worker.debugging": choice(TERRA, "xhigh"),
+  "Worker.visual": choice(TERRA, "high"),
+  "Reviewer.visual": choice(TERRA, "high"),
+  "Reviewer.code": choice(TERRA, "high"),
+  "Reviewer.testing": choice(TERRA, "medium"),
+  "Reviewer.audit": choice(LUNA, "high"),
+  "Reviewer.security": choice(TERRA, "xhigh"),
+  "Reviewer.artifact": choice(TERRA, "medium")
+};
+var SCREEN_MINIMUM_THINKING = "medium";
+var THINKING_RANK = {
+  off: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  high: 4,
+  xhigh: 5,
+  max: 6
+};
+var screenRoute = (row) => {
+  const higher = THINKING_RANK[row.thinking] >= THINKING_RANK[SCREEN_MINIMUM_THINKING] ? row.thinking : SCREEN_MINIMUM_THINKING;
+  return choice(TERRA, higher);
+};
 
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed5(value)));
 var VcsSettings = Struct({
@@ -17667,47 +17694,9 @@ var rootActiveTools = (args, active, registered) => {
   return [...new Set([...active, ...added])].filter((tool) => !args.excludeTools.some((pattern) => toolMatches(pattern, tool)));
 };
 
-import { existsSync, readdirSync } from "node:fs";
-import { posix, win32 } from "node:path";
-
 import { homedir } from "node:os";
 var firstNonEmpty = (...values) => values.find((value) => value !== undefined && value !== "");
 var homeDirectory = (env, fallback = homedir) => firstNonEmpty(env.HOME, env.USERPROFILE) ?? fallback();
-
-var PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
-var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
-var BUILD_EXECUTABLES = {
-  linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
-  darwin: [
-    "chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
-    "chrome-mac/Chromium.app/Contents/MacOS/Chromium"
-  ],
-  win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
-};
-var pathsOf = (platform) => platform === "win32" ? win32 : posix;
-var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
-var inFolder = (folder, platform, exists, list) => {
-  const { join } = pathsOf(platform);
-  const entry = join(folder, "chromium");
-  if (exists(entry))
-    return entry;
-  const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
-  for (const build of builds)
-    for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
-      const path = join(folder, build, ...executable.split("/"));
-      if (exists(path))
-        return path;
-    }
-  return;
-};
-var safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => [])));
-var findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
-  const given = firstNonEmpty(env[PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE]);
-  if (given !== undefined)
-    return given;
-  const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
-  return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
-};
 
 var inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true";
 
@@ -17737,7 +17726,7 @@ var TRACKED_STATE_PATHSPEC = [
 
 import { lstatSync, realpathSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
-import { posix as posix2, win32 as win322 } from "node:path";
+import { posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 var REVIEW_MODEL = "codex-auto-review";
@@ -18130,7 +18119,7 @@ var PROTECTED_FOLDERS = [
   ".agents"
 ];
 var currentHost = () => ({ platform: process.platform, home: homedir2() });
-var pathsOf2 = (host) => host.platform === "win32" ? win322 : posix2;
+var pathsOf = (host) => host.platform === "win32" ? win32 : posix;
 var UNICODE_SPACES = /[  -   　]/g;
 var SHELL_DRIVE_PATH = /^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i;
 var shellDrivePath = (path) => {
@@ -18142,7 +18131,7 @@ var shellDrivePath = (path) => {
 var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) && typeof error.code === "string" ? error.code : undefined;
 var probe = (run) => runSync2(try_2({ try: run, catch: errorCode }).pipe(map4((value) => ({ found: true, value })), catch_2((code) => succeed5({ found: false, code }))));
 var piPath = (input, root, host) => {
-  const paths = pathsOf2(host);
+  const paths = pathsOf(host);
   const windows = host.platform === "win32";
   let text = input.replace(UNICODE_SPACES, " ");
   if (text.startsWith("@"))
@@ -18164,7 +18153,7 @@ var piPath = (input, root, host) => {
 var throughLinks = (path, host) => {
   if (host.platform !== process.platform)
     return path;
-  const paths = pathsOf2(host);
+  const paths = pathsOf(host);
   const tail = [];
   let current = path;
   for (;; ) {
@@ -18194,7 +18183,7 @@ var isProtectedName = (part, host) => {
   return PROTECTED_FOLDERS.some((folder) => bare === folder || short !== undefined && short === shortStem(folder));
 };
 var writeTrigger = (path, root, host = currentHost()) => {
-  const paths = pathsOf2(host);
+  const paths = pathsOf(host);
   const target = piPath(path, root, host);
   const real = target === undefined ? undefined : throughLinks(target, host);
   const base = paths.resolve(root);
@@ -19166,20 +19155,23 @@ var AGENT_TYPES = [...SPECIALIST_NAMES, ...SCREEN_SPECIALIST_NAMES];
 
 var isScreenAgent = (agent) => agent !== undefined && SCREEN_SPECIALIST_NAMES.includes(agent);
 var screenFormOf = (agent) => isHeadlessScreenAgent(agent) ? "headless" : "normal";
-var screenServers = (config, form, chromium) => config.pi.features.mcp ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap((capability) => (formContent(capability, form)?.mcpServers ?? []).map(({ chromiumFlag, ...server }) => chromiumFlag === undefined || chromium === undefined ? server : { ...server, args: [...server.args, chromiumFlag, chromium] })) : [];
+var screenServers = (config, form) => config.pi.features.mcp ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap((capability) => formContent(capability, form)?.mcpServers ?? []) : [];
 var refuseT3PreviewOutsideT3 = (event, agent, t3) => !t3 && isScreenAgent(agent) && T3_PREVIEW_TOOLS.some((pattern) => toolMatches(pattern, event.toolName)) ? {
   block: true,
   reason: `${event.toolName} is T3 Code's tool, and T3 does not host this session. Use the browser tools you were given instead.`
 } : undefined;
-var registerScreenServers = (register, agent, servers, neutralDirectory) => {
+var registerScreenServers = (register, agent, servers, neutralDirectory, launch) => {
   if (!isScreenAgent(agent))
     return { registered: [], failures: [] };
   const outcomes = servers.map((server) => runSync2(try_2({
-    try: () => register(server.name, {
-      command: server.command,
-      args: [...server.args],
-      ...server.command === "npx" ? { cwd: neutralDirectory } : {}
-    }),
+    try: () => {
+      const { command, args } = server.launchesChromium === true ? launch(server) : server;
+      return register(server.name, {
+        command,
+        args: [...args],
+        ...server.command === "npx" || server.launchesChromium === true ? { cwd: neutralDirectory } : {}
+      });
+    },
     catch: (cause) => `${server.name}: ${cause instanceof Error ? cause.message : String(cause)}`
   }).pipe(as2({ name: server.name, failure: undefined }), catch_2((failure) => succeed5({ name: server.name, failure })))));
   return {
@@ -19346,9 +19338,7 @@ class DeadlineExceeded extends TaggedError2("DeadlineExceeded") {
 var rootExclusions = (configs) => [
   ...new Set(configs.flatMap((config) => toolArgs(config, "root").excludeTools))
 ];
-var settingsFor = (config, role, bound = [], form = "normal", chromium = () => {
-  return;
-}) => {
+var settingsFor = (config, role, bound = [], form = "normal") => {
   const rootArgs = toolArgs(config, "root");
   const codex = codexSettings(config);
   return {
@@ -19356,7 +19346,7 @@ var settingsFor = (config, role, bound = [], form = "normal", chromium = () => {
     providerEnvironment: providerEnv(config),
     ...codex === undefined ? {} : { codex },
     ...justBashOn(config) ? { justBash: true } : {},
-    ...role === "specialist" ? { screenServers: screenServers(config, form, chromium()) } : {},
+    ...role === "specialist" ? { screenServers: screenServers(config, form) } : {},
     ...role === "root" ? {
       rootPrompt: true,
       tools: {
@@ -19564,7 +19554,7 @@ var createExtension = ({
   const closedSettings = (config, user) => gen2(function* () {
     const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
     const defaults = yield* defaultConfig;
-    return settingsFor(config ?? defaults, role, boundConfigs(defaults, user), machineForm(), () => findChromium(env));
+    return settingsFor(config ?? defaults, role, boundConfigs(defaults, user), machineForm());
   }).pipe(orDie2);
   const startingExclusions = gen2(function* () {
     const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
@@ -19603,7 +19593,7 @@ var createExtension = ({
         if (!config.pi.enable) {
           if (user !== undefined && !user.pi.enable)
             return { enabled: false, gatesOff: true };
-          const off = settingsFor(config, yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE)), bound, machineForm(), () => findChromium(env));
+          const off = settingsFor(config, yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE)), bound, machineForm());
           return {
             enabled: false,
             ...off.rootPrompt === undefined ? {} : { rootPrompt: off.rootPrompt },
@@ -19611,7 +19601,7 @@ var createExtension = ({
           };
         }
         const role = yield* roleOf;
-        configured = settingsFor(config, role, bound, machineForm(), () => findChromium(env));
+        configured = settingsFor(config, role, bound, machineForm());
         const status = yield* holyagent(signal, project, "status").pipe(flatMap2((text) => parseOutput("status", text)));
         const reconcile = RECONCILED.has(reason) ? yield* holyagent(signal, project, "reconcile").pipe(flatMap2((text) => parseOutput("reconcile", text))) : undefined;
         const directory = yield* fromResult2(folder);
@@ -19712,8 +19702,18 @@ var createExtension = ({
       noServerTold = true;
       return notice("no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing");
     }
-    const { failures } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, servers, homeDirectory(env));
+    const { failures } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, servers, homeDirectory(env), browserLauncher);
     return failures.length === 0 ? undefined : notice(`an MCP server of the screen capability was not registered (${failures.join("; ")}); work without its tools and report that they are missing`);
+  };
+  const browserLauncher = () => {
+    const argv = [...bundled, BROWSER_SERVER_COMMAND];
+    const found = bunFor(argv);
+    if (!found.ok)
+      throw new Error(found.reason);
+    const launch = launchOf(found.program, argv);
+    if (!launch.ok)
+      throw new Error(launch.reason);
+    return { command: isShim(found.program) ? "cmd.exe" : found.program, args: launch.args };
   };
   const gather = (taken, ctx, reason) => {
     taken.current?.abort();

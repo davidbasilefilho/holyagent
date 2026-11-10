@@ -1,16 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  BROWSE_PACKAGE,
-  FEATURE_PACKAGES,
-  PLAYWRIGHT_PACKAGE,
-} from "../../src/config/capabilities.ts"
+import { BROWSE_PACKAGE, FEATURE_PACKAGES } from "../../src/config/capabilities.ts"
 import { piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
 import {
   PI_PACKAGE_VERSIONS,
   type PiPackageName,
   piPackageSource,
 } from "../../src/config/pi-packages.ts"
+import { PYPI_PACKAGE_VERSIONS } from "../../src/config/pypi-packages.ts"
 import type { Config } from "../../src/config/schema.ts"
 import { DEFAULT_CONFIG } from "./defaults.ts"
 
@@ -108,14 +105,20 @@ describe("piPackages order and pi.enable", () => {
 describe("the pin table", () => {
   const named = ALL_NAMES.toSorted()
 
-  test("pins exactly the packages the integration can enable and the MCP servers of browser use (opencode browse and Playwright), each to an exact stable release", () => {
+  test("pins exactly the packages the integration can enable and the npm MCP server of browser use (opencode browse), each to an exact stable release", () => {
     // Pi installs neither: each MCP server runs its package through npx at the pin, so they are in
     // the table for the updater and in no list of Pi packages.
     expect(Object.keys(PI_PACKAGE_VERSIONS).toSorted()).toEqual(
-      [...named, BROWSE_PACKAGE, PLAYWRIGHT_PACKAGE].toSorted(),
+      [...named, BROWSE_PACKAGE].toSorted(),
     )
     for (const version of Object.values(PI_PACKAGE_VERSIONS))
       expect(version).toMatch(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)
+  })
+
+  test("the PyPI table pins browser-use exactly and names nothing Pi installs", () => {
+    expect(PYPI_PACKAGE_VERSIONS).toEqual({ "browser-use": "1.0.0" })
+    for (const name of Object.keys(PYPI_PACKAGE_VERSIONS))
+      expect(Object.keys(PI_PACKAGE_VERSIONS)).not.toContain(name)
   })
 
   test("every source piPackages returns reads its version from the table", () => {

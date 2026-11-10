@@ -14,12 +14,16 @@ import {
   PI_PACKAGE_PINS,
   type Pin,
   PinsBehind,
+  PYPI_PACKAGE_PINS,
+  pypiReleaseOf,
   releaseOf,
   renderPiPins,
+  renderPypiPins,
   SourceError,
   type Steps,
   type Survey,
   surveyPiPackages,
+  surveyPypiPackages,
   Usage,
   verifyChecksum,
 } from "./update-dependencies.ts"
@@ -40,6 +44,7 @@ const survey = (...pins: ReadonlyArray<Pin>): Survey => ({
   mise: new Map(),
   packages: new Map(),
   piPackages: new Map(),
+  pypiPackages: new Map(),
 })
 
 /** Steps that read a fixed survey and count the writes asked for. */
@@ -403,5 +408,148 @@ describe("Pi package pins", () => {
     const repository = join(import.meta.dir, "..")
     const text = await Bun.file(join(repository, PI_PACKAGE_PINS)).text()
     expect(await Effect.runPromise(renderPiPins(repository, new Map()))).toBe(text)
+  })
+})
+
+describe("PyPI package pins", () => {
+  const write = (file: string, text: string) => Bun.write(join(root, file), text)
+
+  /** The JSON API's answer for one project: each version with its files, some yanked. */
+  const project = (releases: Record<string, ReadonlyArray<boolean>>) =>
+    JSON.stringify({
+      info: { name: "browser-use", version: "1.2.0" },
+      urls: [],
+      releases: Object.fromEntries(
+        Object.entries(releases).map(([version, yanked]) => [
+          version,
+          yanked.map((flag) => ({ filename: `${version}.whl`, yanked: flag })),
+        ]),
+      ),
+    })
+
+  /** An index serving fixtures by project; the path is `/pypi/<name>/json`. */
+  const index = (answers: Record<string, string>) =>
+    Bun.serve({
+      port: 0,
+      fetch: (request) => {
+        const answer = answers[new URL(request.url).pathname]
+        return answer === undefined ? new Response("", { status: 404 }) : new Response(answer)
+      },
+    })
+
+  const FIXTURE = {
+    "/pypi/browser-use/json": project({
+      "1.0.0": [false],
+      "1.1.0": [false],
+      "1.2.0": [true],
+      "1.3.0rc1": [false],
+      "1.2.1.post1": [false],
+      "2.0.0.dev4": [false],
+    }),
+    "/pypi/old-line/json": project({ "1.0.0": [false], "2.0.0": [false] }),
+  }
+
+  const seed = () =>
+    write(PYPI_PACKAGE_PINS, JSON.stringify({ "browser-use": "1.0.0", "old-line": "3.0.0" }))
+
+  test("the repository pins browser-use exactly, in the form the updater writes", async () => {
+    const repository = join(import.meta.dir, "..")
+    const text = await Bun.file(join(repository, PYPI_PACKAGE_PINS)).text()
+    expect(JSON.parse(text)).toEqual({ "browser-use": "1.0.0" })
+    expect(await Effect.runPromise(renderPypiPins(repository, new Map()))).toBe(text)
+  })
+
+  test("moves each pin to the newest stable release that is not yanked, never down", async () => {
+    await seed()
+    const server = index(FIXTURE)
+    try {
+      const { pins, latest } = await Effect.runPromise(
+        surveyPypiPackages(root, `http://127.0.0.1:${server.port}`),
+      )
+      expect(pins.map(({ kind, name, current, next }) => ({ kind, name, current, next }))).toEqual([
+        // 1.2.0 is yanked, 1.3.0rc1, 1.2.1.post1 and 2.0.0.dev4 are not stable.
+        { kind: "pypi", name: "browser-use", current: "1.0.0", next: "1.1.0" },
+        // The newest release is behind the pin: the pin stays.
+        { kind: "pypi", name: "old-line", current: "3.0.0", next: "3.0.0" },
+      ])
+      expect(Object.fromEntries(latest)).toEqual({ "browser-use": "1.1.0", "old-line": "3.0.0" })
+      expect(pins.every(({ file }) => file === PYPI_PACKAGE_PINS)).toBe(true)
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("--check fails when a PyPI pin is behind and passes once it is current", async () => {
+    await seed()
+    const server = index(FIXTURE)
+    try {
+      const found = await Effect.runPromise(
+        surveyPypiPackages(root, `http://127.0.0.1:${server.port}`),
+      )
+      const error = await Effect.runPromise(
+        Effect.flip(execute(["--check", root], steps(survey(...found.pins)).stand)),
+      )
+      expect(error).toBeInstanceOf(PinsBehind)
+      expect((error as PinsBehind).count).toBe(1)
+      expect(logged.join("\n")).toContain("browser-use")
+
+      const current = survey(...found.pins.map((pin) => ({ ...pin, current: pin.next })))
+      await Effect.runPromise(execute(["--check", root], steps(current).stand))
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("a project with no stable, installable release fails the survey", async () => {
+    const server = index({
+      "/pypi/browser-use/json": project({ "1.0.0": [true], "1.1.0rc1": [false] }),
+    })
+    try {
+      const error = await Effect.runPromise(
+        Effect.flip(pypiReleaseOf("browser-use", `http://127.0.0.1:${server.port}`)),
+      )
+      expect(error).toBeInstanceOf(SourceError)
+      expect(error.message).toContain("no stable release that is not yanked")
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("an unknown project, an answer of another shape and a stalled index fail with a SourceError", async () => {
+    const server = index({ "/pypi/odd/json": JSON.stringify({ releases: [] }) })
+    const stalled = Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) })
+    try {
+      const base = `http://127.0.0.1:${server.port}`
+      expect(await Effect.runPromise(Effect.flip(pypiReleaseOf("missing", base)))).toBeInstanceOf(
+        SourceError,
+      )
+      expect(await Effect.runPromise(Effect.flip(pypiReleaseOf("odd", base)))).toBeInstanceOf(
+        SourceError,
+      )
+      expect(
+        await Effect.runPromise(
+          Effect.flip(pypiReleaseOf("browser-use", `http://127.0.0.1:${stalled.port}`, 50)),
+        ),
+      ).toBeInstanceOf(SourceError)
+    } finally {
+      await server.stop(true)
+      await stalled.stop(true)
+    }
+  })
+
+  test("a pin file that is not a table of strings fails with a FileError", async () => {
+    await write(PYPI_PACKAGE_PINS, JSON.stringify({ "browser-use": 1 }))
+    const error = await Effect.runPromise(
+      Effect.flip(surveyPypiPackages(root, "http://127.0.0.1:1")),
+    )
+    expect(error._tag).toBe("FileError")
+  })
+
+  test("renders the moved versions into the file text, keeping the key order", async () => {
+    await seed()
+    const text = await Effect.runPromise(renderPypiPins(root, new Map([["browser-use", "1.1.0"]])))
+    expect(JSON.parse(text)).toEqual({ "browser-use": "1.1.0", "old-line": "3.0.0" })
+    expect(Object.keys(JSON.parse(text) as object)).toEqual(["browser-use", "old-line"])
+    expect(text.endsWith("}\n")).toBe(true)
   })
 })

@@ -91,7 +91,7 @@ const setProjectConfig = (config: unknown) =>
 /** A fake shell where `pi`, `node` and `bun` are installed and print the given versions. */
 const shellWith = (
   versions: { readonly pi?: string; readonly node?: string } = {},
-  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx"],
+  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx", "uvx"],
 ) =>
   fakeShell({
     commands,
@@ -469,7 +469,7 @@ describe("holyagent doctor, capabilities", () => {
     await write(globalSettings(), {
       packages: [SOURCE, ...DEFAULT_SOURCES.filter((source) => !source.includes("computer-use"))],
     })
-    const report = await doctorIn("headless")
+    const report = await doctorIn("headless", { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" })
     expect(report.ok).toBe(true)
     expect(piLines(report).slice(3)).toEqual([
       BASE_OK,

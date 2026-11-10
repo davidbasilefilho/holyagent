@@ -1,5 +1,6 @@
 import { VCS_COMMANDS } from "../vcs/commands.ts"
 import { ASSIGNMENT_COMMANDS } from "./assignment.ts"
+import { BROWSER_SERVER_COMMANDS } from "./browser-server.ts"
 import { HOOK_COMMANDS } from "./hook.ts"
 import { INTENT_COMMANDS } from "./intent.ts"
 import { MIGRATE_COMMANDS } from "./migrate.ts"
@@ -18,6 +19,7 @@ export const COMMANDS: ReadonlyArray<Command> = [
   ...SETUP_COMMANDS,
   ...STATE_COMMANDS,
   ...TOOL_COMMANDS,
+  ...BROWSER_SERVER_COMMANDS,
   ...VCS_COMMANDS,
   ...HOOK_COMMANDS,
 ]

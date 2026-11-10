@@ -428,7 +428,11 @@ describe("the specialists", () => {
       const headless = file(`${route.agent}-headless-screen`)
       const tools = String(headless.frontmatter["tools"]).split(", ")
       expect(tools, route.agent).toEqual([...agentTools(config, route, true, "headless")])
-      for (const tool of ["mcp__playwright__browser_*", "mcp__t3*code__preview_*"])
+      for (const tool of [
+        "mcp__browser_use__browser_exec",
+        "mcp__browser_use__browser_screenshot",
+        "mcp__t3*code__preview_*",
+      ])
         expect(tools, route.agent).toContain(tool)
       // Not even a visual role, whose own file has them: the machine has no desktop to drive.
       for (const tool of ["ext:pi-computer-use", "mcp__browse__*"])
@@ -437,9 +441,12 @@ describe("the specialists", () => {
         tools.some((tool) => /browse__|computer/.test(tool)),
         route.agent,
       ).toBe(false)
-      // The normal screen file has browse and computer use and never the Playwright server.
+      // browser_login opens a browser for a person to approve, so no file grants it or the pattern.
+      expect(tools, route.agent).not.toContain("mcp__browser_use__browser_login")
+      expect(tools, route.agent).not.toContain("mcp__browser_use__*")
+      // The normal screen file has browse and computer use and never the browser-use server.
       const normal = String(file(`${route.agent}-screen`).frontmatter["tools"]).split(", ")
-      expect(normal, route.agent).not.toContain("mcp__playwright__browser_*")
+      expect(normal.some((tool) => tool.startsWith("mcp__browser_use__"))).toBe(false)
       expect(normal, route.agent).toContain("mcp__browse__*")
       // The prompt is the role's, then the note that this machine has a headless browser and no desktop.
       expect(headless.body, route.agent).toStartWith(file(route.agent).body)

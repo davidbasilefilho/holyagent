@@ -5,8 +5,8 @@ import { Effect } from "effect"
 
 import { type Env, firstNonEmpty } from "./environment.ts"
 
-/** The environment variable in which the Playwright MCP server reads the browser's executable path. */
-export const PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH"
+/** The environment variable in which the person can name the Chromium executable to use. */
+export const CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH"
 
 /**
  * The folder where the images of cloud sessions preinstall Playwright's browsers, whose `chromium`
@@ -58,10 +58,9 @@ const safeList = (folder: string): ReadonlyArray<string> =>
   )
 
 /**
- * The Chromium executable the machine already provides, for the Playwright MCP server's
- * `--executable-path`, or `undefined` when there is none (the server then uses the browser
- * Playwright installs for itself). In order: the path the person set in
- * {@link PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE}; the `chromium` entry or the newest
+ * The Chromium executable the machine already provides, which `holyagent browser-server` starts
+ * headless for the browser-use MCP server, or `undefined` when there is none. In order: the path
+ * the person set in {@link CHROMIUM_EXECUTABLE_VARIABLE}; the `chromium` entry or the newest
  * `chromium-<revision>` build in `PLAYWRIGHT_BROWSERS_PATH` when it names a folder (Playwright
  * itself looks nowhere else then), else in {@link PREINSTALLED_BROWSERS}. It only looks at the file
  * system; `exists` and `list` replace that for a test. Paths are joined the way `platform` joins
@@ -73,7 +72,7 @@ export const findChromium = (
   exists: (path: string) => boolean = existsSync,
   list: (folder: string) => ReadonlyArray<string> = safeList,
 ): string | undefined => {
-  const given = firstNonEmpty(env[PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE])
+  const given = firstNonEmpty(env[CHROMIUM_EXECUTABLE_VARIABLE])
   if (given !== undefined) return given
   const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"])
   return inFolder(
