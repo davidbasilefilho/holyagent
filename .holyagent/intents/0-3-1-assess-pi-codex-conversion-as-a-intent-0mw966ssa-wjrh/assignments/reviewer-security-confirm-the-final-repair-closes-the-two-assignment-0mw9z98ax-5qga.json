@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "confirm-the-final-repair-closes-the-two",
   "objective": "Confirm the final repair closes the two remaining auto-review bypasses and opens no new one.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Final repair commit 7ab278c on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range c580abb0..7ab278c); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ar-final-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9z1r3h-mxfi.md. Review only this repair against the previous findings in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ygj4s-zz8e.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ygiuj-u3ox.md (code), and the screen polish items it names.",
     "Testing rule: never start pi or make a model or network request; unit tests only.",
@@ -40,7 +40,29 @@
     "agentId": "workflow:wf_b1e8c2ac-624/assignment-0mw9z98ax-5qga",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T00:54:17.674Z"
+    "startedAt": "2026-11-10T00:54:17.674Z",
+    "finishedAt": "2026-11-10T01:00:05.184Z"
+  },
+  "result": "result: the two blockers from the previous round are closed, and I found no new bypass. This is a read-only review. I had no shell, so I ran no tests and rely on the writer's reported verify run, exit 0 with 3395 pass.\n\nBuilt-in `/security-review`: it could not run. The skill's `git diff origin/HEAD...` step fails because `origin/HEAD` is unset, so nothing came back from it. I reviewed the repair by hand from the source in `/home/user/holyagent-0.3.1-autoreview`, not from the dist diff.\n\n**Earlier security findings**\n- **Indented `apply_patch` headers: closed.** `patchPaths` in `classify.ts:434` now calls `patchHeaderPaths` (`apply-patch.ts:161`), which trims each line exactly as `parsePatch` does.\n  - It lists a superset of the parser's headers, which is the safe side.\n  - The tool's parameter is `input` (`codex.ts:247`) and the classifier reads the same key.\n  - The classifier and the tool use the same cwd.\n  - Where the two read a path differently (`@`, `~`), the classifier only reviews more.\n  - Tests exist at `codex-auto-review-classify.test.ts:255`, `:300` and `:402`.\n- **Windows `~\\` and `/c/...` drive paths: closed.** `piPath` (`classify.ts:336`) maps both as Pi does on win32.\n- **Windows `.git.`, `.git `, `GIT~1` and stream suffixes: closed.** `isProtectedName` (`classify.ts:383`) covers them. I checked the 8.3 stems: `.git` gives `git`, `.holyagent` gives `holyag`, `.pi`, `.codex`, `.claude` and `.agents` give their bare names. Anything that looks like a short name is reviewed, and the tests are at `:323-402`.\n- **`.agents`: now protected.**\n- **Approval-marker scrub: now case-, spacing- and invisible-character-proof** (`transcript.ts:195-209`). Homoglyph lookalikes are not caught; this is an optional residual.\n- **State-only tools and setup scope: closed, details below.**\n\n**New checks**\n- **`readOnlyHint` for `todo` and `ask_user_question`: sound.** It is granted only when the tool name matches and `sourceInfo.source` equals `piPackageSource(<package>)`, the exact `npm:<name>@<pin>`, and the tool has no MCP namespace (`classify.ts:478`, `auto-review.ts:117`).\n  - In Pi 1.5.0 the registry keeps one entry per name. The reported `sourceInfo` belongs to the tool that actually runs (`agent-session.js:2902-2943`, `runner.js:411`), so a same-named tool from another extension carries a different source and gets no hint.\n  - A source mismatch fails safe, because the call is reviewed.\n  - `subagent`, `SubagentWorkflow` and `codemode` stay reviewed, and the tests assert it.\n  - I could not inspect the `rpiv-todo` code, since it is not installed. That the tool is state-only is taken from the doc and the writer.\n- **npx `cwd` set to the home folder: sound.** Only `npx` servers get it (`screen.ts:127`), and Pi honors `config.cwd` (`mcp/runtime.js:67`).\n  - It removes the project `node_modules` and `.npmrc` as influences. Home is user-owned.\n  - Side effect: the MCP root advertised to those servers becomes the home folder (`runtime.js:283`). I rate this low.\n  - The writer did not confirm Pi's behavior; I did by reading the code.\n- **Setup refusal outside user scope: sound.** `refuseUserOnly` (`setup/capabilities.ts:59,109`) runs before any write, dry runs included. It uses the same `USER_ONLY` list the loader drops.\n  - A no-op choice, where the value already equals the current one, writes nothing.\n  - The only writer of this key is `applyCapabilityChoices`.\n\n**Validated new bypasses, fail-open paths or data exposures:** none.\n\n**Residuals, not blockers, carried over**\n- A safe `cat` can read secrets, such as the Codex auth file.\n- A project-supplied MCP server can set `readOnlyHint: true`.\n- `.mcp.json` and `.vscode` are outside the protected list.\n- Project-scope package installs through a repository `.npmrc` are outside this gate. Such an extension already runs in-process, so the hint adds nothing.\n\nevidence:\nEach earlier security finding is closed or its remaining gap is stated: all closed; the remaining gaps are only the residuals above. Read `classify.ts:279-434`, `apply-patch.ts:136-166,404-420`, `transcript.ts:192-222`, `setup/capabilities.ts:54-111`, `config/load.ts:76-116`. The repair has tests at `codex-auto-review-classify.test.ts:255,300,323-402`.\nEach validated new bypass, fail-open path or data exposure is reported with source, sink and a concrete scenario, or none is found: none found. I checked the `readOnlyHint` spoof path (`classify.ts:478`, `auto-review.ts:117`, Pi `agent-session.js:2902-2943` and `runner.js:411`), the npx `cwd` (`screen.ts:127`, Pi `mcp/runtime.js:67`) and the setup refusal (`setup/capabilities.ts:108-111`).\nfindings: no blockers; the optional items are the homoglyph marker case, the MCP root now being the home folder, and the residuals above. No log file written.\n",
+  "acceptance": {
+    "revision": 22,
+    "rationale": "No blockers; old classifier fails 9 new tests; verify 3395 pass",
+    "criteria": [
+      {
+        "criterion": "Each earlier security finding is closed or its remaining gap is stated",
+        "support": "all closed; the remaining gaps are only the residuals above. Read `classify.ts:279-434`, `apply-patch.ts:136-166,404-420`, `transcript.ts:192-222`, `setup/capabilities.ts:54-111`, `config/load.ts:76-116`. The repair has tests at `codex-auto-review-classify.test.ts:255,300,323-402`."
+      },
+      {
+        "criterion": "Each validated new bypass, fail-open path or data exposure is reported with source, sink and a concrete scenario, or none is found",
+        "support": "none found. I checked the `readOnlyHint` spoof path (`classify.ts:478`, `auto-review.ts:117`, Pi `agent-session.js:2902-2943` and `runner.js:411`), the npx `cwd` (`screen.ts:127`, Pi `mcp/runtime.js:67`) and the setup refusal (`setup/capabilities.ts:108-111`)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "no blockers; the optional items are the homoglyph marker case, the MCP root now being the home folder, and the residuals above. No log file written."
+      }
+    ]
   },
   "createdAt": "2026-11-10T00:54:17.674Z"
 }
