@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "judge-whether-the-auto-review-repair",
   "objective": "Judge whether the auto-review repair closes the earlier code findings and is merge-ready.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Repair commit 19bb39ae on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range b3cd9951..19bb39ae; head c580abb0 adds only a no-content merge of the integration branch). Repair diff without dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ar-fix-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9xp81h-vbzh.md. Review only this repair against the previous findings in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9x71h4-9je3.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9x71pm-6wpd.md (security).",
     "New default to implement (verbatim from the Intent): auto-review is a security control that repository content and the model cannot weaken. A project-level .holyagent/config.json cannot turn auto-review off or replace or extend its policy (only the user's own config can), a malformed config keeps it on, its settings are fixed for the session, and it applies whenever the active model is served by the Codex provider. Inside the project root, writes to .git, .holyagent and the agent configuration folders (.pi, .codex, .claude) are reviewed, as Codex's sandbox keeps them read-only; paths are normalized as Pi's tools do (a leading @, ~, file:// URLs) and resolved through existing links before the root check. A tool that is neither known read-only nor annotated read-only is reviewed. Commands with brace expansion, and programs or flags that run other programs or write files, are outside the safe set.",
@@ -47,7 +47,37 @@
     "agentId": "workflow:wf_454b6a2d-7eb/assignment-0mw9ygiuj-u3ox",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T00:31:58.315Z"
+    "startedAt": "2026-11-10T00:31:58.315Z",
+    "finishedAt": "2026-11-10T00:38:35.139Z"
+  },
+  "result": "result: Merge-ready. The earlier code blockers are closed, and I found no regression or untested error path. Build and verify pass on c580abb0.\n\nchanged: none\n\nchecks-run:\n- `bun install --frozen-lockfile` -> exit 0.\n- `bunx --no-install mise run build` -> exit 0; `git status --short` was empty afterwards.\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean (306 files), lint clean (307 files), 3379 pass, 0 fail, 112 files. The tree is still clean (0 status lines, HEAD c580abb0).\n- Logs: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/r3-install.log`, `r3-build.log`, `r3-verify.log`, `r3-summary.log`.\n- Probe re-run against the new `classify()`. Every bypass now returns \"outside the read-only safe set\": `git grep -O…`, `git grep --open-files-in-pager=sh`, `uniq in.txt /etc/cron.d/x`, `rg -iz`. `git diff` and `sed -n 1,3p f` still run unreviewed.\n- Read only, not run: the live Pi `tool_call` order and the Codex backend request.\n\nbuilt-in /code-review: it ran as the real built-in (medium) and returned 8 findings. I read the code for each. None is a blocker. Optional or rejected:\n- Zero-width characters get past the approval-marker scrub, and the action JSON is not scrubbed. Optional. Both are untrusted, role-labelled text, and the reviewer prompt was not checked.\n- Windows aliases of `.git` (`.git.`, `GIT~1`) are not matched by the protected-folder check. Optional; a Windows-only gap.\n- `unsafeRg` and `git grep` treat any dash word containing `z` or `O` as unsafe. Optional; this only costs extra reviews, in the safe direction.\n- The first collection fixes the auto-review choice. Rejected. `user` is settled before `autoReviewChoice(user)` on every path, because `failed()` awaits the user read. It is `undefined` only when the file cannot be read, and then it stays on.\n- A failed review keeps `/approve`. Rejected. It is bounded to the exact action JSON and consumed on the first real decision. My earlier note asked for this.\n- `newTurn` clears `timedOut`. Rejected. It is what my earlier note asked for, and it is tested.\n- The default is now to review any tool that is not known read-only. Matches the Intent; see the judgments below.\n\nblockers: none\n\nThe earlier findings are closed:\n- `git grep -O` and the long-flag abbreviations: `classify.ts` `UNSAFE_GIT_LONG` and `unsafeGit`, around lines 136-170.\n- `uniq`: removed from `SAFE_PROGRAMS`.\n- `rg -iz`: `unsafeRg` and `isShortCluster`.\n- Brace expansion and globs: `splitCommand` sends `{}*?[` to review.\n- Project config switching auto-review off or replacing its policy: `config/load.ts` `USER_ONLY` and `mergeFiles`, and `autoReviewChoice` in `auto-review.ts`. A malformed project config leaves it on, and `createAutoReviewSettings.fix` locks the choice for the session.\n- Path normalization and links: `writeTrigger`, `piPath` and `throughLinks`, plus `PROTECTED_FOLDERS`, in `classify.ts`. Tests cover `@`, `~`, `file://` URLs, dangling and looping links, and `.GIT`.\n- Unannotated tools: `classify.ts` now ends in `tool-approval`.\n- Hot-path cost: `gate.ts` takes `client` and `entries` as Effects and runs them after classification. Tests cover it.\n\njudgments:\n- A known-safe list for todo, ask and subagent is not needed. The Intent says a tool that is neither known read-only nor annotated read-only is reviewed. A name-based list could be spoofed by an extension tool. Subagent is not harmless, because it runs bash. If the noise matters, annotate the truly read-only own tools with `readOnlyHint: true` later.\n- Setup writing an ignored auto-review key at project or local scope: optional, not blocking. The loader keeps auto-review on, so the result is safe. But `setup` accepts `--auto-review off --scope project` without saying it is ignored, while `refuseLockedOn` already refuses the locked-on case. A fix would refuse it in `setup/capabilities.ts` and point to `--scope user`. The description comment at `config/capabilities.ts:523-525` still says the capability exists only under `openai-codex`.\n\nevidence:\n- The earlier code findings are closed, each with file and line evidence: the mapping above covers each finding with a file and symbol. The probe re-run returns \"outside the read-only safe set\" for all four bypasses, and verify exit 0 includes the new tests in `codex-auto-review-classify.test.ts`.\n- The repair introduces no regression or untested error path: error paths are tested (an unresolvable link, a bad `file://` URL, a failed review keeping `/approve`, a failing client built after classification). The only findings are the optional ones above.\n- Build leaves the tree unchanged and verify passes on c580abb0: build exit 0 with a clean `git status`, verify exit 0 with 3379 pass and 0 fail, tree clean afterwards.\n- checks-run: see above.\n- findings: no blockers; optional items listed above.\n",
+  "acceptance": {
+    "revision": 22,
+    "rationale": "Findings traced to file and line; probe re-run; verify 3379 pass",
+    "criteria": [
+      {
+        "criterion": "The earlier code findings are closed, each with file and line evidence",
+        "support": "the mapping above covers each finding with a file and symbol. The probe re-run returns \"outside the read-only safe set\" for all four bypasses, and verify exit 0 includes the new tests in `codex-auto-review-classify.test.ts`."
+      },
+      {
+        "criterion": "The repair introduces no regression or untested error path",
+        "support": "error paths are tested (an unresolvable link, a bad `file://` URL, a failed review keeping `/approve`, a failing client built after classification). The only findings are the optional ones above."
+      },
+      {
+        "criterion": "Build leaves the tree unchanged and verify passes on c580abb0",
+        "support": "build exit 0 with a clean `git status`, verify exit 0 with 3379 pass and 0 fail, tree clean afterwards."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see above."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers; optional items listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-10T00:31:58.315Z"
 }
