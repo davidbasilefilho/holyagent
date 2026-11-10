@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwao0fyv-6ckh",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Worker.mechanical",
+  "slug": "check-that-the-merge-of-the-integration",
+  "objective": "Check that the merge of the integration branch into the browser-use branch leaves the generated output current and the gates green, and regenerate it if not.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-browser-use, branch release/0.3.2/feat/browser-use, head de10b1f8: a clean textual merge of release/0.3.2/integration (which brought the fff follow-links change, #114) into the browser-use work. Both sides changed the generated bundles under packages/integrations/{claude,pi}/dist, so a textual merge may not equal a fresh build.",
+    "Run `bunx --no-install mise run build`. If it changes files, they are the regenerated output; leave them in the tree and list them. Then run `bunx --no-install mise run verify`. Change no source file; if verify fails for a reason a rebuild does not fix, stop and report the failure."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Report in under 150 words: commands, exit codes, test counts, changed paths."
+  ],
+  "criteria": [
+    {
+      "text": "mise run build leaves the tree unchanged on a second run and mise run verify passes on the merged head",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-10T12:27:18.103Z"
+  },
+  "createdAt": "2026-11-10T12:27:18.103Z"
+}
