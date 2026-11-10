@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "judge-whether-codex-auto-review-is",
   "objective": "Judge whether Codex auto-review is correct, complete and merge-ready against its requirements.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit 08b054b on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range 91d9eb07..08b054b); source diff without generated dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/auto-review-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9wh8o1-xebk.md; design research /home/user/holyagent/.git/holyagent/reports/assignment-0mw96z5n3-mw6f.md.",
     "Testing rule: unit tests with recorded or synthesized fixtures only; the reviewer request is made through an injectable client so tests never reach a network.",
@@ -46,7 +46,37 @@
     "agentId": "workflow:wf_78b118fb-77d/assignment-0mw9x71h4-9je3",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T23:56:36.280Z"
+    "startedAt": "2026-11-09T23:56:36.280Z",
+    "finishedAt": "2026-11-10T00:05:22.510Z"
+  },
+  "result": "result: Not merge-ready. Build and verify both pass, but the safe-command classifier has three confirmed holes. A second blocker is a per-call cost on the Codex tool path.\n\nchecks-run:\n- `bun install --frozen-lockfile` -> exit 0, no changes.\n- `bunx --no-install mise run build` -> exit 0. `git status --short` is empty afterwards, so the tree is unchanged.\n- `bunx --no-install mise run verify` -> exit 0. 3336 pass, 0 fail, 112 files. The tree is still clean.\n- Logs: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rev-build.log` and `rev-verify.log`.\n- Probe: I ran the real `classify()` through `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/probe.ts`, with no network and no model.\n- I only read, and did not run, the Pi tool_call handler order and the live Codex request shape.\n\nbuilt-in /code-review: it ran as the real built-in skill and returned 8 findings. I verified each by reading the code.\n\nblockers:\n1. Safe-command bypass in `packages/runtime/src/pi/codex/auto-review/classify.ts`. The probe shows each of these returns `undefined`, so the call runs with no review:\n   - `git grep -O'sh -c id' foo`. `grep` is in `SAFE_GIT` and `-O` / `--open-files-in-pager` is not in `UNSAFE_GIT`, so this runs an arbitrary command.\n   - `uniq in.txt /etc/cron.d/x`. `uniq` is in `SAFE_PROGRAMS`, but it writes its second file operand.\n   - `rg -iz pat`. `UNSAFE_RG` matches only the exact word `-z`.\n   - Affected criterion: the classifier must send everything outside a read-only set to review.\n   - No test covers any of these.\n   - Fix: drop `git grep` or add `-O` and `--open-files-in-pager` to `UNSAFE_GIT`. Remove `uniq` or allow at most one operand. Also check combined short flags for `rg -z`. Add a failing test for each.\n2. Per-call hot-path cost in `packages/integrations/pi/src/auto-review.ts`, in the `tool_call` handler.\n   - `defaultClient()` calls `getApiKeyForProvider`, which can refresh OAuth credentials. `entriesFromMessages(getBranch())` walks the whole history. Both run before `gate()` calls `classify()`.\n   - Every `read` or safe `ls` pays this under the Codex provider, where the feature is on by default, and the result is discarded.\n   - Fix: classify first, then build the client and entries only for a reviewed call.\n\nnotes (optional):\n- `assessment.ts`: `rationale` must be non-empty, but the template only asks for one on non-low-risk decisions. An empty rationale on a harmless allow becomes a fail-closed denial. I could not confirm this without a live model. Consider accepting an empty string.\n- `gate.ts`: `/approve` is consumed on a failed review too, not only on allow or deny. This matches the docs, but a transient 5xx wastes it.\n- `session.ts`: the `timedOut` set is not cleared on `newTurn`, so a stale entry can deny the one retry the policy promises.\n- Whole-history rendering and stringifying run per reviewed call in `transcript.ts` `renderTranscript` and `gate.ts` `summarize`.\n- `schema.ts`: a project-level `.holyagent/config.json` can replace `pi.autoReview.policy`. This is a trust-boundary decision for the root.\n- The live backend request shape is untested, which the brief allows.\n\nevidence:\n- Triggers, request, decisions, breaker, override and the capability switch behave as the requirements state, with tests that fail without them: Breaker, timeout, failure, override, capability and request behavior match the requirements and are tested (`codex-auto-review-gate.test.ts`, `integrations/pi/tests/auto-review.test.ts`, `codex-auto-review-capability.test.ts`; verify exit 0). Triggers are not met: the safe-set holes in blocker 1 are untested and confirmed by probe.\n- The change introduces no regression in the Codex provider, the tool_call gate order or other providers, and error paths are handled and tested: Error paths are handled and tested, and the gate is inert under other providers (tests at `auto-review.test.ts` lines 226-262). Blocker 2 is a hot-path regression for the Codex provider. I did not run the gate order.\n- Build leaves the tree unchanged and verify passes on 08b054b: build exit 0 with a clean `git status`; verify exit 0, 3336 pass, 0 fail.\n- checks-run: see the checks-run section above.\n- findings: blockers 1 and 2, plus the optional notes above.\n",
+  "acceptance": {
+    "revision": 21,
+    "rationale": "Blockers validated by probe and source reading; they go to a repair",
+    "criteria": [
+      {
+        "criterion": "Triggers, request, decisions, breaker, override and the capability switch behave as the requirements state, with tests that fail without them",
+        "support": "Breaker, timeout, failure, override, capability and request behavior match the requirements and are tested (`codex-auto-review-gate.test.ts`, `integrations/pi/tests/auto-review.test.ts`, `codex-auto-review-capability.test.ts`; verify exit 0). Triggers are not met: the safe-set holes in blocker 1 are untested and confirmed by probe."
+      },
+      {
+        "criterion": "The change introduces no regression in the Codex provider, the tool_call gate order or other providers, and error paths are handled and tested",
+        "support": "Error paths are handled and tested, and the gate is inert under other providers (tests at `auto-review.test.ts` lines 226-262). Blocker 2 is a hot-path regression for the Codex provider. I did not run the gate order."
+      },
+      {
+        "criterion": "Build leaves the tree unchanged and verify passes on 08b054b",
+        "support": "build exit 0 with a clean `git status`; verify exit 0, 3336 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see the checks-run section above."
+      },
+      {
+        "label": "findings",
+        "support": "blockers 1 and 2, plus the optional notes above."
+      }
+    ]
   },
   "createdAt": "2026-11-09T23:56:36.280Z"
 }
