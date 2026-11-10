@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mwaprm1p-6aa7",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-b36e708-ripgrep-and-fd-as",
+  "objective": "Review commit b36e708 (ripgrep and fd as user-installed prerequisites) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-unbundle, branch release/0.3.2/feat/user-installed-search-tools. The change is commit b36e708; review `git diff 3cc15367 b36e708` (source, tests, docs and instruction text without the generated dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/unbundle-src.diff; the dist also deletes the vendored binaries and regenerates bundles and agent files). Head 86e6d051 only adds a no-content merge of the integration branch.",
+    "Requirement (maintainer, verbatim: \"remove the bundling of the executables, list them as dependencies instead\", then \"I mean dependencies for the users\"): HolyAgent stops bundling ripgrep and fd; they become prerequisites the user installs; holyagent rg and holyagent fd run the ones on PATH (fd also as Debian's fdfind); a missing tool fails with install commands per platform; setup and doctor of the Claude plugin and of Pi report them; mise provides them for development and CI; instructions tell agents to fall back to the system search tools when one is missing; docs list them as prerequisites; the updater no longer moves vendored binaries.",
+    "Check the CLI wrappers (arguments, stdin, exit codes, Windows .exe lookup through PATHEXT), the doctor/setup reports, the updater after removing the vendored step (mise tools ripgrep and fd moved by it), the mise.toml tool names working on Linux, macOS and Windows CI, and anything still referring to the removed vendor folder."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-unbundle; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests.",
+    "Mark each finding blocking or non-blocking, with file:line and a concrete failure scenario. Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "The change meets the requirement without regressions in the CLI, setup, doctor, build and updater",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover PATH lookup, the fdfind fallback, the missing-tool error and the doctor and setup reports, and would fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwap1f0u-kq3f"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T13:16:25.309Z"
+  },
+  "createdAt": "2026-11-10T13:16:25.309Z"
+}
