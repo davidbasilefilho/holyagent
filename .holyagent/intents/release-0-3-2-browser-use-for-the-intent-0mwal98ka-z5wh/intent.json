@@ -4,6 +4,7 @@
   "objective": "Release 0.3.2: browser-use for the headless screen form, fff following links by default, updated dependencies, the atomics test fix.",
   "requirements": [
     "Maintainer (verbatim, 2026-11-10): \"use browser use, not playwright https://github.com/browser-use/browser-use\". The screen capability's headless form (cloud or CI sessions) uses browser-use instead of the Playwright MCP server (@playwright/mcp); the normal form keeps opencode browse with a paired real browser plus pi-computer-use. Default (revisitable): browser-use's --cli-mcp mode attaches to a running Chrome, so HolyAgent launches the found headless Chromium with a remote-debugging port and a temporary profile, then runs `uvx --no-config --default-index https://pypi.org/simple --from browser-use==<pin> browser-use --cli-mcp` with BU_CDP_URL pointing at it and ANONYMIZED_TELEMETRY=0; only the browser_exec and browser_screenshot tools are allowed (browser_login stays off); the pin sits in a PyPI pin table moved by mise run deps:update; @playwright/mcp is removed.",
+    "Maintainer (verbatim, 2026-11-10): \"btw browser-use kind of makes the t3code browser useless unless we can disable when the t3code browser is detected\". When the session runs where T3 Code's browser (its preview tools) is available, HolyAgent does not register or launch browser-use, so screen specialists drive the T3 browser the person sees; browser-use stays the headless form only outside T3.",
     "Maintainer (verbatim, 2026-11-10): \"change the fff search default as well\". Read as the one fff default reported to the maintainer: setup no longer writes followSymlinks: false to pi-fff.json, so fff follows directory links as its own default does (revisitable: a link inside a repository to a folder such as ~/.ssh becomes searchable).",
     "Maintainer (verbatim, 2026-11-10): \"update deps as well\". Dependencies move through mise run deps:update (GitHub Actions, vendored ripgrep and fd, mise tools, Pi package pins, package.json ranges, bun.lock), and the release passes its gates on the new versions.",
     "Maintainer (verbatim, 2026-11-10): \"bump to 0.3.2\". Release 0.3.2: release/0.3.2/integration cut from main, the first PR carries mise run bump:patch as its own commit, every later branch is cut after it, and only the integration branch opens the PR into main.",
@@ -11,7 +12,7 @@
     "Testing rules carried: never run pi; never make live Kimi, Codex or OpenAI requests; unit tests and fixtures only. Standing authority: squash-merge reviewed green PRs, including the release PR into main; continue until mergeable or blocked.",
     "Every third-party package or binary sits at an exact pin moved only through mise run deps:update; each capability is its own module that can be turned off."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-10T11:10:09.562Z"
 }
