@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mwazqxnu-ox38",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 2,
+  "roleTask": "Explorer.map",
+  "slug": "map-where-interaction-states-hover",
+  "objective": "Map where interaction states (hover, pressed, focus, disabled) are required today in HolyAgent's visual-work instructions and design skills, per model family.",
+  "state": "Running",
+  "scope": [
+    "Read-only, in /home/user/holyagent-0.3.3-bump (release/0.3.3 bump head; a writer is busy in another worktree, so read this one).",
+    "Planned change: for every interactive element, require a visible hover state where a pointer hovers, a pressed/active state on click or tap, a visible keyboard focus state and a disabled state where it applies, mapped per platform (touch: pressed feedback since no hover; web and desktop: both; terminal UIs: focus and selection marks), and make Worker.visual and Reviewer.visual exercise and capture each state. Reason: GPT-family models often skip hover and pressed states.",
+    "Map with paths and line ranges: (a) the requirements tree entries for visual work and the design skills (requirements/skills/*-design, visual-judging, worker-visual and reviewer-visual role requirements) and their R- ids, and what they say about states now (the shared core has 'Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content'); (b) the gpt-6 family copies of the same (skills and the Worker.visual and Reviewer.visual agent text), and gpt-6/guide.md's advice on how to phrase rules for that family (checklists, emphasis, examples); (c) the claude-5.5 and kimi-k3.1 copies of the same; (d) the coverage.ts entries for those ids; (e) whether each design skill's capture checklist names hover and pressed captures, per platform section (web, mobile iOS/Android, desktop Windows/macOS/GNOME, TUI); (f) the build step and the generated dist paths these files compile to."
+  ],
+  "constraints": [
+    "Read only; make no edits and no git writes.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "Parts a to f each name files and line ranges with source evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "paths"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-10T17:55:49.866Z"
+  },
+  "createdAt": "2026-11-10T17:55:49.866Z"
+}
