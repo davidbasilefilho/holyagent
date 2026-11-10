@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwazxkym-gxrp",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-handoff-directive-text-and",
+  "objective": "Review the handoff directive text and docs in commit 0167e289 against the requirements.",
+  "state": "Running",
+  "scope": [
+    "Diff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/handoff-text.diff (docs/ and packages/runtime/src/instructions/ only, from /home/user/holyagent-0.3.3-handoff). Read the full files in that worktree for context: the requirements tree packages/runtime/src/instructions/requirements/root/{version-control,identity}.md, each family's root/version-control.md and guide.md, and docs/usage.md.",
+    "Requirements (Intent intent-0mwaz75rz-i978): a root directive in every family (claude-5.5, gpt-6, kimi-k3.1) that (1) pushes holyagent/state in the branch state mode after each Assignment close, each merge and before ending a turn; (2) keeps one Intent requirement starting 'Status and open items (<date>):', replaced in place at each merge, new blocker and before the final report, with merged PRs, open PRs and CI, next step, residuals and untested-live items, detailed enough for an agent with no session context; (3) a read-only `holyagent handoff` command printing open Intents with requirements, Assignments with state and outcome, recorded branches and PRs, from local state only. The reader may be another host or model (Pi with Kimi or GPT), so the text names no Claude-only tool.",
+    "Check: each family states all parts of the directive with its reason, in that family's style per its guide.md; no family text keeps the old rule that the state push rides only work pushes; the text names no Claude-only tool; the docs (usage.md new section, command lists, decisions.md) are accurate to the command's behavior (read-only, local state, no live PR or CI state) and do not contradict each other; nothing beyond the requirements was added."
+  ],
+  "constraints": [
+    "Make no edits.",
+    "Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "Every family's root text and the docs state the handoff directive completely and consistently, with no contradiction or Claude-only tool",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwazi6k1-me7p"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T18:00:59.998Z"
+  },
+  "createdAt": "2026-11-10T18:00:59.998Z"
+}
