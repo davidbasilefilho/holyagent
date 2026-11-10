@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-a46163b-t3-marker-for-specialists",
   "objective": "Assess a46163b (T3 marker for specialists and launcher tidy-ups) for security vulnerabilities.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-browser-use, branch release/0.3.2/feat/browser-use, head a46163b. Review only `git diff 99a42e1 a46163b` (also at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/bu-final.diff).",
     "It closes these earlier non-blocking findings: (a) the T3 gate (isT3Session needs Pi mode rpc) did not hold in specialists, which pi-subagents runs in-process in print mode, so a T3-hosted specialist registered browser-use and refuseT3PreviewOutsideT3 refused T3's preview tools; the fix is hostedByT3 in packages/integrations/pi/src/t3.ts: the root decides with isT3Session on every session_start and writes or deletes HOLYAGENT_T3_HOSTED in the shared process env (also clearing a stale value from outside), and specialists read only that marker; (b) a bare Chromium command name now resolves through PATH; (c) the uvx env allowlist keeps XDG_CACHE_HOME, XDG_DATA_HOME, UV_PYTHON_INSTALL_DIR; (d) the DevTools timeout names the profile; (e) win32 stopGroup skips taskkill for an exited child; (f) docs call the allowlist defense in depth.",
@@ -36,7 +36,25 @@
     "agentId": "workflow:wf_23a5f957-173/assignment-0mwanx8va-83h7",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T12:24:48.934Z"
+    "startedAt": "2026-11-10T12:24:48.934Z",
+    "finishedAt": "2026-11-10T12:27:00.300Z"
+  },
+  "result": "result: no blocking or validated vulnerability in 99a42e1..a46163b; 3 non-blocking notes.\n\nBuilt-in /security-review: it did not run. It failed with `fatal: ambiguous argument 'origin/HEAD...'` because my cwd is /home/user/holyagent and the diff skill gets no target. I reviewed the 985-line bu-final.diff by hand and read the surrounding source in /home/user/holyagent-0.3.2-browser-use. This report rests on reading only: I ran no tests, because I have no shell.\n\nfindings: (all non-blocking, none exploitable beyond what the person's own environment already controls)\n\n1. HOLYAGENT_T3_HOSTED as a trust signal (packages/integrations/pi/src/t3.ts:57-66, extension.ts:1508).\n   - Source: process.env, which is shared and inheritable.\n   - Sink: for a specialist, `t3` gates `withoutBrowserUseInT3` (extension.ts:1474) and `refuseT3PreviewOutsideT3` (extension.ts:1638).\n   - Write path: a root (isChild false) rewrites or deletes the marker on every session_start from `isT3Session` (rpc mode plus T3 variables). A stale or hostile marker from outside is therefore cleared when a root starts. A specialist only reads `=== \"1\"`, and only the exact value \"1\" counts.\n   - How a specialist could get `t3` true or false wrongly: only if the person's own shell exports the marker and a specialist-named session runs with no T3 root to clear it. That grants nothing beyond lifting the refusal of T3 preview tool names that must already be registered, and the actor is the environment owner.\n   - Project files: config cannot reach this key. `applyEnvironment` takes `rootArgs.env` and `providerEnv`, which the config cannot set to this name. I did not trace every writer.\n   - Scope of the marker for a specialist: `collect` gives specialists no `tools`, so t3Gate and t3Root stay false. A specialist with `t3` true gets only the browser-use drop and the preview allowance.\n   - Marker content: a constant \"1\", no secret. It is inherited by bash and MCP children, which is harmless.\n\n2. Ordering (non-blocking, availability only). Specialists start after the root's session_start, so the root has written the marker by then.\n   - If a specialist's session_start ever ran before `pi.getSessionName()` is set, `isChild()` would be false. `hostedByT3` would then take the root path and delete the shared marker, so every later specialist would fall back to browser-use and be refused the preview tools. The failure direction is closed.\n   - The existing `roleOf` and `startingExclusions` already rely on the name being set at session_start, and the tests set it. I could not read @tintinweb/pi-subagents (not in node_modules), so I could not confirm this. Suggest a regression test with the name unset.\n\n3. PATH resolution of a bare Chromium name (packages/runtime/src/setup/chromium.ts:80-95, 100-130).\n   - Source: HOLYAGENT_CHROMIUM_PATH or PLAYWRIGHT_MCP_EXECUTABLE_PATH. Both come from the environment only.\n   - Sink: the Chromium executable that `holyagent browser-server` spawns.\n   - Bare names resolve through `findCommand(env, name)` using the environment's PATH, with the Bun bin folder not appended (`includeBunBin` is unset). If PATH is unset the lookup is empty and nothing resolves. A name with a separator must exist as given and is never searched on PATH.\n   - This adds no new trust: whoever controls that variable could already name any absolute executable, and whoever controls PATH controls what a shell resolves. A relative PATH entry (`.`) resolves against the cwd, as in a shell. Not a boundary crossing.\n\n4. Allowlist additions (browser-launch.ts:142-147).\n   - XDG_CACHE_HOME, XDG_DATA_HOME and UV_PYTHON_INSTALL_DIR now reach the uvx and Python process. They are non-secret paths, but they choose where uv finds interpreters and caches. That is equivalent to the already-passed HOME and PATH.\n   - Secrets and the package-source overrides stay blocked. The doc now correctly says the allowlist is defense in depth, because `browser_exec` can read /proc/<pid>/environ.\n\nAlso checked and sound:\n- The win32 `stopGroup` exitCode guard only removes a kill, and the guard avoids pid reuse.\n- The DevTools timeout message adds only the local profile path, no secret.\n- The generated dist files mirror src, and the Claude dist `findCommand` move only reorders code.\n\nevidence:\nNo validated vulnerability introduced by the change remains unreported, each finding traced from source to sink: no blocking finding. Items 1-4 above are non-blocking. Reviewed bu-final.diff lines 1-985 plus extension.ts:1305-1520 and 1634-1640, t3.ts:46-66, screen.ts:62-100. The built-in /security-review failed to run (origin/HEAD unresolved).\nfindings: see items 1-4 above; none blocking.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "No blockers; notes optional",
+    "criteria": [
+      {
+        "criterion": "No validated vulnerability introduced by the change remains unreported, each finding traced from source to sink",
+        "support": "no blocking finding. Items 1-4 above are non-blocking. Reviewed bu-final.diff lines 1-985 plus extension.ts:1305-1520 and 1634-1640, t3.ts:46-66, screen.ts:62-100. The built-in /security-review failed to run (origin/HEAD unresolved)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "see items 1-4 above; none blocking."
+      }
+    ]
   },
   "createdAt": "2026-11-10T12:24:48.934Z"
 }
