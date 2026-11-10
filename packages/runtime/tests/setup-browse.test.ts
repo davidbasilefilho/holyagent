@@ -35,6 +35,8 @@ import {
 
 let home: string
 let project: string
+// A file standing in for the Chromium executable a person configured, which has to exist.
+let chromiumPath: string
 let remove: () => Promise<void>
 
 beforeEach(async () => {
@@ -43,6 +45,8 @@ beforeEach(async () => {
   project = join(made.directory, "project")
   await mkdir(project, { recursive: true })
   await writeCompleteSettings(join(home, ".claude"))
+  chromiumPath = join(made.directory, "chromium")
+  await writeFile(chromiumPath, "")
   remove = made.remove
 })
 afterEach(() => remove())
@@ -371,7 +375,7 @@ describe("holyagent doctor on browse", () => {
   })
 
   test("the headless form is offered: the browser-use server, needing uvx and a Chromium and no node, npx or display", async () => {
-    const chromium = { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" }
+    const chromium = { HOLYAGENT_CHROMIUM_PATH: chromiumPath }
     const ok = await run("headless", chromium, ["bun", "ctx7", "pi", "uvx"])
     expect(lines(ok)).toEqual([
       "ok   pi capability browser-use: headless form, specialists, nothing to install",
@@ -379,7 +383,7 @@ describe("holyagent doctor on browse", () => {
   })
 
   test("a missing uvx is a failing need with its fix, and so is a missing Chromium", async () => {
-    const chromium = { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" }
+    const chromium = { HOLYAGENT_CHROMIUM_PATH: chromiumPath }
     const noUvx = await run("headless", chromium, ["bun", "ctx7", "pi", "node", "npx"])
     expect(lines(noUvx)[0]).toBe(
       "FAIL pi capability browser-use: needs uvx on PATH; install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs",
@@ -395,13 +399,26 @@ describe("holyagent doctor on browse", () => {
     expect(lines(normal)[0]).toStartWith("ok   pi capability browser-use: normal form")
   })
 
+  test("a configured Chromium path that does not exist is a failing need that names it, under the old variable too", async () => {
+    const missing = join(home, "no", "chromium")
+    for (const variable of ["HOLYAGENT_CHROMIUM_PATH", "PLAYWRIGHT_MCP_EXECUTABLE_PATH"]) {
+      const report = await run("headless", { [variable]: missing })
+      expect(lines(report)[0]).toStartWith(
+        `FAIL pi capability browser-use: needs a Chromium; ${variable} is set to ${missing}, which does not exist; set HOLYAGENT_CHROMIUM_PATH to a Chromium executable`,
+      )
+      expect(report.ok).toBe(false)
+    }
+    const legacy = await run("headless", { PLAYWRIGHT_MCP_EXECUTABLE_PATH: chromiumPath })
+    expect(lines(legacy)[0]).toStartWith("ok   pi capability browser-use: headless form")
+  })
+
   test("with the MCP extension off the servers are not registered, and doctor says so", async () => {
     await setConfig({ pi: { features: { mcp: false } } })
     const normal = await run("normal", { DISPLAY: ":0" })
     expect(lines(normal)).toContain(
       "~ pi capability browser-use: pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
     )
-    const headless = await run("headless", { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" })
+    const headless = await run("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })
     expect(lines(headless)).toContain(
       "~ pi capability browser-use: pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
     )
@@ -484,9 +501,9 @@ describe("holyagent setup on browse", () => {
     expect(await report("normal")).toEqual([
       "~ browser-use: normal form; pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
     ])
-    expect(await report("headless", { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" })).toEqual([
+    expect(await report("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })).toEqual([
       "~ browser-use: headless form; pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
-      "= browser-use: the headless browser is the Chromium at /fake/chromium",
+      `= browser-use: the headless browser is the Chromium at ${chromiumPath}`,
     ])
   })
 
@@ -525,10 +542,10 @@ describe("holyagent setup on browse", () => {
 
   test("headless form: registers the browser-use server through browser-server, and reads no pairing", async () => {
     await writeBrowsePairing(home)
-    const lines = await report("headless", { HOLYAGENT_CHROMIUM_PATH: "/fake/chromium" })
+    const lines = await report("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })
     expect(lines).toEqual([
       "= browser-use: headless form; the extension registers `uvx --no-config --default-index https://pypi.org/simple --from browser-use==1.0.0 browser-use --cli-mcp` for screen specialists through `holyagent browser-server`, which starts the headless browser and stops it with the server and writes no file for it",
-      "= browser-use: the headless browser is the Chromium at /fake/chromium",
+      `= browser-use: the headless browser is the Chromium at ${chromiumPath}`,
     ])
   })
 

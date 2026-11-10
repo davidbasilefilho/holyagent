@@ -9,6 +9,12 @@ import { type Env, firstNonEmpty } from "./environment.ts"
 export const CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH"
 
 /**
+ * The old name of {@link CHROMIUM_EXECUTABLE_VARIABLE}, from when the Playwright MCP server took
+ * the executable: still read when the new one is unset, so a machine set up for it keeps working.
+ */
+export const LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH"
+
+/**
  * The folder where the images of cloud sessions preinstall Playwright's browsers, whose `chromium`
  * entry is the Chromium executable (or a link to it), and the folder of the Chromium build it came
  * from (`chromium-<revision>`).
@@ -58,13 +64,31 @@ const safeList = (folder: string): ReadonlyArray<string> =>
   )
 
 /**
+ * The Chromium path the person configured and the variable it came from:
+ * {@link CHROMIUM_EXECUTABLE_VARIABLE}, else {@link LEGACY_CHROMIUM_EXECUTABLE_VARIABLE}; an empty
+ * variable counts as unset.
+ */
+export const configuredChromium = (
+  env: Env,
+): { readonly variable: string; readonly path: string } | undefined => {
+  for (const variable of [CHROMIUM_EXECUTABLE_VARIABLE, LEGACY_CHROMIUM_EXECUTABLE_VARIABLE]) {
+    const path = firstNonEmpty(env[variable])
+    if (path !== undefined) return { variable, path }
+  }
+  return undefined
+}
+
+/**
  * The Chromium executable the machine already provides, which `holyagent browser-server` starts
  * headless for the browser-use MCP server, or `undefined` when there is none. In order: the path
- * the person set in {@link CHROMIUM_EXECUTABLE_VARIABLE}; the `chromium` entry or the newest
- * `chromium-<revision>` build in `PLAYWRIGHT_BROWSERS_PATH` when it names a folder (Playwright
- * itself looks nowhere else then), else in {@link PREINSTALLED_BROWSERS}. It only looks at the file
- * system; `exists` and `list` replace that for a test. Paths are joined the way `platform` joins
- * them (the machine's by default), whatever the host is.
+ * the person set in {@link CHROMIUM_EXECUTABLE_VARIABLE}, else in the old
+ * {@link LEGACY_CHROMIUM_EXECUTABLE_VARIABLE}, which must exist (a configured path that does not is
+ * missing, not replaced by another Chromium the person did not choose; see {@link chromiumFixFor});
+ * the `chromium` entry or the newest `chromium-<revision>` build in `PLAYWRIGHT_BROWSERS_PATH` when
+ * it names a folder (Playwright itself looks nowhere else then), else in
+ * {@link PREINSTALLED_BROWSERS}. It only looks at the file system; `exists` and `list` replace that
+ * for a test. Paths are joined the way `platform` joins them (the machine's by default), whatever
+ * the host is.
  */
 export const findChromium = (
   env: Env,
@@ -72,8 +96,8 @@ export const findChromium = (
   exists: (path: string) => boolean = existsSync,
   list: (folder: string) => ReadonlyArray<string> = safeList,
 ): string | undefined => {
-  const given = firstNonEmpty(env[CHROMIUM_EXECUTABLE_VARIABLE])
-  if (given !== undefined) return given
+  const given = configuredChromium(env)
+  if (given !== undefined) return exists(given.path) ? given.path : undefined
   const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"])
   return inFolder(
     configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured,
@@ -81,4 +105,19 @@ export const findChromium = (
     exists,
     list,
   )
+}
+
+/**
+ * How the person gets a Chromium, as `fix` says, led by what is wrong with the path they configured
+ * when {@link findChromium} rejected it because the file does not exist.
+ */
+export const chromiumFixFor = (
+  env: Env,
+  fix: string,
+  exists: (path: string) => boolean = existsSync,
+): string => {
+  const given = configuredChromium(env)
+  return given === undefined || exists(given.path)
+    ? fix
+    : `${given.variable} is set to ${given.path}, which does not exist; ${fix}`
 }

@@ -20,7 +20,7 @@ import { piPackageSource } from "../config/pi-packages.ts"
 import type { Config } from "../config/schema.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { describeBrowseState, readBrowseState } from "./browse.ts"
-import { findChromium } from "./chromium.ts"
+import { chromiumFixFor, findChromium } from "./chromium.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice, hasDisplay } from "./form.ts"
@@ -375,7 +375,9 @@ export const unmetNeed = (env: Env, need: SystemNeed, platform: string = process
         ? undefined
         : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)"
     if (need.kind === "chromium")
-      return findChromium(env, platform) === undefined ? `needs a Chromium; ${need.fix}` : undefined
+      return findChromium(env, platform) === undefined
+        ? `needs a Chromium; ${chromiumFixFor(env, need.fix)}`
+        : undefined
     if (need.kind === "node") return yield* unmetNode(env, need)
     const found = yield* (yield* Shell).which(need.command)
     return Option.isSome(found) ? undefined : `needs ${need.command} on PATH; ${need.fix}`

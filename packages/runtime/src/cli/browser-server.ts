@@ -6,7 +6,7 @@ import {
   CHROMIUM_FIX,
 } from "../config/capabilities.ts"
 import { liveHost, runBrowserServer } from "../pi/browser-launch.ts"
-import { findChromium } from "../setup/chromium.ts"
+import { chromiumFixFor, findChromium } from "../setup/chromium.ts"
 import { type Command, Verbatim } from "./types.ts"
 
 /**
@@ -32,7 +32,7 @@ export const BROWSER_SERVER_COMMANDS: ReadonlyArray<Command> = [
       runBrowserServer(liveHost, {
         env: call.env,
         chromium: findChromium(call.env),
-        chromiumFix: CHROMIUM_FIX,
+        chromiumFix: chromiumFixFor(call.env, CHROMIUM_FIX),
         server: BROWSER_USE_MCP_SERVER,
       }).pipe(Effect.map((code) => new Verbatim("", "", code))),
   },

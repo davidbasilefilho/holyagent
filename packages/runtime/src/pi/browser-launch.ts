@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { Data, Effect, Option } from "effect"
+import { Data, Deferred, Effect, Option, type Scope } from "effect"
 
 import { definedEnv, type Env } from "../setup/environment.ts"
 import { killGroup } from "../state/tree.ts"
@@ -41,8 +41,11 @@ export interface Running {
 export interface LaunchHost {
   /** Starts a process. */
   readonly spawn: (spec: ProcessSpec) => Effect.Effect<Running, BrowserLaunchFailed>
-  /** A TCP port nothing listens on, on 127.0.0.1. */
-  readonly freePort: Effect.Effect<number, BrowserLaunchFailed>
+  /**
+   * The DevTools port Chromium reports in the `DevToolsActivePort` file of the profile folder, or
+   * `undefined` while the file is missing or incomplete.
+   */
+  readonly devToolsPort: (profile: string) => Effect.Effect<number | undefined>
   /** Whether the DevTools endpoint at the URL answers. */
   readonly answers: (url: string) => Effect.Effect<boolean>
   /** Creates a new, empty directory in the system's temporary folder and returns its path. */
@@ -51,8 +54,12 @@ export interface LaunchHost {
   readonly makeDirectory: (path: string) => Effect.Effect<void, BrowserLaunchFailed>
   /** Removes a directory and everything in it; a directory that is gone is not an error. */
   readonly removeDirectory: (path: string) => Effect.Effect<void>
-  /** Completes with the exit code to end with when a termination signal arrives. */
-  readonly interrupted: Effect.Effect<number>
+  /**
+   * Handles `SIGINT`, `SIGTERM` and `SIGHUP` for as long as the scope is open, so that a signal
+   * never ends the process on its own, and returns an effect that completes with the exit code to
+   * end with once the first one has arrived. Later signals change nothing.
+   */
+  readonly signals: Effect.Effect<Effect.Effect<number>, never, Scope.Scope>
   /** Whether this process runs as root, where Chromium refuses to start with its sandbox on. */
   readonly root: boolean
 }
@@ -86,17 +93,15 @@ export const STOP_GRACE_MS = 3_000
 const FOLDERS = { profile: "profile", config: "browser-use", harness: "harness" } as const
 
 /**
- * The arguments that start Chromium headless with its DevTools endpoint on `port` of 127.0.0.1 only
- * and a profile in `profile`, a folder of the run. With `sandbox` off, which only a root process
- * needs (Chromium refuses to run as root otherwise), `--no-sandbox` is added.
+ * The arguments that start Chromium headless with its DevTools endpoint on 127.0.0.1 only and a
+ * profile in `profile`, a folder of the run. The port is 0, so Chromium binds one itself and writes
+ * it to `DevToolsActivePort` in the profile: a port probed beforehand could be taken by another
+ * process before Chromium binds it. With `sandbox` off, which only a root process needs (Chromium
+ * refuses to run as root otherwise), `--no-sandbox` is added.
  */
-export const chromiumArguments = (
-  port: number,
-  profile: string,
-  sandbox: boolean,
-): ReadonlyArray<string> => [
+export const chromiumArguments = (profile: string, sandbox: boolean): ReadonlyArray<string> => [
   "--headless=new",
-  `--remote-debugging-port=${port}`,
+  "--remote-debugging-port=0",
   "--remote-debugging-address=127.0.0.1",
   `--user-data-dir=${profile}`,
   "--no-first-run",
@@ -107,16 +112,69 @@ export const chromiumArguments = (
 ]
 
 /**
- * The environment of the browser-use server: the inherited one, then the DevTools URL of the
- * browser it attaches to, a name for its session, telemetry off, and its config and state in
- * `config` and `harness`, folders of the run, so nothing is written to the user's own.
+ * The variables of the inherited environment that reach the browser-use server (`uvx` and the
+ * Python it runs), matched without regard to case because Windows names are case-insensitive, and
+ * every `LC_*`. Only what a process needs to run, find its programs, reach the network through the
+ * person's proxy and certificates, and reuse uv's cache. Everything else stays behind: `UV_INDEX*`,
+ * `UV_FIND_LINKS`, `PIP_*` and `PYTHONPATH` could redirect where the code of a server with browser
+ * control comes from, and the provider API keys and tokens of the environment would otherwise reach
+ * the Python that `browser_exec` runs.
+ */
+export const SERVER_ENVIRONMENT_ALLOWLIST: ReadonlyArray<string> = [
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "TZ",
+  "TERM",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "ALL_PROXY",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "REQUESTS_CA_BUNDLE",
+  "UV_CACHE_DIR",
+  "UV_NATIVE_TLS",
+  // Windows needs these to start a process and to find its profile and programs.
+  "SYSTEMROOT",
+  "SYSTEMDRIVE",
+  "WINDIR",
+  "COMSPEC",
+  "PATHEXT",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "PROGRAMDATA",
+  "PROGRAMFILES",
+]
+
+const ALLOWED_NAMES: ReadonlySet<string> = new Set(SERVER_ENVIRONMENT_ALLOWLIST)
+
+const reachesServer = (name: string) => {
+  const upper = name.toUpperCase()
+  return ALLOWED_NAMES.has(upper) || upper.startsWith("LC_")
+}
+
+/**
+ * The environment of the browser-use server: the part of the inherited one that
+ * {@link SERVER_ENVIRONMENT_ALLOWLIST} lets through, then the DevTools URL of the browser it
+ * attaches to, a name for its session, telemetry off, and its config and state in `config` and
+ * `harness`, folders of the run, so nothing is written to the user's own.
  */
 export const serverEnvironment = (
   inherited: Env,
   port: number,
   folders: { readonly config: string; readonly harness: string },
 ): Record<string, string> => ({
-  ...definedEnv(inherited),
+  ...Object.fromEntries(
+    Object.entries(definedEnv(inherited)).filter(([name]) => reachesServer(name)),
+  ),
   BU_CDP_URL: `http://127.0.0.1:${port}`,
   BU_NAME: `holyagent-${port}`,
   ANONYMIZED_TELEMETRY: "0",
@@ -125,23 +183,40 @@ export const serverEnvironment = (
   BROWSER_HARNESS_HOME: folders.harness,
 })
 
+/**
+ * The port in the text of a `DevToolsActivePort` file: its first line, which Chromium ends with a
+ * newline, so a half-written line is not taken. `undefined` when there is no complete, valid port.
+ */
+export const parseDevToolsActivePort = (text: string): number | undefined => {
+  const [line, rest] = text.split("\n")
+  if (line === undefined || rest === undefined) return undefined
+  const port = Number(line.trim())
+  return Number.isInteger(port) && port > 0 && port <= 65_535 ? port : undefined
+}
+
 const failed = (reason: string) => new BrowserLaunchFailed({ reason })
 
-// Waits until the DevTools endpoint answers, for at most `timeoutMs`, and fails early when Chromium
-// exits first (a bad executable or a profile it cannot use).
+// Waits until Chromium has reported its DevTools port and that port answers, for at most
+// `timeoutMs`, and returns the port. It fails early when Chromium exits first (a bad executable or
+// a profile it cannot use).
 const awaitDevTools = (
   host: LaunchHost,
   chromium: Running,
-  url: string,
+  profile: string,
   timeoutMs: number,
   pollMs: number,
 ) => {
-  const poll: Effect.Effect<void> = Effect.suspend(() =>
+  const again = (poll: Effect.Effect<number>) => Effect.sleep(pollMs).pipe(Effect.andThen(poll))
+  const poll: Effect.Effect<number> = Effect.suspend(() =>
     host
-      .answers(url)
+      .devToolsPort(profile)
       .pipe(
-        Effect.flatMap((ok) =>
-          ok ? Effect.void : Effect.sleep(pollMs).pipe(Effect.andThen(poll)),
+        Effect.flatMap((port) =>
+          port === undefined
+            ? again(poll)
+            : host
+                .answers(`http://127.0.0.1:${port}/json/version`)
+                .pipe(Effect.flatMap((ok) => (ok ? Effect.succeed(port) : again(poll)))),
         ),
       ),
   )
@@ -149,8 +224,8 @@ const awaitDevTools = (
     Effect.timeoutOption(timeoutMs),
     Effect.flatMap((result) =>
       Option.isSome(result)
-        ? Effect.void
-        : Effect.fail(failed(`the DevTools endpoint ${url} did not answer within ${timeoutMs} ms`)),
+        ? Effect.succeed(result.value)
+        : Effect.fail(failed(`the DevTools endpoint did not answer within ${timeoutMs} ms`)),
     ),
   )
   const exitedFirst = chromium.exited.pipe(
@@ -163,17 +238,8 @@ const awaitDevTools = (
   return Effect.raceFirst(answered, exitedFirst)
 }
 
-/**
- * Runs the browser-use MCP server against a headless Chromium it starts, and returns the server's
- * exit code. In order: a temporary directory for the run (the profile, browser-use's config and its
- * state); a free port; Chromium, headless, with its DevTools endpoint on that port of 127.0.0.1 and
- * a fresh profile; a wait until the endpoint answers; then the server with `BU_CDP_URL` and the
- * variables of {@link serverEnvironment}, on this process's stdio. The run ends when the server
- * exits, when Chromium exits under it, or when a termination signal arrives. Every step that
- * succeeded is undone in reverse order whatever ends the run, a failed start included: the server
- * is stopped, then Chromium, and the temporary directory is removed.
- */
-export const runBrowserServer = (host: LaunchHost, options: BrowserServerOptions) =>
+// The run itself: every step that succeeded is undone when the scope closes, in reverse order.
+const launch = (host: LaunchHost, options: BrowserServerOptions) =>
   Effect.scoped(
     Effect.gen(function* () {
       const { chromium: executable } = options
@@ -189,21 +255,20 @@ export const runBrowserServer = (host: LaunchHost, options: BrowserServerOptions
         harness: join(base, FOLDERS.harness),
       }
       for (const folder of Object.values(folders)) yield* host.makeDirectory(folder)
-      const port = yield* host.freePort
       const inherited = definedEnv(options.env)
       const chromium = yield* Effect.acquireRelease(
         host.spawn({
           command: executable,
-          args: chromiumArguments(port, folders.profile, !host.root),
+          args: chromiumArguments(folders.profile, !host.root),
           env: inherited,
           stdio: "ignore",
         }),
         (running) => running.stop,
       )
-      yield* awaitDevTools(
+      const port = yield* awaitDevTools(
         host,
         chromium,
-        `http://127.0.0.1:${port}/json/version`,
+        folders.profile,
         options.readyTimeoutMs ?? READY_TIMEOUT_MS,
         options.pollMs ?? POLL_MS,
       )
@@ -221,7 +286,28 @@ export const runBrowserServer = (host: LaunchHost, options: BrowserServerOptions
           Effect.fail(failed(`Chromium exited with code ${code} while the server was running`)),
         ),
       )
-      return yield* Effect.raceFirst(Effect.raceFirst(server.exited, host.interrupted), browserLost)
+      return yield* Effect.raceFirst(server.exited, browserLost)
+    }),
+  )
+
+/**
+ * Runs the browser-use MCP server against a headless Chromium it starts, and returns the server's
+ * exit code. In order: a temporary directory for the run (the profile, browser-use's config and its
+ * state); Chromium, headless, with its DevTools endpoint on a port of 127.0.0.1 that Chromium picks
+ * and reports in the profile, and a fresh profile; a wait until that port answers; then the server
+ * with `BU_CDP_URL` and the variables of {@link serverEnvironment}, on this process's stdio. The
+ * run ends when the server exits, when Chromium exits under it, or when a termination signal
+ * arrives. Every step that succeeded is undone in reverse order whatever ends the run, a failed
+ * start included: the server is stopped, then Chromium, and the temporary directory is removed. The
+ * signal handlers are installed before the first step and stay until the last undo is done, so a
+ * signal at any point, a repeated one during cleanup included, ends the run through its cleanup and
+ * never around it.
+ */
+export const runBrowserServer = (host: LaunchHost, options: BrowserServerOptions) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const received = yield* host.signals
+      return yield* Effect.raceFirst(launch(host, options), received)
     }),
   )
 
@@ -233,16 +319,39 @@ const SIGNALS = [
 
 const reason = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause))
 
-// Ends a process group: asks it to end, waits up to the grace, then kills what is left. A process
-// that is already gone is left alone, since its pid may belong to an unrelated group by now.
-const stopGroup = (child: Bun.Subprocess) =>
+// Asks the process group the child leads to end. Nothing is signalled when the pid is not a real
+// child's: a pid of 0 or 1 would make the negative one reach every process the user may signal. A
+// group that is already empty answers ESRCH, which is ignored.
+const terminateGroup = (child: Pick<Bun.Subprocess, "pid">) =>
+  Effect.try(() => {
+    if (Number.isInteger(child.pid) && child.pid > 1) process.kill(-child.pid, "SIGTERM")
+  }).pipe(Effect.ignore)
+
+/**
+ * Ends the process group a child leads and waits for the child to be gone. On Unix the group is
+ * asked to end, given {@link STOP_GRACE_MS} for the child to exit, then killed, and the group is
+ * signalled even when the child exited already: the helpers it started (Chromium's renderers, a
+ * server's workers) stay in the group and outlive their leader. Once the leader is reaped its pid
+ * could in principle belong to an unrelated group, but a group id is not reused while any member
+ * lives, and an empty group only answers ESRCH, so the signal is the safer side of that risk. On
+ * Windows, which has no group signals, `taskkill /T /F` ends the whole tree at once, since waiting
+ * out a grace for a process with no signal to ask it gives it nothing. `platform` is a parameter so
+ * a test can stand in for either system.
+ */
+export const stopGroup = (
+  child: Pick<Bun.Subprocess, "pid" | "kill" | "exited">,
+  platform: string = process.platform,
+) =>
   Effect.gen(function* () {
-    if (child.exitCode !== null) return
-    yield* Effect.try(() =>
-      process.platform === "win32" ? child.kill() : process.kill(-child.pid, "SIGTERM"),
-    ).pipe(Effect.ignore)
-    const done = yield* Effect.promise(() => child.exited).pipe(Effect.timeoutOption(STOP_GRACE_MS))
-    if (Option.isNone(done) && child.exitCode === null) yield* killGroup(child)
+    const exit = Effect.promise(() => child.exited).pipe(Effect.timeoutOption(STOP_GRACE_MS))
+    if (platform === "win32") {
+      yield* killGroup(child, platform)
+      yield* exit
+      return
+    }
+    yield* terminateGroup(child)
+    yield* exit
+    yield* killGroup(child, platform)
   })
 
 /**
@@ -269,15 +378,11 @@ export const liveHost: LaunchHost = {
       },
       catch: (cause) => failed(`cannot start ${spec.command}: ${reason(cause)}`),
     }),
-  freePort: Effect.try({
-    try: () => {
-      const probe = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
-      const { port } = probe
-      probe.stop(true)
-      return port
-    },
-    catch: (cause) => failed(`cannot find a free port: ${reason(cause)}`),
-  }),
+  devToolsPort: (profile) =>
+    Effect.tryPromise(() => Bun.file(join(profile, "DevToolsActivePort")).text()).pipe(
+      Effect.map(parseDevToolsActivePort),
+      Effect.orElseSucceed(() => undefined),
+    ),
   answers: (url) =>
     Effect.tryPromise(() => fetch(url, { signal: AbortSignal.timeout(1_000) })).pipe(
       Effect.map((response) => response.ok),
@@ -297,15 +402,20 @@ export const liveHost: LaunchHost = {
     Effect.tryPromise(() => rm(path, { recursive: true, force: true, maxRetries: 5 })).pipe(
       Effect.ignore,
     ),
-  interrupted: Effect.callback<number>((resume) => {
-    const handlers = SIGNALS.map(([name, code]) => {
-      const handler = () => resume(Effect.succeed(code))
-      process.once(name, handler)
-      return [name, handler] as const
-    })
-    return Effect.sync(() => {
-      for (const [name, handler] of handlers) process.off(name, handler)
-    })
-  }),
+  signals: Effect.acquireRelease(
+    Effect.sync(() => {
+      const received = Deferred.makeUnsafe<number>()
+      const handlers = SIGNALS.map(([name, code]) => {
+        const handler = () => void Deferred.doneUnsafe(received, Effect.succeed(code))
+        process.on(name, handler)
+        return [name, handler] as const
+      })
+      return { received, handlers }
+    }),
+    ({ handlers }) =>
+      Effect.sync(() => {
+        for (const [name, handler] of handlers) process.off(name, handler)
+      }),
+  ).pipe(Effect.map(({ received }) => Deferred.await(received))),
   root: process.getuid?.() === 0,
 }

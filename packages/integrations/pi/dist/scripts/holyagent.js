@@ -4722,7 +4722,7 @@ var init_Request = __esm(() => {
 
 var init_Metric = () => {};
 
-var all2, forEach2, promise2, tryPromise2, succeed6, suspend2, sync2, void_3, callback2, gen2, fail5, failCauseSync2, die3, try_2, withFiber2, fromResult2, flatMap2, andThen2, tap2, option2, exit2, map5, as2, asVoid2, catch_2, catchTag2, catchCause2, catchDefect2, catchIf2, mapError2, orDie2, tapError2, retry2, ignore2, orElseSucceed2, timeoutOption2, sleep2, raceFirst2, filter3, filterOrFail2, match4, matchEffect3, provide4, provideService2, scoped2, acquireRelease2, acquireUseRelease2, ensuring2, onError2, runPromise2, runSync2, runSyncExit2, fn2, mapEager2, mapErrorEager2, flatMapEager2, fnUntracedEager2;
+var all2, forEach2, promise2, tryPromise2, succeed6, suspend2, sync2, void_3, gen2, fail5, failCauseSync2, die3, try_2, withFiber2, fromResult2, flatMap2, andThen2, tap2, option2, exit2, map5, as2, asVoid2, catch_2, catchTag2, catchCause2, catchDefect2, catchIf2, mapError2, orDie2, tapError2, retry2, ignore2, orElseSucceed2, timeoutOption2, sleep2, raceFirst2, filter3, filterOrFail2, match4, matchEffect3, provide4, provideService2, scoped2, acquireRelease2, acquireUseRelease2, ensuring2, onError2, runPromise2, runSync2, runSyncExit2, fn2, mapEager2, mapErrorEager2, flatMapEager2, fnUntracedEager2;
 var init_Effect = __esm(() => {
   init_core();
   init_effect();
@@ -4736,7 +4736,6 @@ var init_Effect = __esm(() => {
   suspend2 = suspend;
   sync2 = sync;
   void_3 = void_;
-  callback2 = callback;
   gen2 = gen;
   fail5 = fail3;
   failCauseSync2 = failCauseSync;
@@ -16115,9 +16114,9 @@ var init_assignment2 = __esm(() => {
 import { mkdir as mkdir3, mkdtemp, rm as rm5 } from "fs/promises";
 import { tmpdir } from "os";
 import { join as join9 } from "path";
-var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS = 3000, FOLDERS, chromiumArguments = (port, profile, sandbox) => [
+var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS = 3000, FOLDERS, chromiumArguments = (profile, sandbox) => [
   "--headless=new",
-  `--remote-debugging-port=${port}`,
+  "--remote-debugging-port=0",
   "--remote-debugging-address=127.0.0.1",
   `--user-data-dir=${profile}`,
   "--no-first-run",
@@ -16125,20 +16124,31 @@ var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS 
   "--disable-dev-shm-usage",
   ...sandbox ? [] : ["--no-sandbox"],
   "about:blank"
-], serverEnvironment = (inherited, port, folders) => ({
-  ...definedEnv(inherited),
+], SERVER_ENVIRONMENT_ALLOWLIST, ALLOWED_NAMES, reachesServer = (name) => {
+  const upper = name.toUpperCase();
+  return ALLOWED_NAMES.has(upper) || upper.startsWith("LC_");
+}, serverEnvironment = (inherited, port, folders) => ({
+  ...Object.fromEntries(Object.entries(definedEnv(inherited)).filter(([name]) => reachesServer(name))),
   BU_CDP_URL: `http://127.0.0.1:${port}`,
   BU_NAME: `holyagent-${port}`,
   ANONYMIZED_TELEMETRY: "0",
   BROWSER_USE_CONFIG_DIR: folders.config,
   BH_HOME: folders.harness,
   BROWSER_HARNESS_HOME: folders.harness
-}), failed2 = (reason) => new BrowserLaunchFailed({ reason }), awaitDevTools = (host, chromium, url, timeoutMs, pollMs) => {
-  const poll = suspend2(() => host.answers(url).pipe(flatMap2((ok) => ok ? void_3 : sleep2(pollMs).pipe(andThen2(poll)))));
-  const answered = poll.pipe(timeoutOption2(timeoutMs), flatMap2((result) => isSome2(result) ? void_3 : fail5(failed2(`the DevTools endpoint ${url} did not answer within ${timeoutMs} ms`))));
+}), parseDevToolsActivePort = (text) => {
+  const [line, rest] = text.split(`
+`);
+  if (line === undefined || rest === undefined)
+    return;
+  const port = Number(line.trim());
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
+}, failed2 = (reason) => new BrowserLaunchFailed({ reason }), awaitDevTools = (host, chromium, profile, timeoutMs, pollMs) => {
+  const again = (poll) => sleep2(pollMs).pipe(andThen2(poll));
+  const poll = suspend2(() => host.devToolsPort(profile).pipe(flatMap2((port) => port === undefined ? again(poll) : host.answers(`http://127.0.0.1:${port}/json/version`).pipe(flatMap2((ok) => ok ? succeed6(port) : again(poll))))));
+  const answered = poll.pipe(timeoutOption2(timeoutMs), flatMap2((result) => isSome2(result) ? succeed6(result.value) : fail5(failed2(`the DevTools endpoint did not answer within ${timeoutMs} ms`))));
   const exitedFirst = chromium.exited.pipe(flatMap2((code) => fail5(failed2(`Chromium exited with code ${code} before its DevTools endpoint answered`))));
   return raceFirst2(answered, exitedFirst);
-}, runBrowserServer = (host, options) => scoped2(gen2(function* () {
+}, launch = (host, options) => scoped2(gen2(function* () {
   const { chromium: executable } = options;
   if (executable === undefined)
     return yield* failed2(`no Chromium was found; ${options.chromiumFix}`);
@@ -16150,15 +16160,14 @@ var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS 
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
-  const port = yield* host.freePort;
   const inherited = definedEnv(options.env);
   const chromium = yield* acquireRelease2(host.spawn({
     command: executable,
-    args: chromiumArguments(port, folders.profile, !host.root),
+    args: chromiumArguments(folders.profile, !host.root),
     env: inherited,
     stdio: "ignore"
   }), (running) => running.stop);
-  yield* awaitDevTools(host, chromium, `http://127.0.0.1:${port}/json/version`, options.readyTimeoutMs ?? READY_TIMEOUT_MS, options.pollMs ?? POLL_MS);
+  const port = yield* awaitDevTools(host, chromium, folders.profile, options.readyTimeoutMs ?? READY_TIMEOUT_MS, options.pollMs ?? POLL_MS);
   const server = yield* acquireRelease2(host.spawn({
     command: options.server.command,
     args: options.server.args,
@@ -16166,14 +16175,23 @@ var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS 
     stdio: "inherit"
   }), (running) => running.stop);
   const browserLost = chromium.exited.pipe(flatMap2((code) => fail5(failed2(`Chromium exited with code ${code} while the server was running`))));
-  return yield* raceFirst2(raceFirst2(server.exited, host.interrupted), browserLost);
-})), SIGNALS, reason = (cause) => cause instanceof Error ? cause.message : String(cause), stopGroup = (child) => gen2(function* () {
-  if (child.exitCode !== null)
+  return yield* raceFirst2(server.exited, browserLost);
+})), runBrowserServer = (host, options) => scoped2(gen2(function* () {
+  const received = yield* host.signals;
+  return yield* raceFirst2(launch(host, options), received);
+})), SIGNALS, reason = (cause) => cause instanceof Error ? cause.message : String(cause), terminateGroup = (child) => try_2(() => {
+  if (Number.isInteger(child.pid) && child.pid > 1)
+    process.kill(-child.pid, "SIGTERM");
+}).pipe(ignore2), stopGroup = (child, platform = process.platform) => gen2(function* () {
+  const exit = promise2(() => child.exited).pipe(timeoutOption2(STOP_GRACE_MS));
+  if (platform === "win32") {
+    yield* killGroup(child, platform);
+    yield* exit;
     return;
-  yield* try_2(() => process.platform === "win32" ? child.kill() : process.kill(-child.pid, "SIGTERM")).pipe(ignore2);
-  const done = yield* promise2(() => child.exited).pipe(timeoutOption2(STOP_GRACE_MS));
-  if (isNone2(done) && child.exitCode === null)
-    yield* killGroup(child);
+  }
+  yield* terminateGroup(child);
+  yield* exit;
+  yield* killGroup(child, platform);
 }), liveHost;
 var init_browser_launch = __esm(() => {
   init_dist();
@@ -16185,6 +16203,39 @@ var init_browser_launch = __esm(() => {
     }
   };
   FOLDERS = { profile: "profile", config: "browser-use", harness: "harness" };
+  SERVER_ENVIRONMENT_ALLOWLIST = [
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+    "LANG",
+    "TZ",
+    "TERM",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "ALL_PROXY",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "REQUESTS_CA_BUNDLE",
+    "UV_CACHE_DIR",
+    "UV_NATIVE_TLS",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+    "PROGRAMFILES"
+  ];
+  ALLOWED_NAMES = new Set(SERVER_ENVIRONMENT_ALLOWLIST);
   SIGNALS = [
     ["SIGINT", 130],
     ["SIGTERM", 143],
@@ -16208,15 +16259,9 @@ var init_browser_launch = __esm(() => {
       },
       catch: (cause) => failed2(`cannot start ${spec.command}: ${reason(cause)}`)
     }),
-    freePort: try_2({
-      try: () => {
-        const probe = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } });
-        const { port } = probe;
-        probe.stop(true);
-        return port;
-      },
-      catch: (cause) => failed2(`cannot find a free port: ${reason(cause)}`)
-    }),
+    devToolsPort: (profile) => tryPromise2(() => Bun.file(join9(profile, "DevToolsActivePort")).text()).pipe(map5(parseDevToolsActivePort), orElseSucceed2(() => {
+      return;
+    })),
     answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map5((response) => response.ok), orElseSucceed2(() => false)),
     temporaryDirectory: (prefix) => tryPromise2({
       try: () => mkdtemp(join9(tmpdir(), prefix)),
@@ -16227,24 +16272,25 @@ var init_browser_launch = __esm(() => {
       catch: (cause) => failed2(`cannot create ${path}: ${reason(cause)}`)
     }).pipe(asVoid2),
     removeDirectory: (path) => tryPromise2(() => rm5(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
-    interrupted: callback2((resume) => {
+    signals: acquireRelease2(sync2(() => {
+      const received = makeUnsafe2();
       const handlers = SIGNALS.map(([name, code]) => {
-        const handler = () => resume(succeed6(code));
-        process.once(name, handler);
+        const handler = () => void doneUnsafe(received, succeed6(code));
+        process.on(name, handler);
         return [name, handler];
       });
-      return sync2(() => {
-        for (const [name, handler] of handlers)
-          process.off(name, handler);
-      });
-    }),
+      return { received, handlers };
+    }), ({ handlers }) => sync2(() => {
+      for (const [name, handler] of handlers)
+        process.off(name, handler);
+    })).pipe(map5(({ received }) => _await(received))),
     root: process.getuid?.() === 0
   };
 });
 
 import { existsSync, readdirSync } from "fs";
 import { posix, win32 } from "path";
-var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win32 : posix, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
+var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win32 : posix, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
   const { join } = pathsOf(platform);
   const entry = join(folder, "chromium");
   if (exists(entry))
@@ -16257,12 +16303,22 @@ var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", PREINSTALLED_BROWS
         return path;
     }
   return;
-}, safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => []))), findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
-  const given = firstNonEmpty(env[CHROMIUM_EXECUTABLE_VARIABLE]);
+}, safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => []))), configuredChromium = (env) => {
+  for (const variable of [CHROMIUM_EXECUTABLE_VARIABLE, LEGACY_CHROMIUM_EXECUTABLE_VARIABLE]) {
+    const path = firstNonEmpty(env[variable]);
+    if (path !== undefined)
+      return { variable, path };
+  }
+  return;
+}, findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
+  const given = configuredChromium(env);
   if (given !== undefined)
-    return given;
+    return exists(given.path) ? given.path : undefined;
   const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
   return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
+}, chromiumFixFor = (env, fix, exists = existsSync) => {
+  const given = configuredChromium(env);
+  return given === undefined || exists(given.path) ? fix : `${given.variable} is set to ${given.path}, which does not exist; ${fix}`;
 };
 var init_chromium = __esm(() => {
   init_dist();
@@ -16298,7 +16354,7 @@ var init_browser_server = __esm(() => {
       run: (call) => runBrowserServer(liveHost, {
         env: call.env,
         chromium: findChromium(call.env),
-        chromiumFix: CHROMIUM_FIX,
+        chromiumFix: chromiumFixFor(call.env, CHROMIUM_FIX),
         server: BROWSER_USE_MCP_SERVER
       }).pipe(map5((code) => new Verbatim("", "", code)))
     }
@@ -25691,7 +25747,7 @@ ${result.stderr}`;
   if (need.kind === "display")
     return hasDisplay(env, platform) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
   if (need.kind === "chromium")
-    return findChromium(env, platform) === undefined ? `needs a Chromium; ${need.fix}` : undefined;
+    return findChromium(env, platform) === undefined ? `needs a Chromium; ${chromiumFixFor(env, need.fix)}` : undefined;
   if (need.kind === "node")
     return yield* unmetNode(env, need);
   const found = yield* (yield* Shell).which(need.command);
