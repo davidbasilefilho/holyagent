@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mwa2oc1c-pga3",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 22,
+  "roleTask": "Reviewer.code",
+  "slug": "judge-whether-the-js-exec-stale-wake-fix",
+  "objective": "Judge whether the js-exec stale-wake fix is correct, contained and merge-ready.",
+  "state": "Running",
+  "scope": [
+    "Commit cef6cd84 on release/0.3.1/fix/js-exec-fallback in /home/user/holyagent-0.3.1-jsexec (head 9c916dd4 adds only a no-content merge of the integration branch); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/jsexec-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mwa1c8xm-m5ze.md; the upstream code is under node_modules/.bun/just-bash@3.6.0/node_modules/run/dist/runtime/ (manager.js around line 959, sync-bridge-protocol.js 112-118).",
+    "Judge especially: the fix replaces the process-global Atomics.waitAsync; check where runShell runs (the main Pi process or a Bun Worker, and whether other code in that process uses Atomics.waitAsync, such as Pi, Bun internals or other extensions) and whether a wrapper that ignores spurious wakes can hang or change semantics for them (timeouts, the not-equal result, the sync value form); whether the regression test is deterministic; whether a narrower fix exists.",
+    "Testing rule: never start pi or make a model request; unit tests only."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Work only inside /home/user/holyagent-0.3.1-jsexec; never check out a branch or commit in /home/user/holyagent or any other worktree; to see old code use git show <rev>:<path>.",
+    "Run in the worktree: bun install --frozen-lockfile, bunx --no-install mise run build (tree unchanged after it) and bunx --no-install mise run verify; give command, exit code and counts.",
+    "Report in under 400 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The fix addresses the traced cause and cannot hang or change behaviour for other users of Atomics.waitAsync in the same process",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The regression test is deterministic and fails without the fix",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Build leaves the tree unchanged and verify passes on 9c916dd4",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwa1c8xm-m5ze"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T02:30:01.201Z"
+  },
+  "createdAt": "2026-11-10T02:30:01.201Z"
+}
