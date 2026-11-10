@@ -5,20 +5,27 @@
  */
 
 /**
- * The keys of the package's `pi-fff.json` that setup writes:
+ * The keys of the package's `pi-fff.json` that setup writes: `mode: "override"` puts it in
+ * `override` mode, where it registers its tools under the names of Pi's own `grep` and `find` (and
+ * adds `multi_grep`), so they replace Pi's. The package's default, `tools-and-ui`, adds `fffind`,
+ * `ffgrep` and `fff-multi-grep` beside Pi's tools.
  *
- * - `mode: "override"` puts it in `override` mode: it then registers its tools under the names of
- *   Pi's own `grep` and `find` (and adds `multi_grep`), so they replace Pi's. The package's
- *   default, `tools-and-ui`, adds `fffind`, `ffgrep` and `fff-multi-grep` beside Pi's tools.
- * - `followSymlinks: false` keeps its index inside the real tree. The package follows directory links
- *   by default, which Pi's own `rg` and `fd` do not, so a link in a repository (`docs -> ~/.ssh`)
- *   would become searchable under a workspace path. A user's own value stays, and the package's
- *   `--fff-follow-symlinks` flag and `FFF_FOLLOW_SYMLINKS` outrank the file.
+ * Setup leaves `followSymlinks` unset, so the package follows directory links by its own default
+ * (for worktree and stow layouts): a link in a repository to a folder outside it becomes
+ * searchable, which Pi's own `rg` and `fd` do not allow. A user's own value stays, and the
+ * package's `--fff-follow-symlinks` flag and `FFF_FOLLOW_SYMLINKS` outrank the file.
  *
  * The file is read from Pi's agent directory only (`PI_CODING_AGENT_DIR` honored); a project file
  * is not read, and `--fff-mode` or `PI_FFF_MODE` outrank `mode`.
  */
-export const FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false } as const
+export const FFF_OVERRIDE_SETTINGS = { mode: "override" } as const
+
+/**
+ * What an earlier setup wrote to `pi-fff.json` and no longer does (0.3.1 wrote `followSymlinks:
+ * false`). Setup takes these keys back out by its record, only while they still hold the recorded
+ * value, so a person's own value stays.
+ */
+export const FFF_RETIRED_SETTINGS = { followSymlinks: false } as const
 
 /**
  * Every tool name `@ff-labs/pi-fff` registers at the pin of `pi-packages.json` (0.11.0,

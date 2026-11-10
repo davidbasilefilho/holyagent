@@ -14078,7 +14078,7 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
-var FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false };
+var FFF_OVERRIDE_SETTINGS = { mode: "override" };
 var FFF_TOOLS = [
   "grep",
   "find",

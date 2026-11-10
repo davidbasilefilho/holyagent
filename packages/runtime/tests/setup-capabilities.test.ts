@@ -105,7 +105,7 @@ describe("a capability flag in setup", () => {
     const FFF = ALL.find((source) => source.includes("pi-fff")) as string
     await write(globalSettings(), { packages: ALL })
     await runSetup(withPi())
-    expect(await read(piFff)).toEqual({ mode: "override", followSymlinks: false })
+    expect(await read(piFff)).toEqual({ mode: "override" })
 
     const off = withPi()
     const turnedOff = await runSetup(off, { capabilities: { fff: false } })
@@ -119,7 +119,7 @@ describe("a capability flag in setup", () => {
     const on = withPi()
     await runSetup(on, { capabilities: { fff: true } })
     expect(piCommands(on)).toEqual([`pi install ${FFF}`])
-    expect(await read(piFff)).toEqual({ mode: "override", followSymlinks: false })
+    expect(await read(piFff)).toEqual({ mode: "override" })
   })
 
   test("a choice equal to what the config decides writes nothing, so a default is never frozen into the file", async () => {

@@ -10,7 +10,7 @@ import { defaultConfig } from "../src/config/schema.ts"
 import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../src/pi/bash/guardrails.ts"
 import { doctor } from "../src/setup/doctor.ts"
 import { PI_HOST_VERSION } from "../src/setup/pi-check.ts"
-import { recordPath } from "../src/setup/record.ts"
+import { addRecorded, recordPath } from "../src/setup/record.ts"
 import { setup } from "../src/setup/steps.ts"
 import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
 
@@ -119,10 +119,10 @@ const COMPUTER_USE = {
 const KIMI = { tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: true } } }
 const SUBAGENTS = { disableDefaultAgents: true, fallbackSubagent: "none" }
 /**
- * `@ff-labs/pi-fff`'s file with the override mode that puts its tools in place of Pi's, and the
- * directory links left unfollowed, which Pi's own `rg` and `fd` do not follow either.
+ * `@ff-labs/pi-fff`'s file with the override mode that puts its tools in place of Pi's. Setup
+ * leaves `followSymlinks` out, so the package follows directory links by its own default.
  */
-const PI_FFF = { mode: "override", followSymlinks: false }
+const PI_FFF = { mode: "override" }
 const BILLION_SUBAGENTS = { pi: { subagents: false } }
 /** What setup writes into Billion Context's file: the subagents setting and the guardrails off. */
 const BILLION = { ...BILLION_SUBAGENTS, ...BILLION_CONTEXT_GUARDRAILS_FILE }
@@ -389,16 +389,108 @@ describe("holyagent setup, Pi tool settings", () => {
 
   describe("fff", () => {
     const off = { pi: { features: { fff: false } } }
-    const ADDED = () => `+ tool settings ${piFff()}: added mode "override", followSymlinks false`
-    const REMOVED = () =>
-      `- tool settings ${piFff()}: removed mode "override", followSymlinks false`
+    const ADDED = () => `+ tool settings ${piFff()}: added mode "override"`
+    const REMOVED = () => `- tool settings ${piFff()}: removed mode "override"`
 
-    test("puts pi-fff in override mode with directory links unfollowed in Pi's agent folder, beside what the file holds", async () => {
+    test("puts pi-fff in override mode in Pi's agent folder, beside what the file holds", async () => {
       await installed()
       await write(piFff(), { enableHomeDirScanning: false })
       const report = await runSetup(withPi())
       expect(await read(piFff())).toEqual({ enableHomeDirScanning: false, ...PI_FFF })
       expect(toolLines(report)).toContain(ADDED())
+    })
+
+    test("never writes followSymlinks, so the package follows directory links by its own default", async () => {
+      await installed()
+      await runSetup(withPi())
+      expect(await read(piFff())).not.toHaveProperty("followSymlinks")
+      await write(piFff(), { followSymlinks: true })
+      await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ followSymlinks: true, mode: "override" })
+    })
+
+    test("takes out the followSymlinks false that an earlier setup recorded, while the capability stays on", async () => {
+      await installed()
+      await write(piFff(), { mode: "override", followSymlinks: false })
+      await Effect.runPromise(
+        addRecorded({ HOME: home }, piFff(), [
+          { path: ["mode"], value: "override" },
+          { path: ["followSymlinks"], value: false },
+        ]),
+      )
+      const report = await runSetup(withPi())
+      expect(await read(piFff())).toEqual(PI_FFF)
+      expect(toolLines(report)).toContain(
+        `- tool settings ${piFff()}: removed followSymlinks false`,
+      )
+      // The record forgot it, so a value the user sets the same later is theirs.
+      await write(piFff(), { mode: "override", followSymlinks: false })
+      await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ mode: "override", followSymlinks: false })
+    })
+
+    test("leaves a followSymlinks false that setup did not record", async () => {
+      await installed()
+      await write(piFff(), { followSymlinks: false })
+      await runSetup(withPi())
+      expect(await read(piFff())).toEqual({ followSymlinks: false, mode: "override" })
+    })
+
+    describe("the followSymlinks false that 0.3.1 wrote", () => {
+      /** A file as 0.3.1 setup left it: `followSymlinks: false` beside the override, both recorded. */
+      const afterOldSetup = async (file: Record<string, unknown> = { followSymlinks: false }) => {
+        await installed()
+        await write(piFff(), { mode: "override", ...file })
+        await Effect.runPromise(
+          addRecorded({ HOME: home }, piFff(), [
+            { path: ["mode"], value: "override" },
+            { path: ["followSymlinks"], value: false },
+          ]),
+        )
+      }
+
+      test("is taken out when the capability is turned off, with the override", async () => {
+        await afterOldSetup()
+        await setConfig(off)
+        const report = await runSetup(withPi())
+        expect(await read(piFff())).toEqual({})
+        expect(toolLines(report)).toContain(
+          `- tool settings ${piFff()}: removed mode "override", followSymlinks false`,
+        )
+      })
+
+      test("is taken out when pi.enable is off", async () => {
+        await afterOldSetup()
+        await setConfig({ pi: { enable: false } })
+        const report = await runSetup(withPi())
+        expect(await read(piFff())).toEqual({})
+        expect(toolLines(report)).toContain(
+          `- tool settings ${piFff()}: removed mode "override", followSymlinks false`,
+        )
+      })
+
+      test("is reported by a dry run, which writes neither the file nor the record", async () => {
+        await afterOldSetup()
+        await setConfig(off)
+        const report = await runSetup(withPi(), { dryRun: true })
+        expect(await read(piFff())).toEqual({ mode: "override", followSymlinks: false })
+        expect(toolLines(report)).toContain(
+          `- tool settings ${piFff()}: would remove mode "override", followSymlinks false (dry run, nothing written)`,
+        )
+        // The record is intact, so the real run still removes both.
+        await runSetup(withPi())
+        expect(await read(piFff())).toEqual({})
+      })
+
+      test("stays when the person changed it to true after setup, and the report says so", async () => {
+        await afterOldSetup({ followSymlinks: true })
+        await setConfig(off)
+        const report = await runSetup(withPi())
+        expect(await read(piFff())).toEqual({ followSymlinks: true })
+        expect(toolLines(report)).toContain(
+          `- tool settings ${piFff()}: removed mode "override"; kept followSymlinks true (setup wrote false)`,
+        )
+      })
     })
 
     test("follows PI_CODING_AGENT_DIR, which is where the package reads the file", async () => {
@@ -413,9 +505,9 @@ describe("holyagent setup, Pi tool settings", () => {
       await installed()
       await write(piFff(), { mode: "tools-only" })
       const report = await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ mode: "tools-only", followSymlinks: false })
+      expect(await read(piFff())).toEqual({ mode: "tools-only" })
       expect(toolLines(report)).toContain(
-        `+ tool settings ${piFff()}: added followSymlinks false; kept mode "tools-only" (HolyAgent sets "override"; yours wins)`,
+        `~ tool settings ${piFff()}: kept mode "tools-only" (HolyAgent sets "override"; yours wins)`,
       )
     })
 
@@ -439,24 +531,22 @@ describe("holyagent setup, Pi tool settings", () => {
       await write(piFff(), { followSymlinks: true })
       const report = await runSetup(withPi())
       expect(await read(piFff())).toEqual({ followSymlinks: true, mode: "override" })
-      expect(toolLines(report)).toContain(
-        `+ tool settings ${piFff()}: added mode "override"; kept followSymlinks true (HolyAgent sets false; yours wins)`,
-      )
+      expect(toolLines(report)).toContain(ADDED())
       await setConfig(off)
       const reverted = await runSetup(withPi())
       expect(await read(piFff())).toEqual({ followSymlinks: true })
       expect(toolLines(reverted)).toContain(`- tool settings ${piFff()}: removed mode "override"`)
     })
 
-    test("leaves a value the user changed after setup, and removes the one still at what setup wrote", async () => {
+    test("leaves a value the user changed after setup", async () => {
       await installed()
       await runSetup(withPi())
-      await write(piFff(), { mode: "override", followSymlinks: true })
+      await write(piFff(), { mode: "tools-only", followSymlinks: true })
       await setConfig(off)
       const report = await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ followSymlinks: true })
+      expect(await read(piFff())).toEqual({ mode: "tools-only", followSymlinks: true })
       expect(toolLines(report)).toContain(
-        `- tool settings ${piFff()}: removed mode "override"; kept followSymlinks true (setup wrote false)`,
+        `~ tool settings ${piFff()}: kept mode "tools-only" (setup wrote "override")`,
       )
     })
 
@@ -521,7 +611,7 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
       expect(toolLines(report)).toEqual([
         `- tool settings ${billion()}: removed ${GUARDRAILS}`,
-        `- tool settings ${piFff()}: removed mode "override", followSymlinks false`,
+        `- tool settings ${piFff()}: removed mode "override"`,
       ])
       // Nothing else is written or touched with Pi off, and a second run has nothing to revert.
       expect(toolLines(await runSetup(withPi()))).toEqual([])
@@ -772,7 +862,7 @@ describe("holyagent doctor, Pi tool settings", () => {
         billion(),
         "pi.subagents, guardrails.bashTimeout, guardrails.maxOutputBytes, guardrails.repetition",
       ),
-      lacking(piFff(), "mode, followSymlinks"),
+      lacking(piFff(), "mode"),
     ])
   })
 
