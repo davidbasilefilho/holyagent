@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-browser-use-launcher",
   "objective": "Re-review the browser-use launcher repair and the T3 gate (b0ba7eb1..99a42e1).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-browser-use, branch release/0.3.2/feat/browser-use, head 99a42e1. Review only `git diff b0ba7eb1 99a42e1` (also at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/bu-rereview.diff): commit f4869a9 repairs the earlier review findings, and commit 99a42e1 adds a new requirement.",
     "Earlier findings f4869a9 should close: (blocking) signal handlers existed only after the server started, so a SIGINT/SIGTERM/SIGHUP during the DevTools poll or server spawn, or a second signal during stopGroup's grace, left the detached Chromium and the temp dir; (non-blocking) the freePort probe-then-bind race let another local process answer the DevTools poll; stopGroup skipped the process group once the leader exited, and win32 killed only the top process; the uvx child inherited the whole environment (UV_INDEX, PIP_*, PYTHONPATH, provider API keys); PLAYWRIGHT_MCP_EXECUTABLE_PATH was dropped with no fallback and a configured missing path passed doctor; docs understated browser_exec (host Python), the unauthenticated DevTools port on shared hosts and --no-sandbox as root.",
@@ -43,7 +43,33 @@
     "agentId": "workflow:wf_f11045a2-939/assignment-0mwane6z3-57j0",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T12:10:00.015Z"
+    "startedAt": "2026-11-10T12:10:00.015Z",
+    "finishedAt": "2026-11-10T12:13:32.472Z"
+  },
+  "result": "result: no blockers. The earlier findings are closed and the T3 gate meets its requirement. I found five non-blocking issues.\n\nBuilt-in /code-review (medium, `b0ba7eb1...99a42e1`): ran, and it is the built-in text. It returned 5 claims. I checked each against the code: 4 are valid but non-blocking (items 1-4 below), and 1 is rejected (item 7). Item 5 is mine.\n\nchanged: none (read-only)\n\nchecks:\n- `bun test` on 8 files: browser-launch, setup-chromium, setup-browse, setup-pi, runtime screen, pi screen, extension and pi tests -> exit 0, 578 pass, 0 fail.\n- `bunx --no-install mise run check` -> exit 0, no type errors in 312 files.\n- `bunx --no-install mise run lint` -> exit 0, no problems in 313 files.\n- Not run: `mise run verify` (the full gate), the `mise run build` dist-freshness check, and anything live (pi, uvx, a real Chromium).\n\nblockers: none\n\nfindings (all non-blocking):\n1. `packages/runtime/src/setup/chromium.ts:99`: `findChromium` now returns `undefined` when the configured path fails `existsSync`. A bare command name such as `HOLYAGENT_CHROMIUM_PATH=chromium` used to resolve through PATH at spawn. It now reports \"does not exist\" and fails. The docs say \"path\", so this is a narrowing, not a break. Resolve bare names with `Bun.which`, or document that a full path is required.\n2. `packages/runtime/src/pi/browser-launch.ts:128`: the environment allowlist omits `XDG_CACHE_HOME`, `XDG_DATA_HOME` and `UV_PYTHON*`. A user whose uv cache comes from `XDG_CACHE_HOME` gets a cold cache and a re-download, or fails offline. `UV_INDEX*` is rightly dropped, since `--default-index` is pinned. Consider adding `XDG_*` and `UV_PYTHON_INSTALL_DIR`.\n3. `packages/runtime/src/pi/browser-launch.ts:355` (`stopGroup`): it now signals `-pid` after the leader has been reaped. The pid could be recycled to an unrelated group leader, with low probability. The doc comment states the trade-off and the real-process test covers the helper-outlives-leader case. Accepted as is.\n4. `packages/runtime/src/pi/browser-launch.ts:187` and `:223`: the DevTools timeout message no longer names the profile or URL. A wrapper script that ignores `--user-data-dir` never writes `DevToolsActivePort` and polls silently for 20 seconds.\n5. `docs/pi/screen.md`, the T3 paragraph, and `unmetNeed` in `pi-check.ts`: `holyagent doctor` and `setup` still require `uvx` and Chromium in a T3 host, where browser-use is never started. The docs say so. It is a false doctor failure only for T3 users on a headless machine.\n6. Unverified (read only): `isT3Session` needs `mode === \"rpc\"`. `registerScreen` runs in the specialist child, so the gate holds only if T3-spawned specialists run in RPC mode. The existing `refuseT3PreviewOutsideT3` assumes the same, and the tests set `mode: \"rpc\"`.\n7. Rejected: the claim that browser-use stays referenced elsewhere in T3. The only registration call site is `extension.ts:1474`, now gated. The agent text and docs match the gate.\n\nEarlier findings, checked:\n- Signal handlers: `runBrowserServer` installs them first through `host.signals` in an outer scope. `raceFirst(launch, received)` runs the full cleanup before it returns, and the test with a 120 ms `stop` proves it. Repeat signals do nothing, and the handlers are removed after cleanup. Closed.\n- `freePort` race: closed. The launcher passes `--remote-debugging-port=0` and reads the port from `DevToolsActivePort`.\n- `stopGroup`: it signals the group after the leader exits, and win32 uses `taskkill /T /F`. Closed.\n- Environment allowlist: closed, with item 2 as a refinement.\n- `PLAYWRIGHT_MCP_EXECUTABLE_PATH`: kept as a legacy fallback, and a missing configured path now fails doctor and names the variable. Closed (see item 1).\n- Docs: they now cover `browser_exec` as host code execution, the unauthenticated DevTools port on shared hosts, and `--no-sandbox` as root. Closed.\n\nT3 gate: `withoutBrowserUseInT3` drops only the browser_use server, and only when `t3` is true. The normal form's `browse` stays, and outside T3 nothing changes. The no-server notice follows the config's servers, not the filtered ones, so there is no false \"missing server\" notice. The headless specialist text, the brief's line and the docs agree. The generated dist is consistent with the sources.\n\ntests assessment: the new tests would fail without the change.\n- Gate: `extension.test.ts` asserts `mcpServers === []` in T3 and `[\"browser_use\"]` outside T3, including T3 variables with `mode: \"print\"`; `screen.test.ts` covers the filter.\n- Signals: they use the real `liveHost.signals` and real process listeners, checking exit codes 130, 129 and 143 and that cleanup finishes.\n- Process groups: they use real shell processes and cover a helper that ignores SIGTERM and outlives its leader, a pid of 0, 1 or NaN, and win32.\n- Chromium: legacy variable, missing path and fix text.\n- Gap: no test of a signal during the server run or during the real SIGTERM-to-SIGKILL grace. Both are covered by design and by the fakes. Optional.\n\nevidence:\nThe earlier findings are closed and the T3 gate meets its requirement without regressions: source diff read; 578 tests pass; check and lint exit 0; no blockers (findings 1-6 non-blocking). `browser-launch.ts` (`runBrowserServer`, `stopGroup`, `devToolsPort`), `screen.ts:withoutBrowserUseInT3`, `extension.ts:1474`.\nTests cover the repaired paths and the T3 gate and would fail without the change: `packages/runtime/tests/pi/browser-launch.test.ts`, `setup-chromium.test.ts`, `packages/integrations/pi/tests/extension.test.ts` (\"in a session T3 hosts\") and `screen.test.ts`; 578 pass, 0 fail.\nchecks-run: `bun test` (8 files) exit 0, 578 pass; `mise run check` exit 0; `mise run lint` exit 0; `verify` and `build` not run.\nfindings: items 1-7 above; blocking: none.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "No blockers; earlier findings verified closed",
+    "criteria": [
+      {
+        "criterion": "The earlier findings are closed and the T3 gate meets its requirement without regressions",
+        "support": "source diff read; 578 tests pass; check and lint exit 0; no blockers (findings 1-6 non-blocking). `browser-launch.ts` (`runBrowserServer`, `stopGroup`, `devToolsPort`), `screen.ts:withoutBrowserUseInT3`, `extension.ts:1474`."
+      },
+      {
+        "criterion": "Tests cover the repaired paths and the T3 gate and would fail without the change",
+        "support": "`packages/runtime/tests/pi/browser-launch.test.ts`, `setup-chromium.test.ts`, `packages/integrations/pi/tests/extension.test.ts` (\"in a session T3 hosts\") and `screen.test.ts`; 578 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun test` (8 files) exit 0, 578 pass; `mise run check` exit 0; `mise run lint` exit 0; `verify` and `build` not run."
+      },
+      {
+        "label": "findings",
+        "support": "items 1-7 above; blocking: none."
+      }
+    ]
   },
   "createdAt": "2026-11-10T12:10:00.015Z"
 }
