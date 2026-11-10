@@ -1,6 +1,6 @@
 {
   "name": "holyagent",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "HolyAgent for Pi: its skills, its 18 specialists and an extension, built from the shared holyagent runtime.",
   "license": "Apache-2.0",
   "author": "davidbasilefilho",
