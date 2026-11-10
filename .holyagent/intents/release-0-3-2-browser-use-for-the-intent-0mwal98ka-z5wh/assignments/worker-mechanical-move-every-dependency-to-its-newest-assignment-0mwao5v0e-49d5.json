@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mwao5v0e-49d5",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Worker.mechanical",
+  "slug": "move-every-dependency-to-its-newest",
+  "objective": "Move every dependency to its newest stable release with the repository's updater and keep the gates green.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-deps, branch release/0.3.2/chore/update-deps, cut from the browser-use branch head de10b1f8 (version 0.3.2). Dependencies change only through the updater: run `bunx --no-install mise run deps:update` (it moves the GitHub Actions SHAs, the vendored ripgrep and fd with recomputed checksums, the mise tools, the Pi npm pins, the PyPI pins such as browser-use, the package.json ranges and bun.lock). Never hand-edit a pin, a checksum or bun.lock.",
+    "Then run `bunx --no-install mise run build` and `bunx --no-install mise run verify`, and `bunx --no-install mise run deps:check` to show nothing is behind. If verify fails because a new version changed behavior, report the failing tests and the version move that caused them, without changing source; a small fix may follow as a separate Assignment.",
+    "List every version that moved (from -> to) in the report."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Report in under 300 words; put the full updater output in a file in the scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "mise run deps:update moves the dependencies and mise run deps:check reports nothing behind",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "mise.toml",
+    ".github",
+    "packages",
+    "scripts",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-10T12:31:30.878Z"
+  },
+  "createdAt": "2026-11-10T12:31:30.878Z"
+}
