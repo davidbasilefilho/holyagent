@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mw9ygj4s-zz8e",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 22,
+  "roleTask": "Reviewer.security",
+  "slug": "confirm-the-auto-review-repair-closes",
+  "objective": "Confirm the auto-review repair closes the earlier bypasses and opens no new one.",
+  "state": "Running",
+  "scope": [
+    "Repair commit 19bb39ae on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range b3cd9951..19bb39ae; head c580abb0 adds only a no-content merge of the integration branch). Repair diff without dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ar-fix-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9xp81h-vbzh.md. Review only this repair against the previous findings in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9x71h4-9je3.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9x71pm-6wpd.md (security).",
+    "New default to implement (verbatim from the Intent): auto-review is a security control that repository content and the model cannot weaken. A project-level .holyagent/config.json cannot turn auto-review off or replace or extend its policy (only the user's own config can), a malformed config keeps it on, its settings are fixed for the session, and it applies whenever the active model is served by the Codex provider. Inside the project root, writes to .git, .holyagent and the agent configuration folders (.pi, .codex, .claude) are reviewed, as Codex's sandbox keeps them read-only; paths are normalized as Pi's tools do (a leading @, ~, file:// URLs) and resolved through existing links before the root check. A tool that is neither known read-only nor annotated read-only is reviewed. Commands with brace expansion, and programs or flags that run other programs or write files, are outside the safe set.",
+    "Judge too, from the writer's notes: whether reviewing HolyAgent's and Pi's own harmless tools (todo, ask, subagent and the like) is a usability defect that needs a known-safe list, and whether setup writing an auto-review key at project scope that the loader ignores needs fixing.",
+    "Testing rule: never start pi or make a model or network request; unit tests only.",
+    "Look again for bypasses of the new rules: other shell expansions (tilde, parameter forms, process substitution, here-strings, ANSI-C quoting, line continuations, env assignments before a command), safe programs with writer or runner flags the audit missed, path tricks against the link resolution (races, relative links, case-insensitive file systems, Windows paths), config keys that still let a project weaken the gate, and transcript forging."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Report in under 400 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each earlier security finding is closed or its remaining gap is stated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each validated new bypass, fail-open path or data exposure is reported with source, sink and a concrete scenario, or none is found",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9xp81h-vbzh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T00:31:58.684Z"
+  },
+  "createdAt": "2026-11-10T00:31:58.684Z"
+}
