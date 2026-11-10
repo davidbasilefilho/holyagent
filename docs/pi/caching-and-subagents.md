@@ -96,7 +96,7 @@ Pi itself has none. Pi "skips features like sub-agents and plan mode" and tells 
 
 ### In-process children of the package
 
-**Decided and built:** `@tintinweb/pi-subagents` 0.23.1 runs each specialist as an `AgentSession` inside the root's Pi process, so nothing below is a per-child flag, and the primitives of the next table other than the SDK row are not used.
+**Decided and built:** `@tintinweb/pi-subagents` 0.23.2 runs each specialist as an `AgentSession` inside the root's Pi process, so nothing below is a per-child flag, and the primitives of the next table other than the SDK row are not used.
 
 - **Prompt and tools** come from the agent file the package loads from HolyAgent's Pi package (`dist/agents/<name>.md`, `prompt_mode: replace`, a `tools:` allowlist), never from `--append-system-prompt` or `--tools`. The 18 files, their frontmatter, the `${HOLYAGENT_PI_ROOT}` fill and the `subagents.json` settings that leave only those 18 launchable are in [extensions.md](extensions.md#specialists-as-package-agents).
 - **Model and thinking** are not in the files: the root passes them on each `Agent` call (the package ranks frontmatter above call parameters, so a pinned value would override the route table).
