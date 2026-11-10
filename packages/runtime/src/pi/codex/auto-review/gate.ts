@@ -20,10 +20,16 @@ export interface GateInput {
   readonly cwd: string
   /** What the tool registry knows of the tool. */
   readonly traits?: ToolTraits
-  /** The session history as review entries. */
-  readonly entries: ReadonlyArray<TranscriptEntry>
-  /** The client that asks the reviewer. */
-  readonly client: ReviewerClient
+  /**
+   * The session history as review entries. Run only for a call that goes to review, since reading
+   * the history costs a walk of it that a call run at once must not pay.
+   */
+  readonly entries: Effect.Effect<ReadonlyArray<TranscriptEntry>>
+  /**
+   * The client that asks the reviewer. Run only for a call that goes to review, since building it
+   * may look up and refresh credentials.
+   */
+  readonly client: Effect.Effect<ReviewerClient>
   /** The policy text of the config. */
   readonly policy: PolicyConfig
   /** The auto-review state of the session. */
@@ -59,8 +65,10 @@ const summarize = (call: ToolCallInput): string => {
   return line.length > SUMMARY_LIMIT ? `${line.slice(0, SUMMARY_LIMIT)}...` : line
 }
 
-const verdict = (word: string, assessment: GuardianAssessment): string =>
-  `Automatic approval review ${word} (risk: ${assessment.risk_level}, authorization: ${assessment.user_authorization}): ${assessment.rationale}`
+const verdict = (word: string, assessment: GuardianAssessment): string => {
+  const rationale = assessment.rationale.trim()
+  return `Automatic approval review ${word} (risk: ${assessment.risk_level}, authorization: ${assessment.user_authorization})${rationale === "" ? "" : `: ${rationale}`}`
+}
 
 /** What the user reads when a review times out. */
 export const TIMEOUT_NOTICE =
@@ -73,7 +81,8 @@ export const TIMEOUT_NOTICE =
  * breaker; a timeout blocks it without a denial and says one retry is allowed; a review that fails
  * blocks it as a denial the breaker does not count. A call the user approved with `/approve` is
  * reviewed once more with the approval in its transcript, and the approval is used up by the
- * decision.
+ * decision, not by a review that failed or timed out. The history and the client are built only
+ * once the classifier has sent the call to review.
  */
 export const gate = (input: GateInput): Effect.Effect<GateResult> =>
   Effect.gen(function* () {
@@ -82,10 +91,12 @@ export const gate = (input: GateInput): Effect.Effect<GateResult> =>
     const { session } = input
     const json = actionJson(input.call, input.cwd, trigger)
     const approved = session.isApproved(json)
+    const client = yield* input.client
+    const entries = yield* input.entries
     const decision = yield* review({
-      client: input.client,
+      client,
       policy: input.policy,
-      entries: approved ? [...input.entries, manualApprovalEntry(json)] : input.entries,
+      entries: approved ? [...entries, manualApprovalEntry(json)] : entries,
       actionJson: json,
       ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
     })
@@ -100,7 +111,8 @@ export const gate = (input: GateInput): Effect.Effect<GateResult> =>
       }
     }
     session.forgetTimeout(json)
-    if (approved) session.consumeApproval(json)
+    // A review that failed decided nothing, so the user's approval stays for the next try.
+    if (approved && !(decision._tag === "Deny" && decision.failed)) session.consumeApproval(json)
     if (decision._tag === "Allow") {
       session.recordNonDenial()
       return { block: false, notice: verdict("approved", decision.assessment) }

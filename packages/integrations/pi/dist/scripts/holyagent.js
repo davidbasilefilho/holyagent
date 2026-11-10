@@ -11134,7 +11134,13 @@ var HOME_VARIABLE = "HOLYAGENT_HOME", userConfigFile = (env) => join3(firstNonEm
 } : override, FINAL_OFF, valueAt = (value, path) => path.reduce((node, key) => isRecord(node) ? node[key] : undefined, value), setAt = (value, path, leaf) => {
   const [key, ...rest] = path;
   return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
-}, userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off), mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, project)), JsonValue, withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value, readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map5(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message }))))), loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
+}, userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off), USER_ONLY, withoutAt = (value, path) => {
+  const [key, ...rest] = path;
+  if (key === undefined || !isRecord(value) || !Object.hasOwn(value, key))
+    return value;
+  const entries = Object.entries(value);
+  return Object.fromEntries(rest.length === 0 ? entries.filter(([name]) => name !== key) : entries.map(([name, item]) => [name, name === key ? withoutAt(item, rest) : item]));
+}, mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, USER_ONLY.reduce((kept, path) => withoutAt(kept, path), project))), JsonValue, withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value, readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map5(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message }))))), loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
   const userPath = userConfigFile(env);
   const user = yield* readConfigFile(userPath);
   let project;
@@ -11160,6 +11166,10 @@ var init_load = __esm(() => {
     { path: ["pi", "features", "computerUse"], off: false },
     { path: ["pi", "features", "web"], off: "off" },
     { path: ["pi", "t3", "deviceAccess"], off: false }
+  ];
+  USER_ONLY = [
+    ["pi", "features", "autoReview"],
+    ["pi", "autoReview"]
   ];
   JsonValue = fromJsonString2(Unknown2);
 });

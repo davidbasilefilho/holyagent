@@ -11,7 +11,12 @@ import type {
   ReviewerClient,
   ReviewerRequest,
 } from "../../../runtime/src/pi/codex/auto-review/review.ts"
-import { registerAutoReview } from "../src/auto-review.ts"
+import {
+  AUTO_REVIEW_ON,
+  autoReviewChoice,
+  createAutoReviewSettings,
+  registerAutoReview,
+} from "../src/auto-review.ts"
 import { codexSettings } from "../src/codex.ts"
 
 const decode = (value: unknown) =>
@@ -53,7 +58,7 @@ const start = (
   const handlers = new Map<string, Array<Handler>>()
   const commands = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>()
   const notices: Array<string> = []
-  const state = { aborts: 0 }
+  const state = { aborts: 0, lookups: 0, walks: 0 }
   const api = {
     on: (event: string, handler: Handler) =>
       void handlers.set(event, [...(handlers.get(event) ?? []), handler]),
@@ -78,14 +83,19 @@ const start = (
       },
       ui: { notify: (text: string) => void notices.push(text) },
       modelRegistry: {
-        getApiKeyForProvider: () =>
-          Promise.resolve("token" in options ? options.token : "secret-token"),
+        getApiKeyForProvider: () => {
+          state.lookups++
+          return Promise.resolve("token" in options ? options.token : "secret-token")
+        },
       },
       sessionManager: {
-        getBranch: () => [
-          { type: "message", message: { role: "user", content: "clean the build output" } },
-          { type: "label", id: "x" },
-        ],
+        getBranch: () => {
+          state.walks++
+          return [
+            { type: "message", message: { role: "user", content: "clean the build output" } },
+            { type: "label", id: "x" },
+          ]
+        },
       },
     }) as unknown as ExtensionContext
   const emit = async (event: string, payload: object, provider?: string) => {
@@ -122,21 +132,49 @@ const recording = (...texts: Array<string>) => {
 
 const RISKY = { command: "rm -rf build" }
 
-describe("the auto-review settings of the Codex module", () => {
-  test("are on by default under Codex, carry the policy text, and are absent when switched off", async () => {
-    const on = await decode({
-      pi: {
-        provider: "openai-codex",
-        autoReview: { policy: "Own.", extraPolicy: "More." },
-      },
+describe("what decides the auto-review settings", () => {
+  test("the user's config decides: on by default, its policy text, and off only when it says so", async () => {
+    expect(autoReviewChoice(await decode({}))).toEqual({ settings: {} })
+    expect(
+      autoReviewChoice(
+        await decode({ pi: { autoReview: { policy: "Own.", extraPolicy: "More." } } }),
+      ),
+    ).toEqual({ settings: { policy: "Own.", extraPolicy: "More." } })
+    expect(autoReviewChoice(await decode({ pi: { features: { autoReview: false } } }))).toEqual({
+      settings: undefined,
     })
-    expect(codexSettings(on)?.autoReview).toEqual({ policy: "Own.", extraPolicy: "More." })
-    const off = await decode({
-      pi: { provider: "openai-codex", features: { autoReview: false } },
+    expect(autoReviewChoice(await decode({ pi: { enable: false } }))).toEqual({
+      settings: undefined,
     })
-    expect(codexSettings(off)?.autoReview).toBeUndefined()
-    const kimi = await decode({})
-    expect(codexSettings(kimi)).toBeUndefined()
+  })
+
+  test("a user config that could not be read leaves it on with the default policy", () => {
+    expect(autoReviewChoice(undefined)).toEqual({ settings: {} })
+    expect(AUTO_REVIEW_ON).toEqual({ settings: {} })
+  })
+
+  test("is not tied to the config's provider: the Codex module's settings no longer carry it", async () => {
+    const codex = codexSettings(await decode({ pi: { provider: "openai-codex" } }))
+    expect(codex).toBeDefined()
+    expect(codex).not.toHaveProperty("autoReview")
+    expect(autoReviewChoice(await decode({ pi: { provider: "kimi-coding-global" } }))).toEqual({
+      settings: {},
+    })
+  })
+
+  test("is fixed for the session by the first choice: a later one, from a rewritten config or a compaction, changes nothing", () => {
+    const session = createAutoReviewSettings()
+    // Before any config is read it is on with the default policy.
+    expect(session.settings()).toEqual({})
+    session.fix({ settings: { policy: "First." } })
+    session.fix({ settings: undefined })
+    session.fix(AUTO_REVIEW_ON)
+    expect(session.settings()).toEqual({ policy: "First." })
+
+    const off = createAutoReviewSettings()
+    off.fix({ settings: undefined })
+    off.fix({ settings: {} })
+    expect(off.settings()).toBeUndefined()
   })
 })
 
@@ -207,13 +245,66 @@ describe("the tool_call gate", () => {
     expect(requests).toHaveLength(2)
   })
 
-  test("a write outside the project root is reviewed", async () => {
+  test("a write outside the project root, or into a protected folder of it, is reviewed", async () => {
     const { reviewer, requests } = recording(answer("allow"))
     const module = start({ current: {} }, { reviewer })
     await module.call("write", { path: "src/a.ts", content: "x" })
     expect(requests).toHaveLength(0)
     await module.call("write", { path: "/etc/hosts", content: "x" })
-    expect(requests).toHaveLength(1)
+    await module.call("write", { path: "@/etc/hosts", content: "x" })
+    await module.call("write", { path: "@~/.ssh/authorized_keys", content: "x" })
+    await module.call("write", { path: ".git/hooks/pre-commit", content: "x" })
+    await module.call("write", { path: ".holyagent/config.json", content: "{}" })
+    expect(requests).toHaveLength(5)
+  })
+
+  test("a tool that is neither known read-only nor annotated read-only is reviewed, a process runner included", async () => {
+    const { reviewer, requests } = recording(answer("allow"))
+    const module = start(
+      { current: {} },
+      {
+        reviewer,
+        tools: [{ name: "process" }, { name: "read" }, { name: "mcp__x__y", namespace: {} }],
+      },
+    )
+    await module.call("read", { path: "src/a.ts" })
+    expect(requests).toHaveLength(0)
+    await module.call("process", { command: "sh -c id" })
+    await module.call("mcp__x__y", {})
+    await module.call("codemode", { code: "run()" })
+    expect(requests).toHaveLength(3)
+  })
+
+  test("a call that runs at once looks up no credentials and walks no history", async () => {
+    const { reviewer } = recording(answer("allow"))
+    const module = start({ current: {} }, { reviewer })
+    const fetched: Array<string> = []
+    const quiet = start(
+      { current: {} },
+      {
+        fetcher: (url) => {
+          fetched.push(url)
+          return Promise.reject(new Error("no network in tests"))
+        },
+      },
+    )
+    for (const [tool, input] of [
+      ["read", { path: "a.ts" }],
+      ["ls", {}],
+      ["bash", { command: "ls -la" }],
+      ["bash", { command: "git status" }],
+      ["write", { path: "src/a.ts", content: "x" }],
+    ] as const)
+      expect(await quiet.call(tool, input)).toEqual({})
+    expect(quiet.state.lookups).toBe(0)
+    expect(quiet.state.walks).toBe(0)
+    expect(fetched).toEqual([])
+    // A reviewed call does both, once.
+    await module.call("bash", RISKY)
+    expect(module.state.walks).toBe(1)
+    await quiet.call("bash", RISKY)
+    expect(quiet.state.lookups).toBe(1)
+    expect(quiet.state.walks).toBe(1)
   })
 
   test("the policy text of the config reaches the reviewer", async () => {

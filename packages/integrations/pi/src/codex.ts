@@ -18,7 +18,6 @@ import {
   type PatchFs,
   type Snapshot,
 } from "../../../runtime/src/pi/codex/apply-patch.ts"
-import type { PolicyConfig } from "../../../runtime/src/pi/codex/auto-review/policy.ts"
 import {
   compactThreshold,
   contextManagementOn,
@@ -52,11 +51,6 @@ export interface CodexSettings {
   readonly contextManagement: boolean
   /** Whether the Luna Reserve fallback is on (`pi.features.lunaReserve`). */
   readonly lunaReserve: boolean
-  /**
-   * The auto-review policy text when auto-review is on (`pi.features.autoReview`, with
-   * `pi.autoReview` for the text), `undefined` when it is off.
-   */
-  readonly autoReview: PolicyConfig | undefined
   /** The specialists (by agent name) that have `apply_patch` beside Pi's own write tools. */
   readonly applyPatchAgents: ReadonlyArray<string>
 }
@@ -72,7 +66,6 @@ export const codexSettings = (config: Config): CodexSettings | undefined => {
     family: profile.family,
     contextManagement: contextManagementOn(config),
     lunaReserve: config.pi.features.lunaReserve,
-    autoReview: config.pi.features.autoReview ? config.pi.autoReview : undefined,
     applyPatchAgents: RoleTask.literals.flatMap((roleTask) =>
       toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL)
         ? [

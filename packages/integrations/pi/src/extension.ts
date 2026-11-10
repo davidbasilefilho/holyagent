@@ -51,7 +51,13 @@ import {
 import { findChromium } from "../../../runtime/src/setup/chromium.ts"
 import { detectForm } from "../../../runtime/src/setup/form.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
-import { registerAutoReview } from "./auto-review.ts"
+import {
+  type AutoReviewChoice,
+  autoReviewChoice,
+  type AutoReviewSettings,
+  createAutoReviewSettings,
+  registerAutoReview,
+} from "./auto-review.ts"
 import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
@@ -456,6 +462,11 @@ interface Collected {
    */
   readonly codex?: CodexSettings
   /**
+   * What the user-level config, read alone, decides for auto-review. Present on every result,
+   * whether the config was readable or not, and never from the project's config.
+   */
+  readonly autoReview?: AutoReviewChoice
+  /**
    * True when the config runs the bash tool on just-bash (`pi.features.justBash`), present with
    * `environment`; every session reads it, since the root and the specialists both have `bash`.
    */
@@ -506,6 +517,11 @@ interface Held {
   started: boolean
   /** The Codex provider's settings once the config is read, or undefined for another provider. */
   codex: CodexSettings | undefined
+  /**
+   * The session's auto-review settings: on with the default policy from the start, fixed once by
+   * the first collection to the user-level config's choice. The project's config has no part.
+   */
+  autoReview: AutoReviewSettings
   /** True once the config is read and runs the bash tool on just-bash. */
   justBash: boolean
   /** Stops the provider checks of the session. */
@@ -1197,7 +1213,11 @@ export const createExtension =
           Effect.catch((error) => failed(error.message)),
           Effect.catchCause((cause) => failed(Cause.pretty(cause))),
         )
-        return homeNotice === undefined ? collected : { ...collected, homeNotice }
+        // Both the success and every failure path of `collected` end after the user's read, so
+        // `user` is settled here; it is `undefined` when the file could not be read, which leaves
+        // auto-review on.
+        const decided = { ...collected, autoReview: autoReviewChoice(user) }
+        return homeNotice === undefined ? decided : { ...decided, homeNotice }
       })
     }
 
@@ -1416,6 +1436,7 @@ export const createExtension =
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)
         if (result !== undefined) taken.codex = result.codex
+        if (result?.autoReview !== undefined) taken.autoReview.fix(result.autoReview)
         if (result !== undefined) taken.justBash = result.justBash === true
         if (result?.justBash === true) bash.enable(ctx.cwd)
         if (!taken.started && result?.enabled !== false) {
@@ -1462,6 +1483,7 @@ export const createExtension =
         t3Gate: false,
         t3Root: false,
         codex: undefined,
+        autoReview: createAutoReviewSettings(),
         justBash: false,
         probe: undefined,
         readiness: undefined,
@@ -1609,9 +1631,13 @@ export const createExtension =
         if (held !== undefined) held.setupNotice = joinNotices(held.setupNotice, notice(text))
       },
     })
-    // After every other gate, so a call they refuse is never sent to review. Auto-review is its own
-    // capability: off (or another provider) leaves no policy, and the gate returns at once.
-    registerAutoReview(pi, { settings: () => held?.codex?.autoReview })
+    // After every other gate, so a call they refuse is never sent to review. Auto-review is a
+    // security control: it is on from the session's start, whatever the config says or fails to
+    // say, and only the user's own config turns it off (see `autoReviewChoice`). The gate applies
+    // whenever the active model is served by Codex, not only when the config selects it.
+    registerAutoReview(pi, {
+      settings: () => (held === undefined ? {} : held.autoReview.settings()),
+    })
   }
 
 /**

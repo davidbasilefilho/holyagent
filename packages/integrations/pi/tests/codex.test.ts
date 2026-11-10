@@ -60,7 +60,6 @@ describe("codexSettings", () => {
       family: "gpt-6",
       contextManagement: false,
       lunaReserve: true,
-      autoReview: {},
       applyPatchAgents: WRITERS,
     })
     expect(settings(WITHOUT_BILLION).contextManagement).toBe(true)

@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
+import type { Config } from "../../../runtime/src/config/schema.ts"
 import { codexReviewer } from "../../../runtime/src/pi/codex/auto-review/client.ts"
 import { gate } from "../../../runtime/src/pi/codex/auto-review/gate.ts"
 import type { PolicyConfig } from "../../../runtime/src/pi/codex/auto-review/policy.ts"
@@ -14,11 +15,63 @@ import { isCodexProvider } from "../../../runtime/src/pi/codex/context-managemen
 import type { Fetch } from "../../../runtime/src/pi/codex/luna-reserve.ts"
 import { CODEX_PROVIDER_ID } from "../../../runtime/src/pi/codex/routes.ts"
 
+/**
+ * What the user's own config decides for auto-review: the policy text while it is on, `undefined`
+ * while it is off.
+ */
+export interface AutoReviewChoice {
+  readonly settings: PolicyConfig | undefined
+}
+
+/**
+ * Auto-review as it stands with no config read: on, with the default policy. A session starts here
+ * and a user config that cannot be read leaves it here, so a failure never turns the control off.
+ */
+export const AUTO_REVIEW_ON: AutoReviewChoice = { settings: {} }
+
+/**
+ * The choice of the user-level config, read alone. Auto-review is a security control, so the
+ * project's `.holyagent/config.json` takes no part: a repository cannot switch it off or replace or
+ * extend its policy, and a project file that is malformed changes nothing. Only the user's own file
+ * turns it off (`pi.features.autoReview`, or `pi.enable` for the whole extension) or sets its
+ * policy; with no readable user config it is on with the default policy. It is not tied to the
+ * config's provider: the gate applies whenever the active model is served by Codex.
+ */
+export const autoReviewChoice = (user: Config | undefined): AutoReviewChoice =>
+  user === undefined
+    ? AUTO_REVIEW_ON
+    : { settings: user.pi.enable && user.pi.features.autoReview ? user.pi.autoReview : undefined }
+
+/** The auto-review settings of one Pi session: the default until a choice is fixed, then the choice. */
+export interface AutoReviewSettings {
+  /** The policy text while auto-review is on, `undefined` while it is off. */
+  readonly settings: () => PolicyConfig | undefined
+  /**
+   * Fixes the choice for the rest of the session; only the first call counts, so a config written
+   * mid-session, or read again by a compaction, changes nothing.
+   */
+  readonly fix: (choice: AutoReviewChoice) => void
+}
+
+/** A fresh {@link AutoReviewSettings}, on with the default policy until a choice is fixed. */
+export const createAutoReviewSettings = (): AutoReviewSettings => {
+  let current = AUTO_REVIEW_ON
+  let fixed = false
+  return {
+    settings: () => current.settings,
+    fix: (choice) => {
+      if (fixed) return
+      fixed = true
+      current = choice
+    },
+  }
+}
+
 /** What the auto-review module needs from the extension that hosts it. */
 export interface AutoReviewHost {
   /**
-   * The policy text of the session's config while auto-review is on under the Codex provider, and
-   * `undefined` before the config is read, with the capability off or under another provider.
+   * The policy text of the session's auto-review while it is on, and `undefined` while the user's
+   * own config has it off. The module applies it only when the active model is served by Codex.
    */
   readonly settings: () => PolicyConfig | undefined
   /**
@@ -58,9 +111,10 @@ const APPROVE_USAGE =
 /**
  * Registers Codex auto-review on Pi: a `tool_call` gate that sends the calls the classifier picks
  * to the `codex-auto-review` reviewer before they run, and the `/approve` command that lifts one
- * denied action for a single retry. The module is inert (the gate returns at once, `/approve` says
- * auto-review is off) while `host.settings()` is `undefined`, so with the capability off, or under
- * another provider, no call is classified and none is reviewed.
+ * denied action for a single retry. The gate is inert (it returns at once, and `/approve` says
+ * auto-review is off) while `host.settings()` is `undefined`, which only the user's own config
+ * causes, or while the active model is not served by the Codex provider: then no call is classified
+ * and none is reviewed.
  *
  * - `tool_call`: classifies the call; a reviewed call runs on an allow and is blocked on a deny, a
  *   timeout or a failed review, and the breaker interrupts the turn after repeated denials.
@@ -81,26 +135,30 @@ export const registerAutoReview = (pi: ExtensionAPI, host: AutoReviewHost): void
     const policy = host.settings()
     if (policy === undefined || !isCodexProvider(ctx.model?.provider)) return undefined
     const info = pi.getAllTools().find((tool) => tool.name === event.toolName)
+    // The client and the history are built inside the gate, after the classifier has sent the call
+    // to review: a call that runs at once looks up no credentials and walks no history.
     const result = await Effect.runPromise(
-      Effect.gen(function* () {
-        const client = host.reviewer ?? (yield* defaultClient(ctx, host.fetcher))
-        return yield* gate({
-          call: { toolName: event.toolName, input: event.input },
-          cwd: ctx.cwd,
-          traits: {
-            ...(info?.annotations === undefined ? {} : { annotations: info.annotations }),
-            mcp: info?.namespace !== undefined,
-          },
-          entries: entriesFromMessages(
+      gate({
+        call: { toolName: event.toolName, input: event.input },
+        cwd: ctx.cwd,
+        traits: {
+          ...(info?.annotations === undefined ? {} : { annotations: info.annotations }),
+          mcp: info?.namespace !== undefined,
+        },
+        entries: Effect.sync(() =>
+          entriesFromMessages(
             ctx.sessionManager
               .getBranch()
               .flatMap((entry) => (entry.type === "message" ? [entry.message] : [])),
           ),
-          client,
-          policy,
-          session,
-          ...(host.timeoutMs === undefined ? {} : { timeoutMs: host.timeoutMs }),
-        })
+        ),
+        client:
+          host.reviewer === undefined
+            ? defaultClient(ctx, host.fetcher)
+            : Effect.succeed(host.reviewer),
+        policy,
+        session,
+        ...(host.timeoutMs === undefined ? {} : { timeoutMs: host.timeoutMs }),
       }),
     )
     if (result.notice !== undefined) ctx.ui.notify(result.notice, result.block ? "warning" : "info")

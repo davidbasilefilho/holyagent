@@ -1,11 +1,15 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { homedir, tmpdir } from "node:os"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 
 import {
   actionJson,
   classify,
-  isOutsideRoot,
   isSafeCommand,
   patchPaths,
+  writeTrigger,
 } from "../../src/pi/codex/auto-review/classify.ts"
 
 const ROOT = "/work/project"
@@ -128,9 +132,221 @@ describe("writes", () => {
   })
 
   test("the root itself and its children are inside; a sibling with the same prefix is not", () => {
-    expect(isOutsideRoot(".", ROOT)).toBe(false)
-    expect(isOutsideRoot("a/b", ROOT)).toBe(false)
-    expect(isOutsideRoot("/work/project-other/a", ROOT)).toBe(true)
+    expect(writeTrigger(".", ROOT)).toBeUndefined()
+    expect(writeTrigger("a/b", ROOT)).toBeUndefined()
+    expect(writeTrigger("/work/project-other/a", ROOT)?.kind).toBe("write-outside-root")
+  })
+})
+
+describe("the path of a write, read as Pi reads it", () => {
+  let base: string
+  let root: string
+  let outside: string
+
+  beforeAll(() => {
+    base = realpathSync(mkdtempSync(join(tmpdir(), "auto-review-paths-")))
+    root = join(base, "project")
+    outside = join(base, "outside")
+    mkdirSync(join(root, "src"), { recursive: true })
+    mkdirSync(join(root, ".git", "hooks"), { recursive: true })
+    mkdirSync(outside)
+    symlinkSync(outside, join(root, "link-out"))
+    symlinkSync(join(root, ".git"), join(root, "link-git"))
+    symlinkSync(join(base, "missing"), join(root, "dangling"))
+    symlinkSync(join(root, "loop-b"), join(root, "loop-a"))
+    symlinkSync(join(root, "loop-a"), join(root, "loop-b"))
+    writeFileSync(join(root, "src", "a.ts"), "x")
+  })
+
+  afterAll(() => {
+    rmSync(base, { recursive: true, force: true })
+  })
+
+  const write = (path: string) => classify({ toolName: "write", input: { path } }, root)?.kind
+
+  test("a leading @ is dropped, as Pi drops it, before the root check", () => {
+    expect(write("@src/a.ts")).toBeUndefined()
+    expect(write("@/etc/cron.d/x")).toBe("write-outside-root")
+    expect(write("@../outside/x")).toBe("write-outside-root")
+    expect(write("@.git/config")).toBe("protected-path")
+  })
+
+  test("~ and ~/ are the home folder, which is outside the project", () => {
+    expect(write("~")).toBe("write-outside-root")
+    expect(write("~/.ssh/authorized_keys")).toBe("write-outside-root")
+    expect(write("@~/.ssh/authorized_keys")).toBe("write-outside-root")
+    // Pi expands only "~" and "~/", so "~name" is a file of the project named so.
+    expect(write("~name/x")).toBeUndefined()
+    expect(homedir()).not.toContain(root)
+  })
+
+  test("a file:// URL is the path it names", () => {
+    expect(write("file:///etc/passwd")).toBe("write-outside-root")
+    expect(write(pathToFileURL(join(root, "src", "b.ts")).href)).toBeUndefined()
+    expect(write(pathToFileURL(join(root, ".git", "config")).href)).toBe("protected-path")
+    expect(write("file://remote-host/share/x")).toBe("write-outside-root")
+  })
+
+  test("a link inside the project that leads out is followed, whatever lies below it", () => {
+    expect(write("link-out/authorized_keys")).toBe("write-outside-root")
+    expect(write("link-out/new/dir/file")).toBe("write-outside-root")
+    expect(write("link-git/hooks/pre-commit")).toBe("protected-path")
+  })
+
+  test("a link that cannot be resolved, dangling or looping, is reviewed", () => {
+    expect(write("dangling")).toBe("write-outside-root")
+    expect(write("dangling/x")).toBe("write-outside-root")
+    expect(write("loop-a/x")).toBe("write-outside-root")
+  })
+
+  test("a path that does not exist yet is judged by its closest existing parent", () => {
+    expect(write("src/new/deep/file.ts")).toBeUndefined()
+    expect(write("nothing/at/all")).toBeUndefined()
+    expect(write("src/../../outside/x")).toBe("write-outside-root")
+  })
+
+  test("the folders of git and of the agents are protected inside the root, in any letter case", () => {
+    for (const path of [
+      ".git/config",
+      ".git/hooks/pre-commit",
+      ".git",
+      ".holyagent/config.json",
+      ".pi/settings.json",
+      ".codex/config.toml",
+      ".claude/settings.json",
+      ".GIT/config",
+      ".Claude/x",
+      "packages/sub/.git/hooks/x",
+      "src/../.git/config",
+    ])
+      expect([path, write(path)]).toEqual([path, "protected-path"])
+    expect(write(".gitignore")).toBeUndefined()
+    expect(write(".github/workflows/x.yml")).toBeUndefined()
+    expect(write("docs/.holyagentish")).toBeUndefined()
+  })
+
+  test("an edit and a patch are judged the same way", () => {
+    expect(
+      classify({ toolName: "edit", input: { path: "@.git/config", edits: [] } }, root)?.kind,
+    ).toBe("protected-path")
+    const patch = (...lines: Array<string>) => ({
+      toolName: "apply_patch",
+      input: { input: ["*** Begin Patch", ...lines, "*** End Patch"].join("\n") },
+    })
+    expect(classify(patch("*** Add File: .git/hooks/post-checkout", "+x"), root)?.kind).toBe(
+      "protected-path",
+    )
+    expect(
+      classify(patch("*** Update File: src/a.ts", "*** Move to: .claude/a.ts"), root)?.kind,
+    ).toBe("protected-path")
+    expect(classify(patch("*** Add File: link-out/x", "+x"), root)?.kind).toBe("write-outside-root")
+    // An outside path ahead of a protected one, whatever their order.
+    expect(
+      classify(patch("*** Add File: .git/x", "+x", "*** Add File: ../outside/y", "+y"), root)?.kind,
+    ).toBe("write-outside-root")
+    expect(classify(patch("*** Update File: src/a.ts"), root)).toBeUndefined()
+  })
+})
+
+describe("commands that run other programs or write files", () => {
+  const review = (command: string) => [command, isSafeCommand(command)] as const
+
+  test("brace expansion is reviewed, since it builds flags that the checks never saw", () => {
+    for (const command of [
+      "rg --p{re,re}=./x.sh foo .",
+      "git log --out{put,put}=/tmp/x",
+      "ls {a,b}",
+      "cat file{1..3}",
+      "echo {a,b}",
+    ])
+      expect(review(command)).toEqual([command, false])
+    // Quoted, a brace is an ordinary character.
+    expect(isSafeCommand("rg 'a{2}' src")).toBe(true)
+    expect(isSafeCommand('echo "{a,b}"')).toBe(true)
+  })
+
+  test("a glob is reviewed, since a file named like a flag would join it", () => {
+    for (const command of ["rg foo *", "cat ?", "ls [ab]*", "git grep foo -- *.ts"])
+      expect(review(command)).toEqual([command, false])
+    expect(isSafeCommand("find . -name '*.ts'")).toBe(true)
+  })
+
+  test("git grep may not open its matches in a program: -O, glued or clustered, and its long form", () => {
+    for (const command of [
+      "git grep -O'sh -c id' foo",
+      "git grep -Osh foo",
+      "git grep -nO foo",
+      "git grep -in -Ovim foo",
+      "git grep --open-files-in-pager=sh foo",
+      "git grep --open-files-in-pager foo",
+      "git grep --open-files foo",
+      "git grep --open foo",
+    ])
+      expect(review(command)).toEqual([command, false])
+    expect(isSafeCommand("git grep -n -i foo")).toBe(true)
+  })
+
+  test("git flags that write or run are unsafe under any unambiguous abbreviation", () => {
+    for (const command of [
+      "git log --output=/tmp/x",
+      "git log --out=/tmp/x",
+      "git diff --outp /tmp/x",
+      "git diff --ext-d",
+      "git show --textc",
+      "git cat-file --filters HEAD:a",
+      "git log --exe=x",
+      "git diff --config-env=a=b",
+    ])
+      expect(review(command)).toEqual([command, false])
+    for (const command of ["git log --oneline", "git diff --stat -- a.ts", "git log --format=%H"])
+      expect(review(command)).toEqual([command, true])
+  })
+
+  test("uniq may write its second operand, so it is reviewed", () => {
+    for (const command of ["uniq in.txt /etc/cron.d/x", "uniq in.txt", "sort a | uniq"])
+      expect(review(command)).toEqual([command, false])
+  })
+
+  test("ripgrep flags that start a program are unsafe alone or among short flags", () => {
+    for (const command of [
+      "rg -iz pat",
+      "rg -zi pat",
+      "rg -uuz pat src",
+      "rg -z pat",
+      "rg --search-zip pat",
+      "rg --pre=./x.sh pat",
+      "rg --pre ./x.sh pat",
+      "rg --hostname-bin=./x.sh pat",
+      "rg --hook=x pat",
+    ])
+      expect(review(command)).toEqual([command, false])
+    for (const command of ["rg -in pat src", "rg -e zebra src", "rg --glob '*.zig' pat"])
+      expect(review(command)).toEqual([command, true])
+  })
+
+  test("every program of the safe set is read-only whatever its operands", () => {
+    for (const command of [
+      "cat a b",
+      "head -n 5 a",
+      "tail -n 5 a",
+      "wc -l a",
+      "cut -d, -f1 a",
+      "nl a",
+      "paste a b",
+      "rev a",
+      "tr a b",
+      "stat a",
+      "ls -la src",
+      "grep -rn foo src",
+      "find . -type f -newer a",
+      "git rev-parse --show-toplevel",
+      "git ls-files",
+      "sed -n 3,9p a",
+    ])
+      expect(review(command)).toEqual([command, true])
+    // Safe programs alone, none of them one that writes through an operand.
+    for (const command of ["tee out", "sort -o out a", "cp a b", "dd of=out", "truncate -s0 a"])
+      expect(review(command)).toEqual([command, false])
   })
 })
 
@@ -153,17 +369,53 @@ describe("network use and annotations", () => {
     expect(classify(call, ROOT, { mcp: true })?.kind).toBe("tool-approval")
   })
 
-  test("a read-only tool, or one that says it is closed and not destructive, runs", () => {
+  test("a tool annotated read-only runs", () => {
     const call = { toolName: "mcp__docs__search", input: {} }
     expect(classify(call, ROOT, { annotations: { readOnlyHint: true } })).toBe(undefined)
-    expect(
-      classify(call, ROOT, { annotations: { destructiveHint: false, openWorldHint: false } }),
-    ).toBe(undefined)
   })
 
-  test("every other tool runs", () => {
-    for (const toolName of ["read", "grep", "find", "ls", "todo", "Agent", "ask"])
+  test("a tool that only says it is closed and not destructive is not read-only, so it is reviewed", () => {
+    const call = { toolName: "mcp__docs__search", input: {} }
+    expect(
+      classify(call, ROOT, { annotations: { destructiveHint: false, openWorldHint: false } })?.kind,
+    ).toBe("tool-approval")
+  })
+})
+
+describe("tools that are neither known read-only nor annotated read-only", () => {
+  test("Pi's read tools run", () => {
+    for (const toolName of ["read", "grep", "find", "ls"])
       expect(classify({ toolName, input: { path: "/etc/hosts" } }, ROOT)).toBe(undefined)
+  })
+
+  test("any other tool is reviewed, a process runner and a tool nobody classified included", () => {
+    for (const toolName of [
+      "process",
+      "processes",
+      "codemode",
+      "subagent",
+      "todo",
+      "Agent",
+      "ask",
+      "computer_use_click",
+      "unknown_tool",
+    ])
+      expect([toolName, classify({ toolName, input: { command: "id" } }, ROOT)?.kind]).toEqual([
+        toolName,
+        "tool-approval",
+      ])
+  })
+
+  test("a tool of an MCP server that takes a built-in name earns nothing by it", () => {
+    expect(classify({ toolName: "read", input: {} }, ROOT, { mcp: true })?.kind).toBe(
+      "tool-approval",
+    )
+    expect(
+      classify({ toolName: "read", input: {} }, ROOT, {
+        mcp: true,
+        annotations: { readOnlyHint: true },
+      }),
+    ).toBe(undefined)
   })
 })
 

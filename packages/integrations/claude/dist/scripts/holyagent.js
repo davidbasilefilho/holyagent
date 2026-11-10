@@ -13059,7 +13059,18 @@ var setAt = (value, path, leaf) => {
   return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
 };
 var userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off);
-var mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, project));
+var USER_ONLY = [
+  ["pi", "features", "autoReview"],
+  ["pi", "autoReview"]
+];
+var withoutAt = (value, path) => {
+  const [key, ...rest] = path;
+  if (key === undefined || !isRecord(value) || !Object.hasOwn(value, key))
+    return value;
+  const entries = Object.entries(value);
+  return Object.fromEntries(rest.length === 0 ? entries.filter(([name]) => name !== key) : entries.map(([name, item]) => [name, name === key ? withoutAt(item, rest) : item]));
+};
+var mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, USER_ONLY.reduce((kept, path) => withoutAt(kept, path), project)));
 var JsonValue = fromJsonString2(Unknown2);
 var withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value;
 var readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map4(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message })))));

@@ -1,5 +1,11 @@
-import { isAbsolute, relative, resolve, sep } from "node:path"
+import { lstatSync, realpathSync } from "node:fs"
+import { homedir } from "node:os"
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
+import { fileURLToPath } from "node:url"
 
+import { Effect } from "effect"
+
+import { READ_TOOLS } from "../../tools.ts"
 import { MAX_ACTION_STRING_TOKENS, truncateText } from "./transcript.ts"
 
 /**
@@ -9,10 +15,14 @@ import { MAX_ACTION_STRING_TOKENS, truncateText } from "./transcript.ts"
  * - `command`: a shell command outside the read-only safe set (Codex's escalation request).
  * - `write-outside-root`: a file write below no folder of the project (Codex's edit outside the
  *   writable roots).
+ * - `protected-path`: a file write into `.git`, `.holyagent` or an agent configuration folder of the
+ *   project, which Codex's sandbox keeps read-only even inside the writable roots.
  * - `network`: a command or tool that reaches the network (Codex's network approval).
- * - `tool-approval`: a tool whose annotations ask for approval (Codex's MCP tool approval).
+ * - `tool-approval`: a tool that is not known to be read-only (Codex's MCP tool approval, which also
+ *   asks for a tool that does not say it is read-only).
  */
-export type TriggerKind = "command" | "write-outside-root" | "network" | "tool-approval"
+export type TriggerKind =
+  "command" | "write-outside-root" | "protected-path" | "network" | "tool-approval"
 
 /** A tool call that goes to review, with the reason shown to the reviewer. */
 export interface Trigger {
@@ -33,7 +43,10 @@ export interface ToolTraits {
     readonly destructiveHint?: boolean | undefined
     readonly openWorldHint?: boolean | undefined
   }
-  /** The tool belongs to an MCP server (it has a namespace), whether or not it has annotations. */
+  /**
+   * The tool belongs to an MCP server (it has a namespace): its name is its server's to choose, so
+   * a name shared with a built-in tool earns it nothing.
+   */
   readonly mcp?: boolean
 }
 
@@ -53,7 +66,11 @@ const NETWORK_TOOLS = /^(web_[a-z_]+|moonshot_(search|fetch))$/
 // Shell commands
 // ---------------------------------------------------------------------------------------------
 
-/** The programs Codex treats as known safe: they read and print, and write nothing. */
+/**
+ * The programs that read and print and write nothing, whatever their operands. `uniq` is not among
+ * them, though Codex lists it: its second operand is a file it writes, and Pi has no sandbox to
+ * stop that.
+ */
 const SAFE_PROGRAMS: ReadonlySet<string> = new Set([
   "cat",
   "cd",
@@ -75,7 +92,6 @@ const SAFE_PROGRAMS: ReadonlySet<string> = new Set([
   "tr",
   "true",
   "uname",
-  "uniq",
   "wc",
   "which",
   "whoami",
@@ -93,7 +109,15 @@ const UNSAFE_FIND = new Set([
   "-fprintf",
 ])
 
-const UNSAFE_RG = ["--pre", "--hook", "--search-zip", "-z"]
+// Flags that make ripgrep start another program: a preprocessor, a decompressor, a hostname command.
+const UNSAFE_RG = ["--pre", "--hook", "--hostname-bin", "--search-zip"]
+
+// A cluster of short flags, `-iz`: one word that holds several.
+const isShortCluster = (word: string): boolean => /^-[^-]/.test(word)
+
+// `-z` (`--search-zip`) runs a decompressor; it can sit inside a cluster, as in `-iz`.
+const unsafeRg = (word: string): boolean =>
+  startsWithAny(word, UNSAFE_RG) || (isShortCluster(word) && word.includes("z"))
 
 const SAFE_GIT = new Set([
   "status",
@@ -112,15 +136,41 @@ const SAFE_GIT = new Set([
 
 const SAFE_GIT_BRANCH_FLAGS = new Set(["--list", "-l", "--show-current", "-a", "-r", "-v", "-vv"])
 
-const UNSAFE_GIT = ["--output", "--ext-diff", "--textconv", "--exec", "-c", "--config-env"]
+// Long flags that write a file or start a program: `--output` writes, `--ext-diff`, `--textconv` and
+// `--filters` run configured drivers, `--exec` and `--open-files-in-pager` (`git grep -O`) run a
+// command.
+const UNSAFE_GIT_LONG = [
+  "--output",
+  "--ext-diff",
+  "--textconv",
+  "--filters",
+  "--exec",
+  "--open-files-in-pager",
+  "--config-env",
+]
 
 const startsWithAny = (word: string, prefixes: ReadonlyArray<string>): boolean =>
   prefixes.some((prefix) => word === prefix || word.startsWith(`${prefix}=`))
 
+// Git takes any unambiguous prefix of a long flag (`--out=file`), so a flag that is the start of an
+// unsafe one is unsafe too.
+const unsafeGitLong = (word: string): boolean => {
+  if (!word.startsWith("--")) return false
+  const name = word.split("=")[0] ?? word
+  return name.length > 2 && UNSAFE_GIT_LONG.some((flag) => flag.startsWith(name))
+}
+
+const unsafeGit = (sub: string, word: string): boolean =>
+  unsafeGitLong(word) ||
+  word === "-c" ||
+  word.startsWith("-c=") ||
+  // `git grep -O` (open the matches in a pager) takes its program glued on, or sits in a cluster.
+  (sub === "grep" && isShortCluster(word) && word.includes("O"))
+
 const safeGit = (args: ReadonlyArray<string>): boolean => {
   const sub = args[0]
   if (sub === undefined || sub.startsWith("-")) return false
-  if (args.some((word) => startsWithAny(word, UNSAFE_GIT))) return false
+  if (args.some((word) => unsafeGit(sub, word))) return false
   if (sub === "branch") return args.slice(1).every((word) => SAFE_GIT_BRANCH_FLAGS.has(word))
   return SAFE_GIT.has(sub)
 }
@@ -139,7 +189,7 @@ const safeProgram = (words: ReadonlyArray<string>): boolean => {
     case "find":
       return args.every((word) => !UNSAFE_FIND.has(word))
     case "rg":
-      return args.every((word) => !startsWithAny(word, UNSAFE_RG))
+      return args.every((word) => !unsafeRg(word))
     case "git":
       return safeGit(args)
     case "sed":
@@ -151,9 +201,10 @@ const safeProgram = (words: ReadonlyArray<string>): boolean => {
 
 // Splits a command into the words of its simple commands, or `undefined` when it uses anything but
 // plain words and the separators `;`, `&&`, `||`, `|` and newline: redirections, substitutions,
-// variables, backslashes, comments, grouping and background jobs all send the command to review.
-// Single quotes are literal; double quotes are allowed as long as they hold no `$`, backtick or
-// backslash.
+// variables, backslashes, comments, grouping and background jobs all send the command to review, as
+// do an unquoted brace or glob: the shell would expand it into words (`--p{re,re}=x` is `--pre=x`,
+// and a file named `--pre=x` joins `*`) that the flag checks never saw. Single quotes are literal;
+// double quotes are allowed as long as they hold no `$`, backtick or backslash.
 const splitCommand = (command: string): ReadonlyArray<ReadonlyArray<string>> | undefined => {
   const segments: Array<Array<string>> = []
   let words: Array<string> = []
@@ -176,7 +227,7 @@ const splitCommand = (command: string): ReadonlyArray<ReadonlyArray<string>> | u
       if (char === '"' && /[$`\\]/.test(inner)) return undefined
       word = (word ?? "") + inner
       index = close
-    } else if (/[\\$`<>()#!]/.test(char)) {
+    } else if (/[\\$`<>()#!{}*?[]/.test(char)) {
       return undefined
     } else if (char === "&") {
       if (command.charAt(index + 1) !== "&") return undefined
@@ -216,11 +267,96 @@ const NETWORK_COMMAND =
 // Files
 // ---------------------------------------------------------------------------------------------
 
-/** Whether a path, taken against the project root, is outside it (or cannot be told to be inside). */
-export const isOutsideRoot = (path: string, root: string): boolean => {
-  if (path.startsWith("~")) return true
-  const away = relative(resolve(root), resolve(root, path))
-  return away === ".." || away.startsWith(`..${sep}`) || isAbsolute(away)
+/**
+ * The folders of a project that Codex's sandbox keeps read-only even inside the writable roots, and
+ * that decide what runs later: git hooks and config, the HolyAgent state and config, and the
+ * configuration of the agents (Pi, Codex, Claude). Compared in lower case, since a case-folding
+ * file system opens `.GIT` as `.git`.
+ */
+export const PROTECTED_FOLDERS: ReadonlyArray<string> = [
+  ".git",
+  ".holyagent",
+  ".pi",
+  ".codex",
+  ".claude",
+]
+
+const UNICODE_SPACES = /[  -   　]/g
+
+const errorCode = (error: unknown): string | undefined =>
+  typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+    ? error.code
+    : undefined
+
+type Probe<A> =
+  | { readonly found: true; readonly value: A }
+  | { readonly found: false; readonly code: string | undefined }
+
+// Runs a file system call that may throw, and says what it found or the error code it met.
+const probe = <A>(run: () => A): Probe<A> =>
+  Effect.runSync(
+    Effect.try({ try: run, catch: errorCode }).pipe(
+      Effect.map((value): Probe<A> => ({ found: true, value })),
+      Effect.catch((code) => Effect.succeed<Probe<A>>({ found: false, code })),
+    ),
+  )
+
+// The path as Pi's write and edit tools read it (`resolveToCwd`): Unicode spaces become spaces, a
+// leading `@` goes, `~` and `~/` are the home folder, a `file://` URL is its path, and a relative
+// path is taken against the project root. `undefined` for a URL that is not a path.
+const piPath = (input: string, root: string): string | undefined => {
+  let text = input.replace(UNICODE_SPACES, " ")
+  if (text.startsWith("@")) text = text.slice(1)
+  if (text === "~") text = homedir()
+  else if (text.startsWith("~/")) text = join(homedir(), text.slice(2))
+  if (text.startsWith("file://")) {
+    const url = probe(() => fileURLToPath(text))
+    if (!url.found) return undefined
+    text = url.value
+  }
+  return resolve(root, text)
+}
+
+// The path with every link that exists resolved: the deepest ancestor that exists is resolved by
+// the file system, and the part below it, which does not exist yet, follows as written. A link that
+// leads nowhere, or one the file system will not resolve, gives `undefined`: where a write through
+// it would land is not known.
+const throughLinks = (path: string): string | undefined => {
+  const tail: Array<string> = []
+  let current = path
+  for (;;) {
+    const real = probe(() => realpathSync(current))
+    if (real.found) return join(real.value, ...tail)
+    if (real.code !== "ENOENT") return undefined
+    // The path itself exists but its target does not: a dangling link.
+    if (probe(() => lstatSync(current)).found) return undefined
+    const parent = dirname(current)
+    if (parent === current) return path
+    tail.unshift(basename(current))
+    current = parent
+  }
+}
+
+/**
+ * Whether a write to `path` goes to review, and why: the path is read as Pi's tools read it (a
+ * leading `@`, `~`, a `file://` URL), resolved through the links that exist, and compared with the
+ * project root (itself resolved). A target outside the root, or one that cannot be resolved, is
+ * `write-outside-root`; one inside it that has a protected folder (see {@link PROTECTED_FOLDERS})
+ * among its parts is `protected-path`.
+ */
+export const writeTrigger = (path: string, root: string): Trigger | undefined => {
+  const target = piPath(path, root)
+  const real = target === undefined ? undefined : throughLinks(target)
+  const base = resolve(root)
+  const away = real === undefined ? undefined : relative(throughLinks(base) ?? base, real)
+  if (away === undefined || away === ".." || away.startsWith(`..${sep}`) || isAbsolute(away))
+    return { kind: "write-outside-root", reason: `${path} is outside the project root` }
+  return away.split(sep).some((part) => PROTECTED_FOLDERS.includes(part.toLowerCase()))
+    ? {
+        kind: "protected-path",
+        reason: `${path} is in a folder that holds git or agent configuration, which Codex's sandbox keeps read-only`,
+      }
+    : undefined
 }
 
 const PATCH_PATH = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+?)\s*$/gm
@@ -238,30 +374,26 @@ const stringInput = (input: Readonly<Record<string, unknown>>, key: string) => {
 const writtenPath = (input: Readonly<Record<string, unknown>>): string | undefined =>
   stringInput(input, "path") ?? stringInput(input, "file_path")
 
-const outsideRoot = (paths: ReadonlyArray<string>, root: string): string | undefined =>
-  paths.find((path) => isOutsideRoot(path, root))
-
-// ---------------------------------------------------------------------------------------------
-// Tool annotations
-// ---------------------------------------------------------------------------------------------
-
-// Codex asks for approval of an MCP tool unless it says it is read-only; a tool that does not say
-// it is not destructive, or not open-world, is taken as both (the MCP defaults).
-const needsApproval = (traits: ToolTraits): string | undefined => {
-  const hints = traits.annotations
-  if (hints?.readOnlyHint === true) return undefined
-  const destructive = hints?.destructiveHint ?? true
-  const openWorld = hints?.openWorldHint ?? true
-  if (destructive) return "its annotations say it may delete or overwrite data"
-  if (openWorld) return "its annotations say it reaches an open world of external entities"
-  return undefined
+// The first trigger among the paths of a write, an outside path ahead of a protected one.
+const firstTrigger = (paths: ReadonlyArray<string>, root: string): Trigger | undefined => {
+  const triggers = paths.flatMap((path) => writeTrigger(path, root) ?? [])
+  return triggers.find((trigger) => trigger.kind === "write-outside-root") ?? triggers[0]
 }
 
+// ---------------------------------------------------------------------------------------------
+// Tools
+// ---------------------------------------------------------------------------------------------
+
+/** The tools known to read and change nothing: Pi's own `read`, `grep`, `find` and `ls`. */
+const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(READ_TOOLS)
+
 /**
- * Decides whether a tool call goes to review, and why. `undefined` runs the call. A shell command
- * outside the safe set, a write below no project folder, a network use and a tool whose annotations
- * need approval are reviewed; everything else runs, since nothing else would have stopped for
- * approval under Codex's sandbox. `traits` is what the tool registry knows of the tool.
+ * Decides whether a tool call goes to review, and why. `undefined` runs the call. Review is the
+ * default: a call runs only when it is a shell command in the safe set, a write inside the project
+ * that touches no protected folder, a read tool of Pi, or a tool annotated read-only. A tool that
+ * is neither known to be read-only nor says so (a process runner, a tool with no annotations, one
+ * that says it is destructive or open-world) is reviewed, since Pi has no sandbox to stop what it
+ * does. `traits` is what the tool registry knows of the tool.
  */
 export const classify = (
   call: ToolCallInput,
@@ -280,24 +412,15 @@ export const classify = (
   if (FILE_TOOLS.has(call.toolName)) {
     const path = writtenPath(call.input)
     if (path === undefined) return { kind: "write-outside-root", reason: "no path to write" }
-    return isOutsideRoot(path, root)
-      ? { kind: "write-outside-root", reason: `${path} is outside the project root` }
-      : undefined
+    return writeTrigger(path, root)
   }
-  if (call.toolName === PATCH_TOOL) {
-    const paths = patchPaths(stringInput(call.input, "input") ?? "")
-    const outside = outsideRoot(paths, root)
-    return outside === undefined
-      ? undefined
-      : { kind: "write-outside-root", reason: `${outside} is outside the project root` }
-  }
+  if (call.toolName === PATCH_TOOL)
+    return firstTrigger(patchPaths(stringInput(call.input, "input") ?? ""), root)
   if (NETWORK_TOOLS.test(call.toolName))
     return { kind: "network", reason: `${call.toolName} reaches the network` }
-  if (traits.annotations !== undefined || traits.mcp === true) {
-    const why = needsApproval(traits)
-    return why === undefined ? undefined : { kind: "tool-approval", reason: why }
-  }
-  return undefined
+  if (traits.annotations?.readOnlyHint === true) return undefined
+  if (traits.mcp !== true && READ_ONLY_TOOLS.has(call.toolName)) return undefined
+  return { kind: "tool-approval", reason: `${call.toolName} is not known to be read-only` }
 }
 
 // ---------------------------------------------------------------------------------------------

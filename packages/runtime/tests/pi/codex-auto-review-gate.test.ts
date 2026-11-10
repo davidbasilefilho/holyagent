@@ -56,8 +56,8 @@ const run = (
     gate({
       call,
       cwd: ROOT,
-      entries: [{ role: "user", kind: "user", text: "clean up" }],
-      client,
+      entries: Effect.succeed([{ role: "user", kind: "user", text: "clean up" }]),
+      client: Effect.succeed(client),
       policy: {},
       session,
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
@@ -277,5 +277,90 @@ describe("the /approve override", () => {
     const session = createReviewSession()
     await run(() => Effect.fail(new ReviewerUnavailable({ reason: "down" })), session)
     expect(session.denied()).toHaveLength(1)
+  })
+
+  test("a failed review does not use up the approval, so the next try still carries it", async () => {
+    const session = createReviewSession()
+    await run(scripted(answer("deny")).client, session)
+    session.approve(0)
+    await run(() => Effect.fail(new ReviewerUnavailable({ reason: "HTTP 503" })), session)
+    // The failed try does not list the action as denied again, so it cannot be approved twice.
+    expect(session.denied()).toEqual([])
+    const retry = scripted(answer("allow"))
+    expect((await run(retry.client, session)).block).toBe(false)
+    expect(retry.requests[0]?.prompt).toContain(MANUAL_APPROVAL_PREFIX)
+    // Now the decision used it up.
+    const after = scripted(answer("deny"))
+    await run(after.client, session)
+    expect(after.requests[0]?.prompt).not.toContain(MANUAL_APPROVAL_PREFIX)
+  })
+})
+
+describe("the work a call that runs at once does not do", () => {
+  test("neither the client nor the history is built for a call the classifier lets run", async () => {
+    let built = 0
+    const counted = <A>(value: A) =>
+      Effect.sync(() => {
+        built++
+        return value
+      })
+    const input = (call: { toolName: string; input: Record<string, unknown> }) => ({
+      call,
+      cwd: ROOT,
+      entries: counted([]),
+      client: counted<ReviewerClient>(() => Effect.succeed(answer("allow"))),
+      policy: {},
+      session: createReviewSession(),
+    })
+    for (const call of [
+      { toolName: "read", input: { path: "a.ts" } },
+      { toolName: "bash", input: { command: "ls" } },
+      { toolName: "write", input: { path: "a.ts", content: "x" } },
+    ])
+      expect(await Effect.runPromise(gate(input(call)))).toEqual({ block: false })
+    expect(built).toBe(0)
+    await Effect.runPromise(gate(input(RISKY)))
+    expect(built).toBe(2)
+  })
+})
+
+describe("the retry that a timeout allows", () => {
+  test("belongs to its turn: a new turn forgets that the review timed out", async () => {
+    const session = createReviewSession()
+    expect(await run(() => Effect.never, session, RISKY, 20)).toMatchObject({
+      reason: TIMEOUT_MESSAGE,
+    })
+    session.newTurn()
+    expect(await run(() => Effect.never, session, RISKY, 20)).toMatchObject({
+      reason: TIMEOUT_MESSAGE,
+    })
+  })
+})
+
+describe("a rationale left empty", () => {
+  test("is accepted on a low-risk allow, and denies closed on any other decision", async () => {
+    const low = JSON.stringify({
+      risk_level: "low",
+      user_authorization: "high",
+      outcome: "allow",
+      rationale: "",
+    })
+    expect(await run(scripted(low).client, createReviewSession())).toEqual({
+      block: false,
+      notice: "Automatic approval review approved (risk: low, authorization: high)",
+    })
+    for (const [outcome, risk] of [
+      ["allow", "medium"],
+      ["deny", "low"],
+    ]) {
+      const empty = JSON.stringify({
+        risk_level: risk,
+        user_authorization: "high",
+        outcome,
+        rationale: " ",
+      })
+      const result = await run(scripted(empty).client, createReviewSession())
+      expect(result.block ? result.reason : "").toContain("Automatic approval review failed")
+    }
   })
 })

@@ -33,7 +33,7 @@ export interface DeniedAction {
  * timed out once.
  */
 export interface ReviewSession {
-  /** Starts a turn: the breaker's counts begin at zero. */
+  /** Starts a turn: the breaker's counts begin at zero and the timed-out actions are forgotten. */
   readonly newTurn: () => void
   /**
    * Records a denial by the reviewer and remembers the action for `/approve`. After
@@ -43,7 +43,8 @@ export interface ReviewSession {
   readonly recordDenial: (action: DeniedAction) => BreakerResult
   /**
    * Remembers a denial that the breaker does not count, a review that could not complete (Codex
-   * leaves it out too): the action can be approved, and the run of denials ends.
+   * leaves it out too): the action can be approved, and the run of denials ends. An action that
+   * already has an approval keeps it.
    */
   readonly recordFailure: (action: DeniedAction) => void
   /** Records a review that did not deny (an allow or a timeout): the run of denials ends. */
@@ -84,6 +85,8 @@ export const createReviewSession = (): ReviewSession => {
       consecutive = 0
       total = 0
       interrupted = false
+      // The retry that a timeout allows belongs to its turn.
+      timedOut.clear()
     },
     recordDenial: (action) => {
       remember(action)
@@ -95,7 +98,8 @@ export const createReviewSession = (): ReviewSession => {
       return { interrupt, consecutive, total }
     },
     recordFailure: (action) => {
-      remember(action)
+      // An approved action stays approved: the review that failed decided nothing.
+      if (!approved.has(action.key)) remember(action)
       consecutive = 0
     },
     recordNonDenial: () => {

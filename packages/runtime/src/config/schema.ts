@@ -170,7 +170,8 @@ const Enabled = Schema.Boolean
 /**
  * The policy text of the Codex provider's auto-review (`pi.autoReview`), as Codex's `[auto_review]`
  * table has it: `policy` replaces the default policy, `extraPolicy` is added after whichever policy
- * stands. Both are markdown the reviewer reads; a blank value counts as absent.
+ * stands. Both are markdown the reviewer reads; a blank value counts as absent. Only the user-level
+ * config sets them: auto-review is a security control, so a project file's value is ignored.
  */
 const AutoReviewPolicy = Schema.Struct({
   policy: Schema.optionalKey(Schema.String),

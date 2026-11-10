@@ -23,13 +23,15 @@ export const AUTHORIZATION_LEVELS = ["unknown", "low", "medium", "high"] as cons
 
 /**
  * The reviewer's verdict, Codex's `GuardianAssessment`. Every field is required (the output schema
- * is strict), and a field of another name is an error.
+ * is strict), and a field of another name is an error. The rationale may be empty only for a
+ * low-risk allow, as the policy asks for one on every other decision (see
+ * {@link parseAssessment}).
  */
 export const GuardianAssessment = Schema.Struct({
   risk_level: Schema.Literals(RISK_LEVELS),
   user_authorization: Schema.Literals(AUTHORIZATION_LEVELS),
   outcome: Schema.Literals(["allow", "deny"]),
-  rationale: Schema.String.check(Schema.isNonEmpty()),
+  rationale: Schema.String,
 })
 /** One reviewer verdict. */
 export type GuardianAssessment = typeof GuardianAssessment.Type
@@ -66,13 +68,20 @@ const decodeAssessment = Schema.decodeUnknownEffect(Schema.fromJsonString(Guardi
 
 /**
  * Decodes the reviewer's final message as a {@link GuardianAssessment}, strictly: the whole text
- * must be the JSON object, with the four fields and nothing else.
+ * must be the JSON object, with the four fields and nothing else. A blank rationale is accepted on
+ * a low-risk allow, where the policy asks for none, and is invalid on any other decision.
  */
 export const parseAssessment = (
   text: string,
 ): Effect.Effect<GuardianAssessment, InvalidAssessment> =>
   decodeAssessment(text).pipe(
     Effect.mapError((error) => new InvalidAssessment({ reason: error.message })),
+    Effect.flatMap((assessment) =>
+      assessment.rationale.trim() === "" &&
+      !(assessment.outcome === "allow" && assessment.risk_level === "low")
+        ? Effect.fail(new InvalidAssessment({ reason: "the rationale is empty" }))
+        : Effect.succeed(assessment),
+    ),
   )
 
 /**

@@ -70,9 +70,18 @@ export const truncateText = (text: string, tokenCap: number): string => {
   return `${prefixWithin(text, head)}${marker}${suffixWithin(text, room - head)}`
 }
 
+// Every kind of line break that a reader may take for one, as a `\n`.
+const LINE_BREAKS = /\r\n|[\r\u0085\u2028\u2029\v\f]/g
+
+// An entry's text goes in as an indented block: its lines start with two spaces, while the
+// transcript's own lines (`[3] user: ...`, `>>> TRANSCRIPT END`) start at the margin, so no text
+// can forge one.
+const indented = (text: string): string =>
+  text.replaceAll(LINE_BREAKS, "\n").replaceAll("\n", "\n  ")
+
 const renderOne = (entry: TranscriptEntry, number: number) => {
   const cap = entry.kind === "tool" ? MAX_TOOL_ENTRY_TOKENS : MAX_MESSAGE_ENTRY_TOKENS
-  const text = `[${number}] ${entry.role}: ${truncateText(entry.text, cap)}`
+  const text = `[${number}] ${entry.role}: ${indented(truncateText(entry.text, cap))}`
   return { text, tokens: approxTokens(text) }
 }
 
@@ -180,8 +189,27 @@ const textOf = (content: string | ReadonlyArray<unknown>): string =>
         .map((block) => block.text)
         .join("\n")
 
+// The marker of the user's approval, as a pattern that survives other case and spacing: only
+// `manualApprovalEntry` may write it, so it comes out of everything the history holds.
+const APPROVAL_MARKER = new RegExp(
+  MANUAL_APPROVAL_PREFIX.split(/\s+/)
+    .map((word) => word.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("\\s+"),
+  "gi",
+)
+
+// A history entry as the reviewer reads it: the label on one line (a tool name comes from the
+// model), and the approval marker out of the text.
 const nonEmpty = (entry: TranscriptEntry): ReadonlyArray<TranscriptEntry> =>
-  entry.text.trim() === "" ? [] : [entry]
+  entry.text.trim() === ""
+    ? []
+    : [
+        {
+          ...entry,
+          role: entry.role.replaceAll(/\s+/g, " ").trim(),
+          text: entry.text.replaceAll(APPROVAL_MARKER, "[approval marker removed]"),
+        },
+      ]
 
 /**
  * The entries of Pi's session history that the reviewer reads
