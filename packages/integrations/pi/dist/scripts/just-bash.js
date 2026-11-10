@@ -89809,6 +89809,34 @@ try {
   Hf = null;
 }
 
+var current = (cells, index) => Atomics.load(cells, index);
+var STABLE = Symbol.for("holyagent.stableWaitAsync");
+var stableWaitAsync = (waitAsync) => {
+  const native = waitAsync;
+  const stable = (typedArray, index, value, timeout) => {
+    if (timeout !== undefined)
+      return native(typedArray, index, value, timeout);
+    const first = native(typedArray, index, value);
+    if (!first.async)
+      return first;
+    const changed = (pending) => promise2(() => pending).pipe(flatMap2(() => {
+      if (current(typedArray, index) !== value)
+        return succeed5("ok");
+      const next = native(typedArray, index, value);
+      return next.async ? changed(next.value) : succeed5("ok");
+    }));
+    return { async: true, value: runPromise2(changed(first.value)) };
+  };
+  return stable;
+};
+var installStableWaitAsync = () => {
+  const atomics = Atomics;
+  if (atomics.waitAsync === undefined || atomics[STABLE] === true)
+    return;
+  atomics.waitAsync = stableWaitAsync(Atomics.waitAsync.bind(Atomics));
+  atomics[STABLE] = true;
+};
+
 var UNQUOTABLE = /["%^!]|\p{Cc}/u;
 var BARE_SYNTAX = /[&|<>()]/;
 var cmdExeArguments = (command, args) => {
@@ -90422,6 +90450,7 @@ var runJsExec = (args, ctx) => gen2(function* () {
   exitCode: 1
 })));
 var runShell = (request, options) => gen2(function* () {
+  yield* sync2(installStableWaitAsync);
   const platform = options.platform ?? process.platform;
   const windows = platform === "win32";
   const folders = hostSearchFolders(request.env, platform);

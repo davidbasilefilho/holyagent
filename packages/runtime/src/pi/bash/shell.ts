@@ -22,6 +22,7 @@ import {
   unsafeBytesFromLatin1,
 } from "just-bash"
 
+import { installStableWaitAsync } from "./atomics.ts"
 import { cmdExeArguments, isBatchFile } from "./cmd.ts"
 import { withNullDevice } from "./devices.ts"
 import { DONE, SNAPSHOT, watchExit } from "./exit.ts"
@@ -493,6 +494,7 @@ export const runShell = (
   options: ShellOptions,
 ): Effect.Effect<void, ShellFailed> =>
   Effect.gen(function* () {
+    yield* Effect.sync(installStableWaitAsync)
     const platform = options.platform ?? process.platform
     const windows = platform === "win32"
     const folders = hostSearchFolders(request.env, platform)
