@@ -15,6 +15,7 @@
     "Status and open items (2026-11-10, final): released. #112-#117 merged into release/0.3.2/integration; release PR https://github.com/davidbasilefilho/holyagent/pull/118 squash-merged into main as 074bc72a; Publish succeeded and the Release holyagent-0.3.2 exists. Non-blocking residuals, none fixed yet: (1) browser-use env var names and the launch against a real Chromium were never tried live; (2) a SIGKILL of the browser server leaves Chromium running; (3) doctor inside T3 still asks for uvx and a Chromium; (4) Codex backend request shapes from 0.3.1 untested live; (5) Windows: a .cmd shim earlier on PATH hides a later rg.exe (fails closed); tools.test.ts:239-240 skips by non-strict Bun.which; (6) search-tool lookup drops PATH entries inside cwd (e.g. ~/.cargo/bin when run from $HOME) and the containment check is lexical (no realpath); (7) docs: the 'open a new terminal' advice should be Windows-only, installation.md needs 'except with --undo', the aqua checksum claims in decisions.md are unverified; (8) bun.lock resolves the hoisted transitive typescript to 5.9.3 (was 6.0.3); pi-subagents journal-key fixtures still name 0.23.1; (9) upstream reports suggested, not filed: just-bash run wake, a T3 opt-in CDP endpoint. These residuals are carried to later releases; none blocks 0.3.2."
   ],
   "revision": 4,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "0.3.2 released: PR 118 merged into main, Release holyagent-0.3.2 published; residuals recorded in the status requirement.",
   "createdAt": "2026-11-10T11:10:09.562Z"
 }
