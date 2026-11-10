@@ -17,7 +17,11 @@ import { Text } from "@earendil-works/pi-tui"
 import { Cause, Data, Effect, Exit, Fiber, Schema } from "effect"
 
 import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
-import type { CapabilityForm, McpServer } from "../../../runtime/src/config/capabilities.ts"
+import {
+  BROWSER_SERVER_COMMAND,
+  type CapabilityForm,
+  type McpServer,
+} from "../../../runtime/src/config/capabilities.ts"
 import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
@@ -48,7 +52,6 @@ import {
   toolArgs,
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
-import { findChromium } from "../../../runtime/src/setup/chromium.ts"
 import { homeDirectory } from "../../../runtime/src/setup/environment.ts"
 import { detectForm } from "../../../runtime/src/setup/form.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
@@ -69,11 +72,12 @@ import {
   registerScreenServers,
   screenFormOf,
   screenServers,
+  withoutBrowserUseInT3,
 } from "./screen.ts"
 import { AGENT_TYPES, SPECIALIST_NAMES } from "./specialists.ts"
 import {
   belowFullAccess,
-  isT3Session,
+  hostedByT3,
   refuseDeactivatedT3Tool,
   T3_ACCESS_NOTICE,
   T3_ACCESS_STATUS,
@@ -527,7 +531,7 @@ interface Held {
   justBash: boolean
   /** Stops the provider checks of the session. */
   probe: AbortController | undefined
-  /** True when the session runs under T3 Code (see {@link isT3Session}). */
+  /** True when the session runs under T3 Code (see {@link hostedByT3}), a specialist's included. */
   t3: boolean
   /**
    * True once the start ran for a root under T3 Code, applied or not: T3's tools the root keeps off
@@ -566,17 +570,16 @@ const rootExclusions = (configs: ReadonlyArray<Config>): ReadonlyArray<string> =
 
 /**
  * What a config decides for a session of `role`: the worker cap and the provider's variables for
- * every role, for a specialist the MCP servers of the screen capability in the machine's `form`
- * (`chromium` finds the Chromium the machine provides for the headless one), and for the root also
- * its prompt and its tool selection. The root's exclusions are those of `config` and of `bound`,
- * the configs whose exclusions it keeps whatever `config` says (the defaults and the user's).
+ * every role, for a specialist the MCP servers of the screen capability in the machine's `form`,
+ * and for the root also its prompt and its tool selection. The root's exclusions are those of
+ * `config` and of `bound`, the configs whose exclusions it keeps whatever `config` says (the
+ * defaults and the user's).
  */
 const settingsFor = (
   config: Config,
   role: PiRole,
   bound: ReadonlyArray<Config> = [],
   form: CapabilityForm = "normal",
-  chromium: () => string | undefined = () => undefined,
 ): Collected => {
   const rootArgs = toolArgs(config, "root")
   const codex = codexSettings(config)
@@ -585,7 +588,7 @@ const settingsFor = (
     providerEnvironment: providerEnv(config),
     ...(codex === undefined ? {} : { codex }),
     ...(justBashOn(config) ? { justBash: true as const } : {}),
-    ...(role === "specialist" ? { screenServers: screenServers(config, form, chromium()) } : {}),
+    ...(role === "specialist" ? { screenServers: screenServers(config, form) } : {}),
     ...(role === "root"
       ? {
           rootPrompt: true,
@@ -1073,13 +1076,7 @@ export const createExtension =
       Effect.gen(function* () {
         const role = yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE))
         const defaults = yield* defaultConfig
-        return settingsFor(
-          config ?? defaults,
-          role,
-          boundConfigs(defaults, user),
-          machineForm(),
-          () => findChromium(env),
-        )
+        return settingsFor(config ?? defaults, role, boundConfigs(defaults, user), machineForm())
       }).pipe(Effect.orDie)
 
     // The root's exclusions before any config is known: the defaults', so a run in flight while a
@@ -1168,7 +1165,6 @@ export const createExtension =
               yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE)),
               bound,
               machineForm(),
-              () => findChromium(env),
             )
             return {
               enabled: false,
@@ -1177,7 +1173,7 @@ export const createExtension =
             } satisfies Collected
           }
           const role = yield* roleOf
-          configured = settingsFor(config, role, bound, machineForm(), () => findChromium(env))
+          configured = settingsFor(config, role, bound, machineForm())
           // Status first, then reconcile: for a project that keeps state, status makes the state
           // worktree that the next calls read.
           const status = yield* holyagent(signal, project, "status").pipe(
@@ -1393,7 +1389,13 @@ export const createExtension =
     // The no-server notice is told once for the process: a child is one session, and a later start
     // (a resume or a reload) has the notice in its history already.
     let noServerTold = false
-    const registerScreen = (servers: ReadonlyArray<McpServer>): Delivery | undefined => {
+    // Under T3 the browser-use server is left out (`withoutBrowserUseInT3`), and that is no missing
+    // server: the specialist has T3's preview tools, so the no-server notice follows the config's
+    // servers, not those kept.
+    const registerScreen = (
+      servers: ReadonlyArray<McpServer>,
+      t3: boolean,
+    ): Delivery | undefined => {
       const agent = childAgent(pi.getSessionName())
       // No server for a screen specialist: `pi.features.mcp` or the capability is off, so tell it.
       if (isScreenAgent(agent) && servers.length === 0) {
@@ -1406,14 +1408,30 @@ export const createExtension =
       const { failures } = registerScreenServers(
         (name, server) => pi.registerMcpServer(name, server),
         agent,
-        servers,
+        withoutBrowserUseInT3(servers, t3),
         homeDirectory(env),
+        browserLauncher,
       )
       return failures.length === 0
         ? undefined
         : notice(
             `an MCP server of the screen capability was not registered (${failures.join("; ")}); work without its tools and report that they are missing`,
           )
+    }
+
+    // A server that drives a Chromium it does not start is registered as `holyagent browser-server`:
+    // Bun on the package's bundled runtime, which starts the Chromium, runs the server against it
+    // and removes both when the server ends. Found and started like the bash tool's shell.
+    const browserLauncher = (): {
+      readonly command: string
+      readonly args: ReadonlyArray<string>
+    } => {
+      const argv = [...bundled, BROWSER_SERVER_COMMAND]
+      const found = bunFor(argv)
+      if (!found.ok) throw new Error(found.reason)
+      const launch = launchOf(found.program, argv)
+      if (!launch.ok) throw new Error(launch.reason)
+      return { command: isShim(found.program) ? "cmd.exe" : found.program, args: launch.args }
     }
 
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
@@ -1453,7 +1471,7 @@ export const createExtension =
           if (result?.screenServers !== undefined)
             taken.specialistNotice = joinOptional(
               taken.specialistNotice,
-              registerScreen(result.screenServers),
+              registerScreen(result.screenServers, taken.t3),
             )
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
           if (result?.tools !== undefined) {
@@ -1487,7 +1505,7 @@ export const createExtension =
         rootPrompt: false,
         excluded: Effect.runSync(startingExclusions),
         started: false,
-        t3: isT3Session(ctx, env),
+        t3: hostedByT3(ctx, env, isChild()),
         t3Gate: false,
         t3Root: false,
         codex: undefined,

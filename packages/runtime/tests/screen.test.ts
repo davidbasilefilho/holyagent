@@ -155,6 +155,8 @@ describe("the screen capability on an Assignment's draft", () => {
     expect(headless).toContain(HEADLESS_SCREEN_LINE)
     expect(HEADLESS_SCREEN_LINE).toContain("headless browser")
     expect(HEADLESS_SCREEN_LINE).toContain("no desktop")
+    expect(HEADLESS_SCREEN_LINE).toContain("where T3 hosts the session, T3's preview tools")
+    expect(HEADLESS_SCREEN_LINE).toContain("browser-use is not available")
     expect(headless).not.toContain("computer-use, browser-use (mcp__browse__*)")
   })
 })

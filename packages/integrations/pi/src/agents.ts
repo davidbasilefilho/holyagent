@@ -59,8 +59,8 @@ const webEntries = (mode: Config["pi"]["features"]["web"]): ReadonlyArray<string
  * would leave the role under-tooled in silence. With `screen` the entries are those of a specialist
  * launched for an Assignment that carries the screen capability in the machine's `form` (`normal`
  * by default): the role's own, then the screen tools of the form (see `toolArgs`): computer use and
- * browse (`mcp__browse__*`) in the normal form, the Playwright server's `mcp__playwright__*` in the
- * headless one, and the T3 preview tools in both.
+ * browse (`mcp__browse__*`) in the normal form, the browser-use server's `browser_exec` and
+ * `browser_screenshot` in the headless one, and the T3 preview tools in both.
  */
 export const agentTools = (
   config: Config,

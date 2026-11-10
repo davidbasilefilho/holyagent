@@ -35,6 +35,8 @@ import {
 
 let home: string
 let project: string
+// A file standing in for the Chromium executable a person configured, which has to exist.
+let chromiumPath: string
 let remove: () => Promise<void>
 
 beforeEach(async () => {
@@ -44,6 +46,8 @@ beforeEach(async () => {
   await mkdir(project, { recursive: true })
   await writeCompleteSettings(join(home, ".claude"))
   await writeBrowsePairing(home)
+  chromiumPath = join(made.directory, "chromium")
+  await writeFile(chromiumPath, "")
   remove = made.remove
 })
 afterEach(() => remove())
@@ -91,7 +95,7 @@ const setProjectConfig = (config: unknown) =>
 /** A fake shell where `pi`, `node` and `bun` are installed and print the given versions. */
 const shellWith = (
   versions: { readonly pi?: string; readonly node?: string } = {},
-  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx"],
+  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx", "uvx"],
 ) =>
   fakeShell({
     commands,
@@ -469,7 +473,7 @@ describe("holyagent doctor, capabilities", () => {
     await write(globalSettings(), {
       packages: [SOURCE, ...DEFAULT_SOURCES.filter((source) => !source.includes("computer-use"))],
     })
-    const report = await doctorIn("headless")
+    const report = await doctorIn("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })
     expect(report.ok).toBe(true)
     expect(piLines(report).slice(3)).toEqual([
       BASE_OK,

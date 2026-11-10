@@ -3417,11 +3417,16 @@ var pi_packages_default = {
   "@amaster.ai/pi-computer-use": "0.1.36",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.15",
-  "@playwright/mcp": "0.0.85"
+  "@opencode/browse": "0.0.15"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
+
+var pypi_packages_default = {
+  "browser-use": "1.0.0"
+};
+
+var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
 
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
@@ -3456,18 +3461,30 @@ var BROWSE_MCP_SERVER = {
   command: "npx",
   args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
 };
-var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
-var PLAYWRIGHT_SERVER = "playwright";
-var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
-var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
-var PLAYWRIGHT_MCP_SERVER = {
-  name: PLAYWRIGHT_SERVER,
-  command: "npx",
-  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
-  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+var BROWSER_USE_PACKAGE = "browser-use";
+var BROWSER_USE_SERVER = "browser_use";
+var BROWSER_USE_TOOLS = [
+  `mcp__${BROWSER_USE_SERVER}__browser_exec`,
+  `mcp__${BROWSER_USE_SERVER}__browser_screenshot`
+];
+var BROWSER_USE_ALL_TOOLS = [`mcp__${BROWSER_USE_SERVER}__*`];
+var PYPI_INDEX = "https://pypi.org/simple";
+var uvxServerArgs = (name, rest) => [
+  "--no-config",
+  "--default-index",
+  PYPI_INDEX,
+  "--from",
+  `${name}==${PYPI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
+var BROWSER_USE_MCP_SERVER = {
+  name: BROWSER_USE_SERVER,
+  command: "uvx",
+  args: uvxServerArgs(BROWSER_USE_PACKAGE, ["browser-use", "--cli-mcp"]),
+  launchesChromium: true
 };
 var BROWSE_MINIMUM_NODE = [22, 19, 0];
-var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var CHROMIUM_FIX = "set HOLYAGENT_CHROMIUM_PATH to a Chromium executable, or put a Playwright Chromium build in the folder PLAYWRIGHT_BROWSERS_PATH names (PLAYWRIGHT_BROWSERS_PATH=<folder> uvx playwright install chromium)";
 var nodeNeed = (minimum) => ({
   kind: "node",
   minimum,
@@ -3584,34 +3601,43 @@ var CAPABILITIES = [
   {
     name: "browser-use",
     feature: "browserUse",
-    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the browser-use MCP server (browser-use) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
-    needs: [
-      {
-        kind: "command",
-        command: "npx",
-        fix: "install Node.js from https://nodejs.org, which ships npx"
-      }
-    ],
+    needs: [],
     forms: {
       headless: {
         packages: [],
-        mcpServers: [PLAYWRIGHT_MCP_SERVER],
-        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
+        mcpServers: [BROWSER_USE_MCP_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: "uvx",
+            fix: "install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs"
+          },
+          { kind: "chromium", fix: CHROMIUM_FIX }
+        ]
       },
       normal: {
         packages: [],
         mcpServers: [BROWSE_MCP_SERVER],
-        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        needs: [
+          {
+            kind: "command",
+            command: "npx",
+            fix: "install Node.js from https://nodejs.org, which ships npx"
+          },
+          { kind: "display" },
+          nodeNeed(BROWSE_MINIMUM_NODE)
+        ],
         pairing: true
       }
     },
     tools: {
-      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      rootExclude: [...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS],
       visual: [],
-      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+      screen: [...BROWSE_TOOLS, ...BROWSER_USE_TOOLS]
     },
     settings: [],
     health: ["needs"]

@@ -3184,6 +3184,7 @@ var updateService = /* @__PURE__ */ dual(3, (self, service, f) => updateContext(
     return s;
   return add(s, service, next);
 }));
+var contextWith = (f) => withFiber((fiber) => f(fiber.context));
 var provideContext = /* @__PURE__ */ dual(2, (self, context) => {
   if (effectIsExit(self))
     return self;
@@ -3337,6 +3338,7 @@ var exitPrimitive = /* @__PURE__ */ makePrimitive({
 var timeoutOption = /* @__PURE__ */ dual(2, (self, duration) => raceFirst(asSome(self), as(sleep(duration), none2())));
 var ScopeTypeId = "~effect/Scope";
 var ScopeCloseableTypeId = "~effect/Scope/Closeable";
+var scopeTag = /* @__PURE__ */ Service("effect/Scope");
 var scopeClose = (self, exit_) => withFiber((fiber) => {
   fiberEnterUninterruptibleUnsafe(fiber);
   return scopeCloseUnsafe(self, exit_) ?? void_;
@@ -3398,6 +3400,15 @@ var scopeForkUnsafe = (scope, finalizerStrategy) => {
   scopeAddFinalizerUnsafe(scope, child, (exit) => scopeClose(child, exit));
   return child;
 };
+var scopeAddFinalizerExit = (scope, finalizer) => {
+  return suspend(() => {
+    if (scope.state._tag === "Closed") {
+      return finalizer(scope.state.exit);
+    }
+    scopeAddFinalizerUnsafe(scope, {}, finalizer);
+    return void_;
+  });
+};
 var scopeAddFinalizerUnsafe = (scope, key, finalizer) => {
   if (scope.state._tag === "Empty") {
     scope.state = {
@@ -3442,10 +3453,22 @@ var makeScope = (finalizerStrategy = "sequential", parent) => ({
 var constScopeEmpty = {
   _tag: "Empty"
 };
+var scope = scopeTag;
+var scoped = (self) => withFiber((fiber) => {
+  const prev = fiber.context;
+  const scope = scopeMakeUnsafe();
+  fiber.setContext(add(fiber.context, scopeTag, scope));
+  onExitUnsafe(fiber, (exit) => {
+    fiber.setContext(prev);
+    return scopeCloseUnsafe(scope, exit);
+  });
+  return self;
+});
 var scopedWith = (f) => suspend(() => {
   const scope = scopeMakeUnsafe();
   return onExit(f(scope), (exit) => suspend(() => scopeCloseUnsafe(scope, exit) ?? void_));
 });
+var acquireRelease = (acquire, release, options) => contextWith((context) => uninterruptibleMask((restore) => flatMap(scope, (scope) => tap(options?.interruptible ? restore(acquire) : acquire, (a) => scopeAddFinalizerExit(scope, (exit) => provideContext(release(a, exit), context))))));
 var OnExitImpl = /* @__PURE__ */ function() {
   const Proto = /* @__PURE__ */ makePrimitiveProto({
     op: "OnExit",
@@ -4558,12 +4581,16 @@ var retry2 = retry;
 var ignore2 = ignore;
 var orElseSucceed2 = orElseSucceed;
 var timeoutOption2 = timeoutOption;
+var sleep2 = sleep;
+var raceFirst2 = raceFirst;
 var filter3 = filter2;
 var filterOrFail2 = filterOrFail;
 var match4 = match3;
 var matchEffect3 = matchEffect;
 var provide3 = provide2;
 var provideService2 = provideService;
+var scoped2 = scoped;
+var acquireRelease2 = acquireRelease;
 var acquireUseRelease2 = acquireUseRelease;
 var ensuring2 = ensuring;
 var onError2 = onError;
@@ -8472,6 +8499,7 @@ var HINTS = {
   MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
   UnsupportedPlatform: "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
   ToolMissing: "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
+  BrowserLaunchFailed: "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
   StateModeRefused: "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
   StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
@@ -12149,7 +12177,7 @@ var PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-
 var dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
 `, 1)[0] ?? "")?.[1];
 var SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.";
-var HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.";
+var HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (outside T3 the mcp__browser_use__browser_exec and mcp__browser_use__browser_screenshot tools, a temporary profile; where T3 hosts the session, T3's preview tools, and browser-use is not available) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.";
 var renderPrompt = (assignment, agent) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
   `Objective: ${assignment.objective}`,
@@ -12625,12 +12653,17 @@ var pi_packages_default = {
   "@amaster.ai/pi-computer-use": "0.1.36",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.15",
-  "@playwright/mcp": "0.0.85"
+  "@opencode/browse": "0.0.15"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 var piPackageSource = (name) => `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`;
+
+var pypi_packages_default = {
+  "browser-use": "1.0.0"
+};
+
+var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
 
 var CAPABILITY_FORMS = ["headless", "normal"];
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
@@ -12666,18 +12699,31 @@ var BROWSE_MCP_SERVER = {
   command: "npx",
   args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
 };
-var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
-var PLAYWRIGHT_SERVER = "playwright";
-var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
-var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
-var PLAYWRIGHT_MCP_SERVER = {
-  name: PLAYWRIGHT_SERVER,
-  command: "npx",
-  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
-  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+var BROWSER_USE_PACKAGE = "browser-use";
+var BROWSER_USE_SERVER = "browser_use";
+var BROWSER_USE_TOOLS = [
+  `mcp__${BROWSER_USE_SERVER}__browser_exec`,
+  `mcp__${BROWSER_USE_SERVER}__browser_screenshot`
+];
+var BROWSER_USE_ALL_TOOLS = [`mcp__${BROWSER_USE_SERVER}__*`];
+var PYPI_INDEX = "https://pypi.org/simple";
+var uvxServerArgs = (name, rest) => [
+  "--no-config",
+  "--default-index",
+  PYPI_INDEX,
+  "--from",
+  `${name}==${PYPI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
+var BROWSER_SERVER_COMMAND = "browser-server";
+var BROWSER_USE_MCP_SERVER = {
+  name: BROWSER_USE_SERVER,
+  command: "uvx",
+  args: uvxServerArgs(BROWSER_USE_PACKAGE, ["browser-use", "--cli-mcp"]),
+  launchesChromium: true
 };
 var BROWSE_MINIMUM_NODE = [22, 19, 0];
-var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var CHROMIUM_FIX = "set HOLYAGENT_CHROMIUM_PATH to a Chromium executable, or put a Playwright Chromium build in the folder PLAYWRIGHT_BROWSERS_PATH names (PLAYWRIGHT_BROWSERS_PATH=<folder> uvx playwright install chromium)";
 var nodeNeed = (minimum) => ({
   kind: "node",
   minimum,
@@ -12794,34 +12840,43 @@ var CAPABILITIES = [
   {
     name: "browser-use",
     feature: "browserUse",
-    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the browser-use MCP server (browser-use) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
-    needs: [
-      {
-        kind: "command",
-        command: "npx",
-        fix: "install Node.js from https://nodejs.org, which ships npx"
-      }
-    ],
+    needs: [],
     forms: {
       headless: {
         packages: [],
-        mcpServers: [PLAYWRIGHT_MCP_SERVER],
-        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
+        mcpServers: [BROWSER_USE_MCP_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: "uvx",
+            fix: "install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs"
+          },
+          { kind: "chromium", fix: CHROMIUM_FIX }
+        ]
       },
       normal: {
         packages: [],
         mcpServers: [BROWSE_MCP_SERVER],
-        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        needs: [
+          {
+            kind: "command",
+            command: "npx",
+            fix: "install Node.js from https://nodejs.org, which ships npx"
+          },
+          { kind: "display" },
+          nodeNeed(BROWSE_MINIMUM_NODE)
+        ],
         pairing: true
       }
     },
     tools: {
-      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      rootExclude: [...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS],
       visual: [],
-      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+      screen: [...BROWSE_TOOLS, ...BROWSER_USE_TOOLS]
     },
     settings: [],
     health: ["needs"]
@@ -13919,6 +13974,307 @@ var ASSIGNMENT_COMMANDS = [
   }
 ];
 
+import { mkdir as mkdir3, mkdtemp, rm as rm5 } from "fs/promises";
+import { tmpdir } from "os";
+import { join as join9 } from "path";
+class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
+  get message() {
+    return this.reason;
+  }
+}
+var READY_TIMEOUT_MS = 20000;
+var POLL_MS = 100;
+var STOP_GRACE_MS = 3000;
+var FOLDERS = { profile: "profile", config: "browser-use", harness: "harness" };
+var chromiumArguments = (profile, sandbox) => [
+  "--headless=new",
+  "--remote-debugging-port=0",
+  "--remote-debugging-address=127.0.0.1",
+  `--user-data-dir=${profile}`,
+  "--no-first-run",
+  "--no-default-browser-check",
+  "--disable-dev-shm-usage",
+  ...sandbox ? [] : ["--no-sandbox"],
+  "about:blank"
+];
+var SERVER_ENVIRONMENT_ALLOWLIST = [
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "TZ",
+  "TERM",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "ALL_PROXY",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "REQUESTS_CA_BUNDLE",
+  "UV_CACHE_DIR",
+  "UV_NATIVE_TLS",
+  "UV_PYTHON_INSTALL_DIR",
+  "XDG_CACHE_HOME",
+  "XDG_DATA_HOME",
+  "SYSTEMROOT",
+  "SYSTEMDRIVE",
+  "WINDIR",
+  "COMSPEC",
+  "PATHEXT",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "PROGRAMDATA",
+  "PROGRAMFILES"
+];
+var ALLOWED_NAMES = new Set(SERVER_ENVIRONMENT_ALLOWLIST);
+var reachesServer = (name) => {
+  const upper = name.toUpperCase();
+  return ALLOWED_NAMES.has(upper) || upper.startsWith("LC_");
+};
+var serverEnvironment = (inherited, port, folders) => ({
+  ...Object.fromEntries(Object.entries(definedEnv(inherited)).filter(([name]) => reachesServer(name))),
+  BU_CDP_URL: `http://127.0.0.1:${port}`,
+  BU_NAME: `holyagent-${port}`,
+  ANONYMIZED_TELEMETRY: "0",
+  BROWSER_USE_CONFIG_DIR: folders.config,
+  BH_HOME: folders.harness,
+  BROWSER_HARNESS_HOME: folders.harness
+});
+var parseDevToolsActivePort = (text) => {
+  const [line, rest] = text.split(`
+`);
+  if (line === undefined || rest === undefined)
+    return;
+  const port = Number(line.trim());
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
+};
+var failed2 = (reason) => new BrowserLaunchFailed({ reason });
+var awaitDevTools = (host, chromium, profile, timeoutMs, pollMs) => {
+  const again = (poll) => sleep2(pollMs).pipe(andThen2(poll));
+  const poll = suspend2(() => host.devToolsPort(profile).pipe(flatMap2((port) => port === undefined ? again(poll) : host.answers(`http://127.0.0.1:${port}/json/version`).pipe(flatMap2((ok) => ok ? succeed6(port) : again(poll))))));
+  const answered = poll.pipe(timeoutOption2(timeoutMs), flatMap2((result) => isSome2(result) ? succeed6(result.value) : fail5(failed2(`the DevTools endpoint did not answer within ${timeoutMs} ms: Chromium never wrote DevToolsActivePort in the profile directory ${profile} or never answered on the port it reported (a Chromium wrapper that ignores --user-data-dir writes it elsewhere)`))));
+  const exitedFirst = chromium.exited.pipe(flatMap2((code) => fail5(failed2(`Chromium exited with code ${code} before its DevTools endpoint answered`))));
+  return raceFirst2(answered, exitedFirst);
+};
+var launch = (host, options) => scoped2(gen2(function* () {
+  const { chromium: executable } = options;
+  if (executable === undefined)
+    return yield* failed2(`no Chromium was found; ${options.chromiumFix}`);
+  const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
+  const folders = {
+    profile: join9(base, FOLDERS.profile),
+    config: join9(base, FOLDERS.config),
+    harness: join9(base, FOLDERS.harness)
+  };
+  for (const folder of Object.values(folders))
+    yield* host.makeDirectory(folder);
+  const inherited = definedEnv(options.env);
+  const chromium = yield* acquireRelease2(host.spawn({
+    command: executable,
+    args: chromiumArguments(folders.profile, !host.root),
+    env: inherited,
+    stdio: "ignore"
+  }), (running) => running.stop);
+  const port = yield* awaitDevTools(host, chromium, folders.profile, options.readyTimeoutMs ?? READY_TIMEOUT_MS, options.pollMs ?? POLL_MS);
+  const server = yield* acquireRelease2(host.spawn({
+    command: options.server.command,
+    args: options.server.args,
+    env: serverEnvironment(inherited, port, folders),
+    stdio: "inherit"
+  }), (running) => running.stop);
+  const browserLost = chromium.exited.pipe(flatMap2((code) => fail5(failed2(`Chromium exited with code ${code} while the server was running`))));
+  return yield* raceFirst2(server.exited, browserLost);
+}));
+var runBrowserServer = (host, options) => scoped2(gen2(function* () {
+  const received = yield* host.signals;
+  return yield* raceFirst2(launch(host, options), received);
+}));
+var SIGNALS = [
+  ["SIGINT", 130],
+  ["SIGTERM", 143],
+  ["SIGHUP", 129]
+];
+var reason = (cause) => cause instanceof Error ? cause.message : String(cause);
+var terminateGroup = (child) => try_2(() => {
+  if (Number.isInteger(child.pid) && child.pid > 1)
+    process.kill(-child.pid, "SIGTERM");
+}).pipe(ignore2);
+var stopGroup = (child, platform = process.platform) => gen2(function* () {
+  const exit = promise2(() => child.exited).pipe(timeoutOption2(STOP_GRACE_MS));
+  if (platform === "win32") {
+    if (child.exitCode === null)
+      yield* killGroup(child, platform);
+    yield* exit;
+    return;
+  }
+  yield* terminateGroup(child);
+  yield* exit;
+  yield* killGroup(child, platform);
+});
+var liveHost = {
+  spawn: (spec) => try_2({
+    try: () => {
+      const child = Bun.spawn({
+        cmd: [spec.command, ...spec.args],
+        env: { ...spec.env },
+        stdin: spec.stdio === "inherit" ? "inherit" : "ignore",
+        stdout: spec.stdio === "inherit" ? "inherit" : "ignore",
+        stderr: spec.stdio === "inherit" ? "inherit" : "ignore",
+        detached: true
+      });
+      return {
+        exited: promise2(() => child.exited),
+        stop: stopGroup(child)
+      };
+    },
+    catch: (cause) => failed2(`cannot start ${spec.command}: ${reason(cause)}`)
+  }),
+  devToolsPort: (profile) => tryPromise2(() => Bun.file(join9(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
+    return;
+  })),
+  answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map4((response) => response.ok), orElseSucceed2(() => false)),
+  temporaryDirectory: (prefix) => tryPromise2({
+    try: () => mkdtemp(join9(tmpdir(), prefix)),
+    catch: (cause) => failed2(`cannot create a temporary directory: ${reason(cause)}`)
+  }),
+  makeDirectory: (path) => tryPromise2({
+    try: () => mkdir3(path, { recursive: true }),
+    catch: (cause) => failed2(`cannot create ${path}: ${reason(cause)}`)
+  }).pipe(asVoid2),
+  removeDirectory: (path) => tryPromise2(() => rm5(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
+  signals: acquireRelease2(sync2(() => {
+    const received = makeUnsafe2();
+    const handlers = SIGNALS.map(([name, code]) => {
+      const handler = () => void doneUnsafe(received, succeed6(code));
+      process.on(name, handler);
+      return [name, handler];
+    });
+    return { received, handlers };
+  }), ({ handlers }) => sync2(() => {
+    for (const [name, handler] of handlers)
+      process.off(name, handler);
+  })).pipe(map4(({ received }) => _await(received))),
+  root: process.getuid?.() === 0
+};
+
+import { existsSync, readdirSync } from "fs";
+import { posix, win32 } from "path";
+
+import { delimiter, join as join10 } from "path";
+var {$: $3 } = globalThis.Bun;
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+};
+var pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join10(options.home, ".bun");
+  const bunBin = join10(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+};
+var findCommand = (env, command, options) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+  return fromNullishOr(Bun.which(command, {
+    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
+  }));
+};
+var EMPTY_BUNFIG = join10(import.meta.dir, "empty-bunfig.toml");
+
+class Shell extends Service()("holyagent/Shell") {
+  static live = (env) => {
+    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+    return succeed5(Shell, Shell.of({
+      which: (command, options) => sync2(() => findCommand(env, command, options)),
+      run: (command, args, options) => tryPromise2({
+        try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+          exitCode: result.exitCode,
+          stdout: result.stdout.toString(),
+          stderr: result.stderr.toString()
+        })),
+        catch: (error) => String(error)
+      }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+    }));
+  };
+}
+
+var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH";
+var LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
+var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
+var BUILD_EXECUTABLES = {
+  linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
+  darwin: [
+    "chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
+    "chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+  ],
+  win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
+};
+var pathsOf = (platform) => platform === "win32" ? win32 : posix;
+var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
+var inFolder = (folder, platform, exists, list) => {
+  const { join } = pathsOf(platform);
+  const entry = join(folder, "chromium");
+  if (exists(entry))
+    return entry;
+  const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
+  for (const build of builds)
+    for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
+      const path = join(folder, build, ...executable.split("/"));
+      if (exists(path))
+        return path;
+    }
+  return;
+};
+var safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => [])));
+var configuredChromium = (env) => {
+  for (const variable of [CHROMIUM_EXECUTABLE_VARIABLE, LEGACY_CHROMIUM_EXECUTABLE_VARIABLE]) {
+    const path = firstNonEmpty(env[variable]);
+    if (path !== undefined)
+      return { variable, path };
+  }
+  return;
+};
+var onPath = (command, env) => getOrUndefined(findCommand(env, command));
+var resolveConfigured = (given, env, exists, which) => /[\\/]/.test(given) ? exists(given) ? given : undefined : which(given, env);
+var findChromium = (env, platform = process.platform, exists = existsSync, list = safeList, which = onPath) => {
+  const given = configuredChromium(env);
+  if (given !== undefined)
+    return resolveConfigured(given.path, env, exists, which);
+  const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
+  return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
+};
+var chromiumFixFor = (env, fix, exists = existsSync, which = onPath) => {
+  const given = configuredChromium(env);
+  return given === undefined || resolveConfigured(given.path, env, exists, which) !== undefined ? fix : `${given.variable} is set to ${given.path}, which does not exist; ${fix}`;
+};
+
+var BROWSER_SERVER_COMMANDS = [
+  {
+    path: [BROWSER_SERVER_COMMAND],
+    usage: BROWSER_SERVER_COMMAND,
+    summary: "Run the headless screen capability's browser-use MCP server against a headless Chromium this command starts, then remove the Chromium and its temporary directories",
+    notes: [
+      "stdin, stdout and stderr are the MCP server's own, so a host runs this command as a stdio MCP server; the exit code is the server's",
+      "the server is `uvx` at the pin of pypi-packages.json with no uv config and the public PyPI index (see docs/pi/screen.md); telemetry is off and its state is temporary"
+    ],
+    flags: {},
+    stateless: true,
+    positionals: 0,
+    run: (call) => runBrowserServer(liveHost, {
+      env: call.env,
+      chromium: findChromium(call.env),
+      chromiumFix: chromiumFixFor(call.env, CHROMIUM_FIX),
+      server: BROWSER_USE_MCP_SERVER
+    }).pipe(map4((code) => new Verbatim("", "", code)))
+  }
+];
+
 import { stat as stat2 } from "fs/promises";
 var hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 
@@ -13967,13 +14323,13 @@ var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
 import { lstat as lstat3, realpath as realpath4 } from "fs/promises";
-import { dirname as dirname4, isAbsolute as isAbsolute2, join as join12, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
+import { dirname as dirname4, isAbsolute as isAbsolute2, join as join13, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
-import { chmod, mkdir as mkdir3, realpath as realpath3, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename4, dirname as dirname3, join as join9 } from "path";
+import { chmod, mkdir as mkdir4, realpath as realpath3, rename as rename4, rm as rm6, writeFile } from "fs/promises";
+import { basename as basename4, dirname as dirname3, join as join11 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -14006,7 +14362,7 @@ var removeFileIfUnchanged = (path, unchangedSince) => gen2(function* () {
     return unchangedSince === undefined;
   if (text !== unchangedSince)
     return false;
-  yield* fileOperation(path, "remove", () => rm5(path, { force: true }));
+  yield* fileOperation(path, "remove", () => rm6(path, { force: true }));
   return true;
 });
 var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2);
@@ -14017,24 +14373,24 @@ var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function*
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join9(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname3(target), "write", () => mkdir3(dirname3(target), { recursive: true }));
+  const temporary = join11(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname3(target), "write", () => mkdir4(dirname3(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
-  }).pipe(catch_2((error) => (error.code === "EEXIST" ? void_3 : ignore2(fileOperation(temporary, "remove", () => rm5(temporary, { force: true })))).pipe(andThen2(fail5(new SetupFailure({
+  }).pipe(catch_2((error) => (error.code === "EEXIST" ? void_3 : ignore2(fileOperation(temporary, "remove", () => rm6(temporary, { force: true })))).pipe(andThen2(fail5(new SetupFailure({
     message: `cannot write ${temporary}: ${error instanceof Error ? error.message : String(error)}`
   }))))));
   return yield* gen2(function* () {
     if (mode !== undefined)
       yield* fileOperation(temporary, "write", () => chmod(temporary, mode));
     if (unchangedSince !== undefined && (yield* fileOperation(target, "read", () => Bun.file(target).text())) !== unchangedSince) {
-      yield* fileOperation(temporary, "remove", () => rm5(temporary, { force: true }));
+      yield* fileOperation(temporary, "remove", () => rm6(temporary, { force: true }));
       return false;
     }
     yield* fileOperation(target, "write", () => rename4(temporary, target));
     return true;
-  }).pipe(onError2(() => ignore2(fileOperation(temporary, "remove", () => rm5(temporary, { force: true })))));
+  }).pipe(onError2(() => ignore2(fileOperation(temporary, "remove", () => rm6(temporary, { force: true })))));
 });
 var place = (node, path, depth, wanted) => {
   const key = path[depth];
@@ -14068,7 +14424,7 @@ var applyDefaults = (existing, defaults) => {
   return { merged, entries: [...entries.values()] };
 };
 
-import { join as join10, resolve as resolve5 } from "path";
+import { join as join12, resolve as resolve5 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String4),
   value: Unknown2
@@ -14076,7 +14432,7 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join10(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var recordPath = (env) => join12(userFiles(env).claudeDir, "holyagent", "setup-records.json");
 var keyOf = (file) => resolve5(file);
 var load = (env) => gen2(function* () {
   const path = recordPath(env);
@@ -14135,7 +14491,7 @@ var added = (text) => `+ ${text}`;
 var present2 = (text) => `= ${text}`;
 var skipped = (text) => `- ${text}`;
 var hint = (text) => `~ ${text}`;
-var failed2 = (what, result) => {
+var failed3 = (what, result) => {
   const detail = (result.stderr || result.stdout).trim().split(`
 `)[0] ?? "";
   return `! ${what}: failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`;
@@ -14284,44 +14640,6 @@ var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
   return applyDefaults(existing, defaultsFor(existing, "1h")).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
 });
 
-import { delimiter, join as join11 } from "path";
-var {$: $3 } = globalThis.Bun;
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-};
-var pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join11(options.home, ".bun");
-  const bunBin = join11(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-};
-var findCommand = (env, command, options) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-  return fromNullishOr(Bun.which(command, {
-    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
-  }));
-};
-var EMPTY_BUNFIG = join11(import.meta.dir, "empty-bunfig.toml");
-
-class Shell extends Service()("holyagent/Shell") {
-  static live = (env) => {
-    const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-    return succeed5(Shell, Shell.of({
-      which: (command, options) => sync2(() => findCommand(env, command, options)),
-      run: (command, args, options) => tryPromise2({
-        try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
-          exitCode: result.exitCode,
-          stdout: result.stdout.toString(),
-          stderr: result.stderr.toString()
-        })),
-        catch: (error) => String(error)
-      }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-    }));
-  };
-}
-
 var SCOPES = ["user", "project", "local"];
 var within = (parent, child) => {
   const path = relative4(parent, child);
@@ -14343,7 +14661,7 @@ var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action)
     return;
   const parts = relative4(cwd, file).split(sep6);
   for (let depth = 1;depth <= parts.length; depth++) {
-    const path = join12(cwd, ...parts.slice(0, depth));
+    const path = join13(cwd, ...parts.slice(0, depth));
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
         message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
@@ -14358,17 +14676,17 @@ var claudeFolder = fn2("claudeFolder")(function* (cwd) {
   const named = top.exitCode === 0 && line !== "" ? resolve6(line) : undefined;
   const realTop = named === undefined ? undefined : yield* real(named);
   const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present3(join12(named, ".git")));
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present3(join13(named, ".git")));
   const root = trusted ? named : cwd;
   const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-  return { folder: join12(root, ".claude"), root, trusted, notice };
+  return { folder: join13(root, ".claude"), root, trusted, notice };
 });
 var fileName = (scope) => scope === "project" ? "settings.json" : "settings.local.json";
 var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   if (scope === "user")
     return { file: userFiles(env).settings };
   const { folder, notice } = yield* claudeFolder(cwd);
-  const file = join12(folder, fileName(scope));
+  const file = join13(folder, fileName(scope));
   for (const path of [folder, file]) {
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
@@ -14381,7 +14699,7 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
 var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
   const roots = [resolve6(cwd)];
   for (let folder = resolve6(cwd);; folder = dirname4(folder)) {
-    if (yield* present3(join12(folder, ".git"))) {
+    if (yield* present3(join13(folder, ".git"))) {
       if (folder !== roots[0])
         roots.push(folder);
       break;
@@ -14390,8 +14708,8 @@ var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
       break;
   }
   return roots.flatMap((root) => [
-    join12(root, ".claude", "settings.json"),
-    join12(root, ".claude", "settings.local.json")
+    join13(root, ".claude", "settings.json"),
+    join13(root, ".claude", "settings.local.json")
   ]);
 });
 var enablement = fn2("enablement")(function* (folder, file) {
@@ -14422,7 +14740,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
   const own = yield* identity2(file);
   if (own !== undefined) {
     for (const entry of tracked) {
-      if ((yield* identity2(join12(root, entry))) === own)
+      if ((yield* identity2(join13(root, entry))) === own)
         return "git tracks it";
     }
   }
@@ -14434,7 +14752,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
       if (component === folderName || seen.has(component))
         continue;
       seen.add(component);
-      if ((yield* identity2(join12(root, component))) === home)
+      if ((yield* identity2(join13(root, component))) === home)
         return `git tracks ${component} as ${folderName}`;
     }
   }
@@ -14447,8 +14765,8 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
 });
 var installedScope = fn2("installedScope")(function* (cwd) {
   const { folder, root, trusted } = yield* claudeFolder(cwd);
-  const local = join12(folder, fileName("local"));
-  const project = join12(folder, fileName("project"));
+  const local = join13(folder, fileName("local"));
+  const project = join13(folder, fileName("project"));
   const notices = [];
   const found = yield* enablement(folder, local);
   if (found === "enabled") {
@@ -14502,17 +14820,17 @@ var setupNotice = (env, cwd) => {
   }));
 };
 
-import { lstat as lstat4, mkdir as mkdir4, open as open3 } from "fs/promises";
-import { tmpdir, userInfo } from "os";
-import { join as join13 } from "path";
+import { lstat as lstat4, mkdir as mkdir5, open as open3 } from "fs/promises";
+import { tmpdir as tmpdir2, userInfo } from "os";
+import { join as join14 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join13(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join13(markers(), sessionId);
+var markers = () => join14(tmpdir2(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join14(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir4(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat4(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir5(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat4(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -14521,7 +14839,7 @@ var create2 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId
 var markRulesDelivered = (sessionId) => create2(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create2;
 
-import { join as join14 } from "path";
+import { join as join15 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -14677,7 +14995,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join14(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join15(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -14798,13 +15116,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join14(root, folderName);
+  const legacy = join15(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join14(legacy, "intents", folder);
+    const base = join15(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -14812,7 +15130,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join14(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join15(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -14823,10 +15141,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join14(base, path), to: join14(target, path) });
+      state.notes.push({ from: join15(base, path), to: join15(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join14(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join15(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -14928,13 +15246,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join14(root, folderName);
+  const legacy = join15(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join14(legacy, folder);
+    const base = join15(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -14948,7 +15266,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join14(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join15(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -14959,10 +15277,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join14(base, path), to: join14(target, path) });
+      state.notes.push({ from: join15(base, path), to: join15(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join14(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join15(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -22937,7 +23255,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join15, relative as relative5 } from "path";
+import { join as join16, relative as relative5 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -23026,7 +23344,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join15(root, name));
+    const text = yield* readText(join16(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -23100,7 +23418,7 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join17 } from "path";
+import { join as join18 } from "path";
 
 var WEB_KIT_PACKAGE = "pi-web-kit";
 var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
@@ -23115,7 +23433,7 @@ var piPackages = (config, profile = providerProfile(config), form = "normal", de
   return names.map((name) => piPackageSource(name));
 };
 
-import { isAbsolute as isAbsolute3, join as join16 } from "path";
+import { isAbsolute as isAbsolute3, join as join17 } from "path";
 var BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE];
 var BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
 var BROWSE_PAIR_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page when no browser has it and pairs the browser (\`${BROWSE_COMMAND} pair\` prints a code to enter in the extension's options instead)`;
@@ -23125,9 +23443,9 @@ var browseDataDirectory = (env) => {
   if (home !== undefined)
     return home;
   const data = firstNonEmpty(env["XDG_DATA_HOME"]);
-  return join16(data !== undefined && isAbsolute3(data) ? data : join16(homeDirectory(env), ".local", "share"), "browse");
+  return join17(data !== undefined && isAbsolute3(data) ? data : join17(homeDirectory(env), ".local", "share"), "browse");
 };
-var browsePairingFile = (env) => join16(browseDataDirectory(env), "browser-tokens.json");
+var browsePairingFile = (env) => join17(browseDataDirectory(env), "browser-tokens.json");
 var Open = Record(String4, Unknown2);
 var Pairing = StructWithRest(Struct({
   token: String4.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
@@ -23166,7 +23484,7 @@ var BROWSE_EXTENSION_IDS = [
 var browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory(env);
   if (platform === "darwin") {
-    const support = join16(home, "Library", "Application Support");
+    const support = join17(home, "Library", "Application Support");
     return [
       ["Google Chrome", "Google/Chrome"],
       ["Google Chrome Beta", "Google/Chrome Beta"],
@@ -23177,21 +23495,21 @@ var browserDirectories = (env, platform = process.platform) => {
       ["Opera", "com.operasoftware.Opera"],
       ["Vivaldi", "Vivaldi"],
       ["Arc", "Arc/User Data"]
-    ].map(([name = "", folder = ""]) => ({ name, directory: join16(support, folder) }));
+    ].map(([name = "", folder = ""]) => ({ name, directory: join17(support, folder) }));
   }
   if (platform === "win32") {
-    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join16(home, "AppData", "Local");
-    const roaming = firstNonEmpty(env["APPDATA"]) ?? join16(home, "AppData", "Roaming");
+    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join17(home, "AppData", "Local");
+    const roaming = firstNonEmpty(env["APPDATA"]) ?? join17(home, "AppData", "Roaming");
     return [
-      { name: "Google Chrome", directory: join16(local, "Google", "Chrome", "User Data") },
-      { name: "Microsoft Edge", directory: join16(local, "Microsoft", "Edge", "User Data") },
-      { name: "Brave", directory: join16(local, "BraveSoftware", "Brave-Browser", "User Data") },
-      { name: "Vivaldi", directory: join16(local, "Vivaldi", "User Data") },
-      { name: "Opera", directory: join16(roaming, "Opera Software", "Opera Stable") }
+      { name: "Google Chrome", directory: join17(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join17(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join17(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join17(local, "Vivaldi", "User Data") },
+      { name: "Opera", directory: join17(roaming, "Opera Software", "Opera Stable") }
     ];
   }
   const configured = firstNonEmpty(env["XDG_CONFIG_HOME"]);
-  const config = configured !== undefined && isAbsolute3(configured) ? configured : join16(home, ".config");
+  const config = configured !== undefined && isAbsolute3(configured) ? configured : join17(home, ".config");
   return [
     ["Google Chrome", "google-chrome"],
     ["Google Chrome Beta", "google-chrome-beta"],
@@ -23201,7 +23519,7 @@ var browserDirectories = (env, platform = process.platform) => {
     ["Brave", "BraveSoftware/Brave-Browser"],
     ["Opera", "opera"],
     ["Vivaldi", "vivaldi"]
-  ].map(([name = "", folder = ""]) => ({ name, directory: join16(config, folder) }));
+  ].map(([name = "", folder = ""]) => ({ name, directory: join17(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
   profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String4, Open)) }), [Open]))
@@ -23217,12 +23535,12 @@ var isDisabled = (setting) => {
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 };
 var findBrowseExtension = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
-  const state = yield* readOptional(join16(directory, "Local State"));
+  const state = yield* readOptional(join17(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
-    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join16(directory, profile, file)).pipe(map4((text) => {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join17(directory, profile, file)).pipe(map4((text) => {
       const parsed = text === undefined ? undefined : decodeUnknownOption2(Preferences)(text, {
         onExcessProperty: "error"
       });
@@ -23327,8 +23645,8 @@ var piAgentDirectory = (env) => {
   const home = homeDirectory(env);
   const set = firstNonEmpty(env["PI_CODING_AGENT_DIR"]);
   if (set === undefined)
-    return join17(home, ".pi", "agent");
-  return set === "~" ? home : /^~[/\\]/.test(set) ? join17(home, set.slice(2)) : set;
+    return join18(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join18(home, set.slice(2)) : set;
 };
 var piSettingsSources = (file) => gen2(function* () {
   const exists = yield* fileOperation(file, "read", () => Bun.file(file).exists());
@@ -23342,7 +23660,7 @@ var piSettingsSources = (file) => gen2(function* () {
   }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
   return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
 });
-var piSettingsFiles = (env, cwd) => [join17(piAgentDirectory(env), "settings.json"), join17(cwd, ".pi", "settings.json")];
+var piSettingsFiles = (env, cwd) => [join18(piAgentDirectory(env), "settings.json"), join18(cwd, ".pi", "settings.json")];
 var piPresenceFiles = (env, cwd, scope) => {
   const [globalFile, projectFile] = piSettingsFiles(env, cwd);
   return scope === "user" ? [globalFile] : [globalFile, projectFile];
@@ -23395,6 +23713,8 @@ var checkBasePackages = (files, scope, config, listed) => {
 var unmetNeed = (env, need, platform = process.platform) => gen2(function* () {
   if (need.kind === "display")
     return hasDisplay(env, platform) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
+  if (need.kind === "chromium")
+    return findChromium(env, platform) === undefined ? `needs a Chromium; ${chromiumFixFor(env, need.fix)}` : undefined;
   if (need.kind === "node")
     return yield* unmetNode(env, need);
   const found = yield* (yield* Shell).which(need.command);
@@ -23492,7 +23812,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function*
   }));
 });
 
-import { join as join18, resolve as resolve7 } from "path";
+import { join as join19, resolve as resolve7 } from "path";
 
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
@@ -23557,20 +23877,20 @@ var locate2 = (env, cwd, scope, logical) => {
     const explicit = firstNonEmpty(env["BILI_CONFIG_FILE"]);
     if (explicit !== undefined)
       return resolve7(cwd, explicit);
-    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join18(home, ".config");
-    return join18(base, "billion-context", "billion-context.json");
+    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join19(home, ".config");
+    return join19(base, "billion-context", "billion-context.json");
   }
   if (logical === PI_FFF_FILE)
-    return project ? undefined : join18(piAgentDirectory(env), "pi-fff.json");
+    return project ? undefined : join19(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
-    return project ? join18(cwd, ".pi", name) : join18(piAgentDirectory(env), name);
+    return project ? join19(cwd, ".pi", name) : join19(piAgentDirectory(env), name);
   }
   if (logical.startsWith(PI_PREFIX)) {
     const name = logical.slice(PI_PREFIX.length);
-    return project ? join18(cwd, ".pi", name) : join18(home, ".pi", name);
+    return project ? join19(cwd, ".pi", name) : join19(home, ".pi", name);
   }
-  return project || !logical.startsWith("~/") ? undefined : join18(home, logical.slice(2));
+  return project || !logical.startsWith("~/") ? undefined : join19(home, logical.slice(2));
 };
 var keyName = ({ path }) => path.join(".");
 var inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf));
@@ -23819,44 +24139,7 @@ var checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   return lines;
 });
 
-import { join as join21 } from "path";
-
-import { existsSync, readdirSync } from "fs";
-import { posix, win32 } from "path";
-var PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
-var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
-var BUILD_EXECUTABLES = {
-  linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
-  darwin: [
-    "chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
-    "chrome-mac/Chromium.app/Contents/MacOS/Chromium"
-  ],
-  win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
-};
-var pathsOf = (platform) => platform === "win32" ? win32 : posix;
-var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
-var inFolder = (folder, platform, exists, list) => {
-  const { join } = pathsOf(platform);
-  const entry = join(folder, "chromium");
-  if (exists(entry))
-    return entry;
-  const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
-  for (const build of builds)
-    for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
-      const path = join(folder, build, ...executable.split("/"));
-      if (exists(path))
-        return path;
-    }
-  return;
-};
-var safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => [])));
-var findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
-  const given = firstNonEmpty(env[PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE]);
-  if (given !== undefined)
-    return given;
-  const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
-  return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
-};
+import { join as join22 } from "path";
 
 var reportOne = (env, capability, features, options, platform) => gen2(function* () {
   const form = options.form ?? "normal";
@@ -23870,15 +24153,16 @@ var reportOne = (env, capability, features, options, platform) => gen2(function*
   const withheld = serversWithheld(capability, form, features);
   const unmet = yield* forEach2(formNeeds(capability, form), (need) => unmetNeed(env, need, platform));
   const needs = unmet.flatMap((problem) => problem === undefined ? [] : [hint(`${label}: ${problem}`)]);
+  const launched = (content?.mcpServers ?? []).some(({ launchesChromium }) => launchesChromium === true);
   const servers = (content?.mcpServers ?? []).map(({ command, args }) => `${command} ${args.join(" ")}`);
-  const chromium = (content?.mcpServers ?? []).some(({ chromiumFlag }) => chromiumFlag !== undefined) ? findChromium(env, platform) : undefined;
+  const chromium = launched ? findChromium(env, platform) : undefined;
   const browser = chromium === undefined ? [] : [present2(`${label}: the headless browser is the Chromium at ${chromium}`)];
   const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env, platform).pipe(map4((state) => {
     const { text, fix } = describeBrowseState(state);
     return state.state === "paired" ? present2(`${label}: ${text}`) : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`);
   }), catchTag2("SetupFailure", (error) => succeed6(hint(`${label}: cannot tell whether a browser is paired: ${error.message}`))), map4((line) => [line])) : [];
   return [
-    withheld === undefined ? present2(`${label}: ${form} form; the extension registers \`${servers.join("`, `")}\` for screen specialists and writes no file for it`) : hint(`${label}: ${form} form; ${withheld}`),
+    withheld === undefined ? present2(`${label}: ${form} form; the extension registers \`${servers.join("`, `")}\` for screen specialists${launched ? " through `holyagent browser-server`, which starts the headless browser and stops it with the server" : ""} and writes no file for it`) : hint(`${label}: ${form} form; ${withheld}`),
     ...needs,
     ...browser,
     ...pairing
@@ -23895,8 +24179,8 @@ var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform
   return lines.flat();
 });
 
-import { join as join19 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join19(stateDirectory(cwd), CONFIG_FILE);
+import { join as join20 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join20(stateDirectory(cwd), CONFIG_FILE);
 var objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
@@ -24016,7 +24300,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       continue;
     }
     const result = yield* shell.run("pi", args, { cwd });
-    lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
+    lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed3(command, result));
   }
   for (const name of removals) {
     const args = withScope(["remove", `npm:${name}`]);
@@ -24026,13 +24310,13 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       continue;
     }
     const result = yield* shell.run("pi", args, { cwd });
-    lines.push(result.exitCode === 0 ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`) : failed2(command, result));
+    lines.push(result.exitCode === 0 ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`) : failed3(command, result));
   }
   return lines;
 });
 
 import { stat as stat3 } from "fs/promises";
-import { join as join20 } from "path";
+import { join as join21 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
   browserArtifactsAfterDays: 14,
@@ -24045,21 +24329,21 @@ var restoreSettings = (path, previous, unchangedSince) => previous === undefined
 var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
-var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join20(homeDirectory(env), ".t3");
-var t3SettingsFile = (env) => join20(t3Home(env), "userdata", "settings.json");
+var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join21(homeDirectory(env), ".t3");
+var t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory(env);
   if (platform === "darwin") {
     const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-    const simulator = join20(developer, "Platforms", "iPhoneSimulator.platform");
+    const simulator = join21(developer, "Platforms", "iPhoneSimulator.platform");
     if (yield* isDirectory2(simulator))
       return `Xcode (${developer})`;
   }
   const sdkFolders = [
     firstNonEmpty(env["ANDROID_HOME"]),
     firstNonEmpty(env["ANDROID_SDK_ROOT"]),
-    platform === "darwin" ? join20(home, "Library", "Android", "sdk") : platform === "win32" ? join20(firstNonEmpty(env["LOCALAPPDATA"]) ?? join20(home, "AppData", "Local"), "Android", "Sdk") : join20(home, "Android", "Sdk")
+    platform === "darwin" ? join21(home, "Library", "Android", "sdk") : platform === "win32" ? join21(firstNonEmpty(env["LOCALAPPDATA"]) ?? join21(home, "AppData", "Local"), "Android", "Sdk") : join21(home, "Android", "Sdk")
   ];
   for (const folder of sdkFolders) {
     if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -24365,7 +24649,7 @@ var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dry
   }
   const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
   if (result.exitCode !== 0)
-    return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
+    return { usable: false, lines: [failed3(`bun add -g ${packageName}`, result)] };
   const lines = [added(`${command}: installed with bun add -g ${packageName}`)];
   const onPath = yield* shell.which(command);
   const anywhere = yield* shell.which(command, { includeBunBin: true });
@@ -24380,7 +24664,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join21(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join21(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join22(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join22(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present2("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -24398,7 +24682,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const result = yield* shell.run("ctx7", args, { cwd: neutralDirectory(env) });
   return [
     ...global.lines,
-    result.exitCode === 0 ? added("ctx7 skill: installed with ctx7 setup --cli --claude") : failed2("ctx7 setup", result)
+    result.exitCode === 0 ? added("ctx7 skill: installed with ctx7 setup --cli --claude") : failed3("ctx7 setup", result)
   ];
 });
 var asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`])));
@@ -24514,9 +24798,9 @@ var doctor = fn2("doctor")(function* (env, options) {
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
 });
 
-import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
+import { lstat as lstat5, mkdir as mkdir6, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile2 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join22, posix as posix2, win32 as win322 } from "path";
+import { basename as basename5, dirname as dirname5, join as join23, posix as posix2, win32 as win322 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -25721,8 +26005,8 @@ var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join22(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join22(directory, file)}`, cause)
+      try: () => Bun.write(join23(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join23(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -25741,11 +26025,11 @@ var importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
 });
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join22(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join23(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
 }));
 var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join22(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join23(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
 var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
@@ -25754,7 +26038,7 @@ var STICKY = 512;
 var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined;
 var privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
-    yield* fileSystem(`cannot create ${folder}`, () => mkdir5(folder, { recursive: true, mode: 448 }));
+    yield* fileSystem(`cannot create ${folder}`, () => mkdir6(folder, { recursive: true, mode: 448 }));
   const found = yield* tryPromise2({
     try: () => lstat5(folder),
     catch: (cause) => cause
@@ -25785,8 +26069,8 @@ var privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined 
   const text = yield* tryPromise2(() => Bun.file(groupFile).text());
   return namesPrivateGroup(text, gid, name);
 }).pipe(orElseSucceed2(() => false));
-var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm6(temporary, { force: true })));
-var remove = (path) => promise2(() => rm6(path, { recursive: true, force: true }));
+var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm7(temporary, { force: true })));
+var remove = (path) => promise2(() => rm7(path, { recursive: true, force: true }));
 var promote = (temporary, directory, packages, lock) => gen2(function* () {
   for (let attempt = 0;attempt < 3; attempt += 1) {
     const moved = yield* exit2(fileSystem(`cannot move ${temporary}`, () => rename5(temporary, directory)));
@@ -25801,8 +26085,8 @@ var promote = (temporary, directory, packages, lock) => gen2(function* () {
 var STALE_AFTER_MS = 60 * 60 * 1000;
 var newestChange = (path) => gen2(function* () {
   const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join22(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join22(path, "node_modules"))];
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join23(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join23(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 });
@@ -25812,26 +26096,26 @@ var sweepStale = (directory, uid) => gen2(function* () {
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir2(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join22(parent, name);
+    const path = join23(parent, name);
     const found = yield* tryPromise2(() => lstat5(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
 }).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join22(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join23(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join22(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join23(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove);
 var loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join22(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join23(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -25850,9 +26134,9 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join22(directory, TUI_BUNDLE);
+  const target = join23(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join22(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join23(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -26225,14 +26509,14 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join23 } from "path";
+import { join as join24 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS = [
   { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
   { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
   { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
 ];
-var BUNDLED_TOOLS = join23(import.meta.dir, "vendor");
+var BUNDLED_TOOLS = join24(import.meta.dir, "vendor");
 
 class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
   get message() {
@@ -26249,7 +26533,7 @@ var selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
 };
-var toolPath = (directory, tool, target) => join23(directory, target.id, `${tool}${target.suffix}`);
+var toolPath = (directory, tool, target) => join24(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
@@ -26296,6 +26580,7 @@ var COMMANDS = [
   ...SETUP_COMMANDS,
   ...STATE_COMMANDS,
   ...TOOL_COMMANDS,
+  ...BROWSER_SERVER_COMMANDS,
   ...VCS_COMMANDS,
   ...HOOK_COMMANDS
 ];
@@ -26404,13 +26689,13 @@ ${output.text}
 `;
   return { stdout, stderr: "", code: 0 };
 });
-var failed3 = (error, env) => hostForText(env).pipe(map4((agent) => {
+var failed4 = (error, env) => hostForText(env).pipe(map4((agent) => {
   const { tag, message, hint, code } = describeFailure(error, wordsFor(agent));
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
 }));
-var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => failed3(error, host.env)), catchCause2((cause) => failed3({ _tag: "Defect", message: pretty(cause) }, host.env)));
+var run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => failed4(error, host.env)), catchCause2((cause) => failed4({ _tag: "Defect", message: pretty(cause) }, host.env)));
 
 var stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ reason: "stdin is a terminal" })) : tryPromise2({
   try: () => Bun.stdin.text(),

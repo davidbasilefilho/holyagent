@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -3897,7 +3897,7 @@ describe("the MCP servers of the screen capability", () => {
       expect(
         (await registered(`${name}#a1b2c3d4`)).map((server) => server.name),
         name,
-      ).toEqual([name.endsWith("-headless-screen") ? "playwright" : "browse"])
+      ).toEqual([name.endsWith("-headless-screen") ? "browser_use" : "browse"])
   })
 
   test("the root and the specialists without the capability register none, so no other process starts the server", async () => {
@@ -3907,33 +3907,86 @@ describe("the MCP servers of the screen capability", () => {
     expect(await registered("my chat#1")).toEqual([])
   })
 
-  test("a headless screen specialist registers the Playwright server headless and isolated, with the machine's Chromium when there is one", async () => {
-    const browsers = await mkdtemp(join(tmpdir(), "holyagent-chromium-"))
-    try {
-      // The server comes from the agent file's form, whatever the machine's environment says.
-      const bare = await registered("worker-visual-headless-screen#a1b2c3d4", {
-        env: { ...DISPLAY, PLAYWRIGHT_BROWSERS_PATH: browsers },
-      })
-      expect(bare).toHaveLength(1)
-      expect(bare[0]?.name).toBe("playwright")
-      const args = (bare[0]?.config as { args: Array<string> }).args
-      expect(args.slice(0, 2)).toEqual([
-        "--registry=https://registry.npmjs.org/",
-        "--@playwright:registry=https://registry.npmjs.org/",
-      ])
-      expect(args.join(" ")).toContain("--headless --isolated --browser chromium")
-      expect(args).not.toContain("--executable-path")
-      await writeFile(join(browsers, "chromium"), "")
-      const preinstalled = await registered("worker-visual-headless-screen#a1b2c3d4", {
-        env: { PLAYWRIGHT_BROWSERS_PATH: browsers },
-      })
-      expect((preinstalled[0]?.config as { args: Array<string> }).args.slice(-2)).toEqual([
-        "--executable-path",
-        join(browsers, "chromium"),
-      ])
-    } finally {
-      await rm(browsers, { recursive: true, force: true })
+  test("a headless screen specialist registers holyagent's browser-server, which runs the browser-use server, from the home folder", async () => {
+    const [server] = await registered("worker-visual-headless-screen#a1b2c3d4", {
+      env: { ...DISPLAY, HOME: "/home/neutral" },
+    })
+    expect(server?.name).toBe("browser_use")
+    // Pi's configuration takes a fixed command: Bun on the bundled runtime, whose command starts
+    // the Chromium and the server, with the flags that keep the project's .env and bunfig out.
+    expect(server?.config).toEqual({
+      command: BUN,
+      args: [...RUNTIME, "browser-server"],
+      cwd: "/home/neutral",
+    })
+  })
+
+  describe("in a session T3 hosts", () => {
+    const T3_HOSTED = {
+      DISPLAY: ":0",
+      T3_PI_RUNTIME_MODE: "full-access",
+      T3_MCP_URL: "http://127.0.0.1:1/mcp",
     }
+    const started = (name: string, env: Record<string, string>, mode: "rpc" | "print") =>
+      run(configWith({}), { sessionName: `${name}#a1b2c3d4`, env, mode, startOnly: true })
+
+    test("a headless screen specialist registers no browser-use server and is told of no missing server", async () => {
+      const env: Record<string, string> = { ...T3_HOSTED }
+      await run(configWith({}), { env, mode: "rpc", startOnly: true })
+      const { api, delivered } = await run(configWith({}), {
+        sessionName: "worker-visual-headless-screen#a1b2c3d4",
+        env,
+        mode: "print",
+      })
+      expect(api.mcpServers).toEqual([])
+      expect(delivered?.message?.content ?? "").not.toContain("MCP server of the screen capability")
+    })
+
+    test("the same specialist outside T3 still registers it, also with T3's variables in a session that is not RPC", async () => {
+      for (const [env, mode] of [
+        [{ DISPLAY: ":0" }, "rpc"],
+        [T3_HOSTED, "print"],
+      ] as const) {
+        const { api } = await started("worker-visual-headless-screen", env, mode)
+        expect(api.mcpServers.map((server) => server.name)).toEqual(["browser_use"])
+      }
+    })
+
+    // The package runs a specialist in-process and binds its extensions with no mode, so its
+    // ctx.mode is "print" (agent-runner.ts `bindExtensions`, Pi's `_extensionMode` default) while it
+    // shares the root's environment: the gate has to hold on what the root recorded.
+    test("a specialist of a root T3 hosts, whose mode is print, registers no browser-use and may use T3's preview tools", async () => {
+      const env: Record<string, string> = { ...T3_HOSTED }
+      await run(configWith({}), { env, mode: "rpc", startOnly: true })
+      const { api } = await started("worker-visual-headless-screen", env, "print")
+      expect(api.mcpServers).toEqual([])
+      expect(
+        await api.emit("tool_call", {
+          toolName: "mcp__t3-code__preview_open",
+          toolCallId: "t1",
+          input: {},
+        }),
+      ).toEqual([undefined])
+    })
+
+    test("a specialist of a root T3 does not host registers browser-use and is refused T3's preview tools, T3's variables or not", async () => {
+      const env: Record<string, string> = { ...T3_HOSTED }
+      await run(configWith({}), { env, mode: "print", startOnly: true })
+      const { api } = await started("worker-visual-headless-screen", env, "print")
+      expect(api.mcpServers.map((server) => server.name)).toEqual(["browser_use"])
+      expect(
+        await api.emit("tool_call", {
+          toolName: "mcp__t3-code__preview_open",
+          toolCallId: "t1",
+          input: {},
+        }),
+      ).toEqual([expect.objectContaining({ block: true })])
+    })
+
+    test("a normal screen specialist still registers browse", async () => {
+      const { api } = await started("worker-visual-screen", T3_HOSTED, "rpc")
+      expect(api.mcpServers.map((server) => server.name)).toEqual(["browse"])
+    })
   })
 
   test("browser use switched off registers none, and the specialist is told", async () => {
@@ -4009,10 +4062,14 @@ describe("T3's preview tools for a screen specialist", () => {
   })
 
   test("are granted when T3 hosts the session", async () => {
+    // The specialist runs in-process under the root, so its mode is print and the root's start
+    // has recorded that T3 hosts the process.
+    const env: Record<string, string> = { ...T3_ENV }
+    await run(healthy("/missing"), { env, mode: "rpc", startOnly: true })
     const { api } = await run(healthy("/missing"), {
       sessionName: "worker-visual-screen#a1b2c3d4",
-      env: T3_ENV,
-      mode: "rpc",
+      env,
+      mode: "print",
       startOnly: true,
     })
     for (const name of PREVIEW)
@@ -4031,7 +4088,7 @@ describe("T3's preview tools for a screen specialist", () => {
       env: {},
       startOnly: true,
     })
-    expect(await screen.api.emit("tool_call", call("mcp__playwright__browser_navigate"))).toEqual([
+    expect(await screen.api.emit("tool_call", call("mcp__browser_use__browser_exec"))).toEqual([
       undefined,
     ])
   })

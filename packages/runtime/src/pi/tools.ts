@@ -142,7 +142,7 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
  * With `screen` (an Assignment that carries the screen capability) a specialist also gets the
  * `screen` tools of each enabled capability the `form` offers (`screenTools`), whatever its role,
  * and a visual role's own computer-use tools only where the form offers them: in the normal form
- * the computer-use tools and opencode browse's, in the headless form the Playwright server's (a
+ * the computer-use tools and opencode browse's, in the headless form the browser-use server's (a
  * headless machine has no desktop to drive), and, while `pi.features.mcp` is on, T3 Code's preview
  * and render tools in both; every `mcp__` tool needs `pi.features.mcp`, the extension that runs the
  * servers. Without `screen` none of them is granted beyond what VisualInspection gives. The root

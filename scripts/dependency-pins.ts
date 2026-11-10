@@ -128,6 +128,29 @@ export const newestAllowedRelease = (
   )
 }
 
+/** One file of a PyPI release, as the JSON API lists it. */
+export interface PypiFile {
+  /** True when the publisher yanked this file. */
+  readonly yanked?: boolean
+}
+
+/**
+ * The newest stable release of a PyPI project that can still be installed: a version of exactly
+ * `major.minor.patch` (a PEP 440 prerelease such as `1.0.0rc1` or `1.0.0a1`, a `.devN` or `.postN`
+ * release and anything else that is not three numbers is ignored, as {@link parseRelease} reads
+ * it), with at least one file and not every file yanked. `releases` maps each version to its files,
+ * as the `releases` of `https://pypi.org/pypi/<name>/json` does. Without such a release the result
+ * is `undefined`.
+ */
+export const newestPypiRelease = (
+  releases: Readonly<Record<string, ReadonlyArray<PypiFile>>>,
+): string | undefined =>
+  newestRelease(
+    Object.entries(releases).flatMap(([version, files]) =>
+      files.some((file) => file.yanked !== true) ? [version] : [],
+    ),
+  )
+
 /**
  * The newest stable tag among some tags, with its release: tags that are not `<prefix>X.Y.Z`
  * (floating tags such as `v7`, prereleases, other products' tags) are ignored.
@@ -286,10 +309,10 @@ export const rewriteVendoredTool = (
 }
 
 /**
- * The release a Pi package pin moves to: `release`, unless the pin is already above it, which is
- * kept, because a registry whose `latest` tag points at an older line must not move an exact pin
- * down. A `release` that is not stable keeps `current`; a `current` that is not stable is
- * replaced.
+ * The release a pin of an exact version (a Pi package, a PyPI package) moves to: `release`, unless
+ * the pin is already above it, which is kept, because a registry whose `latest` tag points at an
+ * older line must not move an exact pin down. A `release` that is not stable keeps `current`; a
+ * `current` that is not stable is replaced.
  */
 export const nextPiVersion = (current: string, release: string): string => {
   const from = parseRelease(current)
@@ -299,8 +322,8 @@ export const nextPiVersion = (current: string, release: string): string => {
 }
 
 /**
- * The pin table of the Pi packages with their versions set from `versions`, by npm name, keeping
- * the key order; packages not in the map keep their version.
+ * A pin table (`pi-packages.json` or `pypi-packages.json`) with its versions set from `versions`,
+ * by package name, keeping the key order; packages not in the map keep their version.
  */
 export const withPiPackageVersions = (
   table: Readonly<Record<string, string>>,
@@ -310,7 +333,10 @@ export const withPiPackageVersions = (
     Object.entries(table).map(([name, version]) => [name, versions.get(name) ?? version]),
   )
 
-/** The text of `pi-packages.json` for a pin table: two-space JSON and a final newline. */
+/**
+ * The text of a pin table file (`pi-packages.json`, `pypi-packages.json`): two-space JSON and a
+ * final newline.
+ */
 export const renderPiPackages = (table: Readonly<Record<string, string>>): string =>
   `${JSON.stringify(table, null, 2)}\n`
 

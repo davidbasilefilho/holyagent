@@ -5,6 +5,7 @@ import {
   EXACT_PACKAGES,
   isExactPin,
   newestAllowedRelease,
+  newestPypiRelease,
   newestRelease,
   newestTag,
   nextPackageRange,
@@ -334,6 +335,39 @@ describe("newestAllowedRelease", () => {
   test("gives nothing when latest is not a stable release or every version is deprecated", () => {
     expect(newestAllowedRelease(versions("1.0.0"), "next")).toBeUndefined()
     expect(newestAllowedRelease(versions(["1.0.0", "old"]), "1.0.0")).toBeUndefined()
+  })
+})
+
+describe("newestPypiRelease", () => {
+  const live = [{ yanked: false }]
+  const dead = [{ yanked: true }, { yanked: true }]
+
+  test("is the newest stable release that has a file nobody yanked", () => {
+    expect(newestPypiRelease({ "0.9.0": live, "1.0.0": live, "1.1.0": live })).toBe("1.1.0")
+    expect(newestPypiRelease({ "1.0.0": live, "1.1.0": dead })).toBe("1.0.0")
+    // One live file is enough: only a release with every file yanked is gone.
+    expect(newestPypiRelease({ "1.0.0": live, "1.1.0": [{ yanked: true }, {}] })).toBe("1.1.0")
+  })
+
+  test("skips PEP 440 prereleases, dev and post releases and anything that is not three numbers", () => {
+    expect(
+      newestPypiRelease({
+        "1.0.0": live,
+        "1.1.0a1": live,
+        "1.1.0b2": live,
+        "1.1.0rc1": live,
+        "1.1.0.dev3": live,
+        "1.0.0.post1": live,
+        "1.1": live,
+        "2.0.0-rc.1": live,
+      }),
+    ).toBe("1.0.0")
+  })
+
+  test("skips a release with no files and gives nothing when none is eligible", () => {
+    expect(newestPypiRelease({ "1.0.0": live, "2.0.0": [] })).toBe("1.0.0")
+    expect(newestPypiRelease({ "1.0.0": dead, "1.1.0rc1": live })).toBeUndefined()
+    expect(newestPypiRelease({})).toBeUndefined()
   })
 })
 

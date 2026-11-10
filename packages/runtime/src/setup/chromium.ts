@@ -1,12 +1,19 @@
 import { existsSync, readdirSync } from "node:fs"
 import { posix, win32 } from "node:path"
 
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 
 import { type Env, firstNonEmpty } from "./environment.ts"
+import { findCommand } from "./shell.ts"
 
-/** The environment variable in which the Playwright MCP server reads the browser's executable path. */
-export const PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH"
+/** The environment variable in which the person can name the Chromium executable to use. */
+export const CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH"
+
+/**
+ * The old name of {@link CHROMIUM_EXECUTABLE_VARIABLE}, from when the Playwright MCP server took
+ * the executable: still read when the new one is unset, so a machine set up for it keeps working.
+ */
+export const LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH"
 
 /**
  * The folder where the images of cloud sessions preinstall Playwright's browsers, whose `chromium`
@@ -58,23 +65,60 @@ const safeList = (folder: string): ReadonlyArray<string> =>
   )
 
 /**
- * The Chromium executable the machine already provides, for the Playwright MCP server's
- * `--executable-path`, or `undefined` when there is none (the server then uses the browser
- * Playwright installs for itself). In order: the path the person set in
- * {@link PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE}; the `chromium` entry or the newest
- * `chromium-<revision>` build in `PLAYWRIGHT_BROWSERS_PATH` when it names a folder (Playwright
- * itself looks nowhere else then), else in {@link PREINSTALLED_BROWSERS}. It only looks at the file
- * system; `exists` and `list` replace that for a test. Paths are joined the way `platform` joins
- * them (the machine's by default), whatever the host is.
+ * The Chromium path the person configured and the variable it came from:
+ * {@link CHROMIUM_EXECUTABLE_VARIABLE}, else {@link LEGACY_CHROMIUM_EXECUTABLE_VARIABLE}; an empty
+ * variable counts as unset.
+ */
+export const configuredChromium = (
+  env: Env,
+): { readonly variable: string; readonly path: string } | undefined => {
+  for (const variable of [CHROMIUM_EXECUTABLE_VARIABLE, LEGACY_CHROMIUM_EXECUTABLE_VARIABLE]) {
+    const path = firstNonEmpty(env[variable])
+    if (path !== undefined) return { variable, path }
+  }
+  return undefined
+}
+
+/**
+ * The executable a bare command name (no path separator) stands for on the environment's `PATH`, or
+ * `undefined` when none is there.
+ */
+const onPath = (command: string, env: Env): string | undefined =>
+  Option.getOrUndefined(findCommand(env, command))
+
+// The executable the person configured, or `undefined` when it is missing. A path with a separator
+// must exist as given; a bare command name such as `chromium` is looked up on the PATH, the way a
+// shell would start it.
+const resolveConfigured = (
+  given: string,
+  env: Env,
+  exists: (path: string) => boolean,
+  which: (command: string, env: Env) => string | undefined,
+): string | undefined =>
+  /[\\/]/.test(given) ? (exists(given) ? given : undefined) : which(given, env)
+
+/**
+ * The Chromium executable the machine already provides, which `holyagent browser-server` starts
+ * headless for the browser-use MCP server, or `undefined` when there is none. In order: the path
+ * the person set in {@link CHROMIUM_EXECUTABLE_VARIABLE}, else in the old
+ * {@link LEGACY_CHROMIUM_EXECUTABLE_VARIABLE}, which must exist, or, as a bare command name such as
+ * `chromium`, be found on the `PATH` (it then resolves to that file); a configured one that is
+ * missing is no Chromium, and no other one the person did not choose stands in for it, see
+ * {@link chromiumFixFor}; the `chromium` entry or the newest `chromium-<revision>` build in
+ * `PLAYWRIGHT_BROWSERS_PATH` when it names a folder (Playwright itself looks nowhere else then),
+ * else in {@link PREINSTALLED_BROWSERS}. It only looks at the file system and the `PATH`; `exists`,
+ * `list` and `which` replace that for a test. Paths are joined the way `platform` joins them (the
+ * machine's by default), whatever the host is.
  */
 export const findChromium = (
   env: Env,
   platform: string = process.platform,
   exists: (path: string) => boolean = existsSync,
   list: (folder: string) => ReadonlyArray<string> = safeList,
+  which: (command: string, env: Env) => string | undefined = onPath,
 ): string | undefined => {
-  const given = firstNonEmpty(env[PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE])
-  if (given !== undefined) return given
+  const given = configuredChromium(env)
+  if (given !== undefined) return resolveConfigured(given.path, env, exists, which)
   const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"])
   return inFolder(
     configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured,
@@ -82,4 +126,21 @@ export const findChromium = (
     exists,
     list,
   )
+}
+
+/**
+ * How the person gets a Chromium, as `fix` says, led by what is wrong with the path they configured
+ * when {@link findChromium} rejected it because the file does not exist or, for a bare command name,
+ * is not on the `PATH`.
+ */
+export const chromiumFixFor = (
+  env: Env,
+  fix: string,
+  exists: (path: string) => boolean = existsSync,
+  which: (command: string, env: Env) => string | undefined = onPath,
+): string => {
+  const given = configuredChromium(env)
+  return given === undefined || resolveConfigured(given.path, env, exists, which) !== undefined
+    ? fix
+    : `${given.variable} is set to ${given.path}, which does not exist; ${fix}`
 }
