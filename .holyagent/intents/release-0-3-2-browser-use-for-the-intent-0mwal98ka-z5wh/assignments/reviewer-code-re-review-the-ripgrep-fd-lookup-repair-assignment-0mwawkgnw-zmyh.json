@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-ripgrep-fd-lookup-repair",
   "objective": "Re-review the ripgrep/fd lookup repair (86e6d051..2ace98e).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-unbundle, branch release/0.3.2/feat/user-installed-search-tools, head 2ace98e. Review only the repair: `git diff 86e6d051 2ace98e` (without generated dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ub-rr.diff).",
     "Earlier findings it should close: (blocking) docs/components.md promised the same answer everywhere; (non-blocking) relative or empty PATH entries and Windows .cmd/.bat shims let a repository plant rg/fd; mise.toml named no checksum-verifying backend; the fallback wording differed between the ToolMissing hint, docs and instructions; README 'ships or installs', the decisions.md checksum reason, the Pi installation doc and the one-call winget command; stale 'bundled' comments and duplicated search-tool helpers.",
@@ -42,7 +42,33 @@
     "agentId": "workflow:wf_cbd8b7bf-338/assignment-0mwawkgnw-zmyh",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T16:26:49.052Z"
+    "startedAt": "2026-11-10T16:26:49.052Z",
+    "finishedAt": "2026-11-10T16:32:35.803Z"
+  },
+  "result": "result: the repair closes the earlier findings with no blocking regression; 4 non-blocking points remain.\n\nBuilt-in /code-review ran (medium, 86e6d051...2ace98e, skill text was the built-in). I read each of its 7 claims against the code; classifications are in findings.\n\nchanged: none (read-only)\n\nchecks:\n- `bunx --no-install mise run verify` -> exit 0. Type-check clean on 310 files, lint clean on 311, fmt check on 729 files, 3449 pass, 1 skip, 0 fail. Worktree stayed clean.\n- `bun test` on tools, setup-search-tools, dependency-pins and update-dependencies tests -> 103 pass, 2 skip, 0 fail.\n- `mise ls --current` resolves both aqua keys (ripgrep 15.2.0, fd 10.5.2), and `mise ls-remote aqua:sharkdp/fd` returns versions.\n- Under `mise exec`, rg and fd resolve to absolute `~/.local/share/mise/installs/...` paths outside cwd, so the strict lookup accepts them. The dev and CI flow on Linux is not broken.\n\nblockers: none\n\nfindings (file:line):\n1. Non-blocking, shell.ts:83: on Windows, `strictWhich` returns null when the first `Bun.which` hit is a non-.exe. A `.cmd` shim in an earlier PATH dir hides a later real `rg.exe`. It fails closed with ToolMissing, so it is a usability gap, not a security one.\n2. Non-blocking, tools.test.ts:239-240: the \"programs installed on this machine\" tests use non-strict `Bun.which`, then run through the strict CLI. If mise on the Windows CI job exposes `rg` or `fd` as a non-.exe shim, they would get exit 4 where they expect 0 or 1. I could not run Windows. Use the same strict lookup in the skip condition to remove the risk.\n3. Non-blocking, shell.ts:77-80: PATH entries inside cwd are dropped, so a session at `$HOME` loses `~/.cargo/bin` or `~/.local/bin`. The behavior is documented in components.md, but the ToolMissing hint and doctor line say only \"not found on PATH\". The lexical check also ignores symlinks. A repo cannot set PATH, so I rate that low.\n4. Non-blocking, search-tools.ts:68 / dependency-pins.ts:233: the `fdfind` note is gone from the search.md instructions but kept in docs and the doctor line. The quoted-key regex rejects keys with `@` or spaces; the two current keys parse.\n- Rejected: setup using `piOptions.cwd` (steps.ts:254). It is the same cwd setup uses for its other work. Rejected: the `which` signature claim. `locateTool` is typed to take `WhichOptions`, and `Shell.which` and `findCommand` both pass it through.\n\nEarlier findings closed:\n- components.md no longer promises identical answers; it says \"one search interface\" and notes that versions can differ.\n- Relative and empty PATH entries are filtered, and Windows takes only `.exe`.\n- mise.toml names the aqua backend.\n- decisions.md states the checksum facts conditionally: ripgrep has a sha256 check, fd has none.\n- The fallback wording is \"grep or find\" in the hint, docs, instructions and coverage.\n- README now reads \"builds with or needs\".\n- The winget command is split into two calls.\n- Stale \"bundled\" comments and the duplicated helpers are gone; `searchToolLines` and `locateTool` are shared.\n\nevidence:\nThe repair closes the earlier findings without regressions: `mise run verify` exit 0 (3449 pass, 0 fail). Findings 1-4 are non-blocking; Windows behavior was read from code, not run.\nTests cover the strict lookup and the aqua keys and would fail without the change: tools.test.ts:140-170 plants `rg` in the project and runs the CLI with relative, empty and in-cwd PATH entries. tools.test.ts:181-226 covers the per-platform filter, the .exe/.cmd/.bat rule and results inside cwd. dependency-pins.test.ts:207-222 parses and rewrites quoted aqua keys. update-dependencies.test.ts:160-164 asserts the aqua keys exist. The strict API did not exist on the base, so these tests fail without the change.\nchecks-run: `mise run verify` exit 0; targeted `bun test` of 4 files exit 0 (103 pass, 2 skip); `mise ls --current`, `mise ls-remote aqua:sharkdp/fd` and `mise exec` PATH check ran. Not run: Windows tests, a live aqua checksum verification.\nfindings: listed above, 0 blocking, 4 non-blocking.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Re-review of 2ace98e found no blocking findings; non-blocking residuals are recorded for the final report.",
+    "criteria": [
+      {
+        "criterion": "The repair closes the earlier findings without regressions",
+        "support": "`mise run verify` exit 0 (3449 pass, 0 fail). Findings 1-4 are non-blocking; Windows behavior was read from code, not run."
+      },
+      {
+        "criterion": "Tests cover the strict lookup and the aqua keys and would fail without the change",
+        "support": "tools.test.ts:140-170 plants `rg` in the project and runs the CLI with relative, empty and in-cwd PATH entries. tools.test.ts:181-226 covers the per-platform filter, the .exe/.cmd/.bat rule and results inside cwd. dependency-pins.test.ts:207-222 parses and rewrites quoted aqua keys. update-dependencies.test.ts:160-164 asserts the aqua keys exist. The strict API did not exist on the base, so these tests fail without the change."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run verify` exit 0; targeted `bun test` of 4 files exit 0 (103 pass, 2 skip); `mise ls --current`, `mise ls-remote aqua:sharkdp/fd` and `mise exec` PATH check ran. Not run: Windows tests, a live aqua checksum verification."
+      },
+      {
+        "label": "findings",
+        "support": "listed above, 0 blocking, 4 non-blocking."
+      }
+    ]
   },
   "createdAt": "2026-11-10T16:26:49.052Z"
 }
