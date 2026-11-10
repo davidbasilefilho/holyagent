@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwaprmor-p91z",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-commit-b36e708-ripgrep-and-fd-run",
+  "objective": "Assess commit b36e708 (ripgrep and fd run from PATH instead of bundled pinned binaries) for security vulnerabilities.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-unbundle, branch release/0.3.2/feat/user-installed-search-tools. The change is commit b36e708; review `git diff 3cc15367 b36e708` (source, tests, docs and instruction text without the generated dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/unbundle-src.diff; the dist also deletes the vendored binaries and regenerates bundles and agent files). Head 86e6d051 only adds a no-content merge of the integration branch.",
+    "Requirement (maintainer, verbatim: \"remove the bundling of the executables, list them as dependencies instead\", then \"I mean dependencies for the users\"): HolyAgent stops bundling ripgrep and fd; they become prerequisites the user installs; holyagent rg and holyagent fd run the ones on PATH (fd also as Debian's fdfind); a missing tool fails with install commands per platform; setup and doctor of the Claude plugin and of Pi report them; mise provides them for development and CI; instructions tell agents to fall back to the system search tools when one is missing; docs list them as prerequisites; the updater no longer moves vendored binaries.",
+    "Read the diff file above; you have no shell. Trace: how the binary is resolved (PATH order, the current directory or a project-relative PATH entry, Windows PATHEXT and the current-directory search of Windows, a repository that ships an `rg` or `fd` or `fdfind` file), argument passing to the resolved binary (shell interpolation), what replaces the removed checksum verification, and whether the mise tool sources in mise.toml pin and verify what they download."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-unbundle; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests.",
+    "Mark each finding blocking or non-blocking, with file:line and a concrete failure scenario. Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "No validated vulnerability introduced by the change remains unreported, each finding traced from source to sink",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwap1f0u-kq3f"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T13:16:26.140Z"
+  },
+  "createdAt": "2026-11-10T13:16:26.140Z"
+}
