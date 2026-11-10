@@ -114,12 +114,13 @@ describe("the capability registry", () => {
     )
     expect(file).toEqual(written)
     const config = await Effect.runPromise(Schema.decodeUnknownEffect(Config)(written))
-    // Only the keys a later release added (the Codex provider's Luna Reserve and context_management,
+    // Only the keys a later release added (the Codex provider's Luna Reserve, context_management and auto-review,
     // the just-bash shell, fff and browser use) take their default.
     expect(config.pi.features).toEqual({
       ...written.pi.features,
       lunaReserve: true,
       contextManagement: true,
+      autoReview: true,
       justBash: true,
       fff: true,
       browserUse: true,

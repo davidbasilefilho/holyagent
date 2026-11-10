@@ -152,6 +152,20 @@ const unwrapHeredoc = (lines: ReadonlyArray<string>): ReadonlyArray<string> => {
 }
 
 /**
+ * The paths a patch names in its file headers (`*** Add File:`, `*** Update File:`, `*** Delete
+ * File:` and `*** Move to:`), read with the rule {@link parsePatch} reads a header by: each line is
+ * trimmed first, so an indented header counts. It is a superset of what the parser accepts (it does
+ * not follow hunks, so a context line that looks like a header is listed too), which is the safe
+ * side for a check that decides what to review. Nothing is validated and no file is touched.
+ */
+export const patchHeaderPaths = (text: string): ReadonlyArray<string> =>
+  text.split("\n").flatMap((line) => {
+    const head = line.replace(/\r$/, "").trim()
+    const header = [ADD, DELETE, UPDATE, MOVE].find((prefix) => head.startsWith(prefix))
+    return header === undefined ? [] : [head.slice(header.length)]
+  })
+
+/**
  * Parses a patch in Codex's format: `*** Begin Patch`, then `*** Add File:`, `*** Delete File:` and
  * `*** Update File:` operations (an update may follow with `*** Move to:`), then `*** End Patch`.
  * An update holds hunks, each opened by `@@` (the first may omit it) and made of lines that start

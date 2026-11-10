@@ -73,11 +73,46 @@ export const userLocksOff = (user: unknown, path: ReadonlyArray<string>): boolea
     (entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off,
   )
 
-/** Merges the project over the user, then restores every setting the user switched off for good. */
+/**
+ * Settings that only the user-level file decides, since they are security controls that a cloned
+ * repository must not weaken: auto-review's switch and its policy text. A project file that holds
+ * them is read and then ignored for these keys.
+ */
+const USER_ONLY: ReadonlyArray<ReadonlyArray<string>> = [
+  ["pi", "features", "autoReview"],
+  ["pi", "autoReview"],
+]
+
+/**
+ * Whether a setting is one only the user-level file decides (see `USER_ONLY`): a project or local
+ * file that holds it is ignored, so setup must not write it there.
+ */
+export const isUserOnly = (path: ReadonlyArray<string>): boolean =>
+  USER_ONLY.some((entry) => entry.join(".") === path.join("."))
+
+// The value without the key at `path`, which stays out of the merge.
+const withoutAt = (value: unknown, path: ReadonlyArray<string>): unknown => {
+  const [key, ...rest] = path
+  if (key === undefined || !isRecord(value) || !Object.hasOwn(value, key)) return value
+  const entries = Object.entries(value)
+  return Object.fromEntries(
+    rest.length === 0
+      ? entries.filter(([name]) => name !== key)
+      : entries.map(([name, item]) => [name, name === key ? withoutAt(item, rest) : item]),
+  )
+}
+
+/**
+ * Merges the project over the user, without the project's value for a user-only setting, then
+ * restores every setting the user switched off for good.
+ */
 const mergeFiles = (user: unknown, project: unknown): unknown =>
   FINAL_OFF.reduce(
     (merged, { path, off }) => (valueAt(user, path) === off ? setAt(merged, path, off) : merged),
-    merge(user, project),
+    merge(
+      user,
+      USER_ONLY.reduce((kept, path) => withoutAt(kept, path), project),
+    ),
   )
 
 const JsonValue = Schema.fromJsonString(Schema.Unknown)
@@ -125,8 +160,9 @@ export interface ConfigSources {
  * `.holyagent/config.json`, each decoded with excess properties refused, merged key by key with the
  * project winning (lists replace wholesale), and the defaults filling what neither file sets. A
  * setting that the user file switches off for good (`pi.features.computerUse`, `pi.features.web`,
- * `pi.t3.deviceAccess`) stays off whatever the project says. A missing file reads as an empty one;
- * a bad file stops the load with ConfigInvalid for that file.
+ * `pi.t3.deviceAccess`) stays off whatever the project says, and auto-review's switch and policy
+ * (`pi.features.autoReview`, `pi.autoReview`) are the user file's alone. A missing file reads as an
+ * empty one; a bad file stops the load with ConfigInvalid for that file.
  */
 export const loadConfig = ({ projectDirectories, env = process.env }: ConfigSources) =>
   Effect.gen(function* () {

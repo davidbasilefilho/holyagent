@@ -159,6 +159,7 @@ const start = (directory: string, sessionName?: string) => {
     getFlag: () => undefined,
     registerToolRenderer: () => undefined,
     registerTool: () => undefined,
+    registerCommand: () => undefined,
     getSessionName: () => sessionName,
     getActiveTools: () => [],
     getAllTools: () => [],
@@ -184,6 +185,8 @@ const start = (directory: string, sessionName?: string) => {
     {
       get: (target, key) => {
         if (key === "cwd") return target.cwd
+        // The auto-review gate reads the active model's provider; no model keeps it inert.
+        if (key === "model") return undefined
         throw new Error(`the extension used ctx.${String(key)}`)
       },
     },

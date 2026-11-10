@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { Effect } from "effect"
 
 import { CAPABILITIES, type CapabilityDefinition } from "../config/capabilities.ts"
-import { readConfigFile, userConfigFile, userLocksOff } from "../config/load.ts"
+import { isUserOnly, readConfigFile, userConfigFile, userLocksOff } from "../config/load.ts"
 import { CONFIG_FILE, stateDirectory } from "../state/layout.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
@@ -52,6 +52,21 @@ const refuseLockedOn = Effect.fn("refuseLockedCapabilities")(function* (
 })
 
 /**
+ * Fails when a capability's switch is one only the user's own config decides (auto-review, a
+ * security control that a repository must not weaken), since a project or local file's value would
+ * be ignored: the message points to user scope, and nothing is written.
+ */
+const refuseUserOnly = Effect.fn("refuseUserOnlyCapabilities")(function* (
+  changed: ReadonlyArray<{ readonly capability: CapabilityDefinition }>,
+) {
+  const only = changed.find(({ capability }) => isUserOnly(["pi", "features", capability.feature]))
+  if (only !== undefined)
+    return yield* new SetupFailure({
+      message: `capability ${only.capability.name} cannot be changed at this scope: pi.features.${only.capability.feature} is read from the user's config alone, so a project or local value is ignored; use --scope user`,
+    })
+})
+
+/**
  * The capability step of `holyagent setup`: records each capability the run switched (`--<name>
  * on|off`, or a row of the setup screen) as `pi.features.<key>` in the HolyAgent config of the
  * scope ({@link capabilityConfigFile}), so setup, doctor and the Pi extension agree afterwards. A
@@ -61,8 +76,10 @@ const refuseLockedOn = Effect.fn("refuseLockedCapabilities")(function* (
  * an object, is a {@link SetupFailure}, and so is a choice to turn on, at scope `project` or
  * `local`, a capability the user's config switches off for good (the merged config would stay off,
  * yet the package would be installed): the message names the user setting, and nothing is written.
- * A project or local config file that is, or sits below, a symlink is refused too
- * ({@link refuseLinks}), so a repository cannot redirect the write; a dry run refuses it too.
+ * A choice at those scopes for a capability that only the user's config decides (auto-review) is
+ * refused the same way, naming `--scope user`. A project or local config file that is, or sits
+ * below, a symlink is refused too ({@link refuseLinks}), so a repository cannot redirect the write;
+ * a dry run refuses it too.
  */
 export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(function* (
   env: Env,
@@ -88,7 +105,10 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
     )
   if (changed.length === 0) return lines
   const file = capabilityConfigFile(env, options.cwd, options.scope)
-  if (options.scope !== "user") yield* refuseLockedOn(env, changed)
+  if (options.scope !== "user") {
+    yield* refuseUserOnly(changed)
+    yield* refuseLockedOn(env, changed)
+  }
   yield* refuseLinks(options.cwd, options.scope, file, "write")
   if (!options.dryRun) {
     const existing = yield* readJsonObject(file)

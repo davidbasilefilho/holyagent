@@ -299,6 +299,7 @@ const drive = async (
     getFlag: () => undefined,
     registerToolRenderer: () => undefined,
     registerTool: () => undefined,
+    registerCommand: () => undefined,
     getSessionName: () => undefined,
     getActiveTools: () => [...active],
     getAllTools: () => active.map((name) => ({ name })),
@@ -338,6 +339,8 @@ const drive = async (
         if (key === "cwd") return target.cwd
         if (key === "mode") return "rpc"
         if (key === "ui") return recorded.ui
+        // The auto-review gate reads the active model's provider; no model keeps it inert.
+        if (key === "model") return undefined
         touched.push(String(key))
         throw new Error(`the extension used ctx.${String(key)}`)
       },

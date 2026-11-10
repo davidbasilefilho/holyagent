@@ -49,8 +49,16 @@ import {
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
 import { findChromium } from "../../../runtime/src/setup/chromium.ts"
+import { homeDirectory } from "../../../runtime/src/setup/environment.ts"
 import { detectForm } from "../../../runtime/src/setup/form.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
+import {
+  type AutoReviewChoice,
+  autoReviewChoice,
+  type AutoReviewSettings,
+  createAutoReviewSettings,
+  registerAutoReview,
+} from "./auto-review.ts"
 import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
@@ -455,6 +463,11 @@ interface Collected {
    */
   readonly codex?: CodexSettings
   /**
+   * What the user-level config, read alone, decides for auto-review. Present on every result,
+   * whether the config was readable or not, and never from the project's config.
+   */
+  readonly autoReview?: AutoReviewChoice
+  /**
    * True when the config runs the bash tool on just-bash (`pi.features.justBash`), present with
    * `environment`; every session reads it, since the root and the specialists both have `bash`.
    */
@@ -505,6 +518,11 @@ interface Held {
   started: boolean
   /** The Codex provider's settings once the config is read, or undefined for another provider. */
   codex: CodexSettings | undefined
+  /**
+   * The session's auto-review settings: on with the default policy from the start, fixed once by
+   * the first collection to the user-level config's choice. The project's config has no part.
+   */
+  autoReview: AutoReviewSettings
   /** True once the config is read and runs the bash tool on just-bash. */
   justBash: boolean
   /** Stops the provider checks of the session. */
@@ -1196,7 +1214,11 @@ export const createExtension =
           Effect.catch((error) => failed(error.message)),
           Effect.catchCause((cause) => failed(Cause.pretty(cause))),
         )
-        return homeNotice === undefined ? collected : { ...collected, homeNotice }
+        // Both the success and every failure path of `collected` end after the user's read, so
+        // `user` is settled here; it is `undefined` when the file could not be read, which leaves
+        // auto-review on.
+        const decided = { ...collected, autoReview: autoReviewChoice(user) }
+        return homeNotice === undefined ? decided : { ...decided, homeNotice }
       })
     }
 
@@ -1368,17 +1390,24 @@ export const createExtension =
     // specialists would start one they never call. Servers registered while a session starts
     // connect right away. A server that cannot be registered is told to the specialist on its
     // first run, which then has none of that server's tools.
+    // The no-server notice is told once for the process: a child is one session, and a later start
+    // (a resume or a reload) has the notice in its history already.
+    let noServerTold = false
     const registerScreen = (servers: ReadonlyArray<McpServer>): Delivery | undefined => {
       const agent = childAgent(pi.getSessionName())
       // No server for a screen specialist: `pi.features.mcp` or the capability is off, so tell it.
-      if (isScreenAgent(agent) && servers.length === 0)
+      if (isScreenAgent(agent) && servers.length === 0) {
+        if (noServerTold) return undefined
+        noServerTold = true
         return notice(
           "no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing",
         )
+      }
       const { failures } = registerScreenServers(
         (name, server) => pi.registerMcpServer(name, server),
         agent,
         servers,
+        homeDirectory(env),
       )
       return failures.length === 0
         ? undefined
@@ -1415,6 +1444,7 @@ export const createExtension =
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)
         if (result !== undefined) taken.codex = result.codex
+        if (result?.autoReview !== undefined) taken.autoReview.fix(result.autoReview)
         if (result !== undefined) taken.justBash = result.justBash === true
         if (result?.justBash === true) bash.enable(ctx.cwd)
         if (!taken.started && result?.enabled !== false) {
@@ -1461,6 +1491,7 @@ export const createExtension =
         t3Gate: false,
         t3Root: false,
         codex: undefined,
+        autoReview: createAutoReviewSettings(),
         justBash: false,
         probe: undefined,
         readiness: undefined,
@@ -1607,6 +1638,13 @@ export const createExtension =
       notify: (text) => {
         if (held !== undefined) held.setupNotice = joinNotices(held.setupNotice, notice(text))
       },
+    })
+    // After every other gate, so a call they refuse is never sent to review. Auto-review is a
+    // security control: it is on from the session's start, whatever the config says or fails to
+    // say, and only the user's own config turns it off (see `autoReviewChoice`). The gate applies
+    // whenever the active model is served by Codex, not only when the config selects it.
+    registerAutoReview(pi, {
+      settings: () => (held === undefined ? {} : held.autoReview.settings()),
     })
   }
 

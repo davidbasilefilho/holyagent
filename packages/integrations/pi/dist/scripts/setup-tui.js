@@ -3645,6 +3645,20 @@ var CAPABILITIES = [
     health: ["needs"]
   },
   {
+    name: "auto-review",
+    feature: "autoReview",
+    description: "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [], screen: [] },
+    settings: [],
+    health: ["needs"]
+  },
+  {
     name: "just-bash",
     feature: "justBash",
     description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",

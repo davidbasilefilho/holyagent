@@ -10961,6 +10961,20 @@ var init_capabilities = __esm(() => {
       health: ["needs"]
     },
     {
+      name: "auto-review",
+      feature: "autoReview",
+      description: "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+      provider: "openai-codex",
+      skills: [],
+      applicability: "both",
+      defaultOn: true,
+      needs: [],
+      forms: sameForm([]),
+      tools: { rootExclude: [], visual: [], screen: [] },
+      settings: [],
+      health: ["needs"]
+    },
+    {
       name: "just-bash",
       feature: "justBash",
       description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
@@ -11011,7 +11025,7 @@ var init_capabilities = __esm(() => {
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value))), VcsSettings, PiProvider, Thinking, ModelId, KIMI_ROOT = "k3.1-pro", KIMI_SPECIALIST = "kimi-for-coding", kimi = (model, thinking) => ({ model, thinking }), KIMI_ROUTES, PROVIDER_ROUTES, route = () => defaulted(Struct({
   model: optionalKey2(ModelId),
   thinking: optionalKey2(Thinking)
-}), {}), ROUTE_FIELDS, WebMode, CodemodeMode, T3Scope, Enabled, capabilitySwitch = (on) => defaulted(Enabled, on), CAPABILITY_FIELDS, PI_FIELDS, PiAsWritten, PiResolved, withProviderRoutes = (pi) => {
+}), {}), ROUTE_FIELDS, WebMode, CodemodeMode, T3Scope, Enabled, AutoReviewPolicy, capabilitySwitch = (on) => defaulted(Enabled, on), CAPABILITY_FIELDS, PI_FIELDS, PiAsWritten, PiResolved, withProviderRoutes = (pi) => {
   const defaults = PROVIDER_ROUTES[pi.provider];
   const routes = Object.fromEntries(Object.keys(defaults).map((key) => [
     key,
@@ -11064,6 +11078,10 @@ var init_schema = __esm(() => {
   CodemodeMode = Literals(["on", "only"]);
   T3Scope = Literals(["global", "project"]);
   Enabled = Boolean3;
+  AutoReviewPolicy = Struct({
+    policy: optionalKey2(String6),
+    extraPolicy: optionalKey2(String6)
+  });
   CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
   PI_FIELDS = {
     enable: defaulted(Enabled, true),
@@ -11081,7 +11099,8 @@ var init_schema = __esm(() => {
       scope: defaulted(T3Scope, "global"),
       worktrees: defaulted(Enabled, true),
       deviceAccess: defaulted(Enabled, true)
-    }), {})
+    }), {}),
+    autoReview: defaulted(AutoReviewPolicy, {})
   };
   PiAsWritten = Struct(PI_FIELDS);
   PiResolved = toType2(Struct({
@@ -11115,7 +11134,13 @@ var HOME_VARIABLE = "HOLYAGENT_HOME", userConfigFile = (env) => join3(firstNonEm
 } : override, FINAL_OFF, valueAt = (value, path) => path.reduce((node, key) => isRecord(node) ? node[key] : undefined, value), setAt = (value, path, leaf) => {
   const [key, ...rest] = path;
   return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
-}, userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off), mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, project)), JsonValue, withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value, readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map5(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message }))))), loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
+}, userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off), USER_ONLY, isUserOnly = (path) => USER_ONLY.some((entry) => entry.join(".") === path.join(".")), withoutAt = (value, path) => {
+  const [key, ...rest] = path;
+  if (key === undefined || !isRecord(value) || !Object.hasOwn(value, key))
+    return value;
+  const entries = Object.entries(value);
+  return Object.fromEntries(rest.length === 0 ? entries.filter(([name]) => name !== key) : entries.map(([name, item]) => [name, name === key ? withoutAt(item, rest) : item]));
+}, mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, USER_ONLY.reduce((kept, path) => withoutAt(kept, path), project))), JsonValue, withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value, readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map5(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message }))))), loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
   const userPath = userConfigFile(env);
   const user = yield* readConfigFile(userPath);
   let project;
@@ -11141,6 +11166,10 @@ var init_load = __esm(() => {
     { path: ["pi", "features", "computerUse"], off: false },
     { path: ["pi", "features", "web"], off: "off" },
     { path: ["pi", "t3", "deviceAccess"], off: false }
+  ];
+  USER_ONLY = [
+    ["pi", "features", "autoReview"],
+    ["pi", "autoReview"]
   ];
   JsonValue = fromJsonString2(Unknown2);
 });
@@ -14719,7 +14748,7 @@ var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length
     ...carryForward ? { carryForward: true } : {}
   });
 }, section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)], PROMPT_LINE, dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
-`, 1)[0] ?? "")?.[1], SCREEN_LINE = "Screen capability: this Assignment carries it, so the computer-use, browser-use (mcp__browse__*) and T3 preview tools are yours where this machine provides them. Report a tool that is missing instead of working around it.", HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.", renderPrompt = (assignment, agent) => [
+`, 1)[0] ?? "")?.[1], SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.", HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.", renderPrompt = (assignment, agent) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
   `Objective: ${assignment.objective}`,
   ...section2("Scope", assignment.scope),
@@ -25435,8 +25464,9 @@ ${result.stderr}`) : undefined;
   const content = formContent(capability, form);
   const problems = [];
   if (capability.health.includes("needs")) {
+    const system = platform?.split("-", 1)[0];
     for (const need of formNeeds(capability, form)) {
-      const unmet = yield* unmetNeed(env, need);
+      const unmet = yield* unmetNeed(env, need, system);
       if (unmet !== undefined)
         problems.push(unmet);
     }
@@ -25946,7 +25976,7 @@ var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFil
   if (value === undefined)
     return succeed6({});
   return isJsonObject2(value) ? succeed6(value) : fail5(new SetupFailure({ message: `${file}: ${path} is not an object` }));
-}, refuseLockedOn, applyCapabilityChoices;
+}, refuseLockedOn, refuseUserOnly, applyCapabilityChoices;
 var init_capabilities2 = __esm(() => {
   init_dist();
   init_capabilities();
@@ -25968,6 +25998,13 @@ var init_capabilities2 = __esm(() => {
         message: `capability ${locked.capability.name} cannot be turned on here: ${file} sets pi.features.${locked.capability.feature} to false, which a project or local config cannot override; change it there or use --scope user`
       });
   });
+  refuseUserOnly = fn2("refuseUserOnlyCapabilities")(function* (changed) {
+    const only = changed.find(({ capability }) => isUserOnly(["pi", "features", capability.feature]));
+    if (only !== undefined)
+      return yield* new SetupFailure({
+        message: `capability ${only.capability.name} cannot be changed at this scope: pi.features.${only.capability.feature} is read from the user's config alone, so a project or local value is ignored; use --scope user`
+      });
+  });
   applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, options) {
     const chosen = CAPABILITIES.flatMap((capability) => {
       const value = options.choices[capability.feature];
@@ -25982,8 +26019,10 @@ var init_capabilities2 = __esm(() => {
     if (changed.length === 0)
       return lines;
     const file = capabilityConfigFile(env, options.cwd, options.scope);
-    if (options.scope !== "user")
+    if (options.scope !== "user") {
+      yield* refuseUserOnly(changed);
       yield* refuseLockedOn(env, changed);
+    }
     yield* refuseLinks(options.cwd, options.scope, file, "write");
     if (!options.dryRun) {
       const existing = yield* readJsonObject(file);

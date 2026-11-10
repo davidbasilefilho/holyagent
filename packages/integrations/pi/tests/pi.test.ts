@@ -388,6 +388,9 @@ describe("the specialists", () => {
         name?.endsWith("-headless-screen") === true,
       )
     }
+    // Each description names the form of the machine it is for.
+    expect(SCREEN_DESCRIPTION).toContain("graphical session")
+    expect(SCREEN_DESCRIPTION).not.toContain("where this machine provides")
   })
 
   test("a screen specialist has its role's prompt and tools, plus the computer-use, browse and T3 preview tools; the others have none of the browse and preview-only tools", () => {
@@ -590,10 +593,12 @@ describe("the extension", () => {
         on: (event: string) => void used.push(`on ${event}`),
         registerToolRenderer: () => void used.push("registerToolRenderer"),
         registerTool: (tool: { name: string }) => void used.push(`registerTool ${tool.name}`),
+        registerCommand: (name: string) => void used.push(`registerCommand ${name}`),
       }
       expect(typeof loaded.default).toBe("function")
       expect(loaded.default(api)).toBeUndefined()
       expect(used.toSorted()).toEqual([
+        "on agent_start",
         "on before_agent_start",
         "on before_agent_start",
         "on before_agent_start",
@@ -609,9 +614,12 @@ describe("the extension", () => {
         "on session_shutdown",
         "on session_start",
         "on session_start",
+        "on session_start",
         "on session_tree",
         "on session_tree",
         "on tool_call",
+        "on tool_call",
+        "registerCommand approve",
         "registerFlag holyagent-role",
         "registerTool apply_patch",
         "registerToolRenderer",

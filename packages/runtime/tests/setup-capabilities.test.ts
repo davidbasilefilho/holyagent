@@ -177,6 +177,28 @@ describe("a capability flag in setup", () => {
     }
   })
 
+  test("auto-review is the user config's alone: a choice at project or local scope is refused and points to user scope, and user scope writes it", async () => {
+    await write(globalSettings(), { packages: ALL })
+    for (const scope of ["project", "local"] as const) {
+      for (const value of [false, true]) {
+        const report = await runSetup(withPi(), { scope, capabilities: { autoReview: value } })
+        // `on` is the default, so a choice for it equals what the config decides there.
+        if (value) {
+          expect(report.lines).toContain("= capability auto-review: already on")
+          continue
+        }
+        expect(report.ok).toBe(false)
+        expect(report.lines).toContain(
+          "! capabilities: capability auto-review cannot be changed at this scope: pi.features.autoReview is read from the user's config alone, so a project or local value is ignored; use --scope user",
+        )
+        expect(await Bun.file(projectConfig()).exists()).toBe(false)
+      }
+    }
+    const report = await runSetup(withPi(), { capabilities: { autoReview: false } })
+    expect(report.ok).toBe(true)
+    expect(await read(userConfig())).toEqual({ pi: { features: { autoReview: false } } })
+  })
+
   test("a locked capability can still be turned off at project scope, and on in the user file itself", async () => {
     await write(userConfig(), { pi: { features: { computerUse: false } } })
     await write(globalSettings(), { packages: ALL.filter((source) => source !== COMPUTER_USE) })

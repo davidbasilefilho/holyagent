@@ -77,8 +77,9 @@ describe("the setup interface, capability rows", () => {
       capabilities: capabilityOffers(HEADLESS),
     })
     // The focus wraps up from the first row to the last (fff), then back through just-bash,
-    // context-management, luna-reserve and browser-use to computer-use. Browser use is offered
-    // headless (the Playwright server), so only computer use says it is not.
+    // auto-review, context-management, luna-reserve and browser-use to computer-use. Browser use
+    // is offered headless (the Playwright server), so only computer use says it is not.
+    await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
@@ -119,6 +120,7 @@ describe("the capability helpers of the setup session", () => {
       subagents: true,
       lunaReserve: true,
       contextManagement: true,
+      autoReview: true,
       justBash: true,
       fff: true,
       browserUse: true,

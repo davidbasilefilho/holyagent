@@ -12148,7 +12148,7 @@ var section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...
 var PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-z0-9]+)*)\.$/;
 var dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
 `, 1)[0] ?? "")?.[1];
-var SCREEN_LINE = "Screen capability: this Assignment carries it, so the computer-use, browser-use (mcp__browse__*) and T3 preview tools are yours where this machine provides them. Report a tool that is missing instead of working around it.";
+var SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.";
 var HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.";
 var renderPrompt = (assignment, agent) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
@@ -12854,6 +12854,20 @@ var CAPABILITIES = [
     health: ["needs"]
   },
   {
+    name: "auto-review",
+    feature: "autoReview",
+    description: "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+    provider: "openai-codex",
+    skills: [],
+    applicability: "both",
+    defaultOn: true,
+    needs: [],
+    forms: sameForm([]),
+    tools: { rootExclude: [], visual: [], screen: [] },
+    settings: [],
+    health: ["needs"]
+  },
+  {
     name: "just-bash",
     feature: "justBash",
     description: "Runs the bash tool on just-bash, with the host's programs, TypeScript first and JavaScript as the fallback; turns Billion Context's bash guardrails off",
@@ -12967,6 +12981,10 @@ var WebMode = Literals(["provider", "pi-web-kit", "off"]);
 var CodemodeMode = Literals(["on", "only"]);
 var T3Scope = Literals(["global", "project"]);
 var Enabled = Boolean3;
+var AutoReviewPolicy = Struct({
+  policy: optionalKey2(String4),
+  extraPolicy: optionalKey2(String4)
+});
 var capabilitySwitch = (on) => defaulted(Enabled, on);
 var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
 var PI_FIELDS = {
@@ -12985,7 +13003,8 @@ var PI_FIELDS = {
     scope: defaulted(T3Scope, "global"),
     worktrees: defaulted(Enabled, true),
     deviceAccess: defaulted(Enabled, true)
-  }), {})
+  }), {}),
+  autoReview: defaulted(AutoReviewPolicy, {})
 };
 var PiAsWritten = Struct(PI_FIELDS);
 var PiResolved = toType2(Struct({
@@ -13040,7 +13059,19 @@ var setAt = (value, path, leaf) => {
   return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
 };
 var userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off);
-var mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, project));
+var USER_ONLY = [
+  ["pi", "features", "autoReview"],
+  ["pi", "autoReview"]
+];
+var isUserOnly = (path) => USER_ONLY.some((entry) => entry.join(".") === path.join("."));
+var withoutAt = (value, path) => {
+  const [key, ...rest] = path;
+  if (key === undefined || !isRecord(value) || !Object.hasOwn(value, key))
+    return value;
+  const entries = Object.entries(value);
+  return Object.fromEntries(rest.length === 0 ? entries.filter(([name]) => name !== key) : entries.map(([name, item]) => [name, name === key ? withoutAt(item, rest) : item]));
+};
+var mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, USER_ONLY.reduce((kept, path) => withoutAt(kept, path), project)));
 var JsonValue = fromJsonString2(Unknown2);
 var withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value;
 var readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map4(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message })))));
@@ -23389,8 +23420,9 @@ var checkCapability = (env, scope, capability, form, listed, files, platform) =>
   const content = formContent(capability, form);
   const problems = [];
   if (capability.health.includes("needs")) {
+    const system = platform?.split("-", 1)[0];
     for (const need of formNeeds(capability, form)) {
-      const unmet = yield* unmetNeed(env, need);
+      const unmet = yield* unmetNeed(env, need, system);
       if (unmet !== undefined)
         problems.push(unmet);
     }
@@ -23879,6 +23911,13 @@ var refuseLockedOn = fn2("refuseLockedCapabilities")(function* (env, changed) {
       message: `capability ${locked.capability.name} cannot be turned on here: ${file} sets pi.features.${locked.capability.feature} to false, which a project or local config cannot override; change it there or use --scope user`
     });
 });
+var refuseUserOnly = fn2("refuseUserOnlyCapabilities")(function* (changed) {
+  const only = changed.find(({ capability }) => isUserOnly(["pi", "features", capability.feature]));
+  if (only !== undefined)
+    return yield* new SetupFailure({
+      message: `capability ${only.capability.name} cannot be changed at this scope: pi.features.${only.capability.feature} is read from the user's config alone, so a project or local value is ignored; use --scope user`
+    });
+});
 var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, options) {
   const chosen = CAPABILITIES.flatMap((capability) => {
     const value = options.choices[capability.feature];
@@ -23893,8 +23932,10 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   if (changed.length === 0)
     return lines;
   const file = capabilityConfigFile(env, options.cwd, options.scope);
-  if (options.scope !== "user")
+  if (options.scope !== "user") {
+    yield* refuseUserOnly(changed);
     yield* refuseLockedOn(env, changed);
+  }
   yield* refuseLinks(options.cwd, options.scope, file, "write");
   if (!options.dryRun) {
     const existing = yield* readJsonObject(file);

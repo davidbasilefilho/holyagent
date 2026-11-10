@@ -139,6 +139,9 @@ describe("the screen capability on an Assignment's draft", () => {
     const screen = renderPrompt(assignment({ screen: true }), "worker-implementation-screen")
     expect(plain).not.toContain("Screen capability")
     expect(screen).toContain("Screen capability: this Assignment carries it")
+    // It says which form the machine has, not where a machine provides the tools.
+    expect(screen).toContain("this machine has a graphical session")
+    expect(screen).not.toContain("where this machine provides")
     expect(screen.split("\n")[0]).toBe(
       "Role: Worker.implementation (worker-implementation-screen). Assignment: assignment-a.",
     )

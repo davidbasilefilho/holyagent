@@ -594,6 +594,20 @@ describe("holyagent doctor, capabilities", () => {
       }
     })
 
+    test("the graphical-session need is judged on the platform given, as the form's availability is", async () => {
+      const entry: CapabilityDefinition = {
+        ...ENTRY,
+        needs: [{ kind: "display" }],
+        health: ["needs"],
+      }
+      // The environment has no DISPLAY: macOS and Windows have a session anyway, other systems not.
+      for (const platform of ["darwin-arm64", "win32-x64"])
+        expect(await probe(entry, "normal", [], [], platform)).toStartWith("ok   ")
+      expect(await probe(entry, "normal", [], [], "linux-x64")).toBe(
+        "FAIL pi capability made-up: needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)",
+      )
+    })
+
     test("a present command and a listed package are healthy, and the form decides what is expected", async () => {
       expect(await probe(ENTRY, "normal", ["npm:pi-web-kit@0.5.0"], ["madeup"])).toBe(
         "ok   pi capability made-up: normal form, both, 1 package listed at its pin",

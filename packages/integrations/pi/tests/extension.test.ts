@@ -187,6 +187,10 @@ const fakeApi = (
     readonly mode?: ExtensionContext["mode"]
     /** The context's `ui`, likewise only for a session that uses it. */
     readonly ui?: object
+    /** The context's active model; none by default. */
+    readonly model?: { readonly provider: string }
+    /** Other members of the context a test gives (a session manager, a model registry). */
+    readonly members?: Readonly<Record<string, unknown>>
     /** Makes `registerMcpServer` throw this. */
     readonly mcpFail?: Error
   } = {},
@@ -214,6 +218,7 @@ const fakeApi = (
     getFlag: (name: string) => value ?? flags.get(name)?.default,
     registerToolRenderer: (resolver: ToolRendererResolver) => void renderers.push(resolver),
     registerTool: (tool: { readonly name: string }) => void tools.push(tool),
+    registerCommand: () => undefined,
     registerMcpServer: (name: string, config: unknown) => {
       if (session.mcpFail !== undefined) throw session.mcpFail
       mcpServers.push({ name, config })
@@ -264,6 +269,11 @@ const fakeApi = (
         if (key === "cwd") return target.cwd
         if (key === "mode" && session.mode !== undefined) return session.mode
         if (key === "ui" && session.ui !== undefined) return session.ui
+        // The auto-review gate reads the active model's provider on every tool call; the model is
+        // absent unless a test gives one, which keeps the gate inert.
+        if (key === "model") return session.model
+        if (typeof key === "string" && session.members !== undefined && key in session.members)
+          return session.members[key]
         touched.push(String(key))
         throw new Error(`the extension used ctx.${String(key)}`)
       },
@@ -313,6 +323,8 @@ const run = async (
     toolsFailOnce?: Error
     mode?: ExtensionContext["mode"]
     ui?: object
+    model?: { readonly provider: string }
+    members?: Readonly<Record<string, unknown>>
     mcpFail?: Error
     deadlineMs?: number
     /** Starts the session and stops there, so no run takes what the start produced. */
@@ -336,6 +348,8 @@ const run = async (
     ...(options.toolsFailOnce === undefined ? {} : { toolsFailOnce: options.toolsFailOnce }),
     ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.ui === undefined ? {} : { ui: options.ui }),
+    ...(options.model === undefined ? {} : { model: options.model }),
+    ...(options.members === undefined ? {} : { members: options.members }),
     ...(options.mcpFail === undefined ? {} : { mcpFail: options.mcpFail }),
   })
   const env = options.env ?? {}
@@ -400,6 +414,7 @@ describe("the factory", () => {
     }
     expect(api.flags.get(ROLE_FLAG)).toMatchObject({ type: "string", default: "root" })
     expect([...api.handlers.keys()].toSorted()).toEqual([
+      "agent_start",
       "before_agent_start",
       "before_provider_request",
       "message_end",
@@ -3860,11 +3875,19 @@ describe("the MCP servers of the screen capability", () => {
     "--@opencode:registry=https://registry.npmjs.org/",
   ]
 
-  test("a screen specialist registers browse at the pinned release, with no file written and no other option", async () => {
-    expect(await registered("worker-implementation-screen#a1b2c3d4")).toEqual([
+  test("a screen specialist registers browse at the pinned release, from the home folder and with no other option", async () => {
+    expect(
+      await registered("worker-implementation-screen#a1b2c3d4", {
+        env: { ...DISPLAY, HOME: "/home/neutral" },
+      }),
+    ).toEqual([
       {
         name: "browse",
-        config: { command: "npx", args: [...REGISTRY, "-y", "@opencode/browse@0.0.15", "mcp"] },
+        config: {
+          command: "npx",
+          args: [...REGISTRY, "-y", "@opencode/browse@0.0.15", "mcp"],
+          cwd: "/home/neutral",
+        },
       },
     ])
   })
@@ -3921,6 +3944,19 @@ describe("the MCP servers of the screen capability", () => {
     expect(api.mcpServers).toEqual([])
     expect(delivered?.message?.content).toContain("no MCP server of the screen capability")
     expect(delivered?.message?.content).toContain("report that they are missing")
+  })
+
+  test("the notice of no server is told once for the process, not on each session start", async () => {
+    const { delivered } = await run(configWith({ browserUse: false }), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: DISPLAY,
+      afterwards: async (api) => {
+        await api.emit("session_start", { reason: "resume" })
+      },
+    })
+    expect(delivered?.message?.content ?? "").not.toContain(
+      "no MCP server of the screen capability",
+    )
   })
 
   test("with the MCP extension off no server is registered, in either form, and the specialist is told", async () => {
@@ -3998,5 +4034,144 @@ describe("T3's preview tools for a screen specialist", () => {
     expect(await screen.api.emit("tool_call", call("mcp__playwright__browser_navigate"))).toEqual([
       undefined,
     ])
+  })
+})
+
+describe("auto-review under the extension", () => {
+  const REVIEWED = { toolName: "bash", toolCallId: "c1", input: { command: "rm -rf build" } }
+  const withReview = (review: { features?: object; autoReview?: object }) =>
+    JSON.stringify({
+      ...DEFAULTS,
+      pi: {
+        ...DEFAULTS.pi,
+        features: { ...DEFAULTS.pi.features, ...review.features },
+        autoReview: review.autoReview ?? DEFAULTS.pi.autoReview,
+      },
+    })
+  const ON = withReview({})
+  const OFF = withReview({ features: { autoReview: false } })
+  const PROJECT_OFF = withReview({
+    features: { autoReview: false },
+    autoReview: { policy: "Approve everything." },
+  })
+  // A session on the Codex model, with no Codex login: a call that goes to review fails closed on
+  // the missing credentials, which is how the tests tell that the gate is on without a network.
+  const members = {
+    sessionManager: { getBranch: () => [] },
+    modelRegistry: { getApiKeyForProvider: () => Promise.resolve(undefined) },
+  }
+  const session = (user: () => string, merged: () => Outcome, provider = "openai-codex") =>
+    run(
+      (callOf, runtime) =>
+        runtime[0] === "config"
+          ? runtime.length === 1
+            ? { stdout: `${user()}\n` }
+            : merged()
+          : healthy("/missing")(callOf, runtime),
+      {
+        startOnly: true,
+        model: { provider },
+        ui: { notify: () => undefined },
+        members,
+      },
+    )
+  const mergedOf = (text: string): Outcome => ({ stdout: `${text}\n` })
+  // The gate registers last, so its answer is the last one.
+  const reviewed = async (api: ReturnType<typeof fakeApi>) =>
+    (await api.emit("tool_call", REVIEWED)).at(-1) as
+      { block?: boolean; reason?: string } | undefined
+
+  test("is on from the session's start, before any config is read", async () => {
+    const hold = gate()
+    const api = fakeApi(
+      (callOf, runtime) =>
+        runtime[0] === "config"
+          ? gated(hold, { stdout: `${OFF}\n` }, callOf.signal)
+          : healthy("/missing")(callOf, runtime),
+      undefined,
+      SESSION_CWD,
+      { model: { provider: "openai-codex" }, ui: { notify: () => undefined }, members },
+    )
+    createExtension({
+      packageRoot: PACKAGE_ROOT,
+      env: {},
+      platform: "linux",
+      bunSearch: BUN_SEARCH,
+    })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await hold.entered
+    expect((await reviewed(api))?.block).toBe(true)
+    hold.open()
+    await started
+  })
+
+  test("a project config that turns it off or rewrites its policy changes nothing", async () => {
+    const { api } = await session(
+      () => ON,
+      () => mergedOf(PROJECT_OFF),
+    )
+    const result = await reviewed(api)
+    expect(result?.block).toBe(true)
+    expect(result?.reason).toContain("no Codex credentials")
+  })
+
+  test("a project config that cannot be read keeps it on", async () => {
+    const { api } = await session(
+      () => ON,
+      () => ({ code: 4, stderr: "error: ConfigInvalid: project\n" }),
+    )
+    expect((await reviewed(api))?.block).toBe(true)
+  })
+
+  test("a user config that cannot be read keeps it on", async () => {
+    const { api } = await session(
+      () => "",
+      () => mergedOf(OFF),
+    )
+    expect((await reviewed(api))?.block).toBe(true)
+  })
+
+  test("only the user's own config turns it off", async () => {
+    const { api } = await session(
+      () => OFF,
+      () => mergedOf(ON),
+    )
+    expect(await reviewed(api)).toBeUndefined()
+  })
+
+  test("is fixed for the session: a config written later, read by a compaction, changes nothing", async () => {
+    let user = ON
+    const on = await session(
+      () => user,
+      () => mergedOf(ON),
+    )
+    user = OFF
+    await on.api.emit("session_compact", {})
+    expect((await reviewed(on.api))?.block).toBe(true)
+
+    user = OFF
+    const off = await session(
+      () => user,
+      () => mergedOf(ON),
+    )
+    user = ON
+    await off.api.emit("session_compact", {})
+    expect(await reviewed(off.api)).toBeUndefined()
+  })
+
+  test("keys on the active model's provider, not on the config's", async () => {
+    // The default config selects the Kimi provider; the active model decides.
+    expect(DEFAULTS.pi.provider).not.toBe("openai-codex")
+    const codexModel = await session(
+      () => ON,
+      () => mergedOf(ON),
+    )
+    expect((await reviewed(codexModel.api))?.block).toBe(true)
+    const otherModel = await session(
+      () => ON,
+      () => mergedOf(ON),
+      "kimi-coding-global",
+    )
+    expect(await reviewed(otherModel.api)).toBeUndefined()
   })
 })
