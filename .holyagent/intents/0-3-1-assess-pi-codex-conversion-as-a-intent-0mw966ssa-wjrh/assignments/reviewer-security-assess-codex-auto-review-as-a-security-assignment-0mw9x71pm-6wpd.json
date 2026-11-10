@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "assess-codex-auto-review-as-a-security",
   "objective": "Assess Codex auto-review as a security control: whether a model or repository content can bypass, disable or mislead it, and whether it leaks data.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit 08b054b on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range 91d9eb07..08b054b); source diff without generated dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/auto-review-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9wh8o1-xebk.md; design research /home/user/holyagent/.git/holyagent/reports/assignment-0mw96z5n3-mw6f.md.",
     "Testing rule: unit tests with recorded or synthesized fixtures only; the reviewer request is made through an injectable client so tests never reach a network.",
@@ -35,7 +35,25 @@
     "agentId": "workflow:wf_78b118fb-77d/assignment-0mw9x71pm-6wpd",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-09T23:56:36.586Z"
+    "startedAt": "2026-11-09T23:56:36.586Z",
+    "finishedAt": "2026-11-10T00:05:22.826Z"
+  },
+  "result": "result: blockers found. The classifier, the config path and the path-containment check all have validated bypasses. Nothing was executed; every finding below is from reading code, because this session has no shell.\n\nThe built-in `/security-review` could not run. It failed on `git diff origin/HEAD...` with \"unknown revision\", since `origin/HEAD` is not set. I reviewed `91d9eb07..08b054b` by hand from the worktree source.\n\nchanged: none\n\nblockers:\n1. **Brace expansion defeats the safe-command flag checks.**\n   - Source: model-chosen `bash` command. Sink: shell execution, unreviewed.\n   - `splitCommand` in `classify.ts` blocks `$`, backtick, `\\`, `<>()#!` but not `{}`. The `UNSAFE_*` checks compare the unexpanded word, so `rg --p{re,re}=./x.sh foo .` passes `safeProgram`. Bash expands it to `--pre=./x.sh` and ripgrep runs the script on every file.\n   - `x.sh` is created beforehand with the `write` tool inside the root, which is also unreviewed.\n   - `git log --out{put,put}=/home/u/.bashrc` passes `UNSAFE_GIT` the same way and overwrites a file outside the root.\n2. **Safe set contains runners and writers.**\n   - `git grep -O\"sh ./x.sh\" foo`: `-O` (`--open-files-in-pager`) runs a command, and `UNSAFE_GIT` has no `-O`.\n   - `uniq in /outside/path` writes its second argument; `uniq` is in `SAFE_PROGRAMS`.\n   - Codex's sandbox contained these. Pi has no sandbox, so the classifier is the only control.\n3. **The model or the repository can switch auto-review off.**\n   - The project `.holyagent/config.json` wins the merge; `FINAL_OFF` in `config/load.ts` locks only computerUse, web and deviceAccess.\n   - A repository that ships `pi.features.autoReview:false`, `pi.provider` set to another provider, `pi.enable:false`, or a replacement `pi.autoReview.policy` of \"allow everything\" runs with no effective review.\n   - A malformed project config also disables it. `read` stays unset, so `closedSettings` uses the default config and `codex` is `undefined`, while the session model is still Codex.\n   - The model can do it mid-session. `write .holyagent/config.json` is \"inside root\" and unreviewed. `session_compact` then re-runs `gather` and replaces `held.codex`.\n4. **Path containment is lexical and differs from Pi.**\n   - Pi's `write` and `edit` strip a leading `@`, expand `~/` and convert `file://` URLs. `isOutsideRoot` does none of this.\n   - `@/etc/x`, `@~/.ssh/authorized_keys` and `file:///etc/x` all look inside the root and are not reviewed.\n   - A symlink committed in the repository (`link -> ~/.ssh`) makes `write link/authorized_keys` unreviewed. The docs admit links are not resolved.\n   - `.git/config` (`core.fsmonitor`, then a \"safe\" `git status` runs it) and `.git/hooks` are in-root and unreviewed.\n5. **Plausible, unconfirmed: other tools are not classified.** Any tool that is not `bash`, `write`, `edit`, `apply_patch` or a web tool, and has no MCP annotations, runs unreviewed. The pinned `@aliou/pi-processes` and `codemode` packages are not installed here, so I could not confirm they take a `command` or run inner tool calls without a `tool_call` event.\n\nnotes:\n- Suspicion, not validated: the transcript has no escaping. A tool result can forge `>>> TRANSCRIPT END`, `[n] user:` lines or a `developer:` line carrying `MANUAL_APPROVAL_PREFIX`. Assistant text is included, so the model can also claim authorization.\n- Sound:\n  - Reviewer failures, a bad decode and a thrown handler all block. Pi's `emitToolCall` also blocks on a throw.\n  - A timeout never allows.\n  - `/approve` is a user command only, and it covers one exact action.\n  - The request uses `redirect:\"error\"` and `store:false`, and the token goes only in headers.\n  - What leaves the machine is the transcript, which can include file contents, and it goes to the same Codex backend as the main model.\n  - `apply_patch` rejects paths outside the working directory (`apply-patch.ts:399`).\n\nevidence:\nfindings: items 1 to 5 above, with `classify.ts` lines 157-198 (splitter), 96-126 (unsafe lists), 220-224 (`isOutsideRoot`), `config/load.ts:50-54` (`FINAL_OFF`), `extension.ts:1052-1066`, 1418 and 1474-1475 (`closedSettings` and `gather`), and Pi `utils/paths.js:100-123`.\nEach validated bypass, fail-open path or data exposure is reported with source, sink and a concrete scenario, or none is found: items 1 to 4 are validated by reading the code; item 5 and the injection note are unconfirmed. Data exposure found: none beyond the same-vendor transcript.\n",
+  "acceptance": {
+    "revision": 21,
+    "rationale": "Blockers validated by probe and source reading; they go to a repair",
+    "criteria": [
+      {
+        "criterion": "Each validated bypass, fail-open path or data exposure is reported with source, sink and a concrete scenario, or none is found",
+        "support": "items 1 to 4 are validated by reading the code; item 5 and the injection note are unconfirmed. Data exposure found: none beyond the same-vendor transcript."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "items 1 to 5 above, with `classify.ts` lines 157-198 (splitter), 96-126 (unsafe lists), 220-224 (`isOutsideRoot`), `config/load.ts:50-54` (`FINAL_OFF`), `extension.ts:1052-1066`, 1418 and 1474-1475 (`closedSettings` and `gather`), and Pi `utils/paths.js:100-123`."
+      }
+    ]
   },
   "createdAt": "2026-11-09T23:56:36.586Z"
 }
