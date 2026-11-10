@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "update-the-docs-and-source-comments-that",
   "objective": "Update the docs and source comments that state a 0.3.2-moved Pi package version as the current pin.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-deps, branch release/0.3.2/chore/update-deps (head 52e6c474, clean). The dependency updater moved @opencode/browse 0.0.15 -> 0.0.16, @amaster.ai/pi-computer-use 0.1.36 -> 0.1.38, @tintinweb/pi-subagents 0.23.1 -> 0.23.2 and billion-context 0.1.212 -> 0.1.213 (packages/runtime/src/config/pi-packages.json is the source of truth). A review listed these lines naming the old versions: docs/pi/screen.md:42 and :44; packages/runtime/src/setup/browse.ts:137; packages/runtime/src/setup/pi-settings.ts:51-52; docs/pi/orchestration.md:11; docs/pi/caching-and-subagents.md:39, :49, :99; docs/pi/extensions.md:47, :52, :102; docs/pi/t3-code.md:128.",
     "For each line: where it presents the version as the current pin or the command to run (for example \"pinned at `0.0.15`\" or an npx command line), change it to the new version. Where it records the version a source was read or audited at (a research statement such as \"read from the 0.0.15 package\" or \"audited against 0.1.36\"), leave the version as it is, because changing it would claim an audit that did not happen. List each line with what you did (changed or kept, and why).",
@@ -51,7 +51,37 @@
     "agentId": "workflow:wf_aa4cd78e-754/assignment-0mwaxa1xu-tfxm",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-10T16:46:43.026Z"
+    "startedAt": "2026-11-10T16:46:43.026Z",
+    "finishedAt": "2026-11-10T16:50:34.053Z"
+  },
+  "result": "result: Updated 4 lines that present the moved versions as the current pin; kept 8 lines that record a read-at or audit version. Build and verify both exit 0.\nchanged: docs/pi/screen.md, docs/pi/caching-and-subagents.md, docs/pi/extensions.md\nchecks:\n- bun install --frozen-lockfile -> exit 0, no changes\n- bunx --no-install mise run build -> exit 0; only the three docs files changed afterwards, no generated-file churn\n- bunx --no-install mise run verify -> exit 0; 3449 pass, 1 skip, 0 fail, 3450 tests across 113 files\nblockers: none\nquestions: (1) docs/pi/orchestration.md:11 cites '0.23.1, 4 Nov 2026' as the README source, so I kept it as a citation. If it is meant as the current pin, change it to 0.23.2, but the date would then need checking. (2) caching-and-subagents.md:99 and extensions.md:52 now name 0.23.2 for behavior that was only verified on 0.23.1. Confirm that is acceptable.\nnotes: kept as read-at or audit: screen.md:44; browse.ts:137; pi-settings.ts:51-52; caching-and-subagents.md:39, :49; extensions.md:47, :102; t3-code.md:128. No edits to browse.ts or pi-settings.ts were needed.\nevidence:\nEvery listed line that presents an old version as the current pin names the new pin, and audit or read-at statements keep their version: screen.md:42 now reads 0.0.16 in both places; caching-and-subagents.md:99 and extensions.md:52 read 0.23.2; read-at lines keep their versions\nmise run build leaves no unexplained changes and mise run verify passes: build exit 0 and verify exit 0 (3449 pass, 0 fail)\nchecks-run: build and verify logs at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and verify.log\nchanged-paths: docs/pi/screen.md, docs/pi/caching-and-subagents.md, docs/pi/extensions.md\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/mechanical-0.3.2-pi-docs.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "4 current-pin lines updated, 8 read-at lines kept; build and verify exit 0 (3449 pass).",
+    "criteria": [
+      {
+        "criterion": "Every listed line that presents an old version as the current pin names the new pin, and audit or read-at statements keep their version",
+        "support": "screen.md:42 now reads 0.0.16 in both places; caching-and-subagents.md:99 and extensions.md:52 read 0.23.2; read-at lines keep their versions"
+      },
+      {
+        "criterion": "mise run build leaves no unexplained changes and mise run verify passes",
+        "support": "build exit 0 and verify exit 0 (3449 pass, 0 fail)"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build and verify logs at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/build.log and verify.log"
+      },
+      {
+        "label": "changed-paths",
+        "support": "docs/pi/screen.md, docs/pi/caching-and-subagents.md, docs/pi/extensions.md"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/mechanical-0.3.2-pi-docs.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-10T16:46:43.026Z"
 }
