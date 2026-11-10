@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-review-findings-on-the-user",
   "objective": "Repair the review findings on the user-installed ripgrep and fd change.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-unbundle (branch release/0.3.2/feat/user-installed-search-tools, head 86e6d051; the change under repair is b36e708). Items:",
     "1 (blocking). docs/components.md:~49 says the search 'answers the same way everywhere'; the tools are now user-installed, so versions differ per machine. Say the CLI gives one interface and drop the sameness claim; in docs/decisions.md say that versions may now differ between machines and why that was accepted.",
@@ -81,7 +81,9 @@
     "agentId": "workflow:wf_94b6dc65-6f8/assignment-0mwaq191u-whzh",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T13:23:55.029Z"
+    "startedAt": "2026-11-10T13:23:55.029Z",
+    "finishedAt": "2026-11-10T16:20:11.349Z"
   },
+  "result": "errored: result: errored, usage limit reached before a report\n",
   "createdAt": "2026-11-10T13:23:55.029Z"
 }
