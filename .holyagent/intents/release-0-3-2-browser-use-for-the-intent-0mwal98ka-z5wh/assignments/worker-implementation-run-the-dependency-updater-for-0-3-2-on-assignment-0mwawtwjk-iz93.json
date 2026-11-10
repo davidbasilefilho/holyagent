@@ -1,0 +1,64 @@
+{
+  "id": "assignment-0mwawtwjk-iz93",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "run-the-dependency-updater-for-0-3-2-on",
+  "objective": "Run the dependency updater for 0.3.2 on top of the unbundled ripgrep/fd change and leave the tree passing its gates.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-deps, branch release/0.3.2/chore/update-deps, head 2ace98ee (clean). This head already removed the vendored ripgrep and fd binaries: they are now user-installed prerequisites, pinned for development only as mise tools in mise.toml (`\"aqua:BurntSushi/ripgrep\" = \"15.2.0\"`, `\"aqua:sharkdp/fd\" = \"10.5.2\"`), and the updater no longer has a vendored-binary step. An earlier run on an older head failed because the GitHub REST API (api.github.com) answers 403 for repositories outside this session's scope; anonymous git (`git ls-remote`) and release downloads work.",
+    "Run `bunx --no-install mise run deps:update --dry-run` first, then `bunx --no-install mise run deps:update` for real (this needs the network; it is the requested update), then `bunx --no-install mise run build`, `bunx --no-install mise run verify` and `bunx --no-install mise run deps:check`. Expected moves from an earlier dry plan: jdx/mise-action v5.2.6 -> v5.2.7, @tintinweb/pi-subagents 0.23.1 -> 0.23.2, billion-context 0.1.212 -> 0.1.213, @amaster.ai/pi-computer-use 0.1.36 -> 0.1.37, @opencode/browse 0.0.15 -> 0.0.16, plus whatever else it finds (browser-use on PyPI, mise tools, package.json ranges, bun.lock). Never hand-edit a pin, a SHA, a checksum or bun.lock, because the updater does the SHA resolution and prerelease filtering the tests expect.",
+    "If the updater fails on a REST API 403 for one source, report the source and the error and stop; do not weaken a check or skip a source to get past it. If verify fails because of a new version, report the failing tests and the move that caused them, and fix only what a version move broke when the fix is small and clearly local; otherwise stop and report.",
+    "List every version that moved (from -> to)."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put the updater output in a file in the scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "mise run deps:update moves the dependencies and mise run deps:check reports nothing behind",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "No pin, SHA, checksum or bun.lock entry is edited by hand and no check is weakened",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "mise.toml",
+    ".github",
+    "packages",
+    "scripts",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T16:34:09.536Z"
+  },
+  "createdAt": "2026-11-10T16:34:09.536Z"
+}
