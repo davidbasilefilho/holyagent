@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "judge-whether-the-final-auto-review-and",
   "objective": "Judge whether the final auto-review and screen repair is correct and merge-ready, and that its new tests fail without it.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Final repair commit 7ab278c on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range c580abb0..7ab278c); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ar-final-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9z1r3h-mxfi.md. Review only this repair against the previous findings in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ygj4s-zz8e.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ygiuj-u3ox.md (code), and the screen polish items it names.",
     "Testing rule: never start pi or make a model or network request; unit tests only."
@@ -46,7 +46,37 @@
     "agentId": "workflow:wf_b1e8c2ac-624/assignment-0mw9z9825-sa6d",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T00:54:17.357Z"
+    "startedAt": "2026-11-10T00:54:17.357Z",
+    "finishedAt": "2026-11-10T01:00:04.872Z"
+  },
+  "result": "result: Merge-ready. The repair closes both earlier blockers (indented patch headers, Windows `~\\` and drive paths). Its new tests fail without the fix and pass with it. I found no blocker.\n\n**checks-run** (worktree `/home/user/holyagent-0.3.1-autoreview`, HEAD 7ab278c)\n- `bun install --frozen-lockfile` -> exit 0.\n- `bunx --no-install mise run build` -> exit 0, `git status --short` empty afterwards.\n- `bunx --no-install mise run verify` -> exit 0: no type errors in 306 files, lint clean in 307 files, 3395 pass, 0 fail, 112 files. The tree was still clean afterwards.\n- Old `classify.ts` (`git show c580abb0:...` over the file, then restored from a backup): `bun test packages/runtime/tests/pi/codex-auto-review-classify.test.ts` -> exit 1, 9 fail and 32 pass.\n  - The failing tests include \"a patch header is read as the patch parser reads it, an indented one included\" and \"every path the parser takes from a patch is a path the classifier lists\".\n  - They also include all six Windows tests and the `.agents` protected-folder test.\n- Mutation of the other new tests:\n  - Without the `noServerTold` guard, the \"told once\" test fails.\n  - Without the `system` argument in `pi-check.ts`, the doctor platform test fails.\n  - I restored both files and the tree is clean.\n- Not mutated: the `toolTraits` state-only tests, the `refuseUserOnly` setup test, the marker-scrub test and the npx `cwd` tests. The state-only, `refuseUserOnly` and `cwd` tests assert behavior that the old code lacks. For the marker scrub I only read the old regex, which allowed invisible characters between words but not inside them.\n- I ran a ReDoS probe on the new approval-marker regex under Bun and Node, using BOM runs, which overlap `\\s` and `\\p{Cf}`. It finished in about 0 ms.\n- Logs and scratch files are in the scratchpad directory: `v-install.log`, `v-build.log`, `v-verify.log`, `v-old-classify.log`, `ar-src.diff`, `redos.ts`.\n- I could only read, not run: that Pi honors `cwd` in `registerMcpServer`, and the live `tool_call` order.\n\n**built-in /code-review** (medium, range `c580abb0...7ab278c`): it ran as the real built-in and returned 8 findings. I read the code for each.\n- **Rejected:** \"mixed separators skip the drive-path rewrite\". `shellDrivePath` is a verbatim port of Pi's `normalizeWindowsShellPath`, including its `\\\\` guard (`pi-coding-agent/dist/utils/paths.js:91-100`). The classifier therefore matches Pi.\n- **Rejected:** `refuseUserOnly` ordering and \"undocumented\". It fails the same way as `refuseLockedOn`, and the doc comment says a dry run refuses too. The test covers it.\n- **Rejected:** `patchHeaderPaths` body lines. A `+*** ...` body line is correctly skipped. An indented context line that looks like a header is listed, which is the safe direction and is documented in the code.\n- **Optional:** the `cwd` is set only for `command === \"npx\"`, and home can hold a `node_modules`. The server list comes from HolyAgent's own config, and the writer reported the home case.\n- **Optional:** `noServerTold` is set before the notice is known to be delivered. It is a documented once-per-process choice.\n- **Optional:** the Windows 8.3 matching could flag a real folder named `pi~1`. That only costs an extra review.\n- **Optional:** `isStateOnlyTool` trusts Pi's `sourceInfo.source` string. A spoofed source would first have to produce `npm:<pkg>@<pin>`.\n- **Optional:** homoglyph or fullwidth forgeries of the approval marker still get through. That was already a residual in the earlier review.\n\n**findings:** no blockers; the optional items are above. This repair adds no untested error path.\n\nevidence:\n- The repair's new tests fail without the fix and pass with it: against the old `classify.ts` the classify tests give 9 fail and 32 pass (`v-old-classify.log`), and the other two mutations fail as noted. The same tests pass on 7ab278c in the verify run.\n- The repair introduces no regression or untested error path: verify exits 0 with 3395 pass and 0 fail. Windows parity with Pi was checked against `utils/paths.js`, and the setup refusal and the no-server notice both have tests.\n- Build leaves the tree unchanged and verify passes on 7ab278c: build exit 0 with empty `git status`, verify exit 0 with 3395 pass, 0 fail, tree clean afterwards.\n- checks-run: see above.\n- findings: none blocking; the optional items are listed above.\n",
+  "acceptance": {
+    "revision": 22,
+    "rationale": "No blockers; old classifier fails 9 new tests; verify 3395 pass",
+    "criteria": [
+      {
+        "criterion": "The repair's new tests fail without the fix and pass with it",
+        "support": "against the old `classify.ts` the classify tests give 9 fail and 32 pass (`v-old-classify.log`), and the other two mutations fail as noted. The same tests pass on 7ab278c in the verify run."
+      },
+      {
+        "criterion": "The repair introduces no regression or untested error path",
+        "support": "verify exits 0 with 3395 pass and 0 fail. Windows parity with Pi was checked against `utils/paths.js`, and the setup refusal and the no-server notice both have tests."
+      },
+      {
+        "criterion": "Build leaves the tree unchanged and verify passes on 7ab278c",
+        "support": "build exit 0 with empty `git status`, verify exit 0 with 3395 pass, 0 fail, tree clean afterwards."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "see above."
+      },
+      {
+        "label": "findings",
+        "support": "none blocking; the optional items are listed above."
+      }
+    ]
   },
   "createdAt": "2026-11-10T00:54:17.357Z"
 }
