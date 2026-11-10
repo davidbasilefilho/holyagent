@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-the-0-3-2-dependency-update",
   "objective": "Review the 0.3.2 dependency update commit (2ace98ee..adedd8b6) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-deps, branch release/0.3.2/chore/update-deps, commit adedd8b6 on top of 2ace98ee. Review `git diff 2ace98ee adedd8b6`. The commit came from `mise run deps:update` (jdx/mise-action v5.2.6 -> v5.2.7 by full SHA, @tintinweb/pi-subagents 0.23.1 -> 0.23.2, billion-context 0.1.212 -> 0.1.213, @amaster.ai/pi-computer-use 0.1.36 -> 0.1.38, @opencode/browse 0.0.15 -> 0.0.16, bun.lock refresh), `mise run build` (generated dist files) and hand edits of version literals in six test files.",
     "Check: the action stays pinned to a full commit SHA with a `# vX.Y.Z` comment; the pin table and the generated dist agree; the test edits only follow the new pins and weaken no assertion; nothing beyond the update and its build output changed. Also list docs or source comments that state a now-stale version as the current pin (the writer named docs/pi/screen.md saying \"pinned at 0.0.15\"), as non-blocking findings with file and line.",
@@ -46,7 +46,37 @@
     "agentId": "workflow:wf_94bd60b1-a43/assignment-0mwax3rlw-gznl",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T16:41:49.700Z"
+    "startedAt": "2026-11-10T16:41:49.700Z",
+    "finishedAt": "2026-11-10T16:46:42.702Z"
+  },
+  "result": "result: adedd8b6 is merge-ready. No blockers; verify and deps:check pass, and the action pin is correct.\n\nchanged: none (review only). I made no git writes or edits.\n\nchecks:\n- `/code-review high 2ace98ee...adedd8b6` -> ran, 7 findings, all classified below. The loaded skill was the built-in.\n- `bun install --frozen-lockfile` -> exit 0, no changes.\n- `bunx --no-install mise run verify` -> exit 0. Type-check: no errors in 310 files. Lint: no problems in 311 files. Format check: all 729 files formatted. Tests: 3449 pass, 1 skip, 0 fail across 113 files. The worktree was clean afterwards. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n- `bunx --no-install mise run deps:check` -> exit 0, \"every pin is on the newest stable release\". Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/depscheck.log\n- Not run: `mise run build`, so I did not regenerate dist to compare it; the verify tests cover it. I also could not check from this session that SHA b44d12e7 is the v5.2.7 commit, because GitHub access was denied; `deps:check` resolves SHAs itself.\n\nblockers: none\n\nfindings:\nBuilt-in findings, classified:\n- Rejected: dist ships effect 4.1.3 runtime changes. This is a patch bump of the lock-resolved `effect` (4.1.2 to 4.1.3) rebundled by `mise run build`. All tests pass, and the dist files are generated output.\n- Optional: `bun.lock` line 810 downgrades the hoisted `typescript` from 6.0.3 to 5.9.3. No `package.json` declares typescript. Type-check, lint and tests pass on 5.9.3. It is not an updater range change, but the revert is unexplained, so the root may want to note it.\n- Optional: `bun.lock` line 758 moves `source-map` from 0.7.6 to 0.8.0. It is pulled in only by `@es-joy/escodegen` 5.0.1, an optional dependency of `eslint-plugin-jsdoc`. That is lint tooling, and lint passes. The claim about the opentui toolchain is wrong.\n- Optional: `packages/runtime/tests/pi/journal.test.ts:23`. The journal-key fixtures say they were computed by pi-subagents 0.23.1. They were not regenerated for 0.23.2, and the tests pass.\n- Optional: the test pin literals are duplicated across test files. This is existing style, and the edits follow the pins exactly.\n\nStale versions (non-blocking). These all describe the old pins:\n- `docs/pi/screen.md:42` (\"pinned at `0.0.15`\" and the `npx` command) and `:44` (\"read from the 0.0.15 package\").\n- `packages/runtime/src/setup/browse.ts:137` (0.0.15).\n- `packages/runtime/src/setup/pi-settings.ts:51` (computer-use 0.1.36) and `:52` (pi-subagents 0.23.1). These are audited-default comments, not re-verified for the new versions.\n- `docs/pi/orchestration.md:11`, `docs/pi/caching-and-subagents.md:99` and `docs/pi/extensions.md:52` (pi-subagents 0.23.1).\n- `docs/pi/extensions.md:47` and `:102`, and `docs/pi/t3-code.md:128` (computer-use 0.1.36).\n- `docs/pi/caching-and-subagents.md:39` and `:49` (billion-context v0.1.212).\n- Some of these are \"when read\" research statements. `scripts/dependency-pins.test.ts:376` and the t3 fixtures are not stale.\n\nevidence:\nThe dependency update changes only pins, bun.lock, generated output and test literals that follow the pins: `git diff --stat 2ace98ee adedd8b6` shows 15 files. They are `validation.yml` (four mise-action lines), `bun.lock`, six dist bundles, `pi-packages.json` (four pins) and six test files. The six test diffs change only version literals, with no assertion removed or weakened. Nothing else changed.\nmise run verify and mise run deps:check pass on adedd8b6: verify exit 0 (3449 pass, 0 fail), deps:check exit 0; logs are in the scratchpad.\nEvery external action stays pinned to a full commit SHA with a version comment: all four mise-action uses are `@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7`. The other `uses:` lines in `.github/workflows` are local `./` paths.\nchecks-run: install exit 0; verify exit 0 (3449 pass, 1 skip, 0 fail); deps:check exit 0; built-in /code-review ran.\nfindings: no blockers; 7 built-in findings classified (1 rejected, 4 optional, 2 folded into the stale-version list); stale-version list above.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "No blockers; verify (3449 pass) and deps:check exit 0 on adedd8b6; action pinned by SHA.",
+    "criteria": [
+      {
+        "criterion": "The dependency update changes only pins, bun.lock, generated output and test literals that follow the pins",
+        "support": "`git diff --stat 2ace98ee adedd8b6` shows 15 files. They are `validation.yml` (four mise-action lines), `bun.lock`, six dist bundles, `pi-packages.json` (four pins) and six test files. The six test diffs change only version literals, with no assertion removed or weakened. Nothing else changed."
+      },
+      {
+        "criterion": "mise run verify and mise run deps:check pass on adedd8b6",
+        "support": "verify exit 0 (3449 pass, 0 fail), deps:check exit 0; logs are in the scratchpad."
+      },
+      {
+        "criterion": "Every external action stays pinned to a full commit SHA with a version comment",
+        "support": "all four mise-action uses are `@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7`. The other `uses:` lines in `.github/workflows` are local `./` paths."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "install exit 0; verify exit 0 (3449 pass, 1 skip, 0 fail); deps:check exit 0; built-in /code-review ran."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers; 7 built-in findings classified (1 rejected, 4 optional, 2 folded into the stale-version list); stale-version list above."
+      }
+    ]
   },
   "createdAt": "2026-11-10T16:41:49.700Z"
 }
