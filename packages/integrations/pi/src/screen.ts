@@ -2,6 +2,7 @@ import type { ToolCallEventResult } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
 import {
+  BROWSER_USE_MCP_SERVER,
   type CapabilityForm,
   enabledCapabilities,
   formContent,
@@ -27,14 +28,14 @@ export const SCREEN_DESCRIPTION =
  * desktop, so the file lists the headless browser's tools and no computer-use or browse tools.
  */
 export const HEADLESS_SCREEN_DESCRIPTION =
-  "Launched for an Assignment that carries the screen capability on a headless machine: it has a headless browser (browser-use) and the T3 preview tools, and no desktop."
+  "Launched for an Assignment that carries the screen capability on a headless machine: it has a headless browser (browser-use, or T3's preview tools in a session T3 hosts, where browser-use is not started) and no desktop."
 
 /**
  * What the prompt of a headless screen specialist adds after the role's: it has a headless browser
  * and no desktop, and says so when a tool is missing instead of working around it.
  */
 export const HEADLESS_SCREEN_NOTE =
-  "## Headless screen\n\nThis machine has no graphical session. You have a headless browser: the browser-use MCP tools (`mcp__browser_use__browser_exec`, which runs Python on the browser, and `mcp__browser_use__browser_screenshot`; a temporary profile that is removed when the session ends) and, where T3 hosts the session, T3's preview tools. You have no desktop: computer use and the user's real browser are not available. Report a missing tool instead of working around it."
+  "## Headless screen\n\nThis machine has no graphical session. You have a headless browser. Outside T3 it is the browser-use MCP tools: `mcp__browser_use__browser_exec`, which runs Python on the browser, and `mcp__browser_use__browser_screenshot`, with a temporary profile that is removed when the session ends. Where T3 hosts the session, the browser is T3's preview tools and browser-use is not available: T3 exposes no endpoint browser-use could attach to, so HolyAgent does not start it. You have no desktop: computer use and the user's real browser are not available. Report a missing tool instead of working around it."
 
 /**
  * Whether an agent name is a screen specialist's: one of the 18 roles' names with the `-screen`
@@ -64,6 +65,20 @@ export const screenServers = (config: Config, form: CapabilityForm): ReadonlyArr
         (capability) => formContent(capability, form)?.mcpServers ?? [],
       )
     : []
+
+/**
+ * The screen servers a session registers: `servers` without the browser-use server when T3 hosts
+ * the session (`t3`, see `isT3Session`), whatever the form. T3's pane is the browser the person
+ * sees and exposes no endpoint browser-use could attach to, so inside T3 browser-use would only add
+ * a second, invisible Chromium; screen specialists there use T3's preview tools. Browse and
+ * computer use drive the person's real browser and desktop, which T3's pane does not replace, so
+ * they stay.
+ */
+export const withoutBrowserUseInT3 = (
+  servers: ReadonlyArray<McpServer>,
+  t3: boolean,
+): ReadonlyArray<McpServer> =>
+  t3 ? servers.filter((server) => server.name !== BROWSER_USE_MCP_SERVER.name) : servers
 
 /**
  * Whether a tool call is one of T3 Code's preview or render tools ({@link T3_PREVIEW_TOOLS}) made

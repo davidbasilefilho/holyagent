@@ -9,11 +9,13 @@ import {
   SCREEN_AGENT_SUFFIX,
 } from "../../../runtime/src/domain/route.ts"
 import {
+  HEADLESS_SCREEN_NOTE,
   isScreenAgent,
   refuseT3PreviewOutsideT3,
   registerScreenServers,
   screenFormOf,
   screenServers,
+  withoutBrowserUseInT3,
 } from "../src/screen.ts"
 import { SCREEN_SPECIALIST_NAMES, SPECIALIST_NAMES } from "../src/specialists.ts"
 
@@ -88,6 +90,31 @@ describe("the servers a screen specialist registers", () => {
     expect(
       screenServers(withFeatures({ browserUse: false, computerUse: true, mcp: true }), "normal"),
     ).toEqual([])
+  })
+})
+
+describe("the servers in a session T3 hosts", () => {
+  test("the headless form's browser-use server is dropped, and nothing else is", () => {
+    expect(withoutBrowserUseInT3(screenServers(DEFAULTS, "headless"), true)).toEqual([])
+    expect(withoutBrowserUseInT3([BROWSE, BROWSER_USE_MCP_SERVER], true)).toEqual([BROWSE])
+  })
+
+  test("the normal form's browse stays", () => {
+    expect(withoutBrowserUseInT3(screenServers(DEFAULTS, "normal"), true)).toEqual([BROWSE])
+  })
+
+  test("outside T3 the servers of either form are unchanged", () => {
+    for (const form of ["normal", "headless"] as const)
+      expect(withoutBrowserUseInT3(screenServers(DEFAULTS, form), false)).toEqual(
+        screenServers(DEFAULTS, form),
+      )
+  })
+
+  test("a headless specialist is told that T3's preview tools are its browser and browser-use is not available there", () => {
+    expect(HEADLESS_SCREEN_NOTE).toContain("T3 hosts the session")
+    expect(HEADLESS_SCREEN_NOTE).toContain("T3's preview tools")
+    expect(HEADLESS_SCREEN_NOTE).toContain("browser-use is not available")
+    expect(HEADLESS_SCREEN_NOTE).toContain("`mcp__browser_use__browser_exec`")
   })
 })
 

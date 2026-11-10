@@ -72,6 +72,7 @@ import {
   registerScreenServers,
   screenFormOf,
   screenServers,
+  withoutBrowserUseInT3,
 } from "./screen.ts"
 import { AGENT_TYPES, SPECIALIST_NAMES } from "./specialists.ts"
 import {
@@ -1388,7 +1389,13 @@ export const createExtension =
     // The no-server notice is told once for the process: a child is one session, and a later start
     // (a resume or a reload) has the notice in its history already.
     let noServerTold = false
-    const registerScreen = (servers: ReadonlyArray<McpServer>): Delivery | undefined => {
+    // Under T3 the browser-use server is left out (`withoutBrowserUseInT3`), and that is no missing
+    // server: the specialist has T3's preview tools, so the no-server notice follows the config's
+    // servers, not those kept.
+    const registerScreen = (
+      servers: ReadonlyArray<McpServer>,
+      t3: boolean,
+    ): Delivery | undefined => {
       const agent = childAgent(pi.getSessionName())
       // No server for a screen specialist: `pi.features.mcp` or the capability is off, so tell it.
       if (isScreenAgent(agent) && servers.length === 0) {
@@ -1401,7 +1408,7 @@ export const createExtension =
       const { failures } = registerScreenServers(
         (name, server) => pi.registerMcpServer(name, server),
         agent,
-        servers,
+        withoutBrowserUseInT3(servers, t3),
         homeDirectory(env),
         browserLauncher,
       )
@@ -1464,7 +1471,7 @@ export const createExtension =
           if (result?.screenServers !== undefined)
             taken.specialistNotice = joinOptional(
               taken.specialistNotice,
-              registerScreen(result.screenServers),
+              registerScreen(result.screenServers, taken.t3),
             )
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
           if (result?.tools !== undefined) {

@@ -455,6 +455,7 @@ describe("the specialists", () => {
     }
     expect(HEADLESS_SCREEN_NOTE).toContain("headless browser")
     expect(HEADLESS_SCREEN_NOTE).toContain("no desktop")
+    expect(HEADLESS_SCREEN_NOTE).toContain("T3's preview tools and browser-use is not available")
   })
 
   test("grant the tools toolArgs decides, in the package's entry forms", () => {

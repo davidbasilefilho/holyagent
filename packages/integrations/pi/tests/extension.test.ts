@@ -3921,6 +3921,41 @@ describe("the MCP servers of the screen capability", () => {
     })
   })
 
+  describe("in a session T3 hosts", () => {
+    const T3_HOSTED = {
+      DISPLAY: ":0",
+      T3_PI_RUNTIME_MODE: "full-access",
+      T3_MCP_URL: "http://127.0.0.1:1/mcp",
+    }
+    const started = (name: string, env: Record<string, string>, mode: "rpc" | "print") =>
+      run(configWith({}), { sessionName: `${name}#a1b2c3d4`, env, mode, startOnly: true })
+
+    test("a headless screen specialist registers no browser-use server and is told of no missing server", async () => {
+      const { api, delivered } = await run(configWith({}), {
+        sessionName: "worker-visual-headless-screen#a1b2c3d4",
+        env: T3_HOSTED,
+        mode: "rpc",
+      })
+      expect(api.mcpServers).toEqual([])
+      expect(delivered?.message?.content ?? "").not.toContain("MCP server of the screen capability")
+    })
+
+    test("the same specialist outside T3 still registers it, also with T3's variables in a session that is not RPC", async () => {
+      for (const [env, mode] of [
+        [{ DISPLAY: ":0" }, "rpc"],
+        [T3_HOSTED, "print"],
+      ] as const) {
+        const { api } = await started("worker-visual-headless-screen", env, mode)
+        expect(api.mcpServers.map((server) => server.name)).toEqual(["browser_use"])
+      }
+    })
+
+    test("a normal screen specialist still registers browse", async () => {
+      const { api } = await started("worker-visual-screen", T3_HOSTED, "rpc")
+      expect(api.mcpServers.map((server) => server.name)).toEqual(["browse"])
+    })
+  })
+
   test("browser use switched off registers none, and the specialist is told", async () => {
     const { api, delivered } = await run(configWith({ browserUse: false }), {
       sessionName: "worker-visual-screen#a1b2c3d4",

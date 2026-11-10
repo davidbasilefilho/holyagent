@@ -19156,6 +19156,7 @@ var AGENT_TYPES = [...SPECIALIST_NAMES, ...SCREEN_SPECIALIST_NAMES];
 var isScreenAgent = (agent) => agent !== undefined && SCREEN_SPECIALIST_NAMES.includes(agent);
 var screenFormOf = (agent) => isHeadlessScreenAgent(agent) ? "headless" : "normal";
 var screenServers = (config, form) => config.pi.features.mcp ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap((capability) => formContent(capability, form)?.mcpServers ?? []) : [];
+var withoutBrowserUseInT3 = (servers, t3) => t3 ? servers.filter((server) => server.name !== BROWSER_USE_MCP_SERVER.name) : servers;
 var refuseT3PreviewOutsideT3 = (event, agent, t3) => !t3 && isScreenAgent(agent) && T3_PREVIEW_TOOLS.some((pattern) => toolMatches(pattern, event.toolName)) ? {
   block: true,
   reason: `${event.toolName} is T3 Code's tool, and T3 does not host this session. Use the browser tools you were given instead.`
@@ -19694,7 +19695,7 @@ var createExtension = ({
     return reason === undefined ? undefined : notice(`apply_patch could not be activated (${reason}); change files with write and edit instead`);
   };
   let noServerTold = false;
-  const registerScreen = (servers) => {
+  const registerScreen = (servers, t3) => {
     const agent = childAgent(pi.getSessionName());
     if (isScreenAgent(agent) && servers.length === 0) {
       if (noServerTold)
@@ -19702,7 +19703,7 @@ var createExtension = ({
       noServerTold = true;
       return notice("no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing");
     }
-    const { failures } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, servers, homeDirectory(env), browserLauncher);
+    const { failures } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, withoutBrowserUseInT3(servers, t3), homeDirectory(env), browserLauncher);
     return failures.length === 0 ? undefined : notice(`an MCP server of the screen capability was not registered (${failures.join("; ")}); work without its tools and report that they are missing`);
   };
   const browserLauncher = () => {
@@ -19752,7 +19753,7 @@ var createExtension = ({
         if (result?.codex !== undefined)
           taken.specialistNotice = activateApplyPatch(result.codex);
         if (result?.screenServers !== undefined)
-          taken.specialistNotice = joinOptional(taken.specialistNotice, registerScreen(result.screenServers));
+          taken.specialistNotice = joinOptional(taken.specialistNotice, registerScreen(result.screenServers, taken.t3));
         if (result?.config !== undefined)
           startProviderCheck(taken, result.config);
         if (result?.tools !== undefined) {

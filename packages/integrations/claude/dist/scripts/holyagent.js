@@ -12177,7 +12177,7 @@ var PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-
 var dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
 `, 1)[0] ?? "")?.[1];
 var SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.";
-var HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__browser_use__browser_exec and mcp__browser_use__browser_screenshot tools, a temporary profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.";
+var HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (outside T3 the mcp__browser_use__browser_exec and mcp__browser_use__browser_screenshot tools, a temporary profile; where T3 hosts the session, T3's preview tools, and browser-use is not available) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.";
 var renderPrompt = (assignment, agent) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
   `Objective: ${assignment.objective}`,
