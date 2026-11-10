@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwawkgnw-zmyh",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-ripgrep-fd-lookup-repair",
+  "objective": "Re-review the ripgrep/fd lookup repair (86e6d051..2ace98e).",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-unbundle, branch release/0.3.2/feat/user-installed-search-tools, head 2ace98e. Review only the repair: `git diff 86e6d051 2ace98e` (without generated dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ub-rr.diff).",
+    "Earlier findings it should close: (blocking) docs/components.md promised the same answer everywhere; (non-blocking) relative or empty PATH entries and Windows .cmd/.bat shims let a repository plant rg/fd; mise.toml named no checksum-verifying backend; the fallback wording differed between the ToolMissing hint, docs and instructions; README 'ships or installs', the decisions.md checksum reason, the Pi installation doc and the one-call winget command; stale 'bundled' comments and duplicated search-tool helpers.",
+    "Also check the aqua-keyed mise.toml entries parse and move in the updater, and that the strict lookup does not break the dev and CI flow (mise-installed rg/fd on PATH)."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-unbundle; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests.",
+    "Mark each finding blocking or non-blocking, with file:line. Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "The repair closes the earlier findings without regressions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover the strict lookup and the aqua keys and would fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwawcn10-0vvq"
+  ],
+  "followUpOf": "assignment-0mwaprm1p-6aa7",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T16:26:49.052Z"
+  },
+  "createdAt": "2026-11-10T16:26:49.052Z"
+}
