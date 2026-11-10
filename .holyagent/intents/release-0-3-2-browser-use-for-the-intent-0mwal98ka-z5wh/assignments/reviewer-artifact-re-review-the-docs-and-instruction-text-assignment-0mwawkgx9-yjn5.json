@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-docs-and-instruction-text",
   "objective": "Re-review the docs and instruction text of the ripgrep/fd repair (86e6d051..2ace98e).",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-unbundle, branch release/0.3.2/feat/user-installed-search-tools, head 2ace98e. Review only the repair: `git diff 86e6d051 2ace98e` (without generated dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ub-rr.diff).",
     "Earlier findings it should close: (blocking) docs/components.md promised the same answer everywhere; (non-blocking) relative or empty PATH entries and Windows .cmd/.bat shims let a repository plant rg/fd; mise.toml named no checksum-verifying backend; the fallback wording differed between the ToolMissing hint, docs and instructions; README 'ships or installs', the decisions.md checksum reason, the Pi installation doc and the one-call winget command; stale 'bundled' comments and duplicated search-tool helpers.",
@@ -36,7 +36,25 @@
     "agentId": "workflow:wf_cbd8b7bf-338/assignment-0mwawkgx9-yjn5",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T16:26:49.389Z"
+    "startedAt": "2026-11-10T16:26:49.389Z",
+    "finishedAt": "2026-11-10T16:32:36.120Z"
+  },
+  "result": "result: the repair closes every earlier finding. I found no blocking gaps and 3 non-blocking nits. Evidence is the diff plus grep of the worktree. I could not run mise, so its claims are unverified.\n\nEarlier findings\n- Blocking \"same answer everywhere\": closed at docs/components.md:23, \"so the agents have one search interface\", plus the explicit statement that versions can differ ([decisions.md](decisions.md)).\n- Relative or empty PATH entries and Windows shims: documented accurately at components.md:23, decisions.md:53 and development.md:151, matching `StrictLookup` and `strictWhich` in shell.ts.\n- Fallback wording is now \"system grep or find, and report the missing program\" in all of these: the ToolMissing hint (errors.ts:129), the three root search.md files, requirements/*, components.md, requirements.md, decisions.md, and the agents.ts comments. The three dist copies I checked match: claude `holyagent.md`, claude `holyagent.js` and the pi dist bundles. A grep for the old phrases (\"grep and find, or\", \"(fd is `fdfind`\") finds nothing in `packages`. The removed `fdfind` parenthetical in the root instructions is fine, since the tool descriptions in cli/tools.ts:49 and :73 still carry it.\n- README now says \"builds with or needs\". The decisions.md checksum reason is now honest: fd publishes no checksum file, so its digest came from the GitHub API. The Pi installation doc now states that setup and doctor report rg and fd. winget is split into two commands in components.md:57, requirements.md:10, usage.md:19 and `INSTALL_COMMANDS`.\n- Duplicated helpers: `searchToolLines`, `doctorToolLine` and `setupToolLine` replace the two copies. I found no stale \"bundled\" comments in setup or cli.\n- The instruction text follows the instruction-writing skill: terse, calm, with the reason beside each rule.\n\nNon-blocking\n1. search-tools.ts:674-679 appends \"then open a new terminal so PATH picks them up\" to the install advice on every platform. The code comment and components.md:41 scope that to Windows, and components.md:43 calls the commands \"the same\". Either word it as Windows-only or reword the doc.\n2. docs/pi/installation.md:99 ends the `holyagent setup` bullet with \"reports whether rg and fd are installed, with or without Pi\". Setup prints no rg/fd line under `--undo` (steps.ts:189 returns before :254), and the bullet's opening says \"not with --undo\". Add \"except with --undo\".\n3. decisions.md:53 says aqua \"is the one mise already picks first\" and that `mise tool` reports a sha256 check for ripgrep and none for fd. I could not confirm either. The mise.toml:9-10 comment says the bare names \"would pick a backend by mise's own order\", which reads as slightly softer. Align the two wordings.\n\nevidence:\nThe docs and instruction text close the earlier findings and are accurate and consistent: met, with the three non-blocking nits above. Support: ub-rr.diff lines 14-181 and 335-900; grep of /home/user/holyagent-0.3.2-unbundle/packages finds no stale phrases.\nfindings: 0 blocking; 3 non-blocking at search-tools.ts:674, docs/pi/installation.md:99 and docs/decisions.md:53.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Re-review of 2ace98e found no blocking findings; non-blocking residuals are recorded for the final report.",
+    "criteria": [
+      {
+        "criterion": "The docs and instruction text close the earlier findings and are accurate and consistent",
+        "support": "met, with the three non-blocking nits above. Support: ub-rr.diff lines 14-181 and 335-900; grep of /home/user/holyagent-0.3.2-unbundle/packages finds no stale phrases."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "0 blocking; 3 non-blocking at search-tools.ts:674, docs/pi/installation.md:99 and docs/decisions.md:53."
+      }
+    ]
   },
   "createdAt": "2026-11-10T16:26:49.389Z"
 }
