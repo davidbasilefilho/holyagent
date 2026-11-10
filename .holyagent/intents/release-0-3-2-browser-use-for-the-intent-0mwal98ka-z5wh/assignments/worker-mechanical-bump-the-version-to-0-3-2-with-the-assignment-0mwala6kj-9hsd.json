@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mwala6kj-9hsd",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "bump-the-version-to-0-3-2-with-the",
+  "objective": "Bump the version to 0.3.2 with the repository's bump task and regenerate the copies.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-bump, branch release/0.3.2/chore/bump-version cut from release/0.3.2/integration (= main, 0.3.1). The version lives in the root package.json only and changes only through bunx --no-install mise run bump:patch; mise run build then copies it to the workspace package.json files, bun.lock and the plugin and marketplace manifests."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 150 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "bunx --no-install mise run bump:patch moves the root version from 0.3.1 to 0.3.2 and mise run build copies it everywhere it belongs",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves the tree unchanged on a second run and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "packages",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-10T11:10:53.636Z"
+  },
+  "createdAt": "2026-11-10T11:10:53.636Z"
+}
