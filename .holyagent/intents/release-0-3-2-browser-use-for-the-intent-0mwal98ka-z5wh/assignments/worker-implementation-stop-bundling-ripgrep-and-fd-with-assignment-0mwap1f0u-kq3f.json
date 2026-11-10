@@ -1,0 +1,91 @@
+{
+  "id": "assignment-0mwap1f0u-kq3f",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "stop-bundling-ripgrep-and-fd-with",
+  "objective": "Stop bundling ripgrep and fd with HolyAgent and make them prerequisites the user installs, checked by setup and doctor.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-unbundle, branch release/0.3.2/feat/user-installed-search-tools, cut from the browser-use branch head 3cc15367 (version 0.3.2). Maintainer (verbatim): \"remove the bundling of the executables, list them as dependencies instead\" and \"I mean dependencies for the users\". Why: the vendored binaries (about 24 MB committed in the Claude plugin's dist) need an independently verified checksum on every update, which the updater cannot get for fd in every environment, and users can install both tools with their package manager.",
+    "A trace of the current code with file:line is at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/vendored-trace-report.md; read it first. Summary: binaries in packages/integrations/claude/dist/scripts/vendor/{darwin-arm64,linux-x64,windows-x64} with licenses, pinned in packages/integrations/claude/src/vendor.ts, fetched by scripts/vendor.ts (mise `vendor` task, a dependency of `build`), moved by the vendored-binary step of scripts/update-dependencies.ts (VENDOR_PINS, publishedChecksums) and scripts/dependency-pins.ts (VendoredTool, rewriteVendoredTool); the only runtime consumer is `holyagent rg` / `holyagent fd` in packages/runtime/src/cli/tools.ts (BUNDLED_TOOLS, TARGETS, UnsupportedPlatform, ToolMissing), with no PATH fallback; the Pi dist has no vendor folder (so `holyagent rg` there likely fails today).",
+    "Wanted: (1) Delete the vendor folder with its binaries and licenses, packages/integrations/claude/src/vendor.ts, scripts/vendor.ts, the mise `vendor` task and its use by `build`, the build exclusion of VENDOR_DIRECTORY, the vendored-binary step of the updater with its pins, checksum lookups and tests, and every test of the bundle. (2) `holyagent rg` and `holyagent fd` stay as the one search interface but run the ripgrep and fd found on PATH (Bun.which with the environment's PATH), passing arguments, stdin, stdout and the exit code through as today. fd is installed as `fdfind` on Debian and Ubuntu, so `holyagent fd` tries `fd` then `fdfind`. When a tool is missing, fail with a tagged error whose message names the tool and the install command per platform (macOS: `brew install ripgrep fd`; Debian/Ubuntu: `sudo apt install ripgrep fd-find`; Fedora: `sudo dnf install ripgrep fd-find`; Arch: `sudo pacman -S ripgrep fd`; Windows: `winget install BurntSushi.ripgrep.MSVC sharkdp.fd`), replacing UnsupportedPlatform and the `mise run vendor` hint. Keep the platform-independent target selection only if something else still needs it. (3) Setup and doctor of both hosts (the Claude plugin's doctor/setup and the Pi doctor/setup; reuse the existing `SystemNeed` kind `command` mechanism in packages/runtime/src/config/capabilities.ts and pi-check.ts where it fits, and add the equivalent check to the Claude doctor) report rg and fd present or missing with the same install hints; a missing tool is a warning that names what stops working (the root's and specialists' `holyagent rg`/`fd` search), not a crash. (4) Development and CI: add ripgrep and fd to the mise `[tools]` of mise.toml at exact current versions (ripgrep 15.2.0 or what the vendor pin says, fd 10.5.1) through mise's registry names, so dev machines and CI, Windows included, have them and the updater's mise-tools step moves them; do not hand-edit bun.lock. (5) Instruction text: the root and specialist requirements (requirements/root/search.md, requirements/specialist/working.md and the per-family copies under requirements/kimi-k3.1, gpt-6, claude-5.5), the coverage phrases in packages/runtime/src/instructions/coverage.ts (for example line ~180 'Search with the ripgrep and fd that ship with the plugin'), and the generated agent files must now say that holyagent rg and fd run the ripgrep and fd installed on the machine, and that when one fails because the tool is missing, search with the system grep/find (or the host's search tools) and report the missing tool. Follow the project skill at /home/user/holyagent-0.3.2-unbundle/.claude/skills/requirements/SKILL.md for editing the requirements tree and regenerating, and the instruction-writing rules at /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md for the wording. packages/integrations/claude/src/agents.ts gives Bash roles no Grep or Glob because holyagent rg covers them; keep that unless the change makes a role unable to search, and say what you chose. (6) Docs: docs/components.md, docs/decisions.md (add the decision and its reason), docs/development.md (requirements and gates), docs/attributions.md (no longer redistributed), docs/pi/search.md, docs/pi/claude-parity.md and the install docs list ripgrep and fd as user prerequisites with the install commands; README.md only if a line there now misstates it (keep its sections as they are). In AGENTS.md change only the Dependencies sentence that names the vendored ripgrep and fd, so it no longer lists them."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and fakes only: never start pi, a Pi session or T3 Code, and make no live Kimi, Codex or OpenAI request. Tests that need a real rg or fd may use the ones mise provides; prefer an injected `which` so most tests need neither.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 500 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "No ripgrep or fd executable, license copy, pin, vendor script or vendor task remains, and the updater no longer handles vendored binaries",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "holyagent rg and holyagent fd run the tools on PATH, fd falling back to fdfind, and a missing tool fails with the install commands",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Setup and doctor of the Claude plugin and of Pi report rg and fd present or missing with the install commands",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise.toml provides ripgrep and fd at exact versions for development and CI",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The requirements, coverage phrases and generated agent files describe the tools as installed on the machine with the fallback when missing",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The docs list ripgrep and fd as user prerequisites with install commands and record the decision",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Tests cover PATH lookup, the fdfind fallback, the missing-tool error and the doctor checks",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "scripts",
+    "requirements",
+    "docs",
+    "mise.toml",
+    "AGENTS.md",
+    "README.md",
+    ".github",
+    "package.json",
+    "bun.lock"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T12:56:03.150Z"
+  },
+  "createdAt": "2026-11-10T12:56:03.150Z"
+}
