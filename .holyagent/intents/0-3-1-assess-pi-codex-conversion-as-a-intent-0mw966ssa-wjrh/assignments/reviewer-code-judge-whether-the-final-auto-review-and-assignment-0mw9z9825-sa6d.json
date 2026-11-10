@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mw9z9825-sa6d",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 22,
+  "roleTask": "Reviewer.code",
+  "slug": "judge-whether-the-final-auto-review-and",
+  "objective": "Judge whether the final auto-review and screen repair is correct and merge-ready, and that its new tests fail without it.",
+  "state": "Running",
+  "scope": [
+    "Final repair commit 7ab278c on release/0.3.1/feat/auto-review in /home/user/holyagent-0.3.1-autoreview (range c580abb0..7ab278c); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ar-final-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9z1r3h-mxfi.md. Review only this repair against the previous findings in /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ygj4s-zz8e.md (security) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9ygiuj-u3ox.md (code), and the screen polish items it names.",
+    "Testing rule: never start pi or make a model or network request; unit tests only."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Work only inside /home/user/holyagent-0.3.1-autoreview; never check out a branch or commit in /home/user/holyagent or any other worktree (it breaks the running session); to see old code use git show <rev>:<path>.",
+    "Run in the worktree: bun install --frozen-lockfile, bunx --no-install mise run build (tree unchanged after it) and bunx --no-install mise run verify; give command, exit code and counts. Confirm the indented-patch-header and Windows path tests fail against the previous classify.ts (git show c580abb0:<path> into a scratch copy, run the tests against it, then restore; leave the tree clean).",
+    "Report in under 400 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The repair's new tests fail without the fix and pass with it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "The repair introduces no regression or untested error path",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Build leaves the tree unchanged and verify passes on 7ab278c",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9z1r3h-mxfi"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T00:54:17.357Z"
+  },
+  "createdAt": "2026-11-10T00:54:17.357Z"
+}
