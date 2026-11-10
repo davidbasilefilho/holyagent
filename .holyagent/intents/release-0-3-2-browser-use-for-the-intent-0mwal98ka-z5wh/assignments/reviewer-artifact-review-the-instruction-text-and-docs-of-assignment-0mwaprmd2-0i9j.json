@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-instruction-text-and-docs-of",
   "objective": "Review the instruction text and docs of commit b36e708 (ripgrep and fd as user-installed prerequisites) for accuracy and completeness.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-unbundle, branch release/0.3.2/feat/user-installed-search-tools. The change is commit b36e708; review `git diff 3cc15367 b36e708` (source, tests, docs and instruction text without the generated dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/unbundle-src.diff; the dist also deletes the vendored binaries and regenerates bundles and agent files). Head 86e6d051 only adds a no-content merge of the integration branch.",
     "Requirement (maintainer, verbatim: \"remove the bundling of the executables, list them as dependencies instead\", then \"I mean dependencies for the users\"): HolyAgent stops bundling ripgrep and fd; they become prerequisites the user installs; holyagent rg and holyagent fd run the ones on PATH (fd also as Debian's fdfind); a missing tool fails with install commands per platform; setup and doctor of the Claude plugin and of Pi report them; mise provides them for development and CI; instructions tell agents to fall back to the system search tools when one is missing; docs list them as prerequisites; the updater no longer moves vendored binaries.",
@@ -35,7 +35,25 @@
     "agentId": "workflow:wf_5d4bfe01-dc5/assignment-0mwaprmd2-0i9j",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T13:16:25.718Z"
+    "startedAt": "2026-11-10T13:16:25.718Z",
+    "finishedAt": "2026-11-10T13:23:54.279Z"
+  },
+  "result": "result: 1 blocking finding, 5 non-blocking. The install commands are correct, the README keeps its six sections, and AGENTS.md changed only the Dependencies sentence. The diff had no wording about missing tools that conflicts with the instruction text. I read the diff (I could not search the generated dist), the eight per-family instruction files, the coverage phrases, the docs, and `tools.ts`, `search-tools.ts`, `errors.ts` and `doctor.ts` in the worktree. I ran no checks.\n\nBlocking:\n1. docs/components.md:49 (\"so a search answers the same way everywhere\") still promises identical results. The programs are now user-installed, so versions differ per machine, and fd may run as `fdfind`. The brief asks that nothing promise identical-on-every-machine tools. Scenario: a reader trusts \"same way everywhere\" while one machine has rg 13 and another rg 15. Fix: say \"through one interface\" and drop the sameness claim. The decisions.md rationale (\"the same query could answer differently...\") is history, but it no longer holds after this change. Consider adding a sentence saying versions now vary.\n\nNon-blocking:\n2. The fallback text conflicts. `errors.ts` (ToolMissing hint) and docs/components.md:70 allow \"the system grep and find, or the host's search tools\". The four root/search.md files and the specialist working.md files allow only \"the system grep or find\" and forbid the Grep and Glob tools. On a machine without grep or find, the root has no permitted fallback. Fix: pick one wording. Also, \"fd is `fdfind` on Debian and Ubuntu\" in the instruction files is detail the agent never acts on, because `holyagent fd` handles it. Dropping it would shorten the text (instruction-writing bar).\n3. README.md:52 still says \"the software HolyAgent builds with, ships or installs\". ripgrep and fd are now neither shipped nor installed by HolyAgent. Use \"builds with or needs\".\n4. docs/decisions.md:53 says the updater \"could not get [a checksum] for fd in every environment\". The removed development.md text said the digest came from GitHub's release API, and the requirement gives no such reason. Cite a source or drop the claim.\n5. docs/pi/installation.md:73 (the doctor bullet) and the setup bullets do not mention the rg/fd report. The brief asks that setup and doctor of Pi report them. `doctor.ts` and `steps.ts` run it for every host, and components.md documents it, but the Pi page's list of doctor lines omits it. Add one sentence or a link to components.md#ripgrep-and-fd.\n6. The winget command `winget install BurntSushi.ripgrep.MSVC sharkdp.fd` (components.md:57, requirements.md:10, usage.md:19, `INSTALL_COMMANDS`) installs two packages in one call. I believe that works only on newer App Installer versions, so I could not confirm it. The ids are right. The docs also do not say to open a new shell so PATH picks the programs up. Splitting it into two commands or a note would be safer. The `mise.toml` pins `ripgrep = \"15.2.0\"` and `fd = \"10.5.2\"`; I could not verify that these releases exist.\n\nCoverage phrases (`coverage.ts`): all three families match their files. The R-SEARCH phrase checks only the first sentence, so it does not guard the ToolMissing fallback. That is optional hardening.\n\nVerified OK:\n- fd-find on Debian/Ubuntu and Fedora, `fd` on Arch and brew, and the two winget ids are right.\n- `holyagent fd` tries `fd` then `fdfind`.\n- The six setup steps listed in components.md match the list.\n- The AGENTS.md diff is one line, the updater now moves mise tools including ripgrep and fd, and the vendored-binary text is gone from development.md, so no `vendor` references remain in docs.\n\nevidence:\nThe instruction text and docs state the new requirement accurately, completely and consistently, with correct install commands: gap. Install commands are right (components.md:51-57, requirements.md:10, `search-tools.ts:27-33`). components.md:49 keeps the \"same way everywhere\" promise (finding 1, blocking). Findings 2-6 are non-blocking.\nfindings: listed above. Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/unbundle-src.diff; worktree /home/user/holyagent-0.3.2-unbundle.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Findings traced with file:line; one blocking doc claim confirmed",
+    "criteria": [
+      {
+        "criterion": "The instruction text and docs state the new requirement accurately, completely and consistently, with correct install commands",
+        "support": "gap. Install commands are right (components.md:51-57, requirements.md:10, `search-tools.ts:27-33`). components.md:49 keeps the \"same way everywhere\" promise (finding 1, blocking). Findings 2-6 are non-blocking."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "listed above. Diff: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/unbundle-src.diff; worktree /home/user/holyagent-0.3.2-unbundle."
+      }
+    ]
   },
   "createdAt": "2026-11-10T13:16:25.718Z"
 }
