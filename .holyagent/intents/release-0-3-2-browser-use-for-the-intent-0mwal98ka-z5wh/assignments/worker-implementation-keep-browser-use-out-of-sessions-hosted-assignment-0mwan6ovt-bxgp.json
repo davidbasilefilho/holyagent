@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mwan6ovt-bxgp",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "keep-browser-use-out-of-sessions-hosted",
+  "objective": "Keep browser-use out of sessions hosted by T3 Code, so screen specialists there drive T3's own browser through its preview tools.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-browser-use (branch release/0.3.2/feat/browser-use, head f4869a9). Facts from a trace of this code (/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/t3-trace-report.md): the form is chosen per machine by detectForm (packages/runtime/src/setup/form.ts: claude.ai cloud, CI or no display -> headless); a T3 session is detected by isT3Session (packages/integrations/pi/src/t3.ts: Pi mode rpc plus a non-blank T3_PI_RUNTIME_MODE or T3_MCP_URL); registerScreen in packages/integrations/pi/src/extension.ts calls registerScreenServers / screenServers(config, form) in packages/integrations/pi/src/screen.ts, which registers the headless form's browser-use server (BROWSER_USE_MCP_SERVER, launched through `holyagent browser-server`); T3 injects its own MCP bridge whose preview_* tools (T3_PREVIEW_TOOLS in packages/runtime/src/config/capabilities.ts) drive the browser the person sees, and refuseT3PreviewOutsideT3 blocks them outside T3. T3's pane cannot be a browser-use backend (no external CDP endpoint), so inside T3 browser-use only adds a second, invisible browser.",
+    "Behavior wanted: in a T3-hosted session, whatever the form, HolyAgent does not register the browser-use server, so no Chromium is launched and no mcp__browser_use__* tool reaches a specialist; screen specialists use the T3 preview tools. Outside T3 nothing changes. The normal form's opencode browse and computer use stay registered in T3 (they drive the person's real browser and desktop, which the T3 pane does not replace). Put the decision in one small exported function next to screenServers (for example dropping the browser-use server when t3 is true), with JSDoc saying why.",
+    "Text a headless screen specialist reads (the headless note in screen.ts and any generated *-headless-screen.md agent text that names browser-use) must tell it that in a T3-hosted session the browser is T3's preview tools and browser-use is not available, and outside T3 it uses browser_exec and browser_screenshot. If doctor or setup reports the screen servers, have it say browser-use is skipped under T3 where it can know that; otherwise leave doctor alone and say so.",
+    "Tests (fakes only): registration in a T3 session with the headless form registers no browser-use server; outside T3 it still does; the normal form in T3 still registers browse; the specialist text names the T3 rule. Update docs/pi/screen.md and docs/pi/t3-code.md with one short paragraph: in T3, screen specialists use T3's browser and browser-use is not started, and why (T3 exposes no endpoint browser-use could attach to)."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and fakes only: never start pi, a Pi session, T3 Code, browser-use, uvx or a real Chromium, and make no live Kimi, Codex or OpenAI request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 400 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "In a T3-hosted session no browser-use server is registered or launched, whatever the form, and outside T3 nothing changes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The normal form's browse and computer use stay registered in T3",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Headless screen specialists are told that in T3 the browser is T3's preview tools",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover T3 and non-T3 registration for both forms and the specialist text",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/pi/screen.md and docs/pi/t3-code.md state the T3 rule and its reason",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T12:04:09.980Z"
+  },
+  "createdAt": "2026-11-10T12:04:09.980Z"
+}
