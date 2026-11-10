@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mwaoy4hi-nprw",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Explorer.trace",
+  "slug": "map-how-holyagent-bundles-and-uses-its",
+  "objective": "Map how HolyAgent bundles and uses its vendored ripgrep and fd executables, to plan replacing the bundling with declared dependencies.",
+  "state": "Running",
+  "scope": [
+    "Read in /home/user/holyagent-0.3.2-deps (clean tree at the 0.3.2 browser-use head). The maintainer's ask: \"remove the bundling of the executables, list them as dependencies instead\".",
+    "Answer with file:line: 1. Where the vendored binaries live (paths, which platforms and archs, sizes if visible), how they are pinned and checksummed (scripts/update-dependencies.ts, scripts/dependency-pins.ts, any pin file), how the build puts them into packages/integrations/claude/dist and packages/integrations/pi/dist, and whether git carries the binaries or the build downloads them. 2. Every runtime consumer: `holyagent rg` / `holyagent fd` CLI commands, the Pi tools (fff, search, bash), hooks, setup or doctor, and how each finds the binary (bundled path, PATH fallback?). 3. Every place text promises the bundled binaries: root instructions (requirements tree and generated agent files such as packages/integrations/claude/dist/agents/holyagent.md, which says the CLI runs 'the ripgrep and fd that ship with the plugin, so every machine gives the same answer'), docs (docs/development.md, install docs, README), AGENTS.md, CI workflows, tests (scripts/*.test.ts). 4. How each install path gets dependencies today: the Claude Code plugin (synced files, any install step?), the Pi package (npm dependencies installed by pi install?), mise.toml tools for development, and setup/doctor's existing 'needs' mechanism (uvx, npx, chromium). 5. Whether npm packages already exist in the dependency tree that ship rg or fd (e.g. @vscode/ripgrep, fd-find), and whether fff (@ff-labs/pi-fff) needs its own binary."
+  ],
+  "constraints": [
+    "Read only; make no edits and no git writes.",
+    "Report in under 500 words, with file:line for each claim."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the five questions is answered with file:line evidence or marked not found",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-10T12:53:29.526Z"
+  },
+  "createdAt": "2026-11-10T12:53:29.526Z"
+}
