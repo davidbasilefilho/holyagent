@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mwax3rlw-gznl",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "review-the-0-3-2-dependency-update",
+  "objective": "Review the 0.3.2 dependency update commit (2ace98ee..adedd8b6) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-deps, branch release/0.3.2/chore/update-deps, commit adedd8b6 on top of 2ace98ee. Review `git diff 2ace98ee adedd8b6`. The commit came from `mise run deps:update` (jdx/mise-action v5.2.6 -> v5.2.7 by full SHA, @tintinweb/pi-subagents 0.23.1 -> 0.23.2, billion-context 0.1.212 -> 0.1.213, @amaster.ai/pi-computer-use 0.1.36 -> 0.1.38, @opencode/browse 0.0.15 -> 0.0.16, bun.lock refresh), `mise run build` (generated dist files) and hand edits of version literals in six test files.",
+    "Check: the action stays pinned to a full commit SHA with a `# vX.Y.Z` comment; the pin table and the generated dist agree; the test edits only follow the new pins and weaken no assertion; nothing beyond the update and its build output changed. Also list docs or source comments that state a now-stale version as the current pin (the writer named docs/pi/screen.md saying \"pinned at 0.0.15\"), as non-blocking findings with file and line.",
+    "Run `bun install --frozen-lockfile` in the worktree first (node_modules is per worktree; if `mise run` then fails with ENOENT for node_modules/mise/bin, run `bun install --frozen-lockfile --force`), then `bunx --no-install mise run verify` and `bunx --no-install mise run deps:check` on the head and give command, exit code and counts."
+  ],
+  "constraints": [
+    "Make no git writes and no file edits; review only.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests.",
+    "Report in under 400 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The dependency update changes only pins, bun.lock, generated output and test literals that follow the pins",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run verify and mise run deps:check pass on adedd8b6",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Every external action stays pinned to a full commit SHA with a version comment",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwawtwjk-iz93"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T16:41:49.700Z"
+  },
+  "createdAt": "2026-11-10T16:41:49.700Z"
+}
