@@ -67,11 +67,6 @@ export interface Host {
   /** Git and GitHub for the `vcs` commands; the real ones when absent. */
   readonly vcs?: Layer.Layer<Git | GitHub>
   /**
-   * The folder of the bundled search tools for the `rg` and `fd` commands; the plugin's when
-   * absent.
-   */
-  readonly tools?: string
-  /**
    * Whether stdin and stdout are terminals, which decides whether `setup` may show its interface;
    * neither is when absent, so a test or a pipe gets the line-based setup.
    */
@@ -109,8 +104,6 @@ export interface Call {
   readonly emit: (text: string) => Effect.Effect<void>
   /** Git and GitHub for the `vcs` commands. */
   readonly vcs: Layer.Layer<Git | GitHub>
-  /** The folder of the bundled search tools, with one subfolder for each target. */
-  readonly tools: string
   /** Whether stdin and stdout are terminals; see {@link Host.terminal}. */
   readonly terminal: Terminal | undefined
   /** Loads the setup interface; see {@link Host.setupTui}. */

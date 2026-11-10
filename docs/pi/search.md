@@ -1,6 +1,6 @@
 # The find and grep tools on fff
 
-**Status: ships in 0.3.1 as the `fff` capability (`pi.features.fff`, on by default).** Pi's `find` and `grep` tools, for the specialists, are replaced by [fff](https://github.com/dmtrKovalenko/fff) through its Pi package `@ff-labs/pi-fff` (0.11.0, MIT), an in-process Rust file finder reached through a Node binding: no `fd` or `rg` process per call, a background index, frecency ranking and a fuzzy `find`. The Claude plugin is not affected: it keeps the bundled ripgrep and fd ([decisions.md](../decisions.md)).
+**Status: ships in 0.3.1 as the `fff` capability (`pi.features.fff`, on by default).** Pi's `find` and `grep` tools, for the specialists, are replaced by [fff](https://github.com/dmtrKovalenko/fff) through its Pi package `@ff-labs/pi-fff` (0.11.0, MIT), an in-process Rust file finder reached through a Node binding: no `fd` or `rg` process per call, a background index, frecency ranking and a fuzzy `find`. The Claude plugin is not affected: it keeps `holyagent rg` and `holyagent fd`, which run the ripgrep and fd the user installs ([decisions.md](../decisions.md)).
 
 ## The decisions
 

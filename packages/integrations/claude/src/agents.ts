@@ -78,7 +78,8 @@ const WRITING = ["Write", "Edit", "Bash"]
 /**
  * The built-in tools of the root: dispatch, ask, tasks (TaskStop stops a running agent or workflow
  * when new information conflicts with it) and reading; it writes no files. It has no Grep or Glob,
- * since a role with a shell searches with the bundled ripgrep and fd.
+ * since a role with a shell searches with `holyagent rg` and `holyagent fd` (the ripgrep and fd
+ * installed on the machine) and falls back to the system grep and find through Bash.
  */
 const ROOT_BUILTINS = [
   "Agent",
@@ -258,8 +259,8 @@ const BUILTIN_REVIEW: ReadonlySet<string> = new Set(["Reviewer.code", "Reviewer.
  * Search capability grants none, since the Exa connector's tools come as MCP tools. Reviewer.code
  * keeps Bash without a Shell capability, since it reads diffs with git. The roles of
  * {@link BUILTIN_REVIEW} get Skill, and a role with Bash gets Monitor for its long commands. A role
- * with Bash searches with the bundled ripgrep and fd and so gets neither Grep nor Glob; a role
- * without it keeps both.
+ * with Bash searches with `holyagent rg` and `holyagent fd`, or the system grep and find when those
+ * programs are missing, and so gets neither Grep nor Glob; a role without it keeps both.
  */
 const builtinsOf = (route: Route): ReadonlyArray<string> => {
   const shell = route.capabilities.includes("Shell") || route.roleTask === "Reviewer.code"

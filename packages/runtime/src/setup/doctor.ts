@@ -8,6 +8,7 @@ import { piChecks } from "./pi-check.ts"
 import { checkPiToolSettings } from "./pi-settings.ts"
 import { fail, hint, pass, type Report } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
+import { checkSearchTools } from "./search-tools.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
 import { Shell } from "./shell.ts"
 import { asStep, installCtx7 } from "./steps.ts"
@@ -74,7 +75,9 @@ const checks = (env: Env, file: string, scope: Scope) =>
  * `ctx7` passes, since setup leaves it out there. With `fix`, the setup steps behind a failing
  * check run first, their lines come before the checks, and the checks then run again; Bun, Pi, Node
  * and the Pi packages are never installed, so the Pi lines are read once and name the command that
- * fixes them. The report is ok when no check fails.
+ * fixes them. The last lines are those of the user-installed `rg` and `fd` that `holyagent rg` and
+ * `holyagent fd` run ({@link checkSearchTools}): a missing one is a `~` warning with the install
+ * commands, never a failure, and `--fix` installs neither. The report is ok when no check fails.
  */
 export const doctor = Effect.fn("doctor")(function* (
   env: Env,
@@ -106,7 +109,7 @@ export const doctor = Effect.fn("doctor")(function* (
       checkCommand(env, "ctx7"),
       Effect.succeed(fail("settings", located.message)),
     ])
-    return { lines: [...lines, ...pi], ok: false } satisfies Report
+    return { lines: [...lines, ...pi, ...(yield* checkSearchTools)], ok: false } satisfies Report
   }
   const { file, notice } = located
   // Like setup, name a git top-level that was refused; the settings check names the file used.
@@ -129,6 +132,7 @@ export const doctor = Effect.fn("doctor")(function* (
   const lines = noted([
     ...(ran.length === 0 ? before : [...ran, ...(yield* checks(env, file, scope))]),
     ...pi,
+    ...(yield* checkSearchTools),
   ])
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) } satisfies Report
 })

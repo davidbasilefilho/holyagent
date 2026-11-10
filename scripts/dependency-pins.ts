@@ -169,21 +169,6 @@ export const newestTag = (
   return release === undefined || tag === undefined ? undefined : { release, tag }
 }
 
-/**
- * The SHA-256 a `<asset>.sha256` file publishes: the first run of exactly 64 hex digits, as
- * lowercase hex, else `undefined`. The files come in two layouts: `sha256sum`'s `<hash> <name>` and
- * the Windows `CertUtil` report, where a line `SHA256 hash of <name>:` comes before the hash.
- */
-export const parseChecksumFile = (text: string): string | undefined =>
-  /(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])/i.exec(text)?.[0].toLowerCase()
-
-/**
- * The SHA-256 in a GitHub release asset `digest` (`sha256:<hex>`) as lowercase hex, else
- * `undefined`.
- */
-export const parseDigest = (digest: string): string | undefined =>
-  /^sha256:([0-9a-f]{64})$/i.exec(digest)?.[1]?.toLowerCase()
-
 /** One external action reference in a workflow: `uses: owner/repo[/path]@<sha> # vX.Y.Z`. */
 export interface ActionUse {
   /** `owner/repo`, without any path inside the repository. */
@@ -260,53 +245,6 @@ export const rewriteMiseTools = (text: string, versions: ReadonlyMap<string, str
       return version === undefined ? entry : `${name}${middle}${version}${end}`
     }),
   )
-
-/** The vendored tools whose pins live in the Claude integration's `vendor.ts`. */
-export type VendoredTool = "ripgrep" | "fd"
-
-/** The constant that holds each vendored tool's version. */
-const VERSION_CONSTANT: Record<VendoredTool, string> = {
-  ripgrep: "RIPGREP_VERSION",
-  fd: "FD_VERSION",
-}
-
-/** The version of a vendored tool in the source of `vendor.ts`, or `undefined` when it is absent. */
-export const parseVendoredVersion = (text: string, tool: VendoredTool): string | undefined =>
-  new RegExp(String.raw`const ${VERSION_CONSTANT[tool]} = "([^"]+)"`).exec(text)?.[1]
-
-/** The two SHA-256 hashes a pin holds for one archive. */
-export interface Hashes {
-  readonly archive: string
-  readonly binary: string
-}
-
-/**
- * Moves a vendored tool in the source of `vendor.ts` to a new version: the version constant, the
- * version in the doc comment above it, and both hashes of each target (`hashes` is keyed by the
- * target id, such as `linux-x64`). Throws when the constant or a target's pin is missing, so a
- * layout the updater does not know fails loudly instead of leaving a half-moved pin.
- */
-export const rewriteVendoredTool = (
-  text: string,
-  tool: VendoredTool,
-  version: string,
-  hashes: ReadonlyMap<string, Hashes>,
-): string => {
-  const constant = `const ${VERSION_CONSTANT[tool]} = "`
-  const at = text.indexOf(constant)
-  const old = parseVendoredVersion(text, tool)
-  if (at < 0 || old === undefined) throw new Error(`vendor.ts has no ${VERSION_CONSTANT[tool]}`)
-  const docStart = text.lastIndexOf("/**", at)
-  let result = `${text.slice(0, docStart)}${text.slice(docStart, at).replaceAll(old, version)}${constant}${version}${text.slice(at + constant.length + old.length)}`
-  for (const [target, { archive, binary }] of hashes) {
-    const pin = new RegExp(
-      String.raw`(\b${tool}\(\s*"${target}",\s*"[^"]+",\s*"[^"]+",\s*")[0-9a-f]{64}(",\s*")[0-9a-f]{64}(")`,
-    )
-    if (!pin.test(result)) throw new Error(`vendor.ts has no ${tool} pin for ${target}`)
-    result = result.replace(pin, `$1${archive}$2${binary}$3`)
-  }
-  return result
-}
 
 /**
  * The release a pin of an exact version (a Pi package, a PyPI package) moves to: `release`, unless

@@ -6,7 +6,7 @@ Pi 1.4.0, commit `4a080252f06caf63a525d7873c5d94d3c23887e0` (HolyAgent pins 1.5.
 
 ## How HolyAgent installs
 
-You install three things, once each. Pi needs Node.js 22.19 or newer; the HolyAgent CLI that the package runs needs Bun on your `PATH`, so Bun is a prerequisite of HolyAgent and not a way to install Pi ([Bun](#bun-only-npm-plus-installer-and-nix-is-documented)). `git` and an authenticated `gh` are needed as for the Claude plugin ([requirements.md](../requirements.md)).
+You install three things, once each. Pi needs Node.js 22.19 or newer; the HolyAgent CLI that the package runs needs Bun on your `PATH`, so Bun is a prerequisite of HolyAgent and not a way to install Pi ([Bun](#bun-only-npm-plus-installer-and-nix-is-documented)). `git`, an authenticated `gh`, and ripgrep and fd on your `PATH` are needed as for the Claude plugin, because the root and the specialists search with `holyagent rg` and `holyagent fd`, which run them; HolyAgent does not bundle them ([requirements.md](../requirements.md), install commands in [components.md](../components.md#ripgrep-and-fd)).
 
 1. Install Pi 1.5.0, the version HolyAgent pins (the `@earendil-works/pi-coding-agent` version in `bun.lock`), with Node.js 22.19 or newer in place: the official installer ([Official instructions](#official-instructions)) or
 

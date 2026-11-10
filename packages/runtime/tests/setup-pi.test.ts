@@ -29,6 +29,7 @@ import {
   BROWSE_LAST_SEEN_TEXT,
   fakeShell,
   scratch,
+  withoutSearchTools,
   writeBrowsePairing,
   writeCompleteSettings,
 } from "./setup-fixture.ts"
@@ -123,7 +124,9 @@ const check = (
  * settings hints are left out here; setup-pi-settings.test.ts covers them.
  */
 const piLines = (report: { readonly lines: ReadonlyArray<string> }) =>
-  report.lines.slice(3).filter((line) => !line.startsWith("~ tool settings "))
+  withoutSearchTools(report)
+    .lines.slice(3)
+    .filter((line) => !line.startsWith("~ tool settings "))
 
 /** The Pi lines of a project or local scope report, which a notice line may shift; found by name. */
 const lineNamed = (report: { readonly lines: ReadonlyArray<string> }, name: string) =>
@@ -310,7 +313,7 @@ describe("holyagent doctor, Pi checks", () => {
   test("pi.enable off in the config runs no Pi check and no process", async () => {
     await setConfig({ pi: { enable: false } })
     const shell = fakeShell({ commands: ["bun", "ctx7", "pi"] })
-    const report = await check(shell)
+    const report = withoutSearchTools(await check(shell))
     expect(report.ok).toBe(true)
     expect(report.lines).toHaveLength(3)
     expect(shell.calls).toEqual([])

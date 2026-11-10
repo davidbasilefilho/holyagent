@@ -53,10 +53,11 @@ describe("holyagent setup and doctor as commands", () => {
     expect(written.subagentPromptCacheTtl).toBe("5m")
     const second = await cli(flags)
     expect(second.code).toBe(0)
-    expect(second.stdout.split("\n").filter((line) => /^[+!~-] /.test(line))).toEqual([
-      "~ scope: user (default)",
-      "- ctx7: skipped by flag",
-    ])
+    // Whether rg and fd are installed depends on the machine, so their lines are left out.
+    const changes = second.stdout
+      .split("\n")
+      .filter((line) => /^[+!~-] /.test(line) && !/^~ (?:rg|fd): /.test(line))
+    expect(changes).toEqual(["~ scope: user (default)", "- ctx7: skipped by flag"])
     expect(second.stdout).toEndWith("no changes\n")
   })
 

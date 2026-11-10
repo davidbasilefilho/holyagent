@@ -6,6 +6,10 @@ node = "lts"
 # below upgrades it to canary; the `toolchain` task, which every gate depends on, fails on a
 # non-canary Bun and names the fix.
 bun = "1.4.4"
+# The search tools behind `holyagent rg` and `holyagent fd`, which HolyAgent does not bundle. The
+# updater moves both with the other pinned tools.
+ripgrep = "15.2.0"
+fd = "10.5.2"
 
 [hooks]
 # Runs after `mise install` (also on `mise use` and the automatic install before `mise run`), with
@@ -54,13 +58,8 @@ run = "bun fmt --no-script --check"
 description = "Run the test suite"
 run = "bun test"
 
-[tasks.vendor]
-description = "Download, verify and extract the pinned ripgrep and fd into the plugin; does nothing when they are in place"
-run = "bun scripts/vendor.ts"
-
 [tasks.build]
 description = "Generate the Claude plugin and the Pi package from the instructions, the route table and the runtime"
-depends = ["vendor"]
 run = ["bun packages/integrations/claude/build.ts", "bun packages/integrations/pi/build.ts"]
 
 [tasks."instructions:scaffold"]

@@ -1,34 +1,20 @@
-import { chmod, readdir, rm } from "node:fs/promises"
+import { chmod, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
 
 import { syncVersions } from "../../../scripts/bump-version.ts"
-import { VENDOR_DIRECTORY } from "./src/files.ts"
-
-/**
- * Removes a path of the repository and everything below it except the folders in `keep`, which are
- * relative to the repository root.
- */
-const clear = async (root: string, path: string, keep: ReadonlyArray<string>): Promise<void> => {
-  if (keep.includes(path)) return
-  if (!keep.some((kept) => kept.startsWith(`${path}/`)))
-    return rm(join(root, path), { recursive: true, force: true })
-  const entries = await readdir(join(root, path)).catch(() => [])
-  for (const entry of entries) await clear(root, `${path}/${entry}`, keep)
-}
 
 /**
  * Writes the plugin below a repository root: first removes every generated path, so a source that
- * was deleted leaves no file behind, then writes the generated files. Nothing else is touched, and
- * the bundled tools stay where they are: `scripts/vendor.ts` owns them.
+ * was deleted leaves no file behind, then writes the generated files. Nothing else is touched.
  */
 export const build = async (root: string): Promise<ReadonlyArray<string>> => {
   // Imported here, not at the top: `generate.ts` reads the version from this package's package.json
   // when it loads, so it must load after the sync in `main` has rewritten that file.
   const { generate, GENERATED_PATHS } = await import("./src/generate.ts")
   const files = await generate()
-  for (const path of GENERATED_PATHS) await clear(root, path, [VENDOR_DIRECTORY])
+  for (const path of GENERATED_PATHS) await rm(join(root, path), { recursive: true, force: true })
   for (const file of files) {
     const target = join(root, file.path)
     await Bun.write(target, file.content, { createPath: true })

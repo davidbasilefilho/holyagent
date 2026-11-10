@@ -13,17 +13,13 @@ import {
   nextRange,
   packageDependencies,
   parseActionUses,
-  parseChecksumFile,
-  parseDigest,
   parseMiseTools,
   parseRelease,
   parseTags,
-  parseVendoredVersion,
   releaseOfTag,
   renderPiPackages,
   rewriteActionUses,
   rewriteMiseTools,
-  rewriteVendoredTool,
   unreadableActionUses,
   withPackageRanges,
   withPiPackageVersions,
@@ -209,64 +205,6 @@ describe("mise tools", () => {
   })
 })
 
-describe("vendored tools", () => {
-  const hash = (letter: string) => letter.repeat(64)
-  const source = [
-    "/**",
-    " * Ripgrep 15.2.0, from https://example.test/releases/tag/15.2.0.",
-    " */",
-    'const RIPGREP_VERSION = "15.2.0"',
-    "",
-    "const ripgrep = (id: string) => id",
-    "export const ASSETS = [",
-    "  ripgrep(",
-    '    "linux-x64",',
-    '    "x86_64-unknown-linux-musl",',
-    '    "tar.gz",',
-    `    "${hash("1")}",`,
-    `    "${hash("2")}",`,
-    "  ),",
-    "  fd(",
-    '    "linux-x64",',
-    '    "x86_64-unknown-linux-musl",',
-    '    "tar.gz",',
-    `    "${hash("3")}",`,
-    `    "${hash("4")}",`,
-    "  ),",
-    "]",
-  ].join("\n")
-
-  test("reads the version of a tool", () => {
-    expect(parseVendoredVersion(source, "ripgrep")).toBe("15.2.0")
-    expect(parseVendoredVersion(source, "fd")).toBeUndefined()
-  })
-
-  test("moves the version, its doc comment and both hashes of the tool, and not the other tool", () => {
-    const result = rewriteVendoredTool(
-      source,
-      "ripgrep",
-      "15.3.0",
-      new Map([["linux-x64", { archive: hash("a"), binary: hash("b") }]]),
-    )
-    expect(result).toContain('const RIPGREP_VERSION = "15.3.0"')
-    expect(result).toContain("Ripgrep 15.3.0, from https://example.test/releases/tag/15.3.0.")
-    expect(result).toContain(`"${hash("a")}",\n    "${hash("b")}",`)
-    expect(result).toContain(`"${hash("3")}",\n    "${hash("4")}",`)
-    expect(result).not.toContain("15.2.0")
-  })
-
-  test("fails when a target has no pin, so a half-moved pin is never written", () => {
-    expect(() =>
-      rewriteVendoredTool(
-        source,
-        "ripgrep",
-        "15.3.0",
-        new Map([["darwin-arm64", { archive: hash("a"), binary: hash("b") }]]),
-      ),
-    ).toThrow("darwin-arm64")
-  })
-})
-
 describe("package dependencies", () => {
   const manifest = {
     name: "x",
@@ -409,31 +347,6 @@ describe("unreadableActionUses", () => {
       `      - uses: actions/checkout@${sha} # v4.1.0`,
     ].join("\n")
     expect(unreadableActionUses(text)).toEqual([])
-  })
-})
-
-describe("published checksums", () => {
-  const hash = "0123456789abcdef".repeat(4)
-
-  test("reads a sha256sum file and a CertUtil report", () => {
-    expect(parseChecksumFile(`${hash}  ripgrep.tar.gz\n`)).toBe(hash)
-    expect(parseChecksumFile(`SHA256 hash of ripgrep.zip:\n${hash}\nCertUtil: done\n`)).toBe(hash)
-    expect(parseChecksumFile(`${hash.toUpperCase()}  x`)).toBe(hash)
-  })
-
-  test.each(["Not Found", "", "abc123", "0".repeat(63), "0".repeat(65)])(
-    "reads no hash from %j",
-    (text) => {
-      expect(parseChecksumFile(text)).toBeUndefined()
-    },
-  )
-
-  test("reads only a sha256 digest", () => {
-    expect(parseDigest(`sha256:${hash}`)).toBe(hash)
-    expect(parseDigest(`sha1:${hash}`)).toBeUndefined()
-    expect(parseDigest(hash)).toBeUndefined()
-    expect(parseDigest("sha256:short")).toBeUndefined()
-    expect(parseDigest("")).toBeUndefined()
   })
 })
 

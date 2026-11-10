@@ -12,7 +12,7 @@ import { doctor } from "../src/setup/doctor.ts"
 import { PI_HOST_VERSION } from "../src/setup/pi-check.ts"
 import { addRecorded, recordPath } from "../src/setup/record.ts"
 import { setup } from "../src/setup/steps.ts"
-import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
+import { fakeShell, scratch, withoutSearchTools, writeCompleteSettings } from "./setup-fixture.ts"
 
 let home: string
 let project: string
@@ -1024,7 +1024,7 @@ describe("holyagent doctor, Pi tool settings", () => {
 
   test("leaves the output of a Claude-only machine as it was, in setup and in doctor", async () => {
     const shell = fakeShell({ commands: ["bun", "ctx7"] })
-    const report = await runDoctor(shell)
+    const report = withoutSearchTools(await runDoctor(shell))
     expect(report.lines).toEqual([
       "ok   bun: /fake/bin/bun",
       "ok   ctx7: /fake/bin/ctx7",

@@ -37,6 +37,17 @@ export const completeSetup = async (home: string): Promise<void> => {
   await writeCompleteSettings(join(home, ".claude"))
 }
 
+/** The report lines on `rg` and `fd`, which the tests of the other steps leave out. */
+const SEARCH_LINE = /^(?:ok {3}|= |~ )(?:rg|fd): /
+
+/**
+ * A report without its `rg` and `fd` lines, for the tests of the other steps; search-tools.test.ts
+ * asserts those lines.
+ */
+export const withoutSearchTools = <T extends { readonly lines: ReadonlyArray<string> }>(
+  report: T,
+): T => ({ ...report, lines: report.lines.filter((line) => !SEARCH_LINE.test(line)) })
+
 /** A temporary directory, removed by the returned function. */
 export const scratch = async (prefix: string) => {
   const directory = await mkdtemp(join(tmpdir(), prefix))

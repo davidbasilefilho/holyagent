@@ -10586,8 +10586,7 @@ var init_errors3 = __esm(() => {
     MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
     NothingToMigrate: "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
     MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
-    UnsupportedPlatform: "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
-    ToolMissing: "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
+    ToolMissing: "Install the program with the command the message gives for your platform; until then search with the system grep and find, or the host's search tools, and report the missing program.",
     BrowserLaunchFailed: "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
     StateModeRefused: "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
     StateLocked: "Another process holds the state lock; retry in a moment.",
@@ -26210,6 +26209,40 @@ var init_pi_settings = __esm(() => {
   });
 });
 
+var TOOLS, SEARCH_TOOLS, INSTALL_COMMANDS, installAdvice, stopsWithout = (tool) => `\`holyagent ${tool}\` (the agents' search) fails`, locateTool = (tool, which) => gen2(function* () {
+  for (const command of SEARCH_TOOLS[tool].commands) {
+    const found = yield* which(command);
+    if (isSome2(found))
+      return found;
+  }
+  return none2();
+}), checkSearchTools, reportSearchTools;
+var init_search_tools = __esm(() => {
+  init_dist();
+  init_shell();
+  TOOLS = ["rg", "fd"];
+  SEARCH_TOOLS = {
+    rg: { title: "ripgrep", commands: ["rg"] },
+    fd: { title: "fd", commands: ["fd", "fdfind"] }
+  };
+  INSTALL_COMMANDS = [
+    ["macOS", "brew install ripgrep fd"],
+    ["Debian/Ubuntu", "sudo apt install ripgrep fd-find"],
+    ["Fedora", "sudo dnf install ripgrep fd-find"],
+    ["Arch", "sudo pacman -S ripgrep fd"],
+    ["Windows", "winget install BurntSushi.ripgrep.MSVC sharkdp.fd"]
+  ];
+  installAdvice = `install ripgrep and fd with your package manager (${INSTALL_COMMANDS.map(([platform, command]) => `${platform}: \`${command}\``).join("; ")})`;
+  checkSearchTools = gen2(function* () {
+    const shell = yield* Shell;
+    return yield* forEach2(TOOLS, (tool) => locateTool(tool, shell.which).pipe(map5((found) => isSome2(found) ? pass(tool, found.value) : hint(`${tool}: ${SEARCH_TOOLS[tool].commands.join(" or ")} not found on PATH, so ${stopsWithout(tool)}; ${installAdvice}`))));
+  });
+  reportSearchTools = gen2(function* () {
+    const shell = yield* Shell;
+    return yield* forEach2(TOOLS, (tool) => locateTool(tool, shell.which).pipe(map5((found) => isSome2(found) ? present2(`${tool}: found at ${found.value}`) : hint(`${tool}: not installed, so ${stopsWithout(tool)}; ${installAdvice}`))));
+  });
+});
+
 var reportOne = (env, capability, features, options, platform) => gen2(function* () {
   const form = options.form ?? "normal";
   const label = capability.name;
@@ -26742,6 +26775,7 @@ var init_steps = __esm(() => {
   init_pi_install();
   init_pi_settings();
   init_scope();
+  init_search_tools();
   init_settings3();
   init_shell();
   init_t3_settings();
@@ -26845,6 +26879,7 @@ var init_steps = __esm(() => {
         ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
         ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
       })) : [],
+      ...yield* reportSearchTools,
       ...yield* onSettings((file) => mergeUserSettings({
         env,
         file,
@@ -26874,6 +26909,7 @@ var init_doctor = __esm(() => {
   init_pi_check();
   init_pi_settings();
   init_scope();
+  init_search_tools();
   init_settings3();
   init_shell();
   init_steps();
@@ -26899,7 +26935,7 @@ var init_doctor = __esm(() => {
         checkCommand(env, "ctx7"),
         succeed6(fail6("settings", located.message))
       ]);
-      return { lines: [...lines, ...pi], ok: false };
+      return { lines: [...lines, ...pi, ...yield* checkSearchTools], ok: false };
     }
     const { file, notice } = located;
     const noted = (lines) => notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines];
@@ -26910,7 +26946,8 @@ var init_doctor = __esm(() => {
     const ran = [...fixes, ...settingsFixes];
     const lines = noted([
       ...ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)],
-      ...pi
+      ...pi,
+      ...yield* checkSearchTools
     ]);
     return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
   });
@@ -28628,65 +28665,43 @@ var init_state = __esm(() => {
   ];
 });
 
-import { join as join24 } from "path";
 var {$: $5 } = globalThis.Bun;
-var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (platform, arch) => {
-  const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
-  return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-}, toolPath = (directory, tool, target) => join24(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
-  const path = toolPath(options.directory, options.tool, options.target);
-  if (!(yield* promise2(() => Bun.file(path).exists())))
-    return yield* new ToolMissing({ tool: options.tool, path });
+var ToolMissing, runTool = (options) => gen2(function* () {
+  const found = yield* locateTool(options.tool, (command) => sync2(() => findCommand(options.env, command)));
+  if (isNone2(found))
+    return yield* new ToolMissing({ tool: options.tool });
+  const path = found.value;
   const output = yield* promise2(() => $5`${path} ${options.args}`.cwd(options.cwd).env(definedEnv(options.env)).nothrow());
   return output.exitCode;
 }), toolCommand = (tool, summary) => ({
   path: [tool],
-  usage: `${tool} <${tool === "rg" ? "ripgrep" : "fd"} arguments\u2026>`,
+  usage: `${tool} <${SEARCH_TOOLS[tool].title} arguments\u2026>`,
   summary,
   notes: [
     `the arguments, stdin, stdout, stderr and exit code are the program's own, so \`holyagent ${tool} --help\` prints its help and its exit codes keep their meaning`,
-    "a failure of holyagent itself (ToolMissing, UnsupportedPlatform) exits 4 with an `error:` line on stderr"
+    "the program is the one on PATH (fd also as fdfind, its name on Debian and Ubuntu); when it is not installed, holyagent itself fails with ToolMissing, exits 4 and prints an `error:` line on stderr with the install commands"
   ],
   flags: {},
   stateless: true,
   raw: true,
   passthrough: true,
   positionals: 0,
-  run: (call) => gen2(function* () {
-    const target = yield* selectTarget(process.platform, process.arch);
-    const code = yield* runTool({
-      tool,
-      directory: call.tools,
-      target,
-      args: call.args.positionals,
-      cwd: call.cwd,
-      env: call.env
-    });
-    return new Verbatim("", "", code);
-  })
+  run: (call) => runTool({ tool, args: call.args.positionals, cwd: call.cwd, env: call.env }).pipe(map5((code) => new Verbatim("", "", code)))
 }), TOOL_COMMANDS;
 var init_tools2 = __esm(() => {
   init_dist();
   init_environment();
-  TARGETS = [
-    { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
-    { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
-    { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
-  ];
-  BUNDLED_TOOLS = join24(import.meta.dir, "vendor");
-  UnsupportedPlatform = class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
-    get message() {
-      return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;
-    }
-  };
+  init_search_tools();
+  init_shell();
   ToolMissing = class ToolMissing extends TaggedError2("ToolMissing") {
     get message() {
-      return `The bundled ${this.tool} is missing: ${this.path} does not exist`;
+      const { title, commands } = SEARCH_TOOLS[this.tool];
+      return `${title} (${commands.join(" or ")}) is not on PATH; ${installAdvice}`;
     }
   };
   TOOL_COMMANDS = [
-    toolCommand("rg", "Search file contents with the ripgrep bundled with the plugin; runs it for this platform with your arguments"),
-    toolCommand("fd", "Find files and folders by name with the fd bundled with the plugin; runs it for this platform with your arguments")
+    toolCommand("rg", "Search file contents with the ripgrep installed on this machine; runs it with your arguments"),
+    toolCommand("fd", "Find files and folders by name with the fd installed on this machine (fdfind on Debian and Ubuntu); runs it with your arguments")
   ];
 });
 
@@ -28748,7 +28763,6 @@ var forWords = (command, words) => command.forHost === undefined ? command : { .
     text: readReport(host),
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
-    tools: host.tools ?? BUNDLED_TOOLS,
     terminal: host.terminal,
     setupTui: host.setupTui,
     input: (schema) => readInput(host, schema, inline),
@@ -28833,7 +28847,6 @@ var init_program = __esm(() => {
   init_config();
   init_context();
   init_errors3();
-  init_tools2();
 });
 
 var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause)));

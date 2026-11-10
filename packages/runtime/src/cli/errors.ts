@@ -125,10 +125,8 @@ const HINTS: Readonly<Record<string, string>> = {
     "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
   MigrationUnverified:
     "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
-  UnsupportedPlatform:
-    "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
   ToolMissing:
-    "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
+    "Install the program with the command the message gives for your platform; until then search with the system grep and find, or the host's search tools, and report the missing program.",
   BrowserLaunchFailed:
     "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
   StateModeRefused:
