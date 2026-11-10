@@ -189,13 +189,23 @@ const textOf = (content: string | ReadonlyArray<unknown>): string =>
         .map((block) => block.text)
         .join("\n")
 
-// The marker of the user's approval, as a pattern that survives other case and spacing: only
-// `manualApprovalEntry` may write it, so it comes out of everything the history holds.
+// Characters that show nothing: format characters (zero-width spaces and joiners, bidirectional
+// marks, the soft hyphen, the byte order mark), the combining grapheme joiner and the variation
+// selectors. Text can hold them between the letters of a word and still read the same.
+const INVISIBLE = "[\\p{Cf}\\u034F\\uFE00-\\uFE0F]"
+
+// The marker of the user's approval, as a pattern that survives other case, spacing and invisible
+// characters inside it: only `manualApprovalEntry` may write it, so it comes out of everything the
+// history holds.
 const APPROVAL_MARKER = new RegExp(
   MANUAL_APPROVAL_PREFIX.split(/\s+/)
-    .map((word) => word.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("\\s+"),
-  "gi",
+    .map((word) =>
+      Array.from(word, (char) => char.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(
+        `${INVISIBLE}*`,
+      ),
+    )
+    .join(`(?:\\s|${INVISIBLE})+`),
+  "giu",
 )
 
 // A history entry as the reviewer reads it: the label on one line (a tool name comes from the

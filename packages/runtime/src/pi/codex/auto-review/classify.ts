@@ -1,11 +1,13 @@
 import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
+import { posix, win32 } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { Effect } from "effect"
 
+import { type PiPackageName, piPackageSource } from "../../../config/pi-packages.ts"
 import { READ_TOOLS } from "../../tools.ts"
+import { patchHeaderPaths } from "../apply-patch.ts"
 import { MAX_ACTION_STRING_TOKENS, truncateText } from "./transcript.ts"
 
 /**
@@ -15,8 +17,9 @@ import { MAX_ACTION_STRING_TOKENS, truncateText } from "./transcript.ts"
  * - `command`: a shell command outside the read-only safe set (Codex's escalation request).
  * - `write-outside-root`: a file write below no folder of the project (Codex's edit outside the
  *   writable roots).
- * - `protected-path`: a file write into `.git`, `.holyagent` or an agent configuration folder of the
- *   project, which Codex's sandbox keeps read-only even inside the writable roots.
+ * - `protected-path`: a file write into `.git`, `.holyagent` or an agent configuration folder (`.pi`,
+ *   `.codex`, `.claude`, `.agents`) of the project, which Codex's sandbox keeps read-only even
+ *   inside the writable roots.
  * - `network`: a command or tool that reaches the network (Codex's network approval).
  * - `tool-approval`: a tool that is not known to be read-only (Codex's MCP tool approval, which also
  *   asks for a tool that does not say it is read-only).
@@ -270,8 +273,8 @@ const NETWORK_COMMAND =
 /**
  * The folders of a project that Codex's sandbox keeps read-only even inside the writable roots, and
  * that decide what runs later: git hooks and config, the HolyAgent state and config, and the
- * configuration of the agents (Pi, Codex, Claude). Compared in lower case, since a case-folding
- * file system opens `.GIT` as `.git`.
+ * configuration of the agents (Pi, Codex, Claude, and the `.agents` folder Codex also protects).
+ * Compared in lower case, since a case-folding file system opens `.GIT` as `.git`.
  */
 export const PROTECTED_FOLDERS: ReadonlyArray<string> = [
   ".git",
@@ -279,9 +282,34 @@ export const PROTECTED_FOLDERS: ReadonlyArray<string> = [
   ".pi",
   ".codex",
   ".claude",
+  ".agents",
 ]
 
-const UNICODE_SPACES = /[  -   　]/g
+/** The platform a path is read on, and the home folder a leading `~` stands for. */
+export interface PathHost {
+  readonly platform: NodeJS.Platform
+  readonly home: string
+}
+
+/** The host this process runs on: the platform paths are read on and the user's home folder. */
+export const currentHost = (): PathHost => ({ platform: process.platform, home: homedir() })
+
+// The path functions of a platform: Windows paths use backslashes and ignore case.
+const pathsOf = (host: PathHost) => (host.platform === "win32" ? win32 : posix)
+
+const UNICODE_SPACES = /[  -   　]/g
+
+// A Git Bash, MSYS, Cygwin or WSL drive path (`/c/Users/me`, `/mnt/c/x`, `/cygdrive/c/x`), which
+// Pi maps to the drive path Windows opens (`normalizeWindowsShellPath`).
+const SHELL_DRIVE_PATH = /^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i
+
+const shellDrivePath = (path: string): string => {
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return path
+  const match = SHELL_DRIVE_PATH.exec(path)
+  return match === null
+    ? path
+    : `${(match[1] ?? "").toUpperCase()}:\\${(match[2] ?? "").replaceAll("/", "\\")}`
+}
 
 const errorCode = (error: unknown): string | undefined =>
   typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
@@ -302,56 +330,95 @@ const probe = <A>(run: () => A): Probe<A> =>
   )
 
 // The path as Pi's write and edit tools read it (`resolveToCwd`): Unicode spaces become spaces, a
-// leading `@` goes, `~` and `~/` are the home folder, a `file://` URL is its path, and a relative
-// path is taken against the project root. `undefined` for a URL that is not a path.
-const piPath = (input: string, root: string): string | undefined => {
+// leading `@` goes, on Windows a Git Bash drive path becomes a drive path, `~` and `~/` (`~\` on
+// Windows) are the home folder, a `file://` URL is its path, and a relative path is taken against
+// the project root. `undefined` for a URL that is not a path.
+const piPath = (input: string, root: string, host: PathHost): string | undefined => {
+  const paths = pathsOf(host)
+  const windows = host.platform === "win32"
   let text = input.replace(UNICODE_SPACES, " ")
   if (text.startsWith("@")) text = text.slice(1)
-  if (text === "~") text = homedir()
-  else if (text.startsWith("~/")) text = join(homedir(), text.slice(2))
+  if (windows) text = shellDrivePath(text)
+  if (text === "~") text = host.home
+  else if (text.startsWith("~/") || (windows && text.startsWith("~\\")))
+    text = paths.join(host.home, text.slice(2))
   if (text.startsWith("file://")) {
-    const url = probe(() => fileURLToPath(text))
+    const url = probe(() => fileURLToPath(text, { windows }))
     if (!url.found) return undefined
     text = url.value
   }
-  return resolve(root, text)
+  return paths.resolve(root, text)
 }
 
 // The path with every link that exists resolved: the deepest ancestor that exists is resolved by
 // the file system, and the part below it, which does not exist yet, follows as written. A link that
 // leads nowhere, or one the file system will not resolve, gives `undefined`: where a write through
-// it would land is not known.
-const throughLinks = (path: string): string | undefined => {
+// it would land is not known. A path of another platform than this process runs on has no file
+// system to ask and stays as it is.
+const throughLinks = (path: string, host: PathHost): string | undefined => {
+  if (host.platform !== process.platform) return path
+  const paths = pathsOf(host)
   const tail: Array<string> = []
   let current = path
   for (;;) {
     const real = probe(() => realpathSync(current))
-    if (real.found) return join(real.value, ...tail)
+    if (real.found) return paths.join(real.value, ...tail)
     if (real.code !== "ENOENT") return undefined
     // The path itself exists but its target does not: a dangling link.
     if (probe(() => lstatSync(current)).found) return undefined
-    const parent = dirname(current)
+    const parent = paths.dirname(current)
     if (parent === current) return path
-    tail.unshift(basename(current))
+    tail.unshift(paths.basename(current))
     current = parent
   }
 }
 
+// The short (8.3) name Windows gives a folder, before its `~N`: the name without its leading dots,
+// cut to six characters (`.git` is `GIT~1`).
+const shortStem = (folder: string): string => folder.replace(/^\.+/, "").slice(0, 6)
+
+// Whether a path part names a protected folder. On Windows the folder also opens under an alias:
+// trailing dots and spaces are dropped (`.git.`), a stream suffix is ignored (`.git::$INDEX_ALLOCATION`)
+// and the short name (`GIT~1`) stands for it.
+const isProtectedName = (part: string, host: PathHost): boolean => {
+  const name = part.toLowerCase()
+  if (PROTECTED_FOLDERS.includes(name)) return true
+  if (host.platform !== "win32") return false
+  const bare = (name.split(":")[0] ?? name).replace(/[. ]+$/, "")
+  const short = /^(.+)~\d+$/.exec(bare)?.[1]
+  return PROTECTED_FOLDERS.some(
+    (folder) => bare === folder || (short !== undefined && short === shortStem(folder)),
+  )
+}
+
 /**
  * Whether a write to `path` goes to review, and why: the path is read as Pi's tools read it (a
- * leading `@`, `~`, a `file://` URL), resolved through the links that exist, and compared with the
- * project root (itself resolved). A target outside the root, or one that cannot be resolved, is
- * `write-outside-root`; one inside it that has a protected folder (see {@link PROTECTED_FOLDERS})
- * among its parts is `protected-path`.
+ * leading `@`, `~`, a `file://` URL, and on Windows `~\` and Git Bash drive paths), resolved
+ * through the links that exist, and compared with the project root (itself resolved). A target
+ * outside the root, or one that cannot be resolved, is `write-outside-root`; one inside it that has
+ * a protected folder (see {@link PROTECTED_FOLDERS}, with its Windows aliases) among its parts is
+ * `protected-path`. `host` is the platform and home folder the path is read on, this process's by
+ * default.
  */
-export const writeTrigger = (path: string, root: string): Trigger | undefined => {
-  const target = piPath(path, root)
-  const real = target === undefined ? undefined : throughLinks(target)
-  const base = resolve(root)
-  const away = real === undefined ? undefined : relative(throughLinks(base) ?? base, real)
-  if (away === undefined || away === ".." || away.startsWith(`..${sep}`) || isAbsolute(away))
+export const writeTrigger = (
+  path: string,
+  root: string,
+  host: PathHost = currentHost(),
+): Trigger | undefined => {
+  const paths = pathsOf(host)
+  const target = piPath(path, root, host)
+  const real = target === undefined ? undefined : throughLinks(target, host)
+  const base = paths.resolve(root)
+  const away =
+    real === undefined ? undefined : paths.relative(throughLinks(base, host) ?? base, real)
+  if (
+    away === undefined ||
+    away === ".." ||
+    away.startsWith(`..${paths.sep}`) ||
+    paths.isAbsolute(away)
+  )
     return { kind: "write-outside-root", reason: `${path} is outside the project root` }
-  return away.split(sep).some((part) => PROTECTED_FOLDERS.includes(part.toLowerCase()))
+  return away.split(paths.sep).some((part) => isProtectedName(part, host))
     ? {
         kind: "protected-path",
         reason: `${path} is in a folder that holds git or agent configuration, which Codex's sandbox keeps read-only`,
@@ -359,11 +426,12 @@ export const writeTrigger = (path: string, root: string): Trigger | undefined =>
     : undefined
 }
 
-const PATCH_PATH = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+?)\s*$/gm
-
-/** The paths a Codex patch names: the files it adds, updates, deletes and moves to. */
-export const patchPaths = (patch: string): ReadonlyArray<string> =>
-  Array.from(patch.matchAll(PATCH_PATH), (match) => match[1] ?? "")
+/**
+ * The paths a Codex patch names: the files it adds, updates, deletes and moves to, found by the
+ * rule the patch parser finds a header by ({@link patchHeaderPaths}), so what is applied is what is
+ * judged.
+ */
+export const patchPaths = (patch: string): ReadonlyArray<string> => patchHeaderPaths(patch)
 
 const stringInput = (input: Readonly<Record<string, unknown>>, key: string) => {
   const value = input[key]
@@ -375,8 +443,12 @@ const writtenPath = (input: Readonly<Record<string, unknown>>): string | undefin
   stringInput(input, "path") ?? stringInput(input, "file_path")
 
 // The first trigger among the paths of a write, an outside path ahead of a protected one.
-const firstTrigger = (paths: ReadonlyArray<string>, root: string): Trigger | undefined => {
-  const triggers = paths.flatMap((path) => writeTrigger(path, root) ?? [])
+const firstTrigger = (
+  paths: ReadonlyArray<string>,
+  root: string,
+  host: PathHost,
+): Trigger | undefined => {
+  const triggers = paths.flatMap((path) => writeTrigger(path, root, host) ?? [])
   return triggers.find((trigger) => trigger.kind === "write-outside-root") ?? triggers[0]
 }
 
@@ -386,6 +458,31 @@ const firstTrigger = (paths: ReadonlyArray<string>, root: string): Trigger | und
 
 /** The tools known to read and change nothing: Pi's own `read`, `grep`, `find` and `ls`. */
 const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(READ_TOOLS)
+
+// The tools of HolyAgent's packages that only keep a list or ask the user a question: they run no
+// command, write no file and start no agent, so a call to one is no risk. By tool name, with the
+// package that registers it.
+const STATE_ONLY_TOOLS: ReadonlyMap<string, PiPackageName> = new Map([
+  ["todo", "@juicesharp/rpiv-todo"],
+  ["ask_user_question", "@juicesharp/rpiv-ask-user-question"],
+])
+
+/**
+ * Whether a registered tool is one of HolyAgent's state-only tools (the todo list and the question
+ * to the user), which carry `readOnlyHint` so they are not reviewed. The tool must come from its
+ * package at the pinned release (`source` is the package source Pi lists for it,
+ * `npm:<name>@<pin>`) and belong to no MCP server, so a tool that merely shares the name earns
+ * nothing. Subagents, workflows, process tools and code execution are not among them: they run
+ * commands or other agents, whose model need not be the Codex one, and stay reviewed.
+ */
+export const isStateOnlyTool = (
+  toolName: string,
+  source: string | undefined,
+  mcp: boolean,
+): boolean => {
+  const name = STATE_ONLY_TOOLS.get(toolName)
+  return !mcp && name !== undefined && source === piPackageSource(name)
+}
 
 /**
  * Decides whether a tool call goes to review, and why. `undefined` runs the call. Review is the
@@ -399,6 +496,7 @@ export const classify = (
   call: ToolCallInput,
   root: string,
   traits: ToolTraits = {},
+  host: PathHost = currentHost(),
 ): Trigger | undefined => {
   if (SHELL_TOOLS.has(call.toolName)) {
     const command = stringInput(call.input, "command")
@@ -412,10 +510,10 @@ export const classify = (
   if (FILE_TOOLS.has(call.toolName)) {
     const path = writtenPath(call.input)
     if (path === undefined) return { kind: "write-outside-root", reason: "no path to write" }
-    return writeTrigger(path, root)
+    return writeTrigger(path, root, host)
   }
   if (call.toolName === PATCH_TOOL)
-    return firstTrigger(patchPaths(stringInput(call.input, "input") ?? ""), root)
+    return firstTrigger(patchPaths(stringInput(call.input, "input") ?? ""), root, host)
   if (NETWORK_TOOLS.test(call.toolName))
     return { kind: "network", reason: `${call.toolName} reaches the network` }
   if (traits.annotations?.readOnlyHint === true) return undefined

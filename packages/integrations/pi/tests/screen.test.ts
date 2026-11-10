@@ -142,6 +142,7 @@ describe("T3's preview tools", () => {
 })
 
 describe("registering them", () => {
+  const NEUTRAL = "/home/user"
   const recorder = (fail?: (name: string) => Error | undefined) => {
     const calls: Array<{ name: string; config: unknown }> = []
     return {
@@ -156,22 +157,36 @@ describe("registering them", () => {
 
   test("a screen specialist registers each server as a stdio command", () => {
     const { calls, register } = recorder()
-    expect(registerScreenServers(register, "worker-visual-screen", [BROWSE])).toEqual({
+    expect(registerScreenServers(register, "worker-visual-screen", [BROWSE], NEUTRAL)).toEqual({
       registered: ["browse"],
       failures: [],
     })
     expect(calls).toEqual([
       {
         name: "browse",
-        config: { command: "npx", args: [...BROWSE.args] },
+        config: { command: "npx", args: [...BROWSE.args], cwd: NEUTRAL },
       },
+    ])
+  })
+
+  test("a server launched through npx starts in the neutral folder and any other starts where Pi puts it", () => {
+    const { calls, register } = recorder()
+    registerScreenServers(
+      register,
+      "worker-visual-screen",
+      [BROWSE, { name: "other", command: "node", args: ["server.js"] }],
+      NEUTRAL,
+    )
+    expect(calls.map(({ name, config }) => [name, (config as { cwd?: string }).cwd])).toEqual([
+      ["browse", NEUTRAL],
+      ["other", undefined],
     ])
   })
 
   test("any other session registers nothing", () => {
     for (const agent of [undefined, "worker-visual", "reviewer-code", "general-purpose"]) {
       const { calls, register } = recorder()
-      expect(registerScreenServers(register, agent, [BROWSE])).toEqual({
+      expect(registerScreenServers(register, agent, [BROWSE], NEUTRAL)).toEqual({
         registered: [],
         failures: [],
       })
@@ -183,10 +198,15 @@ describe("registering them", () => {
     const { calls, register } = recorder((name) =>
       name === "first" ? new Error("invalid name") : undefined,
     )
-    const result = registerScreenServers(register, "explorer-map-screen", [
-      { name: "first", command: "a", args: [] },
-      { name: "second", command: "b", args: ["x"] },
-    ])
+    const result = registerScreenServers(
+      register,
+      "explorer-map-screen",
+      [
+        { name: "first", command: "a", args: [] },
+        { name: "second", command: "b", args: ["x"] },
+      ],
+      NEUTRAL,
+    )
     expect(result).toEqual({ registered: ["second"], failures: ["first: invalid name"] })
     expect(calls).toEqual([{ name: "second", config: { command: "b", args: ["x"] } }])
   })

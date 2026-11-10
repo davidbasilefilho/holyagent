@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
+import type { ExtensionAPI, ExtensionContext, ToolInfo } from "@earendil-works/pi-coding-agent"
 import { Effect, Schema } from "effect"
 
+import { piPackageSource } from "../../../runtime/src/config/pi-packages.ts"
 import { Config } from "../../../runtime/src/config/schema.ts"
 import { MANUAL_APPROVAL_PREFIX } from "../../../runtime/src/pi/codex/auto-review/assessment.ts"
 import { CODEX_RESPONSES_URL } from "../../../runtime/src/pi/codex/auto-review/client.ts"
@@ -16,6 +17,7 @@ import {
   autoReviewChoice,
   createAutoReviewSettings,
   registerAutoReview,
+  toolTraits,
 } from "../src/auto-review.ts"
 import { codexSettings } from "../src/codex.ts"
 
@@ -42,6 +44,7 @@ interface Tool {
   readonly name: string
   readonly annotations?: object
   readonly namespace?: object
+  readonly sourceInfo?: { readonly source: string }
 }
 
 /** Starts the module on a stub Pi API; `held` is read on each event, as the extension reads it. */
@@ -243,6 +246,53 @@ describe("the tool_call gate", () => {
     await module.call("mcp__docs__publish", {})
     await module.call("mcp__docs__other", {})
     expect(requests).toHaveLength(2)
+  })
+
+  test("HolyAgent's state-only tools carry readOnlyHint and run unreviewed; subagent, workflow and code execution are reviewed", async () => {
+    const { reviewer, requests } = recording(answer("allow"))
+    const from = (name: Parameters<typeof piPackageSource>[0]) => ({
+      sourceInfo: { source: piPackageSource(name) },
+    })
+    const module = start(
+      { current: {} },
+      {
+        reviewer,
+        tools: [
+          { name: "todo", ...from("@juicesharp/rpiv-todo") },
+          { name: "ask_user_question", ...from("@juicesharp/rpiv-ask-user-question") },
+          { name: "subagent", ...from("@tintinweb/pi-subagents") },
+          { name: "SubagentWorkflow", ...from("@tintinweb/pi-subagents") },
+          { name: "codemode" },
+        ],
+      },
+    )
+    await module.call("todo", { action: "add" })
+    await module.call("ask_user_question", {})
+    expect(requests).toHaveLength(0)
+    await module.call("subagent", { prompt: "run it" })
+    await module.call("SubagentWorkflow", {})
+    await module.call("codemode", { code: "run()" })
+    expect(requests).toHaveLength(3)
+  })
+
+  test("the readOnlyHint of a state-only tool needs the pinned package of that tool and no MCP namespace", () => {
+    const todo = piPackageSource("@juicesharp/rpiv-todo")
+    const info = (extra: object) =>
+      ({ name: "todo", sourceInfo: { source: todo }, ...extra }) as unknown as ToolInfo
+    expect(toolTraits(info({}))).toEqual({ annotations: { readOnlyHint: true }, mcp: false })
+    expect(toolTraits(info({ annotations: { destructiveHint: true } })).annotations).toEqual({
+      destructiveHint: true,
+      readOnlyHint: true,
+    })
+    // A tool that only shares the name: another source, another version, an MCP server's, unlisted.
+    for (const other of [
+      { sourceInfo: { source: "npm:@evil/todo@1.0.0" } },
+      { sourceInfo: { source: "npm:@juicesharp/rpiv-todo@0.0.1" } },
+      { namespace: {} },
+      { sourceInfo: undefined },
+    ])
+      expect(toolTraits(info(other)).annotations?.readOnlyHint).toBeUndefined()
+    expect(toolTraits(undefined)).toEqual({ mcp: false })
   })
 
   test("a write outside the project root, or into a protected folder of it, is reviewed", async () => {

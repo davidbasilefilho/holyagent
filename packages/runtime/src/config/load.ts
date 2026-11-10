@@ -83,6 +83,13 @@ const USER_ONLY: ReadonlyArray<ReadonlyArray<string>> = [
   ["pi", "autoReview"],
 ]
 
+/**
+ * Whether a setting is one only the user-level file decides (see `USER_ONLY`): a project or local
+ * file that holds it is ignored, so setup must not write it there.
+ */
+export const isUserOnly = (path: ReadonlyArray<string>): boolean =>
+  USER_ONLY.some((entry) => entry.join(".") === path.join("."))
+
 // The value without the key at `path`, which stays out of the merge.
 const withoutAt = (value: unknown, path: ReadonlyArray<string>): unknown => {
   const [key, ...rest] = path

@@ -12148,7 +12148,7 @@ var section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...
 var PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-z0-9]+)*)\.$/;
 var dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
 `, 1)[0] ?? "")?.[1];
-var SCREEN_LINE = "Screen capability: this Assignment carries it, so the computer-use, browser-use (mcp__browse__*) and T3 preview tools are yours where this machine provides them. Report a tool that is missing instead of working around it.";
+var SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.";
 var HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.";
 var renderPrompt = (assignment, agent) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
@@ -13063,6 +13063,7 @@ var USER_ONLY = [
   ["pi", "features", "autoReview"],
   ["pi", "autoReview"]
 ];
+var isUserOnly = (path) => USER_ONLY.some((entry) => entry.join(".") === path.join("."));
 var withoutAt = (value, path) => {
   const [key, ...rest] = path;
   if (key === undefined || !isRecord(value) || !Object.hasOwn(value, key))
@@ -23419,8 +23420,9 @@ var checkCapability = (env, scope, capability, form, listed, files, platform) =>
   const content = formContent(capability, form);
   const problems = [];
   if (capability.health.includes("needs")) {
+    const system = platform?.split("-", 1)[0];
     for (const need of formNeeds(capability, form)) {
-      const unmet = yield* unmetNeed(env, need);
+      const unmet = yield* unmetNeed(env, need, system);
       if (unmet !== undefined)
         problems.push(unmet);
     }
@@ -23909,6 +23911,13 @@ var refuseLockedOn = fn2("refuseLockedCapabilities")(function* (env, changed) {
       message: `capability ${locked.capability.name} cannot be turned on here: ${file} sets pi.features.${locked.capability.feature} to false, which a project or local config cannot override; change it there or use --scope user`
     });
 });
+var refuseUserOnly = fn2("refuseUserOnlyCapabilities")(function* (changed) {
+  const only = changed.find(({ capability }) => isUserOnly(["pi", "features", capability.feature]));
+  if (only !== undefined)
+    return yield* new SetupFailure({
+      message: `capability ${only.capability.name} cannot be changed at this scope: pi.features.${only.capability.feature} is read from the user's config alone, so a project or local value is ignored; use --scope user`
+    });
+});
 var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, options) {
   const chosen = CAPABILITIES.flatMap((capability) => {
     const value = options.choices[capability.feature];
@@ -23923,8 +23932,10 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   if (changed.length === 0)
     return lines;
   const file = capabilityConfigFile(env, options.cwd, options.scope);
-  if (options.scope !== "user")
+  if (options.scope !== "user") {
+    yield* refuseUserOnly(changed);
     yield* refuseLockedOn(env, changed);
+  }
   yield* refuseLinks(options.cwd, options.scope, file, "write");
   if (!options.dryRun) {
     const existing = yield* readJsonObject(file);

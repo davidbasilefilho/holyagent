@@ -11134,7 +11134,7 @@ var HOME_VARIABLE = "HOLYAGENT_HOME", userConfigFile = (env) => join3(firstNonEm
 } : override, FINAL_OFF, valueAt = (value, path) => path.reduce((node, key) => isRecord(node) ? node[key] : undefined, value), setAt = (value, path, leaf) => {
   const [key, ...rest] = path;
   return key === undefined ? leaf : { ...isRecord(value) ? value : {}, [key]: setAt(valueAt(value, [key]), rest, leaf) };
-}, userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off), USER_ONLY, withoutAt = (value, path) => {
+}, userLocksOff = (user, path) => FINAL_OFF.some((entry) => entry.path.join(".") === path.join(".") && valueAt(user, entry.path) === entry.off), USER_ONLY, isUserOnly = (path) => USER_ONLY.some((entry) => entry.join(".") === path.join(".")), withoutAt = (value, path) => {
   const [key, ...rest] = path;
   if (key === undefined || !isRecord(value) || !Object.hasOwn(value, key))
     return value;
@@ -14748,7 +14748,7 @@ var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length
     ...carryForward ? { carryForward: true } : {}
   });
 }, section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)], PROMPT_LINE, dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
-`, 1)[0] ?? "")?.[1], SCREEN_LINE = "Screen capability: this Assignment carries it, so the computer-use, browser-use (mcp__browse__*) and T3 preview tools are yours where this machine provides them. Report a tool that is missing instead of working around it.", HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.", renderPrompt = (assignment, agent) => [
+`, 1)[0] ?? "")?.[1], SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.", HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.", renderPrompt = (assignment, agent) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
   `Objective: ${assignment.objective}`,
   ...section2("Scope", assignment.scope),
@@ -25464,8 +25464,9 @@ ${result.stderr}`) : undefined;
   const content = formContent(capability, form);
   const problems = [];
   if (capability.health.includes("needs")) {
+    const system = platform?.split("-", 1)[0];
     for (const need of formNeeds(capability, form)) {
-      const unmet = yield* unmetNeed(env, need);
+      const unmet = yield* unmetNeed(env, need, system);
       if (unmet !== undefined)
         problems.push(unmet);
     }
@@ -25975,7 +25976,7 @@ var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFil
   if (value === undefined)
     return succeed6({});
   return isJsonObject2(value) ? succeed6(value) : fail5(new SetupFailure({ message: `${file}: ${path} is not an object` }));
-}, refuseLockedOn, applyCapabilityChoices;
+}, refuseLockedOn, refuseUserOnly, applyCapabilityChoices;
 var init_capabilities2 = __esm(() => {
   init_dist();
   init_capabilities();
@@ -25997,6 +25998,13 @@ var init_capabilities2 = __esm(() => {
         message: `capability ${locked.capability.name} cannot be turned on here: ${file} sets pi.features.${locked.capability.feature} to false, which a project or local config cannot override; change it there or use --scope user`
       });
   });
+  refuseUserOnly = fn2("refuseUserOnlyCapabilities")(function* (changed) {
+    const only = changed.find(({ capability }) => isUserOnly(["pi", "features", capability.feature]));
+    if (only !== undefined)
+      return yield* new SetupFailure({
+        message: `capability ${only.capability.name} cannot be changed at this scope: pi.features.${only.capability.feature} is read from the user's config alone, so a project or local value is ignored; use --scope user`
+      });
+  });
   applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, options) {
     const chosen = CAPABILITIES.flatMap((capability) => {
       const value = options.choices[capability.feature];
@@ -26011,8 +26019,10 @@ var init_capabilities2 = __esm(() => {
     if (changed.length === 0)
       return lines;
     const file = capabilityConfigFile(env, options.cwd, options.scope);
-    if (options.scope !== "user")
+    if (options.scope !== "user") {
+      yield* refuseUserOnly(changed);
       yield* refuseLockedOn(env, changed);
+    }
     yield* refuseLinks(options.cwd, options.scope, file, "write");
     if (!options.dryRun) {
       const existing = yield* readJsonObject(file);

@@ -3875,11 +3875,19 @@ describe("the MCP servers of the screen capability", () => {
     "--@opencode:registry=https://registry.npmjs.org/",
   ]
 
-  test("a screen specialist registers browse at the pinned release, with no file written and no other option", async () => {
-    expect(await registered("worker-implementation-screen#a1b2c3d4")).toEqual([
+  test("a screen specialist registers browse at the pinned release, from the home folder and with no other option", async () => {
+    expect(
+      await registered("worker-implementation-screen#a1b2c3d4", {
+        env: { ...DISPLAY, HOME: "/home/neutral" },
+      }),
+    ).toEqual([
       {
         name: "browse",
-        config: { command: "npx", args: [...REGISTRY, "-y", "@opencode/browse@0.0.15", "mcp"] },
+        config: {
+          command: "npx",
+          args: [...REGISTRY, "-y", "@opencode/browse@0.0.15", "mcp"],
+          cwd: "/home/neutral",
+        },
       },
     ])
   })
@@ -3936,6 +3944,19 @@ describe("the MCP servers of the screen capability", () => {
     expect(api.mcpServers).toEqual([])
     expect(delivered?.message?.content).toContain("no MCP server of the screen capability")
     expect(delivered?.message?.content).toContain("report that they are missing")
+  })
+
+  test("the notice of no server is told once for the process, not on each session start", async () => {
+    const { delivered } = await run(configWith({ browserUse: false }), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: DISPLAY,
+      afterwards: async (api) => {
+        await api.emit("session_start", { reason: "resume" })
+      },
+    })
+    expect(delivered?.message?.content ?? "").not.toContain(
+      "no MCP server of the screen capability",
+    )
   })
 
   test("with the MCP extension off no server is registered, in either form, and the specialist is told", async () => {

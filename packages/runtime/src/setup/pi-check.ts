@@ -422,8 +422,10 @@ export const checkCapability = (
     const content = formContent(capability, form)
     const problems: Array<string> = []
     if (capability.health.includes("needs")) {
+      // The host key is `<platform>-<arch>`; the needs know the operating system by its name alone.
+      const system = platform?.split("-", 1)[0]
       for (const need of formNeeds(capability, form)) {
-        const unmet = yield* unmetNeed(env, need)
+        const unmet = yield* unmetNeed(env, need, system)
         if (unmet !== undefined) problems.push(unmet)
       }
     }

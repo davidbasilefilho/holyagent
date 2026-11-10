@@ -228,7 +228,7 @@ export const dispatchedAssignment = (prompt: string): string | undefined =>
   PROMPT_LINE.exec(prompt.split("\n", 1)[0] ?? "")?.[1]
 
 const SCREEN_LINE =
-  "Screen capability: this Assignment carries it, so the computer-use, browser-use (mcp__browse__*) and T3 preview tools are yours where this machine provides them. Report a tool that is missing instead of working around it."
+  "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it."
 
 /**
  * What a headless screen specialist is told (its agent name ends in `-headless-screen`): the

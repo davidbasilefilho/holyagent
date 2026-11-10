@@ -388,6 +388,9 @@ describe("the specialists", () => {
         name?.endsWith("-headless-screen") === true,
       )
     }
+    // Each description names the form of the machine it is for.
+    expect(SCREEN_DESCRIPTION).toContain("graphical session")
+    expect(SCREEN_DESCRIPTION).not.toContain("where this machine provides")
   })
 
   test("a screen specialist has its role's prompt and tools, plus the computer-use, browse and T3 preview tools; the others have none of the browse and preview-only tools", () => {

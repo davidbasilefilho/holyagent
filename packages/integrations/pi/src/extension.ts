@@ -49,6 +49,7 @@ import {
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
 import { findChromium } from "../../../runtime/src/setup/chromium.ts"
+import { homeDirectory } from "../../../runtime/src/setup/environment.ts"
 import { detectForm } from "../../../runtime/src/setup/form.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
 import {
@@ -1389,17 +1390,24 @@ export const createExtension =
     // specialists would start one they never call. Servers registered while a session starts
     // connect right away. A server that cannot be registered is told to the specialist on its
     // first run, which then has none of that server's tools.
+    // The no-server notice is told once for the process: a child is one session, and a later start
+    // (a resume or a reload) has the notice in its history already.
+    let noServerTold = false
     const registerScreen = (servers: ReadonlyArray<McpServer>): Delivery | undefined => {
       const agent = childAgent(pi.getSessionName())
       // No server for a screen specialist: `pi.features.mcp` or the capability is off, so tell it.
-      if (isScreenAgent(agent) && servers.length === 0)
+      if (isScreenAgent(agent) && servers.length === 0) {
+        if (noServerTold) return undefined
+        noServerTold = true
         return notice(
           "no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing",
         )
+      }
       const { failures } = registerScreenServers(
         (name, server) => pi.registerMcpServer(name, server),
         agent,
         servers,
+        homeDirectory(env),
       )
       return failures.length === 0
         ? undefined

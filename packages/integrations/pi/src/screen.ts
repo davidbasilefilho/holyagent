@@ -15,10 +15,12 @@ import { SCREEN_SPECIALIST_NAMES } from "./specialists.ts"
 
 /**
  * What the description of a screen specialist adds to the role's own: the root reads it, in the
- * `Agent` tool's list, to see that the file is the one a screen Assignment is dispatched to.
+ * `Agent` tool's list, to see that the file is the one a screen Assignment is dispatched to, and
+ * that it is the form for a machine with a graphical session (the other is
+ * {@link HEADLESS_SCREEN_DESCRIPTION}).
  */
 export const SCREEN_DESCRIPTION =
-  "Launched for an Assignment that carries the screen capability: it also has the computer-use, browser-use and T3 preview tools."
+  "Launched for an Assignment that carries the screen capability on a machine with a graphical session: it also has the computer-use, browser-use and T3 preview tools."
 
 /**
  * What the description of a headless screen specialist adds to the role's: the machine has no
@@ -96,24 +98,34 @@ export const refuseT3PreviewOutsideT3 = (
 
 /**
  * Registers the screen MCP servers in the session of a specialist, and only a screen specialist's
- * (see {@link isScreenAgent}): every other process, the root included, would start a server it never
- * calls, since Pi starts the servers of each session, a child's too. `register` is
+ * (see {@link isScreenAgent}): every other process, the root included, would start a server it
+ * never calls, since Pi starts the servers of each session, a child's too. `register` is
  * `pi.registerMcpServer`; its failure for one server is returned as a reason and the others still
- * register. The result lists the servers registered and the reasons for those that were not.
+ * register. A server launched through `npx` starts in `neutralDirectory`, not in the project: npx
+ * runs a package it finds in a `node_modules` of its working directory or above without fetching
+ * it, so a repository's own `node_modules` could stand in for the pinned package of a server with
+ * browser control. The result lists the servers registered and the reasons for those that were
+ * not.
  */
 export const registerScreenServers = (
   register: (
     name: string,
-    config: { readonly command: string; readonly args: Array<string> },
+    config: { readonly command: string; readonly args: Array<string>; readonly cwd?: string },
   ) => void,
   agent: string | undefined,
   servers: ReadonlyArray<McpServer>,
+  neutralDirectory: string,
 ): { readonly registered: ReadonlyArray<string>; readonly failures: ReadonlyArray<string> } => {
   if (!isScreenAgent(agent)) return { registered: [], failures: [] }
   const outcomes = servers.map((server) =>
     Effect.runSync(
       Effect.try({
-        try: () => register(server.name, { command: server.command, args: [...server.args] }),
+        try: () =>
+          register(server.name, {
+            command: server.command,
+            args: [...server.args],
+            ...(server.command === "npx" ? { cwd: neutralDirectory } : {}),
+          }),
         catch: (cause) =>
           `${server.name}: ${cause instanceof Error ? cause.message : String(cause)}`,
       }).pipe(

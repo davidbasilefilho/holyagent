@@ -521,8 +521,10 @@ export const CAPABILITIES = [
   },
   {
     // Part of the Codex provider (`pi/codex/auto-review/`, gated in the Pi integration's
-    // `auto-review.ts`): like Luna Reserve it is only the extension's behavior, so it exists only
-    // under `openai-codex`. Off removes the `tool_call` gate and the `/approve` command's effect.
+    // `auto-review.ts`): the extension's behavior, with no package or tool. The gate is keyed on the
+    // provider of the active model, whatever `pi.provider` says; `provider` here only decides where
+    // setup and doctor list it. Off (the user's config alone can say it) removes the `tool_call` gate
+    // and the `/approve` command's effect.
     name: "auto-review",
     feature: "autoReview",
     description:

@@ -4,11 +4,15 @@ import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
+import { Effect } from "effect"
+
+import { parsePatch } from "../../src/pi/codex/apply-patch.ts"
 import {
   actionJson,
   classify,
   isSafeCommand,
   patchPaths,
+  type PathHost,
   writeTrigger,
 } from "../../src/pi/codex/auto-review/classify.ts"
 
@@ -214,6 +218,7 @@ describe("the path of a write, read as Pi reads it", () => {
       ".pi/settings.json",
       ".codex/config.toml",
       ".claude/settings.json",
+      ".agents/skills/x/SKILL.md",
       ".GIT/config",
       ".Claude/x",
       "packages/sub/.git/hooks/x",
@@ -245,6 +250,161 @@ describe("the path of a write, read as Pi reads it", () => {
       classify(patch("*** Add File: .git/x", "+x", "*** Add File: ../outside/y", "+y"), root)?.kind,
     ).toBe("write-outside-root")
     expect(classify(patch("*** Update File: src/a.ts"), root)).toBeUndefined()
+  })
+
+  test("a patch header is read as the patch parser reads it, an indented one included", () => {
+    const patch = (...lines: Array<string>) => ({
+      toolName: "apply_patch",
+      input: { input: ["*** Begin Patch", ...lines, "*** End Patch"].join("\n") },
+    })
+    for (const indent of ["  ", "\t", " \t "]) {
+      expect(
+        classify(patch(`${indent}*** Add File: .git/config`, "+x"), root)?.kind,
+        JSON.stringify(indent),
+      ).toBe("protected-path")
+      expect(
+        classify(patch(`${indent}*** Add File: ../outside/x`, "+x"), root)?.kind,
+        JSON.stringify(indent),
+      ).toBe("write-outside-root")
+      expect(
+        classify(patch("*** Update File: src/a.ts", `${indent}*** Move to: .claude/a.ts`), root)
+          ?.kind,
+      ).toBe("protected-path")
+      expect(classify(patch(`${indent}*** Delete File: .codex/config.toml`), root)?.kind).toBe(
+        "protected-path",
+      )
+    }
+    // Carriage returns and a heredoc around the patch are what the parser tolerates too.
+    expect(
+      classify(
+        {
+          toolName: "apply_patch",
+          input: { input: "*** Begin Patch\r\n  *** Add File: .git/x\r\n+x\r\n*** End Patch" },
+        },
+        root,
+      )?.kind,
+    ).toBe("protected-path")
+    expect(
+      classify(
+        {
+          toolName: "apply_patch",
+          input: {
+            input: "<<'EOF'\n*** Begin Patch\n  *** Add File: .pi/x\n+x\n*** End Patch\nEOF",
+          },
+        },
+        root,
+      )?.kind,
+    ).toBe("protected-path")
+  })
+
+  test("every path the parser takes from a patch is a path the classifier lists", async () => {
+    const text = [
+      "*** Begin Patch",
+      "  *** Add File: a/new.txt",
+      "+x",
+      "\t*** Update File: a/old.txt",
+      " \t*** Move to: b/moved.txt",
+      "@@",
+      " keep",
+      "*** Delete File: c/gone.txt",
+      "*** End Patch",
+    ].join("\n")
+    const operations = await Effect.runPromise(parsePatch(text))
+    const parsed = operations.flatMap((operation) =>
+      operation.kind === "update" && operation.moveTo !== undefined
+        ? [operation.path, operation.moveTo]
+        : [operation.path],
+    )
+    expect(parsed).toEqual(["a/new.txt", "a/old.txt", "b/moved.txt", "c/gone.txt"])
+    expect(patchPaths(text)).toEqual(parsed)
+  })
+})
+
+describe("paths on Windows, read as Pi reads them there", () => {
+  const WINDOWS: PathHost = { platform: "win32", home: "C:\\Users\\me" }
+  const WIN_ROOT = "C:\\work\\project"
+  const win = (path: string) => writeTrigger(path, WIN_ROOT, WINDOWS)?.kind
+
+  test("~\\ is the home folder, as ~/ is", () => {
+    expect(win("~\\.ssh\\authorized_keys")).toBe("write-outside-root")
+    expect(win("~/.ssh/authorized_keys")).toBe("write-outside-root")
+    expect(win("@~\\AppData\\Roaming\\Startup\\x.bat")).toBe("write-outside-root")
+    expect(win("~")).toBe("write-outside-root")
+    // Other systems read "~\\x" as a file of the project named so, as Pi does.
+    expect(
+      writeTrigger("~\\x", "/work/project", { platform: "linux", home: "/home/me" }),
+    ).toBeUndefined()
+  })
+
+  test("a Git Bash, MSYS, Cygwin or WSL drive path is the drive path", () => {
+    expect(win("/c/work/project/src/a.ts")).toBeUndefined()
+    expect(win("/c/work/project/.git/config")).toBe("protected-path")
+    expect(win("/mnt/c/work/project/.claude/settings.json")).toBe("protected-path")
+    expect(win("/cygdrive/c/Users/me/.ssh/config")).toBe("write-outside-root")
+    expect(win("/d/other/x")).toBe("write-outside-root")
+    expect(win("/c")).toBe("write-outside-root")
+    // Only a path of Windows is mapped; "//server/share" and a path with a backslash are not.
+    expect(win("//server/share/x")).toBe("write-outside-root")
+    expect(win("src/a.ts")).toBeUndefined()
+    // Another system does not map it: "/c/work/project/x" is its own absolute path.
+    expect(
+      writeTrigger("/c/work/project/x", "/work/project", { platform: "linux", home: "/h" })?.kind,
+    ).toBe("write-outside-root")
+  })
+
+  test("a file:// URL is read as a Windows path", () => {
+    expect(win("file:///C:/work/project/src/a.ts")).toBeUndefined()
+    expect(win("file:///C:/work/project/.git/config")).toBe("protected-path")
+    expect(win("file:///C:/Windows/x")).toBe("write-outside-root")
+  })
+
+  test("the root check ignores case and separators, and a path on another drive is outside", () => {
+    expect(win("c:\\WORK\\Project\\src\\a.ts")).toBeUndefined()
+    expect(win("src/sub\\a.ts")).toBeUndefined()
+    expect(win("D:\\work\\project\\a.ts")).toBe("write-outside-root")
+    expect(win("..\\other\\a.ts")).toBe("write-outside-root")
+  })
+
+  test("a protected folder matches under the names Windows gives it", () => {
+    for (const path of [
+      ".git",
+      ".GIT\\config",
+      ".git.\\config",
+      ".git...\\config",
+      ".git \\config",
+      "GIT~1\\hooks\\pre-commit",
+      "git~2\\config",
+      ".git::$INDEX_ALLOCATION\\config",
+      "HOLYAG~1\\config.json",
+      ".holyagent.\\config.json",
+      "CLAUDE~1\\settings.json",
+      "CODEX~1\\config.toml",
+      "AGENTS~1\\x",
+      "PI~1\\settings.json",
+      ".pi.\\settings.json",
+      "sub\\GIT~1\\x",
+    ])
+      expect([path, win(path)]).toEqual([path, "protected-path"])
+    for (const path of [".gitignore", ".github\\x", "GITHUB~1\\x", "git~\\x", "ABC~1\\x", "pi~x"])
+      expect([path, win(path)]).toEqual([path, undefined])
+  })
+
+  test("the aliases are Windows names: another system keeps its names exact", () => {
+    const linux: PathHost = { platform: "linux", home: "/home/me" }
+    expect(writeTrigger(".git./config", "/work/project", linux)).toBeUndefined()
+    expect(writeTrigger("GIT~1/config", "/work/project", linux)).toBeUndefined()
+    expect(writeTrigger(".git/config", "/work/project", linux)?.kind).toBe("protected-path")
+  })
+
+  test("a call is judged on the host it is given", () => {
+    const patch = {
+      toolName: "apply_patch",
+      input: { input: "*** Begin Patch\n  *** Add File: GIT~1\\config\n+x\n*** End Patch" },
+    }
+    expect(classify(patch, WIN_ROOT, {}, WINDOWS)?.kind).toBe("protected-path")
+    expect(
+      classify({ toolName: "write", input: { path: "~\\x" } }, WIN_ROOT, {}, WINDOWS)?.kind,
+    ).toBe("write-outside-root")
   })
 })
 

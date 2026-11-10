@@ -1,7 +1,11 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
+import type { ExtensionAPI, ExtensionContext, ToolInfo } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
 import type { Config } from "../../../runtime/src/config/schema.ts"
+import {
+  isStateOnlyTool,
+  type ToolTraits,
+} from "../../../runtime/src/pi/codex/auto-review/classify.ts"
 import { codexReviewer } from "../../../runtime/src/pi/codex/auto-review/client.ts"
 import { gate } from "../../../runtime/src/pi/codex/auto-review/gate.ts"
 import type { PolicyConfig } from "../../../runtime/src/pi/codex/auto-review/policy.ts"
@@ -105,6 +109,20 @@ const defaultClient = (ctx: ExtensionContext, fetcher: Fetch | undefined) =>
     Effect.orElseSucceed(() => unreachable("the Codex credentials could not be read")),
   )
 
+/**
+ * What the classifier is told about a registered tool: the annotations Pi lists for it, with
+ * `readOnlyHint` added for HolyAgent's own state-only tools (see `isStateOnlyTool`), which spawn no
+ * process and no agent. A tool Pi does not list has no annotations.
+ */
+export const toolTraits = (info: ToolInfo | undefined): ToolTraits => {
+  const mcp = info?.namespace !== undefined
+  const annotations =
+    info !== undefined && isStateOnlyTool(info.name, info.sourceInfo?.source, mcp)
+      ? { ...info.annotations, readOnlyHint: true }
+      : info?.annotations
+  return { ...(annotations === undefined ? {} : { annotations }), mcp }
+}
+
 const APPROVE_USAGE =
   "Usage: /approve to approve the latest denied action, /approve <n> for the nth latest, /approve list to list them."
 
@@ -141,10 +159,7 @@ export const registerAutoReview = (pi: ExtensionAPI, host: AutoReviewHost): void
       gate({
         call: { toolName: event.toolName, input: event.input },
         cwd: ctx.cwd,
-        traits: {
-          ...(info?.annotations === undefined ? {} : { annotations: info.annotations }),
-          mcp: info?.namespace !== undefined,
-        },
+        traits: toolTraits(info),
         entries: Effect.sync(() =>
           entriesFromMessages(
             ctx.sessionManager
