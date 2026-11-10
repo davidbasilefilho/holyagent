@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mw9xiyfa-hsit",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 22,
+  "roleTask": "Reviewer.code",
+  "slug": "judge-whether-the-windows-test-fix-of",
+  "objective": "Judge whether the Windows test fix of the screen PR is correct and keeps the tests meaningful.",
+  "state": "Running",
+  "scope": [
+    "Commit a063136 on release/0.3.1/feat/screen in /home/user/holyagent-0.3.1-screen (range 91d9eb07..a063136); source diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win108-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mw9x75wc-redk.md; the Windows CI log of the failure is /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/win108.log (search '(fail)')."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Run bunx --no-install mise run verify in the worktree (after bun install --frozen-lockfile) and give exit code and counts.",
+    "Report in under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "The five failures are fixed by platform-driven behaviour, not by weakening tests, and the change breaks nothing on Linux, macOS or Windows",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mw9x75wc-redk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T00:05:52.198Z"
+  },
+  "createdAt": "2026-11-10T00:05:52.198Z"
+}
