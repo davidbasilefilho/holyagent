@@ -2,11 +2,39 @@ import { describe, expect, test } from "bun:test"
 
 import {
   belowFullAccess,
+  hostedByT3,
   isT3Session,
   refuseDeactivatedT3Tool,
+  T3_HOSTED_ENV,
   T3_MCP_URL_ENV,
   T3_RUNTIME_MODE_ENV,
 } from "../src/t3.ts"
+
+describe("hostedByT3", () => {
+  const T3 = { [T3_RUNTIME_MODE_ENV]: "full-access" }
+
+  test("a root in RPC mode with T3's variables records it for its specialists", () => {
+    const env: Record<string, string | undefined> = { ...T3 }
+    expect(hostedByT3({ mode: "rpc" }, env, false)).toBe(true)
+    expect(env[T3_HOSTED_ENV]).toBe("1")
+    // A specialist runs in-process, and Pi gives its extensions the mode print.
+    expect(hostedByT3({ mode: "print" }, env, true)).toBe(true)
+  })
+
+  test("a root that T3 does not host clears a marker from outside, so a specialist reads false", () => {
+    for (const mode of ["print", "json", "tui"] as const) {
+      const env: Record<string, string | undefined> = { ...T3, [T3_HOSTED_ENV]: "1" }
+      expect(hostedByT3({ mode }, env, false)).toBe(false)
+      expect(T3_HOSTED_ENV in env).toBe(false)
+      expect(hostedByT3({ mode: "print" }, env, true)).toBe(false)
+    }
+  })
+
+  test("a specialist never reads T3's own variables, only the root's record", () => {
+    expect(hostedByT3({ mode: "print" }, { ...T3 }, true)).toBe(false)
+    expect(hostedByT3({ mode: "rpc" }, { [T3_HOSTED_ENV]: "yes" }, true)).toBe(false)
+  })
+})
 
 describe("isT3Session", () => {
   test("is RPC mode with a variable T3 Code sets", () => {

@@ -19185,10 +19185,21 @@ var T3_RUNTIME_MODE_ENV = "T3_PI_RUNTIME_MODE";
 var T3_MCP_URL_ENV = "T3_MCP_URL";
 var T3_FULL_ACCESS = "full-access";
 var T3_STATUS_KEY = "holyagent";
+var T3_HOSTED_ENV = "HOLYAGENT_T3_HOSTED";
 var T3_ACCESS_STATUS = "HolyAgent needs Full access: switch this thread's access mode";
 var T3_ACCESS_NOTICE = "this T3 Code thread is below Full access, so every HolyAgent tool call asks for approval and background specialists can stall. Switch the thread's access mode to Full access in the composer; T3 Code restarts the session.";
 var present = (value) => value !== undefined && value.trim() !== "";
 var isT3Session = (context, env) => (present(env[T3_RUNTIME_MODE_ENV]) || present(env[T3_MCP_URL_ENV])) && context.mode === "rpc";
+var hostedByT3 = (context, env, specialist) => {
+  if (specialist)
+    return env[T3_HOSTED_ENV] === "1";
+  const hosted = isT3Session(context, env);
+  if (hosted)
+    env[T3_HOSTED_ENV] = "1";
+  else
+    delete env[T3_HOSTED_ENV];
+  return hosted;
+};
 var belowFullAccess = (env) => {
   const mode = env[T3_RUNTIME_MODE_ENV];
   return present(mode) && mode.trim() !== T3_FULL_ACCESS;
@@ -19787,7 +19798,7 @@ var createExtension = ({
       rootPrompt: false,
       excluded: runSync2(startingExclusions),
       started: false,
-      t3: isT3Session(ctx, env),
+      t3: hostedByT3(ctx, env, isChild()),
       t3Gate: false,
       t3Root: false,
       codex: undefined,

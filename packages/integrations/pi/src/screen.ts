@@ -68,11 +68,10 @@ export const screenServers = (config: Config, form: CapabilityForm): ReadonlyArr
 
 /**
  * The screen servers a session registers: `servers` without the browser-use server when T3 hosts
- * the session (`t3`, see `isT3Session`), whatever the form. T3's pane is the browser the person
- * sees and exposes no endpoint browser-use could attach to, so inside T3 browser-use would only add
- * a second, invisible Chromium; screen specialists there use T3's preview tools. Browse and
- * computer use drive the person's real browser and desktop, which T3's pane does not replace, so
- * they stay.
+ * the session (`t3`, see `hostedByT3`), whatever the form. T3's pane is the browser the person sees
+ * and exposes no endpoint browser-use could attach to, so inside T3 browser-use would only add a
+ * second, invisible Chromium; screen specialists there use T3's preview tools. Browse and computer
+ * use drive the person's real browser and desktop, which T3's pane does not replace, so they stay.
  */
 export const withoutBrowserUseInT3 = (
   servers: ReadonlyArray<McpServer>,
@@ -83,7 +82,7 @@ export const withoutBrowserUseInT3 = (
 /**
  * Whether a tool call is one of T3 Code's preview or render tools ({@link T3_PREVIEW_TOOLS}) made
  * by a screen specialist outside a session T3 hosts. The tools grant a view into T3's own browser,
- * so a session that T3 does not host (`t3`, see `isT3Session`) is refused them even where their
+ * so a session that T3 does not host (`t3`, see `hostedByT3`) is refused them even where their
  * names are registered, for example by a T3 MCP server the user added by hand.
  */
 export const refuseT3PreviewOutsideT3 = (

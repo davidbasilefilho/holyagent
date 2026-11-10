@@ -194,6 +194,9 @@ describe("the browser-use server's environment", () => {
         SSL_CERT_FILE: "/etc/ssl/ca.pem",
         REQUESTS_CA_BUNDLE: "/etc/ssl/ca.pem",
         UV_CACHE_DIR: "/home/person/.cache/uv",
+        UV_PYTHON_INSTALL_DIR: "/home/person/.local/share/uv/python",
+        XDG_CACHE_HOME: "/home/person/.cache",
+        XDG_DATA_HOME: "/home/person/.local/share",
         UV_INDEX: "https://evil.example/simple",
         UV_EXTRA_INDEX_URL: "https://evil.example/simple",
         UV_FIND_LINKS: "https://evil.example/links",
@@ -216,6 +219,9 @@ describe("the browser-use server's environment", () => {
       SSL_CERT_FILE: "/etc/ssl/ca.pem",
       REQUESTS_CA_BUNDLE: "/etc/ssl/ca.pem",
       UV_CACHE_DIR: "/home/person/.cache/uv",
+      UV_PYTHON_INSTALL_DIR: "/home/person/.local/share/uv/python",
+      XDG_CACHE_HOME: "/home/person/.cache",
+      XDG_DATA_HOME: "/home/person/.local/share",
       BU_CDP_URL: `http://127.0.0.1:${PORT}`,
     })
     for (const name of [
@@ -394,7 +400,13 @@ describe("a launch that fails leaves nothing behind", () => {
 
   test("DevTools that never answers: Chromium is stopped, the directory removed and no server starts", async () => {
     const machine = fakes({ notAnswering: Number.POSITIVE_INFINITY })
-    expect(await failed(machine, { readyTimeoutMs: 20 })).toContain("did not answer within 20 ms")
+    const message = await failed(machine, { readyTimeoutMs: 20 })
+    expect(message).toContain("did not answer within 20 ms")
+    // The profile is where Chromium writes DevToolsActivePort, so a wrapper that ignores
+    // --user-data-dir shows as an empty profile the message names.
+    expect(message).toContain(`profile directory ${join(BASE, "profile")}`)
+    expect(message).toContain("never wrote DevToolsActivePort")
+    expect(message).toContain("never answered")
     expect(machine.events.slice(-3)).toEqual(["stop chromium", `remove ${BASE}`, "signals off"])
     expect(machine.spawned.map(({ stdio }) => stdio)).toEqual(["ignore"])
   })
@@ -623,7 +635,7 @@ describe("the real machine", () => {
       try {
         for (const pid of [0, 1, Number.NaN])
           await Effect.runPromise(
-            stopGroup({ pid, kill: () => {}, exited: Promise.resolve(0) }, "linux"),
+            stopGroup({ pid, kill: () => {}, exited: Promise.resolve(0), exitCode: null }, "linux"),
           )
         expect(kill).not.toHaveBeenCalled()
       } finally {
@@ -642,6 +654,7 @@ describe("the real machine", () => {
               pid: 999_999,
               kill: (signal) => void killed.push(signal),
               exited: Promise.resolve(0),
+              exitCode: null,
             },
             "win32",
           ),
@@ -652,6 +665,22 @@ describe("the real machine", () => {
       }
       expect(killed).toEqual(["SIGKILL"])
       expect(performance.now() - started).toBeLessThan(2_000)
+    })
+
+    test("on Windows a child that exited already is not killed, since its pid may belong to another process by now", async () => {
+      const killed: Array<unknown> = []
+      await Effect.runPromise(
+        stopGroup(
+          {
+            pid: 999_999,
+            kill: (signal) => void killed.push(signal),
+            exited: Promise.resolve(0),
+            exitCode: 0,
+          },
+          "win32",
+        ),
+      )
+      expect(killed).toEqual([])
     })
   })
 })

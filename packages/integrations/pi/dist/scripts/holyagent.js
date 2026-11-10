@@ -16145,7 +16145,7 @@ var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS 
 }, failed2 = (reason) => new BrowserLaunchFailed({ reason }), awaitDevTools = (host, chromium, profile, timeoutMs, pollMs) => {
   const again = (poll) => sleep2(pollMs).pipe(andThen2(poll));
   const poll = suspend2(() => host.devToolsPort(profile).pipe(flatMap2((port) => port === undefined ? again(poll) : host.answers(`http://127.0.0.1:${port}/json/version`).pipe(flatMap2((ok) => ok ? succeed6(port) : again(poll))))));
-  const answered = poll.pipe(timeoutOption2(timeoutMs), flatMap2((result) => isSome2(result) ? succeed6(result.value) : fail5(failed2(`the DevTools endpoint did not answer within ${timeoutMs} ms`))));
+  const answered = poll.pipe(timeoutOption2(timeoutMs), flatMap2((result) => isSome2(result) ? succeed6(result.value) : fail5(failed2(`the DevTools endpoint did not answer within ${timeoutMs} ms: Chromium never wrote DevToolsActivePort in the profile directory ${profile} or never answered on the port it reported (a Chromium wrapper that ignores --user-data-dir writes it elsewhere)`))));
   const exitedFirst = chromium.exited.pipe(flatMap2((code) => fail5(failed2(`Chromium exited with code ${code} before its DevTools endpoint answered`))));
   return raceFirst2(answered, exitedFirst);
 }, launch = (host, options) => scoped2(gen2(function* () {
@@ -16185,7 +16185,8 @@ var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS 
 }).pipe(ignore2), stopGroup = (child, platform = process.platform) => gen2(function* () {
   const exit = promise2(() => child.exited).pipe(timeoutOption2(STOP_GRACE_MS));
   if (platform === "win32") {
-    yield* killGroup(child, platform);
+    if (child.exitCode === null)
+      yield* killGroup(child, platform);
     yield* exit;
     return;
   }
@@ -16224,6 +16225,9 @@ var init_browser_launch = __esm(() => {
     "REQUESTS_CA_BUNDLE",
     "UV_CACHE_DIR",
     "UV_NATIVE_TLS",
+    "UV_PYTHON_INSTALL_DIR",
+    "XDG_CACHE_HOME",
+    "XDG_DATA_HOME",
     "SYSTEMROOT",
     "SYSTEMDRIVE",
     "WINDIR",
@@ -16288,6 +16292,45 @@ var init_browser_launch = __esm(() => {
   };
 });
 
+import { delimiter, join as join10 } from "path";
+var {$: $3 } = globalThis.Bun;
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+}, pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join10(options.home, ".bun");
+  const bunBin = join10(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+}, findCommand = (env, command, options) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+  return fromNullishOr(Bun.which(command, {
+    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
+  }));
+}, EMPTY_BUNFIG, Shell;
+var init_shell = __esm(() => {
+  init_dist();
+  init_environment();
+  EMPTY_BUNFIG = join10(import.meta.dir, "empty-bunfig.toml");
+  Shell = class Shell extends Service()("holyagent/Shell") {
+    static live = (env) => {
+      const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+      return succeed5(Shell, Shell.of({
+        which: (command, options) => sync2(() => findCommand(env, command, options)),
+        run: (command, args, options) => tryPromise2({
+          try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+            exitCode: result.exitCode,
+            stdout: result.stdout.toString(),
+            stderr: result.stderr.toString()
+          })),
+          catch: (error) => String(error)
+        }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+      }));
+    };
+  };
+});
+
 import { existsSync, readdirSync } from "fs";
 import { posix, win32 } from "path";
 var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win32 : posix, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
@@ -16310,19 +16353,20 @@ var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", LEGACY_CHROMIUM_EX
       return { variable, path };
   }
   return;
-}, findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
+}, onPath = (command, env) => getOrUndefined(findCommand(env, command)), resolveConfigured = (given, env, exists, which) => /[\\/]/.test(given) ? exists(given) ? given : undefined : which(given, env), findChromium = (env, platform = process.platform, exists = existsSync, list = safeList, which = onPath) => {
   const given = configuredChromium(env);
   if (given !== undefined)
-    return exists(given.path) ? given.path : undefined;
+    return resolveConfigured(given.path, env, exists, which);
   const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
   return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
-}, chromiumFixFor = (env, fix, exists = existsSync) => {
+}, chromiumFixFor = (env, fix, exists = existsSync, which = onPath) => {
   const given = configuredChromium(env);
-  return given === undefined || exists(given.path) ? fix : `${given.variable} is set to ${given.path}, which does not exist; ${fix}`;
+  return given === undefined || resolveConfigured(given.path, env, exists, which) !== undefined ? fix : `${given.variable} is set to ${given.path}, which does not exist; ${fix}`;
 };
 var init_chromium = __esm(() => {
   init_dist();
   init_environment();
+  init_shell();
   BUILD_EXECUTABLES = {
     linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
     darwin: [
@@ -16435,7 +16479,7 @@ var init_errors6 = __esm(() => {
 });
 
 import { chmod, mkdir as mkdir4, realpath as realpath3, rename as rename4, rm as rm6, writeFile } from "fs/promises";
-import { basename as basename4, dirname as dirname3, join as join10 } from "path";
+import { basename as basename4, dirname as dirname3, join as join11 } from "path";
 var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPromise2({
   try: run,
   catch: (cause) => new SetupFailure({
@@ -16464,7 +16508,7 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join10(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
+  const temporary = join11(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
   yield* fileOperation(dirname3(target), "write", () => mkdir4(dirname3(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
@@ -16522,8 +16566,8 @@ var init_json_file = __esm(() => {
   empty4 = {};
 });
 
-import { join as join11, resolve as resolve5 } from "path";
-var RecordedKey, RecordFile, recordPath = (env) => join11(userFiles(env).claudeDir, "holyagent", "setup-records.json"), keyOf = (file) => resolve5(file), load = (env) => gen2(function* () {
+import { join as join12, resolve as resolve5 } from "path";
+var RecordedKey, RecordFile, recordPath = (env) => join12(userFiles(env).claudeDir, "holyagent", "setup-records.json"), keyOf = (file) => resolve5(file), load = (env) => gen2(function* () {
   const path = recordPath(env);
   const raw = yield* readJsonObject(path);
   if (Object.keys(raw).length === 0)
@@ -16730,45 +16774,6 @@ var init_settings3 = __esm(() => {
     const existing = yield* readJsonObject(file);
     return applyDefaults(existing, defaultsFor(existing, "1h")).entries.filter((entry) => entry.status === "added").map((entry) => entry.path);
   });
-});
-
-import { delimiter, join as join12 } from "path";
-var {$: $3 } = globalThis.Bun;
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-}, pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join12(options.home, ".bun");
-  const bunBin = join12(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-}, findCommand = (env, command, options) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-  return fromNullishOr(Bun.which(command, {
-    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
-  }));
-}, EMPTY_BUNFIG, Shell;
-var init_shell = __esm(() => {
-  init_dist();
-  init_environment();
-  EMPTY_BUNFIG = join12(import.meta.dir, "empty-bunfig.toml");
-  Shell = class Shell extends Service()("holyagent/Shell") {
-    static live = (env) => {
-      const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-      return succeed5(Shell, Shell.of({
-        which: (command, options) => sync2(() => findCommand(env, command, options)),
-        run: (command, args, options) => tryPromise2({
-          try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
-            exitCode: result.exitCode,
-            stdout: result.stdout.toString(),
-            stderr: result.stderr.toString()
-          })),
-          catch: (error) => String(error)
-        }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-      }));
-    };
-  };
 });
 
 import { lstat as lstat3, realpath as realpath4 } from "fs/promises";

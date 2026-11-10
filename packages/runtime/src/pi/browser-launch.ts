@@ -115,10 +115,11 @@ export const chromiumArguments = (profile: string, sandbox: boolean): ReadonlyAr
  * The variables of the inherited environment that reach the browser-use server (`uvx` and the
  * Python it runs), matched without regard to case because Windows names are case-insensitive, and
  * every `LC_*`. Only what a process needs to run, find its programs, reach the network through the
- * person's proxy and certificates, and reuse uv's cache. Everything else stays behind: `UV_INDEX*`,
- * `UV_FIND_LINKS`, `PIP_*` and `PYTHONPATH` could redirect where the code of a server with browser
- * control comes from, and the provider API keys and tokens of the environment would otherwise reach
- * the Python that `browser_exec` runs.
+ * person's proxy and certificates, and reuse uv's cache and the Python it installed (the XDG cache
+ * and data folders and `UV_PYTHON_INSTALL_DIR` only say where that lives). Everything else stays
+ * behind: `UV_INDEX*`, `UV_FIND_LINKS`, `PIP_*` and `PYTHONPATH` could redirect where the code of a
+ * server with browser control comes from, and the provider API keys and tokens of the environment
+ * would otherwise reach the Python that `browser_exec` runs.
  */
 export const SERVER_ENVIRONMENT_ALLOWLIST: ReadonlyArray<string> = [
   "PATH",
@@ -141,6 +142,9 @@ export const SERVER_ENVIRONMENT_ALLOWLIST: ReadonlyArray<string> = [
   "REQUESTS_CA_BUNDLE",
   "UV_CACHE_DIR",
   "UV_NATIVE_TLS",
+  "UV_PYTHON_INSTALL_DIR",
+  "XDG_CACHE_HOME",
+  "XDG_DATA_HOME",
   // Windows needs these to start a process and to find its profile and programs.
   "SYSTEMROOT",
   "SYSTEMDRIVE",
@@ -225,7 +229,11 @@ const awaitDevTools = (
     Effect.flatMap((result) =>
       Option.isSome(result)
         ? Effect.succeed(result.value)
-        : Effect.fail(failed(`the DevTools endpoint did not answer within ${timeoutMs} ms`)),
+        : Effect.fail(
+            failed(
+              `the DevTools endpoint did not answer within ${timeoutMs} ms: Chromium never wrote DevToolsActivePort in the profile directory ${profile} or never answered on the port it reported (a Chromium wrapper that ignores --user-data-dir writes it elsewhere)`,
+            ),
+          ),
     ),
   )
   const exitedFirst = chromium.exited.pipe(
@@ -335,17 +343,18 @@ const terminateGroup = (child: Pick<Bun.Subprocess, "pid">) =>
  * could in principle belong to an unrelated group, but a group id is not reused while any member
  * lives, and an empty group only answers ESRCH, so the signal is the safer side of that risk. On
  * Windows, which has no group signals, `taskkill /T /F` ends the whole tree at once, since waiting
- * out a grace for a process with no signal to ask it gives it nothing. `platform` is a parameter so
- * a test can stand in for either system.
+ * out a grace for a process with no signal to ask it gives it nothing; a child that exited already
+ * is left alone there, because Windows reuses the pid of a reaped process. `platform` is a
+ * parameter so a test can stand in for either system.
  */
 export const stopGroup = (
-  child: Pick<Bun.Subprocess, "pid" | "kill" | "exited">,
+  child: Pick<Bun.Subprocess, "pid" | "kill" | "exited" | "exitCode">,
   platform: string = process.platform,
 ) =>
   Effect.gen(function* () {
     const exit = Effect.promise(() => child.exited).pipe(Effect.timeoutOption(STOP_GRACE_MS))
     if (platform === "win32") {
-      yield* killGroup(child, platform)
+      if (child.exitCode === null) yield* killGroup(child, platform)
       yield* exit
       return
     }

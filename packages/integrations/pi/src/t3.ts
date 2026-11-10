@@ -17,6 +17,14 @@ export const T3_FULL_ACCESS = "full-access"
 /** The key of the status HolyAgent shows near T3 Code's composer. */
 export const T3_STATUS_KEY = "holyagent"
 
+/**
+ * The variable in which the root records that T3 Code hosts the process, for the specialists it
+ * starts. They run in-process in the root's Pi (`@tintinweb/pi-subagents` binds their extensions
+ * with no mode), so a specialist sees `ctx.mode` as `print`, never `rpc`, while it shares the
+ * root's environment.
+ */
+export const T3_HOSTED_ENV = "HOLYAGENT_T3_HOSTED"
+
 /** The status line under a thread below Full access. */
 export const T3_ACCESS_STATUS = "HolyAgent needs Full access: switch this thread's access mode"
 
@@ -40,6 +48,23 @@ export const isT3Session = (
   env: Readonly<Record<string, string | undefined>>,
 ): boolean =>
   (present(env[T3_RUNTIME_MODE_ENV]) || present(env[T3_MCP_URL_ENV])) && context.mode === "rpc"
+
+/**
+ * Whether T3 Code hosts the session, as the gates read it. The root decides with
+ * {@link isT3Session} and writes the answer to {@link T3_HOSTED_ENV} on every start, so a value
+ * from outside never stands. A specialist, which cannot see Pi's mode, reads what the root wrote.
+ */
+export const hostedByT3 = (
+  context: Pick<ExtensionContext, "mode">,
+  env: Record<string, string | undefined>,
+  specialist: boolean,
+): boolean => {
+  if (specialist) return env[T3_HOSTED_ENV] === "1"
+  const hosted = isT3Session(context, env)
+  if (hosted) env[T3_HOSTED_ENV] = "1"
+  else delete env[T3_HOSTED_ENV]
+  return hosted
+}
 
 /**
  * Whether T3 Code's access mode asks for approvals: it is set and is not Full access. T3's bridge

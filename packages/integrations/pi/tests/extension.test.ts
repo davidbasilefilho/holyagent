@@ -3931,10 +3931,12 @@ describe("the MCP servers of the screen capability", () => {
       run(configWith({}), { sessionName: `${name}#a1b2c3d4`, env, mode, startOnly: true })
 
     test("a headless screen specialist registers no browser-use server and is told of no missing server", async () => {
+      const env: Record<string, string> = { ...T3_HOSTED }
+      await run(configWith({}), { env, mode: "rpc", startOnly: true })
       const { api, delivered } = await run(configWith({}), {
         sessionName: "worker-visual-headless-screen#a1b2c3d4",
-        env: T3_HOSTED,
-        mode: "rpc",
+        env,
+        mode: "print",
       })
       expect(api.mcpServers).toEqual([])
       expect(delivered?.message?.content ?? "").not.toContain("MCP server of the screen capability")
@@ -3948,6 +3950,37 @@ describe("the MCP servers of the screen capability", () => {
         const { api } = await started("worker-visual-headless-screen", env, mode)
         expect(api.mcpServers.map((server) => server.name)).toEqual(["browser_use"])
       }
+    })
+
+    // The package runs a specialist in-process and binds its extensions with no mode, so its
+    // ctx.mode is "print" (agent-runner.ts `bindExtensions`, Pi's `_extensionMode` default) while it
+    // shares the root's environment: the gate has to hold on what the root recorded.
+    test("a specialist of a root T3 hosts, whose mode is print, registers no browser-use and may use T3's preview tools", async () => {
+      const env: Record<string, string> = { ...T3_HOSTED }
+      await run(configWith({}), { env, mode: "rpc", startOnly: true })
+      const { api } = await started("worker-visual-headless-screen", env, "print")
+      expect(api.mcpServers).toEqual([])
+      expect(
+        await api.emit("tool_call", {
+          toolName: "mcp__t3-code__preview_open",
+          toolCallId: "t1",
+          input: {},
+        }),
+      ).toEqual([undefined])
+    })
+
+    test("a specialist of a root T3 does not host registers browser-use and is refused T3's preview tools, T3's variables or not", async () => {
+      const env: Record<string, string> = { ...T3_HOSTED }
+      await run(configWith({}), { env, mode: "print", startOnly: true })
+      const { api } = await started("worker-visual-headless-screen", env, "print")
+      expect(api.mcpServers.map((server) => server.name)).toEqual(["browser_use"])
+      expect(
+        await api.emit("tool_call", {
+          toolName: "mcp__t3-code__preview_open",
+          toolCallId: "t1",
+          input: {},
+        }),
+      ).toEqual([expect.objectContaining({ block: true })])
     })
 
     test("a normal screen specialist still registers browse", async () => {
@@ -4029,10 +4062,14 @@ describe("T3's preview tools for a screen specialist", () => {
   })
 
   test("are granted when T3 hosts the session", async () => {
+    // The specialist runs in-process under the root, so its mode is print and the root's start
+    // has recorded that T3 hosts the process.
+    const env: Record<string, string> = { ...T3_ENV }
+    await run(healthy("/missing"), { env, mode: "rpc", startOnly: true })
     const { api } = await run(healthy("/missing"), {
       sessionName: "worker-visual-screen#a1b2c3d4",
-      env: T3_ENV,
-      mode: "rpc",
+      env,
+      mode: "print",
       startOnly: true,
     })
     for (const name of PREVIEW)

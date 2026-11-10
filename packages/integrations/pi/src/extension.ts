@@ -77,7 +77,7 @@ import {
 import { AGENT_TYPES, SPECIALIST_NAMES } from "./specialists.ts"
 import {
   belowFullAccess,
-  isT3Session,
+  hostedByT3,
   refuseDeactivatedT3Tool,
   T3_ACCESS_NOTICE,
   T3_ACCESS_STATUS,
@@ -531,7 +531,7 @@ interface Held {
   justBash: boolean
   /** Stops the provider checks of the session. */
   probe: AbortController | undefined
-  /** True when the session runs under T3 Code (see {@link isT3Session}). */
+  /** True when the session runs under T3 Code (see {@link hostedByT3}), a specialist's included. */
   t3: boolean
   /**
    * True once the start ran for a root under T3 Code, applied or not: T3's tools the root keeps off
@@ -1505,7 +1505,7 @@ export const createExtension =
         rootPrompt: false,
         excluded: Effect.runSync(startingExclusions),
         started: false,
-        t3: isT3Session(ctx, env),
+        t3: hostedByT3(ctx, env, isChild()),
         t3Gate: false,
         t3Root: false,
         codex: undefined,
