@@ -3885,7 +3885,7 @@ describe("the MCP servers of the screen capability", () => {
         name: "browse",
         config: {
           command: "npx",
-          args: [...REGISTRY, "-y", "@opencode/browse@0.0.15", "mcp"],
+          args: [...REGISTRY, "-y", "@opencode/browse@0.0.16", "mcp"],
           cwd: "/home/neutral",
         },
       },

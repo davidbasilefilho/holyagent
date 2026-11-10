@@ -84,12 +84,17 @@ var constFalse = /* @__PURE__ */ constant(false);
 var constUndefined = /* @__PURE__ */ constant(undefined);
 var constVoid = constUndefined;
 
+var errorSiteKeys = ["line", "column", "sourceURL", "originalLine", "originalColumn"];
 var getAllObjectKeys = (obj) => {
   const keys = new Set(Reflect.ownKeys(obj));
   if (obj.constructor === Object)
     return keys;
   if (obj instanceof Error) {
     keys.delete("stack");
+    for (const key of errorSiteKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(obj, key))
+        keys.delete(key);
+    }
   }
   const proto = Object.getPrototypeOf(obj);
   let current = proto;
@@ -779,11 +784,10 @@ var StructuralProto = {
   },
   [symbol2](that) {
     const selfKeys = Object.keys(this);
-    const thatKeys = Object.keys(that);
-    if (selfKeys.length !== thatKeys.length)
+    if (selfKeys.length !== Object.keys(that).length)
       return false;
-    for (let i = 0;i < selfKeys.length; i++) {
-      if (selfKeys[i] !== thatKeys[i] || !equals(this[selfKeys[i]], that[selfKeys[i]])) {
+    for (const key of selfKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
         return false;
       }
     }
@@ -2297,6 +2301,7 @@ class FiberImpl {
     this._children = undefined;
     this._interruptedCause = undefined;
     this._yielded = undefined;
+    this._autoYielded = false;
     this._running = false;
     this._deferredInterrupt = false;
     this._parent = undefined;
@@ -2411,8 +2416,10 @@ class FiberImpl {
     const prevRunning = this._running;
     this._running = true;
     let yielding = false;
+    let resuming = this._autoYielded;
+    this._autoYielded = false;
     let current = effect;
-    this.currentOpCount = 0;
+    this.currentOpCount = resuming ? 1 : 0;
     try {
       while (true) {
         try {
@@ -2422,12 +2429,13 @@ class FiberImpl {
           }
           this.currentOpCount++;
           const cache = this.cache;
-          if (!yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
+          if (!resuming && !yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
             yielding = true;
-            const prev = current;
-            current = flatMap(yieldNow, () => prev);
+            current = this.yieldNow(current, 0, true);
+          } else {
+            resuming = false;
+            current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
           }
-          current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
           if (current === Yield) {
             const yielded = this._yielded;
             if (ExitTypeId in yielded) {
@@ -2484,6 +2492,18 @@ class FiberImpl {
   yieldWith(value) {
     this._yielded = value;
     return Yield;
+  }
+  yieldNow(effect, priority = 0, automatic = false) {
+    let resumed = false;
+    this.currentDispatcher.scheduleTask(() => {
+      if (resumed)
+        return;
+      this._autoYielded = automatic;
+      this.evaluate(effect);
+    }, priority);
+    return this.yieldWith(() => {
+      resumed = true;
+    });
   }
   children() {
     return this._children ??= new Set;
@@ -2597,15 +2617,7 @@ var suspend = /* @__PURE__ */ makePrimitive({
 var yieldNowWith = /* @__PURE__ */ makePrimitive({
   op: "Yield",
   [evaluate](fiber) {
-    let resumed = false;
-    fiber.currentDispatcher.scheduleTask(() => {
-      if (resumed)
-        return;
-      fiber.evaluate(exitVoid);
-    }, this[args] ?? 0);
-    return fiber.yieldWith(() => {
-      resumed = true;
-    });
+    return fiber.yieldNow(exitVoid, this[args] ?? 0);
   }
 });
 var yieldNow = /* @__PURE__ */ yieldNowWith(0);
@@ -2747,8 +2759,9 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
         const isWinner = !done;
         done = true;
         resume(exit);
-        if (isWinner && options?.onWinner) {
-          options.onWinner({
+        if (isWinner) {
+          interruptRaceLosers(fibers, parent);
+          options?.onWinner?.({
             fiber,
             index,
             parentFiber: parent
@@ -2758,6 +2771,12 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
     }
   });
 });
+var interruptRaceLosers = (fibers, parent) => {
+  const annotations = fiberStackAnnotations(parent);
+  for (const fiber of fibers) {
+    fiber.interruptUnsafe(parent.id, annotations);
+  }
+};
 var raceFirst = /* @__PURE__ */ dual((args) => isEffect(args[1]), (self, that, options) => raceAllFirst([self, that], options));
 var flatMap = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, andThenCont, f));
 var map = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, mapCont, f));
@@ -3409,15 +3428,15 @@ var FFF_NATIVE_HOSTS = [
 
 var pi_packages_default = {
   "pi-provider-kimi-code": "0.6.13",
-  "@tintinweb/pi-subagents": "0.23.1",
-  "billion-context": "0.1.212",
+  "@tintinweb/pi-subagents": "0.23.2",
+  "billion-context": "0.1.213",
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.6",
-  "@amaster.ai/pi-computer-use": "0.1.36",
+  "@amaster.ai/pi-computer-use": "0.1.38",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.15"
+  "@opencode/browse": "0.0.16"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;

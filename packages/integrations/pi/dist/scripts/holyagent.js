@@ -133,12 +133,16 @@ var init_Function = __esm(() => {
   constVoid = constUndefined;
 });
 
-var getAllObjectKeys = (obj) => {
+var errorSiteKeys, getAllObjectKeys = (obj) => {
   const keys = new Set(Reflect.ownKeys(obj));
   if (obj.constructor === Object)
     return keys;
   if (obj instanceof Error) {
     keys.delete("stack");
+    for (const key of errorSiteKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(obj, key))
+        keys.delete(key);
+    }
   }
   const proto = Object.getPrototypeOf(obj);
   let current = proto;
@@ -161,6 +165,7 @@ var getAllObjectKeys = (obj) => {
   }
 };
 var init_equal = __esm(() => {
+  errorSiteKeys = ["line", "column", "sourceURL", "originalLine", "originalColumn"];
   byReferenceInstances = /* @__PURE__ */ new WeakSet;
 });
 
@@ -979,11 +984,10 @@ var init_core = __esm(() => {
     },
     [symbol2](that) {
       const selfKeys = Object.keys(this);
-      const thatKeys = Object.keys(that);
-      if (selfKeys.length !== thatKeys.length)
+      if (selfKeys.length !== Object.keys(that).length)
         return false;
-      for (let i = 0;i < selfKeys.length; i++) {
-        if (selfKeys[i] !== thatKeys[i] || !equals(this[selfKeys[i]], that[selfKeys[i]])) {
+      for (const key of selfKeys) {
+        if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
           return false;
         }
       }
@@ -2177,9 +2181,14 @@ var random2 = (length) => {
   const c = randomWord();
   const d = randomWord();
   return String.fromCharCode(hexCharCodes[a >>> 28], hexCharCodes[a >>> 24 & 15], hexCharCodes[a >>> 20 & 15], hexCharCodes[a >>> 16 & 15], hexCharCodes[a >>> 12 & 15], hexCharCodes[a >>> 8 & 15], hexCharCodes[a >>> 4 & 15], hexCharCodes[a & 15], hexCharCodes[b >>> 28], hexCharCodes[b >>> 24 & 15], hexCharCodes[b >>> 20 & 15], hexCharCodes[b >>> 16 & 15], hexCharCodes[b >>> 12 & 15], hexCharCodes[b >>> 8 & 15], hexCharCodes[b >>> 4 & 15], hexCharCodes[b & 15], hexCharCodes[c >>> 28], hexCharCodes[c >>> 24 & 15], hexCharCodes[c >>> 20 & 15], hexCharCodes[c >>> 16 & 15], hexCharCodes[c >>> 12 & 15], hexCharCodes[c >>> 8 & 15], hexCharCodes[c >>> 4 & 15], hexCharCodes[c & 15], hexCharCodes[d >>> 28], hexCharCodes[d >>> 24 & 15], hexCharCodes[d >>> 20 & 15], hexCharCodes[d >>> 16 & 15], hexCharCodes[d >>> 12 & 15], hexCharCodes[d >>> 8 & 15], hexCharCodes[d >>> 4 & 15], hexCharCodes[d & 15]);
-};
+}, hexCodes;
 var init_Hex = __esm(() => {
   hexCharCodes = /* @__PURE__ */ Uint8Array.from("0123456789abcdef", (c) => c.charCodeAt(0));
+  hexCodes = /* @__PURE__ */ new Uint8Array(256).fill(255);
+  for (let i = 0;i < 16; i++) {
+    hexCodes[/* @__PURE__ */ "0123456789abcdef".charCodeAt(i)] = i;
+    hexCodes[/* @__PURE__ */ "0123456789ABCDEF".charCodeAt(i)] = i;
+  }
 });
 
 class NativeSpan {
@@ -2759,8 +2768,9 @@ ${prefix}}`;
         const isWinner = !done;
         done = true;
         resume(exit);
-        if (isWinner && options?.onWinner) {
-          options.onWinner({
+        if (isWinner) {
+          interruptRaceLosers(fibers, parent);
+          options?.onWinner?.({
             fiber,
             index,
             parentFiber: parent
@@ -2769,7 +2779,12 @@ ${prefix}}`;
       });
     }
   });
-}), raceFirst, flatMap, effectIsExit = (effect) => effect[ExitTypeId] !== undefined, flatMapEager, map3, mapEager, mapErrorEager, exitIsSuccess = (self) => self._tag === "Success", exitFilterCause = (self) => self._tag === "Failure" ? succeed2(self.cause) : fail2(self), exitVoid, exitMap, exitMapError, exitAsVoidAll = (exits) => {
+}), interruptRaceLosers = (fibers, parent) => {
+  const annotations = fiberStackAnnotations(parent);
+  for (const fiber of fibers) {
+    fiber.interruptUnsafe(parent.id, annotations);
+  }
+}, raceFirst, flatMap, effectIsExit = (effect) => effect[ExitTypeId] !== undefined, flatMapEager, map3, mapEager, mapErrorEager, exitIsSuccess = (self) => self._tag === "Success", exitFilterCause = (self) => self._tag === "Failure" ? succeed2(self.cause) : fail2(self), exitVoid, exitMap, exitMapError, exitAsVoidAll = (exits) => {
   const failures = [];
   for (const exit of exits) {
     if (exit._tag === "Failure") {
@@ -3365,6 +3380,7 @@ var init_effect = __esm(() => {
       this._children = undefined;
       this._interruptedCause = undefined;
       this._yielded = undefined;
+      this._autoYielded = false;
       this._running = false;
       this._deferredInterrupt = false;
       this._parent = undefined;
@@ -3479,8 +3495,10 @@ var init_effect = __esm(() => {
       const prevRunning = this._running;
       this._running = true;
       let yielding = false;
+      let resuming = this._autoYielded;
+      this._autoYielded = false;
       let current = effect;
-      this.currentOpCount = 0;
+      this.currentOpCount = resuming ? 1 : 0;
       try {
         while (true) {
           try {
@@ -3490,12 +3508,13 @@ var init_effect = __esm(() => {
             }
             this.currentOpCount++;
             const cache = this.cache;
-            if (!yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
+            if (!resuming && !yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
               yielding = true;
-              const prev = current;
-              current = flatMap(yieldNow, () => prev);
+              current = this.yieldNow(current, 0, true);
+            } else {
+              resuming = false;
+              current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
             }
-            current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
             if (current === Yield) {
               const yielded = this._yielded;
               if (ExitTypeId in yielded) {
@@ -3552,6 +3571,18 @@ var init_effect = __esm(() => {
     yieldWith(value) {
       this._yielded = value;
       return Yield;
+    }
+    yieldNow(effect, priority = 0, automatic = false) {
+      let resumed = false;
+      this.currentDispatcher.scheduleTask(() => {
+        if (resumed)
+          return;
+        this._autoYielded = automatic;
+        this.evaluate(effect);
+      }, priority);
+      return this.yieldWith(() => {
+        resumed = true;
+      });
     }
     children() {
       return this._children ??= new Set;
@@ -3613,15 +3644,7 @@ var init_effect = __esm(() => {
   yieldNowWith = /* @__PURE__ */ makePrimitive({
     op: "Yield",
     [evaluate](fiber) {
-      let resumed = false;
-      fiber.currentDispatcher.scheduleTask(() => {
-        if (resumed)
-          return;
-        fiber.evaluate(exitVoid);
-      }, this[args] ?? 0);
-      return fiber.yieldWith(() => {
-        resumed = true;
-      });
+      return fiber.yieldNow(exitVoid, this[args] ?? 0);
     }
   });
   yieldNow = /* @__PURE__ */ yieldNowWith(0);
@@ -5201,6 +5224,21 @@ var init_Chunk = __esm(() => {
   toReadonlyArray = toReadonlyArray_;
 });
 
+var decodeNative = (str, decodedLength, options) => {
+  if (str.length < 128)
+    return;
+  const NativeUint8Array = Uint8Array;
+  if (typeof NativeUint8Array.fromBase64 !== "function")
+    return;
+  try {
+    const bytes = NativeUint8Array.fromBase64(str, options);
+    return bytes.length === decodedLength ? bytes : null;
+  } catch {
+    return null;
+  }
+}, stripCrlf = (str) => str.indexOf(`
+`) === -1 && str.indexOf("\r") === -1 ? str : str.replace(/[\n\r]/g, "");
+
 var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(input) : input), decode = (str) => {
   const stripped = stripCrlf(str);
   const length = stripped.length;
@@ -5221,9 +5259,24 @@ var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(i
       message: "Found a '=' character, but it is not at the end"
     }));
   }
+  const missingOctets = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+  const decodedLength = 3 * (length / 4) - missingOctets;
+  const native = decodeNative(stripped, decodedLength, undefined);
+  if (native)
+    return succeed2(native);
+  if (native === null) {
+    const invalid = invalidCharacter.exec(stripped);
+    if (invalid !== null) {
+      return fail2(new EncodingError({
+        kind: "Decode",
+        module: "Base64",
+        input: stripped,
+        message: `Invalid character ${invalid[0]}`
+      }));
+    }
+  }
   try {
-    const missingOctets = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
-    const result = new Uint8Array(3 * (length / 4) - missingOctets);
+    const result = new Uint8Array(decodedLength);
     for (let i = 0, j = 0;i < length; i += 4, j += 3) {
       const buffer = getCode(stripped.charCodeAt(i)) << 18 | getCode(stripped.charCodeAt(i + 1)) << 12 | getCode(stripped.charCodeAt(i + 2)) << 6 | getCode(stripped.charCodeAt(i + 3));
       result[j] = buffer >> 16;
@@ -5291,7 +5344,7 @@ var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(i
     result[j + 3] = paddingCode;
   }
   return decoder.decode(result);
-}, encoder, decoder, stripCrlf = (str) => str.replace(/[\n\r]/g, ""), alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", alphabetCodes, paddingCode = 61, codes, getCode = (charCode) => {
+}, encoder, decoder, alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", alphabetCodes, paddingCode = 61, invalidCharacter, codes, getCode = (charCode) => {
   if (charCode >= codes.length || codes[charCode] === 255) {
     throw new TypeError(`Invalid character ${String.fromCharCode(charCode)}`);
   }
@@ -5301,8 +5354,11 @@ var init_Base64 = __esm(() => {
   init_Result();
   init_EncodingError();
   encoder = /* @__PURE__ */ new TextEncoder;
-  decoder = /* @__PURE__ */ new TextDecoder;
+  decoder = /* @__PURE__ */ new TextDecoder("utf-8", {
+    ignoreBOM: true
+  });
   alphabetCodes = /* @__PURE__ */ encoder.encode(alphabet);
+  invalidCharacter = /[^A-Za-z0-9+/=]/;
   codes = /* @__PURE__ */ new Uint8Array(123).fill(255);
   for (let i = 0;i < alphabet.length; i++)
     codes[/* @__PURE__ */ alphabet.charCodeAt(i)] = i;
@@ -5362,15 +5418,17 @@ var init_annotations = __esm(() => {
   });
 });
 
-var missing, succeed7, missingExit, sameExit, toOption = (value) => value === missing ? none2() : some2(value), fromOptionExit = (option) => option._tag === "None" ? missingExit : succeed7(option.value);
+var missing, succeed7, missingExit, sameExit, isSameExit = (result) => result[missing] === true, toOption = (value) => value === missing ? none2() : some2(value), fromOptionExit = (option) => option._tag === "None" ? missingExit : succeed7(option.value);
 var init_parser = __esm(() => {
   init_Exit();
   init_Option();
   init_core();
-  missing = /* @__PURE__ */ Symbol();
+  missing = /* @__PURE__ */ Symbol.for("effect/schema/parser/missing");
   succeed7 = succeed4;
   missingExit = /* @__PURE__ */ succeed7(missing);
-  sameExit = /* @__PURE__ */ succeed7(missing);
+  sameExit = /* @__PURE__ */ Object.assign(/* @__PURE__ */ succeed7(missing), {
+    [missing]: true
+  });
 });
 
 function isIssue(u) {
@@ -5828,7 +5886,7 @@ function stepArray(s, item, exit, i) {
   if (exit._tag === "Failure") {
     return wrapPropertyKeyIssue(s, s.ast, i, exit);
   }
-  const value = exit === sameExit ? item : exit[args];
+  const value = isSameExit(exit) ? item : exit[args];
   if (value !== missing) {
     s.output[i] = value;
   } else {
@@ -5900,7 +5958,7 @@ function stepProperty(s, p, exit) {
   if (exit._tag === "Failure") {
     return wrapPropertyKeyIssue(s, s.ast, p.name, exit);
   }
-  if (exit === sameExit)
+  if (isSameExit(exit))
     return;
   const value = exit[args];
   if (value !== missing) {
@@ -6231,10 +6289,8 @@ function parseUnionCandidates(ast, parser, candidates, input, options) {
 }
 function resumeUnion(eff, state) {
   return flatMapEager2(eff, (_) => {
-    if (state.out === sameExit)
-      return succeed6(state.input);
     if (state.out)
-      return state.out;
+      return isSameExit(state.out) ? succeed6(state.input) : state.out;
     return fail5(new AnyOf(state.ast, state.issues ?? [], state.input, state.options));
   });
 }
@@ -6704,7 +6760,7 @@ var isDeclaration, isNever2, isLiteral, isUniqueSymbol, isArrays, isObjects, isS
       throw new Error("Cannot use `Schema.optionalKey` or `Schema.optional` with index signatures. Index signatures already allow keys to be absent; use `Schema.UndefinedOr` to allow `undefined` values.");
     }
   }
-}, Objects, parsePropertiesOptions, parseProperties, parsePropertiesConcurrent, toCandidate, candidateIndexCache, emptyCandidates, getRuntimeType = (input) => input === null ? "null" : Array.isArray(input) ? "array" : typeof input, hasPropertySignature = (input, key) => key === "__proto__" ? Object.hasOwn(input, key) : (key in input), Union, parseUnion, nonFiniteLiterals, Suspend, Filter2, FilterGroup, finite, numberToJson, bodyOwners, optionalKey, optionalKeyLastLink, optional, toType, toEncoded, flip2, parameterFromPropertyKey, isStringFiniteRegExp, isStringNumberRegExp, finiteString, finiteToString, numberToString, BIGINT_PATTERN = "-?\\d+", isStringBigIntRegExp, bigIntString, bigIntToString, REGEXP_PATTERN = "Symbol\\(([\\s\\S]*)\\)", isStringSymbolRegExp, symbolString, symbolToString, Json, StringTree, unknownToStringTree;
+}, Objects, parsePropertiesOptions, parseProperties, parsePropertiesConcurrent, toCandidate, candidateIndexCache, emptyCandidates, getRuntimeType = (input) => input === null ? "null" : Array.isArray(input) ? "array" : typeof input, objectPrototypeKeys, requiresOwnProperty = (key) => objectPrototypeKeys.has(typeof key === "number" ? globalThis.String(key) : key), hasPropertySignature = (input, key) => Object.hasOwn(input, key) || (key in input) && !requiresOwnProperty(key), Union, parseUnion, nonFiniteLiterals, Suspend, Filter2, FilterGroup, finite, numberToJson, bodyOwners, optionalKey, optionalKeyLastLink, optional, toType, toEncoded, flip2, parameterFromPropertyKey, isStringFiniteRegExp, isStringNumberRegExp, finiteString, finiteToString, numberToString, BIGINT_PATTERN = "-?\\d+", isStringBigIntRegExp, bigIntString, bigIntToString, REGEXP_PATTERN = "Symbol\\(([\\s\\S]*)\\)", isStringSymbolRegExp, symbolString, symbolToString, Json, StringTree, unknownToStringTree;
 var init_SchemaAST = __esm(() => {
   init_Array();
   init_Cause();
@@ -7129,7 +7185,8 @@ var init_SchemaAST = __esm(() => {
           properties = ast.propertySignatures.map((ps) => ({
             parser: compileField(ps.type),
             name: ps.name,
-            type: ps.type
+            type: ps.type,
+            ownOnly: requiresOwnProperty(ps.name)
           }));
           indexes = indexCount ? ast.indexSignatures.map((is) => ({
             is,
@@ -7145,7 +7202,7 @@ var init_SchemaAST = __esm(() => {
           if (exitValue._tag === "Failure") {
             return wrapPropertyKeyIssue(s, ast, key, exitValue) ?? void_2;
           }
-          const value = exitValue === sameExit ? inputValue : exitValue[args];
+          const value = isSameExit(exitValue) ? inputValue : exitValue[args];
           if (k2 !== missing && value !== missing) {
             if (hasProperties && (expectedKeys.has(key) || expectedKeys.has(typeof k2 === "number" ? globalThis.String(k2) : k2)))
               return void_2;
@@ -7164,7 +7221,7 @@ var init_SchemaAST = __esm(() => {
           if (exitKey._tag === "Failure") {
             return wrapPropertyKeyIssue(s, ast, key, exitKey) ?? void_2;
           }
-          const k2 = exitKey === sameExit ? key : exitKey[args];
+          const k2 = isSameExit(exitKey) ? key : exitKey[args];
           const inputValue = s.input[key];
           const result = index.parserValue(inputValue, s.options);
           return effectIsExit(result) ? finishIndex(s, key, k2, inputValue, result) : flatMap2(exit2(result), (exit) => finishIndex(s, key, k2, inputValue, exit));
@@ -7310,13 +7367,13 @@ var init_SchemaAST = __esm(() => {
           for (let index = 0;index < props.length; index++) {
             const property = props[index];
             const name = property.name;
-            const hasKey = hasPropertySignature(record, name);
+            const hasKey = property.ownOnly ? Object.hasOwn(record, name) : (name in record);
             const value = hasKey ? record[name] : missing;
             const exit = property.parser(value, options);
             if (!effectIsExit(exit)) {
               return resume(state, index, exit);
             }
-            if (exit === sameExit) {
+            if (isSameExit(exit)) {
               if (hasKey)
                 assignProperty(out, name, value);
               continue;
@@ -7357,7 +7414,7 @@ var init_SchemaAST = __esm(() => {
   };
   parsePropertiesOptions = {
     onItem(s, p) {
-      if (!hasPropertySignature(s.input, p.name)) {
+      if (!(p.ownOnly ? Object.hasOwn(s.input, p.name) : (p.name in s.input))) {
         return p.parser(missing, s.options);
       }
       const value = s.input[p.name];
@@ -7383,6 +7440,7 @@ var init_SchemaAST = __esm(() => {
   });
   candidateIndexCache = /* @__PURE__ */ new WeakMap;
   emptyCandidates = /* @__PURE__ */ Object.freeze([]);
+  objectPrototypeKeys = /* @__PURE__ */ new Set(Reflect.ownKeys(Object.prototype)).add("__proto__");
   Union = class extends ASTNodeImpl {
     _tag = "Union";
     types;
@@ -7578,7 +7636,7 @@ var init_SchemaAST = __esm(() => {
       const checks = canPreserveEncodingChecks(ast) ? type.encodingChecks : isArrays(type) || isObjects(type) || isDeclaration(type) && type.typeParameters.length > 0 ? extractStructuralChecks(type.encodingChecks) : undefined;
       return copy2(type, {
         encodingChecks: undefined,
-        checks: combineChecks(type.checks, checks)
+        checks: combineChecks(checks, type.checks)
       });
     }
     return type;
@@ -7661,14 +7719,14 @@ function compileTransformation(transformation) {
 function compileTransformationUnsafe(transformation) {
   if (transformation._tag === "Middleware") {
     return (result, current, options) => {
-      const transformed = result === sameExit ? transformation.decode(succeed7(toOption(current)), options) : transformation.decode(mapEager2(result, toOption), options);
+      const transformed = isSameExit(result) ? transformation.decode(succeed7(toOption(current)), options) : transformation.decode(mapEager2(result, toOption), options);
       return fromOptionalEffect(transformed);
     };
   }
   const getter = transformation.decode;
   switch (getter._tag) {
     case "Passthrough":
-      return (result, current) => result === sameExit ? succeed7(current) : result;
+      return (result, current) => isSameExit(result) ? succeed7(current) : result;
     case "Transform": {
       const transform = (value) => value === missing ? missingExit : succeed7(getter.transform(value));
       return (result, current) => flatMapTransformation(result, current, transform);
@@ -7703,11 +7761,11 @@ function withDefault2(ast, parser) {
     const result = defaultValue;
     if (effectIsExit(result) && result._tag === "Success") {
       const local = parser(result[args], options);
-      return local === sameExit ? result : local;
+      return isSameExit(local) ? result : local;
     }
     return flatMapEager2(wrapEncoding(ast, input, options, result), (value) => {
       const local = parser(value, options);
-      return local === sameExit ? succeed7(value) : local;
+      return isSameExit(local) ? succeed7(value) : local;
     });
   };
 }
@@ -7736,7 +7794,7 @@ function compile(ast, compile, compileField, base, specialize) {
       if (encodingChecks && !options.disableChecks) {
         if (effectIsExit(result)) {
           if (result._tag === "Success") {
-            const output = result === sameExit ? input : result[args];
+            const output = isSameExit(result) ? input : result[args];
             if (input !== missing && output !== missing) {
               const issues = collectIssues(encodingChecks, input, undefined, ast, options);
               if (issues) {
@@ -7759,7 +7817,7 @@ function compile(ast, compile, compileField, base, specialize) {
       if (checks && !options.disableChecks) {
         if (effectIsExit(result)) {
           if (result._tag === "Success") {
-            const value = result === sameExit ? input : result[args];
+            const value = isSameExit(result) ? input : result[args];
             if (value === missing)
               return result;
             const issues = collectIssues(checks, value, undefined, ast, options);
@@ -7802,7 +7860,7 @@ function compile(ast, compile, compileField, base, specialize) {
         } else {
           result = flatMapEager2(result, (value) => {
             const nextResult = next(value, options);
-            return nextResult === sameExit ? succeed7(value) : nextResult;
+            return isSameExit(nextResult) ? succeed7(value) : nextResult;
           });
         }
       }
@@ -7810,16 +7868,16 @@ function compile(ast, compile, compileField, base, specialize) {
     if (result._tag === "Success") {
       const value = result[args];
       const local = parseLocal(value, options);
-      return local === sameExit ? result : local;
+      return isSameExit(local) ? result : local;
     }
     result = wrapEncoding(ast, input, options, result);
     return flatMapEager2(result, (value) => {
       const local = parseLocal(value, options);
-      return local === sameExit ? succeed7(value) : local;
+      return isSameExit(local) ? succeed7(value) : local;
     });
   };
 }
-var flatMapTransformation = (result, current, f) => result === sameExit ? f(current) : flatMapEager2(result, f), fromOptionalEffect = (effect) => flatMapEager2(effect, fromOptionExit), wrapEncoding = (ast, input, options, effect) => catchCause2(effect, (cause) => failCauseSync2(() => map4(cause, (issue) => new Encoding(ast, issue, input, options))));
+var flatMapTransformation = (result, current, f) => isSameExit(result) ? f(current) : flatMapEager2(result, f), fromOptionalEffect = (effect) => flatMapEager2(effect, fromOptionExit), wrapEncoding = (ast, input, options, effect) => catchCause2(effect, (cause) => failCauseSync2(() => map4(cause, (issue) => new Encoding(ast, issue, input, options))));
 var init_interpreter = __esm(() => {
   init_Cause();
   init_Effect();
@@ -8015,7 +8073,7 @@ function run(ast) {
   return runWithCompiler(normalCompiler, ast);
 }
 function parserResult(result, input) {
-  if (result === sameExit) {
+  if (isSameExit(result)) {
     return succeed6(input);
   }
   if (!effectIsExit(result)) {
@@ -8027,7 +8085,7 @@ function runWithCompiler(compiler, ast) {
   let parser;
   return (input, options) => {
     const result = (parser ??= compiler(ast))(input, options ?? defaultParseOptions);
-    if (result === sameExit) {
+    if (isSameExit(result)) {
       return succeed6(input);
     }
     if (!effectIsExit(result)) {
@@ -8199,14 +8257,50 @@ var init_schemaError = () => {};
 
 var init_Bytes = () => {};
 
-var TypeId20 = "~effect/SemVer", SemVerProto, isSemVer = (u) => hasProperty(u, TypeId20), format4 = (self) => {
+var TypeId20 = "~effect/Rational", RationalProto, isRational = (u) => hasProperty(u, TypeId20), Equivalence3, format4 = (n) => `${n.numerator}/${n.denominator}`;
+var init_Rational = __esm(() => {
+  init_Equal();
+  init_Equivalence();
+  init_Hash();
+  init_Inspectable();
+  init_Pipeable();
+  init_Predicate();
+  RationalProto = {
+    [TypeId20]: TypeId20,
+    [symbol]() {
+      return combine(hash(this.numerator), hash(this.denominator));
+    },
+    [symbol2](that) {
+      return isRational(that) && Equivalence3(this, that);
+    },
+    toString() {
+      return `Rational(${format4(this)})`;
+    },
+    toJSON() {
+      return {
+        _id: "Rational",
+        numerator: String(this.numerator),
+        denominator: String(this.denominator)
+      };
+    },
+    [NodeInspectSymbol]() {
+      return this.toJSON();
+    },
+    pipe() {
+      return pipeArguments(this, arguments);
+    }
+  };
+  Equivalence3 = /* @__PURE__ */ make((self, that) => self.numerator === that.numerator && self.denominator === that.denominator);
+});
+
+var TypeId21 = "~effect/SemVer", SemVerProto, isSemVer = (u) => hasProperty(u, TypeId21), format5 = (self) => {
   let out = `${self.major}.${self.minor}.${self.patch}`;
   if (self.prerelease.length > 0)
     out += `-${self.prerelease.join(".")}`;
   if (self.build.length > 0)
     out += `+${self.build.join(".")}`;
   return out;
-}, identifiersEqual, Equivalence3;
+}, identifiersEqual, Equivalence4;
 var init_SemVer = __esm(() => {
   init_Equal();
   init_Equivalence();
@@ -8215,20 +8309,20 @@ var init_SemVer = __esm(() => {
   init_Pipeable();
   init_Predicate();
   SemVerProto = {
-    [TypeId20]: TypeId20,
+    [TypeId21]: TypeId21,
     [symbol2](that) {
-      return isSemVer(that) && Equivalence3(this, that);
+      return isSemVer(that) && Equivalence4(this, that);
     },
     [symbol]() {
-      return string(format4(this));
+      return string(format5(this));
     },
     toString() {
-      return `SemVer(${format4(this)})`;
+      return `SemVer(${format5(this)})`;
     },
     toJSON() {
       return {
         _id: "SemVer",
-        value: format4(this)
+        value: format5(this)
       };
     },
     [NodeInspectSymbol]() {
@@ -8239,15 +8333,15 @@ var init_SemVer = __esm(() => {
     }
   };
   identifiersEqual = /* @__PURE__ */ Array_(/* @__PURE__ */ strictEqual());
-  Equivalence3 = /* @__PURE__ */ make((self, that) => self.major === that.major && self.minor === that.minor && self.patch === that.patch && identifiersEqual(self.prerelease, that.prerelease) && identifiersEqual(self.build, that.build));
+  Equivalence4 = /* @__PURE__ */ make((self, that) => self.major === that.major && self.minor === that.minor && self.patch === that.patch && identifiersEqual(self.prerelease, that.prerelease) && identifiersEqual(self.build, that.build));
 });
 
-var TypeId21 = "~effect/SemVerRange", SemVerRangeProto, isSemVerRange = (u) => hasProperty(u, TypeId21), formatPartial = (self) => {
+var TypeId22 = "~effect/SemVerRange", SemVerRangeProto, isSemVerRange = (u) => hasProperty(u, TypeId22), formatPartial = (self) => {
   if (self.components.length === 0)
     return "*";
   const core = self.components.join(".");
   return self.prerelease.length === 0 ? core : `${core}-${self.prerelease.join(".")}`;
-}, formatComparator = (self) => self._tag === "Hyphen" ? `${formatPartial(self.from)} - ${formatPartial(self.to)}` : `${self.operator === "=" ? "" : self.operator}${formatPartial(self.version)}`, format5 = (self) => self.sets.map((set) => set.map(formatComparator).join(" ")).join(" || ");
+}, formatComparator = (self) => self._tag === "Hyphen" ? `${formatPartial(self.from)} - ${formatPartial(self.to)}` : `${self.operator === "=" ? "" : self.operator}${formatPartial(self.version)}`, format6 = (self) => self.sets.map((set) => set.map(formatComparator).join(" ")).join(" || ");
 var init_SemVerRange = __esm(() => {
   init_Equal();
   init_Hash();
@@ -8255,20 +8349,20 @@ var init_SemVerRange = __esm(() => {
   init_Pipeable();
   init_Predicate();
   SemVerRangeProto = {
-    [TypeId21]: TypeId21,
+    [TypeId22]: TypeId22,
     [symbol2](that) {
-      return isSemVerRange(that) && format5(this) === format5(that);
+      return isSemVerRange(that) && format6(this) === format6(that);
     },
     [symbol]() {
-      return string(format5(this));
+      return string(format6(this));
     },
     toString() {
-      return `SemVerRange(${format5(this)})`;
+      return `SemVerRange(${format6(this)})`;
     },
     toJSON() {
       return {
         _id: "SemVerRange",
-        value: format5(this)
+        value: format6(this)
       };
     },
     [NodeInspectSymbol]() {
@@ -8869,12 +8963,12 @@ var init_Boolean = __esm(() => {
 
 var init_Brand = () => {};
 
-var TypeId22 = "~effect/Cache", Proto4;
+var TypeId23 = "~effect/Cache", Proto4;
 var init_Cache = __esm(() => {
   init_core();
   Proto4 = {
     ...PipeInspectableProto,
-    [TypeId22]: TypeId22,
+    [TypeId23]: TypeId23,
     toJSON() {
       return {
         _id: "Cache",
@@ -8887,12 +8981,12 @@ var init_Cache = __esm(() => {
 
 var init_Latch = () => {};
 
-var TypeId23 = "~effect/MutableRef", MutableRefProto;
+var TypeId24 = "~effect/MutableRef", MutableRefProto;
 var init_MutableRef = __esm(() => {
   init_Inspectable();
   init_core();
   MutableRefProto = {
-    [TypeId23]: TypeId23,
+    [TypeId24]: TypeId24,
     ...PipeInspectableProto,
     toJSON() {
       return {
@@ -8907,12 +9001,12 @@ var init_PubSub = () => {};
 
 var init_Take = () => {};
 
-var TypeId24 = "~effect/Channel", ChannelProto;
+var TypeId25 = "~effect/Channel", ChannelProto;
 var init_Channel = __esm(() => {
   init_Function();
   init_Pipeable();
   ChannelProto = {
-    [TypeId24]: {
+    [TypeId25]: {
       _Env: identity,
       _InErr: identity,
       _InElem: identity,
@@ -8929,7 +9023,7 @@ var init_ChannelSchema = () => {};
 
 var init_PlatformError = () => {};
 
-var TypeId25 = "~effect/Sink", sinkVariance, SinkProto;
+var TypeId26 = "~effect/Sink", sinkVariance, SinkProto;
 var init_Sink = __esm(() => {
   init_Function();
   init_Pipeable();
@@ -8941,7 +9035,7 @@ var init_Sink = __esm(() => {
     _R: identity
   };
   SinkProto = {
-    [TypeId25]: sinkVariance,
+    [TypeId26]: sinkVariance,
     pipe() {
       return pipeArguments(this, arguments);
     }
@@ -9068,7 +9162,7 @@ var init_ConfigProvider = __esm(() => {
 
 var init_LogLevel = () => {};
 
-var TypeId26 = "~effect/Config", Proto6;
+var TypeId27 = "~effect/Config", Proto6;
 var init_Config = __esm(() => {
   init_ConfigProvider();
   init_Effectable();
@@ -9079,7 +9173,7 @@ var init_Config = __esm(() => {
         return this.parse(fiber.getRef(ConfigProvider));
       }
     }),
-    [TypeId26]: TypeId26,
+    [TypeId27]: TypeId27,
     toJSON() {
       return {
         _id: "Config"
@@ -9094,11 +9188,11 @@ var init_Differ = () => {};
 
 var init_ErrorReporter = () => {};
 
-var TypeId27 = "~effect/FiberHandle", Proto7;
+var TypeId28 = "~effect/FiberHandle", Proto7;
 var init_FiberHandle = __esm(() => {
   init_core();
   Proto7 = {
-    [TypeId27]: TypeId27,
+    [TypeId28]: TypeId28,
     ...PipeInspectableProto,
     toJSON() {
       return {
@@ -9109,12 +9203,12 @@ var init_FiberHandle = __esm(() => {
   };
 });
 
-var TypeId28 = "~effect/FiberMap", Proto8;
+var TypeId29 = "~effect/FiberMap", Proto8;
 var init_FiberMap = __esm(() => {
   init_core();
   init_Iterable();
   Proto8 = {
-    [TypeId28]: TypeId28,
+    [TypeId29]: TypeId29,
     [Symbol.iterator]() {
       if (this.state._tag === "Closed") {
         return empty2();
@@ -9131,12 +9225,12 @@ var init_FiberMap = __esm(() => {
   };
 });
 
-var TypeId29 = "~effect/FiberSet", Proto9;
+var TypeId30 = "~effect/FiberSet", Proto9;
 var init_FiberSet = __esm(() => {
   init_core();
   init_Iterable();
   Proto9 = {
-    [TypeId29]: TypeId29,
+    [TypeId30]: TypeId30,
     [Symbol.iterator]() {
       if (this.state._tag === "Closed") {
         return empty2();
@@ -9153,13 +9247,13 @@ var init_FiberSet = __esm(() => {
   };
 });
 
-var TypeId30 = "~effect/Glob", GlobProto;
+var TypeId31 = "~effect/Glob", GlobProto;
 var init_Glob = __esm(() => {
   init_Formatter();
   init_Inspectable();
   init_Pipeable();
   GlobProto = {
-    [TypeId30]: TypeId30,
+    [TypeId31]: TypeId31,
     toJSON() {
       return {
         _id: "Glob",
@@ -9183,13 +9277,13 @@ var init_Graph = () => {};
 
 var init_PrimaryKey = () => {};
 
-var TypeId31 = "~effect/HashRing", Proto10;
+var TypeId32 = "~effect/HashRing", Proto10;
 var init_HashRing = __esm(() => {
   init_core();
   init_Iterable();
   Proto10 = {
     ...PipeInspectableProto,
-    [TypeId31]: TypeId31,
+    [TypeId32]: TypeId32,
     [Symbol.iterator]() {
       return map(this.nodes.values(), ([n]) => n)[Symbol.iterator]();
     },
@@ -9215,13 +9309,13 @@ var init_ManagedRuntime = () => {};
 
 var init_Match = () => {};
 
-var TypeId32 = "~effect/MutableHashSet", MutableHashSetProto;
+var TypeId33 = "~effect/MutableHashSet", MutableHashSetProto;
 var init_MutableHashSet = __esm(() => {
   init_Formatter();
   init_Inspectable();
   init_Pipeable();
   MutableHashSetProto = {
-    [TypeId32]: TypeId32,
+    [TypeId33]: TypeId33,
     [Symbol.iterator]() {
       return Array.from(this.keyMap).map(([_]) => _)[Symbol.iterator]();
     },
@@ -9251,12 +9345,12 @@ var init_PartitionedSemaphore = () => {};
 
 var init_Pool = () => {};
 
-var TypeId33 = "~effect/Ref", RefProto;
+var TypeId34 = "~effect/Ref", RefProto;
 var init_Ref = __esm(() => {
   init_Function();
   init_core();
   RefProto = {
-    [TypeId33]: {
+    [TypeId34]: {
       _A: identity
     },
     ...PipeInspectableProto,
@@ -9271,12 +9365,12 @@ var init_Ref = __esm(() => {
 
 var init_UndefinedOr = () => {};
 
-var TypeId34 = "~effect/RequestResolver", RequestResolverProto;
+var TypeId35 = "~effect/RequestResolver", RequestResolverProto;
 var init_RequestResolver = __esm(() => {
   init_Function();
   init_Pipeable();
   RequestResolverProto = {
-    [TypeId34]: {
+    [TypeId35]: {
       _A: identity,
       _R: identity
     },
@@ -9286,12 +9380,12 @@ var init_RequestResolver = __esm(() => {
   };
 });
 
-var TypeId35 = "~effect/SynchronizedRef", Proto11;
+var TypeId36 = "~effect/SynchronizedRef", Proto11;
 var init_SynchronizedRef = __esm(() => {
   init_core();
   Proto11 = {
     ...PipeInspectableProto,
-    [TypeId35]: TypeId35,
+    [TypeId36]: TypeId36,
     toJSON() {
       return {
         _id: "SynchronizedRef",
@@ -9301,12 +9395,12 @@ var init_SynchronizedRef = __esm(() => {
   };
 });
 
-var TypeId36 = "~effect/ScopedRef", Proto12;
+var TypeId37 = "~effect/ScopedRef", Proto12;
 var init_ScopedRef = __esm(() => {
   init_core();
   Proto12 = {
     ...PipeInspectableProto,
-    [TypeId36]: TypeId36,
+    [TypeId37]: TypeId37,
     toJSON() {
       return {
         _id: "ScopedRef",
@@ -9316,12 +9410,12 @@ var init_ScopedRef = __esm(() => {
   };
 });
 
-var TypeId37 = "~effect/Resource", Proto13;
+var TypeId38 = "~effect/Resource", Proto13;
 var init_Resource = __esm(() => {
   init_core();
   Proto13 = {
     ...PipeInspectableProto,
-    [TypeId37]: TypeId37,
+    [TypeId38]: TypeId38,
     toJSON() {
       return {
         _id: "Resource"
@@ -9483,12 +9577,12 @@ var init_SchemaRepresentation = __esm(() => {
   }), /* @__PURE__ */ makeKeywordSchema("Number"), /* @__PURE__ */ makeKeywordSchema("Boolean"), /* @__PURE__ */ makeKeywordSchema("BigInt"), /* @__PURE__ */ makeKeywordSchema("Symbol"), /* @__PURE__ */ makeKeywordSchema("ObjectKeyword"), LiteralSchema, UniqueSymbolSchema, EnumSchema, TemplateLiteralSchema, ArraysSchema, ObjectsSchema, UnionSchema]);
 });
 
-var TypeId38 = "~effect/ScopedCache", Proto14;
+var TypeId39 = "~effect/ScopedCache", Proto14;
 var init_ScopedCache = __esm(() => {
   init_core();
   Proto14 = {
     ...PipeInspectableProto,
-    [TypeId38]: TypeId38,
+    [TypeId39]: TypeId39,
     toJSON() {
       return {
         _id: "ScopedCache",
@@ -9503,13 +9597,13 @@ var init_StandardSchema = () => {};
 
 var init_Stdio = () => {};
 
-var TypeId39 = "~effect/SubscriptionRef", Proto15;
+var TypeId40 = "~effect/SubscriptionRef", Proto15;
 var init_SubscriptionRef = __esm(() => {
   init_Function();
   init_core();
   Proto15 = {
     ...PipeInspectableProto,
-    [TypeId39]: {
+    [TypeId40]: {
       _A: identity
     },
     toJSON() {
@@ -9574,13 +9668,13 @@ var init_TxDeferred = __esm(() => {
   };
 });
 
-var TypeId40 = "~effect/TxHashMap", TxHashMapProto;
+var TypeId41 = "~effect/TxHashMap", TxHashMapProto;
 var init_TxHashMap = __esm(() => {
   init_Formatter();
   init_Inspectable();
   init_Pipeable();
   TxHashMapProto = {
-    [TypeId40]: TypeId40,
+    [TypeId41]: TypeId41,
     [NodeInspectSymbol]() {
       return toJson(this);
     },
@@ -9599,13 +9693,13 @@ var init_TxHashMap = __esm(() => {
   };
 });
 
-var TypeId41 = "~effect/TxHashSet", TxHashSetProto;
+var TypeId42 = "~effect/TxHashSet", TxHashSetProto;
 var init_TxHashSet = __esm(() => {
   init_Formatter();
   init_Inspectable();
   init_Pipeable();
   TxHashSetProto = {
-    [TypeId41]: TypeId41,
+    [TypeId42]: TypeId42,
     [NodeInspectSymbol]() {
       return toJson(this);
     },
@@ -9643,7 +9737,7 @@ var init_TxPriorityQueue = __esm(() => {
   };
 });
 
-var EnqueueTypeId2 = "~effect/TxQueue/Enqueue", DequeueTypeId2 = "~effect/TxQueue/Dequeue", TypeId42 = "~effect/TxQueue", TxQueueProto;
+var EnqueueTypeId2 = "~effect/TxQueue/Enqueue", DequeueTypeId2 = "~effect/TxQueue/Dequeue", TypeId43 = "~effect/TxQueue", TxQueueProto;
 var init_TxQueue = __esm(() => {
   init_Inspectable();
   TxQueueProto = {
@@ -9655,7 +9749,7 @@ var init_TxQueue = __esm(() => {
       _A: (_) => _,
       _E: (_) => _
     },
-    [TypeId42]: {
+    [TypeId43]: {
       _A: (_) => _,
       _E: (_) => _
     },
@@ -9850,6 +9944,7 @@ var init_dist = __esm(() => {
   init_Pull();
   init_Queue();
   init_Random();
+  init_Rational();
   init_RcMap();
   init_RcRef();
   init_Record();
@@ -10739,15 +10834,15 @@ var pi_packages_default;
 var init_pi_packages = __esm(() => {
   pi_packages_default = {
     "pi-provider-kimi-code": "0.6.13",
-    "@tintinweb/pi-subagents": "0.23.1",
-    "billion-context": "0.1.212",
+    "@tintinweb/pi-subagents": "0.23.2",
+    "billion-context": "0.1.213",
     "@juicesharp/rpiv-todo": "2.15.0",
     "@juicesharp/rpiv-ask-user-question": "2.15.0",
     "@aliou/pi-processes": "0.13.6",
-    "@amaster.ai/pi-computer-use": "0.1.36",
+    "@amaster.ai/pi-computer-use": "0.1.38",
     "pi-web-kit": "0.5.0",
     "@ff-labs/pi-fff": "0.11.0",
-    "@opencode/browse": "0.0.15"
+    "@opencode/browse": "0.0.16"
   };
 });
 
@@ -27634,10 +27729,10 @@ var TUI_PACKAGES = {
       "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
     ],
     "electron-to-chromium": [
-      "electron-to-chromium@1.5.478",
+      "electron-to-chromium@1.5.479",
       "",
       {},
-      "sha512-pftG+ma5Lm8O6/p45bhYT6StBN5ziQymaRzmCZwFl8DwWHKPPD93FdOmP1aqftcepolQYvrcyTLa17kE8Yf+jg=="
+      "sha512-uAJdJQ7vHa4TvPfzt1TOqoRgHmav5gwmqHMPLxBH6m8Cbj5R9/z/rygTOQiZ8pe5g0ZAEogga1bP6HoKcOzx/Q=="
     ],
     "emoji-regex": [
       "emoji-regex@10.6.0",
@@ -27917,6 +28012,17 @@ var TUI_PACKAGES = {
       {},
       "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
     ],
+    "typescript": [
+      "typescript@5.9.3",
+      "",
+      {
+        "bin": {
+          "tsc": "bin/tsc",
+          "tsserver": "bin/tsserver"
+        }
+      },
+      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    ],
     "update-browserslist-db": [
       "update-browserslist-db@1.3.4",
       "",
@@ -28008,17 +28114,6 @@ var TUI_PACKAGES = {
       "",
       {},
       "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
-    ],
-    "bun-ffi-structs/typescript": [
-      "typescript@5.9.3",
-      "",
-      {
-        "bin": {
-          "tsc": "bin/tsc",
-          "tsserver": "bin/tsserver"
-        }
-      },
-      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
     ],
     "glob/minimatch": [
       "minimatch@8.0.7",

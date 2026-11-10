@@ -484,7 +484,7 @@ describe("the browse pin", () => {
   test("is exact, from the table, and in the argument of the MCP server the capability registers", () => {
     const entryOf = CAPABILITIES.find((capability) => capability.name === "browser-use")
     const server = entryOf?.forms.normal
-    expect(PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]).toBe("0.0.15")
+    expect(PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]).toBe("0.0.16")
     expect(server).toMatchObject({
       packages: [],
       mcpServers: [
@@ -495,7 +495,7 @@ describe("the browse pin", () => {
             "--registry=https://registry.npmjs.org/",
             "--@opencode:registry=https://registry.npmjs.org/",
             "-y",
-            "@opencode/browse@0.0.15",
+            "@opencode/browse@0.0.16",
             "mcp",
           ],
         },

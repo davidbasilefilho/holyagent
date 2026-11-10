@@ -39,7 +39,7 @@ Neither is a Pi package: Pi installs nothing for them. Browse runs as `npx` at a
 
 ### Normal: opencode browse
 
-[opencode browse](https://github.com/anomalyco/browse) (`@opencode/browse`, MIT, pinned at `0.0.15`) is a stdio MCP server and a paired browser extension: the server drives the user's own Chromium-family browser through the extension, with Playwright code run in the visible tab. It runs as `npx ... @opencode/browse@0.0.15 mcp` and needs Node.js 22.19 or newer (the package's `engines`).
+[opencode browse](https://github.com/anomalyco/browse) (`@opencode/browse`, MIT, pinned at `0.0.16`) is a stdio MCP server and a paired browser extension: the server drives the user's own Chromium-family browser through the extension, with Playwright code run in the visible tab. It runs as `npx ... @opencode/browse@0.0.16 mcp` and needs Node.js 22.19 or newer (the package's `engines`).
 
 - **The tools** (read from the 0.0.15 package): `execute` (Playwright code in the user's tab), `status`, `settings`, `network`, `recording`, `flight_recorder`, `session_new`, `session_use`, `session_list`, `session_reset`, `session_delete`, `session_adopt`, `session_allowlist`, `tabs_cleanup` and `secrets_list`, `secrets_status`, `secrets_refresh`, `secrets_run`. Pi names them `mcp__browse__<tool>`.
 - **The pairing.** The server cannot act until a browser has the extension and has been paired: `npx -y @opencode/browse@<pin> install` opens the extension's Chrome Web Store page when no browser has it and pairs the browser, and `pair` prints a one-time code to enter in the extension's options instead. Browse keeps each pairing in `browser-tokens.json` below its data folder (`OPENCODE_BROWSER_HOME`, else `$XDG_DATA_HOME/browse`, else `~/.local/share/browse`).

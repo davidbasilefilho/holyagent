@@ -49,7 +49,7 @@ What the extension does for the root only, that is a session whose role is `root
 
 ## Specialists as package agents
 
-**Status: built.** `@tintinweb/pi-subagents` 0.23.1 runs every child as an in-process `AgentSession` of the root's Pi process (`src/agent-runner.ts`: the session is created with `createAgentSession`, named and prompted in the same function), so a child has no command line. There is no `--tools`, `--session-id`, `-e` or `--append-system-prompt` for it and no environment of its own: the agent file is the one place a role's prompt and tool set can live, and the process environment is shared by the root and every child. The package's own agent files and settings carry the rest, and the extension adds only what the package does not do.
+**Status: built.** `@tintinweb/pi-subagents` 0.23.2 runs every child as an in-process `AgentSession` of the root's Pi process (`src/agent-runner.ts`: the session is created with `createAgentSession`, named and prompted in the same function), so a child has no command line. There is no `--tools`, `--session-id`, `-e` or `--append-system-prompt` for it and no environment of its own: the agent file is the one place a role's prompt and tool set can live, and the process environment is shared by the root and every child. The package's own agent files and settings carry the rest, and the extension adds only what the package does not do.
 
 ### The agent files
 
