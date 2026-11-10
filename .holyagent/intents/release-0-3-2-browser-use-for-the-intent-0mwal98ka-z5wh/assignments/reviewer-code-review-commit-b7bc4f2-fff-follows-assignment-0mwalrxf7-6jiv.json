@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mwalrxf7-6jiv",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "review-commit-b7bc4f2-fff-follows",
+  "objective": "Review commit b7bc4f2 (fff follows directory links by default) for correctness and regressions.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-fff, branch release/0.3.2/feat/fff-follow-links; review `git diff becf69e b7bc4f2`. Requirement: setup no longer writes followSymlinks: false to pi-fff.json so fff follows directory links by its own default; every other fff override is unchanged; a followSymlinks: false is removed only when the setup record names it as HolyAgent-written and it still equals false, never a value set by hand; docs/pi/search.md states the new default and its consequence.",
+    "Check the revert path when the capability is turned off, the record handling, and that tests fail without the change."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-fff; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests; unit tests only.",
+    "Report blocking findings with file:line and a concrete failure scenario; report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "The change meets the requirement without regressions in setup, revert or record handling",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover the new default and the cleanup and would fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwalkgb1-3qa4"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T11:24:41.587Z"
+  },
+  "createdAt": "2026-11-10T11:24:41.587Z"
+}
