@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mwaz7k7h-fzpu",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 1,
+  "roleTask": "Explorer.map",
+  "slug": "map-where-a-new-root-directive-for",
+  "objective": "Map where a new root directive for handoff-ready state and a handoff-summary CLI command would live in HolyAgent.",
+  "state": "Running",
+  "scope": [
+    "Read-only, in /home/user/holyagent-0.3.2-integration (the 0.3.2 release head, same tree as release/0.3.2/integration).",
+    "Planned change (Intent intent-0mwaz75rz-i978): a root directive in every model family (claude-5.5, gpt-6, kimi-k3.1) that (1) pushes holyagent/state in the branch state mode after each Assignment close, each merge and before ending a turn; (2) keeps a status-and-open-items requirement on the Intent in use (merged PRs, open PRs and CI, next step, residuals, untested-live items), updated at each merge, new blocker and before the final report; (3) a holyagent CLI command that prints a self-contained handoff summary from state (open Intents with requirements, Assignments with state/objective/outcome, recorded branches and PRs, open items).",
+    "Map, with paths and line ranges: (a) the requirements tree for root rules (requirements/root/...), the requirement ids and how a requirement is written, the family translation files for claude-5.5, gpt-6 and kimi-k3.1 and the coverage table (coverage.ts or similar), and the repo's requirements skill (.claude/skills/requirements) steps; which existing root requirement files cover state push, the Intent, version control and the final report (the new directive should extend or sit next to these); (b) how the branch state mode commits and pushes today (runtime source for state commits, any existing push or 'pull before closing' logic, and the holyagent/state worktree setup); (c) the CLI command registry and the existing read-only commands that print state (status, reconcile, requirements, intent show, assignment reports), their source and tests, and the output format they use, so a handoff command can follow it; where the Assignment record's result and acceptance and the Intent's work branches and PRs are stored (vcs commit/pr record them on the Intent); (d) the docs that describe state, the CLI commands and the root's duties (docs/*.md) that the change would update; (e) any session-start hook text that restates root rules (the 'Rules most often missed' list) and where it is generated.",
+    "Report the concrete files to change for each part, and anything in the current design that conflicts with the plan (for example a rule that only the root writes state, or that state pushes ride work pushes)."
+  ],
+  "constraints": [
+    "Read only; make no edits and no git writes.",
+    "Report in under 600 words; put a longer file map in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/map033.md and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "Each of parts a to e names the files and line ranges to change, with source evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "paths"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-10T17:40:45.965Z"
+  },
+  "createdAt": "2026-11-10T17:40:45.965Z"
+}
