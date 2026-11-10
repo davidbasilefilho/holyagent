@@ -1,0 +1,87 @@
+{
+  "id": "assignment-0mwawcn10-0vvq",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-review-findings-on-the-user",
+  "objective": "Repair the review findings on the user-installed ripgrep and fd change.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-unbundle (branch release/0.3.2/feat/user-installed-search-tools, head 86e6d051; the change under repair is b36e708). Items:",
+    "A first attempt at this repair stopped partway (usage limit) and left uncommitted edits in the worktree: 28 files modified (docs, mise.toml, errors.ts, tools.ts, search-tools.ts, shell.ts, doctor.ts, steps.ts, the three family root/search.md, the updater scripts and tests, and regenerated dist); the diff is saved at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/ub-rep-partial.diff. Start by reading `git diff` in the worktree, keep what is right, finish every item below, and check each item against the criteria; the specialist/working.md instruction files and the requirements/ copies were not touched yet.",
+    "1 (blocking). docs/components.md:~49 says the search 'answers the same way everywhere'; the tools are now user-installed, so versions differ per machine. Say the CLI gives one interface and drop the sameness claim; in docs/decisions.md say that versions may now differ between machines and why that was accepted.",
+    "2. Security: findCommand (packages/runtime/src/setup/shell.ts ~50-64) passes the whole PATH to Bun.which, so a relative or empty PATH entry ('.', 'bin', '::') lets a repository that ships an rg, fd or fdfind run when an agent calls holyagent rg/fd. For the search-tool lookup, use only absolute PATH entries and reject a result inside the call's working directory; on win32 accept only a .exe result (a .cmd/.bat shim would pass model-controlled arguments through cmd.exe). Tests: POSIX `PATH=.:<abs>` with a planted rg in the cwd resolves the absolute one or reports missing; a win32 case with an injected which that returns rg.cmd is refused. Add a Windows-only test (skipIf not win32) that resolves a real .exe on PATH, which the windows CI job runs.",
+    "3. mise.toml ripgrep/fd: if mise's aqua backend (which verifies release checksums from the aqua registry) works for both tools on Linux, macOS and Windows, name it explicitly (for example `\"aqua:BurntSushi/ripgrep\" = \"15.2.0\"`, `\"aqua:sharkdp/fd\" = \"10.5.2\"`) and make the updater's mise-tools step (MISE_SOURCES in scripts/update-dependencies.ts) read and move those keys, with a test; check with `mise install` and `mise exec -- rg --version`/`fd --version` here. If the explicit backend does not work, keep the current names and say why in the report.",
+    "4. Text: unify the fallback wording. The ToolMissing hint in packages/runtime/src/cli/errors.ts and docs/components.md:~70 say 'the system grep and find, or the host's search tools', the instruction files say only the system grep or find; use one wording everywhere, matching what the roles can actually use (Bash roles have no Grep or Glob tools), and drop the 'fd is fdfind on Debian' detail from the instruction files since holyagent fd handles it. Follow /home/user/holyagent-0.3.2-unbundle/.claude/skills/requirements/SKILL.md for the requirements tree and regenerate, and /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md for the wording.",
+    "5. README.md:~52 'the software HolyAgent builds with, ships or installs' -> 'builds with or needs' (keep the six sections). docs/decisions.md:~53: state the actual reason for the checksum problem (fd publishes no checksum file; the updater took its digest from GitHub's release API, which is not reachable from every environment) or drop the claim. docs/pi/installation.md: mention the rg/fd lines in the doctor and setup bullets or link to docs/components.md#ripgrep-and-fd. Split the winget install into two commands (`winget install BurntSushi.ripgrep.MSVC` and `winget install sharkdp.fd`) everywhere (INSTALL_COMMANDS in packages/runtime/src/setup/search-tools.ts and the docs) and say to open a new terminal so PATH picks them up.",
+    "6. Code tidy-ups: stale comments at packages/integrations/claude/tests/plugin.test.ts:~792 and packages/runtime/src/setup/shell.ts:~68 ('bundled'); merge the near-duplicate checkSearchTools/reportSearchTools in search-tools.ts into one with the formatter as a parameter; have runTool and doctor/setup resolve through the same function."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests; tests use fakes and the rg/fd mise provides.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 450 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "docs/components.md no longer promises the same answer everywhere, and docs/decisions.md says versions may differ",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The search-tool lookup ignores relative PATH entries, rejects a result in the working directory and accepts only .exe on Windows, with tests",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise.toml names a checksum-verifying backend for ripgrep and fd that the updater moves, or the report says why not",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "The fallback wording is one and the same in the error hint, docs and instructions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "README, decisions, Pi installation docs and the winget commands are corrected",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Stale comments are fixed and the search-tool helpers are merged",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "scripts",
+    "docs",
+    "mise.toml",
+    "README.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwaq191u-whzh",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T16:20:44.055Z"
+  },
+  "createdAt": "2026-11-10T16:20:44.055Z"
+}
