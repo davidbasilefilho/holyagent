@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.audit",
   "slug": "check-the-doc-commit-3e0b2546-against",
   "objective": "Check the doc commit 3e0b2546 against its requirement: lines that state a current pin name the new 0.3.2 pins, and read-at statements keep their version.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Diff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/deps-docs-commit.diff (three docs files in /home/user/holyagent-0.3.2-deps). Current pins (packages/runtime/src/config/pi-packages.json in that worktree): @opencode/browse 0.0.16, @tintinweb/pi-subagents 0.23.2, @amaster.ai/pi-computer-use 0.1.38, billion-context 0.1.213.",
     "Kept as read-at statements by the writer: docs/pi/screen.md:44; packages/runtime/src/setup/browse.ts:137; packages/runtime/src/setup/pi-settings.ts:51-52; docs/pi/caching-and-subagents.md:39, :49; docs/pi/extensions.md:47, :102; docs/pi/t3-code.md:128; docs/pi/orchestration.md:11. Read each kept line in the worktree and say whether it reads as a record of the version a source was read or audited at (correct to keep) or as the current pin (should change)."
@@ -33,7 +33,25 @@
     "agentId": "workflow:wf_c8e7450e-c7b/assignment-0mwaxf88d-zp1x",
     "model": "haiku",
     "effort": "high",
-    "startedAt": "2026-11-10T16:50:44.461Z"
+    "startedAt": "2026-11-10T16:50:44.461Z",
+    "finishedAt": "2026-11-10T16:51:50.891Z"
+  },
+  "result": "result: Pins are updated in the three diffed files, but docs/pi/orchestration.md:11 still states the current pin as 0.23.1 without a read-at marker (discrepant).\nchanged: none\nchecks: none run (review only, no shell). Read the diff file /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/deps-docs-commit.diff and the worktree /home/user/holyagent-0.3.2-deps as it stands. Did not verify that the worktree matches commit 3e0b2546.\nblockers: none\nquestions: none\nnotes: Outside docs, packages/runtime/tests/pi/journal.test.ts:23 and packages/integrations/pi/tests/fixtures/t3/record.ts:217 cite 0.23.1 in comments. Whether the recorded keys still hold at 0.23.2 is unverified. screen.md:44 tool list is from 0.0.15, so the 0.0.16 tool set is unverified.\nevidence:\nLines that state a current pin name the new pins and read-at statements keep their version: DISCREPANT at docs/pi/orchestration.md:11, \"Specialists and workflows run through the @tintinweb/pi-subagents extension (0.23.1, 4 Nov 2026, README)\". Pins in packages/runtime/src/config/pi-packages.json are 0.23.2, and the line has no \"when read\" marker unlike the other kept lines, so a reader takes 0.23.1 as current. Fix: change to 0.23.2 or add \"when read\". Verified in the diff: caching-and-subagents.md:9 (0.23.2), extensions.md:23 (0.23.2), screen.md:36 and its command line (0.0.16). Verified as read-at, correct to keep: screen.md:44 (\"read from the 0.0.15 package\"), browse.ts:137 (\"of @opencode/browse 0.0.15\"), pi-settings.ts:51 (@amaster.ai/pi-computer-use@0.1.36) and :52 (@tintinweb/pi-subagents@0.23.1, README), caching-and-subagents.md:39 and :49 (v0.1.212 publication and notes history), extensions.md:47 (\"0.1.36 registers them deferred\"), extensions.md:102 (\"0.1.36 when read\"), t3-code.md:128 (\"0.1.36 ... when read\"). A docs/ and packages/ grep found no other current-pin lines with old versions.\nfindings: One discrepant line (orchestration.md:11) as above. The other kept read-at lines are correct to keep. The diff's three files carry the new pins.\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Audit: three files correct; one discrepant line orchestration.md:11 goes to repair.",
+    "criteria": [
+      {
+        "criterion": "Lines that state a current pin name the new pins and read-at statements keep their version",
+        "support": "DISCREPANT at docs/pi/orchestration.md:11, \"Specialists and workflows run through the @tintinweb/pi-subagents extension (0.23.1, 4 Nov 2026, README)\". Pins in packages/runtime/src/config/pi-packages.json are 0.23.2, and the line has no \"when read\" marker unlike the other kept lines, so a reader takes 0.23.1 as current. Fix: change to 0.23.2 or add \"when read\". Verified in the diff: caching-and-subagents.md:9 (0.23.2), extensions.md:23 (0.23.2), screen.md:36 and its command line (0.0.16). Verified as read-at, correct to keep: screen.md:44 (\"read from the 0.0.15 package\"), browse.ts:137 (\"of @opencode/browse 0.0.15\"), pi-settings.ts:51 (@amaster.ai/pi-computer-use@0.1.36) and :52 (@tintinweb/pi-subagents@0.23.1, README), caching-and-subagents.md:39 and :49 (v0.1.212 publication and notes history), extensions.md:47 (\"0.1.36 registers them deferred\"), extensions.md:102 (\"0.1.36 when read\"), t3-code.md:128 (\"0.1.36 ... when read\"). A docs/ and packages/ grep found no other current-pin lines with old versions."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "findings",
+        "support": "One discrepant line (orchestration.md:11) as above. The other kept read-at lines are correct to keep. The diff's three files carry the new pins."
+      }
+    ]
   },
   "createdAt": "2026-11-10T16:50:44.461Z"
 }
