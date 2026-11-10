@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mwazi6k1-me7p",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-root-keep-its-state-handoff",
+  "objective": "Make the root keep its state handoff-ready: a root directive in every model family plus a read-only `holyagent handoff` command that prints a self-contained summary from local state.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.3-handoff, branch release/0.3.3/feat/handoff-ready-state, cut from the 0.3.3 bump commit. Why: the maintainer loses access to this host soon and will continue with other agents and hosts (for example Pi with Kimi or GPT); a session's knowledge that is not in the pushed state branch is lost when the session ends. A code map of this change is the 'result' of Assignment assignment-0mwaz7k7h-fzpu (run `holyagent assignment show assignment-0mwaz7k7h-fzpu` from the worktree with the plugin CLI if useful); key locations: requirements/root/version-control.md (R-VCS, R-CLOUD-CHECKOUT, R-MERGEWAIT), requirements/root/assignments.md (R-FINISH), requirements/root/asking.md (R-ASK, decisions recorded in the Intent), requirements/root/identity.md (final report), requirements/skills/state-mode/SKILL.md (R-STATE); the family copies under the instructions tree for claude-5.5, gpt-6 and kimi-k3.1 (root/version-control.md line ~15-19 says push holyagent/state with the work pushes); packages/runtime/src/instructions/coverage.ts (three tables); CLI registry packages/runtime/src/cli/commands.ts:14-25, read-only state views in cli/overview.ts (status, reconcile), cli/intent.ts:92-125 (intent show/list), cli/assignment.ts:550-620, output helpers cli/views.ts (TOON), state loaders state/store.ts (readOpenState ~231), records domain/intent.ts, domain/assignment.ts (result, acceptance), domain/links.ts (BranchRecord, PullRecord).",
+    "Part 1, root directive (requirements tree first, then each family, then coverage). Add a requirement (new id, for example R-HANDOFF, placed with version control or assignments as fits the tree) stating, with the reason: (1) in the branch state mode the root pushes holyagent/state after each Assignment close and each merge, and before it ends a turn, not only with work-branch pushes, because the state branch is the only record another agent or host can read; update the existing sentence that ties the state push to work pushes so the two do not disagree; (2) the Intent in use carries one requirement starting 'Status and open items (<date>):' that the root replaces in place (intent update, not material) at every merge, every new blocker and before the final report, listing what merged (PR links), what is open (PRs and their CI state), the next concrete step, non-blocking residuals and what was never tried against the real services, detailed enough that an agent with no session context continues from it; (3) Assignments carry the full task in scope and criteria (they already do; say so as the reason the brief must be self-contained); (4) a new session or another host reads `holyagent handoff` first. Keep it short: a few sentences per family. Do not change the session-start reminder unless its size budget (cli/sessioncontext.ts budget, docs/hooks.md headroom note) clearly has room for one short line; say which you chose.",
+    "Part 2, `holyagent handoff` command: read-only, local state only, no network and no git writes (like `status`). Output in the CLI's TOON format via the existing view helpers. Contents: a one-line header saying what this is and that live PR and CI state is in the Intent's status requirement; the state mode and state branch; for each open Intent: id, objective, revision, all requirements verbatim (the status requirement included), recorded work branches and PRs (number, url, branch, base); its Assignments with id, role, state, objective, accepted or not, and a one-line outcome (the first line of the result, trimmed); and a closing line on how to resume (the existing resume guidance in docs/usage.md). Optional `--intent <id>` limits it to one Intent. Register it in commands.ts with help text; add tests in packages/runtime/tests/cli.test.ts near the status/reconcile tests using the existing fixture setup, covering: an Intent with assignments in several states, an Intent with branch and PR records, the --intent filter, an unknown id error, and that the command writes nothing (state files unchanged).",
+    "Part 3, docs: docs/usage.md (the read-only command list near line 248, the state push rule near line 261, the resume section near 265) and any doc that restates the state-push rule (docs/commit-authorship.md:18 if it does). No README change.",
+    "Then run `bunx --no-install mise run build` and `bunx --no-install mise run verify`."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Instruction text you write is model-facing: follow the repo's requirements skill (.claude/skills/requirements/SKILL.md) for the requirement format, family translation (read each family's guide.md first) and coverage; write each family copy in that family's style, and name no Claude-only tool in the root text (the reader may be Pi with Kimi or GPT), keeping the existing host-neutral wording such as 'the task list'.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 500 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The requirements tree and the claude-5.5, gpt-6 and kimi-k3.1 root instructions state the handoff directive (state push after each close, merge and before ending a turn; the status-and-open-items requirement and when it is updated; read holyagent handoff first) with no contradiction left in the old state-push sentence, and coverage maps the new id in all three tables",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "holyagent handoff prints open Intents with requirements, Assignments with state and outcome, and recorded branches and PRs, supports --intent, errors on an unknown id, makes no network call and writes nothing, with tests that fail without it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/usage.md lists the command and states the new state-push rule",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "requirements",
+    "packages",
+    "docs",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T17:49:01.490Z"
+  },
+  "createdAt": "2026-11-10T17:49:01.490Z"
+}
