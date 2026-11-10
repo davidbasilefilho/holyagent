@@ -10,8 +10,9 @@ type LooseWaitAsync = (
   timeout?: number,
 ) => ReturnType<WaitAsync>
 
-const current = (cells: Cells, index: number) =>
-  cells instanceof BigInt64Array ? Atomics.load(cells, index) : Atomics.load(cells, index)
+// The cast only picks an overload: `Atomics.load` reads either kind of array at run time.
+const current = (cells: Cells, index: number): number | bigint =>
+  Atomics.load(cells as Int32Array, index)
 
 const STABLE = Symbol.for("holyagent.stableWaitAsync")
 
@@ -50,11 +51,12 @@ export const stableWaitAsync = (waitAsync: WaitAsync): WaitAsync => {
  * "Synchronous bridge entered an invalid request state" after the program's output, which happens
  * when the guest's notify for an earlier write arrives late (see `runSyncBridgeLoop` in `run`
  * 2.1.3, `dist/runtime/manager.js`). Nothing in the shell waits on a cell that way except that
- * runtime, and a wait that ignores a notify that changed nothing is what the call means.
+ * runtime, and a wait that ignores a notify that changed nothing is what the call means. An engine
+ * without `Atomics.waitAsync` is left as it is.
  */
 export const installStableWaitAsync = (): void => {
-  const atomics: { waitAsync: WaitAsync; [STABLE]?: true } = Atomics
-  if (atomics[STABLE] === true) return
+  const atomics: { waitAsync?: WaitAsync; [STABLE]?: true } = Atomics
+  if (atomics.waitAsync === undefined || atomics[STABLE] === true) return
   atomics.waitAsync = stableWaitAsync(Atomics.waitAsync.bind(Atomics))
   atomics[STABLE] = true
 }

@@ -89809,7 +89809,7 @@ try {
   Hf = null;
 }
 
-var current = (cells, index) => cells instanceof BigInt64Array ? Atomics.load(cells, index) : Atomics.load(cells, index);
+var current = (cells, index) => Atomics.load(cells, index);
 var STABLE = Symbol.for("holyagent.stableWaitAsync");
 var stableWaitAsync = (waitAsync) => {
   const native = waitAsync;
@@ -89831,7 +89831,7 @@ var stableWaitAsync = (waitAsync) => {
 };
 var installStableWaitAsync = () => {
   const atomics = Atomics;
-  if (atomics[STABLE] === true)
+  if (atomics.waitAsync === undefined || atomics[STABLE] === true)
     return;
   atomics.waitAsync = stableWaitAsync(Atomics.waitAsync.bind(Atomics));
   atomics[STABLE] = true;
