@@ -1,0 +1,94 @@
+{
+  "id": "assignment-0mwalrxst-09n9",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "replace-the-playwright-mcp-server-in-the",
+  "objective": "Replace the Playwright MCP server in the screen capability's headless form with browser-use, launched against a headless Chromium that HolyAgent starts.",
+  "state": "Running",
+  "scope": [
+    "Work only in the worktree /home/user/holyagent-0.3.2-browser-use (branch release/0.3.2/feat/browser-use, version 0.3.2). Read the research first: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/browser-use-research.md (browser-use 1.0.0, MIT, Python >=3.11; MCP via `browser-use --cli-mcp` over stdio; tools browser_exec, browser_screenshot, browser_login; --cli-mcp attaches to an already-running Chrome given by BU_CDP_URL; telemetry off with ANONYMIZED_TELEMETRY=0; latest stable from https://pypi.org/pypi/browser-use/json info.version with prereleases filtered).",
+    "Current headless form: packages/runtime/src/config/capabilities.ts (PLAYWRIGHT_MCP_SERVER, npxServerArgs, tools.screen, rootExclude patterns, needs), packages/runtime/src/config/pi-packages.json (\"@playwright/mcp\" pin), the setup modules under packages/runtime/src/setup/ (chromium.ts findChromium, browser-use.ts, browse.ts, pi-check.ts / doctor), the *-headless-screen.md agent files and their generator, and docs/pi/screen.md. Find every reference to playwright/@playwright/mcp/mcp__playwright with a search and move each one.",
+    "Behavior wanted: (1) The server command is `uvx --no-config --default-index https://pypi.org/simple --from browser-use==<pin> browser-use --cli-mcp`, so a project's uv config cannot redirect the package source; put the arg construction in one helper (like npxServerArgs) with a test. (2) The pin lives in a PyPI pin table next to the npm pins (a separate JSON file or a separate key kind in the existing one, whichever fits the existing loader and Schema), pinned exactly to 1.0.0. (3) scripts/dependency-pins.ts (mise run deps:update / deps:check) learns to move PyPI pins from the PyPI JSON API, skipping prereleases and yanked releases, with unit tests on recorded or synthesized fixtures only (no live network in tests). (4) Before the server starts, HolyAgent launches the Chromium found by findChromium headless with --remote-debugging-port on a free local port (127.0.0.1 only) and a fresh temporary --user-data-dir, waits until the DevTools endpoint answers, passes BU_CDP_URL=http://127.0.0.1:<port>, a BU_NAME, ANONYMIZED_TELEMETRY=0 and temporary state/config directories (BROWSER_USE_CONFIG_DIR, BH_HOME or whatever the research names) in the server env, and stops Chromium and removes the temporary directories when the session or server ends. Place this where the existing code starts or configures the headless MCP server; if the Pi MCP config only accepts a static command, launch through a small HolyAgent CLI subcommand that starts Chromium, then runs uvx as a child with stdio passed through, and cleans up on exit; say which you chose. (5) Specialists are allowed only mcp__browser_use__browser_exec and mcp__browser_use__browser_screenshot (check the real server-name prefix the Pi MCP adapter produces from the server key you choose, and keep the root excluded as today); browser_login stays off. (6) needs/doctor check for uvx (and Chromium) instead of npx/node for this form, with a clear message when missing. (7) Remove @playwright/mcp and its constants, tests and docs; the normal form (opencode browse plus pi-computer-use) is unchanged.",
+    "Update docs/pi/screen.md (and any doc naming the Playwright server) for the new headless form: what it runs, the pin, what it needs (uv/uvx, Python >=3.11 provided by uv, a Chromium), telemetry off, how to turn the capability off. Keep the capability its own module that can be turned off."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code, browser-use, uvx or a live Chromium in tests, and make no live Kimi, Codex or OpenAI request; inject the process spawner so launch and cleanup are tested with fakes.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 500 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The headless screen form runs browser-use --cli-mcp through uvx with --no-config, the public PyPI index and an exact pin, against a headless Chromium HolyAgent launches with a remote-debugging port on 127.0.0.1 and a temporary profile",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Chromium and the temporary directories are cleaned up when the server or session ends, including on launch failure",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Telemetry is off and browser-use state and config go to temporary directories",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Specialists get only browser_exec and browser_screenshot from browser-use; browser_login stays off and the root stays excluded",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run deps:update and deps:check move and check the PyPI pin from the PyPI JSON API, skipping prereleases and yanked releases",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "@playwright/mcp and its constants, tests and docs are gone and the normal form is unchanged",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Tests cover the uvx args, the launcher (ports, env, cleanup, failure) with fake spawners, the tool allowlist and the PyPI updater on fixtures",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "docs/pi/screen.md describes the new headless form and its needs",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "docs",
+    "scripts",
+    "mise.toml",
+    "package.json",
+    "bun.lock",
+    ".claude-plugin"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T11:24:42.077Z"
+  },
+  "createdAt": "2026-11-10T11:24:42.077Z"
+}
