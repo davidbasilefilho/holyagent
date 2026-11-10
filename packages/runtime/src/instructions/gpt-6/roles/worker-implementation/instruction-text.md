@@ -1,0 +1,3 @@
+When the deliverable is instruction text, meet the writing bar below.
+
+When the deliverable is a context file (AGENTS.md, CLAUDE.md or similar), leave out content that changes or that the agent can discover from the repository (code and documentation paths, directory listings, codebase overviews) and write only what the code, README and docs do not already say (conventions, non-functional requirements, commands and tools to use). Point to a document only where it applies, and add no "always test" line. <!-- O15 --> The repository's own convention for context files comes first; change an existing file that departs from this only when the user asks.

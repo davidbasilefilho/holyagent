@@ -64,7 +64,14 @@ describe("default config", () => {
       computerUse: true,
       contextCompression: true,
       subagents: true,
+      lunaReserve: true,
+      contextManagement: true,
+      autoReview: true,
+      justBash: true,
+      fff: true,
+      browserUse: true,
     })
+    expect(DEFAULT_CONFIG.pi.autoReview).toEqual({})
     expect(DEFAULT_CONFIG.pi.codemode).toEqual({ mode: "only", maxWorkers: 4 })
     expect(DEFAULT_CONFIG.pi.t3).toEqual({
       scope: "global",

@@ -64,6 +64,30 @@ export const isSymlink = (path: string) =>
   )
 
 /**
+ * Refuses a symlinked folder, folder below it or file on the way from `cwd` to `file` at project
+ * and local scope, so a repository cannot redirect a write (or an `--undo`) to a file outside the
+ * project, as the Claude settings step does for `.claude`. Scope `user` follows its links, as
+ * before. `action` names what was refused, in the message.
+ */
+export const refuseLinks = Effect.fn("refuseProjectLinks")(function* (
+  cwd: string,
+  scope: Scope,
+  file: string,
+  action: string,
+) {
+  if (scope === "user") return
+  const parts = relative(cwd, file).split(sep)
+  for (let depth = 1; depth <= parts.length; depth++) {
+    const path = join(cwd, ...parts.slice(0, depth))
+    if (yield* isSymlink(path)) {
+      return yield* new SetupFailure({
+        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`,
+      })
+    }
+  }
+})
+
+/**
  * Where `holyagent setup` and `doctor` read and write the settings of a scope: the `file`, and a
  * `notice` line when the answer is not the usual one.
  */

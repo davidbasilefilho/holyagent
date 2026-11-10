@@ -8,6 +8,7 @@ import { AGENT_HOSTS, type AgentHost } from "../domain/host.ts"
 import { type RoleTask, routeFor } from "../domain/route.ts"
 import { routeModel, subagentModel } from "../pi/provider.ts"
 import { claudeConfigDirectory } from "../setup/environment.ts"
+import { detectForm } from "../setup/form.ts"
 import { readText } from "../state/files.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { Usage } from "./errors.ts"
@@ -129,14 +130,16 @@ export const workflowsAvailable = (env: Host["env"], root: string) => {
 }
 
 /**
- * The execution settings: the TTL from the environment, whether workflows are available and the
- * agent host.
+ * The execution settings: the TTL from the environment, whether workflows are available, the agent
+ * host and the form of the machine (the one setup and doctor detect), which picks the agent file of
+ * a screen Assignment.
  */
 export const loadConfig = (env: Host["env"], root: string) =>
   Effect.all({
     ttlMinutes: reuseTtl(env),
     workflowsAvailable: workflowsAvailable(env, root),
     host: agentHostOf(env),
+    screenForm: Effect.succeed(detectForm(env).form),
   }).pipe(Effect.map((config): ExecutionConfig => config))
 
 /**
@@ -151,23 +154,26 @@ export interface Launch {
 }
 
 /**
- * Resolves the {@link Launch} of each role task under a host. Claude launches a specialist on its
- * route's model alias and effort. Pi launches it on the model and thinking level of its row in the
- * `pi.routes` table of the HolyAgent config (the user's file under the project's, as the `config`
- * command loads it), written as `@tintinweb/pi-subagents` takes them; with `pi.enable` off no row
- * applies and the specialist inherits the session's model and thinking. A pi config that cannot be
- * loaded fails as ConfigInvalid, and Claude never reads it.
+ * Resolves the {@link Launch} of each role task under a host, for an Assignment that carries the
+ * screen capability when `screen` is true. Claude launches a specialist on its route's model alias
+ * and effort, and has no screen capability. Pi launches it on the model and thinking level of its
+ * row in the `pi.routes` table of the HolyAgent config (the user's file under the project's, as the
+ * `config` command loads it), written as `@tintinweb/pi-subagents` takes them; a screen Assignment
+ * takes the provider's screen route instead (Codex: GPT-6.1 Terra at medium or above, see
+ * `routeModel`). With `pi.enable` off no row applies and the specialist inherits the session's
+ * model and thinking. A pi config that cannot be loaded fails as ConfigInvalid, and Claude never
+ * reads it.
  */
 export const launchesOf = (env: Host["env"], root: string, host: AgentHost) =>
   host === "claude"
-    ? Effect.succeed((roleTask: RoleTask): Launch => {
+    ? Effect.succeed((roleTask: RoleTask, _screen?: boolean): Launch => {
         const { model, effort } = routeFor(roleTask)
         return { model, effort }
       })
     : loadHolyagentConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(
-        Effect.map((config) => (roleTask: RoleTask): Launch => {
+        Effect.map((config) => (roleTask: RoleTask, screen?: boolean): Launch => {
           if (!config.pi.enable) return {}
-          const route = routeModel(config, roleTask)
+          const route = routeModel(config, roleTask, { screen: screen === true })
           return { model: subagentModel(route), effort: route.thinking }
         }),
       )

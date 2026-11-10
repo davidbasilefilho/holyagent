@@ -25,6 +25,8 @@ export const SpecialistEntry = Schema.Struct({
   domains: Schema.optionalKey(Schema.Array(Text)),
   lastFinishedAt: Schema.optionalKey(Timestamp),
   running: Schema.Boolean,
+  /** Whether it was launched for a screen Assignment, with the screen tools; absent when not. */
+  screen: Schema.optionalKey(Schema.Boolean),
 })
 /** One registered specialist. */
 export type SpecialistEntry = typeof SpecialistEntry.Type
@@ -79,7 +81,8 @@ export const releaseSpecialist = (
  * Binds a specialist to a running Assignment: registers it on first use, or marks the known one
  * running and extends its history, paths and relations. A known specialist keeps its role task,
  * model and effort, and cannot take a second Assignment while it is running another; binding it
- * again to the Assignment it already runs changes nothing.
+ * again to the Assignment it already runs changes nothing. A specialist is registered with the
+ * screen capability when its Assignment carries it, and a known one keeps that.
  */
 export const bindSpecialist = (
   registry: Registry,
@@ -101,16 +104,18 @@ export const bindSpecialist = (
           related: relatedIds(assignment),
           paths,
           running: true,
+          ...(assignment.screen === true ? { screen: true } : {}),
         },
       ] satisfies Registry
     if (
       known.roleTask !== assignment.roleTask ||
       known.model !== launch.model ||
-      known.effort !== launch.effort
+      known.effort !== launch.effort ||
+      (known.screen === true) !== (assignment.screen === true)
     )
       return yield* new SpecialistMismatch({
         agentId: launch.agentId,
-        detail: `registered as ${known.roleTask} on ${known.model}/${known.effort}, not ${assignment.roleTask} on ${launch.model}/${launch.effort}`,
+        detail: `registered as ${known.roleTask} on ${known.model}/${known.effort}${known.screen === true ? " with the screen capability" : ""}, not ${assignment.roleTask} on ${launch.model}/${launch.effort}${assignment.screen === true ? " with the screen capability" : ""}`,
       })
     if (known.running && !known.assignments.includes(assignment.id))
       return yield* new SpecialistMismatch({

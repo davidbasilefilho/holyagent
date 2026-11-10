@@ -1,8 +1,16 @@
 import { Effect, Schema } from "effect"
 
+import {
+  CAPABILITIES,
+  type CapabilityDefinition,
+  formContent,
+  unavailableIn,
+} from "../../config/capabilities.ts"
+import type { Config } from "../../config/schema.ts"
 import { inCloudSession } from "../../vcs/identity.ts"
 import type { Env } from "../environment.ts"
-import { piInUse } from "../pi-check.ts"
+import { describeForm, type FormChoice, inCi } from "../form.ts"
+import { type CapabilityChoices, loadPiConfig, piInUse } from "../pi-check.ts"
 import { hint, type Report } from "../report.ts"
 import type { Scope } from "../scope.ts"
 import type { Shell } from "../shell.ts"
@@ -10,6 +18,7 @@ import { previewT3Settings, type T3Preview, type T3UnitPreview } from "../t3-set
 import { loadSetupTui, plain, TuiUnavailable } from "./load.ts"
 import {
   type Applied,
+  type CapabilityOffer,
   type Choices,
   type Offer,
   type Review,
@@ -25,15 +34,16 @@ export interface Terminal {
   readonly stdout: boolean
 }
 
-/** The choices the interface starts with and the flags apply when one is left out: all on. */
-export const DEFAULT_CHOICES: Choices = { worktrees: true, deviceAccess: true }
-
-const set = (value: string | undefined) => value !== undefined && value !== ""
+/**
+ * The T3 choices the interface starts with and the flags apply when one is left out: all on. The
+ * capability switches start from the config, not from here.
+ */
+export const DEFAULT_CHOICES: Choices = { worktrees: true, deviceAccess: true, capabilities: {} }
 
 /**
  * Why the interface is not used, or `undefined` when it can be: `--no-tui` or a choice flag was
- * given (the flags apply directly), stdin or stdout is not a terminal, `CI` is set (other than
- * `false`) or `TERM` is `dumb`.
+ * given (the flags apply directly), stdin or stdout is not a terminal, `CI` is set to a truthy
+ * value ({@link inCi}) or `TERM` is `dumb`.
  */
 export const tuiFallbackReason = (options: {
   readonly env: Env
@@ -46,7 +56,7 @@ export const tuiFallbackReason = (options: {
   if (options.choiceFlag) return "a choice flag was passed, so it applies directly"
   if (terminal === undefined || !terminal.stdin || !terminal.stdout)
     return "stdin or stdout is not a terminal"
-  if (set(env["CI"]) && env["CI"] !== "false") return "CI is set"
+  if (inCi(env)) return "CI is set"
   if (env["TERM"] === "dumb") return "TERM is dumb"
   return undefined
 }
@@ -54,27 +64,117 @@ export const tuiFallbackReason = (options: {
 /**
  * The T3 settings step as it would run: a {@link T3Preview} when the T3 part of setup has work on
  * this machine (not an undo, scope `user`, not a cloud session, Pi in use, T3 Code installed), else
- * `undefined`, in which case there is nothing to choose and no interface.
+ * `undefined`, in which case there is nothing to choose and no interface. The caller has probed
+ * whether Pi is in use (`piUsed`) and loaded the config of the scope (`config`, `undefined` when it
+ * cannot be loaded), so neither is repeated here; at scope `user` that is the config the step
+ * reads.
  */
 export const t3Offer = Effect.fn("t3Offer")(function* (
   env: Env,
   cwd: string,
-  options: { readonly scope: Scope; readonly undo: boolean },
+  options: {
+    readonly scope: Scope
+    readonly undo: boolean
+    readonly piUsed: boolean
+    readonly config: Config | undefined
+  },
 ) {
   if (options.undo || options.scope !== "user" || inCloudSession(env)) return undefined
-  if (!(yield* piInUse(env))) return undefined
+  if (!options.piUsed || options.config === undefined) return undefined
   // A settings file that cannot be read is reported by the line-based step, which then runs.
-  const preview = yield* previewT3Settings(env, cwd, DEFAULT_CHOICES).pipe(
-    Effect.catchTag("SetupFailure", () => Effect.succeed(undefined)),
-  )
+  const preview = yield* previewT3Settings(env, cwd, {
+    ...DEFAULT_CHOICES,
+    config: options.config,
+  }).pipe(Effect.catchTag("SetupFailure", () => Effect.succeed(undefined)))
   return preview === undefined || "line" in preview ? undefined : preview
 })
 
-/** The rows the interface offers for a preview. */
-export const offerOf = (preview: T3Preview): Offer => ({
-  device: preview.device,
-  worktrees: preview.worktreesAllowed,
+/** The capability rows for a form: one for each registry entry, with why the form leaves it out. */
+export const capabilityOffers = (
+  form: FormChoice,
+  definitions: ReadonlyArray<CapabilityDefinition> = CAPABILITIES,
+): ReadonlyArray<CapabilityOffer> =>
+  definitions.map((capability) => ({
+    feature: capability.feature,
+    name: capability.name,
+    description: capability.description,
+    unavailable: unavailableIn(capability, form.form),
+  }))
+
+/**
+ * The rows the interface offers: those of a T3 preview, if the T3 part has work, and the
+ * capabilities.
+ */
+export const offerOf = (
+  preview: T3Preview | undefined,
+  capabilities: ReadonlyArray<CapabilityOffer>,
+  form: FormChoice,
+): Offer => ({
+  t3: preview !== undefined,
+  device: preview?.device,
+  worktrees: preview?.worktreesAllowed ?? false,
+  capabilities,
+  form: describeForm(form),
 })
+
+/** The switches a config holds, by `pi.features` key, for the capabilities of the registry. */
+export const featureSwitches = (
+  features: Config["pi"]["features"],
+  definitions: ReadonlyArray<CapabilityDefinition> = CAPABILITIES,
+): Readonly<Record<string, boolean>> =>
+  Object.fromEntries(
+    definitions.map((capability) => [
+      capability.feature,
+      (features as Readonly<Record<string, unknown>>)[capability.feature] === true,
+    ]),
+  )
+
+/**
+ * The capability choices that differ from the switches the screen started with: what the run writes
+ * to the config, so an untouched row never freezes its default into the file.
+ */
+export const changedSwitches = (
+  initial: Readonly<Record<string, boolean>>,
+  chosen: Readonly<Record<string, boolean>>,
+): CapabilityChoices =>
+  Object.fromEntries(
+    CAPABILITIES.flatMap((capability) => {
+      const value = chosen[capability.feature]
+      return value === undefined || value === initial[capability.feature]
+        ? []
+        : [[capability.feature, value]]
+    }),
+  )
+
+/**
+ * The review lines of the capability switches: for each, whether the choice turns it on or off or
+ * leaves it, and what that does to the packages in the form in force. The packages of a capability
+ * the form does not offer are never installed, so it says so instead.
+ */
+export const capabilityReview = (
+  initial: Readonly<Record<string, boolean>>,
+  chosen: Readonly<Record<string, boolean>>,
+  form: FormChoice,
+  definitions: ReadonlyArray<CapabilityDefinition> = CAPABILITIES,
+): ReadonlyArray<ReviewLine> =>
+  definitions.map((capability): ReviewLine => {
+    const was = initial[capability.feature] === true
+    const now = chosen[capability.feature] === true
+    const reason = unavailableIn(capability, form.form)
+    const packages = formContent(capability, form.form)?.packages ?? []
+    const names = packages.length === 0 ? "no package" : packages.join(", ")
+    const name = capability.name
+    if (reason !== undefined)
+      return {
+        mark: "~",
+        name,
+        detail: `${now ? "on" : "off"} in the config; not offered in the ${form.form} form (${reason})`,
+      }
+    if (now === was) return { mark: "=", name, detail: now ? `stays on (${names})` : "stays off" }
+    return now
+      ? { mark: "+", name, detail: `turned on (${names})` }
+      : { mark: "-", name, detail: `turned off (${names} removed)` }
+  })
 
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
@@ -101,13 +201,20 @@ const choiceLine = (name: string, unit: T3UnitPreview | undefined): ReviewLine =
 /**
  * What the review screen lists for a preview and the choices: the groups the choices switch (a
  * group that is off says so), then every group setup always applies, each with its keys and values
- * or why nothing changes. `preview` was read with the same choices.
+ * or why nothing changes. `preview` was read with the same choices; it is `undefined` when the T3
+ * part has no work, and the review then holds the `capabilities` lines alone.
  */
-export const reviewOf = (preview: T3Preview, choices: Choices): Review => {
+export const reviewOf = (
+  preview: T3Preview | undefined,
+  choices: Choices,
+  capabilities: ReadonlyArray<ReviewLine> = [],
+): Review => {
+  if (preview === undefined) return { file: undefined, capabilities, choices: [], always: [] }
   const unit = (choice: T3UnitPreview["choice"]) => preview.units.find((u) => u.choice === choice)
   const pi = unit("pi")
   return {
     file: preview.file,
+    capabilities,
     choices: [
       ...(pi === undefined ? [] : [lineOf({ ...pi, name: "Pi provider" })]),
       ...(preview.device === undefined
@@ -141,6 +248,8 @@ export interface InteractiveOptions {
   readonly terminal: Terminal | undefined
   readonly noTui: boolean
   readonly choiceFlag: boolean
+  /** The form in force, which decides what each capability row says it installs. */
+  readonly form: FormChoice
   /** Loads the interface; {@link loadSetupTui} (with a notice before a first install) when absent. */
   readonly load?: (
     env: Env,
@@ -148,8 +257,11 @@ export interface InteractiveOptions {
   ) => Effect.Effect<SetupTuiModule, TuiUnavailable, Shell>
   /** Prints a line now, for the notice before a first install. */
   readonly notify: (text: string) => Effect.Effect<void>
-  /** Runs the whole setup with the choices and returns its report. */
-  readonly apply: (choices: Choices) => Effect.Effect<Report>
+  /**
+   * Runs the whole setup with the choices and the capability switches that differ from the
+   * config's, and returns its report.
+   */
+  readonly apply: (choices: Choices, capabilities: CapabilityChoices) => Effect.Effect<Report>
 }
 
 /** How {@link runInteractive} ended: the line-based setup runs, or the person decided. */
@@ -165,38 +277,69 @@ const fallback = (reason: string): Interactive => ({
 const decodeOutcome = Schema.decodeUnknownEffect(TuiOutcomeSchema, { onExcessProperty: "error" })
 
 /**
- * Offers the T3 choices in the interface when the T3 part of setup has work and the terminal allows
- * it. It falls back to the line-based setup, with one note saying why, when a flag or the terminal
- * rules the interface out, when it cannot be installed or imported (offline), or when it fails to
- * start or answers in a shape the command does not know. Cancelling writes nothing and reports it;
- * an applied run reports the setup it ran.
+ * Offers the capability switches and the T3 choices in the interface when Pi is in use (and setup
+ * is not an undo or in a cloud session) and there is something to choose: a capability row for each
+ * registry entry while the config loads with `pi.enable` on, and the T3 rows when the T3 part of
+ * setup has work. It falls back to the line-based setup when a flag or the terminal rules the
+ * interface out (with one note saying why, unless the T3 part has no work and the capability rows
+ * are all there was to show), when it cannot be installed or imported (offline), or when it fails
+ * to start or answers in a shape the command does not know. Cancelling writes nothing and reports
+ * it; an applied run reports the setup it ran.
  */
 export const runInteractive = Effect.fn("runInteractive")(function* (options: InteractiveOptions) {
-  const preview = yield* t3Offer(options.env, options.cwd, options)
-  if (preview === undefined) return { kind: "line", notes: [] } satisfies Interactive
+  const line = { kind: "line", notes: [] } satisfies Interactive
+  if (options.undo || inCloudSession(options.env)) return line
+  const piUsed = yield* piInUse(options.env)
+  if (!piUsed) return line
+  // Loaded once for the run: a config that cannot be read is reported by the line-based Pi steps,
+  // which then run.
+  const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(
+    Effect.catchTag("SetupFailure", () => Effect.succeed(undefined)),
+  )
+  const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config })
+  const features =
+    config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features)
+  const offers = features === undefined ? [] : capabilityOffers(options.form)
+  if (preview === undefined && offers.length === 0) return line
   const reason = tuiFallbackReason(options)
-  if (reason !== undefined) return fallback(reason)
+  // With no T3 work the capability rows are all the screen would hold; a scripted run has nothing
+  // to explain then, as before the rows existed.
+  if (reason !== undefined) return preview === undefined ? line : fallback(reason)
   const load = options.load ?? ((env, notify) => loadSetupTui(env, { notify }))
   const loaded = yield* load(options.env, options.notify).pipe(
     Effect.catchTag("TuiUnavailable", (error) => Effect.succeed(error)),
   )
   if (loaded instanceof TuiUnavailable) return fallback(`unavailable (${loaded.reason})`)
+  const initialSwitches = features === undefined ? {} : features
   const input: TuiInput = {
     env: options.env,
-    offer: offerOf(preview),
-    initial: DEFAULT_CHOICES,
+    offer: offerOf(preview, offers, options.form),
+    initial: { ...DEFAULT_CHOICES, capabilities: initialSwitches },
     dryRun: options.dryRun,
     review: (choices) =>
       Effect.runPromise(
-        previewT3Settings(options.env, options.cwd, choices).pipe(
-          Effect.flatMap((next) =>
-            next === undefined || "line" in next
-              ? Effect.fail(new Error("the T3 settings step has nothing to do any more"))
-              : Effect.succeed(reviewOf(next, choices)),
-          ),
-        ),
+        Effect.gen(function* () {
+          const next =
+            preview === undefined
+              ? undefined
+              : yield* previewT3Settings(options.env, options.cwd, {
+                  ...choices,
+                  ...(config === undefined ? {} : { config }),
+                })
+          if (preview !== undefined && (next === undefined || "line" in next))
+            return yield* Effect.fail(new Error("the T3 settings step has nothing to do any more"))
+          return reviewOf(
+            next === undefined || "line" in next ? undefined : next,
+            choices,
+            capabilityReview(initialSwitches, choices.capabilities, options.form),
+          )
+        }),
       ),
-    apply: (choices, signal) => Effect.runPromise(options.apply(choices), { signal }),
+    apply: (choices, signal) =>
+      Effect.runPromise(
+        options.apply(choices, changedSwitches(initialSwitches, choices.capabilities)),
+        { signal },
+      ),
   }
   return yield* Effect.tryPromise({
     try: () => loaded.runSetupTui(input),

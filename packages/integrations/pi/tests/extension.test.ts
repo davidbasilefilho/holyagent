@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -11,13 +11,13 @@ import type {
   ToolRendererResolver,
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 
 import { PLUGIN_NAMESPACE } from "../../../runtime/src/cli/assignment.ts"
 import { HOST_VARIABLE, WORKFLOWS_VARIABLE } from "../../../runtime/src/cli/config.ts"
 import { CONTEXT_BUDGET, SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
 import { CLAUDE_SPECIALISTS } from "../../../runtime/src/cli/workflow-check.ts"
-import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
   PI_ROOT_CORE,
@@ -25,9 +25,11 @@ import {
   PI_SESSION_REMINDER,
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
+import { cmdExeArguments } from "../../../runtime/src/pi/bash/cmd.ts"
 import { providerEnv, routedModels } from "../../../runtime/src/pi/provider.ts"
-import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
+import { PI_ROOT_PROMPT, PI_ROOT_PROMPTS } from "../../../runtime/src/pi/root-prompt.ts"
 import { toolArgs } from "../../../runtime/src/pi/tools.ts"
+import { PROCESS_TIMEOUT_MS } from "../../../runtime/tests/fixtures.ts"
 import {
   AGENT_TOOL,
   applyEnvironment,
@@ -35,7 +37,6 @@ import {
   CACHE_RETENTION_ENV,
   childAgent,
   CMD_NOT_FOUND,
-  cmdExeArguments,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
   createExtension,
@@ -61,8 +62,10 @@ import {
   workflowRenderers,
   WORKFLOWS_ENV,
 } from "../src/extension.ts"
+import { familyAgentPrompt, promptBody } from "../src/families.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
-import { SPECIALIST_NAMES } from "../src/specialists.ts"
+import { AGENT_TYPES, SCREEN_SPECIALIST_NAMES, SPECIALIST_NAMES } from "../src/specialists.ts"
+import { removeTemporary } from "./temp-folder.ts"
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
 // The model reads the wrapper's path with `/` only, drive letter included on Windows.
@@ -184,6 +187,12 @@ const fakeApi = (
     readonly mode?: ExtensionContext["mode"]
     /** The context's `ui`, likewise only for a session that uses it. */
     readonly ui?: object
+    /** The context's active model; none by default. */
+    readonly model?: { readonly provider: string }
+    /** Other members of the context a test gives (a session manager, a model registry). */
+    readonly members?: Readonly<Record<string, unknown>>
+    /** Makes `registerMcpServer` throw this. */
+    readonly mcpFail?: Error
   } = {},
 ) => {
   const flags = new Map<string, { type: string; default?: string }>()
@@ -197,6 +206,10 @@ const fakeApi = (
   const touched: Array<string> = []
   let failedOnce = false
   const renderers: Array<ToolRendererResolver> = []
+  // The tools the extension registered (only `apply_patch`, inactive).
+  const tools: Array<{ readonly name: string }> = []
+  // The MCP servers the extension registered, by name, with the config it gave.
+  const mcpServers: Array<{ readonly name: string; readonly config: unknown }> = []
   // The commands started and not yet settled: a process that is still running.
   const running = { count: 0 }
   const api = {
@@ -204,6 +217,12 @@ const fakeApi = (
       void flags.set(name, options),
     getFlag: (name: string) => value ?? flags.get(name)?.default,
     registerToolRenderer: (resolver: ToolRendererResolver) => void renderers.push(resolver),
+    registerTool: (tool: { readonly name: string }) => void tools.push(tool),
+    registerCommand: () => undefined,
+    registerMcpServer: (name: string, config: unknown) => {
+      if (session.mcpFail !== undefined) throw session.mcpFail
+      mcpServers.push({ name, config })
+    },
     getSessionName: () => session.name,
     getActiveTools: () => [...active],
     getAllTools: () => (session.allTools ?? active).map((name) => ({ name })),
@@ -250,6 +269,11 @@ const fakeApi = (
         if (key === "cwd") return target.cwd
         if (key === "mode" && session.mode !== undefined) return session.mode
         if (key === "ui" && session.ui !== undefined) return session.ui
+        // The auto-review gate reads the active model's provider on every tool call; the model is
+        // absent unless a test gives one, which keeps the gate inert.
+        if (key === "model") return session.model
+        if (typeof key === "string" && session.members !== undefined && key in session.members)
+          return session.members[key]
         touched.push(String(key))
         throw new Error(`the extension used ctx.${String(key)}`)
       },
@@ -266,6 +290,8 @@ const fakeApi = (
     flags,
     handlers,
     renderers,
+    tools,
+    mcpServers,
     calls,
     sent,
     toolSets,
@@ -297,6 +323,9 @@ const run = async (
     toolsFailOnce?: Error
     mode?: ExtensionContext["mode"]
     ui?: object
+    model?: { readonly provider: string }
+    members?: Readonly<Record<string, unknown>>
+    mcpFail?: Error
     deadlineMs?: number
     /** Starts the session and stops there, so no run takes what the start produced. */
     startOnly?: boolean
@@ -319,6 +348,9 @@ const run = async (
     ...(options.toolsFailOnce === undefined ? {} : { toolsFailOnce: options.toolsFailOnce }),
     ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.ui === undefined ? {} : { ui: options.ui }),
+    ...(options.model === undefined ? {} : { model: options.model }),
+    ...(options.members === undefined ? {} : { members: options.members }),
+    ...(options.mcpFail === undefined ? {} : { mcpFail: options.mcpFail }),
   })
   const env = options.env ?? {}
   createExtension({
@@ -382,14 +414,19 @@ describe("the factory", () => {
     }
     expect(api.flags.get(ROLE_FLAG)).toMatchObject({ type: "string", default: "root" })
     expect([...api.handlers.keys()].toSorted()).toEqual([
+      "agent_start",
       "before_agent_start",
+      "before_provider_request",
       "message_end",
+      "provider_stream_event",
       "session_compact",
       "session_shutdown",
       "session_start",
       "session_tree",
       "tool_call",
     ])
+    // The Codex module's one tool is registered inactive, so no other provider has it.
+    expect(api.tools.map((tool) => tool.name)).toEqual(["apply_patch"])
     expect(api.calls).toEqual([])
     expect(api.sent).toEqual([])
     expect(timers).toEqual([])
@@ -464,7 +501,7 @@ describe("session_start and session_shutdown", () => {
 describe("the role flag", () => {
   const projects = async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-role-"))
-    return { directory, done: () => rm(directory, { recursive: true, force: true }) }
+    return { directory, done: () => removeTemporary(directory) }
   }
 
   test("defaults to the root: status only, no root rules", async () => {
@@ -517,7 +554,7 @@ describe("the role flag", () => {
 describe("what runs and when", () => {
   const withState = async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-state-"))
-    return { directory, done: () => rm(directory, { recursive: true, force: true }) }
+    return { directory, done: () => removeTemporary(directory) }
   }
 
   for (const reason of ["startup", "reload", "new", "resume", "fork"] as const) {
@@ -645,7 +682,7 @@ describe("the context", () => {
       expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
       expect(delivered?.message?.content.length).toBeGreaterThan(1000)
     }
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("is empty without a .holyagent folder, except the core of a session role", async () => {
@@ -676,7 +713,7 @@ describe("failing closed", () => {
       expect(delivered?.message?.content).toContain("status")
       expect(oneLine(delivered?.message?.content)).toBe(true)
       expect(delivered?.message?.content).not.toContain("Ship the thing")
-      await rm(directory, { recursive: true, force: true })
+      await removeTemporary(directory)
     })
   }
 
@@ -694,7 +731,7 @@ describe("failing closed", () => {
     await api.emit("session_compact", { reason: "manual" })
     const again = (await api.emit("before_agent_start", { prompt: "x" })).at(0) as Delivered
     expect(again.message?.customType).toBe(CONTEXT_MESSAGE)
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("a notice carries no control character, however the failure is written", async () => {
@@ -810,65 +847,77 @@ describe("with the built package and a real project", () => {
       root,
       home: join(root, "home"),
       proc,
-      done: () => rm(root, { recursive: true, force: true }),
+      done: () => removeTemporary(root),
     }
   }
 
   const real = async (cwd: string, home: string) => (await run(realExec(home), { cwd })).delivered
 
-  test("a project with an Intent gets its status; one without a .holyagent folder gets nothing", async () => {
-    const { root, home, done } = await project()
-    expect((await real(root, home))?.message).toBeUndefined()
-    const created = Bun.spawn(
-      [
-        "bun",
-        ...RUNTIME,
-        "intent",
-        "create",
-        "--input",
-        JSON.stringify({ objective: "Real objective" }),
-      ],
-      {
-        cwd: root,
-        env: { ...process.env, HOLYAGENT_HOME: home },
-        stdout: "ignore",
-        stderr: "pipe",
-      },
-    )
-    expect(await created.exited).toBe(0)
-    const delivered = await real(root, home)
-    expect(delivered?.message?.content).toContain("Real objective")
-    expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
-    await done()
-  }, 30_000)
+  test(
+    "a project with an Intent gets its status; one without a .holyagent folder gets nothing",
+    async () => {
+      const { root, home, done } = await project()
+      expect((await real(root, home))?.message).toBeUndefined()
+      const created = Bun.spawn(
+        [
+          "bun",
+          ...RUNTIME,
+          "intent",
+          "create",
+          "--input",
+          JSON.stringify({ objective: "Real objective" }),
+        ],
+        {
+          cwd: root,
+          env: { ...process.env, HOLYAGENT_HOME: home },
+          stdout: "ignore",
+          stderr: "pipe",
+        },
+      )
+      expect(await created.exited).toBe(0)
+      const delivered = await real(root, home)
+      expect(delivered?.message?.content).toContain("Real objective")
+      expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("a bad .holyagent/config.json is reported with the field it names", async () => {
-    const { root, home, done } = await project()
-    await mkdir(join(root, ".holyagent"), { recursive: true })
-    await Bun.write(
-      join(root, ".holyagent", "config.json"),
-      JSON.stringify({ pi: { enabel: true } }),
-    )
-    const delivered = await real(root, home)
-    expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
-    expect(delivered?.message?.content).toContain("config.json")
-    expect(delivered?.message?.content).toContain("enabel")
-    await done()
-  }, 30_000)
+  test(
+    "a bad .holyagent/config.json is reported with the field it names",
+    async () => {
+      const { root, home, done } = await project()
+      await mkdir(join(root, ".holyagent"), { recursive: true })
+      await Bun.write(
+        join(root, ".holyagent", "config.json"),
+        JSON.stringify({ pi: { enabel: true } }),
+      )
+      const delivered = await real(root, home)
+      expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
+      expect(delivered?.message?.content).toContain("config.json")
+      expect(delivered?.message?.content).toContain("enabel")
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("pi.enable false in the project's config adds nothing", async () => {
-    const { root, home, done } = await project()
-    await mkdir(join(root, ".holyagent"), { recursive: true })
-    await Bun.write(
-      join(root, ".holyagent", "config.json"),
-      JSON.stringify({ pi: { enable: false } }),
-    )
-    // Nothing is added, but the root keeps its prompt: only the user's own config lifts it.
-    const delivered = await real(root, home)
-    expect(delivered?.message).toBeUndefined()
-    expect(delivered?.systemPrompt).toContain("the system prompt")
-    await done()
-  }, 30_000)
+  test(
+    "pi.enable false in the project's config adds nothing",
+    async () => {
+      const { root, home, done } = await project()
+      await mkdir(join(root, ".holyagent"), { recursive: true })
+      await Bun.write(
+        join(root, ".holyagent", "config.json"),
+        JSON.stringify({ pi: { enable: false } }),
+      )
+      // Nothing is added, but the root keeps its prompt: only the user's own config lifts it.
+      const delivered = await real(root, home)
+      expect(delivered?.message).toBeUndefined()
+      expect(delivered?.systemPrompt).toContain("the system prompt")
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 })
 
 /**
@@ -904,7 +953,7 @@ const gated = (
 describe("order and time", () => {
   const state = async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-order-"))
-    return { directory, done: () => rm(directory, { recursive: true, force: true }) }
+    return { directory, done: () => removeTemporary(directory) }
   }
 
   test("status finishes before reconcile starts", async () => {
@@ -1259,7 +1308,7 @@ describe("where programs start", () => {
     expect(bundled.length).toBeGreaterThan(3)
     for (const call of bundled)
       expect(call.args.slice(0, RUNTIME.length + 2)).toEqual([...RUNTIME, PI_PROJECT_FLAG, project])
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("a relative session folder is made absolute, so it cannot resolve against the package's folder", async () => {
@@ -1274,7 +1323,7 @@ describe("where programs start", () => {
     expect(wrapped.length).toBeGreaterThan(3)
     for (const call of wrapped)
       expect(call.args.slice(0, RUNTIME.length + 2)).toEqual([...RUNTIME, PI_PROJECT_FLAG, project])
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 })
 
@@ -1326,7 +1375,7 @@ describe("a project that is not a git repository", () => {
     expect(commands).not.toContain("state mode")
     expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
     expect(delivered?.message?.content).toContain("Ship the thing")
-    await rm(project, { recursive: true, force: true })
+    await removeTemporary(project)
   })
 
   test("without a .holyagent folder it gets nothing, except the core of a session role", async () => {
@@ -1335,7 +1384,7 @@ describe("a project that is not a git repository", () => {
     const { delivered } = await run(notGit, { cwd: project, flag: "session" })
     expect(delivered?.message?.content).toContain("You are the root")
     expect(delivered?.message?.content).not.toContain("holyagent status:")
-    await rm(project, { recursive: true, force: true })
+    await removeTemporary(project)
   })
 })
 
@@ -1372,7 +1421,7 @@ describe("with the built package and a project that is not a git repository", ()
     return {
       root,
       home: join(root, "home"),
-      done: () => rm(root, { recursive: true, force: true }),
+      done: () => removeTemporary(root),
     }
   }
 
@@ -1401,51 +1450,67 @@ describe("with the built package and a project that is not a git repository", ()
   const real = async (cwd: string, home: string, flag?: string) =>
     (await run(realExec(home), { cwd, ...(flag === undefined ? {} : { flag }) })).delivered
 
-  test("a project with a .holyagent folder gets its status", async () => {
-    const { root, home, done } = await plain()
-    expect((await real(root, home))?.message).toBeUndefined()
-    await createIntent(root, home)
-    const delivered = await real(root, home)
-    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
-    expect(delivered?.message?.content).toContain("Plain objective")
-    expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
-    await done()
-  }, 30_000)
+  test(
+    "a project with a .holyagent folder gets its status",
+    async () => {
+      const { root, home, done } = await plain()
+      expect((await real(root, home))?.message).toBeUndefined()
+      await createIntent(root, home)
+      const delivered = await real(root, home)
+      expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+      expect(delivered?.message?.content).toContain("Plain objective")
+      expect(delivered?.message?.content.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("a session role gets the core and the status", async () => {
-    const { root, home, done } = await plain()
-    await createIntent(root, home)
-    const delivered = await real(root, home, "session")
-    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
-    expect(delivered?.message?.content).toContain("You are the root")
-    expect(delivered?.message?.content).toContain("Plain objective")
-    await done()
-  }, 30_000)
+  test(
+    "a session role gets the core and the status",
+    async () => {
+      const { root, home, done } = await plain()
+      await createIntent(root, home)
+      const delivered = await real(root, home, "session")
+      expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+      expect(delivered?.message?.content).toContain("You are the root")
+      expect(delivered?.message?.content).toContain("Plain objective")
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("a session role without a .holyagent folder still gets the core", async () => {
-    const { root, home, done } = await plain()
-    const delivered = await real(root, home, "session")
-    expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
-    expect(delivered?.message?.content).toContain("You are the root")
-    expect(delivered?.message?.content).not.toContain("holyagent status:")
-    await done()
-  }, 30_000)
+  test(
+    "a session role without a .holyagent folder still gets the core",
+    async () => {
+      const { root, home, done } = await plain()
+      const delivered = await real(root, home, "session")
+      expect(delivered?.message?.customType).toBe(CONTEXT_MESSAGE)
+      expect(delivered?.message?.content).toContain("You are the root")
+      expect(delivered?.message?.content).not.toContain("holyagent status:")
+      await done()
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 
-  test("the bundled CLI fails as a state error for a project folder that does not exist", async () => {
-    const child = Bun.spawn(
-      [
-        "bun",
-        ...RUNTIME,
-        PI_PROJECT_FLAG,
-        join(tmpdir(), "holyagent-pi-no-such-project"),
-        "status",
-      ],
-      { cwd: PACKAGE_ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore" },
-    )
-    const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-    expect(code).toBe(4)
-    expect(stderr).toContain("error: StateIo")
-  }, 30_000)
+  test(
+    "the bundled CLI fails as a state error for a project folder that does not exist",
+    async () => {
+      const child = Bun.spawn(
+        [
+          "bun",
+          ...RUNTIME,
+          PI_PROJECT_FLAG,
+          join(tmpdir(), "holyagent-pi-no-such-project"),
+          "status",
+        ],
+        { cwd: PACKAGE_ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore" },
+      )
+      const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+      expect(code).toBe(4)
+      expect(stderr).toContain("error: StateIo")
+    },
+    PROCESS_TIMEOUT_MS,
+  )
 })
 
 describe("finding Bun", () => {
@@ -1900,12 +1965,16 @@ describe("a Windows package root", () => {
     )
     expect(delivered?.message?.content).toContain(wrapper)
     expect(delivered?.message?.content).not.toContain("C:\\Users")
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 })
 
 describe("telling a child from the root", () => {
   test.each(SPECIALIST_NAMES)("%s#<id> is that specialist", (name) => {
+    expect(childAgent(`${name}#a1b2c3d4`)).toBe(name)
+  })
+
+  test.each(SCREEN_SPECIALIST_NAMES)("%s#<id> is that screen specialist", (name) => {
     expect(childAgent(`${name}#a1b2c3d4`)).toBe(name)
   })
 
@@ -1917,6 +1986,9 @@ describe("telling a child from the root", () => {
       "worker-implementation",
       "my chat#1",
       "#a1b2c3d4",
+      "worker-implementation-screen",
+      "general-purpose-screen#a1b2c3d4",
+      "worker-implementation-screen-screen#a1b2c3d4",
     ])
       expect(childAgent(name)).toBeUndefined()
   })
@@ -1931,7 +2003,7 @@ describe("telling a child from the root", () => {
     expect(root.endsWith(PI_SESSION_REMINDER)).toBe(true)
     expect(child).toContain("Ship the thing")
     expect(child).not.toContain(PI_SESSION_REMINDER)
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("a child fills the package folder into its prompt and leaves the root's process variables alone", async () => {
@@ -1966,7 +2038,7 @@ describe("telling a child from the root", () => {
 
 describe("the host and process variables", () => {
   const TOOLS = ["read", "bash", "SubagentWorkflow", "codemode"]
-  const maxWorkers = toolArgs(DEFAULTS, "root").env
+  const rootEnv = toolArgs(DEFAULTS, "root").env
 
   test("the names are the ones the holyagent CLI reads", () => {
     expect(HOST_ENV).toBe(HOST_VARIABLE)
@@ -1992,11 +2064,17 @@ describe("the host and process variables", () => {
     expect(env).toEqual({
       HOLYAGENT_HOST: "pi",
       HOLYAGENT_WORKFLOWS: "1",
-      ...maxWorkers,
+      ...rootEnv,
       ...providerEnv(DEFAULTS),
       PI_CACHE_RETENTION: "long",
     })
-    expect(Object.keys(maxWorkers)).toEqual(["PI_CODEMODE_MAX_WORKERS"])
+    // The worker cap, and Billion Context's guardrails off while the bash tool runs on just-bash.
+    expect(Object.keys(rootEnv)).toEqual([
+      "PI_CODEMODE_MAX_WORKERS",
+      "BILI_GUARDRAIL_BASH_TIMEOUT",
+      "BILI_GUARDRAIL_MAX_OUTPUT_BYTES",
+      "BILI_GUARDRAIL_REPETITION",
+    ])
     expect(CACHE_RETENTION_ENV).toBe("PI_CACHE_RETENTION")
   })
 
@@ -2040,6 +2118,25 @@ describe("the Agent tool", () => {
     expect(
       refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: name } }),
     ).toBeUndefined()
+  })
+
+  test.each(SCREEN_SPECIALIST_NAMES)(
+    "%s may launch, for an Assignment with the screen capability",
+    (name) => {
+      expect(
+        refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: name } }),
+      ).toBeUndefined()
+    },
+  )
+
+  test("a type outside the 18 and their -screen variants is refused, and the refusal names the screen form", () => {
+    for (const type of ["worker-implementation-screen-screen", "screen", "explorer-map-screens"]) {
+      const result = refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: type } })
+      expect(result?.block, type).toBe(true)
+      expect(result?.reason, type).toContain(
+        "(each also as <name>-screen, or <name>-headless-screen on a headless machine)",
+      )
+    }
   })
 
   test("a type outside the 18 is refused with the names that are allowed", () => {
@@ -2114,6 +2211,17 @@ describe("the SubagentWorkflow tool", () => {
 
   test("a script whose every agent() names a specialist by literal agentType may run", async () => {
     expect(await refusedWorkflow({ script: workflowScript(...SPECIALIST_NAMES) })).toBeUndefined()
+  })
+
+  test("a script that names a screen specialist by literal agentType may run, and a made-up -screen name may not", async () => {
+    expect(
+      await refusedWorkflow({ script: workflowScript(...SCREEN_SPECIALIST_NAMES) }),
+    ).toBeUndefined()
+    const result = await refusedWorkflow({ script: workflowScript("explorer-map-screens") })
+    expect(result?.block).toBe(true)
+    expect(result?.reason).toContain(
+      "(each also as <name>-screen, or <name>-headless-screen on a headless machine)",
+    )
   })
 
   test("a script that starts a default, a foreign or a computed agent is refused", async () => {
@@ -2581,7 +2689,7 @@ describe("the root's system prompt", () => {
     const { delivered: both } = await run(healthy(withState))
     expect(both?.message?.customType).toBe(CONTEXT_MESSAGE)
     expect(both?.systemPrompt).toContain(filledPrompt)
-    await rm(withState, { recursive: true, force: true })
+    await removeTemporary(withState)
   })
 
   test("stays when the status fails after the config is read, with the notice beside it", async () => {
@@ -2738,7 +2846,7 @@ describe("the root's tools", () => {
     ])
     expect(messages[1]?.content).toContain("no such loadout")
     expect(await nextMessages(api)).toEqual([])
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   })
 
   test("are the defaults' when the config cannot be read: the root keeps its exclusions", async () => {
@@ -2800,7 +2908,17 @@ describe("the root's excluded tools", () => {
     "web_search",
     "web_fetch",
   ]
-  const EXCLUDED = ["write", "edit", "computer_use_click", "moonshot_search", "moonshot_fetch"]
+  // fff's tools under both name sets: override mode's, and the default mode's, which the package also
+  // registers under `--fff-mode`, `PI_FFF_MODE` and a working directory it does not index.
+  const FFF = ["grep", "find", "multi_grep", "ffgrep", "fffind", "fff-multi-grep"]
+  const EXCLUDED = [
+    "write",
+    "edit",
+    "computer_use_click",
+    "moonshot_search",
+    "moonshot_fetch",
+    ...FFF,
+  ]
   const webKit = JSON.stringify({
     ...DEFAULTS,
     pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, web: "pi-web-kit" } },
@@ -3533,5 +3651,527 @@ describe("under T3 Code", () => {
     expect([...accessed]).toEqual(["setStatus"])
     expect(calls.map(({ method }) => method)).toEqual(["setStatus"])
     expect(api.touched).toEqual([])
+  })
+})
+
+const CODEX = await Effect.runPromise(
+  Schema.decodeUnknownEffect(Config)({ pi: { provider: "openai-codex" } }),
+)
+
+describe("under the Codex provider", () => {
+  const codexConfig = (directory = "/missing") =>
+    healthy(directory, { config: { stdout: `${JSON.stringify(CODEX)}\n` } })
+  const CODEX_CATALOG = [
+    "provider     model   context  max-out  thinking  images",
+    ...routedModels(CODEX).map(
+      ({ provider, model }) => `${provider}  ${model}  500K  128K  yes  yes`,
+    ),
+  ].join("\n")
+  const codexPi: PiProbe = (args) =>
+    args[0] === "auth" ? { code: 0 } : { code: 0, stdout: `${CODEX_CATALOG}\n` }
+  const PI_PROMPT = "Pi's own prompt, with AGENTS.md and the skills"
+  const body = (path: string) => promptBody(readFileSync(join(PACKAGE_ROOT, path), "utf8"))
+
+  test("the root's prompt is the GPT-6 family's, in front of Pi's own", async () => {
+    const { delivered } = await run(codexConfig(), { systemPrompt: PI_PROMPT, pi: codexPi })
+    expect(delivered?.systemPrompt).toBe(
+      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6"], PACKAGE_ROOT)}\n\n${PI_PROMPT}`,
+    )
+    expect(PI_ROOT_PROMPTS["gpt-6"]).not.toBe(PI_ROOT_PROMPT)
+    expect(delivered?.systemPrompt).not.toContain(fillPackageRoot(PI_ROOT_PROMPT, PACKAGE_ROOT))
+  })
+
+  test("a specialist's own prompt is swapped for the family's, and what Pi adds around it stays", async () => {
+    const agent = "worker-implementation"
+    const own = body(`agents/${agent}.md`)
+    const gpt = body(`families/gpt-6/agents/${agent}.md`)
+    expect(gpt).not.toBe(own)
+    const { delivered } = await run(codexConfig(), {
+      sessionName: `${agent}#a1b2c3d4`,
+      systemPrompt: `${own}\n\nPi appended this`,
+      pi: codexPi,
+    })
+    expect(delivered?.systemPrompt).toBe(
+      `${fillPackageRoot(gpt, PACKAGE_ROOT)}\n\nPi appended this`,
+    )
+  })
+
+  test("every specialist, with and without the screen tools, has a GPT-6 prompt the swap finds", () => {
+    for (const agent of AGENT_TYPES) {
+      const own = body(`agents/${agent}.md`)
+      const gpt = body(`families/gpt-6/agents/${agent}.md`)
+      expect(gpt, agent).not.toBe("")
+      expect(gpt, agent).not.toBe(own)
+      expect(familyAgentPrompt(own, agent, "gpt-6", PACKAGE_ROOT), agent).toBe(gpt)
+    }
+  })
+
+  test("the skills Pi lists are the family's copies", async () => {
+    const listed = (folder: string) =>
+      `<skill><location>${join(PACKAGE_ROOT, folder, "ci-watch", "SKILL.md")}</location></skill>`
+    const { delivered } = await run(codexConfig(), {
+      systemPrompt: `${PI_PROMPT}\n${listed("skills")}`,
+      pi: codexPi,
+    })
+    expect(delivered?.systemPrompt).toContain(listed("families/gpt-6/skills"))
+    expect(delivered?.systemPrompt).not.toContain(listed("skills"))
+    const kimi = await run(healthy("/missing"), {
+      systemPrompt: `${PI_PROMPT}\n${listed("skills")}`,
+    })
+    expect(kimi.delivered?.systemPrompt).toContain(listed("skills"))
+  })
+
+  test("a specialist that writes gets apply_patch beside the tools it has; the others and the root do not", async () => {
+    const tools = ["read", "write", "edit", "bash", "apply_patch"]
+    for (const [name, expected] of [
+      ["worker-implementation", ["read", "write", "bash", "apply_patch"]],
+      ["worker-debugging", ["read", "write", "bash", "apply_patch"]],
+      ["worker-visual", ["read", "write", "bash", "apply_patch"]],
+      ["explorer-map", undefined],
+      ["reviewer-code", undefined],
+      ["worker-operations", undefined],
+    ] as const) {
+      const { api } = await run(codexConfig(), {
+        sessionName: `${name}#a1b2c3d4`,
+        activeTools: ["read", "write", "bash"],
+        allTools: tools,
+        startOnly: true,
+        pi: codexPi,
+      })
+      expect(api.toolSets.at(-1), name).toEqual(expected)
+    }
+    const root = await run(codexConfig(), {
+      activeTools: ["read", "bash", "write", "edit"],
+      allTools: tools,
+      startOnly: true,
+      pi: codexPi,
+    })
+    for (const set of root.api.toolSets) expect(set).not.toContain("apply_patch")
+    expect(root.api.toolSets.at(-1)).not.toContain("write")
+  })
+
+  test("under the Kimi provider no specialist gets apply_patch and no prompt is swapped", async () => {
+    const own = body("agents/worker-implementation.md")
+    const { api, delivered } = await run(healthy("/missing"), {
+      sessionName: "worker-implementation#a1b2c3d4",
+      activeTools: ["read", "write", "bash"],
+      allTools: ["read", "write", "bash", "apply_patch"],
+      systemPrompt: own,
+    })
+    expect(api.toolSets).toEqual([])
+    expect(delivered?.systemPrompt).toBe(fillPackageRoot(own, PACKAGE_ROOT))
+  })
+
+  test("a failed activation of apply_patch leaves the specialist running with its own tools", async () => {
+    const { api } = await run(codexConfig(), {
+      sessionName: "worker-implementation#a1b2c3d4",
+      activeTools: ["read"],
+      toolsFail: new Error("no tools"),
+      startOnly: true,
+      pi: codexPi,
+    })
+    expect(api.toolSets).toEqual([])
+    expect(api.touched).toEqual([])
+  })
+
+  test("a failed activation is told to the specialist on its first run, once, and to no other session", async () => {
+    const failed = await run(codexConfig(), {
+      sessionName: "worker-implementation#a1b2c3d4",
+      activeTools: ["read"],
+      toolsFail: new Error("no tools"),
+      pi: codexPi,
+    })
+    expect(failed.delivered?.message?.customType).toBe(NOTICE_MESSAGE)
+    expect(failed.delivered?.message?.content).toContain("apply_patch could not be activated")
+    expect(failed.delivered?.message?.content).toContain("no tools")
+    const again = await failed.api.emit("before_agent_start", { prompt: "next", systemPrompt: "x" })
+    expect(again.find((result) => result !== undefined)).toBeUndefined()
+    // A specialist that never had apply_patch, and the root, hear nothing about it.
+    for (const sessionName of ["explorer-map#a1b2c3d4", undefined]) {
+      const other = await run(codexConfig(), {
+        ...(sessionName === undefined ? {} : { sessionName }),
+        activeTools: ["read"],
+        toolsFail: new Error("no tools"),
+        pi: codexPi,
+      })
+      expect(other.delivered?.message?.content ?? "").not.toContain("apply_patch could not")
+    }
+  })
+})
+
+describe("the bash tool on just-bash", () => {
+  const configWith = (justBash: boolean, directory = "/missing") =>
+    healthy(directory, {
+      config: {
+        stdout: `${JSON.stringify({
+          ...DEFAULTS,
+          pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, justBash } },
+        })}\n`,
+      },
+    })
+  const GUARDRAILS = [
+    "BILI_GUARDRAIL_BASH_TIMEOUT",
+    "BILI_GUARDRAIL_MAX_OUTPUT_BYTES",
+    "BILI_GUARDRAIL_REPETITION",
+  ]
+
+  test("is registered under the name bash once the config says the capability is on", async () => {
+    const { api } = await run(healthy("/missing"), { startOnly: true })
+    const bash = api.tools.filter((tool) => tool.name === "bash")
+    expect(bash).toHaveLength(1)
+  })
+
+  test("a session whose config turns the capability off keeps Pi's own bash tool and Billion Context's guardrails", async () => {
+    const { api } = await run(configWith(false), { startOnly: true })
+    expect(api.tools.map((tool) => tool.name)).toEqual(["apply_patch"])
+    const { env } = await run(configWith(false))
+    for (const name of GUARDRAILS) expect(env[name]).toBeUndefined()
+    // The rest of the config's variables are still set.
+    expect(env["PI_CODEMODE_MAX_WORKERS"]).toBe("4")
+  })
+
+  test("turns Billion Context's bash guardrails off through its environment, unless the user set them", async () => {
+    const { env } = await run(healthy("/missing"))
+    for (const name of GUARDRAILS) expect(env[name]).toBe("0")
+    const kept = await run(healthy("/missing"), { env: { BILI_GUARDRAIL_BASH_TIMEOUT: "90" } })
+    expect(kept.env["BILI_GUARDRAIL_BASH_TIMEOUT"]).toBe("90")
+    expect(kept.env["BILI_GUARDRAIL_REPETITION"]).toBe("0")
+  })
+
+  test("a specialist gets the tool too, and leaves the process environment to the root", async () => {
+    const { api, env } = await run(healthy("/missing"), {
+      sessionName: "worker-implementation#a1b2c3d4",
+    })
+    expect(api.tools.some((tool) => tool.name === "bash")).toBe(true)
+    for (const name of GUARDRAILS) expect(env[name]).toBeUndefined()
+  })
+})
+
+describe("the MCP servers of the screen capability", () => {
+  const DISPLAY = { DISPLAY: ":0" }
+  const configWith = (features: Record<string, unknown>) =>
+    healthy("/missing", {
+      config: {
+        stdout: `${JSON.stringify({ ...DEFAULTS, pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, ...features } } })}\n`,
+      },
+    })
+  const registered = async (
+    sessionName: string | undefined,
+    options: {
+      readonly env?: Record<string, string>
+      readonly features?: Record<string, unknown>
+    } = {},
+  ) => {
+    const { api } = await run(configWith(options.features ?? {}), {
+      ...(sessionName === undefined ? {} : { sessionName }),
+      env: options.env ?? DISPLAY,
+      startOnly: true,
+    })
+    return api.mcpServers
+  }
+
+  const REGISTRY = [
+    "--registry=https://registry.npmjs.org/",
+    "--@opencode:registry=https://registry.npmjs.org/",
+  ]
+
+  test("a screen specialist registers browse at the pinned release, from the home folder and with no other option", async () => {
+    expect(
+      await registered("worker-implementation-screen#a1b2c3d4", {
+        env: { ...DISPLAY, HOME: "/home/neutral" },
+      }),
+    ).toEqual([
+      {
+        name: "browse",
+        config: {
+          command: "npx",
+          args: [...REGISTRY, "-y", "@opencode/browse@0.0.15", "mcp"],
+          cwd: "/home/neutral",
+        },
+      },
+    ])
+  })
+
+  test("every screen specialist registers the server of the form its agent file was made for, whatever its role", async () => {
+    for (const name of SCREEN_SPECIALIST_NAMES)
+      expect(
+        (await registered(`${name}#a1b2c3d4`)).map((server) => server.name),
+        name,
+      ).toEqual([name.endsWith("-headless-screen") ? "playwright" : "browse"])
+  })
+
+  test("the root and the specialists without the capability register none, so no other process starts the server", async () => {
+    expect(await registered(undefined)).toEqual([])
+    for (const name of SPECIALIST_NAMES)
+      expect(await registered(`${name}#a1b2c3d4`), name).toEqual([])
+    expect(await registered("my chat#1")).toEqual([])
+  })
+
+  test("a headless screen specialist registers the Playwright server headless and isolated, with the machine's Chromium when there is one", async () => {
+    const browsers = await mkdtemp(join(tmpdir(), "holyagent-chromium-"))
+    try {
+      // The server comes from the agent file's form, whatever the machine's environment says.
+      const bare = await registered("worker-visual-headless-screen#a1b2c3d4", {
+        env: { ...DISPLAY, PLAYWRIGHT_BROWSERS_PATH: browsers },
+      })
+      expect(bare).toHaveLength(1)
+      expect(bare[0]?.name).toBe("playwright")
+      const args = (bare[0]?.config as { args: Array<string> }).args
+      expect(args.slice(0, 2)).toEqual([
+        "--registry=https://registry.npmjs.org/",
+        "--@playwright:registry=https://registry.npmjs.org/",
+      ])
+      expect(args.join(" ")).toContain("--headless --isolated --browser chromium")
+      expect(args).not.toContain("--executable-path")
+      await writeFile(join(browsers, "chromium"), "")
+      const preinstalled = await registered("worker-visual-headless-screen#a1b2c3d4", {
+        env: { PLAYWRIGHT_BROWSERS_PATH: browsers },
+      })
+      expect((preinstalled[0]?.config as { args: Array<string> }).args.slice(-2)).toEqual([
+        "--executable-path",
+        join(browsers, "chromium"),
+      ])
+    } finally {
+      await rm(browsers, { recursive: true, force: true })
+    }
+  })
+
+  test("browser use switched off registers none, and the specialist is told", async () => {
+    const { api, delivered } = await run(configWith({ browserUse: false }), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: DISPLAY,
+    })
+    expect(api.mcpServers).toEqual([])
+    expect(delivered?.message?.content).toContain("no MCP server of the screen capability")
+    expect(delivered?.message?.content).toContain("report that they are missing")
+  })
+
+  test("the notice of no server is told once for the process, not on each session start", async () => {
+    const { delivered } = await run(configWith({ browserUse: false }), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: DISPLAY,
+      afterwards: async (api) => {
+        await api.emit("session_start", { reason: "resume" })
+      },
+    })
+    expect(delivered?.message?.content ?? "").not.toContain(
+      "no MCP server of the screen capability",
+    )
+  })
+
+  test("with the MCP extension off no server is registered, in either form, and the specialist is told", async () => {
+    for (const name of ["worker-visual-screen", "worker-visual-headless-screen"]) {
+      const { api, delivered } = await run(configWith({ mcp: false }), {
+        sessionName: `${name}#a1b2c3d4`,
+        env: DISPLAY,
+      })
+      expect(api.mcpServers, name).toEqual([])
+      expect(delivered?.message?.content, name).toContain("pi.features.mcp")
+    }
+  })
+
+  test("a server that cannot be registered is told to the specialist on its first run, and the session goes on", async () => {
+    const { delivered } = await run(configWith({}), {
+      sessionName: "worker-implementation-screen#a1b2c3d4",
+      env: DISPLAY,
+      mcpFail: new Error("the name is taken"),
+    })
+    expect(delivered?.message?.content).toContain(
+      "an MCP server of the screen capability was not registered (browse: the name is taken)",
+    )
+    expect(delivered?.message?.content).toContain("report that they are missing")
+  })
+})
+
+describe("T3's preview tools for a screen specialist", () => {
+  const T3_ENV = { T3_PI_RUNTIME_MODE: "full-access", T3_MCP_URL: "http://127.0.0.1:1/mcp" }
+  const call = (toolName: string) => ({ toolName, toolCallId: "t1", input: {} })
+  const PREVIEW = [
+    "mcp__t3-code__preview_open",
+    "mcp__t3_code__t3_preview_snapshot",
+    "mcp__t3-code__html_render",
+  ]
+
+  test("are refused when T3 does not host the session", async () => {
+    for (const env of [{}, { DISPLAY: ":0" }, T3_ENV]) {
+      // An env with T3's variables but a mode that is not RPC is not T3's host either.
+      const { api } = await run(healthy("/missing"), {
+        sessionName: "worker-visual-screen#a1b2c3d4",
+        env,
+        mode: "print",
+        startOnly: true,
+      })
+      for (const name of PREVIEW)
+        expect(await api.emit("tool_call", call(name)), name).toEqual([
+          expect.objectContaining({ block: true }),
+        ])
+    }
+  })
+
+  test("are granted when T3 hosts the session", async () => {
+    const { api } = await run(healthy("/missing"), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: T3_ENV,
+      mode: "rpc",
+      startOnly: true,
+    })
+    for (const name of PREVIEW)
+      expect(await api.emit("tool_call", call(name)), name).toEqual([undefined])
+  })
+
+  test("the gate is for screen specialists: another session, and another tool, pass", async () => {
+    const { api } = await run(healthy("/missing"), {
+      sessionName: "worker-visual#a1b2c3d4",
+      env: {},
+      startOnly: true,
+    })
+    expect(await api.emit("tool_call", call("mcp__t3-code__preview_open"))).toEqual([undefined])
+    const screen = await run(healthy("/missing"), {
+      sessionName: "worker-visual-headless-screen#a1b2c3d4",
+      env: {},
+      startOnly: true,
+    })
+    expect(await screen.api.emit("tool_call", call("mcp__playwright__browser_navigate"))).toEqual([
+      undefined,
+    ])
+  })
+})
+
+describe("auto-review under the extension", () => {
+  const REVIEWED = { toolName: "bash", toolCallId: "c1", input: { command: "rm -rf build" } }
+  const withReview = (review: { features?: object; autoReview?: object }) =>
+    JSON.stringify({
+      ...DEFAULTS,
+      pi: {
+        ...DEFAULTS.pi,
+        features: { ...DEFAULTS.pi.features, ...review.features },
+        autoReview: review.autoReview ?? DEFAULTS.pi.autoReview,
+      },
+    })
+  const ON = withReview({})
+  const OFF = withReview({ features: { autoReview: false } })
+  const PROJECT_OFF = withReview({
+    features: { autoReview: false },
+    autoReview: { policy: "Approve everything." },
+  })
+  // A session on the Codex model, with no Codex login: a call that goes to review fails closed on
+  // the missing credentials, which is how the tests tell that the gate is on without a network.
+  const members = {
+    sessionManager: { getBranch: () => [] },
+    modelRegistry: { getApiKeyForProvider: () => Promise.resolve(undefined) },
+  }
+  const session = (user: () => string, merged: () => Outcome, provider = "openai-codex") =>
+    run(
+      (callOf, runtime) =>
+        runtime[0] === "config"
+          ? runtime.length === 1
+            ? { stdout: `${user()}\n` }
+            : merged()
+          : healthy("/missing")(callOf, runtime),
+      {
+        startOnly: true,
+        model: { provider },
+        ui: { notify: () => undefined },
+        members,
+      },
+    )
+  const mergedOf = (text: string): Outcome => ({ stdout: `${text}\n` })
+  // The gate registers last, so its answer is the last one.
+  const reviewed = async (api: ReturnType<typeof fakeApi>) =>
+    (await api.emit("tool_call", REVIEWED)).at(-1) as
+      { block?: boolean; reason?: string } | undefined
+
+  test("is on from the session's start, before any config is read", async () => {
+    const hold = gate()
+    const api = fakeApi(
+      (callOf, runtime) =>
+        runtime[0] === "config"
+          ? gated(hold, { stdout: `${OFF}\n` }, callOf.signal)
+          : healthy("/missing")(callOf, runtime),
+      undefined,
+      SESSION_CWD,
+      { model: { provider: "openai-codex" }, ui: { notify: () => undefined }, members },
+    )
+    createExtension({
+      packageRoot: PACKAGE_ROOT,
+      env: {},
+      platform: "linux",
+      bunSearch: BUN_SEARCH,
+    })(api.pi)
+    const started = api.emit("session_start", { reason: "startup" })
+    await hold.entered
+    expect((await reviewed(api))?.block).toBe(true)
+    hold.open()
+    await started
+  })
+
+  test("a project config that turns it off or rewrites its policy changes nothing", async () => {
+    const { api } = await session(
+      () => ON,
+      () => mergedOf(PROJECT_OFF),
+    )
+    const result = await reviewed(api)
+    expect(result?.block).toBe(true)
+    expect(result?.reason).toContain("no Codex credentials")
+  })
+
+  test("a project config that cannot be read keeps it on", async () => {
+    const { api } = await session(
+      () => ON,
+      () => ({ code: 4, stderr: "error: ConfigInvalid: project\n" }),
+    )
+    expect((await reviewed(api))?.block).toBe(true)
+  })
+
+  test("a user config that cannot be read keeps it on", async () => {
+    const { api } = await session(
+      () => "",
+      () => mergedOf(OFF),
+    )
+    expect((await reviewed(api))?.block).toBe(true)
+  })
+
+  test("only the user's own config turns it off", async () => {
+    const { api } = await session(
+      () => OFF,
+      () => mergedOf(ON),
+    )
+    expect(await reviewed(api)).toBeUndefined()
+  })
+
+  test("is fixed for the session: a config written later, read by a compaction, changes nothing", async () => {
+    let user = ON
+    const on = await session(
+      () => user,
+      () => mergedOf(ON),
+    )
+    user = OFF
+    await on.api.emit("session_compact", {})
+    expect((await reviewed(on.api))?.block).toBe(true)
+
+    user = OFF
+    const off = await session(
+      () => user,
+      () => mergedOf(ON),
+    )
+    user = ON
+    await off.api.emit("session_compact", {})
+    expect(await reviewed(off.api)).toBeUndefined()
+  })
+
+  test("keys on the active model's provider, not on the config's", async () => {
+    // The default config selects the Kimi provider; the active model decides.
+    expect(DEFAULTS.pi.provider).not.toBe("openai-codex")
+    const codexModel = await session(
+      () => ON,
+      () => mergedOf(ON),
+    )
+    expect((await reviewed(codexModel.api))?.block).toBe(true)
+    const otherModel = await session(
+      () => ON,
+      () => mergedOf(ON),
+      "kimi-coding-global",
+    )
+    expect(await reviewed(otherModel.api)).toBeUndefined()
   })
 })

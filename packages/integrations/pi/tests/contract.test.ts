@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -29,6 +29,7 @@ import {
   renderFixture,
   RERECORD_COMMAND,
 } from "./fixtures/record.ts"
+import { removeTemporary } from "./temp-folder.ts"
 
 // These tests pin the Pi events the integration consumes to the Pi version the fixtures were
 // built for. The fixtures come from Pi's exported types (see fixtures/record.ts), not from a Pi
@@ -157,6 +158,8 @@ const start = (directory: string, sessionName?: string) => {
     registerFlag: () => undefined,
     getFlag: () => undefined,
     registerToolRenderer: () => undefined,
+    registerTool: () => undefined,
+    registerCommand: () => undefined,
     getSessionName: () => sessionName,
     getActiveTools: () => [],
     getAllTools: () => [],
@@ -182,6 +185,8 @@ const start = (directory: string, sessionName?: string) => {
     {
       get: (target, key) => {
         if (key === "cwd") return target.cwd
+        // The auto-review gate reads the active model's provider; no model keeps it inert.
+        if (key === "model") return undefined
         throw new Error(`the extension used ctx.${String(key)}`)
       },
     },
@@ -205,7 +210,7 @@ const withDirectory = async <A>(use: (directory: string) => Promise<A>): Promise
   try {
     return await use(directory)
   } finally {
-    await rm(directory, { recursive: true, force: true })
+    await removeTemporary(directory)
   }
 }
 

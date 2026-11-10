@@ -1,0 +1,3 @@
+Find every site the transformation covers by searching, which is more reliable than memory, and apply exactly the specified change at each. A script or codemod works when its result is reviewable. Search again to confirm that no covered site remains and no uncovered one changed, and read the diff for stray edits.
+
+When the change needs a design decision, stop and put the question in the report.

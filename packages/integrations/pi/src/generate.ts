@@ -7,6 +7,8 @@ import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { jsonText } from "../../../runtime/src/instructions/generated.ts"
 import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
+import { SHELL_EXTERNAL, withoutSqlite } from "../../../runtime/src/pi/bash/bundle.ts"
+import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
 import { PROMPT_TEMPLATES } from "../../../runtime/src/prompts/index.ts"
 import { bundleSetupTui } from "../../../runtime/src/setup/tui/build.ts"
 import { TUI_BUNDLE, TUI_SOURCE } from "../../../runtime/src/setup/tui/files.ts"
@@ -14,6 +16,7 @@ import { frontmatter } from "../../claude/src/agents.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles } from "./agents.ts"
 import { bunFlags } from "./bun-flags.ts"
+import { EXTRA_PI_FAMILIES, FAMILIES_FOLDER, familyAgents, familySkills } from "./families.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -48,10 +51,18 @@ export const DESCRIPTION =
  */
 export const RUNTIME_SOURCE = "packages/runtime/src/hooks/pi-entry.ts"
 
+/**
+ * The entry the package bundles as `scripts/just-bash.js` (see `SHELL_BUNDLE`): the shell process
+ * the extension starts with Bun for each bash call, with just-bash inside. A bundle of its own,
+ * apart from the CLI, so a move of the just-bash pin changes this file and no other.
+ */
+export const SHELL_SOURCE = "packages/runtime/src/pi/bash/entry.ts"
+
 /** The folders and files of the built package, which its manifest lists as the package's files. */
 export const PACKAGE_FILES: ReadonlyArray<string> = [
   "agents",
   "extensions",
+  FAMILIES_FOLDER,
   "prompts",
   "scripts",
   "skills",
@@ -126,6 +137,21 @@ const extension = async (): Promise<GeneratedFile> => ({
 })
 
 /**
+ * The just-bash shell as one file for Bun, with the note that names its source after Bun's `//
+ *
+ * @bun` pragma, as the runtime's.
+ */
+const shell = (): Promise<string> =>
+  Effect.runPromise(
+    bundleModule(join(REPOSITORY, SHELL_SOURCE), {
+      target: "bun",
+      note: generatedNote(SHELL_SOURCE),
+      external: SHELL_EXTERNAL,
+      plugins: [withoutSqlite],
+    }),
+  )
+
+/**
  * The runtime as one file for Bun, like the Claude plugin's `holyagent.js`: Bun's module comments
  * go, so the text is the same on every machine, and the note that names the source follows Bun's
  * `// @bun` pragma, which stays first after the shebang.
@@ -175,6 +201,7 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       content: `# ${generatedNote(BUNFIG_SOURCE)}\n${await readSource(BUNFIG_SOURCE)}`,
     },
     { path: inPackage("scripts/holyagent.js"), content: await runtime() },
+    { path: inPackage(`scripts/${SHELL_BUNDLE}`), content: await shell() },
     {
       path: inPackage(`scripts/${TUI_BUNDLE}`),
       content: await Effect.runPromise(bundleSetupTui(REPOSITORY, generatedNote(TUI_SOURCE))),
@@ -199,11 +226,26 @@ const promptFiles = (): ReadonlyArray<GeneratedFile> =>
     content: `${frontmatter(generatedNote(`${PROMPTS_SOURCE}/${name}.md`), head)}\n${body}\n`,
   }))
 
-const skills = async (family: Family): Promise<ReadonlyArray<GeneratedFile>> =>
+const skills = async (family: Family, folder = "skills"): Promise<ReadonlyArray<GeneratedFile>> =>
   (await Effect.runPromise(skillFiles(family, generatedNote))).map(({ path, content }) => ({
-    path: inPackage(`skills/${path}`),
+    path: inPackage(`${folder}/${path}`),
     content,
   }))
+
+/**
+ * The specialist prompts and skills of the families a provider can run besides the package's own,
+ * below `families/<family>/`: the extension swaps a session onto them when the config selects a
+ * provider with that family.
+ */
+const otherFamilies = async (family: Family): Promise<ReadonlyArray<GeneratedFile>> =>
+  (
+    await Promise.all(
+      EXTRA_PI_FAMILIES.filter((extra) => extra !== family).map(async (extra) => [
+        ...(await agentFiles(extra, undefined, familyAgents(extra))),
+        ...(await skills(extra, familySkills(extra))),
+      ]),
+    )
+  ).flat()
 
 /** Every generated file of the package for a model family, in path order. */
 export const generate = async (family: Family = PI_FAMILY): Promise<ReadonlyArray<GeneratedFile>> =>
@@ -214,4 +256,5 @@ export const generate = async (family: Family = PI_FAMILY): Promise<ReadonlyArra
     ...promptFiles(),
     ...(await scripts()),
     ...(await skills(family)),
+    ...(await otherFamilies(family)),
   ].toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))

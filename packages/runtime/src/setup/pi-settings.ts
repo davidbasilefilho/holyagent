@@ -1,11 +1,17 @@
-import { join, relative, resolve, sep } from "node:path"
+import { join, resolve } from "node:path"
 
 import { Effect, Equal } from "effect"
 
+import {
+  CAPABILITIES,
+  type CapabilityDefinition,
+  type CapabilityForm,
+} from "../config/capabilities.ts"
 import type { Config } from "../config/schema.ts"
 import { PROVIDERS, ROOT_MODEL_PAIR, rootModelSettings } from "../pi/provider.ts"
 import {
   BILLION_CONTEXT_FILE,
+  PI_FFF_FILE,
   PI_SETTINGS_FILE,
   SUBAGENTS_SETTINGS_FILE,
   toolSettings,
@@ -20,11 +26,11 @@ import {
   readJsonObject,
   writeJsonObject,
 } from "./json-file.ts"
-import { loadPiConfig, piAgentDirectory, piInUse } from "./pi-check.ts"
+import { type CapabilityChoices, loadPiConfig, piAgentDirectory, piInUse } from "./pi-check.ts"
 import type { PiInstallOptions } from "./pi-install.ts"
-import { addRecorded, clearRecorded, readRecorded } from "./record.ts"
+import { addRecorded, clearRecorded, readRecorded, removeRecorded } from "./record.ts"
 import { hint, pass, show, skipped } from "./report.ts"
-import { isSymlink, type Scope } from "./scope.ts"
+import { refuseLinks, type Scope } from "./scope.ts"
 import { take } from "./settings.ts"
 
 /**
@@ -45,6 +51,7 @@ import { take } from "./settings.ts"
  * - `@tintinweb/pi-subagents@0.23.1`, README "Disable defaults": `disableDefaultAgents` is `false`.
  * - `pi-provider-kimi-code@0.6.13`, `src/config.ts` `makeDefaultTools`: each Moonshot tool is
  *   `enabled: false`.
+ * - `@ff-labs/pi-fff@0.11.0`, `README.md` "Modes": `mode` defaults to `tools-and-ui`.
  */
 const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonObject>([
   [
@@ -56,12 +63,18 @@ const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonOb
     },
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-  ...Object.values(PROVIDERS).map(
-    (profile) =>
-      [
-        profile.toolsFile,
-        { tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])) },
-      ] as const,
+  [PI_FFF_FILE, { mode: "tools-and-ui" }],
+  ...Object.values(PROVIDERS).flatMap((profile) =>
+    profile.toolsFile === undefined
+      ? []
+      : [
+          [
+            profile.toolsFile,
+            {
+              tools: Object.fromEntries(profile.webTools.map((tool) => [tool, { enabled: false }])),
+            },
+          ] as const,
+        ],
   ),
 ])
 
@@ -81,8 +94,11 @@ const leaves = (content: JsonObject, prefix: ReadonlyArray<string> = []): Readon
 const KNOWN_FILES: ReadonlyArray<string> = [
   PI_SETTINGS_FILE,
   SUBAGENTS_SETTINGS_FILE,
+  PI_FFF_FILE,
   BILLION_CONTEXT_FILE,
-  ...Object.values(PROVIDERS).map((profile) => profile.toolsFile),
+  ...Object.values(PROVIDERS).flatMap((profile) =>
+    profile.toolsFile === undefined ? [] : [profile.toolsFile],
+  ),
 ]
 
 const AGENT_PREFIX = "~/.pi/agent/"
@@ -94,7 +110,9 @@ const PI_PREFIX = "~/.pi/"
  * (`PI_CODING_AGENT_DIR` honored), the home directory's `.pi` for the provider's file, and for
  * Billion Context `BILI_CONFIG_FILE`, else `XDG_CONFIG_HOME`, else `~/.config`. Scopes `project`
  * and `local` use the project's `.pi` folder, where Pi and the packages read project settings;
- * Billion Context has no project file, so its setting is user scope only.
+ * Billion Context has no project file, and `@ff-labs/pi-fff` reads `pi-fff.json` from Pi's agent
+ * folder only (its project config could not safely choose tool names), so their settings are user
+ * scope only.
  */
 const locate = (env: Env, cwd: string, scope: Scope, logical: string): string | undefined => {
   const project = scope !== "user"
@@ -106,6 +124,8 @@ const locate = (env: Env, cwd: string, scope: Scope, logical: string): string | 
     const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join(home, ".config")
     return join(base, "billion-context", "billion-context.json")
   }
+  if (logical === PI_FFF_FILE)
+    return project ? undefined : join(piAgentDirectory(env), "pi-fff.json")
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length)
     return project ? join(cwd, ".pi", name) : join(piAgentDirectory(env), name)
@@ -146,9 +166,15 @@ interface Plan {
   readonly unplaced: ReadonlyArray<string>
 }
 
-const planFor = (env: Env, cwd: string, scope: Scope, config: Config): Plan => {
+const planFor = (
+  env: Env,
+  cwd: string,
+  scope: Scope,
+  config: Config,
+  form: CapabilityForm | undefined,
+): Plan => {
   const byFile = new Map<string, Array<Default>>()
-  for (const patch of toolSettings(config)) {
+  for (const patch of toolSettings(config, undefined, form)) {
     byFile.set(patch.file, [...(byFile.get(patch.file) ?? []), ...leaves(patch.content)])
   }
   const route = routeLeaves(config)
@@ -220,37 +246,27 @@ const resolveTarget = Effect.fn("resolveToolSettingsTarget")(function* (target: 
 })
 
 /**
- * Refuses a symlinked `.pi` folder, folder below it or settings file at project and local scope, so
- * a repository cannot redirect a write (or an `--undo`) to a file outside the project, as the
- * Claude settings step does for `.claude`. Scope `user` follows its links, as before.
- */
-const refuseLinks = Effect.fn("refuseProjectLinks")(function* (
-  cwd: string,
-  scope: Scope,
-  file: string,
-  action: string,
-) {
-  if (scope === "user") return
-  const parts = relative(cwd, file).split(sep)
-  for (let depth = 1; depth <= parts.length; depth++) {
-    const path = join(cwd, ...parts.slice(0, depth))
-    if (yield* isSymlink(path)) {
-      return yield* new SetupFailure({
-        message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`,
-      })
-    }
-  }
-})
-
-/**
  * The plan for a scope from the HolyAgent config that scope reads ({@link loadPiConfig}), or
  * `undefined` with `pi.enable` off or a config that cannot be loaded (the Pi package step and
  * doctor's Pi checks already report that).
  */
-const planAt = (env: Env, cwd: string, scope: Scope) =>
-  loadPiConfig(env, cwd, scope).pipe(
-    Effect.map((config) => (config.pi.enable ? planFor(env, cwd, scope, config) : undefined)),
+const planAt = (
+  env: Env,
+  cwd: string,
+  scope: Scope,
+  form?: CapabilityForm,
+  choices?: CapabilityChoices,
+) =>
+  loadPiConfig(env, cwd, scope, choices).pipe(
+    Effect.map((config) => (config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined)),
     Effect.orElseSucceed(() => undefined),
+  )
+
+/** Whether the config of the scope loads and turns `pi.enable` off, which plans no setting at all. */
+const piDisabledAt = (env: Env, cwd: string, scope: Scope, choices?: CapabilityChoices) =>
+  loadPiConfig(env, cwd, scope, choices).pipe(
+    Effect.map((config) => !config.pi.enable),
+    Effect.orElseSucceed(() => false),
   )
 
 const label = "tool settings"
@@ -317,6 +333,99 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
   return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`
 })
 
+/** The keys that setup takes back out when their patch is no longer planned (`revertWhenOff`). */
+const REVERTABLE: ReadonlyArray<{ readonly file: string; readonly leaf: Default }> = (
+  CAPABILITIES as ReadonlyArray<CapabilityDefinition>
+)
+  .flatMap((capability) => capability.settings)
+  .filter((patch) => patch.revertWhenOff === true)
+  .flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf })))
+
+/**
+ * Takes the revertable keys of one file back out: each key that the setup record names with the
+ * value it holds now. A key the record does not name (the user's own, or set before setup) is never
+ * touched, and one whose value changed since stays and is named. The record forgets all of them.
+ */
+const revertFile = Effect.fn("revertToolSettingsFile")(function* (
+  env: Env,
+  options: PiInstallOptions,
+  file: string,
+  wanted: ReadonlyArray<Default>,
+) {
+  const recorded = yield* readRecorded(env, file)
+  const mine = wanted.filter((leaf) =>
+    recorded.some(
+      (item) => item.path.join(".") === keyName(leaf) && Equal.equals(item.value, leaf.value),
+    ),
+  )
+  if (mine.length === 0) return []
+  yield* refuseLinks(options.cwd, options.scope, file, "edit")
+  let result = yield* readJsonObject(file)
+  const removed: Array<string> = []
+  const kept: Array<string> = []
+  for (const { path, value } of mine) {
+    const [next, removal] = take(result, path, 0, value)
+    result = next
+    if (removal.status === "removed") removed.push(`${removal.path} ${show(removal.value)}`)
+    if (removal.status === "kept")
+      kept.push(`${removal.path} ${show(removal.value)} (setup wrote ${show(removal.wanted)})`)
+  }
+  if (!options.dryRun) {
+    if (removed.length > 0) yield* writeJsonObject(file, result)
+    yield* removeRecorded(
+      env,
+      file,
+      mine.map(({ path }) => path),
+    )
+  }
+  const parts = [
+    ...(removed.length === 0
+      ? []
+      : [`${options.dryRun ? "would remove" : "removed"} ${removed.join(", ")}`]),
+    ...(kept.length === 0 ? [] : [`kept ${kept.join(", ")}`]),
+  ]
+  const mark = removed.length > 0 ? "-" : kept.length > 0 ? "~" : "="
+  return [
+    `${mark} ${label} ${file}: ${parts.length === 0 ? "nothing of setup's left to remove" : parts.join("; ")}${removed.length > 0 && options.dryRun ? " (dry run, nothing written)" : ""}`,
+  ]
+})
+
+/**
+ * The lines for the keys of a setting that must not outlive its capability: those of
+ * {@link REVERTABLE} that the plan no longer asks for and that setup recorded writing are taken back
+ * out of their file at the scope, so turning the capability off restores what it changed. With no
+ * plan (`pi.enable` off) every revertable key is unplanned.
+ */
+const revertUnplanned = Effect.fn("revertUnplannedToolSettings")(function* (
+  env: Env,
+  options: PiInstallOptions,
+  plan: Plan | undefined,
+) {
+  const byFile = new Map<string, Array<Default>>()
+  for (const { file: logical, leaf } of REVERTABLE) {
+    const file = locate(env, options.cwd, options.scope, logical)
+    if (file === undefined) continue
+    const planned = (plan?.targets ?? []).some(
+      (target) =>
+        target.file === file &&
+        target.all.some(
+          (key) => keyName(key) === keyName(leaf) && Equal.equals(key.value, leaf.value),
+        ),
+    )
+    if (!planned) byFile.set(file, [...(byFile.get(file) ?? []), leaf])
+  }
+  const lines: Array<string> = []
+  for (const [file, wanted] of byFile)
+    lines.push(
+      ...(yield* revertFile(env, options, file, wanted).pipe(
+        Effect.catchTag("SetupFailure", (error) =>
+          Effect.succeed([`! ${label}: ${error.message}`]),
+        ),
+      )),
+    )
+  return lines
+})
+
 /**
  * The tool settings step of `holyagent setup`: writes the settings {@link toolSettings} returns for
  * the HolyAgent config of the scope into the files the Pi packages read them from, one report line
@@ -328,18 +437,23 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
  * not written either ({@link resolveTarget}), and a symlinked `.pi` folder or file is a `!` line
  * with nothing written ({@link refuseLinks}). Keys the file already holds are never touched. The
  * keys it adds are recorded outside the project, which is what {@link undoPiToolSettings} removes.
- * Scope `user` writes Pi's global files, `project` and `local` the project's `.pi` folder (Billion
- * Context's file, which has no project location, is skipped with a `-` line). A file that is not a
- * JSON object is a `!` line and stays as it is, and the other files are still written. Each write
- * goes through a temporary file renamed over the target. With `dryRun` nothing is written or
- * recorded. With `pi.enable` off, or a config that cannot be loaded, there are no lines.
+ * Scope `user` writes Pi's global files, `project` and `local` the project's `.pi` folder (the
+ * files of Billion Context and `@ff-labs/pi-fff`, which have no project location, are skipped with
+ * a `-` line). A file that is not a JSON object is a `!` line and stays as it is, and the other
+ * files are still written. Each write goes through a temporary file renamed over the target. With
+ * `dryRun` nothing is written or recorded. With `pi.enable` off nothing is written, but the keys of
+ * a revertable setting that setup recorded are still taken back out; a config that cannot be loaded
+ * gives no lines.
  */
 export const installPiToolSettings = Effect.fn("installPiToolSettings")(function* (
   env: Env,
   options: PiInstallOptions,
 ) {
-  const plan = yield* planAt(env, options.cwd, options.scope)
-  if (plan === undefined) return []
+  const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices)
+  if (plan === undefined)
+    return (yield* piDisabledAt(env, options.cwd, options.scope, options.choices))
+      ? yield* revertUnplanned(env, options, undefined)
+      : []
   const lines: Array<string> = []
   for (const target of plan.targets) {
     lines.push(
@@ -355,6 +469,7 @@ export const installPiToolSettings = Effect.fn("installPiToolSettings")(function
       ),
     )
   }
+  lines.push(...(yield* revertUnplanned(env, options, plan)))
   return lines
 })
 
@@ -505,10 +620,10 @@ const routeLine = Effect.fn("checkRootModel")(function* (planned: Target, existi
  * scope, the same conditions as the Pi checks. A key the user set to another value is not missing.
  * Reads files only.
  */
-export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope) =>
+export const checkPiToolSettings = (env: Env, cwd: string, scope: Scope, form?: CapabilityForm) =>
   Effect.gen(function* () {
     if (!(yield* piInUse(env))) return []
-    const plan = yield* planAt(env, cwd, scope)
+    const plan = yield* planAt(env, cwd, scope, form)
     if (plan === undefined) return []
     const lines: Array<string> = []
     for (const planned of plan.targets) {

@@ -21,7 +21,8 @@ import { AssignmentId, IntentId, newId } from "../domain/ids.ts"
 import { closeAssignment, dispatch, record } from "../domain/lifecycle.ts"
 import { Revision } from "../domain/primitives.ts"
 import { findAssignment, findIntent, type Project } from "../domain/project.ts"
-import { RoleTask, routeFor } from "../domain/route.ts"
+import { agentFor, agentsFor, RoleTask, routeFor } from "../domain/route.ts"
+import { detectForm } from "../setup/form.ts"
 import { io } from "../state/files.ts"
 import { workTreeKey } from "../state/local.ts"
 import { readState, type Snapshot } from "../state/store.ts"
@@ -56,11 +57,12 @@ const AssignmentInput = Schema.Struct({
   intentRevision: Schema.optionalKey(Revision),
 })
 
-const DRAFT_SHAPE = `{roleTask: ${RoleTask.literals.join("|")}, objective, scope?: [text], constraints?: [text], criteria: [{text, blocking, dimension: behavior|regressions|tests|scope|style|repo-standards}], evidence?: [label], ownershipPaths?: [path] (required for writers), dependencies?: [assignmentId], independentFrom?: [assignmentId], followUpOf?: assignmentId, intentId?, intentRevision?}`
+const DRAFT_SHAPE = `{roleTask: ${RoleTask.literals.join("|")}, objective, scope?: [text], constraints?: [text], criteria: [{text, blocking, dimension: behavior|regressions|tests|scope|style|repo-standards}], evidence?: [label], ownershipPaths?: [path] (required for writers), dependencies?: [assignmentId], independentFrom?: [assignmentId], followUpOf?: assignmentId, screen?: boolean, intentId?, intentRevision?}`
 
 const DRAFT_NOTES: ReadonlyArray<string> = [
   "required: roleTask, objective and criteria; unknown fields are refused",
   "evidence labels are answered by the specialist by name; keep them few and observable (checks-run, changed-paths, diff-file)",
+  "screen: true when the Assignment needs to see or drive a screen (a desktop app, a real browser, the page shown in T3); its specialist then gets the computer-use, browser-use and T3 preview tools, and under the Codex provider runs on GPT-6.1 Terra at medium or higher effort. Pi host only; the dispatch prints the agent to launch, whose name ends in -screen",
   "ownershipPaths: relative portable paths that must not overlap a Running writer's in the same work tree; dependencies must be accepted at the live revision; a review names the work it must be independent from in independentFrom; a repair or follow-up sets followUpOf",
 ]
 
@@ -178,10 +180,18 @@ export const recordLaunch = (
 ) =>
   update((snapshot) =>
     Effect.gen(function* () {
-      const route = routeFor((yield* findAssignment(snapshot.project, id)).roleTask)
+      const assignment = yield* findAssignment(snapshot.project, id)
+      const route = routeFor(assignment.roleTask)
       const { model, effort } = route
-      if (launchedAs !== undefined && withoutNamespace(launchedAs.type) !== route.agent)
-        return yield* new AgentMismatch({ expected: route.agent, launched: launchedAs.type })
+      // A screen Assignment may be launched as the agent file of either form; the one a machine
+      // uses is decided at dispatch, and a plain agent never carries the screen tools.
+      const agents = agentsFor(route, assignment.screen)
+      const launched = withoutNamespace(launchedAs?.type)
+      if (launchedAs !== undefined && (launched === undefined || !agents.includes(launched)))
+        return yield* new AgentMismatch({
+          expected: agents.join(" or "),
+          launched: launchedAs.type,
+        })
       return yield* record(
         snapshot.project,
         snapshot.specialists,
@@ -255,14 +265,19 @@ const piReports = (call: Call, source: string, text: string) =>
         }),
       )
     const launchOf = yield* launchesOf(call.env, call.root, "pi")
+    const screenForm = detectForm(call.env).form
     const calls = yield* Effect.forEach(project.assignments, (assignment) =>
       briefPath(call, assignment.id).pipe(
         Effect.map((path) =>
           dispatchedCall(
             assignment,
-            agentTypeFor("pi", routeFor(assignment.roleTask).agent),
+            agentTypeFor(
+              "pi",
+              agentFor(routeFor(assignment.roleTask), assignment.screen, screenForm),
+            ),
             path,
-            launchOf(assignment.roleTask),
+            launchOf(assignment.roleTask, assignment.screen),
+            screenForm,
           ),
         ),
       ),
@@ -328,6 +343,12 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             const id = "id" in request ? request.id : newAssignmentId
             const project =
               "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now)
+            // Refused before anything starts: the other host has no screen tools to grant, and a
+            // dispatch that dropped the capability would hand the specialist a task it cannot do.
+            if (settings.host !== "pi" && (yield* findAssignment(project, id)).screen === true)
+              return yield* new InvalidDraft({
+                message: `The screen capability is available under the pi host only; this is the ${settings.host} host. Dispatch the Assignment without screen`,
+              })
             const dispatched = yield* dispatch(
               project,
               snapshot.specialists,
@@ -340,7 +361,11 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             // Assignment Ready instead of Running with no prompt to send.
             const agent = agentTypeFor(
               settings.host,
-              routeFor(dispatched.assignment.roleTask).agent,
+              agentFor(
+                routeFor(dispatched.assignment.roleTask),
+                dispatched.assignment.screen,
+                settings.screenForm,
+              ),
             )
             const path = yield* writeBrief(
               call,
@@ -360,7 +385,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             ...directiveView(
               started.directive,
               settings.host,
-              launchOf(started.assignment.roleTask),
+              launchOf(started.assignment.roleTask, started.assignment.screen),
             ),
           },
           "prompt",

@@ -3,7 +3,13 @@ import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
-import { DEPENDENCY_FIELDS, isPiHostPeer, PI_HOST_PACKAGES } from "./dependency-pins.ts"
+import {
+  DEPENDENCY_FIELDS,
+  EXACT_PACKAGES,
+  isExactPin,
+  isPiHostPeer,
+  PI_HOST_PACKAGES,
+} from "./dependency-pins.ts"
 import { manifestFiles } from "./update-dependencies.ts"
 
 const repository = join(import.meta.dir, "..")
@@ -33,7 +39,8 @@ const uses = (manifest: Record<string, unknown>): Array<Use> =>
 /**
  * What breaks the rule in a manifest: any specifier that is not a boundary caret range, and a
  * `workspace:*` that does not name a workspace package. A Pi host package may be a peer with the
- * range `*`, which Pi's package documentation requires.
+ * range `*`, which Pi's package documentation requires, and a package of `EXACT_PACKAGES`
+ * (just-bash) must be an exact stable version, and nothing else.
  */
 const problems = (
   file: string,
@@ -41,11 +48,12 @@ const problems = (
   workspaces: ReadonlySet<string>,
 ): Array<string> =>
   uses(manifest).flatMap(({ field, name, range }) => {
-    const ok =
-      typeof range === "string" &&
-      (BOUNDARY_RANGE.test(range) ||
-        (range === "workspace:*" && workspaces.has(name)) ||
-        isPiHostPeer(field, name, range))
+    const ok = EXACT_PACKAGES.includes(name)
+      ? isExactPin(name, range)
+      : typeof range === "string" &&
+        (BOUNDARY_RANGE.test(range) ||
+          (range === "workspace:*" && workspaces.has(name)) ||
+          isPiHostPeer(field, name, range))
     return ok ? [] : [`${file} ${field} ${name}: ${JSON.stringify(range)}`]
   })
 
@@ -105,6 +113,14 @@ describe("the rule", () => {
     expect(problems("f", { dependencies: { typebox: "*" } }, workspaces)).toHaveLength(1)
     expect(problems("f", { devDependencies: { typebox: "*" } }, workspaces)).toHaveLength(1)
     expect(problems("f", { peerDependencies: { typebox: ">=1.0.0" } }, workspaces)).toHaveLength(1)
+  })
+
+  test("an exact version is allowed for just-bash only", () => {
+    expect(problems("f", { dependencies: { "just-bash": "3.6.0" } }, workspaces)).toEqual([])
+    expect(problems("f", { dependencies: { "just-bash": "^3.0.0" } }, workspaces)).toHaveLength(1)
+    expect(problems("f", { dependencies: { "just-bash": "3.6.0-rc.1" } }, workspaces)).toHaveLength(
+      1,
+    )
   })
 
   test("a bad range in a nested override is found", () => {

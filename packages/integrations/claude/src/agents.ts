@@ -312,6 +312,11 @@ export interface SpecialistHost {
   readonly head: (route: Route, source: string, description: string) => string
   /** What the description says after the independence, for example the model; empty for none. */
   readonly runtime: (route: Route) => string
+  /**
+   * A section the host adds after the prompt's own, for example a note on the form of the machine;
+   * none by default.
+   */
+  readonly appendix?: (route: Route) => string
 }
 
 const specialist = async (
@@ -331,6 +336,7 @@ const specialist = async (
     ...CONDITIONAL_SECTIONS.filter(({ applies }) => applies(route)).map(
       ({ file }) => shared.conditional[file] ?? "",
     ),
+    ...(host.appendix === undefined ? [] : [host.appendix(route)]),
   ].join("\n\n")
   return { path: host.path(route), content: `${head}\n\n${body}\n` }
 }

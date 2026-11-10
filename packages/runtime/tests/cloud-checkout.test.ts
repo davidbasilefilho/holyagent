@@ -32,6 +32,26 @@ const session = async (branch = "claude/quiet-fox") => {
   return dir
 }
 
+/**
+ * A repository as the platform leaves it: cloned with HEAD detached at a commit, switched to the
+ * default branch, then to the assigned branch, so the reflog reads clone, `from <commit> to main`,
+ * `from main to <branch>`.
+ */
+const clonedSession = async (branch = "claude/x") => {
+  const source = await initRepo()
+  const commit = await seed(source, { "a.txt": "a\n" })
+  const dir = join(await scratch("holyagent-clone-"), "repo")
+  await sh(source, ["git", "clone", "-q", source, dir])
+  await sh(dir, ["git", "config", "user.name", "Octo Cat"])
+  await sh(dir, ["git", "config", "user.email", "octo@example.com"])
+  await sh(dir, ["git", "update-ref", "--no-deref", "-m", "clone: detached", "HEAD", commit])
+  await sh(dir, ["git", "switch", "-q", "main"])
+  await sh(dir, ["git", "switch", "-q", "-c", branch])
+  const created = await vcs(dir, ["intent", "create"], fakeGitHub().layer, { objective: "Ship it" })
+  expect(created.code).toBe(0)
+  return dir
+}
+
 const status = async (cwd: string, env: Record<string, string>) =>
   toon(await vcs(cwd, ["status"], fakeGitHub().layer, undefined, env))
 
@@ -91,6 +111,28 @@ describe("the notice of a detached primary checkout in a cloud session", () => {
     const notice = String((await status(dir, CLOUD)).notice)
     expect(notice).toContain("`git switch claude/quiet-fox`")
     expect(notice).not.toContain("`git switch main`")
+  })
+
+  test("takes the start branch from the platform's checkout after the clone, not the clone's branch", async () => {
+    const dir = await clonedSession()
+    expect(await sh(dir, ["git", "reflog", "show", "--format=%gs", "HEAD"])).toMatch(
+      /checkout: moving from main to claude\/x\ncheckout: moving from [0-9a-f]{40} to main\nclone: /,
+    )
+    expect(await status(dir, CLOUD)).not.toHaveProperty("notice")
+    expect(await started(dir, CLOUD)).not.toContain(MOVED)
+
+    await sh(dir, ["git", "switch", "-q", "-c", "release/0.3.0/fix/work"])
+    const moved = String((await status(dir, CLOUD)).notice)
+    expect(moved).toContain(MOVED)
+    expect(moved).toContain("`git switch claude/x`")
+    expect(moved).not.toContain("`git switch main`")
+
+    await sh(dir, ["git", "switch", "-q", "claude/x"])
+    await detach(dir)
+    const detached = String((await status(dir, CLOUD)).notice)
+    expect(detached).toContain(NOTICE)
+    expect(detached).toContain("`git switch claude/x`")
+    expect(detached).not.toContain("`git switch main`")
   })
 
   test("is not shown for a checkout on the branch it started on", async () => {

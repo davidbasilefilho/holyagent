@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { FEATURE_PACKAGES, piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
+import {
+  BROWSE_PACKAGE,
+  FEATURE_PACKAGES,
+  PLAYWRIGHT_PACKAGE,
+} from "../../src/config/capabilities.ts"
+import { piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
 import {
   PI_PACKAGE_VERSIONS,
   type PiPackageName,
@@ -34,6 +39,7 @@ describe("piPackages", () => {
       "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
       "npm:@aliou/pi-processes@0.13.6",
       "npm:@amaster.ai/pi-computer-use@0.1.36",
+      "npm:@ff-labs/pi-fff@0.11.0",
     ])
   })
 
@@ -42,6 +48,7 @@ describe("piPackages", () => {
     ["todo", "@juicesharp/rpiv-todo"],
     ["ask", "@juicesharp/rpiv-ask-user-question"],
     ["computerUse", "@amaster.ai/pi-computer-use"],
+    ["fff", "@ff-labs/pi-fff"],
     ["contextCompression", "billion-context"],
     ["subagents", "@tintinweb/pi-subagents"],
   ] as const)("disabling %s drops %s and nothing else", (feature, name) => {
@@ -64,6 +71,7 @@ describe("piPackages", () => {
       computerUse: false,
       contextCompression: false,
       subagents: false,
+      fff: false,
     })
     expect(piPackages(off)).toEqual([pinned("pi-provider-kimi-code")])
   })
@@ -100,8 +108,12 @@ describe("piPackages order and pi.enable", () => {
 describe("the pin table", () => {
   const named = ALL_NAMES.toSorted()
 
-  test("pins exactly the packages the integration can enable, each to an exact stable release", () => {
-    expect(Object.keys(PI_PACKAGE_VERSIONS).toSorted()).toEqual(named)
+  test("pins exactly the packages the integration can enable and the MCP servers of browser use (opencode browse and Playwright), each to an exact stable release", () => {
+    // Pi installs neither: each MCP server runs its package through npx at the pin, so they are in
+    // the table for the updater and in no list of Pi packages.
+    expect(Object.keys(PI_PACKAGE_VERSIONS).toSorted()).toEqual(
+      [...named, BROWSE_PACKAGE, PLAYWRIGHT_PACKAGE].toSorted(),
+    )
     for (const version of Object.values(PI_PACKAGE_VERSIONS))
       expect(version).toMatch(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)
   })

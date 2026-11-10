@@ -87,9 +87,10 @@ describe("routeModel", () => {
 })
 
 describe("the provider profile", () => {
-  test("Kimi for Coding (global) is the only provider the config accepts", () => {
-    expect(PiProvider.literals).toEqual(["kimi-coding-global"])
-    expect(Object.keys(PROVIDERS)).toEqual(["kimi-coding-global"])
+  test("Kimi for Coding (global) is the default of the two providers the config accepts", () => {
+    expect(PiProvider.literals).toEqual(["kimi-coding-global", "openai-codex"])
+    expect(Object.keys(PROVIDERS)).toEqual(["kimi-coding-global", "openai-codex"])
+    expect(DEFAULT_CONFIG.pi.provider).toBe("kimi-coding-global")
   })
 
   test("the launcher environment sets the global region", () => {

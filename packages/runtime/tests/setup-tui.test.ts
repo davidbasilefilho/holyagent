@@ -70,7 +70,7 @@ describe("the setup interface, review and apply", () => {
   test("Enter reviews the current choices: what each switch changes and what is always applied", async () => {
     const screen = await shown({ width: 80, height: 40 })
     await screen.keys("down", " ", "enter")
-    expect(screen.reviews).toEqual([{ worktrees: true, deviceAccess: false }])
+    expect(screen.reviews).toEqual([{ worktrees: true, deviceAccess: false, capabilities: {} }])
     const text = screen.lines().join("\n")
     expect(text).toContain("REVIEW")
     expect(text).toContain("/home/user/.t3/userdata/settings.json")
@@ -86,7 +86,7 @@ describe("the setup interface, review and apply", () => {
   test("confirming applies the choices once and shows the result; closing reports it", async () => {
     const screen = await shown({ width: 80, height: 24 })
     await screen.keys("down", "down", " ", "enter", "enter")
-    expect(screen.applies).toEqual([{ worktrees: false, deviceAccess: true }])
+    expect(screen.applies).toEqual([{ worktrees: false, deviceAccess: true, capabilities: {} }])
     const text = screen.lines().join("\n")
     expect(text).toContain("RESULT")
     expect(text).toContain("Setup finished.")
@@ -244,9 +244,11 @@ describe("the setup interface, look", () => {
   })
 
   test("NO_COLOR draws in the terminal's own colour and keeps bold", async () => {
+    // Four rows taller than a plain terminal: the review lists one line per capability, and the Pi
+    // provider line has to stay inside the page after the thirteenth.
     const screen = await shown({
       width: 80,
-      height: 24,
+      height: 28,
       env: { TERM: "xterm-256color", NO_COLOR: "1" },
     })
     await screen.keys("down", " ")
@@ -517,7 +519,7 @@ describe("the setup interface, a review longer than the screen", () => {
     const screen = await shown({ width: 40, height: 20 })
     await screen.keys("enter", "pageup")
     expect(screen.lines().join("\n")).toMatch(/^Lines 1-/m)
-    await screen.keys("pagedown", "pagedown", "pagedown", "pagedown", "pagedown")
+    await screen.keys("pagedown", "pagedown", "pagedown", "pagedown", "pagedown", "pagedown")
     const end = screen.lines().join("\n")
     expect(end).toMatch(/of (\d+), PgUp for earlier$/m)
     await screen.keys("pageup")
@@ -581,6 +583,10 @@ describe("the colour policy and the glyph set", () => {
     expect(colorEnabled({ FORCE_COLOR: "1", NO_COLOR: "1" }, true)).toBe(false)
     expect(colorEnabled({ CI: "true" }, true)).toBe(false)
     expect(colorEnabled({ CI: "false" }, true)).toBe(true)
+    // The same truthy rule as the CI fallback of the screen: a negative keeps the colour.
+    for (const negative of ["", "0", "no", "OFF"])
+      expect(colorEnabled({ CI: negative }, true)).toBe(true)
+    expect(colorEnabled({ CI: "1" }, true)).toBe(false)
   })
 
   test("read the locale from LC_ALL, then LC_CTYPE, then LANG", () => {

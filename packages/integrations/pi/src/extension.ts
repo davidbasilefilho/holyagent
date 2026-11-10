@@ -17,6 +17,7 @@ import { Text } from "@earendil-works/pi-tui"
 import { Cause, Data, Effect, Exit, Fiber, Schema } from "effect"
 
 import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
+import type { CapabilityForm, McpServer } from "../../../runtime/src/config/capabilities.ts"
 import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
@@ -31,10 +32,14 @@ import {
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
+import { cmdExeArguments, type CmdLaunch } from "../../../runtime/src/pi/bash/cmd.ts"
+import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
+import { justBashOn } from "../../../runtime/src/pi/bash/settings.ts"
 import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
+import { APPLY_PATCH_TOOL } from "../../../runtime/src/pi/codex/apply-patch.ts"
 import { providerEnv } from "../../../runtime/src/pi/provider.ts"
 import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
-import { PI_ROOT_PROMPT } from "../../../runtime/src/pi/root-prompt.ts"
+import { PI_ROOT_PROMPT, PI_ROOT_PROMPTS } from "../../../runtime/src/pi/root-prompt.ts"
 import {
   deactivatedT3Tools,
   POWERSHELL_ENTRY,
@@ -43,9 +48,29 @@ import {
   toolArgs,
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
+import { findChromium } from "../../../runtime/src/setup/chromium.ts"
+import { homeDirectory } from "../../../runtime/src/setup/environment.ts"
+import { detectForm } from "../../../runtime/src/setup/form.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
+import {
+  type AutoReviewChoice,
+  autoReviewChoice,
+  type AutoReviewSettings,
+  createAutoReviewSettings,
+  registerAutoReview,
+} from "./auto-review.ts"
+import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
-import { SPECIALIST_NAMES } from "./specialists.ts"
+import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
+import { familyAgentPrompt, familySkillPaths } from "./families.ts"
+import {
+  isScreenAgent,
+  refuseT3PreviewOutsideT3,
+  registerScreenServers,
+  screenFormOf,
+  screenServers,
+} from "./screen.ts"
+import { AGENT_TYPES, SPECIALIST_NAMES } from "./specialists.ts"
 import {
   belowFullAccess,
   isT3Session,
@@ -104,16 +129,21 @@ export const WORKFLOW_TOOL = "SubagentWorkflow"
 export const CODEMODE_TOOL_NAME = "codemode"
 
 /**
- * The name of the specialist a session is, or undefined for any other session. The package names a
- * child's session `<agent>#<first 8 characters of its id>` before it binds the child's extensions,
- * so the name is readable when the child's `session_start` fires. A session name a user chose does
- * not count unless it names a specialist and has the `#`.
+ * The name of the specialist a session is, or undefined for any other session: one of the 18, or
+ * its `-screen` variant. The package names a child's session `<agent>#<first 8 characters of its
+ * id>` before it binds the child's extensions, so the name is readable when the child's
+ * `session_start` fires. A session name a user chose does not count unless it names a specialist
+ * and has the `#`.
  */
 export const childAgent = (sessionName: string | undefined): string | undefined => {
   const at = sessionName?.indexOf("#") ?? -1
   const agent = at < 0 ? undefined : sessionName?.slice(0, at)
-  return agent !== undefined && SPECIALIST_NAMES.includes(agent) ? agent : undefined
+  return agent !== undefined && AGENT_TYPES.includes(agent) ? agent : undefined
 }
+
+// What the refusals list as the agents a launch may name: the 18 specialists, each also under the
+// name a screen Assignment is dispatched to.
+const SPECIALIST_CHOICES = `${SPECIALIST_NAMES.join(", ")} (each also as <name>-screen, or <name>-headless-screen on a headless machine)`
 
 /**
  * The variables the `holyagent` calls of the root need: the host (`pi`) and whether workflows are
@@ -157,12 +187,12 @@ export const fillPackageRoot = (
 ): string => prompt.replaceAll(PI_ROOT_PLACEHOLDER, () => toPosix(packageRoot, platformPath.sep))
 
 /**
- * Refuses an `Agent` call whose `subagent_type` is not one of the 18 specialists. The package's
- * settings already stop its own agents and the fallback, but an agent file in the project's
- * `.pi/agents` outranks a package's, so the model could still launch a type that has the wrong
- * prompt and tools. A resume names an existing agent, so its type is not checked. The call's
- * `model` and `thinking` are left as given: they come per call by design. Returns the `tool_call`
- * result that blocks the call, or undefined to let it run.
+ * Refuses an `Agent` call whose `subagent_type` is not one of the 18 specialists or its `-screen`
+ * variant. The package's settings already stop its own agents and the fallback, but an agent file
+ * in the project's `.pi/agents` outranks a package's, so the model could still launch a type that
+ * has the wrong prompt and tools. A resume names an existing agent, so its type is not checked. The
+ * call's `model` and `thinking` are left as given: they come per call by design. Returns the
+ * `tool_call` result that blocks the call, or undefined to let it run.
  */
 export const refuseNonSpecialist = (event: {
   readonly toolName: string
@@ -172,14 +202,14 @@ export const refuseNonSpecialist = (event: {
   const { resume, subagent_type: type } = event.input
   if (typeof resume === "string" && resume.trim() !== "") return undefined
   const requested = typeof type === "string" ? type.trim() : ""
-  if (SPECIALIST_NAMES.includes(requested)) return undefined
+  if (AGENT_TYPES.includes(requested)) return undefined
   return {
     block: true,
-    reason: `${requested === "" ? "No agent type given" : `"${requested}" is not a HolyAgent specialist`}. Use one of: ${SPECIALIST_NAMES.join(", ")}.`,
+    reason: `${requested === "" ? "No agent type given" : `"${requested}" is not a HolyAgent specialist`}. Use one of: ${SPECIALIST_CHOICES}.`,
   }
 }
 
-const WORKFLOW_SPECIALISTS: ReadonlySet<string> = new Set(SPECIALIST_NAMES)
+const WORKFLOW_SPECIALISTS: ReadonlySet<string> = new Set(AGENT_TYPES)
 
 // The inputs of an inline workflow call; any other key (a scriptPath, a saved name, ...) makes the
 // package run something the script check did not read.
@@ -190,14 +220,14 @@ const present = (value: unknown): value is string =>
 
 /**
  * Refuses a `SubagentWorkflow` call unless every `agent()` call of its script names one of the 18
- * specialists by a string-literal `agentType`. Without an `agentType` the package starts its own
- * `general-purpose` agent with every tool, and settings cannot switch that off on this path, so the
- * script is read before it runs, with the runtime's check of the Claude `Workflow` tool (the script
- * must be plain, see `workflow-check.ts`) in its Pi mode, which parses the meta fragment and the
- * program the package runs. Only an inline `script` can be read here: a `scriptPath` or a saved
- * `name` is refused, since the file may change before the package reads it. A refusal never asks
- * for confirmation. Returns the `tool_call` result that blocks the call, or undefined to let it
- * run.
+ * specialists, or its `-screen` variant, by a string-literal `agentType`. Without an `agentType`
+ * the package starts its own `general-purpose` agent with every tool, and settings cannot switch
+ * that off on this path, so the script is read before it runs, with the runtime's check of the
+ * Claude `Workflow` tool (the script must be plain, see `workflow-check.ts`) in its Pi mode, which
+ * parses the meta fragment and the program the package runs. Only an inline `script` can be read
+ * here: a `scriptPath` or a saved `name` is refused, since the file may change before the package
+ * reads it. A refusal never asks for confirmation. Returns the `tool_call` result that blocks the
+ * call, or undefined to let it run.
  */
 export const refuseNonSpecialistWorkflow = (event: {
   readonly toolName: string
@@ -207,7 +237,7 @@ export const refuseNonSpecialistWorkflow = (event: {
   const { script, scriptPath, name } = event.input
   const refuse = (reason: string): ToolCallEventResult => ({
     block: true,
-    reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_NAMES.join(", ")}.`,
+    reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_CHOICES}.`,
   })
   if (Object.keys(event.input).some((key) => !INLINE_WORKFLOW_INPUTS.has(key)))
     return Effect.succeed(
@@ -427,6 +457,27 @@ interface Collected {
    * to the root and to every child, since the provider is used by both.
    */
   readonly providerEnvironment?: Readonly<Record<string, string>>
+  /**
+   * The Codex provider's settings, present with `environment` when the config selects Codex; every
+   * session reads them, since the root and the specialists both run on its models.
+   */
+  readonly codex?: CodexSettings
+  /**
+   * What the user-level config, read alone, decides for auto-review. Present on every result,
+   * whether the config was readable or not, and never from the project's config.
+   */
+  readonly autoReview?: AutoReviewChoice
+  /**
+   * True when the config runs the bash tool on just-bash (`pi.features.justBash`), present with
+   * `environment`; every session reads it, since the root and the specialists both have `bash`.
+   */
+  readonly justBash?: true
+  /**
+   * The MCP servers a screen specialist registers (see `registerScreenServers`), present for a
+   * specialist once the config is read and `pi.enable` is on: those of the capabilities the form of
+   * the machine offers.
+   */
+  readonly screenServers?: ReadonlyArray<McpServer>
   /** True for the root once the config is read and `pi.enable` is on: it gets the root prompt. */
   readonly rootPrompt?: true
   /** The root's tool selection, present for the root once the config is read and `pi.enable` is on. */
@@ -465,6 +516,15 @@ interface Held {
    * the start's, so it runs once.
    */
   started: boolean
+  /** The Codex provider's settings once the config is read, or undefined for another provider. */
+  codex: CodexSettings | undefined
+  /**
+   * The session's auto-review settings: on with the default policy from the start, fixed once by
+   * the first collection to the user-level config's choice. The project's config has no part.
+   */
+  autoReview: AutoReviewSettings
+  /** True once the config is read and runs the bash tool on just-bash. */
+  justBash: boolean
   /** Stops the provider checks of the session. */
   probe: AbortController | undefined
   /** True when the session runs under T3 Code (see {@link isT3Session}). */
@@ -487,6 +547,12 @@ interface Held {
    * applied, the user-level config could not be read, or both in one line.
    */
   setupNotice: Delivery | undefined
+  /**
+   * What a specialist is told on its first run when a tool it was granted could not be set up
+   * (`apply_patch` not activated, an MCP server of the screen capability not registered), until
+   * that run delivers it. A specialist has no other notice channel.
+   */
+  specialistNotice: Delivery | undefined
 }
 
 /**
@@ -500,19 +566,26 @@ const rootExclusions = (configs: ReadonlyArray<Config>): ReadonlyArray<string> =
 
 /**
  * What a config decides for a session of `role`: the worker cap and the provider's variables for
- * every role, and for the root also its prompt and its tool selection. The root's exclusions are
- * those of `config` and of `bound`, the configs whose exclusions it keeps whatever `config` says
- * (the defaults and the user's).
+ * every role, for a specialist the MCP servers of the screen capability in the machine's `form`
+ * (`chromium` finds the Chromium the machine provides for the headless one), and for the root also
+ * its prompt and its tool selection. The root's exclusions are those of `config` and of `bound`,
+ * the configs whose exclusions it keeps whatever `config` says (the defaults and the user's).
  */
 const settingsFor = (
   config: Config,
   role: PiRole,
   bound: ReadonlyArray<Config> = [],
+  form: CapabilityForm = "normal",
+  chromium: () => string | undefined = () => undefined,
 ): Collected => {
   const rootArgs = toolArgs(config, "root")
+  const codex = codexSettings(config)
   return {
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
+    ...(codex === undefined ? {} : { codex }),
+    ...(justBashOn(config) ? { justBash: true as const } : {}),
+    ...(role === "specialist" ? { screenServers: screenServers(config, form, chromium()) } : {}),
     ...(role === "root"
       ? {
           rootPrompt: true,
@@ -690,9 +763,20 @@ export const findBun = (
 export const runtimeArgs = (
   packageRoot: string,
   platformPath: Pick<typeof nodePath, "join"> = nodePath,
+): ReadonlyArray<string> => scriptArgs(packageRoot, "holyagent.js", platformPath)
+
+/**
+ * The Bun arguments that run one of the package's bundles from its `scripts` folder, with the same
+ * flags as {@link runtimeArgs}: no env file and the empty Bun config. The shell process of the bash
+ * tool is `just-bash.js`.
+ */
+export const scriptArgs = (
+  packageRoot: string,
+  script: string,
+  platformPath: Pick<typeof nodePath, "join"> = nodePath,
 ): ReadonlyArray<string> => [
   ...bunFlags(platformPath.join(packageRoot, "scripts", "empty-bunfig.toml")),
-  platformPath.join(packageRoot, "scripts", "holyagent.js"),
+  platformPath.join(packageRoot, "scripts", script),
 ]
 
 /**
@@ -701,45 +785,6 @@ export const runtimeArgs = (
  * `pi` runs through `cmd.exe /c`.
  */
 export const CMD_NOT_FOUND = 9009
-
-/** The argv of a `cmd.exe` launch, or why `cmd.exe` cannot be trusted to read it as separate words. */
-export type CmdLaunch =
-  | { readonly ok: true; readonly args: ReadonlyArray<string> }
-  | { readonly ok: false; readonly reason: string }
-
-// What no quoting can make safe: `cmd.exe` expands `%` and `^` and `!` inside quotes, Node's quoting
-// escapes a `"` as `\"`, which `cmd.exe` does not know, and a control character ends or splits the line.
-const UNQUOTABLE = /["%^!]|\p{Cc}/u
-// Metacharacters that only a quote makes literal. Node quotes an argument only when it holds a space,
-// a tab or a quote, so in any other argument these would be read as syntax.
-const BARE_SYNTAX = /[&|<>()]/
-
-/**
- * The arguments that start `command args...` through `cmd.exe`, which only a shell can run for a
- * `.cmd` shim. Pi's `exec` spawns without a shell and without `windowsVerbatimArguments`, so Node
- * quotes each argument itself (in quotes when it holds a space, a tab or a quote, otherwise bare)
- * and joins them with spaces; `cmd.exe` receives that line unchanged. One extra pair of quotes
- * around the whole line cannot be passed through that quoting, which would escape the inner quotes
- * as `\"`. The line instead starts with `call`, so it does not begin with a quote and `cmd.exe`
- * strips none: `cmd.exe /d /s /c call "C:\a b\bun.cmd" --flag "C:\c d\x"`. Every word stays a
- * separate argument. A word with a character that no quoting protects (see {@link UNQUOTABLE}), or
- * with a `cmd.exe` operator while Node would leave it unquoted, is refused instead of started.
- */
-export const cmdExeArguments = (command: string, args: ReadonlyArray<string>): CmdLaunch => {
-  for (const word of [command, ...args]) {
-    if (UNQUOTABLE.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`,
-      }
-    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`,
-      }
-  }
-  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] }
-}
 
 // A notice is built from text a project or Pi printed, so it loses its control characters.
 const oneLine = (text: string): string => printable(text).replace(/\s+/g, " ").trim()
@@ -759,6 +804,12 @@ const joinNotices = (first: Delivery | undefined, second: Delivery): Delivery =>
       ? first
       : { ...first, content: `${first.content}; ${added}` }
 }
+
+// Joins two notices of which either may be absent.
+const joinOptional = (
+  first: Delivery | undefined,
+  second: Delivery | undefined,
+): Delivery | undefined => (second === undefined ? first : joinNotices(first, second))
 
 // What `git rev-parse` says, with exit 128, outside a repository.
 const NOT_A_REPOSITORY = /not a git repository/i
@@ -874,6 +925,24 @@ export const createExtension =
             )
     }
 
+    // The Bun that starts `argv`: the one found before while cmd.exe can still start it with these
+    // arguments, else the next one on the search path, or why there is none.
+    const bunFor = (
+      argv: ReadonlyArray<string>,
+    ):
+      | { readonly ok: true; readonly program: string }
+      | { readonly ok: false; readonly reason: string } => {
+      if (bun === undefined || !launchOf(bun, argv).ok) {
+        const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
+          const launch = launchOf(candidate, argv)
+          return launch.ok ? undefined : launch.reason
+        })
+        if (!lookup.found) return { ok: false, reason: lookup.looked }
+        bun = lookup.program
+      }
+      return { ok: true, program: bun }
+    }
+
     // Bun runs the package's bundled runtime, which enters the project first; its stdout is the
     // command's output. A Bun that cmd.exe cannot start with these arguments (a shim, and a project
     // path with a character no quoting protects) is passed over for the next one. A Bun that is gone
@@ -882,18 +951,10 @@ export const createExtension =
       const argv = [...bundled, PI_PROJECT_FLAG, project, ...args]
       const attempt = (looked: boolean): Effect.Effect<ExecResult, CommandFailed> =>
         Effect.suspend(() => {
-          if (bun === undefined || !launchOf(bun, argv).ok) {
-            const lookup = findBun(platform, platformPath, bunSearch, (candidate) => {
-              const launch = launchOf(candidate, argv)
-              return launch.ok ? undefined : launch.reason
-            })
-            if (!lookup.found)
-              return Effect.fail(
-                new CommandFailed({ command: args.join(" "), reason: lookup.looked }),
-              )
-            bun = lookup.program
-          }
-          const program = bun
+          const found = bunFor(argv)
+          if (!found.ok)
+            return Effect.fail(new CommandFailed({ command: args.join(" "), reason: found.reason }))
+          const program = found.program
           const gone = () => !looked && !signal.aborted && !(bunSearch.exists ?? isFile)(program)
           const again = Effect.suspend(() => {
             bun = undefined
@@ -915,6 +976,29 @@ export const createExtension =
         ),
       )
     }
+
+    // The bash tool's shell: Bun on the package's `scripts/just-bash.js`, started in the package's
+    // folder like every other program, and found the same way as for the CLI. It is registered
+    // once a collection finds the capability on, and runs Pi's own bash while it is off.
+    const shellLaunch = (): ShellLaunch => {
+      const argv = scriptArgs(packageRoot, SHELL_BUNDLE, platformPath)
+      const found = bunFor(argv)
+      if (!found.ok) return found
+      const launch = launchOf(found.program, argv)
+      return launch.ok
+        ? {
+            ok: true,
+            program: isShim(found.program) ? "cmd.exe" : found.program,
+            args: launch.args,
+            cwd: packageRoot,
+          }
+        : { ok: false, reason: launch.reason }
+    }
+    const bash = createBash(pi, {
+      active: () => held?.justBash === true,
+      launch: shellLaunch,
+      platform,
+    })
 
     // The top of the work tree holds the project's config; outside git the project folder does, and
     // so does its state. Only git's own answer that the folder is not in a repository means "not
@@ -961,6 +1045,14 @@ export const createExtension =
       onExcessProperty: "error",
     })
 
+    // The form of the machine, from its environment alone, as setup and doctor detect it; a screen
+    // specialist takes the form of the agent file it was launched from instead, so its servers and
+    // its tools agree.
+    const machineForm = (): CapabilityForm => {
+      const agent = childAgent(pi.getSessionName())
+      return isScreenAgent(agent) ? screenFormOf(agent) : detectForm(env, platform).form
+    }
+
     // The session's role: a child the package launched is a specialist whatever the flag says, since
     // the flag defaults to the root in every Pi session and a child has no launch line of its own.
     const roleOf = Effect.suspend(() => {
@@ -981,7 +1073,13 @@ export const createExtension =
       Effect.gen(function* () {
         const role = yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE))
         const defaults = yield* defaultConfig
-        return settingsFor(config ?? defaults, role, boundConfigs(defaults, user))
+        return settingsFor(
+          config ?? defaults,
+          role,
+          boundConfigs(defaults, user),
+          machineForm(),
+          () => findChromium(env),
+        )
       }).pipe(Effect.orDie)
 
     // The root's exclusions before any config is known: the defaults', so a run in flight while a
@@ -1069,6 +1167,8 @@ export const createExtension =
               config,
               yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE)),
               bound,
+              machineForm(),
+              () => findChromium(env),
             )
             return {
               enabled: false,
@@ -1077,7 +1177,7 @@ export const createExtension =
             } satisfies Collected
           }
           const role = yield* roleOf
-          configured = settingsFor(config, role, bound)
+          configured = settingsFor(config, role, bound, machineForm(), () => findChromium(env))
           // Status first, then reconcile: for a project that keeps state, status makes the state
           // worktree that the next calls read.
           const status = yield* holyagent(signal, project, "status").pipe(
@@ -1114,7 +1214,11 @@ export const createExtension =
           Effect.catch((error) => failed(error.message)),
           Effect.catchCause((cause) => failed(Cause.pretty(cause))),
         )
-        return homeNotice === undefined ? collected : { ...collected, homeNotice }
+        // Both the success and every failure path of `collected` end after the user's read, so
+        // `user` is settled here; it is `undefined` when the file could not be read, which leaves
+        // auto-review on.
+        const decided = { ...collected, autoReview: autoReviewChoice(user) }
+        return homeNotice === undefined ? decided : { ...decided, homeNotice }
       })
     }
 
@@ -1254,6 +1358,64 @@ export const createExtension =
       return notice(T3_ACCESS_NOTICE)
     }
 
+    // A specialist the Codex config gives `apply_patch` (the ones with Write; the module registers
+    // the tool inactive) has it added to its active tools, beside what the package's agent file
+    // gave it. The root never does, since it writes no files. A failure, or a tool that stays
+    // inactive because nothing registered it, is told to the specialist on its first run, which
+    // goes on with `write` and `edit`.
+    const activateApplyPatch = (codex: CodexSettings): Delivery | undefined => {
+      const agent = childAgent(pi.getSessionName())
+      if (agent === undefined || !codex.applyPatchAgents.includes(agent)) return undefined
+      const reason = Effect.runSync(
+        Effect.try(() => {
+          pi.setActiveTools([...new Set([...pi.getActiveTools(), APPLY_PATCH_TOOL])])
+          return pi.getActiveTools().includes(APPLY_PATCH_TOOL)
+            ? undefined
+            : "the tool is not registered"
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.succeed(error.cause instanceof Error ? error.cause.message : "it failed"),
+          ),
+        ),
+      )
+      return reason === undefined
+        ? undefined
+        : notice(
+            `apply_patch could not be activated (${reason}); change files with write and edit instead`,
+          )
+    }
+
+    // The MCP servers of the screen capability go into the session of a screen specialist only (see
+    // `registerScreenServers`): Pi starts the servers of every session, so the root and the other
+    // specialists would start one they never call. Servers registered while a session starts
+    // connect right away. A server that cannot be registered is told to the specialist on its
+    // first run, which then has none of that server's tools.
+    // The no-server notice is told once for the process: a child is one session, and a later start
+    // (a resume or a reload) has the notice in its history already.
+    let noServerTold = false
+    const registerScreen = (servers: ReadonlyArray<McpServer>): Delivery | undefined => {
+      const agent = childAgent(pi.getSessionName())
+      // No server for a screen specialist: `pi.features.mcp` or the capability is off, so tell it.
+      if (isScreenAgent(agent) && servers.length === 0) {
+        if (noServerTold) return undefined
+        noServerTold = true
+        return notice(
+          "no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing",
+        )
+      }
+      const { failures } = registerScreenServers(
+        (name, server) => pi.registerMcpServer(name, server),
+        agent,
+        servers,
+        homeDirectory(env),
+      )
+      return failures.length === 0
+        ? undefined
+        : notice(
+            `an MCP server of the screen capability was not registered (${failures.join("; ")}); work without its tools and report that they are missing`,
+          )
+    }
+
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
     // reads it, and a session that ended has nothing to be told. The root's tools and provider
     // checks belong to a session's start, so they run once, from the first collection that ends:
@@ -1281,8 +1443,18 @@ export const createExtension =
         else if (result?.enabled === false) taken.excluded = []
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)
+        if (result !== undefined) taken.codex = result.codex
+        if (result?.autoReview !== undefined) taken.autoReview.fix(result.autoReview)
+        if (result !== undefined) taken.justBash = result.justBash === true
+        if (result?.justBash === true) bash.enable(ctx.cwd)
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
+          if (result?.codex !== undefined) taken.specialistNotice = activateApplyPatch(result.codex)
+          if (result?.screenServers !== undefined)
+            taken.specialistNotice = joinOptional(
+              taken.specialistNotice,
+              registerScreen(result.screenServers),
+            )
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
           if (result?.tools !== undefined) {
             const notApplied = applyRootTools(result.tools, taken.t3)
@@ -1318,9 +1490,13 @@ export const createExtension =
         t3: isT3Session(ctx, env),
         t3Gate: false,
         t3Root: false,
+        codex: undefined,
+        autoReview: createAutoReviewSettings(),
+        justBash: false,
         probe: undefined,
         readiness: undefined,
         setupNotice: undefined,
+        specialistNotice: undefined,
       }
       return gather(held, ctx, event.reason)
     })
@@ -1350,9 +1526,6 @@ export const createExtension =
         | undefined => {
         const child = isChild()
         if (!child) applyEnvironment(env, hostEnvironment(pi.getActiveTools()), false)
-        const filled = child
-          ? fillPackageRoot(event.systemPrompt, packageRoot, platformPath)
-          : undefined
         const taken = held
         const pending = taken?.pending
         if (taken !== undefined) taken.pending = undefined
@@ -1361,11 +1534,30 @@ export const createExtension =
         ): BeforeAgentStartEventResult | undefined => {
           if (!child && collected?.environment !== undefined)
             applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true)
+          // The Codex provider runs the GPT-6 family: the root's prompt is that family's, a
+          // specialist's own prompt is swapped for it, and the skills Pi lists are its copies.
+          const family = taken?.codex?.family
+          const own = child
+            ? family === undefined
+              ? event.systemPrompt
+              : familyAgentPrompt(
+                  event.systemPrompt,
+                  childAgent(pi.getSessionName()) ?? "",
+                  family,
+                  packageRoot,
+                )
+            : undefined
+          const filled =
+            own === undefined ? undefined : fillPackageRoot(own, packageRoot, platformPath)
           const rooted =
             !child && taken?.rootPrompt === true
-              ? `${fillPackageRoot(PI_ROOT_PROMPT, packageRoot, platformPath)}\n\n${event.systemPrompt}`
+              ? `${fillPackageRoot(family === undefined ? PI_ROOT_PROMPT : PI_ROOT_PROMPTS[family], packageRoot, platformPath)}\n\n${event.systemPrompt}`
               : undefined
-          const prompt = rooted ?? filled
+          const composed = rooted ?? filled
+          const prompt =
+            composed === undefined || family === undefined
+              ? composed
+              : familySkillPaths(composed, family, packageRoot, platformPath)
           const override =
             prompt === undefined || prompt === event.systemPrompt ? {} : { systemPrompt: prompt }
           const message = collected?.delivery
@@ -1389,6 +1581,13 @@ export const createExtension =
       }
     pi.on("before_agent_start", noticeOnce("setupNotice"))
     pi.on("before_agent_start", noticeOnce("readiness"))
+    // Only a specialist ever has this notice (the root's `apply_patch` is never activated, and no
+    // server of the screen capability is registered for it).
+    pi.on("before_agent_start", (): BeforeAgentStartEventResult | undefined => {
+      const message = held?.specialistNotice
+      if (held !== undefined) held.specialistNotice = undefined
+      return message === undefined ? undefined : { message }
+    })
 
     // After the start's collection has applied the root's tools (the handler above awaits it).
     pi.on("before_agent_start", () => {
@@ -1418,6 +1617,7 @@ export const createExtension =
         ? undefined
         : (refuseExcludedTool(event, held?.excluded ?? []) ??
           (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
+          refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ??
           Effect.runPromise(
             refuseNonSpecialistWorkflow(event).pipe(
               Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),
@@ -1429,6 +1629,23 @@ export const createExtension =
     // then: it settles only after every child has exited or its stop grace (STOP_GRACE_MS, 2 s,
     // the graceMs option) has passed.
     pi.on("session_shutdown", () => release())
+
+    // Last, so the handlers above keep their places in each event's order, and the module's own
+    // handlers see the state they leave. The Codex provider's module is inert while the config
+    // selects another provider.
+    registerCodex(pi, {
+      settings: () => held?.codex,
+      notify: (text) => {
+        if (held !== undefined) held.setupNotice = joinNotices(held.setupNotice, notice(text))
+      },
+    })
+    // After every other gate, so a call they refuse is never sent to review. Auto-review is a
+    // security control: it is on from the session's start, whatever the config says or fails to
+    // say, and only the user's own config turns it off (see `autoReviewChoice`). The gate applies
+    // whenever the active model is served by Codex, not only when the config selects it.
+    registerAutoReview(pi, {
+      settings: () => (held === undefined ? {} : held.autoReview.settings()),
+    })
   }
 
 /**

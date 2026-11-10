@@ -1,7 +1,10 @@
 import { Effect, Schema } from "effect"
 
+import { CAPABILITIES } from "../config/capabilities.ts"
 import { doctor } from "../setup/doctor.ts"
 import { SetupFailure } from "../setup/errors.ts"
+import { chooseForm, FORM_CHOICES } from "../setup/form.ts"
+import type { CapabilityChoices } from "../setup/pi-check.ts"
 import { fail, hint, pass, type Report } from "../setup/report.ts"
 import {
   describeScope,
@@ -15,12 +18,18 @@ import { Shell } from "../setup/shell.ts"
 import { setup } from "../setup/steps.ts"
 import { runInteractive } from "../setup/tui/session.ts"
 import { booleanFlag, choiceFlag, stringFlag } from "./args.ts"
-import type { Usage } from "./errors.ts"
+import { Usage } from "./errors.ts"
 import { type Command, Verbatim } from "./types.ts"
 
 const CacheTtlFlag = Schema.Literals(CACHE_TTLS)
 const SwitchFlag = Schema.Literals(["on", "off"])
 const ScopeFlag = Schema.Literals(SCOPES)
+const FormFlag = Schema.Literals(FORM_CHOICES)
+
+/** The flags that switch one capability each, `--<name> on|off`, from the registry. */
+const CAPABILITY_FLAGS = Object.fromEntries(
+  CAPABILITIES.map((capability) => [capability.name, "string" as const]),
+)
 
 /** A report as the text of stdout, one line each, and exit 1 when any step failed. */
 const printed = (report: Report) =>
@@ -41,7 +50,9 @@ const resolveScope = Effect.fn("resolveScope")(function* (
 })
 
 const SETUP_USAGE =
-  "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--worktrees on|off] [--device-access on|off] [--no-tui]"
+  "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]"
+
+const CAPABILITY_NAMES = CAPABILITIES.map((capability) => capability.name).join(", ")
 
 /** A `--worktrees` or `--device-access` value as the choice it makes, or `undefined` when not given. */
 const switchFlag = Effect.fn("switchFlag")(function* (
@@ -52,7 +63,36 @@ const switchFlag = Effect.fn("switchFlag")(function* (
   if (value === undefined) return undefined
   return (yield* choiceFlag(SwitchFlag, name, value, SETUP_USAGE)) === "on"
 })
-const DOCTOR_USAGE = "doctor [--scope user|project|local] [--fix]"
+
+/**
+ * The capabilities a command line switches: each `--<capability> on|off` given, by its
+ * `pi.features` key.
+ */
+const capabilitySwitches = Effect.fn("capabilitySwitches")(function* (
+  args: Parameters<typeof stringFlag>[0],
+) {
+  const entries = yield* Effect.forEach(CAPABILITIES, (capability) =>
+    switchFlag(args, capability.name).pipe(
+      Effect.map((value) => (value === undefined ? [] : [[capability.feature, value] as const])),
+    ),
+  )
+  const choices: CapabilityChoices = Object.fromEntries(entries.flat())
+  return choices
+})
+
+/** The form `--form` names, or the one detected from the machine. */
+const formOf = Effect.fn("formOf")(function* (
+  args: Parameters<typeof stringFlag>[0],
+  env: Parameters<typeof chooseForm>[0],
+  usage: string,
+) {
+  const flag = stringFlag(args, "form")
+  return chooseForm(
+    env,
+    flag === undefined ? undefined : yield* choiceFlag(FormFlag, "form", flag, usage),
+  )
+})
+const DOCTOR_USAGE = "doctor [--scope user|project|local] [--form headless|normal] [--fix]"
 
 /**
  * The `setup` and `doctor` commands, which install and check what HolyAgent needs beside the
@@ -77,9 +117,11 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
       "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
       "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
       "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+      `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
+      "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
-      "in a terminal, when the T3 part has work (Pi in use, scope user, T3 Code installed), setup shows an interactive screen for the two choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
-      "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps",
+      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
+      "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps",
     ],
     flags: {
       scope: "string",
@@ -90,6 +132,8 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
       worktrees: "string",
       "device-access": "string",
       "no-tui": "boolean",
+      form: "string",
+      ...CAPABILITY_FLAGS,
     },
     stateless: true,
     positionals: 0,
@@ -111,11 +155,22 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
           worktrees: yield* switchFlag(args, "worktrees"),
           deviceAccess: yield* switchFlag(args, "device-access"),
         }
+        const capabilities = yield* capabilitySwitches(args)
+        const form = yield* formOf(args, env, SETUP_USAGE)
+        if (
+          booleanFlag(args, "undo") &&
+          (Object.keys(capabilities).length > 0 || stringFlag(args, "form") !== undefined)
+        )
+          return yield* new Usage({
+            message: "--undo takes no capability flag and no --form",
+            hint: `Usage: holyagent ${SETUP_USAGE}`,
+          })
         const apply = (
           choices: {
             readonly worktrees?: boolean | undefined
             readonly deviceAccess?: boolean | undefined
           },
+          chosen: CapabilityChoices,
           notes: ReadonlyArray<string> = [],
         ) =>
           Effect.gen(function* () {
@@ -128,6 +183,8 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
               skipCtx7: booleanFlag(args, "skip-ctx7"),
               ...(choices.worktrees === undefined ? {} : { worktrees: choices.worktrees }),
               ...(choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }),
+              capabilities: chosen,
+              form,
             })
             return {
               ...report,
@@ -147,13 +204,17 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
           dryRun: booleanFlag(args, "dry-run"),
           terminal,
           noTui: booleanFlag(args, "no-tui"),
-          choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined,
+          choiceFlag:
+            flagged.worktrees !== undefined ||
+            flagged.deviceAccess !== undefined ||
+            Object.keys(capabilities).length > 0,
+          form,
           ...(setupTui === undefined ? {} : { load: setupTui }),
           notify: emit,
-          apply: (choices) => apply(choices),
+          apply: (choices, chosen) => apply(choices, chosen),
         })
         if (interactive.kind === "done") return printed(interactive.report)
-        return printed(yield* apply(flagged, interactive.notes))
+        return printed(yield* apply(flagged, capabilities, interactive.notes))
       }).pipe(Effect.provide(Shell.live(env))),
   },
   {
@@ -166,9 +227,10 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
     notes: [
       "--scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
       "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
+      "the Pi checks include `ok   pi form:` (headless or normal, detected from the machine as setup does, or named by --form) and one `pi capability <name>` line for each capability the config turns on: `ok` with its form and what applies, `FAIL` naming an unmet system need or a package not listed at its pin, or a `~` line when the form does not offer it (computer-use on a headless machine), which fails nothing; the provider and web kit packages are the `pi base packages` line",
       "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages",
     ],
-    flags: { scope: "string", fix: "boolean" },
+    flags: { scope: "string", fix: "boolean", form: "string" },
     stateless: true,
     positionals: 0,
     run: ({ args, env, cwd }) =>
@@ -179,10 +241,12 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
         if (resolved instanceof SetupFailure) {
           return printed({ lines: [fail("scope", resolved.message)], ok: false })
         }
+        const form = yield* formOf(args, env, DOCTOR_USAGE)
         const report = yield* doctor(env, {
           fix: booleanFlag(args, "fix"),
           scope: resolved.scope,
           cwd,
+          form,
         })
         return printed({
           ...report,

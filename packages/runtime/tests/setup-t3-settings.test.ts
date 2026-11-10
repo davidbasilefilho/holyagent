@@ -65,6 +65,7 @@ const machine = async (options: { t3?: boolean; sdk?: boolean } = {}) => {
 
 const env = (extra: Record<string, string> = {}) => ({
   HOME: home,
+  DISPLAY: ":0",
   HOLYAGENT_HOST: "pi",
   T3CODE_HOME: t3Home,
   ANDROID_HOME: androidSdk,
@@ -73,7 +74,7 @@ const env = (extra: Record<string, string> = {}) => ({
 
 const withPi = () =>
   fakeShell({
-    commands: ["bun", "ctx7", "pi", "node"],
+    commands: ["bun", "ctx7", "pi", "node", "npx"],
     respond: (line) =>
       line === "pi --version"
         ? { stdout: `${PI_HOST_VERSION}\n` }

@@ -1,6 +1,6 @@
 {
   "name": "@holyagent/runtime",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "The holyagent runtime shared by every harness: the domain, the state, the vcs commands, the instruction text and the command line.",
   "license": "Apache-2.0",
   "type": "module",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@toon-format/toon": "^4.0.0",
     "acorn": "^8.0.0",
-    "effect": "^4.0.0"
+    "effect": "^4.0.0",
+    "just-bash": "3.6.0"
   }
 }

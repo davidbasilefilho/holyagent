@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import { Effect, Equal } from "effect"
 
+import type { Config } from "../config/schema.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import {
@@ -92,6 +93,11 @@ export interface T3SettingsOptions {
   readonly deviceAccess?: boolean
   /** The operating system, `process.platform` when absent; only Xcode detection reads it. */
   readonly platform?: string
+  /**
+   * The user's HolyAgent config when the caller has loaded it already ({@link loadPiConfig} at
+   * scope `user`), so the step does not load it again; loaded here when absent.
+   */
+  readonly config?: Config
   /**
    * Writes the file; {@link writeSettings} when absent. `unchangedSince` is the text the file must
    * still have (`undefined` for a file that did not exist), and a write that finds another text
@@ -416,9 +422,11 @@ type Outcome = { readonly line: string } | { readonly target: Target }
 const decide = Effect.fn("t3SettingsDecide")(function* (
   env: Env,
   cwd: string,
-  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform">,
+  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform" | "config">,
 ) {
-  const config = yield* loadPiConfig(env, cwd, "user").pipe(Effect.orElseSucceed(() => undefined))
+  const config =
+    options.config ??
+    (yield* loadPiConfig(env, cwd, "user").pipe(Effect.orElseSucceed(() => undefined)))
   if (config === undefined || !config.pi.enable) return undefined
   const home = t3Home(env)
   if (!(yield* isDirectory(home)))
@@ -616,7 +624,7 @@ export interface T3Preview {
 export const previewT3Settings = Effect.fn("previewT3Settings")(function* (
   env: Env,
   cwd: string,
-  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform">,
+  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform" | "config">,
 ): Effect.fn.Return<T3Preview | { readonly line: string } | undefined, SetupFailure> {
   const decided = yield* decide(env, cwd, options)
   if (decided === undefined) return undefined

@@ -1,9 +1,11 @@
 import { Effect, Option } from "effect"
 
-import { FEATURE_PACKAGES, piPackages, WEB_KIT_PACKAGE } from "../config/packages.ts"
+import { type CapabilityForm, managedCapabilityPackages } from "../config/capabilities.ts"
+import { piPackages, WEB_KIT_PACKAGE } from "../config/packages.ts"
 import { PROVIDERS } from "../pi/provider.ts"
 import { type Env, homeDirectory } from "./environment.ts"
 import {
+  type CapabilityChoices,
   listsAtPin,
   loadPiConfig,
   parseNpmSource,
@@ -16,14 +18,16 @@ import type { Scope } from "./scope.ts"
 import { Shell } from "./shell.ts"
 
 /**
- * The npm names of the packages setup removes when the config no longer selects them: the feature
- * packages, the web kit and the provider profile packages. The HolyAgent package and anything else
- * HolyAgent does not ship are not here.
+ * The npm names of the packages setup removes when the config no longer selects them: the
+ * capability packages of every form, the web kit and the provider profile packages. The HolyAgent
+ * package and anything else HolyAgent does not ship are not here.
  */
 const MANAGED_NAMES: ReadonlySet<string> = new Set<string>([
-  ...Object.values(FEATURE_PACKAGES),
+  ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
-  ...Object.values(PROVIDERS).map((profile) => profile.package),
+  ...Object.values(PROVIDERS).flatMap((profile) =>
+    profile.package === undefined ? [] : [profile.package],
+  ),
 ])
 
 /**
@@ -57,6 +61,10 @@ export interface PiInstallOptions {
   readonly cwd: string
   /** Say what would run and run nothing. */
   readonly dryRun: boolean
+  /** The form every capability is applied in; `normal` when absent. */
+  readonly form?: CapabilityForm
+  /** Capability switches the run chose, laid over the config (see {@link loadPiConfig}). */
+  readonly choices?: CapabilityChoices
 }
 
 /**
@@ -81,7 +89,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
   options: PiInstallOptions,
 ) {
   const shell = yield* Shell
-  const config = yield* loadPiConfig(env, options.cwd, options.scope)
+  const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices)
   if (!config.pi.enable) return [skipped("pi packages: pi.enable is off in the HolyAgent config")]
 
   const projectLevel = options.scope !== "user"
@@ -103,7 +111,7 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       ? file
       : elsewhere.find((other) => listsAtPin(other.sources, source))?.file
 
-  const wanted = piPackages(config)
+  const wanted = piPackages(config, undefined, options.form)
   const installs = wanted.filter((source) => listedIn(source) === undefined)
   const removals = staleManagedNames(listed, wanted)
   const lines: Array<string> = wanted.flatMap((source) => {

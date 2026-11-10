@@ -7,10 +7,16 @@ import { join } from "node:path"
  * A family folder may hold `guide.md` alone before it is listed, and the mirror and coverage tests
  * apply to listed families only.
  */
-export const FAMILIES = ["claude-5.5", "kimi-k3.1"] as const
+export const FAMILIES = ["claude-5.5", "kimi-k3.1", "gpt-6"] as const
 
 /** A supported model family: an entry of {@link FAMILIES}. */
 export type Family = (typeof FAMILIES)[number]
+
+/**
+ * The families a Pi session can run on, which a provider profile names: the Pi package's default is
+ * `kimi-k3.1`, and the Codex provider runs the root and the specialists on `gpt-6`.
+ */
+export type PiFamily = Extract<Family, "kimi-k3.1" | "gpt-6">
 
 /** The folder that holds the requirements and every family folder, as an absolute path. */
 export const INSTRUCTIONS_ROOT = import.meta.dir

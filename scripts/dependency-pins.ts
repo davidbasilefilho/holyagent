@@ -314,6 +314,27 @@ export const withPiPackageVersions = (
 export const renderPiPackages = (table: Readonly<Record<string, string>>): string =>
   `${JSON.stringify(table, null, 2)}\n`
 
+/**
+ * The registry packages whose `package.json` entry is an exact version, not a caret range. Each is
+ * bundled into generated output and decides how a shipped feature behaves (just-bash is the shell
+ * the Pi bash tool runs on: its command set, limits and output change from release to release), so
+ * a move is one deliberate step of `mise run deps:update`, with the lockfile and the generated
+ * bundle moving with it, and never a range that a plain install could widen.
+ */
+export const EXACT_PACKAGES: ReadonlyArray<string> = ["just-bash"]
+
+/** Whether a dependency is an {@link EXACT_PACKAGES} entry with a stable exact version. */
+export const isExactPin = (name: string, range: unknown): boolean =>
+  EXACT_PACKAGES.includes(name) && typeof range === "string" && parseRelease(range) !== undefined
+
+/**
+ * The version specifier a package dependency moves to: the exact release for an
+ * {@link EXACT_PACKAGES} entry (never down, like a Pi package pin), else the caret range of
+ * {@link nextRange}.
+ */
+export const nextPackageRange = (name: string, current: string, release: string): string =>
+  EXACT_PACKAGES.includes(name) ? nextPiVersion(current, release) : nextRange(current, release)
+
 /** The dependency fields of a `package.json` whose values are version ranges by package name. */
 export const DEPENDENCY_FIELDS: ReadonlyArray<string> = [
   "dependencies",

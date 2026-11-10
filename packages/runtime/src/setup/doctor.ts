@@ -3,6 +3,7 @@ import { Effect, Option } from "effect"
 import { inCloudSession } from "../vcs/identity.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
+import { DEFAULT_FORM_CHOICE, type FormChoice } from "./form.ts"
 import { piChecks } from "./pi-check.ts"
 import { checkPiToolSettings } from "./pi-settings.ts"
 import { fail, hint, pass, type Report } from "./report.ts"
@@ -63,28 +64,36 @@ const checks = (env: Env, file: string, scope: Scope) =>
  * Checks the environment HolyAgent needs, one line per check: `bun` and `ctx7` on PATH, the
  * recommended keys of the settings of the chosen scope (`user` unless set; `project` and `local`
  * are found from `cwd`, the process directory when absent), then the Pi checks of {@link piChecks}
- * when Pi is in use and `pi.enable` is on in the HolyAgent config of that scope (the user's file
- * for `user`, so a repository's own config cannot change what doctor expects of the global install;
- * the project's over it for `project` and `local`). A machine without Pi gets one informational
- * line instead, and a cloud session runs no Pi. When Pi is in use, a `~` line follows for each Pi
- * tool settings file that lacks keys setup writes ({@link checkPiToolSettings}), and at scope
- * `user` one line on T3 Code's settings when T3 is installed ({@link checkT3Settings}). In a
- * claude.ai cloud session `ctx7` passes, since setup leaves it out there. With `fix`, the setup
- * steps behind a failing check run first, their lines come before the checks, and the checks then
- * run again; Bun, Pi, Node and the Pi packages are never installed, so the Pi lines are read once
- * and name the command that fixes them. The report is ok when no check fails.
+ * (the form in force and each enabled capability's health included) when Pi is in use and
+ * `pi.enable` is on in the HolyAgent config of that scope (the user's file for `user`, so a
+ * repository's own config cannot change what doctor expects of the global install; the project's
+ * over it for `project` and `local`). A machine without Pi gets one informational line instead, and
+ * a cloud session runs no Pi. When Pi is in use, a `~` line follows for each Pi tool settings file
+ * that lacks keys setup writes ({@link checkPiToolSettings}), and at scope `user` one line on T3
+ * Code's settings when T3 is installed ({@link checkT3Settings}). In a claude.ai cloud session
+ * `ctx7` passes, since setup leaves it out there. With `fix`, the setup steps behind a failing
+ * check run first, their lines come before the checks, and the checks then run again; Bun, Pi, Node
+ * and the Pi packages are never installed, so the Pi lines are read once and name the command that
+ * fixes them. The report is ok when no check fails.
  */
 export const doctor = Effect.fn("doctor")(function* (
   env: Env,
-  options: { readonly fix: boolean; readonly scope?: Scope; readonly cwd?: string },
+  options: {
+    readonly fix: boolean
+    readonly scope?: Scope
+    readonly cwd?: string
+    /** The form every capability is checked in; the normal form when absent. */
+    readonly form?: FormChoice
+  },
 ) {
   const scope = options.scope ?? "user"
   const cwd = options.cwd ?? process.cwd()
+  const form = options.form ?? DEFAULT_FORM_CHOICE
   const pi = inCloudSession(env)
     ? []
     : [
-        ...(yield* piChecks(env, cwd, scope)),
-        ...(yield* checkPiToolSettings(env, cwd, scope)),
+        ...(yield* piChecks(env, cwd, scope, form)),
+        ...(yield* checkPiToolSettings(env, cwd, scope, form.form)),
         ...(scope === "user" ? yield* checkT3Settings(env, cwd) : []),
       ]
   const located = yield* settingsFile(env, scope, cwd).pipe(
