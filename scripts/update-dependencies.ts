@@ -135,8 +135,8 @@ const GITHUB = "https://github.com"
 /** The mise tools whose releases are tags of a GitHub repository. */
 export const MISE_SOURCES: Record<string, { repository: string; prefix: string }> = {
   bun: { repository: "oven-sh/bun", prefix: "bun-v" },
-  ripgrep: { repository: "BurntSushi/ripgrep", prefix: "" },
-  fd: { repository: "sharkdp/fd", prefix: "v" },
+  "aqua:BurntSushi/ripgrep": { repository: "BurntSushi/ripgrep", prefix: "" },
+  "aqua:sharkdp/fd": { repository: "sharkdp/fd", prefix: "v" },
 }
 
 /** The file that holds the exact version of every Pi package HolyAgent enables. */

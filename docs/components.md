@@ -46,17 +46,19 @@ The Search specialists use the Exa connector, which you connect once at [claude.
 
 ## ripgrep and fd
 
-HolyAgent does not bundle ripgrep or fd. They are prerequisites that you install with your package manager, and `holyagent rg` and `holyagent fd` run the ones on `PATH` (arguments, stdin, stdout and exit code are the program's own). Every agent with a Bash tool searches with them instead of grep, find or the built-in Grep and Glob, so a search answers the same way everywhere. fd is installed as `fdfind` on Debian and Ubuntu, so `holyagent fd` tries `fd` and then `fdfind`.
+HolyAgent does not bundle ripgrep or fd. They are prerequisites that you install with your package manager, and `holyagent rg` and `holyagent fd` run the ones on `PATH` (arguments, stdin, stdout and exit code are the program's own). Every agent with a Bash tool searches with them instead of grep, find or the built-in Grep and Glob, so the agents have one search interface. The programs are the ones you installed, so their versions can differ from one machine to the next ([decisions.md](decisions.md)). fd is installed as `fdfind` on Debian and Ubuntu, so `holyagent fd` tries `fd` and then `fdfind`. The programs run with arguments a model chooses, so the lookup trusts only the absolute entries of `PATH` and nothing inside the working directory (a repository cannot ship its own `rg`), and on Windows only an `.exe`, never a `.cmd` or `.bat` shim, which would pass those arguments through `cmd.exe`.
 
-| Platform      | Install                                             |
-| ------------- | --------------------------------------------------- |
-| macOS         | `brew install ripgrep fd`                           |
-| Debian/Ubuntu | `sudo apt install ripgrep fd-find`                  |
-| Fedora        | `sudo dnf install ripgrep fd-find`                  |
-| Arch          | `sudo pacman -S ripgrep fd`                         |
-| Windows       | `winget install BurntSushi.ripgrep.MSVC sharkdp.fd` |
+| Platform      | Install                                                                  |
+| ------------- | ------------------------------------------------------------------------ |
+| macOS         | `brew install ripgrep fd`                                                |
+| Debian/Ubuntu | `sudo apt install ripgrep fd-find`                                       |
+| Fedora        | `sudo dnf install ripgrep fd-find`                                       |
+| Arch          | `sudo pacman -S ripgrep fd`                                              |
+| Windows       | `winget install BurntSushi.ripgrep.MSVC` and `winget install sharkdp.fd` |
 
-When a program is missing, the command fails with `ToolMissing`, which names it and lists these commands, and the agent searches with the system `grep` and `find` (or the host's search tools) and reports the missing program. `holyagent setup` and `holyagent doctor` report each program as found or missing with the same commands; a missing one is a `~` warning, never a failure, and neither command installs it. The agents without Bash (the explorers, the librarians, `reviewer-audit`, `reviewer-artifact`, `reviewer-security` and `reviewer-visual`) keep the built-in Grep and Glob. Claude Code documents its Grep tool as built on ripgrep; it documents no backend for Glob. Why the programs are not bundled is in [decisions.md](decisions.md).
+On Windows, open a new terminal after the install so `PATH` picks the programs up.
+
+When a program is missing, the command fails with `ToolMissing`, which names it and lists these commands, and the agent searches with the system grep or find and reports the missing program. `holyagent setup` and `holyagent doctor` report each program as found or missing with the same commands; a missing one is a `~` warning, never a failure, and neither command installs it. The agents without Bash (the explorers, the librarians, `reviewer-audit`, `reviewer-artifact`, `reviewer-security` and `reviewer-visual`) keep the built-in Grep and Glob. Claude Code documents its Grep tool as built on ripgrep; it documents no backend for Glob. Why the programs are not bundled is in [decisions.md](decisions.md).
 
 ## ctx7 and the Context7 skill
 
@@ -82,7 +84,7 @@ In a claude.ai cloud session (`CLAUDE_CODE_REMOTE=true`) there is no machine of 
 - `bun` is on `PATH`;
 - `ctx7` is on `PATH` (it passes in a cloud session, where setup leaves it out);
 - the user settings have the keys `holyagent setup` writes;
-- `rg` and `fd` (or `fdfind`) are on `PATH`: `ok` with the path, else a `~` warning that names what stops working (`holyagent rg` or `holyagent fd`) and the install commands; it never fails the report;
+- `rg` and `fd` (or `fdfind`) are on `PATH` ([ripgrep and fd](#ripgrep-and-fd)): `ok` with the path, else a `~` warning that names what stops working (`holyagent rg` or `holyagent fd`) and the install commands; it never fails the report;
 - the Pi checks, run only when Pi is in use (`HOLYAGENT_HOST=pi` or `pi` on `PATH`; never in a cloud session) and `pi.enable` is on: `pi` is on `PATH` at the pinned version or newer, Node.js is 22.19 or newer, the HolyAgent Pi package is listed in Pi's global settings (for `--scope project` and `local`, the project's `.pi/settings.json` counts too), and every package the config of the chosen `--scope` enables is listed in them at its pin. With `pi.enable` off it prints no Pi line. When Pi is in use, a `~ tool settings <file> lacks <keys>` hint follows for each tool settings file that lacks keys, with `holyagent setup` as the fix. When Pi is not in use, one `~ pi: not in use` line is printed and nothing fails. These checks only report, with the install command as the fix, and `--fix` installs none of them ([pi/installation.md](pi/installation.md#what-setup-and-doctor-do));
 
 Without `--scope`, both commands use `user`, or `local` when your `.claude/settings.local.json` enables the plugin, sits in a trusted git work tree and is untracked (an archive that ships its own `.git` omitting the file still counts as untracked); a committed `.claude/settings.json` never selects a scope and only prints a line naming `--scope project` ([usage.md](usage.md#install-scopes)).

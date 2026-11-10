@@ -7,9 +7,11 @@ node = "lts"
 # non-canary Bun and names the fix.
 bun = "1.4.4"
 # The search tools behind `holyagent rg` and `holyagent fd`, which HolyAgent does not bundle. The
-# updater moves both with the other pinned tools.
-ripgrep = "15.2.0"
-fd = "10.5.2"
+# aqua backend is named so that mise installs the upstream release assets, with the checksum the aqua
+# registry records for them where it records one; the bare names would pick a backend by mise's own
+# order. The updater moves both with the other pinned tools.
+"aqua:BurntSushi/ripgrep" = "15.2.0"
+"aqua:sharkdp/fd" = "10.5.2"
 
 [hooks]
 # Runs after `mise install` (also on `mise use` and the automatic install before `mise run`), with

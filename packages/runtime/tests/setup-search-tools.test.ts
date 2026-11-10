@@ -54,10 +54,11 @@ const searchLines = (lines: ReadonlyArray<string>) =>
 
 /** Every platform and its install command appears in the line. */
 const expectInstallCommands = (line: string | undefined) => {
-  for (const [platform, command] of INSTALL_COMMANDS) {
+  for (const [platform, ...commands] of INSTALL_COMMANDS) {
     expect(line).toContain(platform)
-    expect(line).toContain(command)
+    for (const command of commands) expect(line).toContain(command)
   }
+  expect(line).toContain("open a new terminal")
 }
 
 describe("holyagent doctor, rg and fd", () => {

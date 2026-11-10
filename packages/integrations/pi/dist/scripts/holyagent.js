@@ -10586,7 +10586,7 @@ var init_errors3 = __esm(() => {
     MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
     NothingToMigrate: "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
     MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
-    ToolMissing: "Install the program with the command the message gives for your platform; until then search with the system grep and find, or the host's search tools, and report the missing program.",
+    ToolMissing: "Install the program with the command the message gives for your platform; until then search with the system grep or find and report the missing program.",
     BrowserLaunchFailed: "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
     StateModeRefused: "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
     StateLocked: "Another process holds the state lock; retry in a moment.",
@@ -16292,7 +16292,7 @@ var init_browser_launch = __esm(() => {
   };
 });
 
-import { delimiter, join as join10 } from "path";
+import { delimiter, join as join10, posix, win32 } from "path";
 var {$: $3 } = globalThis.Bun;
 var pathKey = (env, insensitive = process.platform === "win32") => {
   if (!insensitive || env.PATH !== undefined)
@@ -16303,11 +16303,21 @@ var pathKey = (env, insensitive = process.platform === "win32") => {
   const root = options.bunInstall ? options.bunInstall : join10(options.home, ".bun");
   const bunBin = join10(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+}, isInside = (api, parent, path) => {
+  const relative = api.relative(parent, path);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
+}, strictWhich = (command, path, strict) => {
+  const windows = (strict.platform ?? process.platform) === "win32";
+  const api = windows ? win32 : posix;
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
+  const found = (strict.which ?? Bun.which)(command, { PATH: trusted.join(windows ? ";" : ":") });
+  if (found === null || isInside(api, strict.cwd, found))
+    return null;
+  return windows && !found.toLowerCase().endsWith(".exe") ? null : found;
 }, findCommand = (env, command, options) => {
   const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-  return fromNullishOr(Bun.which(command, {
-    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
-  }));
+  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
+  return fromNullishOr(options?.strict === undefined ? Bun.which(command, { PATH: path }) : strictWhich(command, path, options.strict));
 }, EMPTY_BUNFIG, Shell;
 var init_shell = __esm(() => {
   init_dist();
@@ -16332,8 +16342,8 @@ var init_shell = __esm(() => {
 });
 
 import { existsSync, readdirSync } from "fs";
-import { posix, win32 } from "path";
-var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win32 : posix, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
+import { posix as posix2, win32 as win322 } from "path";
+var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win322 : posix2, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
   const { join } = pathsOf(platform);
   const entry = join(folder, "chromium");
   if (exists(entry))
@@ -26209,14 +26219,17 @@ var init_pi_settings = __esm(() => {
   });
 });
 
-var TOOLS, SEARCH_TOOLS, INSTALL_COMMANDS, installAdvice, stopsWithout = (tool) => `\`holyagent ${tool}\` (the agents' search) fails`, locateTool = (tool, which) => gen2(function* () {
+var TOOLS, SEARCH_TOOLS, INSTALL_COMMANDS, installAdvice, stopsWithout = (tool) => `\`holyagent ${tool}\` (the agents' search) fails`, locateTool = (tool, cwd, which) => gen2(function* () {
   for (const command of SEARCH_TOOLS[tool].commands) {
-    const found = yield* which(command);
+    const found = yield* which(command, { strict: { cwd } });
     if (isSome2(found))
       return found;
   }
   return none2();
-}), checkSearchTools, reportSearchTools;
+}), doctorToolLine = (tool, found) => isSome2(found) ? pass(tool, found.value) : hint(`${tool}: ${SEARCH_TOOLS[tool].commands.join(" or ")} not found on PATH, so ${stopsWithout(tool)}; ${installAdvice}`), setupToolLine = (tool, found) => isSome2(found) ? present2(`${tool}: found at ${found.value}`) : hint(`${tool}: not installed, so ${stopsWithout(tool)}; ${installAdvice}`), searchToolLines = (cwd, format) => gen2(function* () {
+  const shell = yield* Shell;
+  return yield* forEach2(TOOLS, (tool) => locateTool(tool, cwd, shell.which).pipe(map5((found) => format(tool, found))));
+});
 var init_search_tools = __esm(() => {
   init_dist();
   init_shell();
@@ -26230,17 +26243,9 @@ var init_search_tools = __esm(() => {
     ["Debian/Ubuntu", "sudo apt install ripgrep fd-find"],
     ["Fedora", "sudo dnf install ripgrep fd-find"],
     ["Arch", "sudo pacman -S ripgrep fd"],
-    ["Windows", "winget install BurntSushi.ripgrep.MSVC sharkdp.fd"]
+    ["Windows", "winget install BurntSushi.ripgrep.MSVC", "winget install sharkdp.fd"]
   ];
-  installAdvice = `install ripgrep and fd with your package manager (${INSTALL_COMMANDS.map(([platform, command]) => `${platform}: \`${command}\``).join("; ")})`;
-  checkSearchTools = gen2(function* () {
-    const shell = yield* Shell;
-    return yield* forEach2(TOOLS, (tool) => locateTool(tool, shell.which).pipe(map5((found) => isSome2(found) ? pass(tool, found.value) : hint(`${tool}: ${SEARCH_TOOLS[tool].commands.join(" or ")} not found on PATH, so ${stopsWithout(tool)}; ${installAdvice}`))));
-  });
-  reportSearchTools = gen2(function* () {
-    const shell = yield* Shell;
-    return yield* forEach2(TOOLS, (tool) => locateTool(tool, shell.which).pipe(map5((found) => isSome2(found) ? present2(`${tool}: found at ${found.value}`) : hint(`${tool}: not installed, so ${stopsWithout(tool)}; ${installAdvice}`))));
-  });
+  installAdvice = `install ripgrep and fd with your package manager (${INSTALL_COMMANDS.map(([platform, ...commands]) => `${platform}: ${commands.map((command) => `\`${command}\``).join(" and ")}`).join("; ")}), then open a new terminal so PATH picks them up`;
 });
 
 var reportOne = (env, capability, features, options, platform) => gen2(function* () {
@@ -26879,7 +26884,7 @@ var init_steps = __esm(() => {
         ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
         ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
       })) : [],
-      ...yield* reportSearchTools,
+      ...yield* searchToolLines(piOptions.cwd, setupToolLine),
       ...yield* onSettings((file) => mergeUserSettings({
         env,
         file,
@@ -26935,7 +26940,10 @@ var init_doctor = __esm(() => {
         checkCommand(env, "ctx7"),
         succeed6(fail6("settings", located.message))
       ]);
-      return { lines: [...lines, ...pi, ...yield* checkSearchTools], ok: false };
+      return {
+        lines: [...lines, ...pi, ...yield* searchToolLines(cwd, doctorToolLine)],
+        ok: false
+      };
     }
     const { file, notice } = located;
     const noted = (lines) => notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines];
@@ -26947,7 +26955,7 @@ var init_doctor = __esm(() => {
     const lines = noted([
       ...ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)],
       ...pi,
-      ...yield* checkSearchTools
+      ...yield* searchToolLines(cwd, doctorToolLine)
     ]);
     return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
   });
@@ -28109,9 +28117,9 @@ var TUI_PACKAGES = {
 
 import { lstat as lstat5, mkdir as mkdir6, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile2 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join23, posix as posix2, win32 as win322 } from "path";
+import { basename as basename5, dirname as dirname5, join as join23, posix as posix3, win32 as win323 } from "path";
 import { pathToFileURL } from "url";
-var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : posix2, cacheHome = (env, platform = process.platform) => {
+var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : posix3, cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory(env);
   const { join } = pathModule(platform);
   if (platform === "win32")
@@ -28667,7 +28675,7 @@ var init_state = __esm(() => {
 
 var {$: $5 } = globalThis.Bun;
 var ToolMissing, runTool = (options) => gen2(function* () {
-  const found = yield* locateTool(options.tool, (command) => sync2(() => findCommand(options.env, command)));
+  const found = yield* locateTool(options.tool, options.cwd, (command, whichOptions) => sync2(() => findCommand(options.env, command, whichOptions)));
   if (isNone2(found))
     return yield* new ToolMissing({ tool: options.tool });
   const path = found.value;

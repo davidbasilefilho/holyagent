@@ -16,7 +16,7 @@ HolyAgent is not only for multi-PR projects. The root sizes the plan to the requ
 
 ## Install
 
-Check [requirements.md](requirements.md) first: Bun on `PATH`, Node.js LTS, `git`, an authenticated `gh`, and ripgrep and fd on `PATH` (`brew install ripgrep fd`, `sudo apt install ripgrep fd-find`, `sudo dnf install ripgrep fd-find`, `sudo pacman -S ripgrep fd` or `winget install BurntSushi.ripgrep.MSVC sharkdp.fd`; HolyAgent does not bundle them). HolyAgent installs as a plugin, with these two commands and nothing else (no clone, no `bun install`).
+Check [requirements.md](requirements.md) first: Bun on `PATH`, Node.js LTS, `git`, an authenticated `gh`, and ripgrep and fd on `PATH` (`brew install ripgrep fd`, `sudo apt install ripgrep fd-find`, `sudo dnf install ripgrep fd-find`, `sudo pacman -S ripgrep fd`, or `winget install BurntSushi.ripgrep.MSVC` and `winget install sharkdp.fd` in a new terminal; HolyAgent does not bundle them). HolyAgent installs as a plugin, with these two commands and nothing else (no clone, no `bun install`).
 
 **Marketplace.** The plugin is published from this repository's `main` branch. From a shell:
 

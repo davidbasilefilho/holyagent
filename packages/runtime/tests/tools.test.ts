@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmod, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
 
 import { Effect, Option } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
 import { INSTALL_COMMANDS, locateTool } from "../src/setup/search-tools.ts"
+import { findCommand } from "../src/setup/shell.ts"
 
 const posix = process.platform !== "win32"
 
@@ -48,7 +49,7 @@ describe("finding a search program", () => {
   }
   const find = (tool: "rg" | "fd", present: ReadonlyArray<string>) => {
     const { asked, which } = lookup(present)
-    return Effect.runPromise(locateTool(tool, which)).then((found) => ({
+    return Effect.runPromise(locateTool(tool, project, which)).then((found) => ({
       found: Option.getOrUndefined(found),
       asked,
     }))
@@ -77,9 +78,9 @@ describe("a search program that is not installed", () => {
       expect(result.code).toBe(4)
       expect(result.stderr).toStartWith(`error: ToolMissing: `)
       expect(result.stderr).toContain(tool === "rg" ? "ripgrep (rg)" : "fd (fd or fdfind)")
-      for (const [platform, command] of INSTALL_COMMANDS) {
+      for (const [platform, ...commands] of INSTALL_COMMANDS) {
         expect(result.stderr).toContain(platform)
-        expect(result.stderr).toContain(command)
+        for (const command of commands) expect(result.stderr).toContain(command)
       }
       expect(result.stderr).toContain("hint: ")
       expect(result.stderr).toContain("grep")
@@ -92,7 +93,7 @@ describe("a search program that is not installed", () => {
       ["Debian/Ubuntu", "sudo apt install ripgrep fd-find"],
       ["Fedora", "sudo dnf install ripgrep fd-find"],
       ["Arch", "sudo pacman -S ripgrep fd"],
-      ["Windows", "winget install BurntSushi.ripgrep.MSVC sharkdp.fd"],
+      ["Windows", "winget install BurntSushi.ripgrep.MSVC", "winget install sharkdp.fd"],
     ])
   })
 })
@@ -136,11 +137,101 @@ describe.skipIf(!posix)("the command line passes through to the program on PATH"
     expect((await cli(["fd", "x"])).code).toBe(4)
   })
 
+  test("a relative or empty PATH entry never runs a program of the working directory", async () => {
+    // A relative entry means the process directory to the system, which the CLI runs in.
+    const before = process.cwd()
+    process.chdir(project)
+    try {
+      await relativeEntries()
+    } finally {
+      process.chdir(before)
+    }
+  })
+
+  const relativeEntries = async () => {
+    await fake("rg", 0)
+    // The project ships its own rg, in its root and in a folder a relative entry would name.
+    for (const planted of [join(project, "rg"), join(project, "inside", "rg")]) {
+      await Bun.write(planted, `#!/bin/sh\ntouch "${project}/planted"\nexit 9\n`)
+      await chmod(planted, 0o755)
+    }
+    for (const path of [
+      `.${delimiter}${bin}`,
+      `${delimiter}${bin}`,
+      `${delimiter}${delimiter}${bin}`,
+      `inside${delimiter}${bin}`,
+      `${project}${delimiter}${bin}`,
+    ]) {
+      expect((await cli(["rg", "x"], path)).code).toBe(0)
+      expect(await Bun.file(join(project, "planted")).exists()).toBe(false)
+    }
+    for (const path of [".", "", "inside", project]) {
+      expect((await cli(["rg", "x"], path)).code).toBe(4)
+      expect(await Bun.file(join(project, "planted")).exists()).toBe(false)
+    }
+  }
+
   test("rg does not run fd or fdfind, so a machine with only fd still fails for rg", async () => {
     await fake("fd", 0)
     await fake("fdfind", 0)
     expect((await cli(["rg", "x"])).code).toBe(4)
   })
+})
+
+describe("the strict lookup of a search program", () => {
+  const exe = (path: string) => (_command: string, _options: { readonly PATH: string }) => path
+
+  test("asks only about absolute entries outside the working directory, by the platform's rules", () => {
+    const asked: Array<string> = []
+    const which = (_command: string, options: { readonly PATH: string }) => {
+      asked.push(options.PATH)
+      return null
+    }
+    findCommand({ PATH: "C:\\tools;bin;;.;C:\\proj\\bin;D:\\apps" }, "rg", {
+      strict: { cwd: "C:\\proj", platform: "win32", which },
+    })
+    findCommand({ PATH: "/usr/bin:bin::.:/proj/bin:/opt/rg" }, "rg", {
+      strict: { cwd: "/proj", platform: "linux", which },
+    })
+    expect(asked).toEqual(["C:\\tools;D:\\apps", "/usr/bin:/opt/rg"])
+  })
+
+  test("on Windows accepts an .exe and refuses a .cmd or .bat shim, which would go through cmd.exe", () => {
+    const find = (path: string) =>
+      Option.getOrUndefined(
+        findCommand({ PATH: "C:\\tools" }, "rg", {
+          strict: { cwd: "C:\\proj", platform: "win32", which: exe(path) },
+        }),
+      )
+    expect(find("C:\\tools\\rg.exe")).toBe("C:\\tools\\rg.exe")
+    expect(find("C:\\tools\\RG.EXE")).toBe("C:\\tools\\RG.EXE")
+    expect(find("C:\\tools\\rg.cmd")).toBeUndefined()
+    expect(find("C:\\tools\\rg.bat")).toBeUndefined()
+    expect(find("C:\\tools\\rg")).toBeUndefined()
+  })
+
+  test("refuses a result inside the working directory", () => {
+    const find = (cwd: string, path: string) =>
+      Option.getOrUndefined(
+        findCommand({ PATH: "/opt" }, "rg", {
+          strict: { cwd, platform: "linux", which: exe(path) },
+        }),
+      )
+    expect(find("/proj", "/opt/rg")).toBe("/opt/rg")
+    expect(find("/proj", "/proj/rg")).toBeUndefined()
+    expect(find("/proj", "/proj/bin/rg")).toBeUndefined()
+    expect(find("/proj", "/proj2/rg")).toBe("/proj2/rg")
+  })
+
+  test.skipIf(process.platform !== "win32")(
+    "on Windows resolves a real .exe on PATH (bun.exe stands in for rg.exe)",
+    () => {
+      const found = findCommand({ PATH: dirname(process.execPath) }, "bun", {
+        strict: { cwd: project },
+      })
+      expect(Option.getOrUndefined(found)?.toLowerCase()).toEndWith(".exe")
+    },
+  )
 })
 
 describe("the programs installed on this machine", () => {

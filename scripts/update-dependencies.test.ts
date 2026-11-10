@@ -159,8 +159,8 @@ describe("the mise tools of this repository", () => {
 
   test("provide ripgrep and fd at exact versions, for holyagent rg and holyagent fd", async () => {
     const versions = new Map((await tools()).map(({ name, version }) => [name, version]))
-    expect(versions.get("ripgrep")).toMatch(/^\d+\.\d+\.\d+$/)
-    expect(versions.get("fd")).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(versions.get("aqua:BurntSushi/ripgrep")).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(versions.get("aqua:sharkdp/fd")).toMatch(/^\d+\.\d+\.\d+$/)
   })
 
   test("have a release source for every pinned version, so the updater moves them", async () => {

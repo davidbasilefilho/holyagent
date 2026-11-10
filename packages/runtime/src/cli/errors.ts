@@ -126,7 +126,7 @@ const HINTS: Readonly<Record<string, string>> = {
   MigrationUnverified:
     "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
   ToolMissing:
-    "Install the program with the command the message gives for your platform; until then search with the system grep and find, or the host's search tools, and report the missing program.",
+    "Install the program with the command the message gives for your platform; until then search with the system grep or find and report the missing program.",
   BrowserLaunchFailed:
     "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
   StateModeRefused:

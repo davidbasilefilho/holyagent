@@ -229,20 +229,23 @@ export interface MiseTool {
 }
 
 const TOOLS_SECTION = /^\[tools\]\s*$([\s\S]*?)(?=^\[|(?![\s\S]))/m
-const TOOL_ENTRY = /^([A-Za-z][\w:-]*)(\s*=\s*")([^"]*)(")/gm
+// A key is bare (`bun`) or quoted for a backend prefix (`"aqua:BurntSushi/ripgrep"`); the name has no quotes.
+const TOOL_ENTRY = /^(?:"([A-Za-z][\w:/.-]*)"|([A-Za-z][\w:-]*))(\s*=\s*")([^"]*)(")/gm
 
 /** The `[tools]` entries of a `mise.toml`, whatever their value (a channel such as `lts` too). */
 export const parseMiseTools = (text: string): ReadonlyArray<MiseTool> =>
   [...(TOOLS_SECTION.exec(text)?.[1] ?? "").matchAll(TOOL_ENTRY)].map(
-    ([, name = "", , version = ""]) => ({ name, version }),
+    ([, quoted, bare, , version = ""]) => ({ name: quoted ?? bare ?? "", version }),
   )
 
 /** Sets the version of the named `[tools]` entries of a `mise.toml`; other entries stay as they are. */
 export const rewriteMiseTools = (text: string, versions: ReadonlyMap<string, string>): string =>
   text.replace(TOOLS_SECTION, (section) =>
-    section.replace(TOOL_ENTRY, (entry, name, middle, _version, end) => {
-      const version = versions.get(name as string)
-      return version === undefined ? entry : `${name}${middle}${version}${end}`
+    section.replace(TOOL_ENTRY, (entry, quoted, bare, middle, _version, end) => {
+      const name = (quoted ?? bare) as string
+      const version = versions.get(name)
+      if (version === undefined) return entry
+      return `${quoted === undefined ? name : `"${name}"`}${middle}${version}${end}`
     }),
   )
 

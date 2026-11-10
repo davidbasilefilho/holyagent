@@ -29,8 +29,8 @@ const runTool = (options: {
   readonly env: Readonly<Record<string, string | undefined>>
 }) =>
   Effect.gen(function* () {
-    const found = yield* locateTool(options.tool, (command) =>
-      Effect.sync(() => findCommand(options.env, command)),
+    const found = yield* locateTool(options.tool, options.cwd, (command, whichOptions) =>
+      Effect.sync(() => findCommand(options.env, command, whichOptions)),
     )
     if (Option.isNone(found)) return yield* new ToolMissing({ tool: options.tool })
     const path = found.value

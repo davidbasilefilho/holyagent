@@ -49,7 +49,7 @@ bunx --no-install mise run verify   # type-check, lint, format check and tests
 - [HolyClaude](docs/decisions.md), the predecessor plugin whose one long session was audited to shape HolyAgent's decisions.
 - [t3dotgg/tstack](https://github.com/t3dotgg/tstack), for the inspiration.
 - Anthropic's [frontend-design](docs/attributions.md#design-skill-sources) skill, an inspiration for the design skills.
-- [Context7](https://context7.com), [Effect](https://effect.website), [Bun](https://bun.sh), [mise](https://mise.jdx.dev), [lefthook](https://lefthook.dev), [TOON](https://toonformat.dev), [acorn](https://github.com/acornjs/acorn), [ripgrep](https://github.com/BurntSushi/ripgrep) and [fd](https://github.com/sharkdp/fd), the software HolyAgent builds with, ships or installs.
+- [Context7](https://context7.com), [Effect](https://effect.website), [Bun](https://bun.sh), [mise](https://mise.jdx.dev), [lefthook](https://lefthook.dev), [TOON](https://toonformat.dev), [acorn](https://github.com/acornjs/acorn), [ripgrep](https://github.com/BurntSushi/ripgrep) and [fd](https://github.com/sharkdp/fd), the software HolyAgent builds with or needs.
 
 The full list, with licenses, is in [docs/attributions.md](docs/attributions.md).
 

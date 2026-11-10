@@ -203,6 +203,24 @@ describe("mise tools", () => {
       text.replace('"1.4.4"', '"1.5.0"'),
     )
   })
+
+  test("reads and rewrites a tool whose key is quoted for its backend", () => {
+    const quoted = [
+      "[tools]",
+      'bun = "1.4.4"',
+      '"aqua:BurntSushi/ripgrep" = "15.2.0"',
+      '"aqua:sharkdp/fd" = "10.5.2"',
+      "",
+    ].join("\n")
+    expect(parseMiseTools(quoted)).toEqual([
+      { name: "bun", version: "1.4.4" },
+      { name: "aqua:BurntSushi/ripgrep", version: "15.2.0" },
+      { name: "aqua:sharkdp/fd", version: "10.5.2" },
+    ])
+    expect(rewriteMiseTools(quoted, new Map([["aqua:sharkdp/fd", "10.6.0"]]))).toBe(
+      quoted.replace('"10.5.2"', '"10.6.0"'),
+    )
+  })
 })
 
 describe("package dependencies", () => {

@@ -1,4 +1,4 @@
-import { delimiter, join } from "node:path"
+import { delimiter, join, posix, win32 } from "node:path"
 
 import { $ } from "bun"
 import { Context, Effect, Layer, Option } from "effect"
@@ -44,29 +44,74 @@ export const pathWithBunBin = (
 }
 
 /**
+ * How a lookup trusts PATH for a program that runs with arguments the model controls: only absolute
+ * entries count, so a relative or empty entry (`.`, `bin`, `::`) cannot make a repository's own
+ * program the answer; nothing inside the working directory is found; and on Windows only an `.exe`
+ * is, since a `.cmd` or `.bat` shim would hand those arguments to `cmd.exe`.
+ */
+export interface StrictLookup {
+  /** The working directory of the call. */
+  readonly cwd: string
+  /** The platform whose path rules apply; the running one when absent. For tests. */
+  readonly platform?: NodeJS.Platform
+  /** The lookup in a search path; `Bun.which` when absent. For tests. */
+  readonly which?: (command: string, options: { readonly PATH: string }) => string | null
+}
+
+/** What a lookup of a command can ask for beyond the search path of the environment. */
+export interface WhichOptions {
+  /** Also search Bun's global bin directory. */
+  readonly includeBunBin?: boolean
+  /** Trust only what {@link StrictLookup} allows. */
+  readonly strict?: StrictLookup
+}
+
+/** Whether `path` is `parent` or below it, by the path rules of `api`. */
+const isInside = (api: typeof posix, parent: string, path: string): boolean => {
+  const relative = api.relative(parent, path)
+  return (
+    relative === "" ||
+    (relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative))
+  )
+}
+
+const strictWhich = (command: string, path: string, strict: StrictLookup): string | null => {
+  const windows = (strict.platform ?? process.platform) === "win32"
+  const api = windows ? win32 : posix
+  const trusted = path
+    .split(windows ? ";" : ":")
+    .filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry))
+  const found = (strict.which ?? Bun.which)(command, { PATH: trusted.join(windows ? ";" : ":") })
+  if (found === null || isInside(api, strict.cwd, found)) return null
+  return windows && !found.toLowerCase().endsWith(".exe") ? null : found
+}
+
+/**
  * Finds a command on the search path of an environment, plus Bun's global bin directory when
- * `includeBunBin` is set. A lookup only: nothing is spawned.
+ * `includeBunBin` is set, and with `strict` only where {@link StrictLookup} trusts. A lookup only:
+ * nothing is spawned.
  */
 export const findCommand = (
   env: Env,
   command: string,
-  options?: { readonly includeBunBin?: boolean },
+  options?: WhichOptions,
 ): Option.Option<string> => {
   const bunBin = pathWithBunBin(
     { ...env },
     { home: homeDirectory(env), bunInstall: env.BUN_INSTALL },
   )
+  const path = options?.includeBunBin ? bunBin.value : (env[bunBin.key] ?? "")
   return Option.fromNullishOr(
-    Bun.which(command, {
-      PATH: options?.includeBunBin ? bunBin.value : (env[bunBin.key] ?? ""),
-    }),
+    options?.strict === undefined
+      ? Bun.which(command, { PATH: path })
+      : strictWhich(command, path, options.strict),
   )
 }
 
 /**
  * The empty Bun config the plugin ships beside the CLI script (`scripts/empty-bunfig.toml`), found
- * the way the bundled tools are: in the folder of the running bundle. `bun add -g` takes it as
- * `--config`, so no bunfig.toml of a project can change an install.
+ * in the folder of the running bundle. `bun add -g` takes it as `--config`, so no bunfig.toml of a
+ * project can change an install.
  */
 export const EMPTY_BUNFIG: string = join(import.meta.dir, "empty-bunfig.toml")
 
@@ -80,7 +125,7 @@ export class Shell extends Context.Service<
     /** Finds a command on PATH, plus Bun's global bin directory when `includeBunBin` is set. */
     readonly which: (
       command: string,
-      options?: { readonly includeBunBin?: boolean },
+      options?: WhichOptions,
     ) => Effect.Effect<Option.Option<string>>
     /**
      * Runs a command to completion without a terminal; stdout and stderr are captured. The command

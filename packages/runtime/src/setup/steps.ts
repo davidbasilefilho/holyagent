@@ -15,7 +15,7 @@ import { installPiPackages } from "./pi-install.ts"
 import { installPiToolSettings, undoPiToolSettings } from "./pi-settings.ts"
 import { added, failed, hint, present, type Report, skipped } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
-import { reportSearchTools } from "./search-tools.ts"
+import { searchToolLines, setupToolLine } from "./search-tools.ts"
 import { type CacheTtl, mergeUserSettings, undoUserSettings } from "./settings.ts"
 import { EMPTY_BUNFIG, Shell } from "./shell.ts"
 import { installT3Settings, undoT3Settings } from "./t3-settings.ts"
@@ -151,7 +151,7 @@ export interface SetupOptions {
  * T3 Code's server settings ({@link installPiPackages}, {@link installPiToolSettings} and
  * {@link installT3Settings}; all only when Pi is in use, never in a cloud session), and the
  * recommended keys of the settings of the chosen scope (`user` unless set); a report on the `rg`
- * and `fd` the user installs ({@link reportSearchTools}; it changes nothing and is never a failure)
+ * and `fd` the user installs ({@link searchToolLines}; it changes nothing and is never a failure)
  * comes before the settings lines. Every step checks its own result first, and a step that fails
  * does not stop the next one, except that when the capability choices cannot be saved the Pi
  * packages, tool settings and T3 steps are not run, so no package changes without the config that
@@ -251,7 +251,7 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
           }),
         )
       : []),
-    ...(yield* reportSearchTools),
+    ...(yield* searchToolLines(piOptions.cwd, setupToolLine)),
     ...(yield* onSettings((file) =>
       mergeUserSettings({
         env,
