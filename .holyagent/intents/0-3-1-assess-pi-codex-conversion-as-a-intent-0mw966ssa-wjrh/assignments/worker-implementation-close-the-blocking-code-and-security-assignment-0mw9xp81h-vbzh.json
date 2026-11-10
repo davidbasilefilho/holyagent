@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-blocking-code-and-security",
   "objective": "Close the blocking code and security findings on Codex auto-review so it cannot be bypassed, disabled or slowed by the model or repository content.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-autoreview, branch release/0.3.1/feat/auto-review, head b3cd9951 (auto-review commit 08b054b plus a merge of the screen branch). Your earlier report: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9wh8o1-xebk.md. Findings to close: /home/user/holyagent/.git/holyagent/reports/assignment-0mw9x71h4-9je3.md (code) and /home/user/holyagent/.git/holyagent/reports/assignment-0mw9x71pm-6wpd.md (security); read both in full, they give file and line evidence and a probe script at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/probe.ts.",
     "Testing rule: unit tests with recorded or synthesized fixtures only; the reviewer request is made through an injectable client so tests never reach a network.",
@@ -87,7 +87,61 @@
     "agentId": "workflow:wf_efb721d0-2ff/assignment-0mw9xp81h-vbzh",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T00:10:44.597Z"
+    "startedAt": "2026-11-10T00:10:44.597Z",
+    "finishedAt": "2026-11-10T00:31:28.880Z"
+  },
+  "result": "result: all blocking findings from both reviews are closed, plus the three non-blocking items. `build` and `verify` both exit 0, and the build is idempotent.\n\nchanged (all under `/home/user/holyagent-0.3.1-autoreview`; nothing untracked):\n- Runtime: `packages/runtime/src/pi/codex/auto-review/{classify,gate,session,transcript,assessment}.ts`, `packages/runtime/src/config/{load,schema}.ts`\n- Pi integration: `packages/integrations/pi/src/{auto-review,codex,extension}.ts`\n- Generated dist: `packages/integrations/claude/dist/scripts/holyagent.js`, `packages/integrations/pi/dist/{extensions/holyagent.js,scripts/holyagent.js}`\n- Docs: `docs/pi/{providers,configuration}.md`, `docs/usage.md`\n- Tests: `packages/runtime/tests/pi/codex-auto-review-{classify,gate,request}.test.ts`, `packages/runtime/tests/config/load.test.ts`, `packages/integrations/pi/tests/{auto-review,codex,contract,extension,t3-rpc}.test.ts`\n\nchecks:\n- `bun install --frozen-lockfile` -> exit 0.\n- `bunx --no-install mise run build` -> exit 0. A second build left `git diff` identical (sha256 `22cd45de…`).\n- `bunx --no-install mise run verify` -> exit 0: type-check clean, lint clean, 724 files formatted, 3379 pass, 0 fail, 112 files.\n- Logs: `ar2-build.log` and `ar2-verify.log` in the scratchpad directory.\n- I ran the old `classify.ts` through `isSafeCommand`: all four bypasses returned true, so the new tests fail without the fix.\n\nblockers: none\n\nquestions: none\n\nnotes:\n- Beyond the brief's list, unquoted globs (`*?[`) also send a command to review. A file named `--pre=x` would otherwise join `rg foo *`. It also costs `ls *.ts`.\n- `holyagent setup --auto-review off --scope project` or `local` now writes a key the loader ignores. Consider a warning or forcing user scope in setup. I documented user scope only.\n- The Windows-only path rules in Pi (`/c/x` drive paths, `~\\`) are not ported. Reviewing is the safe side on Windows, except a Git-Bash-style `/c/...` path that would be misjudged as inside a root named `C:\\c`.\n- Every tool outside Pi's `read`/`grep`/`find`/`ls` and without a read-only annotation is now reviewed. That includes `subagent`, `todo` and `ask`, which may be noisy in practice. A known-safe list for those is a later decision for the root.\n- `PROTECTED_FOLDERS` matches at any depth, not only at the root.\n- `.holyagent/state` is reviewed like the rest of `.holyagent`.\n\nevidence:\nEvery bypass in the two reviews is closed with a test that fails without the fix: `codex-auto-review-classify.test.ts`, describe \"commands that run other programs or write files\". It covers brace expansion, globs, `git grep -O` and `--open-files-in-pager`, git long-flag abbreviations, `uniq`, `rg -iz`, and a safe-set audit. Verify exit 0.\nA project-level config cannot turn auto-review off, change the provider gate, or replace or extend its policy; a malformed config keeps it on; settings are fixed for the session so a mid-session config write or compaction cannot change them; the gate keys on the active model's provider; with tests: `load.ts` USER_ONLY drops the project keys, tested in `load.test.ts` (\"auto-review is the user file's alone\"). `extension.test.ts` (\"auto-review under the extension\") covers on-at-start, project off ignored, unreadable project or user config, user-only off, fixed across compaction both ways, and model-provider keying. `auto-review.test.ts` covers `autoReviewChoice` and `createAutoReviewSettings`.\nThe root check normalizes paths as Pi's write and edit do (leading @, ~, file:// URLs), resolves existing links, and reviews writes to .git, .holyagent, .pi, .codex and .claude inside the root, with tests: `classify.ts` `writeTrigger` (`piPath`, `throughLinks`, `PROTECTED_FOLDERS`). Tested in `codex-auto-review-classify.test.ts` (\"the path of a write, read as Pi reads it\") with real temp-dir links, dangling and looping links, and edit and patch paths.\nTools that are neither known read-only nor annotated read-only go to review, including process-running tools, with tests: `classify.ts` ends in `tool-approval`; classify tests \"tools that are neither known read-only nor annotated read-only\" and `auto-review.test.ts`.\nClassification runs before the client and transcript are built, so an unreviewed call does no credential lookup or history walk, with a test: `GateInput.client` and `entries` are Effects run after `classify`. Tests: `codex-auto-review-gate.test.ts` (\"the work a call that runs at once does not do\") and `auto-review.test.ts` (lookups and walks are 0 for unreviewed calls).\nTranscript content cannot forge the transcript delimiters, role lines or the manual-approval prefix, with a test: `transcript.ts` indents continuation lines, flattens roles, and strips the marker from untrusted text. Test: `codex-auto-review-request.test.ts` (\"a transcript that tries to forge its own frame\").\nRiding along (non-blocking): empty low-risk-allow rationale accepted, `newTurn` clears timed-out, and a failed review keeps `/approve`. Tests are in the request and gate test files.\ndocs/pi/providers.md states the new triggers, the config rule and the protected folders: the \"Auto-review\" section, with the new \"A security control…\" bullet, the trigger table (`protected-path`, `tool-approval`), \"Policy text\" and \"Turning it off\".\nmise run build leaves the tree unchanged and mise run verify passes: build exit 0 with identical diff hash on re-run; verify exit 0, 3379 pass, 0 fail.\nchecks-run: `bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 3379 pass, 0 fail, 112 files.\nchanged-paths: the 25 paths under `changed` above (`git status --short`).\ndiff-file: `/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/auto-review-fixes.diff`\n",
+  "acceptance": {
+    "revision": 22,
+    "rationale": "Old classifier shown to pass the bypasses; each criterion has named tests; build idempotent; verify 3379 pass",
+    "criteria": [
+      {
+        "criterion": "Every bypass in the two reviews is closed with a test that fails without the fix: brace expansion, git grep -O and --open-files-in-pager, uniq with an output operand, rg combined short flags such as -iz, and a re-audit of the whole safe set for programs or flags that run programs or write files",
+        "support": "`codex-auto-review-classify.test.ts`, describe \"commands that run other programs or write files\". It covers brace expansion, globs, `git grep -O` and `--open-files-in-pager`, git long-flag abbreviations, `uniq`, `rg -iz`, and a safe-set audit. Verify exit 0."
+      },
+      {
+        "criterion": "A project-level config cannot turn auto-review off, change the provider gate, or replace or extend its policy; a malformed config keeps it on; settings are fixed for the session so a mid-session config write or compaction cannot change them; the gate keys on the active model's provider; with tests",
+        "support": "`load.ts` USER_ONLY drops the project keys, tested in `load.test.ts` (\"auto-review is the user file's alone\"). `extension.test.ts` (\"auto-review under the extension\") covers on-at-start, project off ignored, unreadable project or user config, user-only off, fixed across compaction both ways, and model-provider keying. `auto-review.test.ts` covers `autoReviewChoice` and `createAutoReviewSettings`."
+      },
+      {
+        "criterion": "The root check normalizes paths as Pi's write and edit do (leading @, ~, file:// URLs), resolves existing links, and reviews writes to .git, .holyagent, .pi, .codex and .claude inside the root, with tests",
+        "support": "`classify.ts` `writeTrigger` (`piPath`, `throughLinks`, `PROTECTED_FOLDERS`). Tested in `codex-auto-review-classify.test.ts` (\"the path of a write, read as Pi reads it\") with real temp-dir links, dangling and looping links, and edit and patch paths."
+      },
+      {
+        "criterion": "Tools that are neither known read-only nor annotated read-only go to review, including process-running tools, with tests",
+        "support": "`classify.ts` ends in `tool-approval`; classify tests \"tools that are neither known read-only nor annotated read-only\" and `auto-review.test.ts`."
+      },
+      {
+        "criterion": "Classification runs before the client and transcript are built, so an unreviewed call does no credential lookup or history walk, with a test",
+        "support": "`GateInput.client` and `entries` are Effects run after `classify`. Tests: `codex-auto-review-gate.test.ts` (\"the work a call that runs at once does not do\") and `auto-review.test.ts` (lookups and walks are 0 for unreviewed calls)."
+      },
+      {
+        "criterion": "Transcript content cannot forge the transcript delimiters, role lines or the manual-approval prefix, with a test",
+        "support": "`transcript.ts` indents continuation lines, flattens roles, and strips the marker from untrusted text. Test: `codex-auto-review-request.test.ts` (\"a transcript that tries to forge its own frame\")."
+      },
+      {
+        "criterion": "docs/pi/providers.md states the new triggers, the config rule and the protected folders",
+        "support": "the \"Auto-review\" section, with the new \"A security control…\" bullet, the trigger table (`protected-path`, `tool-approval`), \"Policy text\" and \"Turning it off\"."
+      },
+      {
+        "criterion": "mise run build leaves the tree unchanged and mise run verify passes",
+        "support": "build exit 0 with identical diff hash on re-run; verify exit 0, 3379 pass, 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bunx --no-install mise run build` exit 0; `bunx --no-install mise run verify` exit 0, 3379 pass, 0 fail, 112 files."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the 25 paths under `changed` above (`git status --short`)."
+      },
+      {
+        "label": "diff-file",
+        "support": "`/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/auto-review-fixes.diff`"
+      }
+    ]
   },
   "createdAt": "2026-11-10T00:10:44.597Z"
 }
