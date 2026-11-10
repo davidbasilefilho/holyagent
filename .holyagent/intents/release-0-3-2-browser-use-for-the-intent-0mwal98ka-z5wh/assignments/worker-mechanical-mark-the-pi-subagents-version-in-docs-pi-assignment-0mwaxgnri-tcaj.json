@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "mark-the-pi-subagents-version-in-docs-pi",
   "objective": "Mark the pi-subagents version in docs/pi/orchestration.md:11 as the version read, not the current pin.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-deps (branch release/0.3.2/chore/update-deps, clean). docs/pi/orchestration.md:11 reads \"... @tintinweb/pi-subagents extension (0.23.1, 4 Nov 2026, README)\". The current pin is 0.23.2, and the line records the README version read on 4 Nov 2026, so a reader must not take 0.23.1 as current. Change that parenthesis to \"(README of 0.23.1 when read, 4 Nov 2026)\" and change nothing else.",
     "Then run `bunx --no-install mise run fmt:check` if it exists in mise.toml, else `bunx --no-install mise run verify`, and give command, exit code and counts. Write `git diff` to /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/orch-fix.diff."
@@ -37,7 +37,33 @@
     "agentId": "workflow:wf_9b7281b5-88d/assignment-0mwaxgnri-tcaj",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-10T16:51:51.246Z"
+    "startedAt": "2026-11-10T16:51:51.246Z",
+    "finishedAt": "2026-11-10T16:52:20.589Z"
+  },
+  "result": "result: docs/pi/orchestration.md:11 now reads \"(README of 0.23.1 when read, 4 Nov 2026, [README](...))\". Only that parenthesis changed. The README link is kept, since the brief's replacement text dropped it.\nchanged: docs/pi/orchestration.md\nchecks: `bunx --no-install mise run fmt:check` -> exit 0, \"All 729 files are formatted.\"\nblockers: none\nquestions: none\nnotes: none\nevidence:\n[blocking] docs/pi/orchestration.md:11 marks 0.23.1 as the README version read and nothing else changes: diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/orch-fix.diff shows one changed line, line 11\nchecks-run: fmt:check exit 0, 729 files formatted\nchanged-paths: docs/pi/orchestration.md\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/orch-fix.diff\n",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "One-line diff verified; fmt:check exit 0.",
+    "criteria": [
+      {
+        "criterion": "docs/pi/orchestration.md:11 marks 0.23.1 as the README version read and nothing else changes",
+        "support": "diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/orch-fix.diff shows one changed line, line 11"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "fmt:check exit 0, 729 files formatted"
+      },
+      {
+        "label": "changed-paths",
+        "support": "docs/pi/orchestration.md"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/orch-fix.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-10T16:51:51.246Z"
 }
