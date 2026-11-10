@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwanx8va-83h7",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.security",
+  "slug": "assess-a46163b-t3-marker-for-specialists",
+  "objective": "Assess a46163b (T3 marker for specialists and launcher tidy-ups) for security vulnerabilities.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-browser-use, branch release/0.3.2/feat/browser-use, head a46163b. Review only `git diff 99a42e1 a46163b` (also at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/bu-final.diff).",
+    "It closes these earlier non-blocking findings: (a) the T3 gate (isT3Session needs Pi mode rpc) did not hold in specialists, which pi-subagents runs in-process in print mode, so a T3-hosted specialist registered browser-use and refuseT3PreviewOutsideT3 refused T3's preview tools; the fix is hostedByT3 in packages/integrations/pi/src/t3.ts: the root decides with isT3Session on every session_start and writes or deletes HOLYAGENT_T3_HOSTED in the shared process env (also clearing a stale value from outside), and specialists read only that marker; (b) a bare Chromium command name now resolves through PATH; (c) the uvx env allowlist keeps XDG_CACHE_HOME, XDG_DATA_HOME, UV_PYTHON_INSTALL_DIR; (d) the DevTools timeout names the profile; (e) win32 stopGroup skips taskkill for an exited child; (f) docs call the allowlist defense in depth.",
+    "Read the diff file; you have no shell. Focus on HOLYAGENT_T3_HOSTED as a trust signal: who can set it, whether a value from the person's environment or a project file could grant T3 preview tools outside T3 or suppress browser-use wrongly, the order of root session_start against specialist startup, and the PATH resolution of a bare Chromium name."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-browser-use; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi, uvx, browser-use or a live Chromium, and make no live Kimi, Codex or OpenAI request; unit tests only.",
+    "Mark each finding blocking or non-blocking, with file:line and a concrete failure scenario. Report in under 400 words."
+  ],
+  "criteria": [
+    {
+      "text": "No validated vulnerability introduced by the change remains unreported, each finding traced from source to sink",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwanirlh-937i"
+  ],
+  "followUpOf": "assignment-0mwane7bu-ftni",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T12:24:48.934Z"
+  },
+  "createdAt": "2026-11-10T12:24:48.934Z"
+}
