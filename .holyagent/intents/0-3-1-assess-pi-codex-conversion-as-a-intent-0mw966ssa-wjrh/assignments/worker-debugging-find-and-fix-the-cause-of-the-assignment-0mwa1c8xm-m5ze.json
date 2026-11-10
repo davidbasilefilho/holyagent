@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "find-and-fix-the-cause-of-the",
   "objective": "Find and fix the cause of the intermittent 'js-exec: Synchronous bridge entered an invalid request state.' line that the just-bash js-exec TypeScript-to-JavaScript fallback sometimes prints after correct output.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.1-jsexec, branch release/0.3.1/fix/js-exec-fallback cut from release/0.3.1/feat/auto-review at 7ab278c7. The just-bash backend is packages/runtime/src/pi/bash/ (shell.ts runs each shell in a Bun Worker; the TS-first, JS-fallback js-exec wiring is there) on just-bash 3.6.0 from node_modules.",
     "Failure seen on Linux CI (job log /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/chk109.log, search 'invalid request state'): packages/runtime/tests/pi/bash-shell.test.ts:516 \"js-exec falls back to JavaScript for code TypeScript's grammar refuses\" ran js-exec -c 'function f(a, a) { return a }; console.log(f(1, 2))' and got \"2\\n\" plus that stderr line. The same commit passed in another CI run, so it is intermittent; it may depend on timing, load or worker reuse.",
@@ -62,7 +62,45 @@
     "agentId": "workflow:wf_7302fc46-f97/assignment-0mwa1c8xm-m5ze",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T01:52:37.690Z"
+    "startedAt": "2026-11-10T01:52:37.690Z",
+    "finishedAt": "2026-11-10T02:29:44.487Z"
+  },
+  "result": "result: Fixed. The cause is a stale `Atomics.notify` in just-bash's `run` 2.1.3 sync bridge. I worked around it in HolyAgent's wiring: `runShell` now installs a `waitAsync` wrapper. The repro, which failed about 1-3% of runs before, passed 1600 runs after (0 failures in 8 batches of 200).\n\nroot cause:\n- The guest does `store(Request)` and then `notify`. Under load it can be descheduled between the two. The host sees Request by polling, handles it, stores Response, and registers `waitAsync(Response)`. The late notify then wakes that waiter while the cell is still Response.\n- The host loop treats that state as a protocol error, so the run fails after its output (\"2\\n\" then the stderr line).\n- The defect is upstream, in `node_modules/.bun/just-bash@3.6.0/node_modules/run/dist/runtime/manager.js:959`, in `runSyncBridgeLoop`: `if (state !== SyncBridgeState.Request) throw \"…invalid request state.\"`. `waitAsyncForSyncBridgeChange` in `dist/runtime/sync-bridge-protocol.js:112-118` takes any wake to mean the value changed.\n- Scratch-copy instrumentation showed it: `reg exp=0 cur=1 not-equal`, then `reg exp=2 cur=2 async`, then `res=ok cur=2` about 10µs later, with no state change.\n- The same copy's loop trace ended in \"woke from Response wait, now=2, top state=2\".\n\nfix:\n- New `packages/runtime/src/pi/bash/atomics.ts`. `stableWaitAsync` keeps a timeout-less `Atomics.waitAsync` pending until the cell differs from the awaited value. `installStableWaitAsync` applies it once per process and is called at the start of `runShell`.\n- The `run` loop looks up `Atomics.waitAsync` on each call, so the wrapper takes effect. I did not touch node_modules or the pin.\n- The wrapper replaces a process-global (`Atomics.waitAsync`) once per process. In production the shell is a one-call Bun process, so the effect is contained. In the test process it stays patched after the first `runShell`.\n\nreproduction:\n- Command: `N=200 C=8 taskset -c 0 bun <scratch>/repro/repro.ts`. It runs `runShell` with the failing `js-exec -c` call, 8 in parallel, pinned to one core.\n- Before the fix: 1 to 6 failures per 200 runs. With the fix reverted in-process (the `repro2.ts` NOFIX mode), 2 and 5 failures out of 200 in two of three runs, the third 0.\n- Without pinning I only got 1 failure in about 300 runs of the `bash-shell.test.ts` \"js-exec\" selector under CPU hogs.\n- After the fix: 0 failures in 8 batches of 200 (C=8; C=4, 8 and 16 at 400 each; and 4 more at C=8).\n\ntests:\n- New `packages/runtime/tests/pi/bash-atomics.test.ts`: 3 tests.\n- With the wrapper neutralized, the notify-without-change test and the `runShell` install test both fail, and the pass-through test (not-equal and timeout cases) passes as designed. After the fix all 3 pass.\n- No existing test was changed.\n\nchanged:\n- packages/runtime/src/pi/bash/atomics.ts (new)\n- packages/runtime/src/pi/bash/shell.ts\n- packages/runtime/tests/pi/bash-atomics.test.ts (new)\n- packages/integrations/pi/dist/scripts/just-bash.js (regenerated, +24 lines)\n- docs/pi/shell.md (one bullet)\n\nchecks:\n- `bunx --no-install mise run build` -> exit 0. The tree holds only the changes above; no other generated file changed.\n- `bunx --no-install mise run verify` -> exit 0. No type errors in 308 files, lint clean (0 warnings), 726 files formatted, 3398 pass / 0 fail across 113 files. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/verify.log\n- Temporary instrumentation tags (INSTR-TAG, RED-TAG, REPRO-TAG): 0 left in packages or docs.\n\nblockers: none\nquestions: none\n\nnotes:\n- Upstream defect to report to vercel-labs/just-bash and `run`: re-check the state after a wake, and re-wait while the state is unchanged, instead of throwing.\n- A backgrounded ping-pong check I started in the scratchpad (`pp/main.ts`, P=8) hung and may still be running. I could not kill it because the sandbox denied `pkill`. It writes only under /tmp.\n\nevidence:\nThe failure is reproduced before the fix, with the command and the failure rate: `N=200 C=8 taskset -c 0 bun repro.ts` printed \"2\\njs-exec: Synchronous bridge entered an invalid request state.\\n\" in 1 to 6 of 200 runs per batch. The scratch copy of the loop logged `top state=2`. Files are in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/repro/ and inst2.log.\nThe root cause is identified with file and line evidence and fixed, so the same reproduction no longer fails over many runs: upstream `run/dist/runtime/manager.js:959` and `sync-bridge-protocol.js:112-118`. Fixed by packages/runtime/src/pi/bash/atomics.ts and the call in shell.ts `runShell`. 0 failures in 1600 runs.\nA regression test fails reliably without the fix, and no test is weakened, skipped or retried: packages/runtime/tests/pi/bash-atomics.test.ts. It failed 2 of 3 with the wrapper neutralized and passes 3 of 3 with it. It is deterministic, with no retry.\nmise run build leaves the tree unchanged and mise run verify passes: build exit 0 with the status above, verify exit 0 with 3398 pass / 0 fail.\nchecks-run: `mise run build` exit 0; `mise run verify` exit 0 (check, lint, fmt:check, test); repro batches as above.\nchanged-paths: packages/runtime/src/pi/bash/atomics.ts, packages/runtime/src/pi/bash/shell.ts, packages/runtime/tests/pi/bash-atomics.test.ts, packages/integrations/pi/dist/scripts/just-bash.js, docs/pi/shell.md\ndiff-file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/js-exec-fix.diff\n",
+  "acceptance": {
+    "revision": 22,
+    "rationale": "Reproduced 1-6/200, root cause traced to upstream lines, 0/1600 after; regression test fails without the wrapper; verify 3398 pass",
+    "criteria": [
+      {
+        "criterion": "The failure is reproduced before the fix, with the command and the failure rate",
+        "support": "`N=200 C=8 taskset -c 0 bun repro.ts` printed \"2\\njs-exec: Synchronous bridge entered an invalid request state.\\n\" in 1 to 6 of 200 runs per batch. The scratch copy of the loop logged `top state=2`. Files are in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/repro/ and inst2.log."
+      },
+      {
+        "criterion": "The root cause is identified with file and line evidence and fixed, so the same reproduction no longer fails over many runs",
+        "support": "upstream `run/dist/runtime/manager.js:959` and `sync-bridge-protocol.js:112-118`. Fixed by packages/runtime/src/pi/bash/atomics.ts and the call in shell.ts `runShell`. 0 failures in 1600 runs."
+      },
+      {
+        "criterion": "A regression test fails reliably without the fix, and no test is weakened, skipped or retried",
+        "support": "packages/runtime/tests/pi/bash-atomics.test.ts. It failed 2 of 3 with the wrapper neutralized and passes 3 of 3 with it. It is deterministic, with no retry."
+      },
+      {
+        "criterion": "mise run build leaves the tree unchanged and mise run verify passes",
+        "support": "build exit 0 with the status above, verify exit 0 with 3398 pass / 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`mise run build` exit 0; `mise run verify` exit 0 (check, lint, fmt:check, test); repro batches as above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/src/pi/bash/atomics.ts, packages/runtime/src/pi/bash/shell.ts, packages/runtime/tests/pi/bash-atomics.test.ts, packages/integrations/pi/dist/scripts/just-bash.js, docs/pi/shell.md"
+      },
+      {
+        "label": "diff-file",
+        "support": "/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/js-exec-fix.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-10T01:52:37.690Z"
 }
