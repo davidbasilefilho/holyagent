@@ -8,6 +8,7 @@ import {
   type CapabilityForm,
 } from "../config/capabilities.ts"
 import type { Config } from "../config/schema.ts"
+import { FFF_RETIRED_SETTINGS } from "../pi/fff/settings.ts"
 import { PROVIDERS, ROOT_MODEL_PAIR, rootModelSettings } from "../pi/provider.ts"
 import {
   BILLION_CONTEXT_FILE,
@@ -333,13 +334,18 @@ const mergeTarget = Effect.fn("mergeToolSettingsFile")(function* (
   return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`
 })
 
-/** The keys that setup takes back out when their patch is no longer planned (`revertWhenOff`). */
-const REVERTABLE: ReadonlyArray<{ readonly file: string; readonly leaf: Default }> = (
-  CAPABILITIES as ReadonlyArray<CapabilityDefinition>
-)
-  .flatMap((capability) => capability.settings)
-  .filter((patch) => patch.revertWhenOff === true)
-  .flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf })))
+/**
+ * The keys that setup takes back out when their patch is no longer planned (`revertWhenOff`), and
+ * the keys an earlier setup wrote that no capability plans any more ({@link FFF_RETIRED_SETTINGS}),
+ * which the next run clears by the record while the capability is on.
+ */
+const REVERTABLE: ReadonlyArray<{ readonly file: string; readonly leaf: Default }> = [
+  ...(CAPABILITIES as ReadonlyArray<CapabilityDefinition>)
+    .flatMap((capability) => capability.settings)
+    .filter((patch) => patch.revertWhenOff === true)
+    .flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf }))),
+  ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf })),
+]
 
 /**
  * Takes the revertable keys of one file back out: each key that the setup record names with the
