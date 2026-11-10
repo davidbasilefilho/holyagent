@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwa5uvf8-vhc5",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 22,
+  "roleTask": "Reviewer.code",
+  "slug": "judge-whether-the-bash-atomics-test-fix",
+  "objective": "Judge whether the bash-atomics test fix removes the hang without weakening the tests.",
+  "state": "Running",
+  "scope": [
+    "Commit HEAD on local branch release/0.3.2/fix/atomics-test-hang in /home/user/holyagent-0.3.2-atomics (one test file); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/atomics-hang-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mwa4zs7r-9do7.md with repro scripts in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/exp/."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Work only inside /home/user/holyagent-0.3.2-atomics; never check out a branch or commit in any other checkout.",
+    "Run in the worktree, with the mise Bun (bunx --no-install mise exec -- bun ...): bun install --frozen-lockfile, the bash-atomics test file 20 times with the writer's GC preload if present in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/exp/, and bunx --no-install mise run verify; give exit codes and counts.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "The fix removes the realm-collection hang, keeps the tests meaningful and introduces no regression",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwa4zs7r-9do7"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T03:59:05.108Z"
+  },
+  "createdAt": "2026-11-10T03:59:05.108Z"
+}
