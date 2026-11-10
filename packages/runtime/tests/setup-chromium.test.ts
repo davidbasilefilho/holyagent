@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { join } from "node:path"
 
 import {
   findChromium,
@@ -7,13 +6,15 @@ import {
   PREINSTALLED_BROWSERS,
 } from "../src/setup/chromium.ts"
 
-// A file system of a few paths: `exists` and `list` answer from it.
+// A file system of a few paths, written with `/`: `exists` and `list` answer from it for a path in
+// either separator, so the fixture is the same on every host.
+const slashed = (path: string) => path.replaceAll("\\", "/")
 const machine = (files: ReadonlyArray<string>) => ({
-  exists: (path: string) => files.includes(path),
+  exists: (path: string) => files.includes(slashed(path)),
   list: (folder: string) => [
     ...new Set(
       files
-        .filter((file) => file.startsWith(`${folder}/`))
+        .filter((file) => file.startsWith(`${slashed(folder)}/`))
         .map((file) => file.slice(folder.length + 1).split("/")[0] ?? ""),
     ),
   ],
@@ -49,9 +50,18 @@ describe("the Chromium a machine provides for the headless browser", () => {
         "darwin",
       ),
     ).toBe(`${PREINSTALLED_BROWSERS}/chromium-1/chrome-mac/Chromium.app/Contents/MacOS/Chromium`)
-    expect(
-      find({}, [join(PREINSTALLED_BROWSERS, "chromium-1", "chrome-win", "chrome.exe")], "win32"),
-    ).toBe(join(PREINSTALLED_BROWSERS, "chromium-1", "chrome-win", "chrome.exe"))
+    expect(find({}, [`${PREINSTALLED_BROWSERS}/chromium-1/chrome-win/chrome.exe`], "win32")).toBe(
+      "\\opt\\pw-browsers\\chromium-1\\chrome-win\\chrome.exe",
+    )
+  })
+
+  test("joins the path the way the platform asked for does, not the way the host does", () => {
+    const files = [`${PREINSTALLED_BROWSERS}/chromium`]
+    expect(find({}, files, "linux")).toBe("/opt/pw-browsers/chromium")
+    expect(find({}, files, "win32")).toBe("\\opt\\pw-browsers\\chromium")
+    expect(find({ PLAYWRIGHT_BROWSERS_PATH: "C:\\pw" }, ["C:/pw/chromium"], "win32")).toBe(
+      "C:\\pw\\chromium",
+    )
   })
 
   test("a build folder without the executable is not a Chromium", () => {

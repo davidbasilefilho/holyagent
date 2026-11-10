@@ -25408,9 +25408,9 @@ ${result.stderr}`;
   if (missing.length === 0)
     return [pass("pi base packages", `${wanted.length} packages listed at their pins`)];
   return missing.map((source) => fail6(`pi base package ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`));
-}, unmetNeed = (env, need) => gen2(function* () {
+}, unmetNeed = (env, need, platform = process.platform) => gen2(function* () {
   if (need.kind === "display")
-    return hasDisplay(env) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
+    return hasDisplay(env, platform) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
   if (need.kind === "node")
     return yield* unmetNode(env, need);
   const found = yield* (yield* Shell).which(need.command);
@@ -25862,15 +25862,16 @@ var init_pi_settings = __esm(() => {
 });
 
 import { existsSync, readdirSync } from "fs";
-import { join as join19 } from "path";
-var PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
-  const entry = join19(folder, "chromium");
+import { posix, win32 } from "path";
+var PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win32 : posix, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
+  const { join } = pathsOf(platform);
+  const entry = join(folder, "chromium");
   if (exists(entry))
     return entry;
   const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
   for (const build of builds)
     for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
-      const path = join19(folder, build, ...executable.split("/"));
+      const path = join(folder, build, ...executable.split("/"));
       if (exists(path))
         return path;
     }
@@ -25895,7 +25896,7 @@ var init_chromium = __esm(() => {
   };
 });
 
-var reportOne = (env, capability, features, options) => gen2(function* () {
+var reportOne = (env, capability, features, options, platform) => gen2(function* () {
   const form = options.form ?? "normal";
   const label = capability.name;
   const reason = unavailableIn(capability, form);
@@ -25905,12 +25906,12 @@ var reportOne = (env, capability, features, options) => gen2(function* () {
     ];
   const content = formContent(capability, form);
   const withheld = serversWithheld(capability, form, features);
-  const unmet = yield* forEach2(formNeeds(capability, form), (need) => unmetNeed(env, need));
+  const unmet = yield* forEach2(formNeeds(capability, form), (need) => unmetNeed(env, need, platform));
   const needs = unmet.flatMap((problem) => problem === undefined ? [] : [hint(`${label}: ${problem}`)]);
   const servers = (content?.mcpServers ?? []).map(({ command, args }) => `${command} ${args.join(" ")}`);
-  const chromium = (content?.mcpServers ?? []).some(({ chromiumFlag }) => chromiumFlag !== undefined) ? findChromium(env) : undefined;
+  const chromium = (content?.mcpServers ?? []).some(({ chromiumFlag }) => chromiumFlag !== undefined) ? findChromium(env, platform) : undefined;
   const browser = chromium === undefined ? [] : [present2(`${label}: the headless browser is the Chromium at ${chromium}`)];
-  const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env).pipe(map5((state) => {
+  const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env, platform).pipe(map5((state) => {
     const { text, fix } = describeBrowseState(state);
     return state.state === "paired" ? present2(`${label}: ${text}`) : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`);
   }), catchTag2("SetupFailure", (error) => succeed6(hint(`${label}: cannot tell whether a browser is paired: ${error.message}`))), map5((line) => [line])) : [];
@@ -25927,20 +25928,20 @@ var init_browser_use = __esm(() => {
   init_browse();
   init_chromium();
   init_pi_check();
-  reportBrowserUse = fn2("reportBrowserUse")(function* (env, options) {
+  reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform = process.platform) {
     const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices);
     if (!config.pi.enable)
       return [];
     const reporting = enabledCapabilities(config.pi.features, {
       provider: config.pi.provider
     }).filter((capability) => Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
-    const lines = yield* forEach2(reporting, (capability) => reportOne(env, capability, config.pi.features, options));
+    const lines = yield* forEach2(reporting, (capability) => reportOne(env, capability, config.pi.features, options, platform));
     return lines.flat();
   });
 });
 
-import { join as join20 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join20(stateDirectory(cwd), CONFIG_FILE), objectAt = (parent, key, file, path) => {
+import { join as join19 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join19(stateDirectory(cwd), CONFIG_FILE), objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
     return succeed6({});
@@ -26085,10 +26086,10 @@ var init_pi_install = __esm(() => {
 });
 
 import { stat as stat3 } from "fs/promises";
-import { join as join21 } from "path";
+import { join as join20 } from "path";
 var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 = "t3 settings", restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false)), writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
-})))), t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join21(homeDirectory(env), ".t3"), t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
+})))), t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join20(homeDirectory(env), ".t3"), t3SettingsFile = (env) => join20(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
   {
     name: "Pi provider",
     choice: "pi",
@@ -26241,14 +26242,14 @@ var init_t3_settings = __esm(() => {
     const home = homeDirectory(env);
     if (platform === "darwin") {
       const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-      const simulator = join21(developer, "Platforms", "iPhoneSimulator.platform");
+      const simulator = join20(developer, "Platforms", "iPhoneSimulator.platform");
       if (yield* isDirectory2(simulator))
         return `Xcode (${developer})`;
     }
     const sdkFolders = [
       firstNonEmpty(env["ANDROID_HOME"]),
       firstNonEmpty(env["ANDROID_SDK_ROOT"]),
-      platform === "darwin" ? join21(home, "Library", "Android", "sdk") : platform === "win32" ? join21(firstNonEmpty(env["LOCALAPPDATA"]) ?? join21(home, "AppData", "Local"), "Android", "Sdk") : join21(home, "Android", "Sdk")
+      platform === "darwin" ? join20(home, "Library", "Android", "sdk") : platform === "win32" ? join20(firstNonEmpty(env["LOCALAPPDATA"]) ?? join20(home, "AppData", "Local"), "Android", "Sdk") : join20(home, "Android", "Sdk")
     ];
     for (const folder of sdkFolders) {
       if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -26402,7 +26403,7 @@ var init_t3_settings = __esm(() => {
   });
 });
 
-import { join as join22 } from "path";
+import { join as join21 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on", neutralDirectory = (env) => homeDirectory(env), ensureGlobal, installCtx7, asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))), setup;
 var init_steps = __esm(() => {
   init_dist();
@@ -26448,7 +26449,7 @@ var init_steps = __esm(() => {
     const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
     if (!global.usable)
       return global.lines;
-    const skillReady = (yield* fileExists2(join22(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join22(files.claudeDir, "rules", "context7.md")));
+    const skillReady = (yield* fileExists2(join21(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join21(files.claudeDir, "rules", "context7.md")));
     if (skillReady)
       return [...global.lines, present2("ctx7 skill: already installed")];
     const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -27747,9 +27748,9 @@ var TUI_PACKAGES = {
 
 import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join23, posix, win32 } from "path";
+import { basename as basename5, dirname as dirname5, join as join22, posix as posix2, win32 as win322 } from "path";
 import { pathToFileURL } from "url";
-var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win32 : posix, cacheHome = (env, platform = process.platform) => {
+var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : posix2, cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory(env);
   const { join } = pathModule(platform);
   if (platform === "win32")
@@ -27782,8 +27783,8 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win32 : po
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join23(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join23(directory, file)}`, cause)
+      try: () => Bun.write(join22(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join22(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -27800,9 +27801,9 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win32 : po
 }), importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
-}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join23(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join22(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
-})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join23(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join22(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", fileSystem = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
@@ -27846,8 +27847,8 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win32 : po
   return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
 }), STALE_AFTER_MS, newestChange = (path) => gen2(function* () {
   const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map5((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map5((names) => names.map((name) => join23(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join23(path, "node_modules"))];
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map5((names) => names.map((name) => join22(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join22(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 }), sweepStale = (directory, uid) => gen2(function* () {
@@ -27856,24 +27857,24 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win32 : po
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir2(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join23(parent, name);
+    const path = join22(parent, name);
     const found = yield* tryPromise2(() => lstat5(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
-}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join23(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join22(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join23(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join22(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove), loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join23(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join22(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -27892,9 +27893,9 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win32 : po
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join23(directory, TUI_BUNDLE);
+  const target = join22(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join23(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join22(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -28303,12 +28304,12 @@ var init_state = __esm(() => {
   ];
 });
 
-import { join as join24 } from "path";
+import { join as join23 } from "path";
 var {$: $5 } = globalThis.Bun;
 var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (platform, arch) => {
   const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
   return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-}, toolPath = (directory, tool, target) => join24(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
+}, toolPath = (directory, tool, target) => join23(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
   const path = toolPath(options.directory, options.tool, options.target);
   if (!(yield* promise2(() => Bun.file(path).exists())))
     return yield* new ToolMissing({ tool: options.tool, path });
@@ -28348,7 +28349,7 @@ var init_tools2 = __esm(() => {
     { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
     { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
   ];
-  BUNDLED_TOOLS = join24(import.meta.dir, "vendor");
+  BUNDLED_TOOLS = join23(import.meta.dir, "vendor");
   UnsupportedPlatform = class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
     get message() {
       return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;

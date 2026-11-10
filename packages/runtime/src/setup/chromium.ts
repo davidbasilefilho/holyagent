@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { posix, win32 } from "node:path"
 
 import { Effect } from "effect"
 
@@ -25,6 +25,10 @@ const BUILD_EXECUTABLES: Readonly<Record<string, ReadonlyArray<string>>> = {
   win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"],
 }
 
+// The path functions of the platform the executable is looked up for, not the host's, so a path is
+// joined with the separator that platform uses wherever HolyAgent runs.
+const pathsOf = (platform: string) => (platform === "win32" ? win32 : posix)
+
 const revisionOf = (name: string): number =>
   Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN)
 
@@ -34,6 +38,7 @@ const inFolder = (
   exists: (path: string) => boolean,
   list: (folder: string) => ReadonlyArray<string>,
 ): string | undefined => {
+  const { join } = pathsOf(platform)
   const entry = join(folder, "chromium")
   if (exists(entry)) return entry
   const builds = list(folder)
@@ -59,7 +64,8 @@ const safeList = (folder: string): ReadonlyArray<string> =>
  * {@link PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE}; the `chromium` entry or the newest
  * `chromium-<revision>` build in `PLAYWRIGHT_BROWSERS_PATH` when it names a folder (Playwright
  * itself looks nowhere else then), else in {@link PREINSTALLED_BROWSERS}. It only looks at the file
- * system; `exists` and `list` replace that for a test.
+ * system; `exists` and `list` replace that for a test. Paths are joined the way `platform` joins
+ * them (the machine's by default), whatever the host is.
  */
 export const findChromium = (
   env: Env,
