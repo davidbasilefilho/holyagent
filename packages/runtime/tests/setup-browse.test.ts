@@ -73,11 +73,13 @@ const report = (
   env: Record<string, string> = { DISPLAY: ":0" },
   commands?: ReadonlyArray<string>,
   node?: string,
+  platform?: string,
 ) =>
   Effect.runPromise(
     reportBrowserUse(
       { HOME: home, ...env },
       { scope: "user", cwd: project, dryRun: false, form },
+      platform,
     ).pipe(Effect.provide(shell(commands, node).layer)),
   )
 
@@ -495,12 +497,20 @@ describe("holyagent setup on browse", () => {
     )
   })
 
-  test("no graphical session is reported as a need of the normal form", async () => {
+  test("on Linux, no graphical session is reported as a need of the normal form", async () => {
     await writeBrowsePairing(home)
-    const lines = await report("normal", {})
+    const lines = await report("normal", {}, undefined, undefined, "linux")
     expect(lines).toContain(
       "~ browser-use: needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)",
     )
+  })
+
+  test("macOS and Windows have a graphical session without DISPLAY, so none is a need there", async () => {
+    await writeBrowsePairing(home)
+    for (const platform of ["darwin", "win32"])
+      expect(await report("normal", {}, undefined, undefined, platform)).not.toContain(
+        "~ browser-use: needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)",
+      )
   })
 
   test("headless form: registers the Playwright server headless and isolated, and reads no pairing", async () => {

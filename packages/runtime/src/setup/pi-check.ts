@@ -362,11 +362,15 @@ const checkBasePackages = (
   )
 }
 
-/** The reason a system need is not met on this machine, or `undefined` when it is. */
-export const unmetNeed = (env: Env, need: SystemNeed) =>
+/**
+ * The reason a system need is not met on this machine, or `undefined` when it is. The `platform`
+ * (the machine's by default) decides the graphical-session need, which only a Unix desktop without
+ * `DISPLAY` or `WAYLAND_DISPLAY` fails ({@link hasDisplay}).
+ */
+export const unmetNeed = (env: Env, need: SystemNeed, platform: string = process.platform) =>
   Effect.gen(function* () {
     if (need.kind === "display")
-      return hasDisplay(env)
+      return hasDisplay(env, platform)
         ? undefined
         : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)"
     if (need.kind === "node") return yield* unmetNode(env, need)

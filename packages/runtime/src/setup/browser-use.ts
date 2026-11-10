@@ -21,6 +21,7 @@ const reportOne = (
   capability: CapabilityDefinition,
   features: Readonly<Record<string, unknown>>,
   options: PiInstallOptions,
+  platform: string,
 ) =>
   Effect.gen(function* () {
     const form: CapabilityForm = options.form ?? "normal"
@@ -34,7 +35,9 @@ const reportOne = (
       ]
     const content = formContent(capability, form)
     const withheld = serversWithheld(capability, form, features)
-    const unmet = yield* Effect.forEach(formNeeds(capability, form), (need) => unmetNeed(env, need))
+    const unmet = yield* Effect.forEach(formNeeds(capability, form), (need) =>
+      unmetNeed(env, need, platform),
+    )
     const needs = unmet.flatMap((problem) =>
       problem === undefined ? [] : [hint(`${label}: ${problem}`)],
     )
@@ -44,7 +47,7 @@ const reportOne = (
     const chromium = (content?.mcpServers ?? []).some(
       ({ chromiumFlag }) => chromiumFlag !== undefined,
     )
-      ? findChromium(env)
+      ? findChromium(env, platform)
       : undefined
     const browser =
       chromium === undefined
@@ -54,7 +57,7 @@ const reportOne = (
     // that cannot be read is a line here, not a failure of the step; doctor fails on it.
     const pairing =
       content?.pairing === true && withheld === undefined
-        ? yield* readBrowseState(env).pipe(
+        ? yield* readBrowseState(env, platform).pipe(
             Effect.map((state) => {
               const { text, fix } = describeBrowseState(state)
               return state.state === "paired"
@@ -90,11 +93,14 @@ const reportOne = (
  * stands: paired with a browser, installed in one but not paired, or not installed
  * ({@link readBrowseState}). A form the capability does not offer says why, as a `~` line, and
  * nothing is dropped silently. With `pi.enable` off, or the capability off, there are no lines. The
- * config is the one the Pi steps read at the scope ({@link loadPiConfig}).
+ * config is the one the Pi steps read at the scope ({@link loadPiConfig}). The `platform` (the
+ * machine's by default) decides the graphical-session need, the Chromium paths and the browsers'
+ * folders.
  */
 export const reportBrowserUse = Effect.fn("reportBrowserUse")(function* (
   env: Env,
   options: PiInstallOptions,
+  platform: string = process.platform,
 ) {
   const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices)
   if (!config.pi.enable) return []
@@ -106,7 +112,7 @@ export const reportBrowserUse = Effect.fn("reportBrowserUse")(function* (
     ),
   )
   const lines = yield* Effect.forEach(reporting, (capability) =>
-    reportOne(env, capability, config.pi.features, options),
+    reportOne(env, capability, config.pi.features, options, platform),
   )
   return lines.flat()
 })
