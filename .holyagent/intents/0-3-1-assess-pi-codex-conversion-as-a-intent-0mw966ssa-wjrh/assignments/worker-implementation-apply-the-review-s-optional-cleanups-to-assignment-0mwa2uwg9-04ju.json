@@ -1,0 +1,64 @@
+{
+  "id": "assignment-0mwa2uwg9-04ju",
+  "intentId": "intent-0mw966ssa-wjrh",
+  "intentRevision": 22,
+  "roleTask": "Worker.implementation",
+  "slug": "apply-the-review-s-optional-cleanups-to",
+  "objective": "Apply the review's optional cleanups to the js-exec stale-wake fix so it is portable and simple before it ships.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.1-jsexec, branch release/0.3.1/fix/js-exec-fallback, head 9c916dd4. Review: /home/user/holyagent/.git/holyagent/reports/assignment-0mwa2oc1c-pga3.md (the optional findings list). Files: packages/runtime/src/pi/bash/atomics.ts and packages/runtime/tests/pi/bash-atomics.test.ts.",
+    "Windows CI runs this suite: a test must not rely on POSIX paths or a POSIX PATH; follow how packages/runtime/tests/pi/bash-shell.test.ts sets up its work dir and HOST_DIR."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 250 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The runShell install test works on Windows: its cwd and PATH come from the same helpers bash-shell.test.ts uses, not POSIX literals",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "installStableWaitAsync leaves the process alone when Atomics.waitAsync is missing, the identical-branch ternary in current is replaced by a simpler form, and the test restores the original Atomics.waitAsync after it runs",
+      "blocking": false,
+      "dimension": "style"
+    },
+    {
+      "text": "The regression tests still fail without the wrapper and pass with it",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "mise run build leaves the tree unchanged and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/pi/bash/atomics.ts",
+    "packages/runtime/tests/pi/bash-atomics.test.ts",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwa1c8xm-m5ze",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T02:35:07.593Z"
+  },
+  "createdAt": "2026-11-10T02:35:07.593Z"
+}
