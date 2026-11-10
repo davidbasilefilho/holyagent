@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwaprmd2-0i9j",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-instruction-text-and-docs-of",
+  "objective": "Review the instruction text and docs of commit b36e708 (ripgrep and fd as user-installed prerequisites) for accuracy and completeness.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-unbundle, branch release/0.3.2/feat/user-installed-search-tools. The change is commit b36e708; review `git diff 3cc15367 b36e708` (source, tests, docs and instruction text without the generated dist: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/unbundle-src.diff; the dist also deletes the vendored binaries and regenerates bundles and agent files). Head 86e6d051 only adds a no-content merge of the integration branch.",
+    "Requirement (maintainer, verbatim: \"remove the bundling of the executables, list them as dependencies instead\", then \"I mean dependencies for the users\"): HolyAgent stops bundling ripgrep and fd; they become prerequisites the user installs; holyagent rg and holyagent fd run the ones on PATH (fd also as Debian's fdfind); a missing tool fails with install commands per platform; setup and doctor of the Claude plugin and of Pi report them; mise provides them for development and CI; instructions tell agents to fall back to the system search tools when one is missing; docs list them as prerequisites; the updater no longer moves vendored binaries.",
+    "Read the diff file above; you have no shell. Cover the requirements tree and its per-family copies (packages/runtime/src/instructions/{requirements,claude-5.5,gpt-6,kimi-k3.1}/root/search.md and specialist/working.md), the coverage phrases in packages/runtime/src/instructions/coverage.ts, and docs/components.md, decisions.md, development.md, attributions.md, requirements.md, usage.md, docs/pi/search.md, docs/pi/installation.md, README.md and the AGENTS.md Dependencies sentence. Judge the model-facing text against /root/.claude/plugins/synced/03eb801d-6ff6-4373-b5b1-f94edf359a3e_0f3e6ee9-af2e-4c2c-8d3c-9be25ca27713/holyagent/skills/instruction-writing/SKILL.md (read it). Check: the text tells root and specialists what happens when a tool is missing and what to use instead, nothing still promises bundled or identical-on-every-machine tools, install commands are right (Debian/Ubuntu package fd-find installs the fdfind binary; winget ids BurntSushi.ripgrep.MSVC and sharkdp.fd), README keeps its six sections, and AGENTS.md changed only the Dependencies sentence."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-unbundle; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests.",
+    "Mark each finding blocking or non-blocking, with file:line and a concrete failure scenario. Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "The instruction text and docs state the new requirement accurately, completely and consistently, with correct install commands",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwap1f0u-kq3f"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T13:16:25.718Z"
+  },
+  "createdAt": "2026-11-10T13:16:25.718Z"
+}
