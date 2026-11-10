@@ -436,6 +436,63 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(piFff())).toEqual({ followSymlinks: false, mode: "override" })
     })
 
+    describe("the followSymlinks false that 0.3.1 wrote", () => {
+      /** A file as 0.3.1 setup left it: `followSymlinks: false` beside the override, both recorded. */
+      const afterOldSetup = async (file: Record<string, unknown> = { followSymlinks: false }) => {
+        await installed()
+        await write(piFff(), { mode: "override", ...file })
+        await Effect.runPromise(
+          addRecorded({ HOME: home }, piFff(), [
+            { path: ["mode"], value: "override" },
+            { path: ["followSymlinks"], value: false },
+          ]),
+        )
+      }
+
+      test("is taken out when the capability is turned off, with the override", async () => {
+        await afterOldSetup()
+        await setConfig(off)
+        const report = await runSetup(withPi())
+        expect(await read(piFff())).toEqual({})
+        expect(toolLines(report)).toContain(
+          `- tool settings ${piFff()}: removed mode "override", followSymlinks false`,
+        )
+      })
+
+      test("is taken out when pi.enable is off", async () => {
+        await afterOldSetup()
+        await setConfig({ pi: { enable: false } })
+        const report = await runSetup(withPi())
+        expect(await read(piFff())).toEqual({})
+        expect(toolLines(report)).toContain(
+          `- tool settings ${piFff()}: removed mode "override", followSymlinks false`,
+        )
+      })
+
+      test("is reported by a dry run, which writes neither the file nor the record", async () => {
+        await afterOldSetup()
+        await setConfig(off)
+        const report = await runSetup(withPi(), { dryRun: true })
+        expect(await read(piFff())).toEqual({ mode: "override", followSymlinks: false })
+        expect(toolLines(report)).toContain(
+          `- tool settings ${piFff()}: would remove mode "override", followSymlinks false (dry run, nothing written)`,
+        )
+        // The record is intact, so the real run still removes both.
+        await runSetup(withPi())
+        expect(await read(piFff())).toEqual({})
+      })
+
+      test("stays when the person changed it to true after setup, and the report says so", async () => {
+        await afterOldSetup({ followSymlinks: true })
+        await setConfig(off)
+        const report = await runSetup(withPi())
+        expect(await read(piFff())).toEqual({ followSymlinks: true })
+        expect(toolLines(report)).toContain(
+          `- tool settings ${piFff()}: removed mode "override"; kept followSymlinks true (setup wrote false)`,
+        )
+      })
+    })
+
     test("follows PI_CODING_AGENT_DIR, which is where the package reads the file", async () => {
       const agent = join(home, "agent-dir")
       await write(join(agent, "settings.json"), FULL())
