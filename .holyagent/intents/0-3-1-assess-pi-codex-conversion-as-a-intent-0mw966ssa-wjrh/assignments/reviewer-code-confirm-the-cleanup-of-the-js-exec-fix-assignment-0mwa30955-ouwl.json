@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "confirm-the-cleanup-of-the-js-exec-fix",
   "objective": "Confirm the cleanup of the js-exec fix closes the review's optional items without weakening the tests.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Cleanup commit on release/0.3.1/fix/js-exec-fallback in /home/user/holyagent-0.3.1-jsexec (range 9c916dd4..HEAD); diff at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/jsexec-polish-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mwa2uwg9-04ju.md; previous review /home/user/holyagent/.git/holyagent/reports/assignment-0mwa2oc1c-pga3.md."
   ],
@@ -35,7 +35,29 @@
     "agentId": "workflow:wf_a0b90fc3-86d/assignment-0mwa30955-ouwl",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T02:39:17.322Z"
+    "startedAt": "2026-11-10T02:39:17.322Z",
+    "finishedAt": "2026-11-10T02:42:34.339Z"
+  },
+  "result": "result: Cleanup f6aef92b is merge-ready. No blockers, and it closes the optional items it targeted.\n\nReviewed range 9c916dd4..f6aef92b in /home/user/holyagent-0.3.1-jsexec. This was a re-review, so I did not re-run the built-in /code-review. I read the cleanup diff, the previous review and the changed code.\n\nchecks-run:\n- `bun install --frozen-lockfile` -> exit 0, no changes.\n- `bun test packages/runtime/tests/pi/bash-atomics.test.ts`, run 3 times -> exit 0 each time, 3 pass / 0 fail.\n- `bunx --no-install mise run verify` -> exit 0. Lint reports no problems in 309 files. Tests: 3398 pass / 0 fail across 113 files. `git status` is clean afterwards. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rev2-verify.log\n\nfindings: none blocking. The previous review's optional items are closed:\n- Dead ternary in `current` is now a cast, with a comment saying it only picks the overload.\n- `installStableWaitAsync` now returns early when `Atomics.waitAsync` is undefined. The bundled `just-bash.js` carries the same changes.\n- Test 3 no longer uses a POSIX cwd or PATH. It uses a `mkdtemp` directory and `dirname(process.execPath)`, the same pattern as `bash-shell.test.ts`.\n- Test 3 now resets the global before the shell run and restores it in `afterAll`. Without the reset, the `STABLE` flag could be left set by an earlier test file, so the test would pass without calling the install.\n- Tests 1 and 2 take the native `waitAsync` from a fresh `vm` realm, so they exercise the real engine function whatever another test file has patched.\n\nThe assertions are unchanged, so the tests are not weakened. Test 3 still depends on `runShell` calling `installStableWaitAsync`, so it fails if that call is removed.\n\nNot done:\n- I did not run the tests on Windows. Reading the code, nothing in them is POSIX-specific.\n- I did not run a mutation test that removes the fix.\n- I did not re-run `mise run build`. The dist hunks match the source edits.\n\nevidence:\nThe cleanup keeps the tests meaningful and portable to Windows, and introduces no regression: the assertions are unchanged, and Windows-portability is by reading the code only. The new test code is at `packages/runtime/tests/pi/bash-atomics.test.ts` lines 1-36 and 66-90. The bash-atomics test passed 3 of 3 runs and verify passed with 3398 pass / 0 fail.\nchecks-run: install exit 0; bash-atomics test x3 exit 0 (3/0); mise verify exit 0 (3398 pass / 0 fail, lint clean).\nfindings: none blocking; the previous optional items on `current`, the missing `waitAsync` guard, the POSIX cwd/PATH, the global patch persisting in the test process, and the fragile native source are closed.\n",
+  "acceptance": {
+    "revision": 22,
+    "rationale": "Assertions unchanged, portable setup, verify 3398 pass",
+    "criteria": [
+      {
+        "criterion": "The cleanup keeps the tests meaningful and portable to Windows, and introduces no regression",
+        "support": "the assertions are unchanged, and Windows-portability is by reading the code only. The new test code is at `packages/runtime/tests/pi/bash-atomics.test.ts` lines 1-36 and 66-90. The bash-atomics test passed 3 of 3 runs and verify passed with 3398 pass / 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "install exit 0; bash-atomics test x3 exit 0 (3/0); mise verify exit 0 (3398 pass / 0 fail, lint clean)."
+      },
+      {
+        "label": "findings",
+        "support": "none blocking; the previous optional items on `current`, the missing `waitAsync` guard, the POSIX cwd/PATH, the global patch persisting in the test process, and the fragile native source are closed."
+      }
+    ]
   },
   "createdAt": "2026-11-10T02:39:17.322Z"
 }
