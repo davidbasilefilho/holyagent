@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwazcwhq-i303",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "check-that-the-0-3-3-version-bump-in-the",
+  "objective": "Check that the 0.3.3 version bump in the bump worktree is complete and passes the gates.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.3-bump, branch release/0.3.3/chore/bump-version, uncommitted changes from `mise run bump:patch` and `mise run build` (10 files: package.json, bun.lock, .claude-plugin/marketplace.json, workspace package.json files, generated plugin.json and dist scripts). The previous worker stopped before verify finished.",
+    "Run `bunx --no-install mise run build` and confirm `git status --short` lists the same 10 files and nothing new; `git diff` shows only version 0.3.2 -> 0.3.3 changes (and the rebuilt bundles that embed the version). Then run `bunx --no-install mise run verify` in the foreground and wait for it to finish. If `mise run` fails with ENOENT for node_modules/mise/bin, run `bun install --frozen-lockfile --force` first."
+  ],
+  "constraints": [
+    "Make no edits beyond what build regenerates, and no git writes.",
+    "Report in under 150 words."
+  ],
+  "criteria": [
+    {
+      "text": "The root package.json and every generated copy read 0.3.3, changed only by bump:patch and build",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwaz8thw-jhel",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-10T17:44:55.167Z"
+  },
+  "createdAt": "2026-11-10T17:44:55.167Z"
+}
