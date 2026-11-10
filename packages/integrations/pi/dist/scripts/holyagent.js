@@ -10689,9 +10689,10 @@ var init_guardrails = __esm(() => {
   };
 });
 
-var FFF_OVERRIDE_SETTINGS, FFF_TOOLS, FFF_NATIVE_HOSTS;
+var FFF_OVERRIDE_SETTINGS, FFF_RETIRED_SETTINGS, FFF_TOOLS, FFF_NATIVE_HOSTS;
 var init_settings = __esm(() => {
-  FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false };
+  FFF_OVERRIDE_SETTINGS = { mode: "override" };
+  FFF_RETIRED_SETTINGS = { followSymlinks: false };
   FFF_TOOLS = [
     "grep",
     "find",
@@ -25666,6 +25667,7 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
 var init_pi_settings = __esm(() => {
   init_dist();
   init_capabilities();
+  init_settings();
   init_provider();
   init_tools();
   init_environment();
@@ -25752,7 +25754,10 @@ var init_pi_settings = __esm(() => {
     const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
     return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
   });
-  REVERTABLE = CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf })));
+  REVERTABLE = [
+    ...CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf }))),
+    ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf }))
+  ];
   revertFile = fn2("revertToolSettingsFile")(function* (env, options, file, wanted) {
     const recorded = yield* readRecorded(env, file);
     const mine = wanted.filter((leaf) => recorded.some((item) => item.path.join(".") === keyName(leaf) && equals(item.value, leaf.value)));

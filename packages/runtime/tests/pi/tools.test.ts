@@ -378,19 +378,19 @@ describe("toolSettings", () => {
       },
       {
         file: PI_FFF_FILE,
-        content: { mode: "override", followSymlinks: false },
+        content: { mode: "override" },
         revertWhenOff: true,
       },
     ])
   })
 
-  test("fff puts pi-fff in override mode, without directory links followed, while it is on and its native library covers the host", () => {
+  test("fff puts pi-fff in override mode, leaving followSymlinks unset, while it is on and its native library covers the host", () => {
     const patches = (config: Config, platform?: string) =>
       toolSettings(config, undefined, "normal", platform).filter((p) => p.file === PI_FFF_FILE)
     expect(patches(DEFAULT_CONFIG, "linux-x64")).toEqual([
       {
         file: PI_FFF_FILE,
-        content: { mode: "override", followSymlinks: false },
+        content: { mode: "override" },
         revertWhenOff: true,
       },
     ])
