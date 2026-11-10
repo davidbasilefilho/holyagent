@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwala6w0-wtu2",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "establish-how-holyagent-can-use-browser",
+  "objective": "Establish how HolyAgent can use browser-use (github.com/browser-use/browser-use) as the headless browser of the screen capability for Pi specialists, replacing the Playwright MCP server.",
+  "state": "Running",
+  "scope": [
+    "Answer from browser-use's own repository, README, docs (docs.browser-use.com) and PyPI metadata, current as of 2026-11:",
+    "1. Does browser-use ship an MCP server (for example `uvx browser-use --mcp` or a browser-use[cli] extra)? Exact command, transport (stdio?), the tools it exposes and their names, and which tools need an LLM API key versus drive the browser directly. HolyAgent's specialists are themselves the model, so direct browser tools without a nested agent are wanted; say whether the nested-agent tool can be turned off.",
+    "2. Headless operation in a cloud container or CI with no display: flags or environment variables for headless, using an existing Chromium binary (this container has one at /opt/pw-browsers/chromium; Playwright browsers path PLAYWRIGHT_BROWSERS_PATH), whether it installs its own browser (playwright install / patchright), and what it writes to disk (profiles, config, telemetry). How to turn telemetry off (ANONYMIZED_TELEMETRY or similar).",
+    "3. Requirements: Python version, uv/uvx, the exact latest stable version on PyPI and its license; how an exact version pin is given to uvx (browser-use==X.Y.Z) and whether uvx can be told to use the public index explicitly (like npx --registry) so a project's uv config cannot redirect it.",
+    "4. How HolyAgent's dependency updater could move a PyPI pin: the PyPI JSON API endpoint for the latest stable release.",
+    "5. Anything that makes it unsuitable for a non-interactive specialist (prompts on first run, API key required at start).",
+    "Context: HolyAgent registers MCP servers for Pi in packages/runtime/src/config/capabilities.ts (PLAYWRIGHT_MCP_SERVER, npxServerArgs) and pins Pi packages in packages/runtime/src/config/pi-packages.json moved by scripts/dependency-pins.ts (mise run deps:update). Read those files in /home/user/holyagent-0.3.2-bump to say what would have to change for a PyPI-pinned uvx server, at the level of which pieces, not code."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Separate sourced facts (with URL) from inference.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the five questions is answered with a source URL or marked unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-10T11:10:54.048Z"
+  },
+  "createdAt": "2026-11-10T11:10:54.048Z"
+}
