@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mwamxtzt-fxuw",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Librarian.research",
+  "slug": "establish-whether-browser-use-can-attach",
+  "objective": "Establish whether browser-use can attach to T3 Code's built-in browser as its backend over the Chrome DevTools Protocol.",
+  "state": "Running",
+  "scope": [
+    "T3 Code is github.com/pingdotgg/t3code (desktop app, Electron, and a web/server mode). From its repository source and docs, current as of 2026-11: 1. How is its browser or preview pane implemented (Electron webview, WebContentsView, BrowserView, an iframe in web mode)? 2. Does T3 Code expose a Chrome DevTools Protocol endpoint for that pane (Electron --remote-debugging-port, app.commandLine.appendSwitch('remote-debugging-port'), webContents.debugger, an env var or setting), or any MCP server or API through which an agent drives it (the preview tools HolyAgent uses in T3: how do they reach the pane)? 3. If a CDP endpoint can be enabled, would a CDP client attaching to it see only the preview page target or the whole app's renderer targets (app UI included), and what security implication that has. 4. browser-use 1.0.0 --cli-mcp attaches through BU_CDP_URL or BU_CDP_WS (see /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/browser-use-research.md): can it attach to an Electron CDP endpoint and pick one target (the preview page), and does it open new tabs or windows that an Electron webview cannot host?",
+    "Say clearly which parts are sourced (URL, file path in the t3code repo) and which are inference."
+  ],
+  "constraints": [
+    "Make no edits and no git writes.",
+    "Report in under 500 words."
+  ],
+  "criteria": [
+    {
+      "text": "Each of the four questions is answered with a source or marked unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-10T11:57:16.697Z"
+  },
+  "createdAt": "2026-11-10T11:57:16.697Z"
+}
