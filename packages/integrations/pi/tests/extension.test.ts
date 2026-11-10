@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -64,7 +64,7 @@ import {
 } from "../src/extension.ts"
 import { familyAgentPrompt, promptBody } from "../src/families.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
-import { SPECIALIST_NAMES } from "../src/specialists.ts"
+import { AGENT_TYPES, SCREEN_SPECIALIST_NAMES, SPECIALIST_NAMES } from "../src/specialists.ts"
 import { removeTemporary } from "./temp-folder.ts"
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
@@ -187,6 +187,8 @@ const fakeApi = (
     readonly mode?: ExtensionContext["mode"]
     /** The context's `ui`, likewise only for a session that uses it. */
     readonly ui?: object
+    /** Makes `registerMcpServer` throw this. */
+    readonly mcpFail?: Error
   } = {},
 ) => {
   const flags = new Map<string, { type: string; default?: string }>()
@@ -202,6 +204,8 @@ const fakeApi = (
   const renderers: Array<ToolRendererResolver> = []
   // The tools the extension registered (only `apply_patch`, inactive).
   const tools: Array<{ readonly name: string }> = []
+  // The MCP servers the extension registered, by name, with the config it gave.
+  const mcpServers: Array<{ readonly name: string; readonly config: unknown }> = []
   // The commands started and not yet settled: a process that is still running.
   const running = { count: 0 }
   const api = {
@@ -210,6 +214,10 @@ const fakeApi = (
     getFlag: (name: string) => value ?? flags.get(name)?.default,
     registerToolRenderer: (resolver: ToolRendererResolver) => void renderers.push(resolver),
     registerTool: (tool: { readonly name: string }) => void tools.push(tool),
+    registerMcpServer: (name: string, config: unknown) => {
+      if (session.mcpFail !== undefined) throw session.mcpFail
+      mcpServers.push({ name, config })
+    },
     getSessionName: () => session.name,
     getActiveTools: () => [...active],
     getAllTools: () => (session.allTools ?? active).map((name) => ({ name })),
@@ -273,6 +281,7 @@ const fakeApi = (
     handlers,
     renderers,
     tools,
+    mcpServers,
     calls,
     sent,
     toolSets,
@@ -304,6 +313,7 @@ const run = async (
     toolsFailOnce?: Error
     mode?: ExtensionContext["mode"]
     ui?: object
+    mcpFail?: Error
     deadlineMs?: number
     /** Starts the session and stops there, so no run takes what the start produced. */
     startOnly?: boolean
@@ -326,6 +336,7 @@ const run = async (
     ...(options.toolsFailOnce === undefined ? {} : { toolsFailOnce: options.toolsFailOnce }),
     ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.ui === undefined ? {} : { ui: options.ui }),
+    ...(options.mcpFail === undefined ? {} : { mcpFail: options.mcpFail }),
   })
   const env = options.env ?? {}
   createExtension({
@@ -1948,6 +1959,10 @@ describe("telling a child from the root", () => {
     expect(childAgent(`${name}#a1b2c3d4`)).toBe(name)
   })
 
+  test.each(SCREEN_SPECIALIST_NAMES)("%s#<id> is that screen specialist", (name) => {
+    expect(childAgent(`${name}#a1b2c3d4`)).toBe(name)
+  })
+
   test("any other session is not a child: no name, no #, or a name that is not a specialist", () => {
     for (const name of [
       undefined,
@@ -1956,6 +1971,9 @@ describe("telling a child from the root", () => {
       "worker-implementation",
       "my chat#1",
       "#a1b2c3d4",
+      "worker-implementation-screen",
+      "general-purpose-screen#a1b2c3d4",
+      "worker-implementation-screen-screen#a1b2c3d4",
     ])
       expect(childAgent(name)).toBeUndefined()
   })
@@ -2087,6 +2105,25 @@ describe("the Agent tool", () => {
     ).toBeUndefined()
   })
 
+  test.each(SCREEN_SPECIALIST_NAMES)(
+    "%s may launch, for an Assignment with the screen capability",
+    (name) => {
+      expect(
+        refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: name } }),
+      ).toBeUndefined()
+    },
+  )
+
+  test("a type outside the 18 and their -screen variants is refused, and the refusal names the screen form", () => {
+    for (const type of ["worker-implementation-screen-screen", "screen", "explorer-map-screens"]) {
+      const result = refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: type } })
+      expect(result?.block, type).toBe(true)
+      expect(result?.reason, type).toContain(
+        "(each also as <name>-screen, or <name>-headless-screen on a headless machine)",
+      )
+    }
+  })
+
   test("a type outside the 18 is refused with the names that are allowed", () => {
     for (const type of ["general-purpose", "Explore", "my-reviewer", "Worker-Implementation", ""]) {
       const result = refuseNonSpecialist({ toolName: AGENT_TOOL, input: { subagent_type: type } })
@@ -2159,6 +2196,17 @@ describe("the SubagentWorkflow tool", () => {
 
   test("a script whose every agent() names a specialist by literal agentType may run", async () => {
     expect(await refusedWorkflow({ script: workflowScript(...SPECIALIST_NAMES) })).toBeUndefined()
+  })
+
+  test("a script that names a screen specialist by literal agentType may run, and a made-up -screen name may not", async () => {
+    expect(
+      await refusedWorkflow({ script: workflowScript(...SCREEN_SPECIALIST_NAMES) }),
+    ).toBeUndefined()
+    const result = await refusedWorkflow({ script: workflowScript("explorer-map-screens") })
+    expect(result?.block).toBe(true)
+    expect(result?.reason).toContain(
+      "(each also as <name>-screen, or <name>-headless-screen on a headless machine)",
+    )
   })
 
   test("a script that starts a default, a foreign or a computed agent is refused", async () => {
@@ -3633,8 +3681,8 @@ describe("under the Codex provider", () => {
     )
   })
 
-  test("every specialist has a GPT-6 prompt the swap finds", () => {
-    for (const agent of SPECIALIST_NAMES) {
+  test("every specialist, with and without the screen tools, has a GPT-6 prompt the swap finds", () => {
+    for (const agent of AGENT_TYPES) {
       const own = body(`agents/${agent}.md`)
       const gpt = body(`families/gpt-6/agents/${agent}.md`)
       expect(gpt, agent).not.toBe("")
@@ -3781,5 +3829,174 @@ describe("the bash tool on just-bash", () => {
     })
     expect(api.tools.some((tool) => tool.name === "bash")).toBe(true)
     for (const name of GUARDRAILS) expect(env[name]).toBeUndefined()
+  })
+})
+
+describe("the MCP servers of the screen capability", () => {
+  const DISPLAY = { DISPLAY: ":0" }
+  const configWith = (features: Record<string, unknown>) =>
+    healthy("/missing", {
+      config: {
+        stdout: `${JSON.stringify({ ...DEFAULTS, pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, ...features } } })}\n`,
+      },
+    })
+  const registered = async (
+    sessionName: string | undefined,
+    options: {
+      readonly env?: Record<string, string>
+      readonly features?: Record<string, unknown>
+    } = {},
+  ) => {
+    const { api } = await run(configWith(options.features ?? {}), {
+      ...(sessionName === undefined ? {} : { sessionName }),
+      env: options.env ?? DISPLAY,
+      startOnly: true,
+    })
+    return api.mcpServers
+  }
+
+  const REGISTRY = [
+    "--registry=https://registry.npmjs.org/",
+    "--@opencode:registry=https://registry.npmjs.org/",
+  ]
+
+  test("a screen specialist registers browse at the pinned release, with no file written and no other option", async () => {
+    expect(await registered("worker-implementation-screen#a1b2c3d4")).toEqual([
+      {
+        name: "browse",
+        config: { command: "npx", args: [...REGISTRY, "-y", "@opencode/browse@0.0.15", "mcp"] },
+      },
+    ])
+  })
+
+  test("every screen specialist registers the server of the form its agent file was made for, whatever its role", async () => {
+    for (const name of SCREEN_SPECIALIST_NAMES)
+      expect(
+        (await registered(`${name}#a1b2c3d4`)).map((server) => server.name),
+        name,
+      ).toEqual([name.endsWith("-headless-screen") ? "playwright" : "browse"])
+  })
+
+  test("the root and the specialists without the capability register none, so no other process starts the server", async () => {
+    expect(await registered(undefined)).toEqual([])
+    for (const name of SPECIALIST_NAMES)
+      expect(await registered(`${name}#a1b2c3d4`), name).toEqual([])
+    expect(await registered("my chat#1")).toEqual([])
+  })
+
+  test("a headless screen specialist registers the Playwright server headless and isolated, with the machine's Chromium when there is one", async () => {
+    const browsers = await mkdtemp(join(tmpdir(), "holyagent-chromium-"))
+    try {
+      // The server comes from the agent file's form, whatever the machine's environment says.
+      const bare = await registered("worker-visual-headless-screen#a1b2c3d4", {
+        env: { ...DISPLAY, PLAYWRIGHT_BROWSERS_PATH: browsers },
+      })
+      expect(bare).toHaveLength(1)
+      expect(bare[0]?.name).toBe("playwright")
+      const args = (bare[0]?.config as { args: Array<string> }).args
+      expect(args.slice(0, 2)).toEqual([
+        "--registry=https://registry.npmjs.org/",
+        "--@playwright:registry=https://registry.npmjs.org/",
+      ])
+      expect(args.join(" ")).toContain("--headless --isolated --browser chromium")
+      expect(args).not.toContain("--executable-path")
+      await writeFile(join(browsers, "chromium"), "")
+      const preinstalled = await registered("worker-visual-headless-screen#a1b2c3d4", {
+        env: { PLAYWRIGHT_BROWSERS_PATH: browsers },
+      })
+      expect((preinstalled[0]?.config as { args: Array<string> }).args.slice(-2)).toEqual([
+        "--executable-path",
+        join(browsers, "chromium"),
+      ])
+    } finally {
+      await rm(browsers, { recursive: true, force: true })
+    }
+  })
+
+  test("browser use switched off registers none, and the specialist is told", async () => {
+    const { api, delivered } = await run(configWith({ browserUse: false }), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: DISPLAY,
+    })
+    expect(api.mcpServers).toEqual([])
+    expect(delivered?.message?.content).toContain("no MCP server of the screen capability")
+    expect(delivered?.message?.content).toContain("report that they are missing")
+  })
+
+  test("with the MCP extension off no server is registered, in either form, and the specialist is told", async () => {
+    for (const name of ["worker-visual-screen", "worker-visual-headless-screen"]) {
+      const { api, delivered } = await run(configWith({ mcp: false }), {
+        sessionName: `${name}#a1b2c3d4`,
+        env: DISPLAY,
+      })
+      expect(api.mcpServers, name).toEqual([])
+      expect(delivered?.message?.content, name).toContain("pi.features.mcp")
+    }
+  })
+
+  test("a server that cannot be registered is told to the specialist on its first run, and the session goes on", async () => {
+    const { delivered } = await run(configWith({}), {
+      sessionName: "worker-implementation-screen#a1b2c3d4",
+      env: DISPLAY,
+      mcpFail: new Error("the name is taken"),
+    })
+    expect(delivered?.message?.content).toContain(
+      "an MCP server of the screen capability was not registered (browse: the name is taken)",
+    )
+    expect(delivered?.message?.content).toContain("report that they are missing")
+  })
+})
+
+describe("T3's preview tools for a screen specialist", () => {
+  const T3_ENV = { T3_PI_RUNTIME_MODE: "full-access", T3_MCP_URL: "http://127.0.0.1:1/mcp" }
+  const call = (toolName: string) => ({ toolName, toolCallId: "t1", input: {} })
+  const PREVIEW = [
+    "mcp__t3-code__preview_open",
+    "mcp__t3_code__t3_preview_snapshot",
+    "mcp__t3-code__html_render",
+  ]
+
+  test("are refused when T3 does not host the session", async () => {
+    for (const env of [{}, { DISPLAY: ":0" }, T3_ENV]) {
+      // An env with T3's variables but a mode that is not RPC is not T3's host either.
+      const { api } = await run(healthy("/missing"), {
+        sessionName: "worker-visual-screen#a1b2c3d4",
+        env,
+        mode: "print",
+        startOnly: true,
+      })
+      for (const name of PREVIEW)
+        expect(await api.emit("tool_call", call(name)), name).toEqual([
+          expect.objectContaining({ block: true }),
+        ])
+    }
+  })
+
+  test("are granted when T3 hosts the session", async () => {
+    const { api } = await run(healthy("/missing"), {
+      sessionName: "worker-visual-screen#a1b2c3d4",
+      env: T3_ENV,
+      mode: "rpc",
+      startOnly: true,
+    })
+    for (const name of PREVIEW)
+      expect(await api.emit("tool_call", call(name)), name).toEqual([undefined])
+  })
+
+  test("the gate is for screen specialists: another session, and another tool, pass", async () => {
+    const { api } = await run(healthy("/missing"), {
+      sessionName: "worker-visual#a1b2c3d4",
+      env: {},
+      startOnly: true,
+    })
+    expect(await api.emit("tool_call", call("mcp__t3-code__preview_open"))).toEqual([undefined])
+    const screen = await run(healthy("/missing"), {
+      sessionName: "worker-visual-headless-screen#a1b2c3d4",
+      env: {},
+      startOnly: true,
+    })
+    expect(await screen.api.emit("tool_call", call("mcp__playwright__browser_navigate"))).toEqual([
+      undefined,
+    ])
   })
 })

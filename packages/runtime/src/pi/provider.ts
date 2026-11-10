@@ -1,8 +1,8 @@
 import { type PiPackageName, piPackageSource } from "../config/pi-packages.ts"
-import type { Config, PiProvider, RouteKey, Thinking } from "../config/schema.ts"
+import type { Config, PiProvider, RouteChoice, RouteKey, Thinking } from "../config/schema.ts"
 import type { PiFamily } from "../instructions/families.ts"
 import { APPLY_PATCH_TOOL } from "./codex/apply-patch.ts"
-import { CODEX_PROVIDER_ID } from "./codex/routes.ts"
+import { CODEX_PROVIDER_ID, screenRoute } from "./codex/routes.ts"
 
 /** What the integration knows about one model provider: the only place a provider is named. */
 export interface ProviderProfile {
@@ -37,6 +37,11 @@ export interface ProviderProfile {
    * until a setting enables them), as a path under the user's home. Absent with no web tools.
    */
   readonly toolsFile?: string
+  /**
+   * How an Assignment that carries the screen capability is routed, from the route-table row of its
+   * role (Codex: Terra at medium or above). Absent when the row stands, as under Kimi.
+   */
+  readonly screenRoute?: (row: RouteChoice) => RouteChoice
 }
 
 /**
@@ -66,6 +71,7 @@ export const PROVIDERS: Readonly<Record<PiProvider, ProviderProfile>> = {
     env: {},
     loginFix: "Run /login openai-codex in Pi and sign in with the ChatGPT account that has Codex",
     webTools: [],
+    screenRoute,
   },
 }
 
@@ -88,12 +94,26 @@ export const providerProfile = (config: Config): ProviderProfile => PROVIDERS[co
 
 /**
  * Turns a route-table row into the Pi model and thinking level to launch, with the provider the
- * config selects. The provider takes the route table's reasoning levels as they are.
+ * config selects. The provider takes the route table's reasoning levels as they are. With `screen`
+ * (an Assignment that carries the screen capability) the provider's `screenRoute` decides: Codex
+ * moves it to Terra at medium or above, and a provider without one keeps the row.
  */
-export const routeModel = (config: Config, key: RouteKey): ModelRoute => {
-  const { id } = providerProfile(config)
-  const { model, thinking } = config.pi.routes[key]
-  return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` }
+export const routeModel = (
+  config: Config,
+  key: RouteKey,
+  options: { readonly screen?: boolean } = {},
+): ModelRoute => {
+  const profile = providerProfile(config)
+  const row = config.pi.routes[key]
+  const { model, thinking } =
+    options.screen === true && profile.screenRoute !== undefined ? profile.screenRoute(row) : row
+  return {
+    key,
+    provider: profile.id,
+    model,
+    thinking,
+    spec: `${profile.id}/${model}:${thinking}`,
+  }
 }
 
 /**

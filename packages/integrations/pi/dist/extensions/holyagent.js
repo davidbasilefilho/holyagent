@@ -12228,6 +12228,10 @@ var routeFor = (roleTask) => ({
   agent: `${SPECS[roleTask].role}-${SPECS[roleTask].task}`.toLowerCase(),
   ...SPECS[roleTask]
 });
+var SCREEN_AGENT_SUFFIX = "-screen";
+var HEADLESS_SCREEN_AGENT_SUFFIX = `-headless${SCREEN_AGENT_SUFFIX}`;
+var agentFor = (route, screen, form = "normal") => screen === true ? `${route.agent}${form === "headless" ? HEADLESS_SCREEN_AGENT_SUFFIX : SCREEN_AGENT_SUFFIX}` : route.agent;
+var isHeadlessScreenAgent = (agent) => agent?.endsWith(HEADLESS_SCREEN_AGENT_SUFFIX) === true;
 var ROUTES = RoleTask.literals.map(routeFor);
 
 var isNode = (value) => typeof value === "object" && value !== null && ("type" in value) && typeof value.type === "string";
@@ -14083,6 +14087,20 @@ var CODEX_ROUTES = {
   "Reviewer.security": choice(TERRA, "xhigh"),
   "Reviewer.artifact": choice(TERRA, "medium")
 };
+var SCREEN_MINIMUM_THINKING = "medium";
+var THINKING_RANK = {
+  off: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  high: 4,
+  xhigh: 5,
+  max: 6
+};
+var screenRoute = (row) => {
+  const higher = THINKING_RANK[row.thinking] >= THINKING_RANK[SCREEN_MINIMUM_THINKING] ? row.thinking : SCREEN_MINIMUM_THINKING;
+  return choice(TERRA, higher);
+};
 
 var BILLION_CONTEXT_GUARDRAILS_OFF = {
   BILI_GUARDRAIL_BASH_TIMEOUT: "0",
@@ -14112,6 +14130,23 @@ var FFF_NATIVE_HOSTS = [
   "android-arm64"
 ];
 
+var pi_packages_default = {
+  "pi-provider-kimi-code": "0.6.13",
+  "@tintinweb/pi-subagents": "0.23.1",
+  "billion-context": "0.1.212",
+  "@juicesharp/rpiv-todo": "2.15.0",
+  "@juicesharp/rpiv-ask-user-question": "2.15.0",
+  "@aliou/pi-processes": "0.13.6",
+  "@amaster.ai/pi-computer-use": "0.1.36",
+  "pi-web-kit": "0.5.0",
+  "@ff-labs/pi-fff": "0.11.0",
+  "@opencode/browse": "0.0.15",
+  "@playwright/mcp": "0.0.85"
+};
+
+var PI_PACKAGE_VERSIONS = pi_packages_default;
+
+var CAPABILITY_FORMS = ["headless", "normal"];
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
 var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
@@ -14121,14 +14156,47 @@ var SUBAGENTS_ONLY_SPECIALISTS = {
 };
 var PI_FFF_FILE = "~/.pi/agent/pi-fff.json";
 var T3_PREFIX = "mcp__t3*code__";
-var T3_VISUAL_TOOLS = [
+var T3_PREVIEW_TOOLS = [
   `${T3_PREFIX}preview_*`,
   `${T3_PREFIX}t3_preview_*`,
   `${T3_PREFIX}html_render`,
-  `${T3_PREFIX}html_preview`,
-  `${T3_PREFIX}device_*`
+  `${T3_PREFIX}html_preview`
 ];
+var T3_VISUAL_TOOLS = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`];
 var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var BROWSE_PACKAGE = "@opencode/browse";
+var BROWSE_SERVER = "browse";
+var BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
+var NPM_REGISTRY = "https://registry.npmjs.org/";
+var npxServerArgs = (name, rest) => [
+  `--registry=${NPM_REGISTRY}`,
+  ...name.startsWith("@") ? [`--${name.slice(0, name.indexOf("/"))}:registry=${NPM_REGISTRY}`] : [],
+  "-y",
+  `${name}@${PI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
+var BROWSE_MCP_SERVER = {
+  name: BROWSE_SERVER,
+  command: "npx",
+  args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
+};
+var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
+var PLAYWRIGHT_SERVER = "playwright";
+var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
+var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
+var PLAYWRIGHT_MCP_SERVER = {
+  name: PLAYWRIGHT_SERVER,
+  command: "npx",
+  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
+  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+};
+var BROWSE_MINIMUM_NODE = [22, 19, 0];
+var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var nodeNeed = (minimum) => ({
+  kind: "node",
+  minimum,
+  fix: `install Node.js ${minimum.join(".")} or newer from https://nodejs.org, which ships npx`
+});
 var sameForm = (packages) => ({
   headless: { packages, mcpServers: [] },
   normal: { packages, mcpServers: [] }
@@ -14143,7 +14211,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@tintinweb/pi-subagents"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }],
     health: ["needs", "packages"]
   },
@@ -14156,7 +14224,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["billion-context"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }],
     health: ["needs", "packages"]
   },
@@ -14169,7 +14237,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@juicesharp/rpiv-todo"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"]
   },
@@ -14182,7 +14250,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@juicesharp/rpiv-ask-user-question"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"]
   },
@@ -14195,7 +14263,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@aliou/pi-processes"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"]
   },
@@ -14208,7 +14276,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS },
+    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS, screen: T3_PREVIEW_TOOLS },
     settings: [],
     health: ["needs"]
   },
@@ -14230,8 +14298,47 @@ var CAPABILITIES = [
         content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
       }
     ],
-    tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
+    tools: {
+      rootExclude: COMPUTER_USE_TOOLS,
+      visual: COMPUTER_USE_TOOLS,
+      screen: COMPUTER_USE_TOOLS
+    },
     health: ["needs", "packages"]
+  },
+  {
+    name: "browser-use",
+    feature: "browserUse",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [
+      {
+        kind: "command",
+        command: "npx",
+        fix: "install Node.js from https://nodejs.org, which ships npx"
+      }
+    ],
+    forms: {
+      headless: {
+        packages: [],
+        mcpServers: [PLAYWRIGHT_MCP_SERVER],
+        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
+      },
+      normal: {
+        packages: [],
+        mcpServers: [BROWSE_MCP_SERVER],
+        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        pairing: true
+      }
+    },
+    tools: {
+      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      visual: [],
+      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+    },
+    settings: [],
+    health: ["needs"]
   },
   {
     name: "luna-reserve",
@@ -14243,7 +14350,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs"]
   },
@@ -14257,7 +14364,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs"]
   },
@@ -14276,7 +14383,7 @@ var CAPABILITIES = [
       }
     ],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [
       {
         file: BILLION_CONTEXT_FILE,
@@ -14297,7 +14404,7 @@ var CAPABILITIES = [
     needs: [],
     nativeHosts: FFF_NATIVE_HOSTS,
     forms: sameForm(["@ff-labs/pi-fff"]),
-    tools: { rootExclude: FFF_TOOLS, visual: [] },
+    tools: { rootExclude: FFF_TOOLS, visual: [], screen: [] },
     settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
     health: ["needs", "packages"]
   }
@@ -14306,6 +14413,15 @@ var FEATURE_DEFAULTS = Object.fromEntries(CAPABILITIES.map((capability) => [capa
 var formContent = (capability, form) => {
   const entry = capability.forms[form];
   return "unavailable" in entry ? undefined : entry;
+};
+var screenTools = (capability, form) => {
+  const content = formContent(capability, form);
+  if (content === undefined)
+    return [];
+  const prefix = ({ name }) => `mcp__${name}__`;
+  const own = content.mcpServers.map(prefix);
+  const others = CAPABILITY_FORMS.flatMap((other) => formContent(capability, other)?.mcpServers ?? []).map(prefix).filter((candidate) => !own.includes(candidate));
+  return capability.tools.screen.filter((pattern) => !others.some((candidate) => pattern.startsWith(candidate)));
 };
 var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
   const [first] = formContent(capability, "normal")?.packages ?? [];
@@ -16492,6 +16608,7 @@ var requestLine = (request) => `${JSON.stringify(request)}
 
 var justBashOn = (config) => config.pi.enable && config.pi.features.justBash;
 var justBashEnvironment = (config) => justBashOn(config) ? BILLION_CONTEXT_GUARDRAILS_OFF : {};
+
 import { basename, dirname, isAbsolute, join as join2, relative, resolve as resolve3, sep as sep2 } from "node:path";
 var APPLY_PATCH_TOOL = "apply_patch";
 var APPLY_PATCH_DESCRIPTION = `Edit files with a patch. Put the whole patch in \`input\`:
@@ -16793,14 +16910,22 @@ var PROVIDERS = {
     writeTools: [APPLY_PATCH_TOOL],
     env: {},
     loginFix: "Run /login openai-codex in Pi and sign in with the ChatGPT account that has Codex",
-    webTools: []
+    webTools: [],
+    screenRoute
   }
 };
 var providerProfile = (config) => PROVIDERS[config.pi.provider];
-var routeModel = (config, key) => {
-  const { id } = providerProfile(config);
-  const { model, thinking } = config.pi.routes[key];
-  return { key, provider: id, model, thinking, spec: `${id}/${model}:${thinking}` };
+var routeModel = (config, key, options = {}) => {
+  const profile = providerProfile(config);
+  const row = config.pi.routes[key];
+  const { model, thinking } = options.screen === true && profile.screenRoute !== undefined ? profile.screenRoute(row) : row;
+  return {
+    key,
+    provider: profile.id,
+    model,
+    thinking,
+    spec: `${profile.id}/${model}:${thinking}`
+  };
 };
 var routedModels = (config) => Object.keys(config.pi.routes).map((key) => routeModel(config, key));
 var providerEnv = (config) => providerProfile(config).env;
@@ -16981,6 +17106,10 @@ Criteria cover the mergeability dimensions that apply (behavior, regressions, te
 - a stated repository rule is broken.
 
 Duplication and performance findings carry the severity the specialists' code quality rules give them. A failure already on the base is a baseline, not a regression. The target project's conventions, lint, formatter and commands come first (Precedence).
+
+### The screen capability
+
+Set \`screen: true\` in the draft of an Assignment whose work has to see or drive a screen: a desktop application or native browser chrome (computer use), a page in the user's real browser (browser use), or the page shown in T3 (its preview and HTML render tools). The dispatch then prints an agent whose name ends in \`-screen\`: pass it as printed. That specialist has the computer-use, browser-use and T3 preview tools, and under the Codex provider it runs on GPT-6.1 Terra at medium or higher effort, whatever its role. This is the pi host only. Leave \`screen\` off every other Assignment, because the tools stay out of the specialists that do not need them. <!-- O1: state the result and the context; the method is the specialist's. -->
 
 ### Acceptance
 
@@ -17234,6 +17363,10 @@ Criteria cover the mergeability dimensions that apply (behavior, regressions, te
 
 Duplication and performance findings carry the severity the specialists' code quality rules give them. A failure already on the base is a baseline, not a regression. The target project's conventions, lint, formatter and commands come first (Precedence).
 
+### The screen capability
+
+Set \`screen: true\` in the draft of an Assignment whose work has to see or drive a screen: a desktop application or native browser chrome (computer use), a page in the user's real browser (browser use), or the page shown in T3 (its preview and HTML render tools). The dispatch then prints an agent whose name ends in \`-screen\`: pass it as printed. That specialist has the computer-use, browser-use and T3 preview tools, and under the Codex provider it runs on GPT-6.1 Terra at medium or higher effort, whatever its role. This is the pi host only. Leave \`screen\` off every other Assignment, because the tools stay out of the specialists that do not need them. <!-- K2: the draft says what the specialist needs; the tools follow. -->
+
 ### Acceptance
 
 Proof is command, exit code and counts; long logs sit in files. Judge delegated work from the diff summary and the check output, not the report's claims, and accept nothing as done, nor report it done, without a check run now on the current head (a specialist runs it). Accepted work and its evidence survive follow-ups, resume and compaction; evidence goes stale only when a later change touches what it established, and then only that part is refreshed.
@@ -17457,9 +17590,13 @@ var build = (tools, excludeTools, noMcp, env) => ({
   ]
 });
 var has = (capabilities, capability) => capabilities.includes(capability);
-var toolArgs = (config, key, profile = providerProfile(config)) => {
+var toolArgs = (config, key, profile = providerProfile(config), options = {}) => {
   const { features } = config.pi;
   const enabled = enabledCapabilities(features, { provider: config.pi.provider });
+  const formEnabled = enabledCapabilities(features, {
+    form: options.form ?? "normal",
+    provider: config.pi.provider
+  });
   const noMcp = !features.mcp;
   const env = {
     [CODEMODE_MAX_WORKERS_ENV]: String(config.pi.codemode.maxWorkers),
@@ -17481,7 +17618,8 @@ var toolArgs = (config, key, profile = providerProfile(config)) => {
     ...has(capabilities, "Write") ? [...WRITE_TOOLS, ...profile.writeTools] : [],
     ...has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : [],
     ...has(capabilities, "Search") ? webChoice(profile, features.web).tools : [],
-    ...has(capabilities, "VisualInspection") ? enabled.flatMap((capability) => capability.tools.visual) : []
+    ...has(capabilities, "VisualInspection") ? formEnabled.flatMap((capability) => capability.tools.visual) : [],
+    ...options.screen === true ? formEnabled.flatMap((capability) => screenTools(capability, options.form ?? "normal")).filter((tool) => features.mcp || !tool.startsWith("mcp__")) : []
   ];
   const unique = [...new Set(tools)];
   return build([...unique, CODEMODE_TOOL], [...WRITE_TOOLS, ...profile.writeTools].filter((tool) => !unique.includes(tool)), noMcp, env);
@@ -17493,6 +17631,63 @@ var rootActiveTools = (args, active, registered) => {
     return name.includes("*") ? registered.filter((tool) => toolMatches(name, tool)) : [name];
   });
   return [...new Set([...active, ...added])].filter((tool) => !args.excludeTools.some((pattern) => toolMatches(pattern, tool)));
+};
+
+import { existsSync, readdirSync } from "node:fs";
+import { posix, win32 } from "node:path";
+
+var firstNonEmpty = (...values) => values.find((value) => value !== undefined && value !== "");
+
+var PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
+var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
+var BUILD_EXECUTABLES = {
+  linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
+  darwin: [
+    "chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
+    "chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+  ],
+  win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
+};
+var pathsOf = (platform) => platform === "win32" ? win32 : posix;
+var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
+var inFolder = (folder, platform, exists, list) => {
+  const { join } = pathsOf(platform);
+  const entry = join(folder, "chromium");
+  if (exists(entry))
+    return entry;
+  const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
+  for (const build of builds)
+    for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
+      const path = join(folder, build, ...executable.split("/"));
+      if (exists(path))
+        return path;
+    }
+  return;
+};
+var safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => [])));
+var findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
+  const given = firstNonEmpty(env[PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE]);
+  if (given !== undefined)
+    return given;
+  const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
+  return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
+};
+
+var inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true";
+
+var hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== "");
+var inCi = (env) => {
+  const value = env["CI"]?.trim().toLowerCase();
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+};
+var detectForm = (env, platform = process.platform) => {
+  if (inCloudSession(env))
+    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
+  if (inCi(env))
+    return { form: "headless", source: "detected", reason: "CI is set" };
+  if (!hasDisplay(env, platform))
+    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
+  return { form: "normal", source: "detected", reason: "a graphical session is available" };
 };
 
 var Slug = String4.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
@@ -17818,7 +18013,11 @@ var codexSettings = (config) => {
     family: profile.family,
     contextManagement: contextManagementOn(config),
     lunaReserve: config.pi.features.lunaReserve,
-    applyPatchAgents: RoleTask.literals.flatMap((roleTask) => toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL) ? [routeFor(roleTask).agent] : [])
+    applyPatchAgents: RoleTask.literals.flatMap((roleTask) => toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL) ? [
+      agentFor(routeFor(roleTask), false),
+      agentFor(routeFor(roleTask), true, "normal"),
+      agentFor(routeFor(roleTask), true, "headless")
+    ] : [])
   };
 };
 var fileFailure = (path) => (cause) => new PatchFileError({ path, reason: cause instanceof Error ? cause.message : String(cause) });
@@ -17961,6 +18160,31 @@ var familySkillPaths = (prompt, family, packageRoot, platformPath = nodePath) =>
 };
 
 var SPECIALIST_NAMES = ROUTES.map((route) => route.agent);
+var SCREEN_SPECIALIST_NAMES = ROUTES.flatMap((route) => [
+  agentFor(route, true, "normal"),
+  agentFor(route, true, "headless")
+]);
+var AGENT_TYPES = [...SPECIALIST_NAMES, ...SCREEN_SPECIALIST_NAMES];
+
+var isScreenAgent = (agent) => agent !== undefined && SCREEN_SPECIALIST_NAMES.includes(agent);
+var screenFormOf = (agent) => isHeadlessScreenAgent(agent) ? "headless" : "normal";
+var screenServers = (config, form, chromium) => config.pi.features.mcp ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap((capability) => (formContent(capability, form)?.mcpServers ?? []).map(({ chromiumFlag, ...server }) => chromiumFlag === undefined || chromium === undefined ? server : { ...server, args: [...server.args, chromiumFlag, chromium] })) : [];
+var refuseT3PreviewOutsideT3 = (event, agent, t3) => !t3 && isScreenAgent(agent) && T3_PREVIEW_TOOLS.some((pattern) => toolMatches(pattern, event.toolName)) ? {
+  block: true,
+  reason: `${event.toolName} is T3 Code's tool, and T3 does not host this session. Use the browser tools you were given instead.`
+} : undefined;
+var registerScreenServers = (register, agent, servers) => {
+  if (!isScreenAgent(agent))
+    return { registered: [], failures: [] };
+  const outcomes = servers.map((server) => runSync2(try_2({
+    try: () => register(server.name, { command: server.command, args: [...server.args] }),
+    catch: (cause) => `${server.name}: ${cause instanceof Error ? cause.message : String(cause)}`
+  }).pipe(as2({ name: server.name, failure: undefined }), catch_2((failure) => succeed5({ name: server.name, failure })))));
+  return {
+    registered: outcomes.flatMap(({ name, failure }) => failure === undefined ? [name] : []),
+    failures: outcomes.flatMap(({ failure }) => failure === undefined ? [] : [failure])
+  };
+};
 
 var T3_RUNTIME_MODE_ENV = "T3_PI_RUNTIME_MODE";
 var T3_MCP_URL_ENV = "T3_MCP_URL";
@@ -17994,8 +18218,9 @@ var CODEMODE_TOOL_NAME = "codemode";
 var childAgent = (sessionName) => {
   const at = sessionName?.indexOf("#") ?? -1;
   const agent = at < 0 ? undefined : sessionName?.slice(0, at);
-  return agent !== undefined && SPECIALIST_NAMES.includes(agent) ? agent : undefined;
+  return agent !== undefined && AGENT_TYPES.includes(agent) ? agent : undefined;
 };
+var SPECIALIST_CHOICES = `${SPECIALIST_NAMES.join(", ")} (each also as <name>-screen, or <name>-headless-screen on a headless machine)`;
 var hostEnvironment = (activeTools) => ({
   [HOST_ENV]: "pi",
   [WORKFLOWS_ENV]: activeTools.includes(WORKFLOW_TOOL) && activeTools.includes(CODEMODE_TOOL_NAME) ? "1" : "0"
@@ -18013,14 +18238,14 @@ var refuseNonSpecialist = (event) => {
   if (typeof resume === "string" && resume.trim() !== "")
     return;
   const requested = typeof type === "string" ? type.trim() : "";
-  if (SPECIALIST_NAMES.includes(requested))
+  if (AGENT_TYPES.includes(requested))
     return;
   return {
     block: true,
-    reason: `${requested === "" ? "No agent type given" : `"${requested}" is not a HolyAgent specialist`}. Use one of: ${SPECIALIST_NAMES.join(", ")}.`
+    reason: `${requested === "" ? "No agent type given" : `"${requested}" is not a HolyAgent specialist`}. Use one of: ${SPECIALIST_CHOICES}.`
   };
 };
-var WORKFLOW_SPECIALISTS = new Set(SPECIALIST_NAMES);
+var WORKFLOW_SPECIALISTS = new Set(AGENT_TYPES);
 var INLINE_WORKFLOW_INPUTS = new Set(["script", "args"]);
 var present2 = (value) => typeof value === "string" && value.trim() !== "";
 var refuseNonSpecialistWorkflow = (event) => {
@@ -18029,7 +18254,7 @@ var refuseNonSpecialistWorkflow = (event) => {
   const { script, scriptPath, name } = event.input;
   const refuse = (reason) => ({
     block: true,
-    reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_NAMES.join(", ")}.`
+    reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_CHOICES}.`
   });
   if (Object.keys(event.input).some((key) => !INLINE_WORKFLOW_INPUTS.has(key)))
     return succeed5(refuse("A workflow is run only from an inline `script` and its `args`, with no other input."));
@@ -18119,7 +18344,9 @@ class DeadlineExceeded extends TaggedError2("DeadlineExceeded") {
 var rootExclusions = (configs) => [
   ...new Set(configs.flatMap((config) => toolArgs(config, "root").excludeTools))
 ];
-var settingsFor = (config, role, bound = []) => {
+var settingsFor = (config, role, bound = [], form = "normal", chromium = () => {
+  return;
+}) => {
   const rootArgs = toolArgs(config, "root");
   const codex = codexSettings(config);
   return {
@@ -18127,6 +18354,7 @@ var settingsFor = (config, role, bound = []) => {
     providerEnvironment: providerEnv(config),
     ...codex === undefined ? {} : { codex },
     ...justBashOn(config) ? { justBash: true } : {},
+    ...role === "specialist" ? { screenServers: screenServers(config, form, chromium()) } : {},
     ...role === "root" ? {
       rootPrompt: true,
       tools: {
@@ -18195,6 +18423,7 @@ var joinNotices = (first, second) => {
   const added = second.content.replace(/^holyagent: /, "");
   return first === undefined ? second : first.content.includes(added) ? first : { ...first, content: `${first.content}; ${added}` };
 };
+var joinOptional = (first, second) => second === undefined ? first : joinNotices(first, second);
 var NOT_A_REPOSITORY = /not a git repository/i;
 var SPAWN_FAILURE = /^spawn \S+ E[A-Z0-9]+$/;
 var reasonOf = (result) => {
@@ -18322,6 +18551,10 @@ var createExtension = ({
   const decodeConfig = decodeUnknownEffect2(fromJsonString2(Config), {
     onExcessProperty: "error"
   });
+  const machineForm = () => {
+    const agent = childAgent(pi.getSessionName());
+    return isScreenAgent(agent) ? screenFormOf(agent) : detectForm(env, platform).form;
+  };
   const roleOf = suspend2(() => {
     const flag = isChild() ? "specialist" : pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
     return decodeUnknownEffect2(PiRoleSchema)(flag).pipe(mapError2(() => new UnknownRole({ value: String(flag) })));
@@ -18329,7 +18562,7 @@ var createExtension = ({
   const closedSettings = (config, user) => gen2(function* () {
     const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
     const defaults = yield* defaultConfig;
-    return settingsFor(config ?? defaults, role, boundConfigs(defaults, user));
+    return settingsFor(config ?? defaults, role, boundConfigs(defaults, user), machineForm(), () => findChromium(env));
   }).pipe(orDie2);
   const startingExclusions = gen2(function* () {
     const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
@@ -18368,7 +18601,7 @@ var createExtension = ({
         if (!config.pi.enable) {
           if (user !== undefined && !user.pi.enable)
             return { enabled: false, gatesOff: true };
-          const off = settingsFor(config, yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE)), bound);
+          const off = settingsFor(config, yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE)), bound, machineForm(), () => findChromium(env));
           return {
             enabled: false,
             ...off.rootPrompt === undefined ? {} : { rootPrompt: off.rootPrompt },
@@ -18376,7 +18609,7 @@ var createExtension = ({
           };
         }
         const role = yield* roleOf;
-        configured = settingsFor(config, role, bound);
+        configured = settingsFor(config, role, bound, machineForm(), () => findChromium(env));
         const status = yield* holyagent(signal, project, "status").pipe(flatMap2((text) => parseOutput("status", text)));
         const reconcile = RECONCILED.has(reason) ? yield* holyagent(signal, project, "reconcile").pipe(flatMap2((text) => parseOutput("reconcile", text))) : undefined;
         const directory = yield* fromResult2(folder);
@@ -18467,6 +18700,13 @@ var createExtension = ({
     }).pipe(catch_2((error) => succeed5(error.cause instanceof Error ? error.cause.message : "it failed"))));
     return reason === undefined ? undefined : notice(`apply_patch could not be activated (${reason}); change files with write and edit instead`);
   };
+  const registerScreen = (servers) => {
+    const agent = childAgent(pi.getSessionName());
+    if (isScreenAgent(agent) && servers.length === 0)
+      return notice("no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing");
+    const { failures } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, servers);
+    return failures.length === 0 ? undefined : notice(`an MCP server of the screen capability was not registered (${failures.join("; ")}); work without its tools and report that they are missing`);
+  };
   const gather = (taken, ctx, reason) => {
     taken.current?.abort();
     const own = new AbortController;
@@ -18500,7 +18740,9 @@ var createExtension = ({
       if (!taken.started && result?.enabled !== false) {
         taken.started = true;
         if (result?.codex !== undefined)
-          taken.applyPatchNotice = activateApplyPatch(result.codex);
+          taken.specialistNotice = activateApplyPatch(result.codex);
+        if (result?.screenServers !== undefined)
+          taken.specialistNotice = joinOptional(taken.specialistNotice, registerScreen(result.screenServers));
         if (result?.config !== undefined)
           startProviderCheck(taken, result.config);
         if (result?.tools !== undefined) {
@@ -18542,7 +18784,7 @@ var createExtension = ({
       probe: undefined,
       readiness: undefined,
       setupNotice: undefined,
-      applyPatchNotice: undefined
+      specialistNotice: undefined
     };
     return gather(held, ctx, event.reason);
   });
@@ -18581,9 +18823,9 @@ ${event.systemPrompt}` : undefined;
   pi.on("before_agent_start", noticeOnce("setupNotice"));
   pi.on("before_agent_start", noticeOnce("readiness"));
   pi.on("before_agent_start", () => {
-    const message = held?.applyPatchNotice;
+    const message = held?.specialistNotice;
     if (held !== undefined)
-      held.applyPatchNotice = undefined;
+      held.specialistNotice = undefined;
     return message === undefined ? undefined : { message };
   });
   pi.on("before_agent_start", () => {
@@ -18600,7 +18842,7 @@ ${event.systemPrompt}` : undefined;
     return message === undefined ? undefined : { message };
   });
   pi.registerToolRenderer(workflowRenderers);
-  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : refuseExcludedTool(event, held?.excluded ?? []) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
+  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : refuseExcludedTool(event, held?.excluded ?? []) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
   pi.on("session_shutdown", () => release());
   registerCodex(pi, {
     settings: () => held?.codex,

@@ -8,7 +8,7 @@ import { Effect } from "effect"
 import { Type } from "typebox"
 
 import type { Config } from "../../../runtime/src/config/schema.ts"
-import { RoleTask, routeFor } from "../../../runtime/src/domain/route.ts"
+import { agentFor, RoleTask, routeFor } from "../../../runtime/src/domain/route.ts"
 import type { PiFamily } from "../../../runtime/src/instructions/families.ts"
 import {
   APPLY_PATCH_DESCRIPTION,
@@ -68,7 +68,11 @@ export const codexSettings = (config: Config): CodexSettings | undefined => {
     lunaReserve: config.pi.features.lunaReserve,
     applyPatchAgents: RoleTask.literals.flatMap((roleTask) =>
       toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL)
-        ? [routeFor(roleTask).agent]
+        ? [
+            agentFor(routeFor(roleTask), false),
+            agentFor(routeFor(roleTask), true, "normal"),
+            agentFor(routeFor(roleTask), true, "headless"),
+          ]
         : [],
     ),
   }

@@ -4,13 +4,27 @@ import { join } from "node:path"
 import { Effect, Schema } from "effect"
 
 import {
+  BROWSE_MCP_SERVER,
+  BROWSE_TOOLS,
   CAPABILITIES,
   type CapabilityDefinition,
   capabilityPackages,
+  COMPUTER_USE_TOOLS,
   enabledCapabilities,
   FEATURE_DEFAULTS,
   FEATURE_PACKAGES,
+  formContent,
+  formNeeds,
   managedCapabilityPackages,
+  NPM_REGISTRY,
+  npxServerArgs,
+  PLAYWRIGHT_MCP_SERVER,
+  PLAYWRIGHT_PACKAGE,
+  PLAYWRIGHT_TOOLS,
+  screenTools,
+  serversWithheld,
+  T3_PREVIEW_TOOLS,
+  T3_VISUAL_TOOLS,
   unavailableIn,
 } from "../../src/config/capabilities.ts"
 import { piPackages } from "../../src/config/packages.ts"
@@ -40,7 +54,7 @@ const SYNTHETIC: CapabilityDefinition = {
     headless: { packages: ["pi-web-kit"], mcpServers: [] },
     normal: { packages: ["billion-context", "pi-web-kit"], mcpServers: [] },
   },
-  tools: { rootExclude: [], visual: [] },
+  tools: { rootExclude: [], visual: [], screen: [] },
   settings: [],
   health: ["packages"],
 }
@@ -101,13 +115,14 @@ describe("the capability registry", () => {
     expect(file).toEqual(written)
     const config = await Effect.runPromise(Schema.decodeUnknownEffect(Config)(written))
     // Only the keys a later release added (the Codex provider's Luna Reserve and context_management,
-    // the just-bash shell and fff) take their default.
+    // the just-bash shell, fff and browser use) take their default.
     expect(config.pi.features).toEqual({
       ...written.pi.features,
       lunaReserve: true,
       contextManagement: true,
       justBash: true,
       fff: true,
+      browserUse: true,
     })
     const unknown = Schema.decodeUnknownEffect(ConfigFile, { onExcessProperty: "error" })({
       pi: { features: { notACapability: true } },
@@ -287,5 +302,141 @@ describe("registry-driven tool settings", () => {
     expect(toolSettings(withFeatures({ computerUse: false }))).not.toContainEqual(patch)
     expect(files(withFeatures({ subagents: false }))).not.toContain("~/.pi/agent/subagents.json")
     expect(files(DEFAULT_CONFIG, "headless")).toContain("~/.pi/agent/subagents.json")
+  })
+})
+
+describe("the browser-use capability entry", () => {
+  const entry = CAPABILITIES.find((capability) => capability.name === "browser-use")
+  if (entry === undefined) throw new Error("the registry has no browser-use capability")
+
+  test("is on by default for the specialists, with browse in the normal form and Playwright in the headless one", () => {
+    expect(entry).toMatchObject({
+      feature: "browserUse",
+      defaultOn: true,
+      applicability: "specialists",
+      skills: [],
+      settings: [],
+    })
+    const needsOf = (form: "headless" | "normal") =>
+      (formContent(entry, form)?.needs ?? []).map((need) =>
+        need.kind === "node" ? need.minimum : need.kind,
+      )
+    expect(entry.forms.normal).toMatchObject({
+      packages: [],
+      mcpServers: [BROWSE_MCP_SERVER],
+      pairing: true,
+    })
+    expect(needsOf("normal")).toEqual(["display", [22, 19, 0]])
+    expect(entry.forms.headless).toMatchObject({
+      packages: [],
+      mcpServers: [PLAYWRIGHT_MCP_SERVER],
+    })
+    expect(needsOf("headless")).toEqual([[18, 0, 0]])
+    expect(entry.forms.headless).not.toHaveProperty("pairing")
+    expect(DEFAULT_CONFIG.pi.features.browserUse).toBe(true)
+  })
+
+  test("the headless server is the pinned Playwright MCP server, headless, isolated and on Chromium", () => {
+    expect(PI_PACKAGE_VERSIONS[PLAYWRIGHT_PACKAGE]).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(PLAYWRIGHT_MCP_SERVER).toEqual({
+      name: "playwright",
+      command: "npx",
+      args: [
+        "--registry=https://registry.npmjs.org/",
+        "--@playwright:registry=https://registry.npmjs.org/",
+        "-y",
+        `@playwright/mcp@${PI_PACKAGE_VERSIONS[PLAYWRIGHT_PACKAGE]}`,
+        "--headless",
+        "--isolated",
+        "--browser",
+        "chromium",
+      ],
+      chromiumFlag: "--executable-path",
+    })
+  })
+
+  test("every npx launch of a screen MCP server passes the public registry, for the scope and for the rest", () => {
+    const servers = CAPABILITIES.flatMap((capability) =>
+      (["headless", "normal"] as const).flatMap(
+        (form) => formContent(capability, form)?.mcpServers ?? [],
+      ),
+    )
+    expect(servers.map(({ name }) => name).toSorted()).toEqual(["browse", "playwright"])
+    for (const server of servers) {
+      expect(server.command).toBe("npx")
+      // Before the package, so npx reads them as its own options and not the package's.
+      const package_ = server.args.findIndex((argument) => /^@[^/]+\/[^@]+@/.test(argument))
+      expect(server.args.slice(0, package_)).toContain(`--registry=${NPM_REGISTRY}`)
+      const scope = /^(@[^/]+)\//.exec(server.args[package_] ?? "")?.[1]
+      expect(server.args.slice(0, package_)).toContain(`--${scope}:registry=${NPM_REGISTRY}`)
+    }
+    expect(NPM_REGISTRY).toBe("https://registry.npmjs.org/")
+    // The arguments of a package that is not scoped get only the plain one.
+    expect(npxServerArgs("pi-web-kit", ["x"])).toEqual([
+      "--registry=https://registry.npmjs.org/",
+      "-y",
+      `pi-web-kit@${PI_PACKAGE_VERSIONS["pi-web-kit"]}`,
+      "x",
+    ])
+  })
+
+  test("needs npx in both forms and a graphical session in the normal form only", () => {
+    expect(entry.needs.map((need) => (need.kind === "command" ? need.command : need.kind))).toEqual(
+      ["npx"],
+    )
+    expect(formNeeds(entry, "normal").map(({ kind }) => kind)).toEqual([
+      "command",
+      "display",
+      "node",
+    ])
+    expect(formNeeds(entry, "headless").map(({ kind }) => kind)).toEqual(["command", "node"])
+    expect(entry.health).toEqual(["needs"])
+  })
+
+  test("grants the server's tools of the form to a screen Assignment, never both, and keeps them from the root", () => {
+    expect(entry.tools).toEqual({
+      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      visual: [],
+      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+    })
+    expect(screenTools(entry, "normal")).toEqual(BROWSE_TOOLS)
+    expect(screenTools(entry, "headless")).toEqual(PLAYWRIGHT_TOOLS)
+    expect(PLAYWRIGHT_TOOLS).toEqual(["mcp__playwright__browser_*"])
+    // The capabilities that have no server keep their screen tools whatever the form.
+    const computerUse = CAPABILITIES.find(({ name }) => name === "computer-use")
+    const mcp = CAPABILITIES.find(({ name }) => name === "mcp")
+    expect(computerUse && screenTools(computerUse, "normal")).toEqual(COMPUTER_USE_TOOLS)
+    expect(computerUse && screenTools(computerUse, "headless")).toEqual([])
+    for (const form of ["headless", "normal"] as const)
+      expect(mcp && screenTools(mcp, form)).toEqual(T3_PREVIEW_TOOLS)
+  })
+
+  test("its servers are withheld, with the reason, only while the MCP extension is off", () => {
+    for (const form of ["headless", "normal"] as const) {
+      expect(serversWithheld(entry, form, { mcp: true })).toBeUndefined()
+      expect(serversWithheld(entry, form, { mcp: false })).toContain("pi.features.mcp is off")
+    }
+    // A capability that adds no server has nothing withheld.
+    const todo = CAPABILITIES.find(({ name }) => name === "todo")
+    expect(todo && serversWithheld(todo, "normal", { mcp: false })).toBeUndefined()
+  })
+
+  test("loads no Pi package in either form: the server runs through npx at the pin", () => {
+    for (const form of ["headless", "normal"] as const)
+      expect(capabilityPackages({ browserUse: true }, form)).toEqual([])
+    expect(managedCapabilityPackages()).not.toContain("@opencode/browse")
+    expect(managedCapabilityPackages()).not.toContain("@playwright/mcp")
+  })
+
+  test("only computer use, browser use and T3's preview tools are granted by the screen capability", () => {
+    expect(
+      CAPABILITIES.filter((capability) => capability.tools.screen.length > 0).map(
+        (capability) => capability.name,
+      ),
+    ).toEqual(["mcp", "computer-use", "browser-use"])
+    expect(CAPABILITIES.flatMap((capability) => capability.tools.screen).toSorted()).toEqual(
+      [...T3_PREVIEW_TOOLS, ...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS].toSorted(),
+    )
+    for (const tool of T3_PREVIEW_TOOLS) expect(T3_VISUAL_TOOLS).toContain(tool)
   })
 })

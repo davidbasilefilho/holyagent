@@ -57,7 +57,7 @@ const setProjectConfig = (config: unknown) =>
 
 const withPi = () =>
   fakeShell({
-    commands: ["bun", "ctx7", "pi", "node"],
+    commands: ["bun", "ctx7", "pi", "node", "npx"],
     respond: (line) =>
       line === "pi --version"
         ? { stdout: `${PI_HOST_VERSION}\n` }
@@ -148,7 +148,8 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(toolLines(report)).toContain(
       `+ tool settings ${globalSubagents()}: added disableDefaultAgents true, fallbackSubagent "none"`,
     )
-    expect(shell.calls).toEqual([])
+    // Only the version of Node.js, which the browse need of browser use reads.
+    expect(shell.calls.map((call) => call.line)).toEqual(["node --version"])
   })
 
   test("a second run changes nothing and says so", async () => {

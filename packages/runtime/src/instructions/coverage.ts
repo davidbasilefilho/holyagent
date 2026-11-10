@@ -87,6 +87,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
     "R-VISUAL": {
       section: "skills/visual-judging/SKILL.md",
       phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
@@ -350,6 +351,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
     "R-LEAN": {
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",
@@ -651,6 +653,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
     "R-LEAN": {
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",

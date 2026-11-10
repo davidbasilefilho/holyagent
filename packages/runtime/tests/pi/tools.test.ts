@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { BROWSE_TOOLS, PLAYWRIGHT_TOOLS, T3_PREVIEW_TOOLS } from "../../src/config/capabilities.ts"
 import { piPackages } from "../../src/config/packages.ts"
 import type { Config } from "../../src/config/schema.ts"
 import { RoleTask, routeFor } from "../../src/domain/route.ts"
@@ -138,28 +139,46 @@ describe("toolArgs for the root", () => {
   test("adds codemode to the default selection and takes write, edit, computer use and web away", () => {
     expect(toolArgs(DEFAULT_CONFIG, "root")).toEqual({
       tools: ["+codemode"],
-      excludeTools: ["write", "edit", ...COMPUTER_USE_TOOLS, ...FFF_TOOLS, ...MOONSHOT],
+      excludeTools: [
+        "write",
+        "edit",
+        ...COMPUTER_USE_TOOLS,
+        ...BROWSE_TOOLS,
+        ...PLAYWRIGHT_TOOLS,
+        ...FFF_TOOLS,
+        ...MOONSHOT,
+      ],
       noMcp: false,
       env: { PI_CODEMODE_MAX_WORKERS: "4", ...BILLION_CONTEXT_GUARDRAILS_OFF },
       argv: [
         "--tools",
         "+codemode",
         "--exclude-tools",
-        "write,edit,computer_use_*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
+        "write,edit,computer_use_*,mcp__browse__*,mcp__playwright__browser_*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
       ],
     })
   })
 
   test("excludes the computer-use tools only while pi.features.computerUse is on", () => {
-    const on = toolArgs(withFeatures({ computerUse: true, fff: false, web: "off" }), "root")
-    const off = toolArgs(withFeatures({ computerUse: false, fff: false, web: "off" }), "root")
+    const on = toolArgs(
+      withFeatures({ computerUse: true, fff: false, browserUse: false, web: "off" }),
+      "root",
+    )
+    const off = toolArgs(
+      withFeatures({ computerUse: false, fff: false, browserUse: false, web: "off" }),
+      "root",
+    )
     expect(on.excludeTools).toEqual(["write", "edit", ...COMPUTER_USE_TOOLS])
     expect(off.excludeTools).toEqual(["write", "edit"])
   })
 
   test("excludes the tools of the web choice: pi-web-kit, the provider's, or none", () => {
     const exclusions = (web: Config["pi"]["features"]["web"], profile?: ProviderProfile) =>
-      toolArgs(withFeatures({ computerUse: false, fff: false, web }), "root", profile).excludeTools
+      toolArgs(
+        withFeatures({ computerUse: false, fff: false, browserUse: false, web }),
+        "root",
+        profile,
+      ).excludeTools
     expect(exclusions("pi-web-kit")).toEqual(["write", "edit", ...WEB_KIT])
     expect(exclusions("provider", PROVIDERS["kimi-coding-global"])).toEqual([
       "write",
@@ -171,8 +190,14 @@ describe("toolArgs for the root", () => {
   })
 
   test("excludes the tools fff's override mode registers only while pi.features.fff is on, and never from a specialist", () => {
-    const on = toolArgs(withFeatures({ fff: true, computerUse: false, web: "off" }), "root")
-    const off = toolArgs(withFeatures({ fff: false, computerUse: false, web: "off" }), "root")
+    const on = toolArgs(
+      withFeatures({ fff: true, computerUse: false, browserUse: false, web: "off" }),
+      "root",
+    )
+    const off = toolArgs(
+      withFeatures({ fff: false, computerUse: false, browserUse: false, web: "off" }),
+      "root",
+    )
     expect(on.excludeTools).toEqual(["write", "edit", ...FFF_TOOLS])
     expect(off.excludeTools).toEqual(["write", "edit"])
     for (const role of RoleTask.literals)
@@ -572,5 +597,118 @@ describe("the T3 Code tools the root keeps off", () => {
       "mcp__t3-code__delegate_task",
       "mcp__t3_code__schedule_task",
     ])
+  })
+})
+
+describe("toolArgs with the screen capability", () => {
+  const SCREEN = [...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS, ...T3_PREVIEW_TOOLS]
+  const T3_DEVICE = "mcp__t3*code__device_*"
+
+  test("a specialist of any role gets the computer-use, browse and T3 preview tools after its own", () => {
+    for (const role of RoleTask.literals) {
+      const plain = toolArgs(DEFAULT_CONFIG, role).tools
+      const screen = toolArgs(DEFAULT_CONFIG, role, undefined, { screen: true }).tools
+      const added = screen.filter((tool) => !plain.includes(tool))
+      // The visual roles already have computer use and T3's tools; the others gain every one.
+      const visual = routeFor(role).capabilities.includes("VisualInspection")
+      expect(added.toSorted(), role).toEqual((visual ? BROWSE_TOOLS : SCREEN).toSorted())
+      for (const tool of SCREEN) expect(screen, role).toContain(tool)
+      expect(screen.at(-1), role).toBe("codemode")
+      // Only the screen tools differ, and the write tools stay as the role decides.
+      expect(
+        screen.filter((tool) => plain.includes(tool)),
+        role,
+      ).toEqual([...plain])
+    }
+  })
+
+  test("an Assignment without it gets none of them beyond what a visual role always had", () => {
+    for (const role of RoleTask.literals) {
+      const plain = toolArgs(DEFAULT_CONFIG, role).tools
+      const visual = routeFor(role).capabilities.includes("VisualInspection")
+      expect(
+        plain.some((tool) => BROWSE_TOOLS.includes(tool)),
+        role,
+      ).toBe(false)
+      expect(
+        plain.some((tool) => COMPUTER_USE_TOOLS.includes(tool)),
+        role,
+      ).toBe(visual)
+      expect(
+        plain.some((tool) => T3_PREVIEW_TOOLS.includes(tool)),
+        role,
+      ).toBe(visual)
+      expect(plain, role).toEqual(
+        toolArgs(DEFAULT_CONFIG, role, undefined, { screen: false }).tools,
+      )
+    }
+  })
+
+  test("T3's device tools are not part of it", () => {
+    expect(
+      toolArgs(DEFAULT_CONFIG, "Worker.implementation", undefined, { screen: true }).tools,
+    ).not.toContain(T3_DEVICE)
+  })
+
+  test("a capability that is off, or whose switch is off, adds none of its tools", () => {
+    const tools = (features: Partial<Config["pi"]["features"]>) =>
+      toolArgs(withFeatures(features), "Worker.implementation", undefined, { screen: true }).tools
+    expect(tools({ computerUse: false })).not.toContain("computer_use_*")
+    expect(tools({ browserUse: false })).not.toContain("mcp__browse__*")
+    expect(tools({ mcp: false }).some((tool) => tool.startsWith("mcp__t3"))).toBe(false)
+    // The MCP servers run in Pi's MCP extension, so their tools need it on.
+    expect(tools({ mcp: false }).some((tool) => tool.startsWith("mcp__"))).toBe(false)
+    expect(tools({ mcp: false })).toContain("computer_use_*")
+    expect(tools({ mcp: true })).toContain("mcp__browse__*")
+  })
+
+  test("the headless form grants the Playwright tools and no computer-use or browse tool, whatever the role", () => {
+    for (const role of RoleTask.literals) {
+      const screen = toolArgs(DEFAULT_CONFIG, role, undefined, {
+        screen: true,
+        form: "headless",
+      }).tools
+      for (const tool of [...PLAYWRIGHT_TOOLS, ...T3_PREVIEW_TOOLS])
+        expect(screen, role).toContain(tool)
+      expect(
+        screen.some((tool) => BROWSE_TOOLS.includes(tool)),
+        role,
+      ).toBe(false)
+      // Not even a visual role, whose own tools they are in the normal form: a headless machine has
+      // no desktop.
+      expect(
+        screen.some((tool) => COMPUTER_USE_TOOLS.includes(tool)),
+        role,
+      ).toBe(false)
+    }
+  })
+
+  test("the normal form grants browse and no Playwright tool, and is the default", () => {
+    const normal = toolArgs(DEFAULT_CONFIG, "Worker.implementation", undefined, {
+      screen: true,
+      form: "normal",
+    }).tools
+    expect(normal).toEqual(
+      toolArgs(DEFAULT_CONFIG, "Worker.implementation", undefined, { screen: true }).tools,
+    )
+    for (const tool of BROWSE_TOOLS) expect(normal).toContain(tool)
+    expect(normal.some((tool) => PLAYWRIGHT_TOOLS.includes(tool))).toBe(false)
+  })
+
+  test("without the capability the form changes nothing but a visual role's computer-use tools", () => {
+    for (const role of RoleTask.literals) {
+      const normal = toolArgs(DEFAULT_CONFIG, role).tools
+      const headless = toolArgs(DEFAULT_CONFIG, role, undefined, { form: "headless" }).tools
+      expect(headless, role).toEqual(normal.filter((tool) => !COMPUTER_USE_TOOLS.includes(tool)))
+    }
+  })
+
+  test("the root takes no screen tools: it excludes them whether or not the option is passed", () => {
+    expect(toolArgs(DEFAULT_CONFIG, "root", undefined, { screen: true })).toEqual(
+      toolArgs(DEFAULT_CONFIG, "root"),
+    )
+    const { excludeTools } = toolArgs(DEFAULT_CONFIG, "root")
+    for (const tool of [...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS])
+      expect(excludeTools).toContain(tool)
   })
 })

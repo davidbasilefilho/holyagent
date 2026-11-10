@@ -49,7 +49,7 @@ describe("the Luna Reserve capability entry", () => {
       settings: [],
       skills: [],
     })
-    expect(entry?.tools).toEqual({ rootExclude: [], visual: [] })
+    expect(entry?.tools).toEqual({ rootExclude: [], visual: [], screen: [] })
     expect(entry?.forms.headless).toEqual({ packages: [], mcpServers: [] })
     expect(DEFAULT_CONFIG.pi.features.lunaReserve).toBe(true)
   })
@@ -83,7 +83,7 @@ describe("the context_management capability entry", () => {
       settings: [],
       skills: [],
     })
-    expect(entry?.tools).toEqual({ rootExclude: [], visual: [] })
+    expect(entry?.tools).toEqual({ rootExclude: [], visual: [], screen: [] })
     expect(entry?.forms.headless).toEqual({ packages: [], mcpServers: [] })
     expect(DEFAULT_CONFIG.pi.features.contextManagement).toBe(true)
   })

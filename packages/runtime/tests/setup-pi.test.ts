@@ -9,6 +9,7 @@ import {
   CAPABILITIES,
   type CapabilityDefinition,
   FEATURE_PACKAGES,
+  formNeeds,
 } from "../src/config/capabilities.ts"
 import { piPackages } from "../src/config/packages.ts"
 import { PI_PACKAGE_VERSIONS, piPackageSource } from "../src/config/pi-packages.ts"
@@ -24,7 +25,13 @@ import {
 } from "../src/setup/pi-check.ts"
 import { staleManagedNames } from "../src/setup/pi-install.ts"
 import { setup } from "../src/setup/steps.ts"
-import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
+import {
+  BROWSE_LAST_SEEN_TEXT,
+  fakeShell,
+  scratch,
+  writeBrowsePairing,
+  writeCompleteSettings,
+} from "./setup-fixture.ts"
 
 let home: string
 let project: string
@@ -36,6 +43,7 @@ beforeEach(async () => {
   project = join(made.directory, "project")
   await mkdir(project, { recursive: true })
   await writeCompleteSettings(join(home, ".claude"))
+  await writeBrowsePairing(home)
   remove = made.remove
 })
 afterEach(() => remove())
@@ -56,6 +64,8 @@ const FULL = () => ({ packages: [SOURCE, ...DEFAULT_SOURCES] })
 /** The line for the provider package, the one package no capability owns. */
 const BASE_OK = "ok   pi base packages: 1 packages listed at their pins"
 const FORM_OK = "ok   pi form: normal"
+/** The pairing line of a home with the fixture browser paired. */
+const BROWSE_PAIRING_OK = `ok   pi capability browser-use pairing: 1 browser paired with browse (the extension is installed): Chrome, last seen ${BROWSE_LAST_SEEN_TEXT}`
 /** The line of each capability in the default config when its package is listed (the normal form). */
 const CAPABILITY_LINES_OK = [
   "ok   pi capability subagents: normal form, root, 1 package listed at its pin",
@@ -65,6 +75,8 @@ const CAPABILITY_LINES_OK = [
   "ok   pi capability processes: normal form, root, 1 package listed at its pin",
   "ok   pi capability mcp: normal form, both, nothing to install",
   "ok   pi capability computer-use: normal form, specialists, 1 package listed at its pin",
+  "ok   pi capability browser-use: normal form, specialists, nothing to install",
+  BROWSE_PAIRING_OK,
   "ok   pi capability just-bash: normal form, both, nothing to install",
   "ok   pi capability fff: normal form, specialists, 1 package listed at its pin",
 ]
@@ -79,7 +91,7 @@ const setProjectConfig = (config: unknown) =>
 /** A fake shell where `pi`, `node` and `bun` are installed and print the given versions. */
 const shellWith = (
   versions: { readonly pi?: string; readonly node?: string } = {},
-  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node"],
+  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx"],
 ) =>
   fakeShell({
     commands,
@@ -125,7 +137,8 @@ describe("holyagent doctor, Pi checks", () => {
       `ok   pi package: listed in ${globalSettings()}`,
       ...PI_LINES_OK,
     ])
-    expect(shell.lines()).toEqual(["pi --version", "node --version"])
+    // The second `node --version` is the browse need (Node.js 22.19 or newer) of browser use.
+    expect(shell.lines()).toEqual(["pi --version", "node --version", "node --version"])
   })
 
   test("report each missing part with the command that fixes it, and install nothing even with --fix", async () => {
@@ -140,15 +153,36 @@ describe("holyagent doctor, Pi checks", () => {
         `FAIL pi base package pi-provider-kimi-code: not listed at ${DEFAULT_SOURCES[0]} in the packages of ${globalSettings()}; install it with \`pi install ${DEFAULT_SOURCES[0]}\`, or re-run \`holyagent setup\``,
         FORM_OK,
         // The default provider is Kimi, so a capability of the Codex provider is not listed.
-        ...CAPABILITIES.filter((capability) => !("provider" in capability)).map((capability) => {
-          // A capability with no package of its own has nothing to list.
-          if (capability.name === "mcp" || capability.name === "just-bash")
-            return `ok   pi capability ${capability.name}: normal form, both, nothing to install`
-          const source = piPackageSource(
-            FEATURE_PACKAGES[capability.feature as keyof typeof FEATURE_PACKAGES],
-          )
-          return `FAIL pi capability ${capability.name}: ${source} is not listed in the packages of ${globalSettings()}; install it with \`pi install ${source}\`, or re-run \`holyagent setup\``
-        }),
+        ...CAPABILITIES.filter((capability) => !("provider" in capability)).flatMap(
+          (capability) => {
+            // A capability with no package of its own has nothing to list.
+            if (capability.name === "mcp" || capability.name === "just-bash")
+              return [
+                `ok   pi capability ${capability.name}: normal form, both, nothing to install`,
+              ]
+            // Browse needs npx and Node.js, which this shell lacks; its pairing is read from the home
+            // directory.
+            if (capability.name === "browser-use")
+              return [
+                `FAIL pi capability browser-use: ${formNeeds(capability, "normal")
+                  .flatMap((need) =>
+                    need.kind === "command"
+                      ? [`needs ${need.command} on PATH; ${need.fix}`]
+                      : need.kind === "node"
+                        ? [`needs Node.js ${need.minimum.join(".")} or newer on PATH; ${need.fix}`]
+                        : [],
+                  )
+                  .join("; ")}`,
+                BROWSE_PAIRING_OK,
+              ]
+            const source = piPackageSource(
+              FEATURE_PACKAGES[capability.feature as keyof typeof FEATURE_PACKAGES],
+            )
+            return [
+              `FAIL pi capability ${capability.name}: ${source} is not listed in the packages of ${globalSettings()}; install it with \`pi install ${source}\`, or re-run \`holyagent setup\``,
+            ]
+          },
+        ),
       ])
       expect(shell.calls).toEqual([])
     }
@@ -440,10 +474,14 @@ describe("holyagent doctor, capabilities", () => {
     expect(piLines(report).slice(3)).toEqual([
       BASE_OK,
       "ok   pi form: headless (set by --form headless)",
-      ...CAPABILITY_LINES_OK.map((line) =>
+      ...CAPABILITY_LINES_OK.flatMap((line) =>
         line.includes("computer-use")
-          ? "~ pi capability computer-use: not offered in the headless form (it drives a graphical session and this machine has none); nothing is expected of it"
-          : line.replace("normal form", "headless form"),
+          ? [
+              "~ pi capability computer-use: not offered in the headless form (it drives a graphical session and this machine has none); nothing is expected of it",
+            ]
+          : line.includes("browser-use pairing")
+            ? []
+            : [line.replace("normal form", "headless form")],
       ),
     ])
   })
@@ -463,6 +501,8 @@ describe("holyagent doctor, capabilities", () => {
       "FAIL pi capability processes",
       "ok   pi capability mcp",
       "ok   pi capability computer-use",
+      "ok   pi capability browser-use",
+      "ok   pi capability browser-use pairing",
       "ok   pi capability just-bash",
       "ok   pi capability fff",
     ])
@@ -496,7 +536,7 @@ describe("holyagent doctor, capabilities", () => {
         headless: { packages: [], mcpServers: [] },
         normal: { packages: ["pi-web-kit"], mcpServers: [] },
       },
-      tools: { rootExclude: [], visual: [] },
+      tools: { rootExclude: [], visual: [], screen: [] },
       settings: [],
       health: ["needs", "packages"],
     }

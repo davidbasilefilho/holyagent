@@ -17,6 +17,7 @@ import { Text } from "@earendil-works/pi-tui"
 import { Cause, Data, Effect, Exit, Fiber, Schema } from "effect"
 
 import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
+import type { CapabilityForm, McpServer } from "../../../runtime/src/config/capabilities.ts"
 import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
@@ -47,12 +48,21 @@ import {
   toolArgs,
   toolMatches,
 } from "../../../runtime/src/pi/tools.ts"
+import { findChromium } from "../../../runtime/src/setup/chromium.ts"
+import { detectForm } from "../../../runtime/src/setup/form.ts"
 import { STATE_DIRECTORY } from "../../../runtime/src/state/layout.ts"
 import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { familyAgentPrompt, familySkillPaths } from "./families.ts"
-import { SPECIALIST_NAMES } from "./specialists.ts"
+import {
+  isScreenAgent,
+  refuseT3PreviewOutsideT3,
+  registerScreenServers,
+  screenFormOf,
+  screenServers,
+} from "./screen.ts"
+import { AGENT_TYPES, SPECIALIST_NAMES } from "./specialists.ts"
 import {
   belowFullAccess,
   isT3Session,
@@ -111,16 +121,21 @@ export const WORKFLOW_TOOL = "SubagentWorkflow"
 export const CODEMODE_TOOL_NAME = "codemode"
 
 /**
- * The name of the specialist a session is, or undefined for any other session. The package names a
- * child's session `<agent>#<first 8 characters of its id>` before it binds the child's extensions,
- * so the name is readable when the child's `session_start` fires. A session name a user chose does
- * not count unless it names a specialist and has the `#`.
+ * The name of the specialist a session is, or undefined for any other session: one of the 18, or
+ * its `-screen` variant. The package names a child's session `<agent>#<first 8 characters of its
+ * id>` before it binds the child's extensions, so the name is readable when the child's
+ * `session_start` fires. A session name a user chose does not count unless it names a specialist
+ * and has the `#`.
  */
 export const childAgent = (sessionName: string | undefined): string | undefined => {
   const at = sessionName?.indexOf("#") ?? -1
   const agent = at < 0 ? undefined : sessionName?.slice(0, at)
-  return agent !== undefined && SPECIALIST_NAMES.includes(agent) ? agent : undefined
+  return agent !== undefined && AGENT_TYPES.includes(agent) ? agent : undefined
 }
+
+// What the refusals list as the agents a launch may name: the 18 specialists, each also under the
+// name a screen Assignment is dispatched to.
+const SPECIALIST_CHOICES = `${SPECIALIST_NAMES.join(", ")} (each also as <name>-screen, or <name>-headless-screen on a headless machine)`
 
 /**
  * The variables the `holyagent` calls of the root need: the host (`pi`) and whether workflows are
@@ -164,12 +179,12 @@ export const fillPackageRoot = (
 ): string => prompt.replaceAll(PI_ROOT_PLACEHOLDER, () => toPosix(packageRoot, platformPath.sep))
 
 /**
- * Refuses an `Agent` call whose `subagent_type` is not one of the 18 specialists. The package's
- * settings already stop its own agents and the fallback, but an agent file in the project's
- * `.pi/agents` outranks a package's, so the model could still launch a type that has the wrong
- * prompt and tools. A resume names an existing agent, so its type is not checked. The call's
- * `model` and `thinking` are left as given: they come per call by design. Returns the `tool_call`
- * result that blocks the call, or undefined to let it run.
+ * Refuses an `Agent` call whose `subagent_type` is not one of the 18 specialists or its `-screen`
+ * variant. The package's settings already stop its own agents and the fallback, but an agent file
+ * in the project's `.pi/agents` outranks a package's, so the model could still launch a type that
+ * has the wrong prompt and tools. A resume names an existing agent, so its type is not checked. The
+ * call's `model` and `thinking` are left as given: they come per call by design. Returns the
+ * `tool_call` result that blocks the call, or undefined to let it run.
  */
 export const refuseNonSpecialist = (event: {
   readonly toolName: string
@@ -179,14 +194,14 @@ export const refuseNonSpecialist = (event: {
   const { resume, subagent_type: type } = event.input
   if (typeof resume === "string" && resume.trim() !== "") return undefined
   const requested = typeof type === "string" ? type.trim() : ""
-  if (SPECIALIST_NAMES.includes(requested)) return undefined
+  if (AGENT_TYPES.includes(requested)) return undefined
   return {
     block: true,
-    reason: `${requested === "" ? "No agent type given" : `"${requested}" is not a HolyAgent specialist`}. Use one of: ${SPECIALIST_NAMES.join(", ")}.`,
+    reason: `${requested === "" ? "No agent type given" : `"${requested}" is not a HolyAgent specialist`}. Use one of: ${SPECIALIST_CHOICES}.`,
   }
 }
 
-const WORKFLOW_SPECIALISTS: ReadonlySet<string> = new Set(SPECIALIST_NAMES)
+const WORKFLOW_SPECIALISTS: ReadonlySet<string> = new Set(AGENT_TYPES)
 
 // The inputs of an inline workflow call; any other key (a scriptPath, a saved name, ...) makes the
 // package run something the script check did not read.
@@ -197,14 +212,14 @@ const present = (value: unknown): value is string =>
 
 /**
  * Refuses a `SubagentWorkflow` call unless every `agent()` call of its script names one of the 18
- * specialists by a string-literal `agentType`. Without an `agentType` the package starts its own
- * `general-purpose` agent with every tool, and settings cannot switch that off on this path, so the
- * script is read before it runs, with the runtime's check of the Claude `Workflow` tool (the script
- * must be plain, see `workflow-check.ts`) in its Pi mode, which parses the meta fragment and the
- * program the package runs. Only an inline `script` can be read here: a `scriptPath` or a saved
- * `name` is refused, since the file may change before the package reads it. A refusal never asks
- * for confirmation. Returns the `tool_call` result that blocks the call, or undefined to let it
- * run.
+ * specialists, or its `-screen` variant, by a string-literal `agentType`. Without an `agentType`
+ * the package starts its own `general-purpose` agent with every tool, and settings cannot switch
+ * that off on this path, so the script is read before it runs, with the runtime's check of the
+ * Claude `Workflow` tool (the script must be plain, see `workflow-check.ts`) in its Pi mode, which
+ * parses the meta fragment and the program the package runs. Only an inline `script` can be read
+ * here: a `scriptPath` or a saved `name` is refused, since the file may change before the package
+ * reads it. A refusal never asks for confirmation. Returns the `tool_call` result that blocks the
+ * call, or undefined to let it run.
  */
 export const refuseNonSpecialistWorkflow = (event: {
   readonly toolName: string
@@ -214,7 +229,7 @@ export const refuseNonSpecialistWorkflow = (event: {
   const { script, scriptPath, name } = event.input
   const refuse = (reason: string): ToolCallEventResult => ({
     block: true,
-    reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_NAMES.join(", ")}.`,
+    reason: `${reason} Start only HolyAgent specialists, by a string-literal agentType: ${SPECIALIST_CHOICES}.`,
   })
   if (Object.keys(event.input).some((key) => !INLINE_WORKFLOW_INPUTS.has(key)))
     return Effect.succeed(
@@ -444,6 +459,12 @@ interface Collected {
    * `environment`; every session reads it, since the root and the specialists both have `bash`.
    */
   readonly justBash?: true
+  /**
+   * The MCP servers a screen specialist registers (see `registerScreenServers`), present for a
+   * specialist once the config is read and `pi.enable` is on: those of the capabilities the form of
+   * the machine offers.
+   */
+  readonly screenServers?: ReadonlyArray<McpServer>
   /** True for the root once the config is read and `pi.enable` is on: it gets the root prompt. */
   readonly rootPrompt?: true
   /** The root's tool selection, present for the root once the config is read and `pi.enable` is on. */
@@ -509,10 +530,11 @@ interface Held {
    */
   setupNotice: Delivery | undefined
   /**
-   * What a specialist is told on its first run when `apply_patch` could not be activated for it,
-   * until that run delivers it. A specialist has no other notice channel.
+   * What a specialist is told on its first run when a tool it was granted could not be set up
+   * (`apply_patch` not activated, an MCP server of the screen capability not registered), until
+   * that run delivers it. A specialist has no other notice channel.
    */
-  applyPatchNotice: Delivery | undefined
+  specialistNotice: Delivery | undefined
 }
 
 /**
@@ -526,14 +548,17 @@ const rootExclusions = (configs: ReadonlyArray<Config>): ReadonlyArray<string> =
 
 /**
  * What a config decides for a session of `role`: the worker cap and the provider's variables for
- * every role, and for the root also its prompt and its tool selection. The root's exclusions are
- * those of `config` and of `bound`, the configs whose exclusions it keeps whatever `config` says
- * (the defaults and the user's).
+ * every role, for a specialist the MCP servers of the screen capability in the machine's `form`
+ * (`chromium` finds the Chromium the machine provides for the headless one), and for the root also
+ * its prompt and its tool selection. The root's exclusions are those of `config` and of `bound`,
+ * the configs whose exclusions it keeps whatever `config` says (the defaults and the user's).
  */
 const settingsFor = (
   config: Config,
   role: PiRole,
   bound: ReadonlyArray<Config> = [],
+  form: CapabilityForm = "normal",
+  chromium: () => string | undefined = () => undefined,
 ): Collected => {
   const rootArgs = toolArgs(config, "root")
   const codex = codexSettings(config)
@@ -542,6 +567,7 @@ const settingsFor = (
     providerEnvironment: providerEnv(config),
     ...(codex === undefined ? {} : { codex }),
     ...(justBashOn(config) ? { justBash: true as const } : {}),
+    ...(role === "specialist" ? { screenServers: screenServers(config, form, chromium()) } : {}),
     ...(role === "root"
       ? {
           rootPrompt: true,
@@ -760,6 +786,12 @@ const joinNotices = (first: Delivery | undefined, second: Delivery): Delivery =>
       ? first
       : { ...first, content: `${first.content}; ${added}` }
 }
+
+// Joins two notices of which either may be absent.
+const joinOptional = (
+  first: Delivery | undefined,
+  second: Delivery | undefined,
+): Delivery | undefined => (second === undefined ? first : joinNotices(first, second))
 
 // What `git rev-parse` says, with exit 128, outside a repository.
 const NOT_A_REPOSITORY = /not a git repository/i
@@ -995,6 +1027,14 @@ export const createExtension =
       onExcessProperty: "error",
     })
 
+    // The form of the machine, from its environment alone, as setup and doctor detect it; a screen
+    // specialist takes the form of the agent file it was launched from instead, so its servers and
+    // its tools agree.
+    const machineForm = (): CapabilityForm => {
+      const agent = childAgent(pi.getSessionName())
+      return isScreenAgent(agent) ? screenFormOf(agent) : detectForm(env, platform).form
+    }
+
     // The session's role: a child the package launched is a specialist whatever the flag says, since
     // the flag defaults to the root in every Pi session and a child has no launch line of its own.
     const roleOf = Effect.suspend(() => {
@@ -1015,7 +1055,13 @@ export const createExtension =
       Effect.gen(function* () {
         const role = yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE))
         const defaults = yield* defaultConfig
-        return settingsFor(config ?? defaults, role, boundConfigs(defaults, user))
+        return settingsFor(
+          config ?? defaults,
+          role,
+          boundConfigs(defaults, user),
+          machineForm(),
+          () => findChromium(env),
+        )
       }).pipe(Effect.orDie)
 
     // The root's exclusions before any config is known: the defaults', so a run in flight while a
@@ -1103,6 +1149,8 @@ export const createExtension =
               config,
               yield* roleOf.pipe(Effect.orElseSucceed((): PiRole => DEFAULT_PI_ROLE)),
               bound,
+              machineForm(),
+              () => findChromium(env),
             )
             return {
               enabled: false,
@@ -1111,7 +1159,7 @@ export const createExtension =
             } satisfies Collected
           }
           const role = yield* roleOf
-          configured = settingsFor(config, role, bound)
+          configured = settingsFor(config, role, bound, machineForm(), () => findChromium(env))
           // Status first, then reconcile: for a project that keeps state, status makes the state
           // worktree that the next calls read.
           const status = yield* holyagent(signal, project, "status").pipe(
@@ -1315,6 +1363,30 @@ export const createExtension =
           )
     }
 
+    // The MCP servers of the screen capability go into the session of a screen specialist only (see
+    // `registerScreenServers`): Pi starts the servers of every session, so the root and the other
+    // specialists would start one they never call. Servers registered while a session starts
+    // connect right away. A server that cannot be registered is told to the specialist on its
+    // first run, which then has none of that server's tools.
+    const registerScreen = (servers: ReadonlyArray<McpServer>): Delivery | undefined => {
+      const agent = childAgent(pi.getSessionName())
+      // No server for a screen specialist: `pi.features.mcp` or the capability is off, so tell it.
+      if (isScreenAgent(agent) && servers.length === 0)
+        return notice(
+          "no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing",
+        )
+      const { failures } = registerScreenServers(
+        (name, server) => pi.registerMcpServer(name, server),
+        agent,
+        servers,
+      )
+      return failures.length === 0
+        ? undefined
+        : notice(
+            `an MCP server of the screen capability was not registered (${failures.join("; ")}); work without its tools and report that they are missing`,
+          )
+    }
+
     // A newer collection stops the older one, and the result of a stopped one is dropped: nobody
     // reads it, and a session that ended has nothing to be told. The root's tools and provider
     // checks belong to a session's start, so they run once, from the first collection that ends:
@@ -1347,7 +1419,12 @@ export const createExtension =
         if (result?.justBash === true) bash.enable(ctx.cwd)
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
-          if (result?.codex !== undefined) taken.applyPatchNotice = activateApplyPatch(result.codex)
+          if (result?.codex !== undefined) taken.specialistNotice = activateApplyPatch(result.codex)
+          if (result?.screenServers !== undefined)
+            taken.specialistNotice = joinOptional(
+              taken.specialistNotice,
+              registerScreen(result.screenServers),
+            )
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
           if (result?.tools !== undefined) {
             const notApplied = applyRootTools(result.tools, taken.t3)
@@ -1388,7 +1465,7 @@ export const createExtension =
         probe: undefined,
         readiness: undefined,
         setupNotice: undefined,
-        applyPatchNotice: undefined,
+        specialistNotice: undefined,
       }
       return gather(held, ctx, event.reason)
     })
@@ -1473,10 +1550,11 @@ export const createExtension =
       }
     pi.on("before_agent_start", noticeOnce("setupNotice"))
     pi.on("before_agent_start", noticeOnce("readiness"))
-    // Only a specialist ever has this notice (the root's `apply_patch` is never activated).
+    // Only a specialist ever has this notice (the root's `apply_patch` is never activated, and no
+    // server of the screen capability is registered for it).
     pi.on("before_agent_start", (): BeforeAgentStartEventResult | undefined => {
-      const message = held?.applyPatchNotice
-      if (held !== undefined) held.applyPatchNotice = undefined
+      const message = held?.specialistNotice
+      if (held !== undefined) held.specialistNotice = undefined
       return message === undefined ? undefined : { message }
     })
 
@@ -1508,6 +1586,7 @@ export const createExtension =
         ? undefined
         : (refuseExcludedTool(event, held?.excluded ?? []) ??
           (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
+          refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ??
           Effect.runPromise(
             refuseNonSpecialistWorkflow(event).pipe(
               Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),

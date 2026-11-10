@@ -9,6 +9,8 @@ import {
   type CapabilityForm,
   enabledCapabilities,
   formContent,
+  formNeeds,
+  serversWithheld,
   type SystemNeed,
   unavailableIn,
 } from "../config/capabilities.ts"
@@ -17,6 +19,7 @@ import { piPackages } from "../config/packages.ts"
 import { piPackageSource } from "../config/pi-packages.ts"
 import type { Config } from "../config/schema.ts"
 import { stateDirectory } from "../state/layout.ts"
+import { describeBrowseState, readBrowseState } from "./browse.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice, hasDisplay } from "./form.ts"
@@ -359,15 +362,37 @@ const checkBasePackages = (
   )
 }
 
-/** The reason a system need is not met on this machine, or `undefined` when it is. */
-const unmetNeed = (env: Env, need: SystemNeed) =>
+/**
+ * The reason a system need is not met on this machine, or `undefined` when it is. The `platform`
+ * (the machine's by default) decides the graphical-session need, which only a Unix desktop without
+ * `DISPLAY` or `WAYLAND_DISPLAY` fails ({@link hasDisplay}).
+ */
+export const unmetNeed = (env: Env, need: SystemNeed, platform: string = process.platform) =>
   Effect.gen(function* () {
     if (need.kind === "display")
-      return hasDisplay(env)
+      return hasDisplay(env, platform)
         ? undefined
         : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)"
+    if (need.kind === "node") return yield* unmetNode(env, need)
     const found = yield* (yield* Shell).which(need.command)
     return Option.isSome(found) ? undefined : `needs ${need.command} on PATH; ${need.fix}`
+  })
+
+// Node.js on PATH at the need's minimum release or newer, read from `node --version`.
+const unmetNode = (env: Env, need: Extract<SystemNeed, { readonly kind: "node" }>) =>
+  Effect.gen(function* () {
+    const shell = yield* Shell
+    const found = yield* shell.which("node")
+    const minimum = need.minimum.join(".")
+    if (Option.isNone(found)) return `needs Node.js ${minimum} or newer on PATH; ${need.fix}`
+    const result = yield* shell.run("node", ["--version"], { cwd: homeDirectory(env) })
+    const release =
+      result.exitCode === 0 ? releaseIn(`${result.stdout}\n${result.stderr}`) : undefined
+    if (release === undefined)
+      return `needs Node.js ${minimum} or newer, and ${found.value} did not report a version for --version (exit ${result.exitCode}); ${need.fix}`
+    return compareReleases(release, need.minimum) < 0
+      ? `needs Node.js ${minimum} or newer, but ${found.value} is ${release.join(".")}; ${need.fix}`
+      : undefined
   })
 
 /**
@@ -375,10 +400,10 @@ const unmetNeed = (env: Env, need: SystemNeed) =>
  * the capability does not offer, or a host its native library does not cover, is a `~` line saying
  * why and that nothing is expected (never a failure, since a headless machine is not broken, nor is
  * one without a native build, where Pi keeps its own tools). Otherwise the probes of its `health`
- * run: `needs` checks each system need ({@link
- * SystemNeed}), `packages` that each package of the
+ * run: `needs` checks each system need ({@link SystemNeed}) and `packages` that each package of the
  * form is listed at its pin in the files that count; every problem is named in one `FAIL` line, and
- * a healthy capability is one `ok` line with its form and whom it applies to.
+ * a healthy capability is one `ok` line with its form and whom it applies to. The `pairing` probe
+ * has a line of its own ({@link checkPairing}).
  */
 export const checkCapability = (
   env: Env,
@@ -397,7 +422,7 @@ export const checkCapability = (
     const content = formContent(capability, form)
     const problems: Array<string> = []
     if (capability.health.includes("needs")) {
-      for (const need of capability.needs) {
+      for (const need of formNeeds(capability, form)) {
         const unmet = yield* unmetNeed(env, need)
         if (unmet !== undefined) problems.push(unmet)
       }
@@ -421,6 +446,51 @@ export const checkCapability = (
   })
 
 /**
+ * Doctor's line on the pairing of a capability whose form drives a paired browser (opencode browse,
+ * `pairing` in its normal form), or none for any other form. A browser paired with browse is an
+ * `ok` line naming it: its extension is installed and paired. Otherwise a `~` line, not a failure
+ * (the first run of a machine is in that state until the person adds the extension to their
+ * browser), that says whether the extension is installed in a browser but not paired or not
+ * installed at all ({@link readBrowseState}), with the next step for each. A pairing file that
+ * cannot be read is a `FAIL` line.
+ */
+export const checkPairing = (
+  env: Env,
+  capability: CapabilityDefinition,
+  form: CapabilityForm,
+  platform?: string,
+) =>
+  Effect.gen(function* () {
+    if (unavailableIn(capability, form, platform) !== undefined) return []
+    if (formContent(capability, form)?.pairing !== true) return []
+    const name = `pi capability ${capability.name} pairing`
+    const found = yield* readBrowseState(env, platform).pipe(
+      Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
+    )
+    if (found instanceof SetupFailure) return [fail(name, found.message)]
+    const { text, fix } = describeBrowseState(found)
+    return found.state === "paired"
+      ? [pass(name, text)]
+      : [hint(`${name}: ${text}${fix === undefined ? "" : `; ${fix}`}`)]
+  })
+
+/**
+ * Doctor's note when a capability's MCP servers are not registered because `pi.features.mcp` is off
+ * ({@link serversWithheld}): a `~` line, since the person switched it off, and none otherwise.
+ */
+export const checkServers = (
+  capability: CapabilityDefinition,
+  form: CapabilityForm,
+  config: Config,
+) => {
+  const reason =
+    unavailableIn(capability, form) === undefined
+      ? serversWithheld(capability, form, config.pi.features)
+      : undefined
+  return reason === undefined ? [] : [hint(`pi capability ${capability.name}: ${reason}`)]
+}
+
+/**
  * Doctor's lines on the capabilities: the form in force ({@link describeForm}), then one line for
  * each enabled capability of the config in registry order ({@link checkCapability}). A disabled
  * capability has no line.
@@ -437,9 +507,16 @@ const checkCapabilities = (
     const files = piPresenceFiles(env, cwd, scope)
     const lines = yield* Effect.forEach(
       enabledCapabilities(config.pi.features, { provider: config.pi.provider }),
-      (capability) => checkCapability(env, scope, capability, choice.form, listed, files),
+      (capability) =>
+        Effect.gen(function* () {
+          return [
+            yield* checkCapability(env, scope, capability, choice.form, listed, files),
+            ...(yield* checkPairing(env, capability, choice.form)),
+            ...checkServers(capability, choice.form, config),
+          ]
+        }),
     )
-    return [pass("pi form", describeForm(choice)), ...lines]
+    return [pass("pi form", describeForm(choice)), ...lines.flat()]
   })
 
 /**

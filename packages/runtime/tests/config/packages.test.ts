@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
-import { FEATURE_PACKAGES } from "../../src/config/capabilities.ts"
+import {
+  BROWSE_PACKAGE,
+  FEATURE_PACKAGES,
+  PLAYWRIGHT_PACKAGE,
+} from "../../src/config/capabilities.ts"
 import { piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
 import {
   PI_PACKAGE_VERSIONS,
@@ -104,8 +108,12 @@ describe("piPackages order and pi.enable", () => {
 describe("the pin table", () => {
   const named = ALL_NAMES.toSorted()
 
-  test("pins exactly the packages the integration can enable, each to an exact stable release", () => {
-    expect(Object.keys(PI_PACKAGE_VERSIONS).toSorted()).toEqual(named)
+  test("pins exactly the packages the integration can enable and the MCP servers of browser use (opencode browse and Playwright), each to an exact stable release", () => {
+    // Pi installs neither: each MCP server runs its package through npx at the pin, so they are in
+    // the table for the updater and in no list of Pi packages.
+    expect(Object.keys(PI_PACKAGE_VERSIONS).toSorted()).toEqual(
+      [...named, BROWSE_PACKAGE, PLAYWRIGHT_PACKAGE].toSorted(),
+    )
     for (const version of Object.values(PI_PACKAGE_VERSIONS))
       expect(version).toMatch(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)
   })

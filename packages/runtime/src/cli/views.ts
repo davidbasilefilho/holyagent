@@ -51,6 +51,7 @@ export const assignmentView = (assignment: Assignment) =>
     dependsOn: assignment.dependencies,
     independentFrom: assignment.independentFrom,
     followUpOf: assignment.followUpOf,
+    screen: assignment.screen,
     agent: assignment.specialist?.agentId,
     startedAt: assignment.specialist?.startedAt,
     finishedAt: assignment.specialist?.finishedAt,

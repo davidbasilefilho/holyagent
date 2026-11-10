@@ -16,8 +16,8 @@ const choice = (model: string, thinking: Thinking): RouteChoice => ({ model, thi
  * The default route table of the Codex provider, as the maintainer approved it: the root on Sol at
  * high; the light specialists (map, lookup, validation, mechanical, operations and the audit) on
  * Luna from low to high, never `xhigh`; every other specialist on Terra from medium to `xhigh`, the
- * visual ones and computer use included. An Assignment that uses the screen capability runs on
- * Terra at medium or above, which the later capability applies.
+ * visual ones and computer use included. An Assignment that carries the screen capability runs on
+ * Terra at medium or above ({@link screenRoute}).
  */
 export const CODEX_ROUTES: Readonly<Record<RouteKey, RouteChoice>> = {
   // plans, decides and makes the final pass
@@ -58,4 +58,33 @@ export const CODEX_ROUTES: Readonly<Record<RouteKey, RouteChoice>> = {
   "Reviewer.security": choice(TERRA, "xhigh"),
   // judges instruction text against its requirements
   "Reviewer.artifact": choice(TERRA, "medium"),
+}
+
+/** The lowest reasoning level a screen Assignment runs at under Codex. */
+export const SCREEN_MINIMUM_THINKING: Thinking = "medium"
+
+// The reasoning levels from the least to the most; a record, so a level added to `Thinking` fails
+// the type-check here until it has a rank.
+const THINKING_RANK: Readonly<Record<Thinking, number>> = {
+  off: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  high: 4,
+  xhigh: 5,
+  max: 6,
+}
+
+/**
+ * The route of an Assignment that carries the screen capability, from the route-table row of its
+ * role: GPT-6.1 Terra whatever the role (it sees the screen; the light specialists' Luna does not
+ * run these Assignments), at the row's reasoning level or {@link SCREEN_MINIMUM_THINKING}, the
+ * higher of the two.
+ */
+export const screenRoute = (row: RouteChoice): RouteChoice => {
+  const higher =
+    THINKING_RANK[row.thinking] >= THINKING_RANK[SCREEN_MINIMUM_THINKING]
+      ? row.thinking
+      : SCREEN_MINIMUM_THINKING
+  return choice(TERRA, higher)
 }

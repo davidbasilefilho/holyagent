@@ -3407,6 +3407,22 @@ var FFF_NATIVE_HOSTS = [
   "android-arm64"
 ];
 
+var pi_packages_default = {
+  "pi-provider-kimi-code": "0.6.13",
+  "@tintinweb/pi-subagents": "0.23.1",
+  "billion-context": "0.1.212",
+  "@juicesharp/rpiv-todo": "2.15.0",
+  "@juicesharp/rpiv-ask-user-question": "2.15.0",
+  "@aliou/pi-processes": "0.13.6",
+  "@amaster.ai/pi-computer-use": "0.1.36",
+  "pi-web-kit": "0.5.0",
+  "@ff-labs/pi-fff": "0.11.0",
+  "@opencode/browse": "0.0.15",
+  "@playwright/mcp": "0.0.85"
+};
+
+var PI_PACKAGE_VERSIONS = pi_packages_default;
+
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
 var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
@@ -3416,14 +3432,47 @@ var SUBAGENTS_ONLY_SPECIALISTS = {
 };
 var PI_FFF_FILE = "~/.pi/agent/pi-fff.json";
 var T3_PREFIX = "mcp__t3*code__";
-var T3_VISUAL_TOOLS = [
+var T3_PREVIEW_TOOLS = [
   `${T3_PREFIX}preview_*`,
   `${T3_PREFIX}t3_preview_*`,
   `${T3_PREFIX}html_render`,
-  `${T3_PREFIX}html_preview`,
-  `${T3_PREFIX}device_*`
+  `${T3_PREFIX}html_preview`
 ];
+var T3_VISUAL_TOOLS = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`];
 var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var BROWSE_PACKAGE = "@opencode/browse";
+var BROWSE_SERVER = "browse";
+var BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
+var NPM_REGISTRY = "https://registry.npmjs.org/";
+var npxServerArgs = (name, rest) => [
+  `--registry=${NPM_REGISTRY}`,
+  ...name.startsWith("@") ? [`--${name.slice(0, name.indexOf("/"))}:registry=${NPM_REGISTRY}`] : [],
+  "-y",
+  `${name}@${PI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
+var BROWSE_MCP_SERVER = {
+  name: BROWSE_SERVER,
+  command: "npx",
+  args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
+};
+var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
+var PLAYWRIGHT_SERVER = "playwright";
+var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
+var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
+var PLAYWRIGHT_MCP_SERVER = {
+  name: PLAYWRIGHT_SERVER,
+  command: "npx",
+  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
+  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+};
+var BROWSE_MINIMUM_NODE = [22, 19, 0];
+var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var nodeNeed = (minimum) => ({
+  kind: "node",
+  minimum,
+  fix: `install Node.js ${minimum.join(".")} or newer from https://nodejs.org, which ships npx`
+});
 var sameForm = (packages) => ({
   headless: { packages, mcpServers: [] },
   normal: { packages, mcpServers: [] }
@@ -3438,7 +3487,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@tintinweb/pi-subagents"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [{ file: SUBAGENTS_SETTINGS_FILE, content: SUBAGENTS_ONLY_SPECIALISTS }],
     health: ["needs", "packages"]
   },
@@ -3451,7 +3500,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["billion-context"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [{ file: BILLION_CONTEXT_FILE, content: { pi: { subagents: false } } }],
     health: ["needs", "packages"]
   },
@@ -3464,7 +3513,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@juicesharp/rpiv-todo"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"]
   },
@@ -3477,7 +3526,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@juicesharp/rpiv-ask-user-question"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"]
   },
@@ -3490,7 +3539,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm(["@aliou/pi-processes"]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs", "packages"]
   },
@@ -3503,7 +3552,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS },
+    tools: { rootExclude: [], visual: T3_VISUAL_TOOLS, screen: T3_PREVIEW_TOOLS },
     settings: [],
     health: ["needs"]
   },
@@ -3525,8 +3574,47 @@ var CAPABILITIES = [
         content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
       }
     ],
-    tools: { rootExclude: COMPUTER_USE_TOOLS, visual: COMPUTER_USE_TOOLS },
+    tools: {
+      rootExclude: COMPUTER_USE_TOOLS,
+      visual: COMPUTER_USE_TOOLS,
+      screen: COMPUTER_USE_TOOLS
+    },
     health: ["needs", "packages"]
+  },
+  {
+    name: "browser-use",
+    feature: "browserUse",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+    skills: [],
+    applicability: "specialists",
+    defaultOn: true,
+    needs: [
+      {
+        kind: "command",
+        command: "npx",
+        fix: "install Node.js from https://nodejs.org, which ships npx"
+      }
+    ],
+    forms: {
+      headless: {
+        packages: [],
+        mcpServers: [PLAYWRIGHT_MCP_SERVER],
+        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
+      },
+      normal: {
+        packages: [],
+        mcpServers: [BROWSE_MCP_SERVER],
+        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        pairing: true
+      }
+    },
+    tools: {
+      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      visual: [],
+      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+    },
+    settings: [],
+    health: ["needs"]
   },
   {
     name: "luna-reserve",
@@ -3538,7 +3626,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs"]
   },
@@ -3552,7 +3640,7 @@ var CAPABILITIES = [
     defaultOn: true,
     needs: [],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [],
     health: ["needs"]
   },
@@ -3571,7 +3659,7 @@ var CAPABILITIES = [
       }
     ],
     forms: sameForm([]),
-    tools: { rootExclude: [], visual: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [
       {
         file: BILLION_CONTEXT_FILE,
@@ -3592,7 +3680,7 @@ var CAPABILITIES = [
     needs: [],
     nativeHosts: FFF_NATIVE_HOSTS,
     forms: sameForm(["@ff-labs/pi-fff"]),
-    tools: { rootExclude: FFF_TOOLS, visual: [] },
+    tools: { rootExclude: FFF_TOOLS, visual: [], screen: [] },
     settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
     health: ["needs", "packages"]
   }

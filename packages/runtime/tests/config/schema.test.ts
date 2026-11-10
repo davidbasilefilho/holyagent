@@ -68,6 +68,7 @@ describe("default config", () => {
       contextManagement: true,
       justBash: true,
       fff: true,
+      browserUse: true,
     })
     expect(DEFAULT_CONFIG.pi.codemode).toEqual({ mode: "only", maxWorkers: 4 })
     expect(DEFAULT_CONFIG.pi.t3).toEqual({

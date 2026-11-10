@@ -226,6 +226,55 @@ export const routeFor = (roleTask: RoleTask): Route => ({
   ...SPECS[roleTask],
 })
 
+/**
+ * The end of the agent name of a specialist launched for an Assignment that carries the screen
+ * capability on a machine with a graphical session: `worker-implementation-screen`. The Pi package
+ * ships one such agent file for each specialist, with the screen tools added to its own, since a
+ * launcher can grant tools only through the agent file.
+ */
+export const SCREEN_AGENT_SUFFIX = "-screen"
+
+/**
+ * The end of the agent name of a screen specialist on a headless machine (a cloud session, CI, no
+ * display): `worker-implementation-headless-screen`. Its file lists the headless browser's tools
+ * and no computer-use or browse tools, since the machine has no desktop to drive. It also ends in
+ * {@link SCREEN_AGENT_SUFFIX}.
+ */
+export const HEADLESS_SCREEN_AGENT_SUFFIX = `-headless${SCREEN_AGENT_SUFFIX}`
+
+/**
+ * The form of the machine a screen specialist runs on, which picks the agent file it is launched
+ * as.
+ */
+export type ScreenForm = "headless" | "normal"
+
+/**
+ * The agent name a specialist is launched as: the route's own, or with {@link SCREEN_AGENT_SUFFIX}
+ * (`form` `normal`, the default) or {@link HEADLESS_SCREEN_AGENT_SUFFIX} (`headless`) for an
+ * Assignment that carries the screen capability.
+ */
+export const agentFor = (
+  route: Route,
+  screen: boolean | undefined,
+  form: ScreenForm = "normal",
+): string =>
+  screen === true
+    ? `${route.agent}${form === "headless" ? HEADLESS_SCREEN_AGENT_SUFFIX : SCREEN_AGENT_SUFFIX}`
+    : route.agent
+
+/**
+ * Every agent name an Assignment may be launched as: the route's own, or, with the screen
+ * capability, its name in each form.
+ */
+export const agentsFor = (route: Route, screen: boolean | undefined): ReadonlyArray<string> =>
+  screen === true
+    ? [agentFor(route, true, "normal"), agentFor(route, true, "headless")]
+    : [route.agent]
+
+/** Whether an agent name is a headless screen specialist's ({@link HEADLESS_SCREEN_AGENT_SUFFIX}). */
+export const isHeadlessScreenAgent = (agent: string | undefined): boolean =>
+  agent?.endsWith(HEADLESS_SCREEN_AGENT_SUFFIX) === true
+
 /** The 18 routes, in the order of {@link RoleTask}. */
 export const ROUTES: ReadonlyArray<Route> = RoleTask.literals.map(routeFor)
 
