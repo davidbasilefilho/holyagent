@@ -2,7 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 import { Effect } from "effect"
 
@@ -320,8 +320,8 @@ describe("running the server against a Chromium of its own", () => {
     await run(machine)
     const [chromium, server] = machine.spawned
     expect(chromium?.args).toContain(`--user-data-dir=${join(BASE, "profile")}`)
-    expect(server?.env["BROWSER_USE_CONFIG_DIR"]?.startsWith(`${BASE}/`)).toBe(true)
-    expect(server?.env["BH_HOME"]?.startsWith(`${BASE}/`)).toBe(true)
+    expect(server?.env["BROWSER_USE_CONFIG_DIR"]?.startsWith(`${join(BASE)}${sep}`)).toBe(true)
+    expect(server?.env["BH_HOME"]?.startsWith(`${join(BASE)}${sep}`)).toBe(true)
     expect(machine.events.at(-2)).toBe(`remove ${BASE}`)
   })
 
