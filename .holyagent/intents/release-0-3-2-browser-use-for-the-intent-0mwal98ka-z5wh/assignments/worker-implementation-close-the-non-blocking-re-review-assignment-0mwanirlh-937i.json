@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mwanirlh-937i",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-non-blocking-re-review",
+  "objective": "Close the non-blocking re-review findings on the browser-use launcher and the T3 gate.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-browser-use (branch release/0.3.2/feat/browser-use, head 99a42e1). Items:",
+    "1. T3 gate and specialist mode: isT3Session (packages/integrations/pi/src/t3.ts) needs Pi mode === 'rpc' plus T3_PI_RUNTIME_MODE or T3_MCP_URL, and registerScreen runs in the specialist child. Establish from the source how HolyAgent launches specialist children (which Pi mode, which environment they inherit; look at the specialist launcher and docs/pi/orchestration.md). If a child in a T3-hosted session would not see rpc mode or the T3_* variables, browser-use would run beside T3: make the gate hold for children (for example the root passes an explicit T3-hosted marker to the child it spawns, or the child gate keys on what it reliably inherits), and keep refuseT3PreviewOutsideT3 consistent with it. If the source shows the gate already holds for children, add a test that pins that launch contract and say so with file:line.",
+    "2. packages/runtime/src/setup/chromium.ts:~99: a configured HOLYAGENT_CHROMIUM_PATH (or the old name) that is a bare command name such as `chromium` now fails existsSync. Resolve a bare name with Bun.which before the existence check; a path with a separator still must exist. Tests.",
+    "3. packages/runtime/src/pi/browser-launch.ts allowlist: add XDG_CACHE_HOME, XDG_DATA_HOME and UV_PYTHON_INSTALL_DIR (cache and install locations only; nothing that changes the package or Python download source). Update the allowlist test.",
+    "4. browser-launch.ts: the DevTools timeout message should name the profile directory and say that Chromium never wrote DevToolsActivePort or never answered, so a wrapper that ignores --user-data-dir is diagnosable.",
+    "5. browser-launch.ts win32 branch of stopGroup: skip taskkill when child.exitCode !== null (a reaped pid can be reused on Windows); keep the Unix group signal as is. Test with the fake win32 child.",
+    "6. docs/pi/screen.md 'Security of the headless form': say the environment allowlist stops package-source redirection and keeps keys out of the server process, but is defense in depth only, since browser_exec runs as the same user and can read other processes' environments and the home directory."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Testing is unit tests and fakes only: never start pi, a Pi session, T3 Code, browser-use, uvx or a real Chromium, and make no live Kimi, Codex or OpenAI request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 450 words; put long logs in a file in the scratchpad above and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The T3 gate holds in the specialist children T3-hosted sessions spawn, shown by source and a test",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "A bare Chromium command name resolves through PATH and a missing path still fails",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The allowlist keeps XDG_CACHE_HOME, XDG_DATA_HOME and UV_PYTHON_INSTALL_DIR",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "The DevTools timeout message names the profile and the likely cause",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "On win32 stopGroup does not taskkill a pid whose process already exited",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "docs/pi/screen.md calls the allowlist defense in depth against browser_exec",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwan6ovt-bxgp",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T12:13:33.365Z"
+  },
+  "createdAt": "2026-11-10T12:13:33.365Z"
+}
