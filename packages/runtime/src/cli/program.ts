@@ -13,7 +13,6 @@ import { COMMANDS } from "./commands.ts"
 import { agentHostOf, loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport } from "./context.ts"
 import { describeFailure, Usage } from "./errors.ts"
-import { BUNDLED_TOOLS } from "./tools.ts"
 import { type Call, type Command, type Host, Streamed, Verbatim, WithTrailer } from "./types.ts"
 
 /** What one run prints and the exit code it ends with. */
@@ -81,7 +80,6 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
       text: readReport(host),
       emit,
       vcs: host.vcs ?? vcsLive(root, host.env),
-      tools: host.tools ?? BUNDLED_TOOLS,
       terminal: host.terminal,
       setupTui: host.setupTui,
       input: (schema) => readInput(host, schema, inline),

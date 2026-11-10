@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { BROWSE_TOOLS, PLAYWRIGHT_TOOLS, T3_PREVIEW_TOOLS } from "../../src/config/capabilities.ts"
+import {
+  BROWSE_TOOLS,
+  BROWSER_USE_ALL_TOOLS,
+  BROWSER_USE_TOOLS,
+  T3_PREVIEW_TOOLS,
+} from "../../src/config/capabilities.ts"
 import { piPackages } from "../../src/config/packages.ts"
 import type { Config } from "../../src/config/schema.ts"
 import { RoleTask, routeFor } from "../../src/domain/route.ts"
@@ -144,7 +149,7 @@ describe("toolArgs for the root", () => {
         "edit",
         ...COMPUTER_USE_TOOLS,
         ...BROWSE_TOOLS,
-        ...PLAYWRIGHT_TOOLS,
+        ...BROWSER_USE_ALL_TOOLS,
         ...FFF_TOOLS,
         ...MOONSHOT,
       ],
@@ -154,7 +159,7 @@ describe("toolArgs for the root", () => {
         "--tools",
         "+codemode",
         "--exclude-tools",
-        "write,edit,computer_use_*,mcp__browse__*,mcp__playwright__browser_*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
+        "write,edit,computer_use_*,mcp__browse__*,mcp__browser_use__*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
       ],
     })
   })
@@ -309,7 +314,7 @@ describe("the feature switches and the tool arguments", () => {
       ...T3_VISUAL_TOOLS,
       "codemode",
     ])
-    expect(piPackages(config)).not.toContain("npm:@amaster.ai/pi-computer-use@0.1.36")
+    expect(piPackages(config)).not.toContain("npm:@amaster.ai/pi-computer-use@0.1.38")
   })
 
   test("only the two visual roles get T3 Code and computer-use tools", () => {
@@ -378,19 +383,19 @@ describe("toolSettings", () => {
       },
       {
         file: PI_FFF_FILE,
-        content: { mode: "override", followSymlinks: false },
+        content: { mode: "override" },
         revertWhenOff: true,
       },
     ])
   })
 
-  test("fff puts pi-fff in override mode, without directory links followed, while it is on and its native library covers the host", () => {
+  test("fff puts pi-fff in override mode, leaving followSymlinks unset, while it is on and its native library covers the host", () => {
     const patches = (config: Config, platform?: string) =>
       toolSettings(config, undefined, "normal", platform).filter((p) => p.file === PI_FFF_FILE)
     expect(patches(DEFAULT_CONFIG, "linux-x64")).toEqual([
       {
         file: PI_FFF_FILE,
-        content: { mode: "override", followSymlinks: false },
+        content: { mode: "override" },
         revertWhenOff: true,
       },
     ])
@@ -662,14 +667,16 @@ describe("toolArgs with the screen capability", () => {
     expect(tools({ mcp: true })).toContain("mcp__browse__*")
   })
 
-  test("the headless form grants the Playwright tools and no computer-use or browse tool, whatever the role", () => {
+  test("the headless form grants browser-use's exec and screenshot tools, never its login, and no computer-use or browse tool, whatever the role", () => {
     for (const role of RoleTask.literals) {
       const screen = toolArgs(DEFAULT_CONFIG, role, undefined, {
         screen: true,
         form: "headless",
       }).tools
-      for (const tool of [...PLAYWRIGHT_TOOLS, ...T3_PREVIEW_TOOLS])
+      for (const tool of [...BROWSER_USE_TOOLS, ...T3_PREVIEW_TOOLS])
         expect(screen, role).toContain(tool)
+      expect(screen, role).not.toContain("mcp__browser_use__browser_login")
+      expect(screen, role).not.toContain("mcp__browser_use__*")
       expect(
         screen.some((tool) => BROWSE_TOOLS.includes(tool)),
         role,
@@ -683,7 +690,7 @@ describe("toolArgs with the screen capability", () => {
     }
   })
 
-  test("the normal form grants browse and no Playwright tool, and is the default", () => {
+  test("the normal form grants browse and no browser-use tool, and is the default", () => {
     const normal = toolArgs(DEFAULT_CONFIG, "Worker.implementation", undefined, {
       screen: true,
       form: "normal",
@@ -692,7 +699,7 @@ describe("toolArgs with the screen capability", () => {
       toolArgs(DEFAULT_CONFIG, "Worker.implementation", undefined, { screen: true }).tools,
     )
     for (const tool of BROWSE_TOOLS) expect(normal).toContain(tool)
-    expect(normal.some((tool) => PLAYWRIGHT_TOOLS.includes(tool))).toBe(false)
+    expect(normal.some((tool) => BROWSER_USE_TOOLS.includes(tool))).toBe(false)
   })
 
   test("without the capability the form changes nothing but a visual role's computer-use tools", () => {

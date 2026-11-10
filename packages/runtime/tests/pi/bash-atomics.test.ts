@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { runInNewContext } from "node:vm"
+import { createContext, runInContext } from "node:vm"
 
 import { Effect } from "effect"
 
@@ -14,11 +14,12 @@ const HOST_DIR = dirname(process.execPath)
 const STABLE = Symbol.for("holyagent.stableWaitAsync")
 const atomics: { waitAsync: typeof Atomics.waitAsync; [STABLE]?: true } = Atomics
 
-// The engine's own function, from a fresh realm: an earlier test file in the same process may
-// already have made `Atomics.waitAsync` the wrapper.
-const nativeWaitAsync = (): typeof Atomics.waitAsync =>
-  runInNewContext("Atomics.waitAsync") as typeof Atomics.waitAsync
-
+// The engine's own function, from a realm of its own: an earlier test file in the same process may
+// already have made `Atomics.waitAsync` the wrapper. The realm stays referenced for the whole run:
+// JavaScriptCore collects a realm nothing refers to, and a wait made through its function never
+// settles after that, which hung these tests when a collection ran mid-test.
+const realm = createContext({})
+const nativeWaitAsync = runInContext("Atomics.waitAsync", realm) as typeof Atomics.waitAsync
 const installed = { waitAsync: atomics.waitAsync, stable: atomics[STABLE] }
 let work: string
 
@@ -58,7 +59,7 @@ const endedAfterTurns = async (wait: Wait) => {
 describe("waiting on a shared cell, as just-bash's synchronous bridge does", () => {
   test("a notify that leaves the awaited value in place does not end the wait", async () => {
     const cells = cell(2)
-    const wait = stableWaitAsync(nativeWaitAsync())(cells, 0, 2)
+    const wait = stableWaitAsync(nativeWaitAsync)(cells, 0, 2)
     Atomics.notify(cells, 0)
     expect(await endedAfterTurns(wait)).toBe(false)
     Atomics.notify(cells, 0)
@@ -69,13 +70,13 @@ describe("waiting on a shared cell, as just-bash's synchronous bridge does", () 
   })
 
   test("a wait that finds another value, and a wait with a timeout, are the engine's own", async () => {
-    const wait = stableWaitAsync(nativeWaitAsync())
+    const wait = stableWaitAsync(nativeWaitAsync)
     expect(wait(cell(1), 0, 2)).toEqual({ async: false, value: "not-equal" })
     expect(await pending(wait(cell(2), 0, 2, 5))).toBe("timed-out")
   })
 
   test("a shell run makes every wait in the process ignore a notify that changed nothing", async () => {
-    atomics.waitAsync = nativeWaitAsync()
+    atomics.waitAsync = nativeWaitAsync
     delete atomics[STABLE]
     await Effect.runPromise(
       runShell(

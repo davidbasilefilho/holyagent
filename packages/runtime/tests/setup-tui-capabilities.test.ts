@@ -78,7 +78,7 @@ describe("the setup interface, capability rows", () => {
     })
     // The focus wraps up from the first row to the last (fff), then back through just-bash,
     // auto-review, context-management, luna-reserve and browser-use to computer-use. Browser use
-    // is offered headless (the Playwright server), so only computer use says it is not.
+    // is offered headless (the browser-use server), so only computer use says it is not.
     await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")

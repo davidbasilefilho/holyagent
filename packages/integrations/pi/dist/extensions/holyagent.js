@@ -118,12 +118,17 @@ function memoizeIdempotent(f) {
   };
 }
 
+var errorSiteKeys = ["line", "column", "sourceURL", "originalLine", "originalColumn"];
 var getAllObjectKeys = (obj) => {
   const keys = new Set(Reflect.ownKeys(obj));
   if (obj.constructor === Object)
     return keys;
   if (obj instanceof Error) {
     keys.delete("stack");
+    for (const key of errorSiteKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(obj, key))
+        keys.delete(key);
+    }
   }
   const proto = Object.getPrototypeOf(obj);
   let current = proto;
@@ -843,11 +848,10 @@ var StructuralProto = {
   },
   [symbol2](that) {
     const selfKeys = Object.keys(this);
-    const thatKeys = Object.keys(that);
-    if (selfKeys.length !== thatKeys.length)
+    if (selfKeys.length !== Object.keys(that).length)
       return false;
-    for (let i = 0;i < selfKeys.length; i++) {
-      if (selfKeys[i] !== thatKeys[i] || !equals(this[selfKeys[i]], that[selfKeys[i]])) {
+    for (const key of selfKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
         return false;
       }
     }
@@ -2293,6 +2297,7 @@ class FiberImpl {
     this._children = undefined;
     this._interruptedCause = undefined;
     this._yielded = undefined;
+    this._autoYielded = false;
     this._running = false;
     this._deferredInterrupt = false;
     this._parent = undefined;
@@ -2407,8 +2412,10 @@ class FiberImpl {
     const prevRunning = this._running;
     this._running = true;
     let yielding = false;
+    let resuming = this._autoYielded;
+    this._autoYielded = false;
     let current = effect;
-    this.currentOpCount = 0;
+    this.currentOpCount = resuming ? 1 : 0;
     try {
       while (true) {
         try {
@@ -2418,12 +2425,13 @@ class FiberImpl {
           }
           this.currentOpCount++;
           const cache = this.cache;
-          if (!yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
+          if (!resuming && !yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
             yielding = true;
-            const prev = current;
-            current = flatMap(yieldNow, () => prev);
+            current = this.yieldNow(current, 0, true);
+          } else {
+            resuming = false;
+            current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
           }
-          current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
           if (current === Yield) {
             const yielded = this._yielded;
             if (ExitTypeId in yielded) {
@@ -2480,6 +2488,18 @@ class FiberImpl {
   yieldWith(value) {
     this._yielded = value;
     return Yield;
+  }
+  yieldNow(effect, priority = 0, automatic = false) {
+    let resumed = false;
+    this.currentDispatcher.scheduleTask(() => {
+      if (resumed)
+        return;
+      this._autoYielded = automatic;
+      this.evaluate(effect);
+    }, priority);
+    return this.yieldWith(() => {
+      resumed = true;
+    });
   }
   children() {
     return this._children ??= new Set;
@@ -2623,15 +2643,7 @@ var fromResult = /* @__PURE__ */ match({
 var yieldNowWith = /* @__PURE__ */ makePrimitive({
   op: "Yield",
   [evaluate](fiber) {
-    let resumed = false;
-    fiber.currentDispatcher.scheduleTask(() => {
-      if (resumed)
-        return;
-      fiber.evaluate(exitVoid);
-    }, this[args] ?? 0);
-    return fiber.yieldWith(() => {
-      resumed = true;
-    });
+    return fiber.yieldNow(exitVoid, this[args] ?? 0);
   }
 });
 var yieldNow = /* @__PURE__ */ yieldNowWith(0);
@@ -2875,8 +2887,9 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
         const isWinner = !done;
         done = true;
         resume(exit);
-        if (isWinner && options?.onWinner) {
-          options.onWinner({
+        if (isWinner) {
+          interruptRaceLosers(fibers, parent);
+          options?.onWinner?.({
             fiber,
             index,
             parentFiber: parent
@@ -2886,6 +2899,12 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
     }
   });
 });
+var interruptRaceLosers = (fibers, parent) => {
+  const annotations = fiberStackAnnotations(parent);
+  for (const fiber of fibers) {
+    fiber.interruptUnsafe(parent.id, annotations);
+  }
+};
 var raceFirst = /* @__PURE__ */ dual((args) => isEffect(args[1]), (self, that, options) => raceAllFirst([self, that], options));
 var flatMap = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, andThenCont, f));
 var effectIsExit = (effect) => effect[ExitTypeId] !== undefined;
@@ -3718,6 +3737,22 @@ var fnUntracedEager2 = fnUntracedEager;
 var await_ = fiberAwait;
 var join = fiberJoin;
 
+var decodeNative = (str, decodedLength, options) => {
+  if (str.length < 128)
+    return;
+  const NativeUint8Array = Uint8Array;
+  if (typeof NativeUint8Array.fromBase64 !== "function")
+    return;
+  try {
+    const bytes = NativeUint8Array.fromBase64(str, options);
+    return bytes.length === decodedLength ? bytes : null;
+  } catch {
+    return null;
+  }
+};
+var stripCrlf = (str) => str.indexOf(`
+`) === -1 && str.indexOf("\r") === -1 ? str : str.replace(/[\n\r]/g, "");
+
 var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(input) : input);
 var decode = (str) => {
   const stripped = stripCrlf(str);
@@ -3739,9 +3774,24 @@ var decode = (str) => {
       message: "Found a '=' character, but it is not at the end"
     }));
   }
+  const missingOctets = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+  const decodedLength = 3 * (length / 4) - missingOctets;
+  const native = decodeNative(stripped, decodedLength, undefined);
+  if (native)
+    return succeed2(native);
+  if (native === null) {
+    const invalid = invalidCharacter.exec(stripped);
+    if (invalid !== null) {
+      return fail2(new EncodingError({
+        kind: "Decode",
+        module: "Base64",
+        input: stripped,
+        message: `Invalid character ${invalid[0]}`
+      }));
+    }
+  }
   try {
-    const missingOctets = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
-    const result = new Uint8Array(3 * (length / 4) - missingOctets);
+    const result = new Uint8Array(decodedLength);
     for (let i = 0, j = 0;i < length; i += 4, j += 3) {
       const buffer = getCode(stripped.charCodeAt(i)) << 18 | getCode(stripped.charCodeAt(i + 1)) << 12 | getCode(stripped.charCodeAt(i + 2)) << 6 | getCode(stripped.charCodeAt(i + 3));
       result[j] = buffer >> 16;
@@ -3814,11 +3864,13 @@ var encodeLong = (bytes) => {
   return decoder.decode(result);
 };
 var encoder = /* @__PURE__ */ new TextEncoder;
-var decoder = /* @__PURE__ */ new TextDecoder;
-var stripCrlf = (str) => str.replace(/[\n\r]/g, "");
+var decoder = /* @__PURE__ */ new TextDecoder("utf-8", {
+  ignoreBOM: true
+});
 var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 var alphabetCodes = /* @__PURE__ */ encoder.encode(alphabet);
 var paddingCode = 61;
+var invalidCharacter = /[^A-Za-z0-9+/=]/;
 var codes = /* @__PURE__ */ new Uint8Array(123).fill(255);
 for (let i = 0;i < alphabet.length; i++)
   codes[/* @__PURE__ */ alphabet.charCodeAt(i)] = i;
@@ -3843,10 +3895,13 @@ var getExpected = /* @__PURE__ */ memoize((ast) => {
   return ast.getExpected(getExpected);
 });
 
-var missing = /* @__PURE__ */ Symbol();
+var missing = /* @__PURE__ */ Symbol.for("effect/schema/parser/missing");
 var succeed6 = succeed4;
 var missingExit = /* @__PURE__ */ succeed6(missing);
-var sameExit = /* @__PURE__ */ succeed6(missing);
+var sameExit = /* @__PURE__ */ Object.assign(/* @__PURE__ */ succeed6(missing), {
+  [missing]: true
+});
+var isSameExit = (result) => result[missing] === true;
 var toOption = (value) => value === missing ? none2() : some2(value);
 var fromOptionExit = (option) => option._tag === "None" ? missingExit : succeed6(option.value);
 
@@ -4597,7 +4652,7 @@ function stepArray(s, item, exit, i) {
   if (exit._tag === "Failure") {
     return wrapPropertyKeyIssue(s, s.ast, i, exit);
   }
-  const value = exit === sameExit ? item : exit[args];
+  const value = isSameExit(exit) ? item : exit[args];
   if (value !== missing) {
     s.output[i] = value;
   } else {
@@ -4740,7 +4795,8 @@ var Objects = class extends ASTNodeImpl {
         properties = ast.propertySignatures.map((ps) => ({
           parser: compileField(ps.type),
           name: ps.name,
-          type: ps.type
+          type: ps.type,
+          ownOnly: requiresOwnProperty(ps.name)
         }));
         indexes = indexCount ? ast.indexSignatures.map((is) => ({
           is,
@@ -4756,7 +4812,7 @@ var Objects = class extends ASTNodeImpl {
         if (exitValue._tag === "Failure") {
           return wrapPropertyKeyIssue(s, ast, key, exitValue) ?? void_2;
         }
-        const value = exitValue === sameExit ? inputValue : exitValue[args];
+        const value = isSameExit(exitValue) ? inputValue : exitValue[args];
         if (k2 !== missing && value !== missing) {
           if (hasProperties && (expectedKeys.has(key) || expectedKeys.has(typeof k2 === "number" ? globalThis.String(k2) : k2)))
             return void_2;
@@ -4775,7 +4831,7 @@ var Objects = class extends ASTNodeImpl {
         if (exitKey._tag === "Failure") {
           return wrapPropertyKeyIssue(s, ast, key, exitKey) ?? void_2;
         }
-        const k2 = exitKey === sameExit ? key : exitKey[args];
+        const k2 = isSameExit(exitKey) ? key : exitKey[args];
         const inputValue = s.input[key];
         const result = index.parserValue(inputValue, s.options);
         return effectIsExit(result) ? finishIndex(s, key, k2, inputValue, result) : flatMap2(exit2(result), (exit) => finishIndex(s, key, k2, inputValue, exit));
@@ -4921,13 +4977,13 @@ var Objects = class extends ASTNodeImpl {
         for (let index = 0;index < props.length; index++) {
           const property = props[index];
           const name = property.name;
-          const hasKey = hasPropertySignature(record, name);
+          const hasKey = property.ownOnly ? Object.hasOwn(record, name) : (name in record);
           const value = hasKey ? record[name] : missing;
           const exit = property.parser(value, options);
           if (!effectIsExit(exit)) {
             return resume(state, index, exit);
           }
-          if (exit === sameExit) {
+          if (isSameExit(exit)) {
             if (hasKey)
               assignProperty(out, name, value);
             continue;
@@ -4970,7 +5026,7 @@ function stepProperty(s, p, exit) {
   if (exit._tag === "Failure") {
     return wrapPropertyKeyIssue(s, s.ast, p.name, exit);
   }
-  if (exit === sameExit)
+  if (isSameExit(exit))
     return;
   const value = exit[args];
   if (value !== missing) {
@@ -4993,7 +5049,7 @@ function stepProperty(s, p, exit) {
 }
 var parsePropertiesOptions = {
   onItem(s, p) {
-    if (!hasPropertySignature(s.input, p.name)) {
+    if (!(p.ownOnly ? Object.hasOwn(s.input, p.name) : (p.name in s.input))) {
       return p.parser(missing, s.options);
     }
     const value = s.input[p.name];
@@ -5127,7 +5183,9 @@ function collectSentinels(ast) {
 var candidateIndexCache = /* @__PURE__ */ new WeakMap;
 var emptyCandidates = /* @__PURE__ */ Object.freeze([]);
 var getRuntimeType = (input) => input === null ? "null" : Array.isArray(input) ? "array" : typeof input;
-var hasPropertySignature = (input, key) => key === "__proto__" ? Object.hasOwn(input, key) : (key in input);
+var objectPrototypeKeys = /* @__PURE__ */ new Set(Reflect.ownKeys(Object.prototype)).add("__proto__");
+var requiresOwnProperty = (key) => objectPrototypeKeys.has(typeof key === "number" ? globalThis.String(key) : key);
+var hasPropertySignature = (input, key) => Object.hasOwn(input, key) || (key in input) && !requiresOwnProperty(key);
 function getCandidateIndex(types) {
   let index = candidateIndexCache.get(types);
   if (index)
@@ -5384,10 +5442,8 @@ function parseUnionCandidates(ast, parser, candidates, input, options) {
 }
 function resumeUnion(eff, state) {
   return flatMapEager2(eff, (_) => {
-    if (state.out === sameExit)
-      return succeed5(state.input);
     if (state.out)
-      return state.out;
+      return isSameExit(state.out) ? succeed5(state.input) : state.out;
     return fail5(new AnyOf(state.ast, state.issues ?? [], state.input, state.options));
   });
 }
@@ -5725,7 +5781,7 @@ var toType = /* @__PURE__ */ memoizeIdempotent((ast) => {
     const checks = canPreserveEncodingChecks(ast) ? type.encodingChecks : isArrays(type) || isObjects(type) || isDeclaration(type) && type.typeParameters.length > 0 ? extractStructuralChecks(type.encodingChecks) : undefined;
     return copy(type, {
       encodingChecks: undefined,
-      checks: combineChecks(type.checks, checks)
+      checks: combineChecks(checks, type.checks)
     });
   }
   return type;
@@ -5841,7 +5897,7 @@ function getConstructorDescriptor(ast) {
   return isFunction(getDescriptor) ? getDescriptor(ast.typeParameters) : undefined;
 }
 
-var flatMapTransformation = (result, current, f) => result === sameExit ? f(current) : flatMapEager2(result, f);
+var flatMapTransformation = (result, current, f) => isSameExit(result) ? f(current) : flatMapEager2(result, f);
 function compileTransformation(transformation) {
   const apply = compileTransformationUnsafe(transformation);
   return (result, current, options) => {
@@ -5855,14 +5911,14 @@ function compileTransformation(transformation) {
 function compileTransformationUnsafe(transformation) {
   if (transformation._tag === "Middleware") {
     return (result, current, options) => {
-      const transformed = result === sameExit ? transformation.decode(succeed6(toOption(current)), options) : transformation.decode(mapEager2(result, toOption), options);
+      const transformed = isSameExit(result) ? transformation.decode(succeed6(toOption(current)), options) : transformation.decode(mapEager2(result, toOption), options);
       return fromOptionalEffect(transformed);
     };
   }
   const getter = transformation.decode;
   switch (getter._tag) {
     case "Passthrough":
-      return (result, current) => result === sameExit ? succeed6(current) : result;
+      return (result, current) => isSameExit(result) ? succeed6(current) : result;
     case "Transform": {
       const transform = (value) => value === missing ? missingExit : succeed6(getter.transform(value));
       return (result, current) => flatMapTransformation(result, current, transform);
@@ -5899,11 +5955,11 @@ function withDefault2(ast, parser) {
     const result = defaultValue;
     if (effectIsExit(result) && result._tag === "Success") {
       const local = parser(result[args], options);
-      return local === sameExit ? result : local;
+      return isSameExit(local) ? result : local;
     }
     return flatMapEager2(wrapEncoding(ast, input, options, result), (value) => {
       const local = parser(value, options);
-      return local === sameExit ? succeed6(value) : local;
+      return isSameExit(local) ? succeed6(value) : local;
     });
   };
 }
@@ -5932,7 +5988,7 @@ function compile(ast, compile, compileField, base, specialize) {
       if (encodingChecks && !options.disableChecks) {
         if (effectIsExit(result)) {
           if (result._tag === "Success") {
-            const output = result === sameExit ? input : result[args];
+            const output = isSameExit(result) ? input : result[args];
             if (input !== missing && output !== missing) {
               const issues = collectIssues(encodingChecks, input, undefined, ast, options);
               if (issues) {
@@ -5955,7 +6011,7 @@ function compile(ast, compile, compileField, base, specialize) {
       if (checks && !options.disableChecks) {
         if (effectIsExit(result)) {
           if (result._tag === "Success") {
-            const value = result === sameExit ? input : result[args];
+            const value = isSameExit(result) ? input : result[args];
             if (value === missing)
               return result;
             const issues = collectIssues(checks, value, undefined, ast, options);
@@ -5998,7 +6054,7 @@ function compile(ast, compile, compileField, base, specialize) {
         } else {
           result = flatMapEager2(result, (value) => {
             const nextResult = next(value, options);
-            return nextResult === sameExit ? succeed6(value) : nextResult;
+            return isSameExit(nextResult) ? succeed6(value) : nextResult;
           });
         }
       }
@@ -6006,12 +6062,12 @@ function compile(ast, compile, compileField, base, specialize) {
     if (result._tag === "Success") {
       const value = result[args];
       const local = parseLocal(value, options);
-      return local === sameExit ? result : local;
+      return isSameExit(local) ? result : local;
     }
     result = wrapEncoding(ast, input, options, result);
     return flatMapEager2(result, (value) => {
       const local = parseLocal(value, options);
-      return local === sameExit ? succeed6(value) : local;
+      return isSameExit(local) ? succeed6(value) : local;
     });
   };
 }
@@ -6209,7 +6265,7 @@ function run(ast) {
   return runWithCompiler(normalCompiler, ast);
 }
 function parserResult(result, input) {
-  if (result === sameExit) {
+  if (isSameExit(result)) {
     return succeed5(input);
   }
   if (!effectIsExit(result)) {
@@ -6221,7 +6277,7 @@ function runWithCompiler(compiler, ast) {
   let parser;
   return (input, options) => {
     const result = (parser ??= compiler(ast))(input, options ?? defaultParseOptions);
-    if (result === sameExit) {
+    if (isSameExit(result)) {
       return succeed5(input);
     }
     if (!effectIsExit(result)) {
@@ -14069,47 +14125,6 @@ var workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS, host = "claude"
   catch: (cause) => `cannot read the script: ${String(cause)}`
 }).pipe(catch_2((reason) => succeed5(reason)));
 
-var CODEX_PROVIDER_ID = "openai-codex";
-var SOL = "gpt-6.1-sol";
-var TERRA = "gpt-6.1-terra";
-var LUNA = "gpt-6-luna";
-var choice = (model, thinking) => ({ model, thinking });
-var CODEX_ROUTES = {
-  root: choice(SOL, "high"),
-  "Explorer.map": choice(LUNA, "low"),
-  "Explorer.lookup": choice(LUNA, "low"),
-  "Explorer.trace": choice(TERRA, "medium"),
-  "Librarian.lookup": choice(LUNA, "low"),
-  "Librarian.research": choice(TERRA, "medium"),
-  "Worker.mechanical": choice(LUNA, "medium"),
-  "Worker.implementation": choice(TERRA, "high"),
-  "Worker.integration": choice(TERRA, "medium"),
-  "Worker.operations": choice(LUNA, "medium"),
-  "Worker.validation": choice(LUNA, "low"),
-  "Worker.debugging": choice(TERRA, "xhigh"),
-  "Worker.visual": choice(TERRA, "high"),
-  "Reviewer.visual": choice(TERRA, "high"),
-  "Reviewer.code": choice(TERRA, "high"),
-  "Reviewer.testing": choice(TERRA, "medium"),
-  "Reviewer.audit": choice(LUNA, "high"),
-  "Reviewer.security": choice(TERRA, "xhigh"),
-  "Reviewer.artifact": choice(TERRA, "medium")
-};
-var SCREEN_MINIMUM_THINKING = "medium";
-var THINKING_RANK = {
-  off: 0,
-  minimal: 1,
-  low: 2,
-  medium: 3,
-  high: 4,
-  xhigh: 5,
-  max: 6
-};
-var screenRoute = (row) => {
-  const higher = THINKING_RANK[row.thinking] >= THINKING_RANK[SCREEN_MINIMUM_THINKING] ? row.thinking : SCREEN_MINIMUM_THINKING;
-  return choice(TERRA, higher);
-};
-
 var BILLION_CONTEXT_GUARDRAILS_OFF = {
   BILI_GUARDRAIL_BASH_TIMEOUT: "0",
   BILI_GUARDRAIL_MAX_OUTPUT_BYTES: "0",
@@ -14119,7 +14134,7 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
-var FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false };
+var FFF_OVERRIDE_SETTINGS = { mode: "override" };
 var FFF_TOOLS = [
   "grep",
   "find",
@@ -14140,20 +14155,25 @@ var FFF_NATIVE_HOSTS = [
 
 var pi_packages_default = {
   "pi-provider-kimi-code": "0.6.13",
-  "@tintinweb/pi-subagents": "0.23.1",
-  "billion-context": "0.1.212",
+  "@tintinweb/pi-subagents": "0.23.2",
+  "billion-context": "0.1.213",
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.6",
-  "@amaster.ai/pi-computer-use": "0.1.36",
+  "@amaster.ai/pi-computer-use": "0.1.38",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.15",
-  "@playwright/mcp": "0.0.85"
+  "@opencode/browse": "0.0.16"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 var piPackageSource = (name) => `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`;
+
+var pypi_packages_default = {
+  "browser-use": "1.0.0"
+};
+
+var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
 
 var CAPABILITY_FORMS = ["headless", "normal"];
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
@@ -14189,18 +14209,31 @@ var BROWSE_MCP_SERVER = {
   command: "npx",
   args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
 };
-var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
-var PLAYWRIGHT_SERVER = "playwright";
-var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
-var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
-var PLAYWRIGHT_MCP_SERVER = {
-  name: PLAYWRIGHT_SERVER,
-  command: "npx",
-  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
-  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+var BROWSER_USE_PACKAGE = "browser-use";
+var BROWSER_USE_SERVER = "browser_use";
+var BROWSER_USE_TOOLS = [
+  `mcp__${BROWSER_USE_SERVER}__browser_exec`,
+  `mcp__${BROWSER_USE_SERVER}__browser_screenshot`
+];
+var BROWSER_USE_ALL_TOOLS = [`mcp__${BROWSER_USE_SERVER}__*`];
+var PYPI_INDEX = "https://pypi.org/simple";
+var uvxServerArgs = (name, rest) => [
+  "--no-config",
+  "--default-index",
+  PYPI_INDEX,
+  "--from",
+  `${name}==${PYPI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
+var BROWSER_SERVER_COMMAND = "browser-server";
+var BROWSER_USE_MCP_SERVER = {
+  name: BROWSER_USE_SERVER,
+  command: "uvx",
+  args: uvxServerArgs(BROWSER_USE_PACKAGE, ["browser-use", "--cli-mcp"]),
+  launchesChromium: true
 };
 var BROWSE_MINIMUM_NODE = [22, 19, 0];
-var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var CHROMIUM_FIX = "set HOLYAGENT_CHROMIUM_PATH to a Chromium executable, or put a Playwright Chromium build in the folder PLAYWRIGHT_BROWSERS_PATH names (PLAYWRIGHT_BROWSERS_PATH=<folder> uvx playwright install chromium)";
 var nodeNeed = (minimum) => ({
   kind: "node",
   minimum,
@@ -14317,34 +14350,43 @@ var CAPABILITIES = [
   {
     name: "browser-use",
     feature: "browserUse",
-    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the browser-use MCP server (browser-use) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
-    needs: [
-      {
-        kind: "command",
-        command: "npx",
-        fix: "install Node.js from https://nodejs.org, which ships npx"
-      }
-    ],
+    needs: [],
     forms: {
       headless: {
         packages: [],
-        mcpServers: [PLAYWRIGHT_MCP_SERVER],
-        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
+        mcpServers: [BROWSER_USE_MCP_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: "uvx",
+            fix: "install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs"
+          },
+          { kind: "chromium", fix: CHROMIUM_FIX }
+        ]
       },
       normal: {
         packages: [],
         mcpServers: [BROWSE_MCP_SERVER],
-        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        needs: [
+          {
+            kind: "command",
+            command: "npx",
+            fix: "install Node.js from https://nodejs.org, which ships npx"
+          },
+          { kind: "display" },
+          nodeNeed(BROWSE_MINIMUM_NODE)
+        ],
         pairing: true
       }
     },
     tools: {
-      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      rootExclude: [...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS],
       visual: [],
-      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+      screen: [...BROWSE_TOOLS, ...BROWSER_USE_TOOLS]
     },
     settings: [],
     health: ["needs"]
@@ -14458,6 +14500,47 @@ var unavailableIn = (capability, form, platform = hostPlatform()) => {
   return capability.nativeHosts === undefined || capability.nativeHosts.includes(platform) ? undefined : `its native library does not cover ${platform}, only ${capability.nativeHosts.join(", ")}`;
 };
 var enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form, options.platform) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider));
+
+var CODEX_PROVIDER_ID = "openai-codex";
+var SOL = "gpt-6.1-sol";
+var TERRA = "gpt-6.1-terra";
+var LUNA = "gpt-6-luna";
+var choice = (model, thinking) => ({ model, thinking });
+var CODEX_ROUTES = {
+  root: choice(SOL, "high"),
+  "Explorer.map": choice(LUNA, "low"),
+  "Explorer.lookup": choice(LUNA, "low"),
+  "Explorer.trace": choice(TERRA, "medium"),
+  "Librarian.lookup": choice(LUNA, "low"),
+  "Librarian.research": choice(TERRA, "medium"),
+  "Worker.mechanical": choice(LUNA, "medium"),
+  "Worker.implementation": choice(TERRA, "high"),
+  "Worker.integration": choice(TERRA, "medium"),
+  "Worker.operations": choice(LUNA, "medium"),
+  "Worker.validation": choice(LUNA, "low"),
+  "Worker.debugging": choice(TERRA, "xhigh"),
+  "Worker.visual": choice(TERRA, "high"),
+  "Reviewer.visual": choice(TERRA, "high"),
+  "Reviewer.code": choice(TERRA, "high"),
+  "Reviewer.testing": choice(TERRA, "medium"),
+  "Reviewer.audit": choice(LUNA, "high"),
+  "Reviewer.security": choice(TERRA, "xhigh"),
+  "Reviewer.artifact": choice(TERRA, "medium")
+};
+var SCREEN_MINIMUM_THINKING = "medium";
+var THINKING_RANK = {
+  off: 0,
+  minimal: 1,
+  low: 2,
+  medium: 3,
+  high: 4,
+  xhigh: 5,
+  max: 6
+};
+var screenRoute = (row) => {
+  const higher = THINKING_RANK[row.thinking] >= THINKING_RANK[SCREEN_MINIMUM_THINKING] ? row.thinking : SCREEN_MINIMUM_THINKING;
+  return choice(TERRA, higher);
+};
 
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed5(value)));
 var VcsSettings = Struct({
@@ -17265,7 +17348,7 @@ Pick the cheapest specialist whose agent description fits and whose result you c
 - With several Intents open and none in use, choose one through the structured question tool.
 `;
 
-var search_default = "## Searching\n\nSearch file contents with `holyagent rg` and file names with `holyagent fd`, never with grep, find or the host's own search tools. They run the ripgrep and fd that ship with HolyAgent and take those programs' own arguments, so every machine gives the same answer. Always pass the path, for example `.`: with no path and a piped or redirected stdin, rg reads stdin and reports no matches. Use the system rg, fd, grep or find only when either fails with UnsupportedPlatform. <!-- O19 -->\n";
+var search_default = "## Searching\n\nSearch file contents with `holyagent rg` and file names with `holyagent fd`, never with grep, find or the host's own search tools. They run the ripgrep and fd installed on the machine and take those programs' own arguments. Always pass the path, for example `.`: with no path and a piped or redirected stdin, rg reads stdin and reports no matches. When either fails with ToolMissing, the program is not installed: search with the system grep or find, and report the missing program so the user can install it. <!-- O19 -->\n";
 
 var skills_default = "## Skills\n\nLoad a skill when its description names your situation; each holds rules that matter only then, and a skill never outranks the user. <!-- O8, O16 -->\n\n- `dev-server`: visual work needs a running, capturable render target (a web app or served static build, a terminal UI, a desktop or mobile app); it has Worker.operations start the one target per platform that the visual specialists share, or report why it cannot run here. A browser or device tool the host provides is an optional aid for that target.\n- `visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch, and again when rendered work is accepted, repaired or explained visually; it holds how you pick the platform skill, your own final pass that decides acceptance, what counts as material and the repair rounds.\n- `web-design`, `mobile-design`, `desktop-design`, `tui-design`: the platform standard for visual work, for a web page or app, an iOS or Android app, a desktop app and a terminal UI. `visual-judging` says how to pick and name them; load the one you picked yourself for the final pass.\n- `evidence-judging`: a specialist report carries a verdict you must accept or reject (a blocking finding, a research claim with conflicting sources or numbers, prose for people, a material design choice).\n- `ci-watch`: a pushed PR or commit needs its CI watched or judged.\n- `state-mode`: a clone has no Intent yet, so choose where state lives before the first Intent of a clone.\n- `instruction-writing`: you write or review model-facing text other than a brief.\n- `user-busy`: the user says they are away, asleep, busy or not to be asked; load it before asking anything.\n\nUsing `dev-server`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.\n\nWhen a skill's line makes you pause or conflicts with a rule here, say which `SKILL.md` it is, quote the line and explain, and let the user's instruction and these rules decide. <!-- O8 -->\n";
 
@@ -17474,7 +17557,7 @@ Pick the cheapest specialist whose agent description fits and whose result you c
 - With several Intents open and none in use, choose one through \`ask_user_question\`.
 `;
 
-var search_default2 = "## Searching\n\nSearch file contents with `holyagent rg` and file names with `holyagent fd`, never with grep, find or the grep and find tools. They run the ripgrep and fd that ship with the package and take those programs' own arguments, so every machine gives the same answer. Always pass the path, for example `.`: with no path and a piped or redirected stdin, rg reads stdin and reports no matches. Use the system rg, fd, grep or find only when either fails with UnsupportedPlatform.\n";
+var search_default2 = "## Searching\n\nSearch file contents with `holyagent rg` and file names with `holyagent fd`, never with grep, find or the grep and find tools. They run the ripgrep and fd installed on the machine and take those programs' own arguments. Always pass the path, for example `.`: with no path and a piped or redirected stdin, rg reads stdin and reports no matches. When either fails with ToolMissing, the program is not installed: search with the system grep or find, and report the missing program so the user can install it.\n";
 
 var skills_default2 = "## Skills\n\nClassify the situation first, then load only the skill that matches it; each holds rules that matter only then. <!-- K9, K28: situation-specific rules load on demand and stay out of this prompt. -->\n\n- `dev-server`: visual work needs a running, capturable render target (a web app or served static build, a terminal UI, a desktop or mobile app); it has Worker.operations start the one target per platform that the visual specialists share, or report why it cannot run here. T3 Code's browser and preview tools are optional aids for that target.\n- `visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch, and again when rendered work is accepted, repaired or explained visually; it holds how you pick the platform skill, your own final pass that decides acceptance, what counts as material and the repair rounds.\n- `web-design`, `mobile-design`, `desktop-design`, `tui-design`: the platform standard for visual work, for a web page or app, an iOS or Android app, a desktop app and a terminal UI. `visual-judging` says how to pick and name them; load the one you picked yourself for the final pass.\n- `evidence-judging`: a specialist report carries a verdict you must accept or reject (a blocking finding, a research claim with conflicting sources or numbers, prose for people, a material design choice).\n- `ci-watch`: a pushed PR or commit needs its CI watched or judged.\n- `state-mode`: a clone has no Intent yet, so choose where state lives before the first Intent of a clone.\n- `instruction-writing`: you write or review model-facing text other than a brief.\n- `user-busy`: the user says they are away, asleep, busy or not to be asked; load it before asking anything.\n\nUsing `dev-server`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.\n";
 
@@ -17667,47 +17750,9 @@ var rootActiveTools = (args, active, registered) => {
   return [...new Set([...active, ...added])].filter((tool) => !args.excludeTools.some((pattern) => toolMatches(pattern, tool)));
 };
 
-import { existsSync, readdirSync } from "node:fs";
-import { posix, win32 } from "node:path";
-
 import { homedir } from "node:os";
 var firstNonEmpty = (...values) => values.find((value) => value !== undefined && value !== "");
 var homeDirectory = (env, fallback = homedir) => firstNonEmpty(env.HOME, env.USERPROFILE) ?? fallback();
-
-var PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH";
-var PREINSTALLED_BROWSERS = "/opt/pw-browsers";
-var BUILD_EXECUTABLES = {
-  linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
-  darwin: [
-    "chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
-    "chrome-mac/Chromium.app/Contents/MacOS/Chromium"
-  ],
-  win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
-};
-var pathsOf = (platform) => platform === "win32" ? win32 : posix;
-var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
-var inFolder = (folder, platform, exists, list) => {
-  const { join } = pathsOf(platform);
-  const entry = join(folder, "chromium");
-  if (exists(entry))
-    return entry;
-  const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
-  for (const build of builds)
-    for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
-      const path = join(folder, build, ...executable.split("/"));
-      if (exists(path))
-        return path;
-    }
-  return;
-};
-var safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => [])));
-var findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
-  const given = firstNonEmpty(env[PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE]);
-  if (given !== undefined)
-    return given;
-  const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
-  return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
-};
 
 var inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true";
 
@@ -17737,7 +17782,7 @@ var TRACKED_STATE_PATHSPEC = [
 
 import { lstatSync, realpathSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
-import { posix as posix2, win32 as win322 } from "node:path";
+import { posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 var REVIEW_MODEL = "codex-auto-review";
@@ -18130,7 +18175,7 @@ var PROTECTED_FOLDERS = [
   ".agents"
 ];
 var currentHost = () => ({ platform: process.platform, home: homedir2() });
-var pathsOf2 = (host) => host.platform === "win32" ? win322 : posix2;
+var pathsOf = (host) => host.platform === "win32" ? win32 : posix;
 var UNICODE_SPACES = /[  -   　]/g;
 var SHELL_DRIVE_PATH = /^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i;
 var shellDrivePath = (path) => {
@@ -18142,7 +18187,7 @@ var shellDrivePath = (path) => {
 var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) && typeof error.code === "string" ? error.code : undefined;
 var probe = (run) => runSync2(try_2({ try: run, catch: errorCode }).pipe(map4((value) => ({ found: true, value })), catch_2((code) => succeed5({ found: false, code }))));
 var piPath = (input, root, host) => {
-  const paths = pathsOf2(host);
+  const paths = pathsOf(host);
   const windows = host.platform === "win32";
   let text = input.replace(UNICODE_SPACES, " ");
   if (text.startsWith("@"))
@@ -18164,7 +18209,7 @@ var piPath = (input, root, host) => {
 var throughLinks = (path, host) => {
   if (host.platform !== process.platform)
     return path;
-  const paths = pathsOf2(host);
+  const paths = pathsOf(host);
   const tail = [];
   let current = path;
   for (;; ) {
@@ -18194,7 +18239,7 @@ var isProtectedName = (part, host) => {
   return PROTECTED_FOLDERS.some((folder) => bare === folder || short !== undefined && short === shortStem(folder));
 };
 var writeTrigger = (path, root, host = currentHost()) => {
-  const paths = pathsOf2(host);
+  const paths = pathsOf(host);
   const target = piPath(path, root, host);
   const real = target === undefined ? undefined : throughLinks(target, host);
   const base = paths.resolve(root);
@@ -19166,20 +19211,24 @@ var AGENT_TYPES = [...SPECIALIST_NAMES, ...SCREEN_SPECIALIST_NAMES];
 
 var isScreenAgent = (agent) => agent !== undefined && SCREEN_SPECIALIST_NAMES.includes(agent);
 var screenFormOf = (agent) => isHeadlessScreenAgent(agent) ? "headless" : "normal";
-var screenServers = (config, form, chromium) => config.pi.features.mcp ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap((capability) => (formContent(capability, form)?.mcpServers ?? []).map(({ chromiumFlag, ...server }) => chromiumFlag === undefined || chromium === undefined ? server : { ...server, args: [...server.args, chromiumFlag, chromium] })) : [];
+var screenServers = (config, form) => config.pi.features.mcp ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap((capability) => formContent(capability, form)?.mcpServers ?? []) : [];
+var withoutBrowserUseInT3 = (servers, t3) => t3 ? servers.filter((server) => server.name !== BROWSER_USE_MCP_SERVER.name) : servers;
 var refuseT3PreviewOutsideT3 = (event, agent, t3) => !t3 && isScreenAgent(agent) && T3_PREVIEW_TOOLS.some((pattern) => toolMatches(pattern, event.toolName)) ? {
   block: true,
   reason: `${event.toolName} is T3 Code's tool, and T3 does not host this session. Use the browser tools you were given instead.`
 } : undefined;
-var registerScreenServers = (register, agent, servers, neutralDirectory) => {
+var registerScreenServers = (register, agent, servers, neutralDirectory, launch) => {
   if (!isScreenAgent(agent))
     return { registered: [], failures: [] };
   const outcomes = servers.map((server) => runSync2(try_2({
-    try: () => register(server.name, {
-      command: server.command,
-      args: [...server.args],
-      ...server.command === "npx" ? { cwd: neutralDirectory } : {}
-    }),
+    try: () => {
+      const { command, args } = server.launchesChromium === true ? launch(server) : server;
+      return register(server.name, {
+        command,
+        args: [...args],
+        ...server.command === "npx" || server.launchesChromium === true ? { cwd: neutralDirectory } : {}
+      });
+    },
     catch: (cause) => `${server.name}: ${cause instanceof Error ? cause.message : String(cause)}`
   }).pipe(as2({ name: server.name, failure: undefined }), catch_2((failure) => succeed5({ name: server.name, failure })))));
   return {
@@ -19192,10 +19241,21 @@ var T3_RUNTIME_MODE_ENV = "T3_PI_RUNTIME_MODE";
 var T3_MCP_URL_ENV = "T3_MCP_URL";
 var T3_FULL_ACCESS = "full-access";
 var T3_STATUS_KEY = "holyagent";
+var T3_HOSTED_ENV = "HOLYAGENT_T3_HOSTED";
 var T3_ACCESS_STATUS = "HolyAgent needs Full access: switch this thread's access mode";
 var T3_ACCESS_NOTICE = "this T3 Code thread is below Full access, so every HolyAgent tool call asks for approval and background specialists can stall. Switch the thread's access mode to Full access in the composer; T3 Code restarts the session.";
 var present = (value) => value !== undefined && value.trim() !== "";
 var isT3Session = (context, env) => (present(env[T3_RUNTIME_MODE_ENV]) || present(env[T3_MCP_URL_ENV])) && context.mode === "rpc";
+var hostedByT3 = (context, env, specialist) => {
+  if (specialist)
+    return env[T3_HOSTED_ENV] === "1";
+  const hosted = isT3Session(context, env);
+  if (hosted)
+    env[T3_HOSTED_ENV] = "1";
+  else
+    delete env[T3_HOSTED_ENV];
+  return hosted;
+};
 var belowFullAccess = (env) => {
   const mode = env[T3_RUNTIME_MODE_ENV];
   return present(mode) && mode.trim() !== T3_FULL_ACCESS;
@@ -19346,9 +19406,7 @@ class DeadlineExceeded extends TaggedError2("DeadlineExceeded") {
 var rootExclusions = (configs) => [
   ...new Set(configs.flatMap((config) => toolArgs(config, "root").excludeTools))
 ];
-var settingsFor = (config, role, bound = [], form = "normal", chromium = () => {
-  return;
-}) => {
+var settingsFor = (config, role, bound = [], form = "normal") => {
   const rootArgs = toolArgs(config, "root");
   const codex = codexSettings(config);
   return {
@@ -19356,7 +19414,7 @@ var settingsFor = (config, role, bound = [], form = "normal", chromium = () => {
     providerEnvironment: providerEnv(config),
     ...codex === undefined ? {} : { codex },
     ...justBashOn(config) ? { justBash: true } : {},
-    ...role === "specialist" ? { screenServers: screenServers(config, form, chromium()) } : {},
+    ...role === "specialist" ? { screenServers: screenServers(config, form) } : {},
     ...role === "root" ? {
       rootPrompt: true,
       tools: {
@@ -19564,7 +19622,7 @@ var createExtension = ({
   const closedSettings = (config, user) => gen2(function* () {
     const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
     const defaults = yield* defaultConfig;
-    return settingsFor(config ?? defaults, role, boundConfigs(defaults, user), machineForm(), () => findChromium(env));
+    return settingsFor(config ?? defaults, role, boundConfigs(defaults, user), machineForm());
   }).pipe(orDie2);
   const startingExclusions = gen2(function* () {
     const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
@@ -19603,7 +19661,7 @@ var createExtension = ({
         if (!config.pi.enable) {
           if (user !== undefined && !user.pi.enable)
             return { enabled: false, gatesOff: true };
-          const off = settingsFor(config, yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE)), bound, machineForm(), () => findChromium(env));
+          const off = settingsFor(config, yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE)), bound, machineForm());
           return {
             enabled: false,
             ...off.rootPrompt === undefined ? {} : { rootPrompt: off.rootPrompt },
@@ -19611,7 +19669,7 @@ var createExtension = ({
           };
         }
         const role = yield* roleOf;
-        configured = settingsFor(config, role, bound, machineForm(), () => findChromium(env));
+        configured = settingsFor(config, role, bound, machineForm());
         const status = yield* holyagent(signal, project, "status").pipe(flatMap2((text) => parseOutput("status", text)));
         const reconcile = RECONCILED.has(reason) ? yield* holyagent(signal, project, "reconcile").pipe(flatMap2((text) => parseOutput("reconcile", text))) : undefined;
         const directory = yield* fromResult2(folder);
@@ -19704,7 +19762,7 @@ var createExtension = ({
     return reason === undefined ? undefined : notice(`apply_patch could not be activated (${reason}); change files with write and edit instead`);
   };
   let noServerTold = false;
-  const registerScreen = (servers) => {
+  const registerScreen = (servers, t3) => {
     const agent = childAgent(pi.getSessionName());
     if (isScreenAgent(agent) && servers.length === 0) {
       if (noServerTold)
@@ -19712,8 +19770,18 @@ var createExtension = ({
       noServerTold = true;
       return notice("no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing");
     }
-    const { failures } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, servers, homeDirectory(env));
+    const { failures } = registerScreenServers((name, server) => pi.registerMcpServer(name, server), agent, withoutBrowserUseInT3(servers, t3), homeDirectory(env), browserLauncher);
     return failures.length === 0 ? undefined : notice(`an MCP server of the screen capability was not registered (${failures.join("; ")}); work without its tools and report that they are missing`);
+  };
+  const browserLauncher = () => {
+    const argv = [...bundled, BROWSER_SERVER_COMMAND];
+    const found = bunFor(argv);
+    if (!found.ok)
+      throw new Error(found.reason);
+    const launch = launchOf(found.program, argv);
+    if (!launch.ok)
+      throw new Error(launch.reason);
+    return { command: isShim(found.program) ? "cmd.exe" : found.program, args: launch.args };
   };
   const gather = (taken, ctx, reason) => {
     taken.current?.abort();
@@ -19752,7 +19820,7 @@ var createExtension = ({
         if (result?.codex !== undefined)
           taken.specialistNotice = activateApplyPatch(result.codex);
         if (result?.screenServers !== undefined)
-          taken.specialistNotice = joinOptional(taken.specialistNotice, registerScreen(result.screenServers));
+          taken.specialistNotice = joinOptional(taken.specialistNotice, registerScreen(result.screenServers, taken.t3));
         if (result?.config !== undefined)
           startProviderCheck(taken, result.config);
         if (result?.tools !== undefined) {
@@ -19786,7 +19854,7 @@ var createExtension = ({
       rootPrompt: false,
       excluded: runSync2(startingExclusions),
       started: false,
-      t3: isT3Session(ctx, env),
+      t3: hostedByT3(ctx, env, isChild()),
       t3Gate: false,
       t3Root: false,
       codex: undefined,

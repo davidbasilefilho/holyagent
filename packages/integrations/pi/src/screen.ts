@@ -2,6 +2,7 @@ import type { ToolCallEventResult } from "@earendil-works/pi-coding-agent"
 import { Effect } from "effect"
 
 import {
+  BROWSER_USE_MCP_SERVER,
   type CapabilityForm,
   enabledCapabilities,
   formContent,
@@ -27,14 +28,14 @@ export const SCREEN_DESCRIPTION =
  * desktop, so the file lists the headless browser's tools and no computer-use or browse tools.
  */
 export const HEADLESS_SCREEN_DESCRIPTION =
-  "Launched for an Assignment that carries the screen capability on a headless machine: it has a headless browser (Playwright) and the T3 preview tools, and no desktop."
+  "Launched for an Assignment that carries the screen capability on a headless machine: it has a headless browser (browser-use, or T3's preview tools in a session T3 hosts, where browser-use is not started) and no desktop."
 
 /**
  * What the prompt of a headless screen specialist adds after the role's: it has a headless browser
  * and no desktop, and says so when a tool is missing instead of working around it.
  */
 export const HEADLESS_SCREEN_NOTE =
-  "## Headless screen\n\nThis machine has no graphical session. You have a headless browser: the Playwright MCP tools (`mcp__playwright__browser_*`, an isolated profile that keeps nothing on disk) and, where T3 hosts the session, T3's preview tools. You have no desktop: computer use and the user's real browser are not available. Report a missing tool instead of working around it."
+  "## Headless screen\n\nThis machine has no graphical session. You have a headless browser. Outside T3 it is the browser-use MCP tools: `mcp__browser_use__browser_exec`, which runs Python on the browser, and `mcp__browser_use__browser_screenshot`, with a temporary profile that is removed when the session ends. Where T3 hosts the session, the browser is T3's preview tools and browser-use is not available: T3 exposes no endpoint browser-use could attach to, so HolyAgent does not start it. You have no desktop: computer use and the user's real browser are not available. Report a missing tool instead of working around it."
 
 /**
  * Whether an agent name is a screen specialist's: one of the 18 roles' names with the `-screen`
@@ -54,32 +55,34 @@ export const screenFormOf = (agent: string | undefined): CapabilityForm =>
 /**
  * The MCP servers the capabilities of a config add in a form, for a specialist that carries the
  * screen capability: those of the enabled capabilities the form offers (opencode browse in the
- * normal form, the Playwright MCP server in the headless one), none while `pi.features.mcp` is off
+ * normal form, the browser-use MCP server in the headless one), none while `pi.features.mcp` is off
  * (Pi's MCP extension, which runs them, is not loaded then), and none for a capability the config
- * switches off. A server that launches a browser takes the `chromium` the machine provides, when
- * there is one, as its executable path.
+ * switches off.
  */
-export const screenServers = (
-  config: Config,
-  form: CapabilityForm,
-  chromium?: string,
-): ReadonlyArray<McpServer> =>
+export const screenServers = (config: Config, form: CapabilityForm): ReadonlyArray<McpServer> =>
   config.pi.features.mcp
     ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap(
-        (capability) =>
-          (formContent(capability, form)?.mcpServers ?? []).map(
-            ({ chromiumFlag, ...server }): McpServer =>
-              chromiumFlag === undefined || chromium === undefined
-                ? server
-                : { ...server, args: [...server.args, chromiumFlag, chromium] },
-          ),
+        (capability) => formContent(capability, form)?.mcpServers ?? [],
       )
     : []
 
 /**
+ * The screen servers a session registers: `servers` without the browser-use server when T3 hosts
+ * the session (`t3`, see `hostedByT3`), whatever the form. T3's pane is the browser the person sees
+ * and exposes no endpoint browser-use could attach to, so inside T3 browser-use would only add a
+ * second, invisible Chromium; screen specialists there use T3's preview tools. Browse and computer
+ * use drive the person's real browser and desktop, which T3's pane does not replace, so they stay.
+ */
+export const withoutBrowserUseInT3 = (
+  servers: ReadonlyArray<McpServer>,
+  t3: boolean,
+): ReadonlyArray<McpServer> =>
+  t3 ? servers.filter((server) => server.name !== BROWSER_USE_MCP_SERVER.name) : servers
+
+/**
  * Whether a tool call is one of T3 Code's preview or render tools ({@link T3_PREVIEW_TOOLS}) made
  * by a screen specialist outside a session T3 hosts. The tools grant a view into T3's own browser,
- * so a session that T3 does not host (`t3`, see `isT3Session`) is refused them even where their
+ * so a session that T3 does not host (`t3`, see `hostedByT3`) is refused them even where their
  * names are registered, for example by a T3 MCP server the user added by hand.
  */
 export const refuseT3PreviewOutsideT3 = (
@@ -101,11 +104,14 @@ export const refuseT3PreviewOutsideT3 = (
  * (see {@link isScreenAgent}): every other process, the root included, would start a server it
  * never calls, since Pi starts the servers of each session, a child's too. `register` is
  * `pi.registerMcpServer`; its failure for one server is returned as a reason and the others still
- * register. A server launched through `npx` starts in `neutralDirectory`, not in the project: npx
- * runs a package it finds in a `node_modules` of its working directory or above without fetching
- * it, so a repository's own `node_modules` could stand in for the pinned package of a server with
- * browser control. The result lists the servers registered and the reasons for those that were
- * not.
+ * register. A server launched through `npx`, or through the browser launcher, starts in
+ * `neutralDirectory`, not in the project: npx runs a package it finds in a `node_modules` of its
+ * working directory or above without fetching it, so a repository's own `node_modules` could stand
+ * in for the pinned package of a server with browser control, and the launcher's `uvx` would read
+ * the project's files the same way. A server that launches a Chromium (see
+ * {@link McpServer.launchesChromium}) is registered as the command `launch` returns for it, which
+ * throws when there is none. The result lists the servers registered and the reasons for those that
+ * were not.
  */
 export const registerScreenServers = (
   register: (
@@ -115,17 +121,22 @@ export const registerScreenServers = (
   agent: string | undefined,
   servers: ReadonlyArray<McpServer>,
   neutralDirectory: string,
+  launch: (server: McpServer) => { readonly command: string; readonly args: ReadonlyArray<string> },
 ): { readonly registered: ReadonlyArray<string>; readonly failures: ReadonlyArray<string> } => {
   if (!isScreenAgent(agent)) return { registered: [], failures: [] }
   const outcomes = servers.map((server) =>
     Effect.runSync(
       Effect.try({
-        try: () =>
-          register(server.name, {
-            command: server.command,
-            args: [...server.args],
-            ...(server.command === "npx" ? { cwd: neutralDirectory } : {}),
-          }),
+        try: () => {
+          const { command, args } = server.launchesChromium === true ? launch(server) : server
+          return register(server.name, {
+            command,
+            args: [...args],
+            ...(server.command === "npx" || server.launchesChromium === true
+              ? { cwd: neutralDirectory }
+              : {}),
+          })
+        },
         catch: (cause) =>
           `${server.name}: ${cause instanceof Error ? cause.message : String(cause)}`,
       }).pipe(

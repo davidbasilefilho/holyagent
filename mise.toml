@@ -6,6 +6,12 @@ node = "lts"
 # below upgrades it to canary; the `toolchain` task, which every gate depends on, fails on a
 # non-canary Bun and names the fix.
 bun = "1.4.4"
+# The search tools behind `holyagent rg` and `holyagent fd`, which HolyAgent does not bundle. The
+# aqua backend is named so that mise installs the upstream release assets, with the checksum the aqua
+# registry records for them where it records one; the bare names would pick a backend by mise's own
+# order. The updater moves both with the other pinned tools.
+"aqua:BurntSushi/ripgrep" = "15.2.0"
+"aqua:sharkdp/fd" = "10.5.2"
 
 [hooks]
 # Runs after `mise install` (also on `mise use` and the automatic install before `mise run`), with
@@ -54,13 +60,8 @@ run = "bun fmt --no-script --check"
 description = "Run the test suite"
 run = "bun test"
 
-[tasks.vendor]
-description = "Download, verify and extract the pinned ripgrep and fd into the plugin; does nothing when they are in place"
-run = "bun scripts/vendor.ts"
-
 [tasks.build]
 description = "Generate the Claude plugin and the Pi package from the instructions, the route table and the runtime"
-depends = ["vendor"]
 run = ["bun packages/integrations/claude/build.ts", "bun packages/integrations/pi/build.ts"]
 
 [tasks."instructions:scaffold"]

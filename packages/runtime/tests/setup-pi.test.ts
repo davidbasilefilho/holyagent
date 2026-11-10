@@ -29,12 +29,15 @@ import {
   BROWSE_LAST_SEEN_TEXT,
   fakeShell,
   scratch,
+  withoutSearchTools,
   writeBrowsePairing,
   writeCompleteSettings,
 } from "./setup-fixture.ts"
 
 let home: string
 let project: string
+// A file standing in for the Chromium executable a person configured, which has to exist.
+let chromiumPath: string
 let remove: () => Promise<void>
 
 beforeEach(async () => {
@@ -44,6 +47,8 @@ beforeEach(async () => {
   await mkdir(project, { recursive: true })
   await writeCompleteSettings(join(home, ".claude"))
   await writeBrowsePairing(home)
+  chromiumPath = join(made.directory, "chromium")
+  await writeFile(chromiumPath, "")
   remove = made.remove
 })
 afterEach(() => remove())
@@ -91,7 +96,7 @@ const setProjectConfig = (config: unknown) =>
 /** A fake shell where `pi`, `node` and `bun` are installed and print the given versions. */
 const shellWith = (
   versions: { readonly pi?: string; readonly node?: string } = {},
-  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx"],
+  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx", "uvx"],
 ) =>
   fakeShell({
     commands,
@@ -119,7 +124,9 @@ const check = (
  * settings hints are left out here; setup-pi-settings.test.ts covers them.
  */
 const piLines = (report: { readonly lines: ReadonlyArray<string> }) =>
-  report.lines.slice(3).filter((line) => !line.startsWith("~ tool settings "))
+  withoutSearchTools(report)
+    .lines.slice(3)
+    .filter((line) => !line.startsWith("~ tool settings "))
 
 /** The Pi lines of a project or local scope report, which a notice line may shift; found by name. */
 const lineNamed = (report: { readonly lines: ReadonlyArray<string> }, name: string) =>
@@ -306,7 +313,7 @@ describe("holyagent doctor, Pi checks", () => {
   test("pi.enable off in the config runs no Pi check and no process", async () => {
     await setConfig({ pi: { enable: false } })
     const shell = fakeShell({ commands: ["bun", "ctx7", "pi"] })
-    const report = await check(shell)
+    const report = withoutSearchTools(await check(shell))
     expect(report.ok).toBe(true)
     expect(report.lines).toHaveLength(3)
     expect(shell.calls).toEqual([])
@@ -469,7 +476,7 @@ describe("holyagent doctor, capabilities", () => {
     await write(globalSettings(), {
       packages: [SOURCE, ...DEFAULT_SOURCES.filter((source) => !source.includes("computer-use"))],
     })
-    const report = await doctorIn("headless")
+    const report = await doctorIn("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })
     expect(report.ok).toBe(true)
     expect(piLines(report).slice(3)).toEqual([
       BASE_OK,

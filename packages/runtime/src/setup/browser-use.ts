@@ -41,14 +41,13 @@ const reportOne = (
     const needs = unmet.flatMap((problem) =>
       problem === undefined ? [] : [hint(`${label}: ${problem}`)],
     )
+    const launched = (content?.mcpServers ?? []).some(
+      ({ launchesChromium }) => launchesChromium === true,
+    )
     const servers = (content?.mcpServers ?? []).map(
       ({ command, args }) => `${command} ${args.join(" ")}`,
     )
-    const chromium = (content?.mcpServers ?? []).some(
-      ({ chromiumFlag }) => chromiumFlag !== undefined,
-    )
-      ? findChromium(env, platform)
-      : undefined
+    const chromium = launched ? findChromium(env, platform) : undefined
     const browser =
       chromium === undefined
         ? []
@@ -75,7 +74,7 @@ const reportOne = (
     return [
       withheld === undefined
         ? present(
-            `${label}: ${form} form; the extension registers \`${servers.join("`, `")}\` for screen specialists and writes no file for it`,
+            `${label}: ${form} form; the extension registers \`${servers.join("`, `")}\` for screen specialists${launched ? " through `holyagent browser-server`, which starts the headless browser and stops it with the server" : ""} and writes no file for it`,
           )
         : hint(`${label}: ${form} form; ${withheld}`),
       ...needs,
@@ -87,7 +86,7 @@ const reportOne = (
 /**
  * The browser-use step of `holyagent setup`: one report, and no change, for each enabled capability
  * that registers an MCP server for screen specialists (opencode browse in the normal form, the
- * Playwright MCP server in the headless form). It says the form in force, the MCP server the
+ * browser-use MCP server in the headless form). It says the form in force, the MCP server the
  * extension registers (or that `pi.features.mcp` is off, so none is), each system need that is not
  * met, in the headless form the Chromium the browser runs on, and in the normal form where browse
  * stands: paired with a browser, installed in one but not paired, or not installed

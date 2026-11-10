@@ -5,6 +5,7 @@ import {
   EXACT_PACKAGES,
   isExactPin,
   newestAllowedRelease,
+  newestPypiRelease,
   newestRelease,
   newestTag,
   nextPackageRange,
@@ -12,17 +13,13 @@ import {
   nextRange,
   packageDependencies,
   parseActionUses,
-  parseChecksumFile,
-  parseDigest,
   parseMiseTools,
   parseRelease,
   parseTags,
-  parseVendoredVersion,
   releaseOfTag,
   renderPiPackages,
   rewriteActionUses,
   rewriteMiseTools,
-  rewriteVendoredTool,
   unreadableActionUses,
   withPackageRanges,
   withPiPackageVersions,
@@ -206,63 +203,23 @@ describe("mise tools", () => {
       text.replace('"1.4.4"', '"1.5.0"'),
     )
   })
-})
 
-describe("vendored tools", () => {
-  const hash = (letter: string) => letter.repeat(64)
-  const source = [
-    "/**",
-    " * Ripgrep 15.2.0, from https://example.test/releases/tag/15.2.0.",
-    " */",
-    'const RIPGREP_VERSION = "15.2.0"',
-    "",
-    "const ripgrep = (id: string) => id",
-    "export const ASSETS = [",
-    "  ripgrep(",
-    '    "linux-x64",',
-    '    "x86_64-unknown-linux-musl",',
-    '    "tar.gz",',
-    `    "${hash("1")}",`,
-    `    "${hash("2")}",`,
-    "  ),",
-    "  fd(",
-    '    "linux-x64",',
-    '    "x86_64-unknown-linux-musl",',
-    '    "tar.gz",',
-    `    "${hash("3")}",`,
-    `    "${hash("4")}",`,
-    "  ),",
-    "]",
-  ].join("\n")
-
-  test("reads the version of a tool", () => {
-    expect(parseVendoredVersion(source, "ripgrep")).toBe("15.2.0")
-    expect(parseVendoredVersion(source, "fd")).toBeUndefined()
-  })
-
-  test("moves the version, its doc comment and both hashes of the tool, and not the other tool", () => {
-    const result = rewriteVendoredTool(
-      source,
-      "ripgrep",
-      "15.3.0",
-      new Map([["linux-x64", { archive: hash("a"), binary: hash("b") }]]),
+  test("reads and rewrites a tool whose key is quoted for its backend", () => {
+    const quoted = [
+      "[tools]",
+      'bun = "1.4.4"',
+      '"aqua:BurntSushi/ripgrep" = "15.2.0"',
+      '"aqua:sharkdp/fd" = "10.5.2"',
+      "",
+    ].join("\n")
+    expect(parseMiseTools(quoted)).toEqual([
+      { name: "bun", version: "1.4.4" },
+      { name: "aqua:BurntSushi/ripgrep", version: "15.2.0" },
+      { name: "aqua:sharkdp/fd", version: "10.5.2" },
+    ])
+    expect(rewriteMiseTools(quoted, new Map([["aqua:sharkdp/fd", "10.6.0"]]))).toBe(
+      quoted.replace('"10.5.2"', '"10.6.0"'),
     )
-    expect(result).toContain('const RIPGREP_VERSION = "15.3.0"')
-    expect(result).toContain("Ripgrep 15.3.0, from https://example.test/releases/tag/15.3.0.")
-    expect(result).toContain(`"${hash("a")}",\n    "${hash("b")}",`)
-    expect(result).toContain(`"${hash("3")}",\n    "${hash("4")}",`)
-    expect(result).not.toContain("15.2.0")
-  })
-
-  test("fails when a target has no pin, so a half-moved pin is never written", () => {
-    expect(() =>
-      rewriteVendoredTool(
-        source,
-        "ripgrep",
-        "15.3.0",
-        new Map([["darwin-arm64", { archive: hash("a"), binary: hash("b") }]]),
-      ),
-    ).toThrow("darwin-arm64")
   })
 })
 
@@ -337,6 +294,39 @@ describe("newestAllowedRelease", () => {
   })
 })
 
+describe("newestPypiRelease", () => {
+  const live = [{ yanked: false }]
+  const dead = [{ yanked: true }, { yanked: true }]
+
+  test("is the newest stable release that has a file nobody yanked", () => {
+    expect(newestPypiRelease({ "0.9.0": live, "1.0.0": live, "1.1.0": live })).toBe("1.1.0")
+    expect(newestPypiRelease({ "1.0.0": live, "1.1.0": dead })).toBe("1.0.0")
+    // One live file is enough: only a release with every file yanked is gone.
+    expect(newestPypiRelease({ "1.0.0": live, "1.1.0": [{ yanked: true }, {}] })).toBe("1.1.0")
+  })
+
+  test("skips PEP 440 prereleases, dev and post releases and anything that is not three numbers", () => {
+    expect(
+      newestPypiRelease({
+        "1.0.0": live,
+        "1.1.0a1": live,
+        "1.1.0b2": live,
+        "1.1.0rc1": live,
+        "1.1.0.dev3": live,
+        "1.0.0.post1": live,
+        "1.1": live,
+        "2.0.0-rc.1": live,
+      }),
+    ).toBe("1.0.0")
+  })
+
+  test("skips a release with no files and gives nothing when none is eligible", () => {
+    expect(newestPypiRelease({ "1.0.0": live, "2.0.0": [] })).toBe("1.0.0")
+    expect(newestPypiRelease({ "1.0.0": dead, "1.1.0rc1": live })).toBeUndefined()
+    expect(newestPypiRelease({})).toBeUndefined()
+  })
+})
+
 describe("unreadableActionUses", () => {
   const sha = "a".repeat(40)
 
@@ -375,31 +365,6 @@ describe("unreadableActionUses", () => {
       `      - uses: actions/checkout@${sha} # v4.1.0`,
     ].join("\n")
     expect(unreadableActionUses(text)).toEqual([])
-  })
-})
-
-describe("published checksums", () => {
-  const hash = "0123456789abcdef".repeat(4)
-
-  test("reads a sha256sum file and a CertUtil report", () => {
-    expect(parseChecksumFile(`${hash}  ripgrep.tar.gz\n`)).toBe(hash)
-    expect(parseChecksumFile(`SHA256 hash of ripgrep.zip:\n${hash}\nCertUtil: done\n`)).toBe(hash)
-    expect(parseChecksumFile(`${hash.toUpperCase()}  x`)).toBe(hash)
-  })
-
-  test.each(["Not Found", "", "abc123", "0".repeat(63), "0".repeat(65)])(
-    "reads no hash from %j",
-    (text) => {
-      expect(parseChecksumFile(text)).toBeUndefined()
-    },
-  )
-
-  test("reads only a sha256 digest", () => {
-    expect(parseDigest(`sha256:${hash}`)).toBe(hash)
-    expect(parseDigest(`sha1:${hash}`)).toBeUndefined()
-    expect(parseDigest(hash)).toBeUndefined()
-    expect(parseDigest("sha256:short")).toBeUndefined()
-    expect(parseDigest("")).toBeUndefined()
   })
 })
 

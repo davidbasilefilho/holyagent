@@ -177,7 +177,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-S-SEARCH": {
       section: "specialist/working.md",
-      phrase: "Search with the ripgrep and fd that ship with the plugin",
+      phrase: "Search with the ripgrep and fd installed on the machine",
     },
     "R-S-RULES": { section: "specialist/conduct.md", phrase: "without being reminded" },
     "R-S-REPORT": { section: "specialist/report.md", phrase: "End with one compact report" },
@@ -498,7 +498,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "specialist/working.md",
       phrase: "run the ones that exercise your change now",
     },
-    "R-S-SEARCH": { section: "specialist/working.md", phrase: "Always pass the path" },
+    "R-S-SEARCH": {
+      section: "specialist/working.md",
+      phrase: "search with the system grep or find and name the missing program",
+    },
     "R-MATERIAL": {
       section: "shared/materiality.md",
       phrase: "A discrepancy is material, and starts a repair whatever its size",
@@ -800,7 +803,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "specialist/working.md",
       phrase: "run the ones that exercise your change now",
     },
-    "R-S-SEARCH": { section: "specialist/working.md", phrase: "Always pass the path" },
+    "R-S-SEARCH": {
+      section: "specialist/working.md",
+      phrase: "search with the system grep or find and name the missing program",
+    },
     "R-MATERIAL": {
       section: "shared/materiality.md",
       phrase: "A discrepancy is material, and starts a repair whatever its size",

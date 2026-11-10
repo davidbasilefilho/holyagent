@@ -155,6 +155,8 @@ describe("the screen capability on an Assignment's draft", () => {
     expect(headless).toContain(HEADLESS_SCREEN_LINE)
     expect(HEADLESS_SCREEN_LINE).toContain("headless browser")
     expect(HEADLESS_SCREEN_LINE).toContain("no desktop")
+    expect(HEADLESS_SCREEN_LINE).toContain("where T3 hosts the session, T3's preview tools")
+    expect(HEADLESS_SCREEN_LINE).toContain("browser-use is not available")
     expect(headless).not.toContain("computer-use, browser-use (mcp__browse__*)")
   })
 })
@@ -482,7 +484,7 @@ describe("the browse pin", () => {
   test("is exact, from the table, and in the argument of the MCP server the capability registers", () => {
     const entryOf = CAPABILITIES.find((capability) => capability.name === "browser-use")
     const server = entryOf?.forms.normal
-    expect(PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]).toBe("0.0.15")
+    expect(PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]).toBe("0.0.16")
     expect(server).toMatchObject({
       packages: [],
       mcpServers: [
@@ -493,7 +495,7 @@ describe("the browse pin", () => {
             "--registry=https://registry.npmjs.org/",
             "--@opencode:registry=https://registry.npmjs.org/",
             "-y",
-            "@opencode/browse@0.0.15",
+            "@opencode/browse@0.0.16",
             "mcp",
           ],
         },

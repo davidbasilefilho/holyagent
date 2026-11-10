@@ -133,12 +133,16 @@ var init_Function = __esm(() => {
   constVoid = constUndefined;
 });
 
-var getAllObjectKeys = (obj) => {
+var errorSiteKeys, getAllObjectKeys = (obj) => {
   const keys = new Set(Reflect.ownKeys(obj));
   if (obj.constructor === Object)
     return keys;
   if (obj instanceof Error) {
     keys.delete("stack");
+    for (const key of errorSiteKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(obj, key))
+        keys.delete(key);
+    }
   }
   const proto = Object.getPrototypeOf(obj);
   let current = proto;
@@ -161,6 +165,7 @@ var getAllObjectKeys = (obj) => {
   }
 };
 var init_equal = __esm(() => {
+  errorSiteKeys = ["line", "column", "sourceURL", "originalLine", "originalColumn"];
   byReferenceInstances = /* @__PURE__ */ new WeakSet;
 });
 
@@ -979,11 +984,10 @@ var init_core = __esm(() => {
     },
     [symbol2](that) {
       const selfKeys = Object.keys(this);
-      const thatKeys = Object.keys(that);
-      if (selfKeys.length !== thatKeys.length)
+      if (selfKeys.length !== Object.keys(that).length)
         return false;
-      for (let i = 0;i < selfKeys.length; i++) {
-        if (selfKeys[i] !== thatKeys[i] || !equals(this[selfKeys[i]], that[selfKeys[i]])) {
+      for (const key of selfKeys) {
+        if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
           return false;
         }
       }
@@ -2177,9 +2181,14 @@ var random2 = (length) => {
   const c = randomWord();
   const d = randomWord();
   return String.fromCharCode(hexCharCodes[a >>> 28], hexCharCodes[a >>> 24 & 15], hexCharCodes[a >>> 20 & 15], hexCharCodes[a >>> 16 & 15], hexCharCodes[a >>> 12 & 15], hexCharCodes[a >>> 8 & 15], hexCharCodes[a >>> 4 & 15], hexCharCodes[a & 15], hexCharCodes[b >>> 28], hexCharCodes[b >>> 24 & 15], hexCharCodes[b >>> 20 & 15], hexCharCodes[b >>> 16 & 15], hexCharCodes[b >>> 12 & 15], hexCharCodes[b >>> 8 & 15], hexCharCodes[b >>> 4 & 15], hexCharCodes[b & 15], hexCharCodes[c >>> 28], hexCharCodes[c >>> 24 & 15], hexCharCodes[c >>> 20 & 15], hexCharCodes[c >>> 16 & 15], hexCharCodes[c >>> 12 & 15], hexCharCodes[c >>> 8 & 15], hexCharCodes[c >>> 4 & 15], hexCharCodes[c & 15], hexCharCodes[d >>> 28], hexCharCodes[d >>> 24 & 15], hexCharCodes[d >>> 20 & 15], hexCharCodes[d >>> 16 & 15], hexCharCodes[d >>> 12 & 15], hexCharCodes[d >>> 8 & 15], hexCharCodes[d >>> 4 & 15], hexCharCodes[d & 15]);
-};
+}, hexCodes;
 var init_Hex = __esm(() => {
   hexCharCodes = /* @__PURE__ */ Uint8Array.from("0123456789abcdef", (c) => c.charCodeAt(0));
+  hexCodes = /* @__PURE__ */ new Uint8Array(256).fill(255);
+  for (let i = 0;i < 16; i++) {
+    hexCodes[/* @__PURE__ */ "0123456789abcdef".charCodeAt(i)] = i;
+    hexCodes[/* @__PURE__ */ "0123456789ABCDEF".charCodeAt(i)] = i;
+  }
 });
 
 class NativeSpan {
@@ -2759,8 +2768,9 @@ ${prefix}}`;
         const isWinner = !done;
         done = true;
         resume(exit);
-        if (isWinner && options?.onWinner) {
-          options.onWinner({
+        if (isWinner) {
+          interruptRaceLosers(fibers, parent);
+          options?.onWinner?.({
             fiber,
             index,
             parentFiber: parent
@@ -2769,7 +2779,12 @@ ${prefix}}`;
       });
     }
   });
-}), raceFirst, flatMap, effectIsExit = (effect) => effect[ExitTypeId] !== undefined, flatMapEager, map3, mapEager, mapErrorEager, exitIsSuccess = (self) => self._tag === "Success", exitFilterCause = (self) => self._tag === "Failure" ? succeed2(self.cause) : fail2(self), exitVoid, exitMap, exitMapError, exitAsVoidAll = (exits) => {
+}), interruptRaceLosers = (fibers, parent) => {
+  const annotations = fiberStackAnnotations(parent);
+  for (const fiber of fibers) {
+    fiber.interruptUnsafe(parent.id, annotations);
+  }
+}, raceFirst, flatMap, effectIsExit = (effect) => effect[ExitTypeId] !== undefined, flatMapEager, map3, mapEager, mapErrorEager, exitIsSuccess = (self) => self._tag === "Success", exitFilterCause = (self) => self._tag === "Failure" ? succeed2(self.cause) : fail2(self), exitVoid, exitMap, exitMapError, exitAsVoidAll = (exits) => {
   const failures = [];
   for (const exit of exits) {
     if (exit._tag === "Failure") {
@@ -2814,7 +2829,7 @@ ${prefix}}`;
   };
   MatchImpl.prototype = Proto;
   return MatchImpl;
-}, MatchImpl, matchEffect, match3, matchEager, exit = (self) => effectIsExit(self) ? exitSucceed(self) : exitPrimitive(self), exitPrimitive, timeoutOption, ScopeTypeId = "~effect/Scope", ScopeCloseableTypeId = "~effect/Scope/Closeable", scopeClose = (self, exit_) => withFiber((fiber) => {
+}, MatchImpl, matchEffect, match3, matchEager, exit = (self) => effectIsExit(self) ? exitSucceed(self) : exitPrimitive(self), exitPrimitive, timeoutOption, ScopeTypeId = "~effect/Scope", ScopeCloseableTypeId = "~effect/Scope/Closeable", scopeTag, scopeClose = (self, exit_) => withFiber((fiber) => {
   fiberEnterUninterruptibleUnsafe(fiber);
   return scopeCloseUnsafe(self, exit_) ?? void_;
 }), scopeCloseUnsafe = (self, exit_) => {
@@ -2852,6 +2867,14 @@ ${prefix}}`;
   }
   scopeAddFinalizerUnsafe(scope, child, (exit) => scopeClose(child, exit));
   return child;
+}, scopeAddFinalizerExit = (scope, finalizer) => {
+  return suspend(() => {
+    if (scope.state._tag === "Closed") {
+      return finalizer(scope.state.exit);
+    }
+    scopeAddFinalizerUnsafe(scope, {}, finalizer);
+    return void_;
+  });
 }, scopeAddFinalizerUnsafe = (scope, key, finalizer) => {
   if (scope.state._tag === "Empty") {
     scope.state = {
@@ -2889,10 +2912,19 @@ ${prefix}}`;
   strategy: finalizerStrategy,
   parent,
   state: constScopeEmpty
-}), constScopeEmpty, scopedWith = (f) => suspend(() => {
+}), constScopeEmpty, scope, scoped = (self) => withFiber((fiber) => {
+  const prev = fiber.context;
+  const scope = scopeMakeUnsafe();
+  fiber.setContext(add(fiber.context, scopeTag, scope));
+  onExitUnsafe(fiber, (exit) => {
+    fiber.setContext(prev);
+    return scopeCloseUnsafe(scope, exit);
+  });
+  return self;
+}), scopedWith = (f) => suspend(() => {
   const scope = scopeMakeUnsafe();
   return onExit(f(scope), (exit) => suspend(() => scopeCloseUnsafe(scope, exit) ?? void_));
-}), OnExitImpl, onExitPrimitive = (effect, onExit, interruptible) => new OnExitImpl(effect, onExit, interruptible), onExitUnsafe = (fiber, f) => {
+}), acquireRelease = (acquire, release, options) => contextWith((context) => uninterruptibleMask((restore) => flatMap(scope, (scope) => tap(options?.interruptible ? restore(acquire) : acquire, (a) => scopeAddFinalizerExit(scope, (exit) => provideContext(release(a, exit), context)))))), OnExitImpl, onExitPrimitive = (effect, onExit, interruptible) => new OnExitImpl(effect, onExit, interruptible), onExitUnsafe = (fiber, f) => {
   fiber._stack.push(new OnExitImpl(undefined, f, undefined));
 }, onExit, ensuring, onExitFilter, onError, acquireUseRelease = (acquire, use, release) => uninterruptibleMask((restore) => flatMap(acquire, (a) => onExitPrimitive(suspend(() => restore(use(a))), (exit) => release(a, exit), true))), uninterruptible = (self) => withFiber((fiber) => {
   if (!fiber.interruptible)
@@ -3348,6 +3380,7 @@ var init_effect = __esm(() => {
       this._children = undefined;
       this._interruptedCause = undefined;
       this._yielded = undefined;
+      this._autoYielded = false;
       this._running = false;
       this._deferredInterrupt = false;
       this._parent = undefined;
@@ -3462,8 +3495,10 @@ var init_effect = __esm(() => {
       const prevRunning = this._running;
       this._running = true;
       let yielding = false;
+      let resuming = this._autoYielded;
+      this._autoYielded = false;
       let current = effect;
-      this.currentOpCount = 0;
+      this.currentOpCount = resuming ? 1 : 0;
       try {
         while (true) {
           try {
@@ -3473,12 +3508,13 @@ var init_effect = __esm(() => {
             }
             this.currentOpCount++;
             const cache = this.cache;
-            if (!yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
+            if (!resuming && !yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
               yielding = true;
-              const prev = current;
-              current = flatMap(yieldNow, () => prev);
+              current = this.yieldNow(current, 0, true);
+            } else {
+              resuming = false;
+              current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
             }
-            current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
             if (current === Yield) {
               const yielded = this._yielded;
               if (ExitTypeId in yielded) {
@@ -3535,6 +3571,18 @@ var init_effect = __esm(() => {
     yieldWith(value) {
       this._yielded = value;
       return Yield;
+    }
+    yieldNow(effect, priority = 0, automatic = false) {
+      let resumed = false;
+      this.currentDispatcher.scheduleTask(() => {
+        if (resumed)
+          return;
+        this._autoYielded = automatic;
+        this.evaluate(effect);
+      }, priority);
+      return this.yieldWith(() => {
+        resumed = true;
+      });
     }
     children() {
       return this._children ??= new Set;
@@ -3596,15 +3644,7 @@ var init_effect = __esm(() => {
   yieldNowWith = /* @__PURE__ */ makePrimitive({
     op: "Yield",
     [evaluate](fiber) {
-      let resumed = false;
-      fiber.currentDispatcher.scheduleTask(() => {
-        if (resumed)
-          return;
-        fiber.evaluate(exitVoid);
-      }, this[args] ?? 0);
-      return fiber.yieldWith(() => {
-        resumed = true;
-      });
+      return fiber.yieldNow(exitVoid, this[args] ?? 0);
     }
   });
   yieldNow = /* @__PURE__ */ yieldNowWith(0);
@@ -3860,6 +3900,7 @@ var init_effect = __esm(() => {
     }
   });
   timeoutOption = /* @__PURE__ */ dual(2, (self, duration) => raceFirst(asSome(self), as(sleep(duration), none2())));
+  scopeTag = /* @__PURE__ */ Service("effect/Scope");
   scopeCloseFinalizers = /* @__PURE__ */ fnUntraced(function* (self, finalizers, exit_) {
     let exits = [];
     const fibers = [];
@@ -3881,6 +3922,7 @@ var init_effect = __esm(() => {
   constScopeEmpty = {
     _tag: "Empty"
   };
+  scope = scopeTag;
   OnExitImpl = /* @__PURE__ */ function() {
     const Proto = /* @__PURE__ */ makePrimitiveProto({
       op: "OnExit",
@@ -4703,7 +4745,7 @@ var init_Request = __esm(() => {
 
 var init_Metric = () => {};
 
-var all2, forEach2, promise2, tryPromise2, succeed6, suspend2, sync2, void_3, gen2, fail5, failCauseSync2, die3, try_2, withFiber2, fromResult2, flatMap2, andThen2, tap2, option2, exit2, map5, as2, asVoid2, catch_2, catchTag2, catchCause2, catchDefect2, catchIf2, mapError2, orDie2, tapError2, retry2, ignore2, orElseSucceed2, timeoutOption2, filter3, filterOrFail2, match4, matchEffect3, provide4, provideService2, acquireUseRelease2, ensuring2, onError2, runPromise2, runSync2, runSyncExit2, fn2, mapEager2, mapErrorEager2, flatMapEager2, fnUntracedEager2;
+var all2, forEach2, promise2, tryPromise2, succeed6, suspend2, sync2, void_3, gen2, fail5, failCauseSync2, die3, try_2, withFiber2, fromResult2, flatMap2, andThen2, tap2, option2, exit2, map5, as2, asVoid2, catch_2, catchTag2, catchCause2, catchDefect2, catchIf2, mapError2, orDie2, tapError2, retry2, ignore2, orElseSucceed2, timeoutOption2, sleep2, raceFirst2, filter3, filterOrFail2, match4, matchEffect3, provide4, provideService2, scoped2, acquireRelease2, acquireUseRelease2, ensuring2, onError2, runPromise2, runSync2, runSyncExit2, fn2, mapEager2, mapErrorEager2, flatMapEager2, fnUntracedEager2;
 var init_Effect = __esm(() => {
   init_core();
   init_effect();
@@ -4744,12 +4786,16 @@ var init_Effect = __esm(() => {
   ignore2 = ignore;
   orElseSucceed2 = orElseSucceed;
   timeoutOption2 = timeoutOption;
+  sleep2 = sleep;
+  raceFirst2 = raceFirst;
   filter3 = filter2;
   filterOrFail2 = filterOrFail;
   match4 = match3;
   matchEffect3 = matchEffect;
   provide4 = provide3;
   provideService2 = provideService;
+  scoped2 = scoped;
+  acquireRelease2 = acquireRelease;
   acquireUseRelease2 = acquireUseRelease;
   ensuring2 = ensuring;
   onError2 = onError;
@@ -5178,6 +5224,21 @@ var init_Chunk = __esm(() => {
   toReadonlyArray = toReadonlyArray_;
 });
 
+var decodeNative = (str, decodedLength, options) => {
+  if (str.length < 128)
+    return;
+  const NativeUint8Array = Uint8Array;
+  if (typeof NativeUint8Array.fromBase64 !== "function")
+    return;
+  try {
+    const bytes = NativeUint8Array.fromBase64(str, options);
+    return bytes.length === decodedLength ? bytes : null;
+  } catch {
+    return null;
+  }
+}, stripCrlf = (str) => str.indexOf(`
+`) === -1 && str.indexOf("\r") === -1 ? str : str.replace(/[\n\r]/g, "");
+
 var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(input) : input), decode = (str) => {
   const stripped = stripCrlf(str);
   const length = stripped.length;
@@ -5198,9 +5259,24 @@ var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(i
       message: "Found a '=' character, but it is not at the end"
     }));
   }
+  const missingOctets = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+  const decodedLength = 3 * (length / 4) - missingOctets;
+  const native = decodeNative(stripped, decodedLength, undefined);
+  if (native)
+    return succeed2(native);
+  if (native === null) {
+    const invalid = invalidCharacter.exec(stripped);
+    if (invalid !== null) {
+      return fail2(new EncodingError({
+        kind: "Decode",
+        module: "Base64",
+        input: stripped,
+        message: `Invalid character ${invalid[0]}`
+      }));
+    }
+  }
   try {
-    const missingOctets = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
-    const result = new Uint8Array(3 * (length / 4) - missingOctets);
+    const result = new Uint8Array(decodedLength);
     for (let i = 0, j = 0;i < length; i += 4, j += 3) {
       const buffer = getCode(stripped.charCodeAt(i)) << 18 | getCode(stripped.charCodeAt(i + 1)) << 12 | getCode(stripped.charCodeAt(i + 2)) << 6 | getCode(stripped.charCodeAt(i + 3));
       result[j] = buffer >> 16;
@@ -5268,7 +5344,7 @@ var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(i
     result[j + 3] = paddingCode;
   }
   return decoder.decode(result);
-}, encoder, decoder, stripCrlf = (str) => str.replace(/[\n\r]/g, ""), alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", alphabetCodes, paddingCode = 61, codes, getCode = (charCode) => {
+}, encoder, decoder, alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", alphabetCodes, paddingCode = 61, invalidCharacter, codes, getCode = (charCode) => {
   if (charCode >= codes.length || codes[charCode] === 255) {
     throw new TypeError(`Invalid character ${String.fromCharCode(charCode)}`);
   }
@@ -5278,8 +5354,11 @@ var init_Base64 = __esm(() => {
   init_Result();
   init_EncodingError();
   encoder = /* @__PURE__ */ new TextEncoder;
-  decoder = /* @__PURE__ */ new TextDecoder;
+  decoder = /* @__PURE__ */ new TextDecoder("utf-8", {
+    ignoreBOM: true
+  });
   alphabetCodes = /* @__PURE__ */ encoder.encode(alphabet);
+  invalidCharacter = /[^A-Za-z0-9+/=]/;
   codes = /* @__PURE__ */ new Uint8Array(123).fill(255);
   for (let i = 0;i < alphabet.length; i++)
     codes[/* @__PURE__ */ alphabet.charCodeAt(i)] = i;
@@ -5339,15 +5418,17 @@ var init_annotations = __esm(() => {
   });
 });
 
-var missing, succeed7, missingExit, sameExit, toOption = (value) => value === missing ? none2() : some2(value), fromOptionExit = (option) => option._tag === "None" ? missingExit : succeed7(option.value);
+var missing, succeed7, missingExit, sameExit, isSameExit = (result) => result[missing] === true, toOption = (value) => value === missing ? none2() : some2(value), fromOptionExit = (option) => option._tag === "None" ? missingExit : succeed7(option.value);
 var init_parser = __esm(() => {
   init_Exit();
   init_Option();
   init_core();
-  missing = /* @__PURE__ */ Symbol();
+  missing = /* @__PURE__ */ Symbol.for("effect/schema/parser/missing");
   succeed7 = succeed4;
   missingExit = /* @__PURE__ */ succeed7(missing);
-  sameExit = /* @__PURE__ */ succeed7(missing);
+  sameExit = /* @__PURE__ */ Object.assign(/* @__PURE__ */ succeed7(missing), {
+    [missing]: true
+  });
 });
 
 function isIssue(u) {
@@ -5805,7 +5886,7 @@ function stepArray(s, item, exit, i) {
   if (exit._tag === "Failure") {
     return wrapPropertyKeyIssue(s, s.ast, i, exit);
   }
-  const value = exit === sameExit ? item : exit[args];
+  const value = isSameExit(exit) ? item : exit[args];
   if (value !== missing) {
     s.output[i] = value;
   } else {
@@ -5877,7 +5958,7 @@ function stepProperty(s, p, exit) {
   if (exit._tag === "Failure") {
     return wrapPropertyKeyIssue(s, s.ast, p.name, exit);
   }
-  if (exit === sameExit)
+  if (isSameExit(exit))
     return;
   const value = exit[args];
   if (value !== missing) {
@@ -6208,10 +6289,8 @@ function parseUnionCandidates(ast, parser, candidates, input, options) {
 }
 function resumeUnion(eff, state) {
   return flatMapEager2(eff, (_) => {
-    if (state.out === sameExit)
-      return succeed6(state.input);
     if (state.out)
-      return state.out;
+      return isSameExit(state.out) ? succeed6(state.input) : state.out;
     return fail5(new AnyOf(state.ast, state.issues ?? [], state.input, state.options));
   });
 }
@@ -6681,7 +6760,7 @@ var isDeclaration, isNever2, isLiteral, isUniqueSymbol, isArrays, isObjects, isS
       throw new Error("Cannot use `Schema.optionalKey` or `Schema.optional` with index signatures. Index signatures already allow keys to be absent; use `Schema.UndefinedOr` to allow `undefined` values.");
     }
   }
-}, Objects, parsePropertiesOptions, parseProperties, parsePropertiesConcurrent, toCandidate, candidateIndexCache, emptyCandidates, getRuntimeType = (input) => input === null ? "null" : Array.isArray(input) ? "array" : typeof input, hasPropertySignature = (input, key) => key === "__proto__" ? Object.hasOwn(input, key) : (key in input), Union, parseUnion, nonFiniteLiterals, Suspend, Filter2, FilterGroup, finite, numberToJson, bodyOwners, optionalKey, optionalKeyLastLink, optional, toType, toEncoded, flip2, parameterFromPropertyKey, isStringFiniteRegExp, isStringNumberRegExp, finiteString, finiteToString, numberToString, BIGINT_PATTERN = "-?\\d+", isStringBigIntRegExp, bigIntString, bigIntToString, REGEXP_PATTERN = "Symbol\\(([\\s\\S]*)\\)", isStringSymbolRegExp, symbolString, symbolToString, Json, StringTree, unknownToStringTree;
+}, Objects, parsePropertiesOptions, parseProperties, parsePropertiesConcurrent, toCandidate, candidateIndexCache, emptyCandidates, getRuntimeType = (input) => input === null ? "null" : Array.isArray(input) ? "array" : typeof input, objectPrototypeKeys, requiresOwnProperty = (key) => objectPrototypeKeys.has(typeof key === "number" ? globalThis.String(key) : key), hasPropertySignature = (input, key) => Object.hasOwn(input, key) || (key in input) && !requiresOwnProperty(key), Union, parseUnion, nonFiniteLiterals, Suspend, Filter2, FilterGroup, finite, numberToJson, bodyOwners, optionalKey, optionalKeyLastLink, optional, toType, toEncoded, flip2, parameterFromPropertyKey, isStringFiniteRegExp, isStringNumberRegExp, finiteString, finiteToString, numberToString, BIGINT_PATTERN = "-?\\d+", isStringBigIntRegExp, bigIntString, bigIntToString, REGEXP_PATTERN = "Symbol\\(([\\s\\S]*)\\)", isStringSymbolRegExp, symbolString, symbolToString, Json, StringTree, unknownToStringTree;
 var init_SchemaAST = __esm(() => {
   init_Array();
   init_Cause();
@@ -7106,7 +7185,8 @@ var init_SchemaAST = __esm(() => {
           properties = ast.propertySignatures.map((ps) => ({
             parser: compileField(ps.type),
             name: ps.name,
-            type: ps.type
+            type: ps.type,
+            ownOnly: requiresOwnProperty(ps.name)
           }));
           indexes = indexCount ? ast.indexSignatures.map((is) => ({
             is,
@@ -7122,7 +7202,7 @@ var init_SchemaAST = __esm(() => {
           if (exitValue._tag === "Failure") {
             return wrapPropertyKeyIssue(s, ast, key, exitValue) ?? void_2;
           }
-          const value = exitValue === sameExit ? inputValue : exitValue[args];
+          const value = isSameExit(exitValue) ? inputValue : exitValue[args];
           if (k2 !== missing && value !== missing) {
             if (hasProperties && (expectedKeys.has(key) || expectedKeys.has(typeof k2 === "number" ? globalThis.String(k2) : k2)))
               return void_2;
@@ -7141,7 +7221,7 @@ var init_SchemaAST = __esm(() => {
           if (exitKey._tag === "Failure") {
             return wrapPropertyKeyIssue(s, ast, key, exitKey) ?? void_2;
           }
-          const k2 = exitKey === sameExit ? key : exitKey[args];
+          const k2 = isSameExit(exitKey) ? key : exitKey[args];
           const inputValue = s.input[key];
           const result = index.parserValue(inputValue, s.options);
           return effectIsExit(result) ? finishIndex(s, key, k2, inputValue, result) : flatMap2(exit2(result), (exit) => finishIndex(s, key, k2, inputValue, exit));
@@ -7287,13 +7367,13 @@ var init_SchemaAST = __esm(() => {
           for (let index = 0;index < props.length; index++) {
             const property = props[index];
             const name = property.name;
-            const hasKey = hasPropertySignature(record, name);
+            const hasKey = property.ownOnly ? Object.hasOwn(record, name) : (name in record);
             const value = hasKey ? record[name] : missing;
             const exit = property.parser(value, options);
             if (!effectIsExit(exit)) {
               return resume(state, index, exit);
             }
-            if (exit === sameExit) {
+            if (isSameExit(exit)) {
               if (hasKey)
                 assignProperty(out, name, value);
               continue;
@@ -7334,7 +7414,7 @@ var init_SchemaAST = __esm(() => {
   };
   parsePropertiesOptions = {
     onItem(s, p) {
-      if (!hasPropertySignature(s.input, p.name)) {
+      if (!(p.ownOnly ? Object.hasOwn(s.input, p.name) : (p.name in s.input))) {
         return p.parser(missing, s.options);
       }
       const value = s.input[p.name];
@@ -7360,6 +7440,7 @@ var init_SchemaAST = __esm(() => {
   });
   candidateIndexCache = /* @__PURE__ */ new WeakMap;
   emptyCandidates = /* @__PURE__ */ Object.freeze([]);
+  objectPrototypeKeys = /* @__PURE__ */ new Set(Reflect.ownKeys(Object.prototype)).add("__proto__");
   Union = class extends ASTNodeImpl {
     _tag = "Union";
     types;
@@ -7555,7 +7636,7 @@ var init_SchemaAST = __esm(() => {
       const checks = canPreserveEncodingChecks(ast) ? type.encodingChecks : isArrays(type) || isObjects(type) || isDeclaration(type) && type.typeParameters.length > 0 ? extractStructuralChecks(type.encodingChecks) : undefined;
       return copy2(type, {
         encodingChecks: undefined,
-        checks: combineChecks(type.checks, checks)
+        checks: combineChecks(checks, type.checks)
       });
     }
     return type;
@@ -7638,14 +7719,14 @@ function compileTransformation(transformation) {
 function compileTransformationUnsafe(transformation) {
   if (transformation._tag === "Middleware") {
     return (result, current, options) => {
-      const transformed = result === sameExit ? transformation.decode(succeed7(toOption(current)), options) : transformation.decode(mapEager2(result, toOption), options);
+      const transformed = isSameExit(result) ? transformation.decode(succeed7(toOption(current)), options) : transformation.decode(mapEager2(result, toOption), options);
       return fromOptionalEffect(transformed);
     };
   }
   const getter = transformation.decode;
   switch (getter._tag) {
     case "Passthrough":
-      return (result, current) => result === sameExit ? succeed7(current) : result;
+      return (result, current) => isSameExit(result) ? succeed7(current) : result;
     case "Transform": {
       const transform = (value) => value === missing ? missingExit : succeed7(getter.transform(value));
       return (result, current) => flatMapTransformation(result, current, transform);
@@ -7680,11 +7761,11 @@ function withDefault2(ast, parser) {
     const result = defaultValue;
     if (effectIsExit(result) && result._tag === "Success") {
       const local = parser(result[args], options);
-      return local === sameExit ? result : local;
+      return isSameExit(local) ? result : local;
     }
     return flatMapEager2(wrapEncoding(ast, input, options, result), (value) => {
       const local = parser(value, options);
-      return local === sameExit ? succeed7(value) : local;
+      return isSameExit(local) ? succeed7(value) : local;
     });
   };
 }
@@ -7713,7 +7794,7 @@ function compile(ast, compile, compileField, base, specialize) {
       if (encodingChecks && !options.disableChecks) {
         if (effectIsExit(result)) {
           if (result._tag === "Success") {
-            const output = result === sameExit ? input : result[args];
+            const output = isSameExit(result) ? input : result[args];
             if (input !== missing && output !== missing) {
               const issues = collectIssues(encodingChecks, input, undefined, ast, options);
               if (issues) {
@@ -7736,7 +7817,7 @@ function compile(ast, compile, compileField, base, specialize) {
       if (checks && !options.disableChecks) {
         if (effectIsExit(result)) {
           if (result._tag === "Success") {
-            const value = result === sameExit ? input : result[args];
+            const value = isSameExit(result) ? input : result[args];
             if (value === missing)
               return result;
             const issues = collectIssues(checks, value, undefined, ast, options);
@@ -7779,7 +7860,7 @@ function compile(ast, compile, compileField, base, specialize) {
         } else {
           result = flatMapEager2(result, (value) => {
             const nextResult = next(value, options);
-            return nextResult === sameExit ? succeed7(value) : nextResult;
+            return isSameExit(nextResult) ? succeed7(value) : nextResult;
           });
         }
       }
@@ -7787,16 +7868,16 @@ function compile(ast, compile, compileField, base, specialize) {
     if (result._tag === "Success") {
       const value = result[args];
       const local = parseLocal(value, options);
-      return local === sameExit ? result : local;
+      return isSameExit(local) ? result : local;
     }
     result = wrapEncoding(ast, input, options, result);
     return flatMapEager2(result, (value) => {
       const local = parseLocal(value, options);
-      return local === sameExit ? succeed7(value) : local;
+      return isSameExit(local) ? succeed7(value) : local;
     });
   };
 }
-var flatMapTransformation = (result, current, f) => result === sameExit ? f(current) : flatMapEager2(result, f), fromOptionalEffect = (effect) => flatMapEager2(effect, fromOptionExit), wrapEncoding = (ast, input, options, effect) => catchCause2(effect, (cause) => failCauseSync2(() => map4(cause, (issue) => new Encoding(ast, issue, input, options))));
+var flatMapTransformation = (result, current, f) => isSameExit(result) ? f(current) : flatMapEager2(result, f), fromOptionalEffect = (effect) => flatMapEager2(effect, fromOptionExit), wrapEncoding = (ast, input, options, effect) => catchCause2(effect, (cause) => failCauseSync2(() => map4(cause, (issue) => new Encoding(ast, issue, input, options))));
 var init_interpreter = __esm(() => {
   init_Cause();
   init_Effect();
@@ -7992,7 +8073,7 @@ function run(ast) {
   return runWithCompiler(normalCompiler, ast);
 }
 function parserResult(result, input) {
-  if (result === sameExit) {
+  if (isSameExit(result)) {
     return succeed6(input);
   }
   if (!effectIsExit(result)) {
@@ -8004,7 +8085,7 @@ function runWithCompiler(compiler, ast) {
   let parser;
   return (input, options) => {
     const result = (parser ??= compiler(ast))(input, options ?? defaultParseOptions);
-    if (result === sameExit) {
+    if (isSameExit(result)) {
       return succeed6(input);
     }
     if (!effectIsExit(result)) {
@@ -8176,14 +8257,50 @@ var init_schemaError = () => {};
 
 var init_Bytes = () => {};
 
-var TypeId20 = "~effect/SemVer", SemVerProto, isSemVer = (u) => hasProperty(u, TypeId20), format4 = (self) => {
+var TypeId20 = "~effect/Rational", RationalProto, isRational = (u) => hasProperty(u, TypeId20), Equivalence3, format4 = (n) => `${n.numerator}/${n.denominator}`;
+var init_Rational = __esm(() => {
+  init_Equal();
+  init_Equivalence();
+  init_Hash();
+  init_Inspectable();
+  init_Pipeable();
+  init_Predicate();
+  RationalProto = {
+    [TypeId20]: TypeId20,
+    [symbol]() {
+      return combine(hash(this.numerator), hash(this.denominator));
+    },
+    [symbol2](that) {
+      return isRational(that) && Equivalence3(this, that);
+    },
+    toString() {
+      return `Rational(${format4(this)})`;
+    },
+    toJSON() {
+      return {
+        _id: "Rational",
+        numerator: String(this.numerator),
+        denominator: String(this.denominator)
+      };
+    },
+    [NodeInspectSymbol]() {
+      return this.toJSON();
+    },
+    pipe() {
+      return pipeArguments(this, arguments);
+    }
+  };
+  Equivalence3 = /* @__PURE__ */ make((self, that) => self.numerator === that.numerator && self.denominator === that.denominator);
+});
+
+var TypeId21 = "~effect/SemVer", SemVerProto, isSemVer = (u) => hasProperty(u, TypeId21), format5 = (self) => {
   let out = `${self.major}.${self.minor}.${self.patch}`;
   if (self.prerelease.length > 0)
     out += `-${self.prerelease.join(".")}`;
   if (self.build.length > 0)
     out += `+${self.build.join(".")}`;
   return out;
-}, identifiersEqual, Equivalence3;
+}, identifiersEqual, Equivalence4;
 var init_SemVer = __esm(() => {
   init_Equal();
   init_Equivalence();
@@ -8192,20 +8309,20 @@ var init_SemVer = __esm(() => {
   init_Pipeable();
   init_Predicate();
   SemVerProto = {
-    [TypeId20]: TypeId20,
+    [TypeId21]: TypeId21,
     [symbol2](that) {
-      return isSemVer(that) && Equivalence3(this, that);
+      return isSemVer(that) && Equivalence4(this, that);
     },
     [symbol]() {
-      return string(format4(this));
+      return string(format5(this));
     },
     toString() {
-      return `SemVer(${format4(this)})`;
+      return `SemVer(${format5(this)})`;
     },
     toJSON() {
       return {
         _id: "SemVer",
-        value: format4(this)
+        value: format5(this)
       };
     },
     [NodeInspectSymbol]() {
@@ -8216,15 +8333,15 @@ var init_SemVer = __esm(() => {
     }
   };
   identifiersEqual = /* @__PURE__ */ Array_(/* @__PURE__ */ strictEqual());
-  Equivalence3 = /* @__PURE__ */ make((self, that) => self.major === that.major && self.minor === that.minor && self.patch === that.patch && identifiersEqual(self.prerelease, that.prerelease) && identifiersEqual(self.build, that.build));
+  Equivalence4 = /* @__PURE__ */ make((self, that) => self.major === that.major && self.minor === that.minor && self.patch === that.patch && identifiersEqual(self.prerelease, that.prerelease) && identifiersEqual(self.build, that.build));
 });
 
-var TypeId21 = "~effect/SemVerRange", SemVerRangeProto, isSemVerRange = (u) => hasProperty(u, TypeId21), formatPartial = (self) => {
+var TypeId22 = "~effect/SemVerRange", SemVerRangeProto, isSemVerRange = (u) => hasProperty(u, TypeId22), formatPartial = (self) => {
   if (self.components.length === 0)
     return "*";
   const core = self.components.join(".");
   return self.prerelease.length === 0 ? core : `${core}-${self.prerelease.join(".")}`;
-}, formatComparator = (self) => self._tag === "Hyphen" ? `${formatPartial(self.from)} - ${formatPartial(self.to)}` : `${self.operator === "=" ? "" : self.operator}${formatPartial(self.version)}`, format5 = (self) => self.sets.map((set) => set.map(formatComparator).join(" ")).join(" || ");
+}, formatComparator = (self) => self._tag === "Hyphen" ? `${formatPartial(self.from)} - ${formatPartial(self.to)}` : `${self.operator === "=" ? "" : self.operator}${formatPartial(self.version)}`, format6 = (self) => self.sets.map((set) => set.map(formatComparator).join(" ")).join(" || ");
 var init_SemVerRange = __esm(() => {
   init_Equal();
   init_Hash();
@@ -8232,20 +8349,20 @@ var init_SemVerRange = __esm(() => {
   init_Pipeable();
   init_Predicate();
   SemVerRangeProto = {
-    [TypeId21]: TypeId21,
+    [TypeId22]: TypeId22,
     [symbol2](that) {
-      return isSemVerRange(that) && format5(this) === format5(that);
+      return isSemVerRange(that) && format6(this) === format6(that);
     },
     [symbol]() {
-      return string(format5(this));
+      return string(format6(this));
     },
     toString() {
-      return `SemVerRange(${format5(this)})`;
+      return `SemVerRange(${format6(this)})`;
     },
     toJSON() {
       return {
         _id: "SemVerRange",
-        value: format5(this)
+        value: format6(this)
       };
     },
     [NodeInspectSymbol]() {
@@ -8846,12 +8963,12 @@ var init_Boolean = __esm(() => {
 
 var init_Brand = () => {};
 
-var TypeId22 = "~effect/Cache", Proto4;
+var TypeId23 = "~effect/Cache", Proto4;
 var init_Cache = __esm(() => {
   init_core();
   Proto4 = {
     ...PipeInspectableProto,
-    [TypeId22]: TypeId22,
+    [TypeId23]: TypeId23,
     toJSON() {
       return {
         _id: "Cache",
@@ -8864,12 +8981,12 @@ var init_Cache = __esm(() => {
 
 var init_Latch = () => {};
 
-var TypeId23 = "~effect/MutableRef", MutableRefProto;
+var TypeId24 = "~effect/MutableRef", MutableRefProto;
 var init_MutableRef = __esm(() => {
   init_Inspectable();
   init_core();
   MutableRefProto = {
-    [TypeId23]: TypeId23,
+    [TypeId24]: TypeId24,
     ...PipeInspectableProto,
     toJSON() {
       return {
@@ -8884,12 +9001,12 @@ var init_PubSub = () => {};
 
 var init_Take = () => {};
 
-var TypeId24 = "~effect/Channel", ChannelProto;
+var TypeId25 = "~effect/Channel", ChannelProto;
 var init_Channel = __esm(() => {
   init_Function();
   init_Pipeable();
   ChannelProto = {
-    [TypeId24]: {
+    [TypeId25]: {
       _Env: identity,
       _InErr: identity,
       _InElem: identity,
@@ -8906,7 +9023,7 @@ var init_ChannelSchema = () => {};
 
 var init_PlatformError = () => {};
 
-var TypeId25 = "~effect/Sink", sinkVariance, SinkProto;
+var TypeId26 = "~effect/Sink", sinkVariance, SinkProto;
 var init_Sink = __esm(() => {
   init_Function();
   init_Pipeable();
@@ -8918,7 +9035,7 @@ var init_Sink = __esm(() => {
     _R: identity
   };
   SinkProto = {
-    [TypeId25]: sinkVariance,
+    [TypeId26]: sinkVariance,
     pipe() {
       return pipeArguments(this, arguments);
     }
@@ -9045,7 +9162,7 @@ var init_ConfigProvider = __esm(() => {
 
 var init_LogLevel = () => {};
 
-var TypeId26 = "~effect/Config", Proto6;
+var TypeId27 = "~effect/Config", Proto6;
 var init_Config = __esm(() => {
   init_ConfigProvider();
   init_Effectable();
@@ -9056,7 +9173,7 @@ var init_Config = __esm(() => {
         return this.parse(fiber.getRef(ConfigProvider));
       }
     }),
-    [TypeId26]: TypeId26,
+    [TypeId27]: TypeId27,
     toJSON() {
       return {
         _id: "Config"
@@ -9071,11 +9188,11 @@ var init_Differ = () => {};
 
 var init_ErrorReporter = () => {};
 
-var TypeId27 = "~effect/FiberHandle", Proto7;
+var TypeId28 = "~effect/FiberHandle", Proto7;
 var init_FiberHandle = __esm(() => {
   init_core();
   Proto7 = {
-    [TypeId27]: TypeId27,
+    [TypeId28]: TypeId28,
     ...PipeInspectableProto,
     toJSON() {
       return {
@@ -9086,12 +9203,12 @@ var init_FiberHandle = __esm(() => {
   };
 });
 
-var TypeId28 = "~effect/FiberMap", Proto8;
+var TypeId29 = "~effect/FiberMap", Proto8;
 var init_FiberMap = __esm(() => {
   init_core();
   init_Iterable();
   Proto8 = {
-    [TypeId28]: TypeId28,
+    [TypeId29]: TypeId29,
     [Symbol.iterator]() {
       if (this.state._tag === "Closed") {
         return empty2();
@@ -9108,12 +9225,12 @@ var init_FiberMap = __esm(() => {
   };
 });
 
-var TypeId29 = "~effect/FiberSet", Proto9;
+var TypeId30 = "~effect/FiberSet", Proto9;
 var init_FiberSet = __esm(() => {
   init_core();
   init_Iterable();
   Proto9 = {
-    [TypeId29]: TypeId29,
+    [TypeId30]: TypeId30,
     [Symbol.iterator]() {
       if (this.state._tag === "Closed") {
         return empty2();
@@ -9130,13 +9247,13 @@ var init_FiberSet = __esm(() => {
   };
 });
 
-var TypeId30 = "~effect/Glob", GlobProto;
+var TypeId31 = "~effect/Glob", GlobProto;
 var init_Glob = __esm(() => {
   init_Formatter();
   init_Inspectable();
   init_Pipeable();
   GlobProto = {
-    [TypeId30]: TypeId30,
+    [TypeId31]: TypeId31,
     toJSON() {
       return {
         _id: "Glob",
@@ -9160,13 +9277,13 @@ var init_Graph = () => {};
 
 var init_PrimaryKey = () => {};
 
-var TypeId31 = "~effect/HashRing", Proto10;
+var TypeId32 = "~effect/HashRing", Proto10;
 var init_HashRing = __esm(() => {
   init_core();
   init_Iterable();
   Proto10 = {
     ...PipeInspectableProto,
-    [TypeId31]: TypeId31,
+    [TypeId32]: TypeId32,
     [Symbol.iterator]() {
       return map(this.nodes.values(), ([n]) => n)[Symbol.iterator]();
     },
@@ -9192,13 +9309,13 @@ var init_ManagedRuntime = () => {};
 
 var init_Match = () => {};
 
-var TypeId32 = "~effect/MutableHashSet", MutableHashSetProto;
+var TypeId33 = "~effect/MutableHashSet", MutableHashSetProto;
 var init_MutableHashSet = __esm(() => {
   init_Formatter();
   init_Inspectable();
   init_Pipeable();
   MutableHashSetProto = {
-    [TypeId32]: TypeId32,
+    [TypeId33]: TypeId33,
     [Symbol.iterator]() {
       return Array.from(this.keyMap).map(([_]) => _)[Symbol.iterator]();
     },
@@ -9228,12 +9345,12 @@ var init_PartitionedSemaphore = () => {};
 
 var init_Pool = () => {};
 
-var TypeId33 = "~effect/Ref", RefProto;
+var TypeId34 = "~effect/Ref", RefProto;
 var init_Ref = __esm(() => {
   init_Function();
   init_core();
   RefProto = {
-    [TypeId33]: {
+    [TypeId34]: {
       _A: identity
     },
     ...PipeInspectableProto,
@@ -9248,12 +9365,12 @@ var init_Ref = __esm(() => {
 
 var init_UndefinedOr = () => {};
 
-var TypeId34 = "~effect/RequestResolver", RequestResolverProto;
+var TypeId35 = "~effect/RequestResolver", RequestResolverProto;
 var init_RequestResolver = __esm(() => {
   init_Function();
   init_Pipeable();
   RequestResolverProto = {
-    [TypeId34]: {
+    [TypeId35]: {
       _A: identity,
       _R: identity
     },
@@ -9263,12 +9380,12 @@ var init_RequestResolver = __esm(() => {
   };
 });
 
-var TypeId35 = "~effect/SynchronizedRef", Proto11;
+var TypeId36 = "~effect/SynchronizedRef", Proto11;
 var init_SynchronizedRef = __esm(() => {
   init_core();
   Proto11 = {
     ...PipeInspectableProto,
-    [TypeId35]: TypeId35,
+    [TypeId36]: TypeId36,
     toJSON() {
       return {
         _id: "SynchronizedRef",
@@ -9278,12 +9395,12 @@ var init_SynchronizedRef = __esm(() => {
   };
 });
 
-var TypeId36 = "~effect/ScopedRef", Proto12;
+var TypeId37 = "~effect/ScopedRef", Proto12;
 var init_ScopedRef = __esm(() => {
   init_core();
   Proto12 = {
     ...PipeInspectableProto,
-    [TypeId36]: TypeId36,
+    [TypeId37]: TypeId37,
     toJSON() {
       return {
         _id: "ScopedRef",
@@ -9293,12 +9410,12 @@ var init_ScopedRef = __esm(() => {
   };
 });
 
-var TypeId37 = "~effect/Resource", Proto13;
+var TypeId38 = "~effect/Resource", Proto13;
 var init_Resource = __esm(() => {
   init_core();
   Proto13 = {
     ...PipeInspectableProto,
-    [TypeId37]: TypeId37,
+    [TypeId38]: TypeId38,
     toJSON() {
       return {
         _id: "Resource"
@@ -9460,12 +9577,12 @@ var init_SchemaRepresentation = __esm(() => {
   }), /* @__PURE__ */ makeKeywordSchema("Number"), /* @__PURE__ */ makeKeywordSchema("Boolean"), /* @__PURE__ */ makeKeywordSchema("BigInt"), /* @__PURE__ */ makeKeywordSchema("Symbol"), /* @__PURE__ */ makeKeywordSchema("ObjectKeyword"), LiteralSchema, UniqueSymbolSchema, EnumSchema, TemplateLiteralSchema, ArraysSchema, ObjectsSchema, UnionSchema]);
 });
 
-var TypeId38 = "~effect/ScopedCache", Proto14;
+var TypeId39 = "~effect/ScopedCache", Proto14;
 var init_ScopedCache = __esm(() => {
   init_core();
   Proto14 = {
     ...PipeInspectableProto,
-    [TypeId38]: TypeId38,
+    [TypeId39]: TypeId39,
     toJSON() {
       return {
         _id: "ScopedCache",
@@ -9480,13 +9597,13 @@ var init_StandardSchema = () => {};
 
 var init_Stdio = () => {};
 
-var TypeId39 = "~effect/SubscriptionRef", Proto15;
+var TypeId40 = "~effect/SubscriptionRef", Proto15;
 var init_SubscriptionRef = __esm(() => {
   init_Function();
   init_core();
   Proto15 = {
     ...PipeInspectableProto,
-    [TypeId39]: {
+    [TypeId40]: {
       _A: identity
     },
     toJSON() {
@@ -9551,13 +9668,13 @@ var init_TxDeferred = __esm(() => {
   };
 });
 
-var TypeId40 = "~effect/TxHashMap", TxHashMapProto;
+var TypeId41 = "~effect/TxHashMap", TxHashMapProto;
 var init_TxHashMap = __esm(() => {
   init_Formatter();
   init_Inspectable();
   init_Pipeable();
   TxHashMapProto = {
-    [TypeId40]: TypeId40,
+    [TypeId41]: TypeId41,
     [NodeInspectSymbol]() {
       return toJson(this);
     },
@@ -9576,13 +9693,13 @@ var init_TxHashMap = __esm(() => {
   };
 });
 
-var TypeId41 = "~effect/TxHashSet", TxHashSetProto;
+var TypeId42 = "~effect/TxHashSet", TxHashSetProto;
 var init_TxHashSet = __esm(() => {
   init_Formatter();
   init_Inspectable();
   init_Pipeable();
   TxHashSetProto = {
-    [TypeId41]: TypeId41,
+    [TypeId42]: TypeId42,
     [NodeInspectSymbol]() {
       return toJson(this);
     },
@@ -9620,7 +9737,7 @@ var init_TxPriorityQueue = __esm(() => {
   };
 });
 
-var EnqueueTypeId2 = "~effect/TxQueue/Enqueue", DequeueTypeId2 = "~effect/TxQueue/Dequeue", TypeId42 = "~effect/TxQueue", TxQueueProto;
+var EnqueueTypeId2 = "~effect/TxQueue/Enqueue", DequeueTypeId2 = "~effect/TxQueue/Dequeue", TypeId43 = "~effect/TxQueue", TxQueueProto;
 var init_TxQueue = __esm(() => {
   init_Inspectable();
   TxQueueProto = {
@@ -9632,7 +9749,7 @@ var init_TxQueue = __esm(() => {
       _A: (_) => _,
       _E: (_) => _
     },
-    [TypeId42]: {
+    [TypeId43]: {
       _A: (_) => _,
       _E: (_) => _
     },
@@ -9827,6 +9944,7 @@ var init_dist = __esm(() => {
   init_Pull();
   init_Queue();
   init_Random();
+  init_Rational();
   init_RcMap();
   init_RcRef();
   init_Record();
@@ -10563,8 +10681,8 @@ var init_errors3 = __esm(() => {
     MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
     NothingToMigrate: "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
     MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
-    UnsupportedPlatform: "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
-    ToolMissing: "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
+    ToolMissing: "Install the program with the command the message gives for your platform; until then search with the system grep or find and report the missing program.",
+    BrowserLaunchFailed: "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
     StateModeRefused: "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
     StateLocked: "Another process holds the state lock; retry in a moment.",
     StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
@@ -10689,9 +10807,10 @@ var init_guardrails = __esm(() => {
   };
 });
 
-var FFF_OVERRIDE_SETTINGS, FFF_TOOLS, FFF_NATIVE_HOSTS;
+var FFF_OVERRIDE_SETTINGS, FFF_RETIRED_SETTINGS, FFF_TOOLS, FFF_NATIVE_HOSTS;
 var init_settings = __esm(() => {
-  FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false };
+  FFF_OVERRIDE_SETTINGS = { mode: "override" };
+  FFF_RETIRED_SETTINGS = { followSymlinks: false };
   FFF_TOOLS = [
     "grep",
     "find",
@@ -10715,16 +10834,15 @@ var pi_packages_default;
 var init_pi_packages = __esm(() => {
   pi_packages_default = {
     "pi-provider-kimi-code": "0.6.13",
-    "@tintinweb/pi-subagents": "0.23.1",
-    "billion-context": "0.1.212",
+    "@tintinweb/pi-subagents": "0.23.2",
+    "billion-context": "0.1.213",
     "@juicesharp/rpiv-todo": "2.15.0",
     "@juicesharp/rpiv-ask-user-question": "2.15.0",
     "@aliou/pi-processes": "0.13.6",
-    "@amaster.ai/pi-computer-use": "0.1.36",
+    "@amaster.ai/pi-computer-use": "0.1.38",
     "pi-web-kit": "0.5.0",
     "@ff-labs/pi-fff": "0.11.0",
-    "@opencode/browse": "0.0.15",
-    "@playwright/mcp": "0.0.85"
+    "@opencode/browse": "0.0.16"
   };
 });
 
@@ -10734,13 +10852,33 @@ var init_pi_packages2 = __esm(() => {
   PI_PACKAGE_VERSIONS = pi_packages_default;
 });
 
+var pypi_packages_default;
+var init_pypi_packages = __esm(() => {
+  pypi_packages_default = {
+    "browser-use": "1.0.0"
+  };
+});
+
+var PYPI_PACKAGE_VERSIONS;
+var init_pypi_packages2 = __esm(() => {
+  init_pypi_packages();
+  PYPI_PACKAGE_VERSIONS = pypi_packages_default;
+});
+
 var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json", PI_SETTINGS_FILE = "~/.pi/agent/settings.json", SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json", SUBAGENTS_ONLY_SPECIALISTS, PI_FFF_FILE = "~/.pi/agent/pi-fff.json", T3_PREFIX = "mcp__t3*code__", T3_PREVIEW_TOOLS, T3_VISUAL_TOOLS, COMPUTER_USE_TOOLS, BROWSE_PACKAGE = "@opencode/browse", BROWSE_SERVER = "browse", BROWSE_TOOLS, NPM_REGISTRY = "https://registry.npmjs.org/", npxServerArgs = (name, rest) => [
   `--registry=${NPM_REGISTRY}`,
   ...name.startsWith("@") ? [`--${name.slice(0, name.indexOf("/"))}:registry=${NPM_REGISTRY}`] : [],
   "-y",
   `${name}@${PI_PACKAGE_VERSIONS[name]}`,
   ...rest
-], BROWSE_MCP_SERVER, PLAYWRIGHT_PACKAGE = "@playwright/mcp", PLAYWRIGHT_SERVER = "playwright", PLAYWRIGHT_TOOLS, PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path", PLAYWRIGHT_MCP_SERVER, BROWSE_MINIMUM_NODE, PLAYWRIGHT_MINIMUM_NODE, nodeNeed = (minimum) => ({
+], BROWSE_MCP_SERVER, BROWSER_USE_PACKAGE = "browser-use", BROWSER_USE_SERVER = "browser_use", BROWSER_USE_TOOLS, BROWSER_USE_ALL_TOOLS, PYPI_INDEX = "https://pypi.org/simple", uvxServerArgs = (name, rest) => [
+  "--no-config",
+  "--default-index",
+  PYPI_INDEX,
+  "--from",
+  `${name}==${PYPI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+], BROWSER_SERVER_COMMAND = "browser-server", BROWSER_USE_MCP_SERVER, BROWSE_MINIMUM_NODE, CHROMIUM_FIX = "set HOLYAGENT_CHROMIUM_PATH to a Chromium executable, or put a Playwright Chromium build in the folder PLAYWRIGHT_BROWSERS_PATH names (PLAYWRIGHT_BROWSERS_PATH=<folder> uvx playwright install chromium)", nodeNeed = (minimum) => ({
   kind: "node",
   minimum,
   fix: `install Node.js ${minimum.join(".")} or newer from https://nodejs.org, which ships npx`
@@ -10765,6 +10903,7 @@ var init_capabilities = __esm(() => {
   init_guardrails();
   init_settings();
   init_pi_packages2();
+  init_pypi_packages2();
   CAPABILITY_FORMS = ["headless", "normal"];
   SUBAGENTS_ONLY_SPECIALISTS = {
     disableDefaultAgents: true,
@@ -10784,15 +10923,18 @@ var init_capabilities = __esm(() => {
     command: "npx",
     args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
   };
-  PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
-  PLAYWRIGHT_MCP_SERVER = {
-    name: PLAYWRIGHT_SERVER,
-    command: "npx",
-    args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
-    chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+  BROWSER_USE_TOOLS = [
+    `mcp__${BROWSER_USE_SERVER}__browser_exec`,
+    `mcp__${BROWSER_USE_SERVER}__browser_screenshot`
+  ];
+  BROWSER_USE_ALL_TOOLS = [`mcp__${BROWSER_USE_SERVER}__*`];
+  BROWSER_USE_MCP_SERVER = {
+    name: BROWSER_USE_SERVER,
+    command: "uvx",
+    args: uvxServerArgs(BROWSER_USE_PACKAGE, ["browser-use", "--cli-mcp"]),
+    launchesChromium: true
   };
   BROWSE_MINIMUM_NODE = [22, 19, 0];
-  PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
   CAPABILITIES = [
     {
       name: "subagents",
@@ -10900,34 +11042,43 @@ var init_capabilities = __esm(() => {
     {
       name: "browser-use",
       feature: "browserUse",
-      description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+      description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the browser-use MCP server (browser-use) where there is no desktop",
       skills: [],
       applicability: "specialists",
       defaultOn: true,
-      needs: [
-        {
-          kind: "command",
-          command: "npx",
-          fix: "install Node.js from https://nodejs.org, which ships npx"
-        }
-      ],
+      needs: [],
       forms: {
         headless: {
           packages: [],
-          mcpServers: [PLAYWRIGHT_MCP_SERVER],
-          needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
+          mcpServers: [BROWSER_USE_MCP_SERVER],
+          needs: [
+            {
+              kind: "command",
+              command: "uvx",
+              fix: "install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs"
+            },
+            { kind: "chromium", fix: CHROMIUM_FIX }
+          ]
         },
         normal: {
           packages: [],
           mcpServers: [BROWSE_MCP_SERVER],
-          needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+          needs: [
+            {
+              kind: "command",
+              command: "npx",
+              fix: "install Node.js from https://nodejs.org, which ships npx"
+            },
+            { kind: "display" },
+            nodeNeed(BROWSE_MINIMUM_NODE)
+          ],
           pairing: true
         }
       },
       tools: {
-        rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+        rootExclude: [...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS],
         visual: [],
-        screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+        screen: [...BROWSE_TOOLS, ...BROWSER_USE_TOOLS]
       },
       settings: [],
       health: ["needs"]
@@ -12898,7 +13049,7 @@ var init_dist2 = __esm(() => {
   NUMERIC_LIKE_PATTERN = /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i;
 });
 
-var version = "0.3.1";
+var version = "0.3.2";
 var init_package = () => {};
 
 var SpecialistEntry, union2 = (a, b) => [
@@ -14748,7 +14899,7 @@ var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length
     ...carryForward ? { carryForward: true } : {}
   });
 }, section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)], PROMPT_LINE, dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
-`, 1)[0] ?? "")?.[1], SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.", HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.", renderPrompt = (assignment, agent) => [
+`, 1)[0] ?? "")?.[1], SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.", HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (outside T3 the mcp__browser_use__browser_exec and mcp__browser_use__browser_screenshot tools, a temporary profile; where T3 hosts the session, T3's preview tools, and browser-use is not available) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.", renderPrompt = (assignment, agent) => [
   `Role: ${assignment.roleTask} (${agent}). Assignment: ${assignment.id}.`,
   `Objective: ${assignment.objective}`,
   ...section2("Scope", assignment.scope),
@@ -16055,6 +16206,310 @@ var init_assignment2 = __esm(() => {
   ];
 });
 
+import { mkdir as mkdir3, mkdtemp, rm as rm5 } from "fs/promises";
+import { tmpdir } from "os";
+import { join as join9 } from "path";
+var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS = 3000, FOLDERS, chromiumArguments = (profile, sandbox) => [
+  "--headless=new",
+  "--remote-debugging-port=0",
+  "--remote-debugging-address=127.0.0.1",
+  `--user-data-dir=${profile}`,
+  "--no-first-run",
+  "--no-default-browser-check",
+  "--disable-dev-shm-usage",
+  ...sandbox ? [] : ["--no-sandbox"],
+  "about:blank"
+], SERVER_ENVIRONMENT_ALLOWLIST, ALLOWED_NAMES, reachesServer = (name) => {
+  const upper = name.toUpperCase();
+  return ALLOWED_NAMES.has(upper) || upper.startsWith("LC_");
+}, serverEnvironment = (inherited, port, folders) => ({
+  ...Object.fromEntries(Object.entries(definedEnv(inherited)).filter(([name]) => reachesServer(name))),
+  BU_CDP_URL: `http://127.0.0.1:${port}`,
+  BU_NAME: `holyagent-${port}`,
+  ANONYMIZED_TELEMETRY: "0",
+  BROWSER_USE_CONFIG_DIR: folders.config,
+  BH_HOME: folders.harness,
+  BROWSER_HARNESS_HOME: folders.harness
+}), parseDevToolsActivePort = (text) => {
+  const [line, rest] = text.split(`
+`);
+  if (line === undefined || rest === undefined)
+    return;
+  const port = Number(line.trim());
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : undefined;
+}, failed2 = (reason) => new BrowserLaunchFailed({ reason }), awaitDevTools = (host, chromium, profile, timeoutMs, pollMs) => {
+  const again = (poll) => sleep2(pollMs).pipe(andThen2(poll));
+  const poll = suspend2(() => host.devToolsPort(profile).pipe(flatMap2((port) => port === undefined ? again(poll) : host.answers(`http://127.0.0.1:${port}/json/version`).pipe(flatMap2((ok) => ok ? succeed6(port) : again(poll))))));
+  const answered = poll.pipe(timeoutOption2(timeoutMs), flatMap2((result) => isSome2(result) ? succeed6(result.value) : fail5(failed2(`the DevTools endpoint did not answer within ${timeoutMs} ms: Chromium never wrote DevToolsActivePort in the profile directory ${profile} or never answered on the port it reported (a Chromium wrapper that ignores --user-data-dir writes it elsewhere)`))));
+  const exitedFirst = chromium.exited.pipe(flatMap2((code) => fail5(failed2(`Chromium exited with code ${code} before its DevTools endpoint answered`))));
+  return raceFirst2(answered, exitedFirst);
+}, launch = (host, options) => scoped2(gen2(function* () {
+  const { chromium: executable } = options;
+  if (executable === undefined)
+    return yield* failed2(`no Chromium was found; ${options.chromiumFix}`);
+  const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
+  const folders = {
+    profile: join9(base, FOLDERS.profile),
+    config: join9(base, FOLDERS.config),
+    harness: join9(base, FOLDERS.harness)
+  };
+  for (const folder of Object.values(folders))
+    yield* host.makeDirectory(folder);
+  const inherited = definedEnv(options.env);
+  const chromium = yield* acquireRelease2(host.spawn({
+    command: executable,
+    args: chromiumArguments(folders.profile, !host.root),
+    env: inherited,
+    stdio: "ignore"
+  }), (running) => running.stop);
+  const port = yield* awaitDevTools(host, chromium, folders.profile, options.readyTimeoutMs ?? READY_TIMEOUT_MS, options.pollMs ?? POLL_MS);
+  const server = yield* acquireRelease2(host.spawn({
+    command: options.server.command,
+    args: options.server.args,
+    env: serverEnvironment(inherited, port, folders),
+    stdio: "inherit"
+  }), (running) => running.stop);
+  const browserLost = chromium.exited.pipe(flatMap2((code) => fail5(failed2(`Chromium exited with code ${code} while the server was running`))));
+  return yield* raceFirst2(server.exited, browserLost);
+})), runBrowserServer = (host, options) => scoped2(gen2(function* () {
+  const received = yield* host.signals;
+  return yield* raceFirst2(launch(host, options), received);
+})), SIGNALS, reason = (cause) => cause instanceof Error ? cause.message : String(cause), terminateGroup = (child) => try_2(() => {
+  if (Number.isInteger(child.pid) && child.pid > 1)
+    process.kill(-child.pid, "SIGTERM");
+}).pipe(ignore2), stopGroup = (child, platform = process.platform) => gen2(function* () {
+  const exit = promise2(() => child.exited).pipe(timeoutOption2(STOP_GRACE_MS));
+  if (platform === "win32") {
+    if (child.exitCode === null)
+      yield* killGroup(child, platform);
+    yield* exit;
+    return;
+  }
+  yield* terminateGroup(child);
+  yield* exit;
+  yield* killGroup(child, platform);
+}), liveHost;
+var init_browser_launch = __esm(() => {
+  init_dist();
+  init_environment();
+  init_tree();
+  BrowserLaunchFailed = class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
+    get message() {
+      return this.reason;
+    }
+  };
+  FOLDERS = { profile: "profile", config: "browser-use", harness: "harness" };
+  SERVER_ENVIRONMENT_ALLOWLIST = [
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+    "LANG",
+    "TZ",
+    "TERM",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "ALL_PROXY",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "REQUESTS_CA_BUNDLE",
+    "UV_CACHE_DIR",
+    "UV_NATIVE_TLS",
+    "UV_PYTHON_INSTALL_DIR",
+    "XDG_CACHE_HOME",
+    "XDG_DATA_HOME",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+    "PROGRAMFILES"
+  ];
+  ALLOWED_NAMES = new Set(SERVER_ENVIRONMENT_ALLOWLIST);
+  SIGNALS = [
+    ["SIGINT", 130],
+    ["SIGTERM", 143],
+    ["SIGHUP", 129]
+  ];
+  liveHost = {
+    spawn: (spec) => try_2({
+      try: () => {
+        const child = Bun.spawn({
+          cmd: [spec.command, ...spec.args],
+          env: { ...spec.env },
+          stdin: spec.stdio === "inherit" ? "inherit" : "ignore",
+          stdout: spec.stdio === "inherit" ? "inherit" : "ignore",
+          stderr: spec.stdio === "inherit" ? "inherit" : "ignore",
+          detached: true
+        });
+        return {
+          exited: promise2(() => child.exited),
+          stop: stopGroup(child)
+        };
+      },
+      catch: (cause) => failed2(`cannot start ${spec.command}: ${reason(cause)}`)
+    }),
+    devToolsPort: (profile) => tryPromise2(() => Bun.file(join9(profile, "DevToolsActivePort")).text()).pipe(map5(parseDevToolsActivePort), orElseSucceed2(() => {
+      return;
+    })),
+    answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map5((response) => response.ok), orElseSucceed2(() => false)),
+    temporaryDirectory: (prefix) => tryPromise2({
+      try: () => mkdtemp(join9(tmpdir(), prefix)),
+      catch: (cause) => failed2(`cannot create a temporary directory: ${reason(cause)}`)
+    }),
+    makeDirectory: (path) => tryPromise2({
+      try: () => mkdir3(path, { recursive: true }),
+      catch: (cause) => failed2(`cannot create ${path}: ${reason(cause)}`)
+    }).pipe(asVoid2),
+    removeDirectory: (path) => tryPromise2(() => rm5(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
+    signals: acquireRelease2(sync2(() => {
+      const received = makeUnsafe2();
+      const handlers = SIGNALS.map(([name, code]) => {
+        const handler = () => void doneUnsafe(received, succeed6(code));
+        process.on(name, handler);
+        return [name, handler];
+      });
+      return { received, handlers };
+    }), ({ handlers }) => sync2(() => {
+      for (const [name, handler] of handlers)
+        process.off(name, handler);
+    })).pipe(map5(({ received }) => _await(received))),
+    root: process.getuid?.() === 0
+  };
+});
+
+import { delimiter, join as join10, posix, win32 } from "path";
+var {$: $3 } = globalThis.Bun;
+var pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+}, pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join10(options.home, ".bun");
+  const bunBin = join10(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+}, isInside = (api, parent, path) => {
+  const relative = api.relative(parent, path);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
+}, strictWhich = (command, path, strict) => {
+  const windows = (strict.platform ?? process.platform) === "win32";
+  const api = windows ? win32 : posix;
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
+  const found = (strict.which ?? Bun.which)(command, { PATH: trusted.join(windows ? ";" : ":") });
+  if (found === null || isInside(api, strict.cwd, found))
+    return null;
+  return windows && !found.toLowerCase().endsWith(".exe") ? null : found;
+}, findCommand = (env, command, options) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
+  return fromNullishOr(options?.strict === undefined ? Bun.which(command, { PATH: path }) : strictWhich(command, path, options.strict));
+}, EMPTY_BUNFIG, Shell;
+var init_shell = __esm(() => {
+  init_dist();
+  init_environment();
+  EMPTY_BUNFIG = join10(import.meta.dir, "empty-bunfig.toml");
+  Shell = class Shell extends Service()("holyagent/Shell") {
+    static live = (env) => {
+      const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
+      return succeed5(Shell, Shell.of({
+        which: (command, options) => sync2(() => findCommand(env, command, options)),
+        run: (command, args, options) => tryPromise2({
+          try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+            exitCode: result.exitCode,
+            stdout: result.stdout.toString(),
+            stderr: result.stderr.toString()
+          })),
+          catch: (error) => String(error)
+        }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+      }));
+    };
+  };
+});
+
+import { existsSync, readdirSync } from "fs";
+import { posix as posix2, win32 as win322 } from "path";
+var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win322 : posix2, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
+  const { join } = pathsOf(platform);
+  const entry = join(folder, "chromium");
+  if (exists(entry))
+    return entry;
+  const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
+  for (const build of builds)
+    for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
+      const path = join(folder, build, ...executable.split("/"));
+      if (exists(path))
+        return path;
+    }
+  return;
+}, safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => []))), configuredChromium = (env) => {
+  for (const variable of [CHROMIUM_EXECUTABLE_VARIABLE, LEGACY_CHROMIUM_EXECUTABLE_VARIABLE]) {
+    const path = firstNonEmpty(env[variable]);
+    if (path !== undefined)
+      return { variable, path };
+  }
+  return;
+}, onPath = (command, env) => getOrUndefined(findCommand(env, command)), resolveConfigured = (given, env, exists, which) => /[\\/]/.test(given) ? exists(given) ? given : undefined : which(given, env), findChromium = (env, platform = process.platform, exists = existsSync, list = safeList, which = onPath) => {
+  const given = configuredChromium(env);
+  if (given !== undefined)
+    return resolveConfigured(given.path, env, exists, which);
+  const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
+  return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
+}, chromiumFixFor = (env, fix, exists = existsSync, which = onPath) => {
+  const given = configuredChromium(env);
+  return given === undefined || resolveConfigured(given.path, env, exists, which) !== undefined ? fix : `${given.variable} is set to ${given.path}, which does not exist; ${fix}`;
+};
+var init_chromium = __esm(() => {
+  init_dist();
+  init_environment();
+  init_shell();
+  BUILD_EXECUTABLES = {
+    linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
+    darwin: [
+      "chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
+      "chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+    ],
+    win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
+  };
+});
+
+var BROWSER_SERVER_COMMANDS;
+var init_browser_server = __esm(() => {
+  init_dist();
+  init_capabilities();
+  init_browser_launch();
+  init_chromium();
+  BROWSER_SERVER_COMMANDS = [
+    {
+      path: [BROWSER_SERVER_COMMAND],
+      usage: BROWSER_SERVER_COMMAND,
+      summary: "Run the headless screen capability's browser-use MCP server against a headless Chromium this command starts, then remove the Chromium and its temporary directories",
+      notes: [
+        "stdin, stdout and stderr are the MCP server's own, so a host runs this command as a stdio MCP server; the exit code is the server's",
+        "the server is `uvx` at the pin of pypi-packages.json with no uv config and the public PyPI index (see docs/pi/screen.md); telemetry is off and its state is temporary"
+      ],
+      flags: {},
+      stateless: true,
+      positionals: 0,
+      run: (call) => runBrowserServer(liveHost, {
+        env: call.env,
+        chromium: findChromium(call.env),
+        chromiumFix: chromiumFixFor(call.env, CHROMIUM_FIX),
+        server: BROWSER_USE_MCP_SERVER
+      }).pipe(map5((code) => new Verbatim("", "", code)))
+    }
+  ];
+});
+
 import { stat as stat2 } from "fs/promises";
 var hasStateFolder = (directory) => io(directory, () => stat2(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var init_state_folder = __esm(() => {
@@ -16128,8 +16583,8 @@ var init_errors6 = __esm(() => {
   };
 });
 
-import { chmod, mkdir as mkdir3, realpath as realpath3, rename as rename4, rm as rm5, writeFile } from "fs/promises";
-import { basename as basename4, dirname as dirname3, join as join9 } from "path";
+import { chmod, mkdir as mkdir4, realpath as realpath3, rename as rename4, rm as rm6, writeFile } from "fs/promises";
+import { basename as basename4, dirname as dirname3, join as join11 } from "path";
 var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPromise2({
   try: run,
   catch: (cause) => new SetupFailure({
@@ -16150,7 +16605,7 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
     return unchangedSince === undefined;
   if (text !== unchangedSince)
     return false;
-  yield* fileOperation(path, "remove", () => rm5(path, { force: true }));
+  yield* fileOperation(path, "remove", () => rm6(path, { force: true }));
   return true;
 }), writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2), writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince), replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
   const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists());
@@ -16158,24 +16613,24 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join9(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname3(target), "write", () => mkdir3(dirname3(target), { recursive: true }));
+  const temporary = join11(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname3(target), "write", () => mkdir4(dirname3(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
-  }).pipe(catch_2((error) => (error.code === "EEXIST" ? void_3 : ignore2(fileOperation(temporary, "remove", () => rm5(temporary, { force: true })))).pipe(andThen2(fail5(new SetupFailure({
+  }).pipe(catch_2((error) => (error.code === "EEXIST" ? void_3 : ignore2(fileOperation(temporary, "remove", () => rm6(temporary, { force: true })))).pipe(andThen2(fail5(new SetupFailure({
     message: `cannot write ${temporary}: ${error instanceof Error ? error.message : String(error)}`
   }))))));
   return yield* gen2(function* () {
     if (mode !== undefined)
       yield* fileOperation(temporary, "write", () => chmod(temporary, mode));
     if (unchangedSince !== undefined && (yield* fileOperation(target, "read", () => Bun.file(target).text())) !== unchangedSince) {
-      yield* fileOperation(temporary, "remove", () => rm5(temporary, { force: true }));
+      yield* fileOperation(temporary, "remove", () => rm6(temporary, { force: true }));
       return false;
     }
     yield* fileOperation(target, "write", () => rename4(temporary, target));
     return true;
-  }).pipe(onError2(() => ignore2(fileOperation(temporary, "remove", () => rm5(temporary, { force: true })))));
+  }).pipe(onError2(() => ignore2(fileOperation(temporary, "remove", () => rm6(temporary, { force: true })))));
 }), place = (node, path, depth, wanted) => {
   const key = path[depth];
   const reported = path.slice(0, depth + 1).join(".");
@@ -16216,8 +16671,8 @@ var init_json_file = __esm(() => {
   empty4 = {};
 });
 
-import { join as join10, resolve as resolve5 } from "path";
-var RecordedKey, RecordFile, recordPath = (env) => join10(userFiles(env).claudeDir, "holyagent", "setup-records.json"), keyOf = (file) => resolve5(file), load = (env) => gen2(function* () {
+import { join as join12, resolve as resolve5 } from "path";
+var RecordedKey, RecordFile, recordPath = (env) => join12(userFiles(env).claudeDir, "holyagent", "setup-records.json"), keyOf = (file) => resolve5(file), load = (env) => gen2(function* () {
   const path = recordPath(env);
   const raw = yield* readJsonObject(path);
   if (Object.keys(raw).length === 0)
@@ -16282,7 +16737,7 @@ var init_record2 = __esm(() => {
   });
 });
 
-var added = (text) => `+ ${text}`, present2 = (text) => `= ${text}`, skipped = (text) => `- ${text}`, hint = (text) => `~ ${text}`, failed2 = (what, result) => {
+var added = (text) => `+ ${text}`, present2 = (text) => `= ${text}`, skipped = (text) => `- ${text}`, hint = (text) => `~ ${text}`, failed3 = (what, result) => {
   const detail = (result.stderr || result.stdout).trim().split(`
 `)[0] ?? "";
   return `! ${what}: failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`;
@@ -16426,47 +16881,8 @@ var init_settings3 = __esm(() => {
   });
 });
 
-import { delimiter, join as join11 } from "path";
-var {$: $3 } = globalThis.Bun;
-var pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-}, pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join11(options.home, ".bun");
-  const bunBin = join11(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-}, findCommand = (env, command, options) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-  return fromNullishOr(Bun.which(command, {
-    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
-  }));
-}, EMPTY_BUNFIG, Shell;
-var init_shell = __esm(() => {
-  init_dist();
-  init_environment();
-  EMPTY_BUNFIG = join11(import.meta.dir, "empty-bunfig.toml");
-  Shell = class Shell extends Service()("holyagent/Shell") {
-    static live = (env) => {
-      const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-      return succeed5(Shell, Shell.of({
-        which: (command, options) => sync2(() => findCommand(env, command, options)),
-        run: (command, args, options) => tryPromise2({
-          try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
-            exitCode: result.exitCode,
-            stdout: result.stdout.toString(),
-            stderr: result.stderr.toString()
-          })),
-          catch: (error) => String(error)
-        }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-      }));
-    };
-  };
-});
-
 import { lstat as lstat3, realpath as realpath4 } from "fs/promises";
-import { dirname as dirname4, isAbsolute as isAbsolute2, join as join12, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
+import { dirname as dirname4, isAbsolute as isAbsolute2, join as join13, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
 var SCOPES, within = (parent, child) => {
   const path = relative4(parent, child);
   return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
@@ -16500,7 +16916,7 @@ var init_scope = __esm(() => {
       return;
     const parts = relative4(cwd, file).split(sep6);
     for (let depth = 1;depth <= parts.length; depth++) {
-      const path = join12(cwd, ...parts.slice(0, depth));
+      const path = join13(cwd, ...parts.slice(0, depth));
       if (yield* isSymlink(path)) {
         return yield* new SetupFailure({
           message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
@@ -16515,16 +16931,16 @@ var init_scope = __esm(() => {
     const named = top.exitCode === 0 && line !== "" ? resolve6(line) : undefined;
     const realTop = named === undefined ? undefined : yield* real(named);
     const realCwd = yield* real(cwd);
-    const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present3(join12(named, ".git")));
+    const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present3(join13(named, ".git")));
     const root = trusted ? named : cwd;
     const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-    return { folder: join12(root, ".claude"), root, trusted, notice };
+    return { folder: join13(root, ".claude"), root, trusted, notice };
   });
   settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
     if (scope === "user")
       return { file: userFiles(env).settings };
     const { folder, notice } = yield* claudeFolder(cwd);
-    const file = join12(folder, fileName(scope));
+    const file = join13(folder, fileName(scope));
     for (const path of [folder, file]) {
       if (yield* isSymlink(path)) {
         return yield* new SetupFailure({
@@ -16537,7 +16953,7 @@ var init_scope = __esm(() => {
   projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
     const roots = [resolve6(cwd)];
     for (let folder = resolve6(cwd);; folder = dirname4(folder)) {
-      if (yield* present3(join12(folder, ".git"))) {
+      if (yield* present3(join13(folder, ".git"))) {
         if (folder !== roots[0])
           roots.push(folder);
         break;
@@ -16546,8 +16962,8 @@ var init_scope = __esm(() => {
         break;
     }
     return roots.flatMap((root) => [
-      join12(root, ".claude", "settings.json"),
-      join12(root, ".claude", "settings.local.json")
+      join13(root, ".claude", "settings.json"),
+      join13(root, ".claude", "settings.local.json")
     ]);
   });
   enablement = fn2("enablement")(function* (folder, file) {
@@ -16578,7 +16994,7 @@ var init_scope = __esm(() => {
     const own = yield* identity2(file);
     if (own !== undefined) {
       for (const entry of tracked) {
-        if ((yield* identity2(join12(root, entry))) === own)
+        if ((yield* identity2(join13(root, entry))) === own)
           return "git tracks it";
       }
     }
@@ -16590,7 +17006,7 @@ var init_scope = __esm(() => {
         if (component === folderName || seen.has(component))
           continue;
         seen.add(component);
-        if ((yield* identity2(join12(root, component))) === home)
+        if ((yield* identity2(join13(root, component))) === home)
           return `git tracks ${component} as ${folderName}`;
       }
     }
@@ -16603,8 +17019,8 @@ var init_scope = __esm(() => {
   });
   installedScope = fn2("installedScope")(function* (cwd) {
     const { folder, root, trusted } = yield* claudeFolder(cwd);
-    const local = join12(folder, fileName("local"));
-    const project = join12(folder, fileName("project"));
+    const local = join13(folder, fileName("local"));
+    const project = join13(folder, fileName("project"));
     const notices = [];
     const found = yield* enablement(folder, local);
     if (found === "enabled") {
@@ -16656,13 +17072,13 @@ var init_check = __esm(() => {
   init_shell();
 });
 
-import { lstat as lstat4, mkdir as mkdir4, open as open3 } from "fs/promises";
-import { tmpdir, userInfo } from "os";
-import { join as join13 } from "path";
-var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id), markers = () => join13(tmpdir(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`), markerOf = (sessionId) => join13(markers(), sessionId), ensureMarkers = () => {
+import { lstat as lstat4, mkdir as mkdir5, open as open3 } from "fs/promises";
+import { tmpdir as tmpdir2, userInfo } from "os";
+import { join as join14 } from "path";
+var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id), markers = () => join14(tmpdir2(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`), markerOf = (sessionId) => join14(markers(), sessionId), ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir4(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat4(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir5(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat4(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -16675,7 +17091,7 @@ var init_delivery = __esm(() => {
   claimRulesDelivery = create2;
 });
 
-import { join as join14 } from "path";
+import { join as join15 } from "path";
 var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " ").trim(), strings, optionalStrings, HolyclaudeIntent, HolyclaudeAssignment, CodexIntentState, codexIntentFields, HolycodexIntent, _compatibility, legacyIntentFields, HolycodexIntentV0, CodexInvocation, HolycodexAssignment, parseText = (format, text) => try_2({
   try: () => format === "json" ? JSON.parse(text) : decode2(text, { strict: true }),
   catch: (cause) => `not valid ${format === "json" ? "JSON" : "TOON"}: ${String(cause)}`
@@ -16689,7 +17105,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     folders.set(folder, [...folders.get(folder) ?? [], path.slice(slash + 1)]);
   }
   return folders;
-}, convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith("."))), legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join14(root, LEGACY_FOLDERS[source])).pipe(map5((files) => convertibleFolders(source, files).size > 0))).pipe(map5((sources) => sources.map((source) => LEGACY_FOLDERS[source]))), isoOf = (millis) => {
+}, convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith("."))), legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join15(root, LEGACY_FOLDERS[source])).pipe(map5((files) => convertibleFolders(source, files).size > 0))).pipe(map5((sources) => sources.map((source) => LEGACY_FOLDERS[source]))), isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }, EPOCH, idTime = (id) => {
@@ -16794,13 +17210,13 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
   return { value: assignment };
 }, gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join14(root, folderName);
+  const legacy = join15(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join14(legacy, "intents", folder);
+    const base = join15(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -16808,7 +17224,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join14(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join15(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -16819,10 +17235,10 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join14(base, path), to: join14(target, path) });
+      state.notes.push({ from: join15(base, path), to: join15(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join14(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join15(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -16912,13 +17328,13 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
   return { value: assignment };
 }, TRANSACTION_FILE = ".holycodex-transaction.toon", gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join14(root, folderName);
+  const legacy = join15(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join14(legacy, folder);
+    const base = join15(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -16932,7 +17348,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join14(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join15(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -16943,10 +17359,10 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join14(base, path), to: join14(target, path) });
+      state.notes.push({ from: join15(base, path), to: join15(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join14(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join15(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -25013,7 +25429,7 @@ ${cleanedBelow}
   ];
 });
 
-import { join as join15, relative as relative5 } from "path";
+import { join as join16, relative as relative5 } from "path";
 var {$: $4 } = globalThis.Bun;
 var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => io(path, () => Bun.file(path).exists()), countsOf = (gathered) => ({
   intents: gathered.records.filter((record) => record.kind === "intent").length,
@@ -25078,7 +25494,7 @@ var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => 
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join15(root, name));
+    const text = yield* readText(join16(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -25198,14 +25614,14 @@ var init_packages = __esm(() => {
   init_pi_packages2();
 });
 
-import { isAbsolute as isAbsolute3, join as join16 } from "path";
+import { isAbsolute as isAbsolute3, join as join17 } from "path";
 var BROWSE_VERSION, BROWSE_COMMAND, BROWSE_PAIR_FIX, BROWSE_INSTALL_FIX, browseDataDirectory = (env) => {
   const home = firstNonEmpty(env["OPENCODE_BROWSER_HOME"]);
   if (home !== undefined)
     return home;
   const data = firstNonEmpty(env["XDG_DATA_HOME"]);
-  return join16(data !== undefined && isAbsolute3(data) ? data : join16(homeDirectory(env), ".local", "share"), "browse");
-}, browsePairingFile = (env) => join16(browseDataDirectory(env), "browser-tokens.json"), Open, Pairing, PairingFile, readBrowsePairing = (env) => gen2(function* () {
+  return join17(data !== undefined && isAbsolute3(data) ? data : join17(homeDirectory(env), ".local", "share"), "browse");
+}, browsePairingFile = (env) => join17(browseDataDirectory(env), "browser-tokens.json"), Open, Pairing, PairingFile, readBrowsePairing = (env) => gen2(function* () {
   const text = yield* readJsonText(browsePairingFile(env));
   if (text === undefined || text.trim() === "")
     return { state: "unpaired" };
@@ -25227,7 +25643,7 @@ var BROWSE_VERSION, BROWSE_COMMAND, BROWSE_PAIR_FIX, BROWSE_INSTALL_FIX, browseD
 }), seen = (browser) => browser.lastSeen === undefined ? "not connected yet" : `last seen ${new Date(browser.lastSeen).toISOString()}`, describePairing = (pairing) => pairing.state === "unpaired" ? "no browser is paired with browse (the extension is not installed or not paired; browse cannot tell which)" : `${pairing.browsers.length === 1 ? "1 browser" : `${pairing.browsers.length} browsers`} paired with browse (the extension is installed): ${pairing.browsers.map((browser) => `${browser.name ?? browser.id ?? browser.key}, ${seen(browser)}`).join("; ")}`, BROWSE_EXTENSION_IDS, browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory(env);
   if (platform === "darwin") {
-    const support = join16(home, "Library", "Application Support");
+    const support = join17(home, "Library", "Application Support");
     return [
       ["Google Chrome", "Google/Chrome"],
       ["Google Chrome Beta", "Google/Chrome Beta"],
@@ -25238,21 +25654,21 @@ var BROWSE_VERSION, BROWSE_COMMAND, BROWSE_PAIR_FIX, BROWSE_INSTALL_FIX, browseD
       ["Opera", "com.operasoftware.Opera"],
       ["Vivaldi", "Vivaldi"],
       ["Arc", "Arc/User Data"]
-    ].map(([name = "", folder = ""]) => ({ name, directory: join16(support, folder) }));
+    ].map(([name = "", folder = ""]) => ({ name, directory: join17(support, folder) }));
   }
   if (platform === "win32") {
-    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join16(home, "AppData", "Local");
-    const roaming = firstNonEmpty(env["APPDATA"]) ?? join16(home, "AppData", "Roaming");
+    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join17(home, "AppData", "Local");
+    const roaming = firstNonEmpty(env["APPDATA"]) ?? join17(home, "AppData", "Roaming");
     return [
-      { name: "Google Chrome", directory: join16(local, "Google", "Chrome", "User Data") },
-      { name: "Microsoft Edge", directory: join16(local, "Microsoft", "Edge", "User Data") },
-      { name: "Brave", directory: join16(local, "BraveSoftware", "Brave-Browser", "User Data") },
-      { name: "Vivaldi", directory: join16(local, "Vivaldi", "User Data") },
-      { name: "Opera", directory: join16(roaming, "Opera Software", "Opera Stable") }
+      { name: "Google Chrome", directory: join17(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join17(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join17(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join17(local, "Vivaldi", "User Data") },
+      { name: "Opera", directory: join17(roaming, "Opera Software", "Opera Stable") }
     ];
   }
   const configured = firstNonEmpty(env["XDG_CONFIG_HOME"]);
-  const config = configured !== undefined && isAbsolute3(configured) ? configured : join16(home, ".config");
+  const config = configured !== undefined && isAbsolute3(configured) ? configured : join17(home, ".config");
   return [
     ["Google Chrome", "google-chrome"],
     ["Google Chrome Beta", "google-chrome-beta"],
@@ -25262,19 +25678,19 @@ var BROWSE_VERSION, BROWSE_COMMAND, BROWSE_PAIR_FIX, BROWSE_INSTALL_FIX, browseD
     ["Brave", "BraveSoftware/Brave-Browser"],
     ["Opera", "opera"],
     ["Vivaldi", "vivaldi"]
-  ].map(([name = "", folder = ""]) => ({ name, directory: join16(config, folder) }));
+  ].map(([name = "", folder = ""]) => ({ name, directory: join17(config, folder) }));
 }, LocalState, Preferences, readOptional = (file) => readJsonText(file).pipe(orElseSucceed2(() => {
   return;
 })), isDisabled = (setting) => {
   const reasons = setting["disable_reasons"];
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 }, findBrowseExtension = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
-  const state = yield* readOptional(join16(directory, "Local State"));
+  const state = yield* readOptional(join17(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
-    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join16(directory, profile, file)).pipe(map5((text) => {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join17(directory, profile, file)).pipe(map5((text) => {
       const parsed = text === undefined ? undefined : decodeUnknownOption2(Preferences)(text, {
         onExcessProperty: "error"
       });
@@ -25337,7 +25753,7 @@ var init_browse = __esm(() => {
   }), [Open]));
 });
 
-import { join as join17 } from "path";
+import { join as join18 } from "path";
 var PI_HOST_VERSION = "1.5.0", PI_MINIMUM_NODE = "22.19.0", PI_INSTALL, NODE_FIX, PI_FIX, PACKAGE_COMMAND, packageFix = (scope) => scope === "user" ? `install it with \`${PACKAGE_COMMAND}\`` : `install it with \`${PACKAGE_COMMAND}\` (add -l for this project only)`, VERSION, releaseIn = (text) => {
   const [, major, minor, patch] = VERSION.exec(text) ?? [];
   return major === undefined || minor === undefined || patch === undefined ? undefined : [Number(major), Number(minor), Number(patch)];
@@ -25384,8 +25800,8 @@ ${result.stderr}`;
   const home = homeDirectory(env);
   const set = firstNonEmpty(env["PI_CODING_AGENT_DIR"]);
   if (set === undefined)
-    return join17(home, ".pi", "agent");
-  return set === "~" ? home : /^~[/\\]/.test(set) ? join17(home, set.slice(2)) : set;
+    return join18(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join18(home, set.slice(2)) : set;
 }, piSettingsSources = (file) => gen2(function* () {
   const exists = yield* fileOperation(file, "read", () => Bun.file(file).exists());
   if (!exists)
@@ -25397,7 +25813,7 @@ ${result.stderr}`;
     onExcessProperty: "error"
   }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
   return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
-}), piSettingsFiles = (env, cwd) => [join17(piAgentDirectory(env), "settings.json"), join17(cwd, ".pi", "settings.json")], piPresenceFiles = (env, cwd, scope) => {
+}), piSettingsFiles = (env, cwd) => [join18(piAgentDirectory(env), "settings.json"), join18(cwd, ".pi", "settings.json")], piPresenceFiles = (env, cwd, scope) => {
   const [globalFile, projectFile] = piSettingsFiles(env, cwd);
   return scope === "user" ? [globalFile] : [globalFile, projectFile];
 }, parseNpmSource = (source) => {
@@ -25440,6 +25856,8 @@ ${result.stderr}`;
 }, unmetNeed = (env, need, platform = process.platform) => gen2(function* () {
   if (need.kind === "display")
     return hasDisplay(env, platform) ? undefined : "needs a graphical session (no DISPLAY or WAYLAND_DISPLAY)";
+  if (need.kind === "chromium")
+    return findChromium(env, platform) === undefined ? `needs a Chromium; ${chromiumFixFor(env, need.fix)}` : undefined;
   if (need.kind === "node")
     return yield* unmetNode(env, need);
   const found = yield* (yield* Shell).which(need.command);
@@ -25539,6 +25957,7 @@ var init_pi_check = __esm(() => {
   init_pi_packages2();
   init_layout();
   init_browse();
+  init_chromium();
   init_environment();
   init_errors6();
   init_form();
@@ -25591,7 +26010,7 @@ var init_tools = __esm(() => {
   T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
 });
 
-import { join as join18, resolve as resolve7 } from "path";
+import { join as join19, resolve as resolve7 } from "path";
 var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => isJsonObject2(current) ? current[key] : undefined, node), leaves = (content, prefix = []) => Object.entries(content).flatMap(([key, child]) => isJsonObject2(child) ? leaves(child, [...prefix, key]) : [{ path: [...prefix, key], value: child }]), KNOWN_FILES, AGENT_PREFIX = "~/.pi/agent/", PI_PREFIX = "~/.pi/", locate2 = (env, cwd, scope, logical) => {
   const project = scope !== "user";
   const home = homeDirectory(env);
@@ -25601,20 +26020,20 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
     const explicit = firstNonEmpty(env["BILI_CONFIG_FILE"]);
     if (explicit !== undefined)
       return resolve7(cwd, explicit);
-    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join18(home, ".config");
-    return join18(base, "billion-context", "billion-context.json");
+    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join19(home, ".config");
+    return join19(base, "billion-context", "billion-context.json");
   }
   if (logical === PI_FFF_FILE)
-    return project ? undefined : join18(piAgentDirectory(env), "pi-fff.json");
+    return project ? undefined : join19(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
-    return project ? join18(cwd, ".pi", name) : join18(piAgentDirectory(env), name);
+    return project ? join19(cwd, ".pi", name) : join19(piAgentDirectory(env), name);
   }
   if (logical.startsWith(PI_PREFIX)) {
     const name = logical.slice(PI_PREFIX.length);
-    return project ? join18(cwd, ".pi", name) : join18(home, ".pi", name);
+    return project ? join19(cwd, ".pi", name) : join19(home, ".pi", name);
   }
-  return project || !logical.startsWith("~/") ? undefined : join18(home, logical.slice(2));
+  return project || !logical.startsWith("~/") ? undefined : join19(home, logical.slice(2));
 }, keyName = ({ path }) => path.join("."), inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf)), routeLeaves = (config) => leaves(rootModelSettings(config)), planFor = (env, cwd, scope, config, form) => {
   const byFile = new Map;
   for (const patch of toolSettings(config, undefined, form)) {
@@ -25666,6 +26085,7 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
 var init_pi_settings = __esm(() => {
   init_dist();
   init_capabilities();
+  init_settings();
   init_provider();
   init_tools();
   init_environment();
@@ -25752,7 +26172,10 @@ var init_pi_settings = __esm(() => {
     const mark = added.length > 0 ? "+" : kept.length > 0 ? "~" : "=";
     return `${mark} ${label} ${file}: ${parts.join("; ")}${added.length > 0 && dryRun ? " (dry run, nothing written)" : ""}`;
   });
-  REVERTABLE = CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf })));
+  REVERTABLE = [
+    ...CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf }))),
+    ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf }))
+  ];
   revertFile = fn2("revertToolSettingsFile")(function* (env, options, file, wanted) {
     const recorded = yield* readRecorded(env, file);
     const mine = wanted.filter((leaf) => recorded.some((item) => item.path.join(".") === keyName(leaf) && equals(item.value, leaf.value)));
@@ -25891,39 +26314,33 @@ var init_pi_settings = __esm(() => {
   });
 });
 
-import { existsSync, readdirSync } from "fs";
-import { posix, win32 } from "path";
-var PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win32 : posix, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
-  const { join } = pathsOf(platform);
-  const entry = join(folder, "chromium");
-  if (exists(entry))
-    return entry;
-  const builds = list(folder).filter((name) => Number.isFinite(revisionOf(name))).toSorted((a, b) => revisionOf(b) - revisionOf(a));
-  for (const build of builds)
-    for (const executable of BUILD_EXECUTABLES[platform] ?? BUILD_EXECUTABLES["linux"] ?? []) {
-      const path = join(folder, build, ...executable.split("/"));
-      if (exists(path))
-        return path;
-    }
-  return;
-}, safeList = (folder) => runSync2(try_2(() => readdirSync(folder)).pipe(orElseSucceed2(() => []))), findChromium = (env, platform = process.platform, exists = existsSync, list = safeList) => {
-  const given = firstNonEmpty(env[PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE]);
-  if (given !== undefined)
-    return given;
-  const configured = firstNonEmpty(env["PLAYWRIGHT_BROWSERS_PATH"]);
-  return inFolder(configured === undefined || configured === "0" ? PREINSTALLED_BROWSERS : configured, platform, exists, list);
-};
-var init_chromium = __esm(() => {
+var TOOLS, SEARCH_TOOLS, INSTALL_COMMANDS, installAdvice, stopsWithout = (tool) => `\`holyagent ${tool}\` (the agents' search) fails`, locateTool = (tool, cwd, which) => gen2(function* () {
+  for (const command of SEARCH_TOOLS[tool].commands) {
+    const found = yield* which(command, { strict: { cwd } });
+    if (isSome2(found))
+      return found;
+  }
+  return none2();
+}), doctorToolLine = (tool, found) => isSome2(found) ? pass(tool, found.value) : hint(`${tool}: ${SEARCH_TOOLS[tool].commands.join(" or ")} not found on PATH, so ${stopsWithout(tool)}; ${installAdvice}`), setupToolLine = (tool, found) => isSome2(found) ? present2(`${tool}: found at ${found.value}`) : hint(`${tool}: not installed, so ${stopsWithout(tool)}; ${installAdvice}`), searchToolLines = (cwd, format) => gen2(function* () {
+  const shell = yield* Shell;
+  return yield* forEach2(TOOLS, (tool) => locateTool(tool, cwd, shell.which).pipe(map5((found) => format(tool, found))));
+});
+var init_search_tools = __esm(() => {
   init_dist();
-  init_environment();
-  BUILD_EXECUTABLES = {
-    linux: ["chrome-linux64/chrome", "chrome-linux/chrome"],
-    darwin: [
-      "chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
-      "chrome-mac/Chromium.app/Contents/MacOS/Chromium"
-    ],
-    win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
+  init_shell();
+  TOOLS = ["rg", "fd"];
+  SEARCH_TOOLS = {
+    rg: { title: "ripgrep", commands: ["rg"] },
+    fd: { title: "fd", commands: ["fd", "fdfind"] }
   };
+  INSTALL_COMMANDS = [
+    ["macOS", "brew install ripgrep fd"],
+    ["Debian/Ubuntu", "sudo apt install ripgrep fd-find"],
+    ["Fedora", "sudo dnf install ripgrep fd-find"],
+    ["Arch", "sudo pacman -S ripgrep fd"],
+    ["Windows", "winget install BurntSushi.ripgrep.MSVC", "winget install sharkdp.fd"]
+  ];
+  installAdvice = `install ripgrep and fd with your package manager (${INSTALL_COMMANDS.map(([platform, ...commands]) => `${platform}: ${commands.map((command) => `\`${command}\``).join(" and ")}`).join("; ")}), then open a new terminal so PATH picks them up`;
 });
 
 var reportOne = (env, capability, features, options, platform) => gen2(function* () {
@@ -25938,15 +26355,16 @@ var reportOne = (env, capability, features, options, platform) => gen2(function*
   const withheld = serversWithheld(capability, form, features);
   const unmet = yield* forEach2(formNeeds(capability, form), (need) => unmetNeed(env, need, platform));
   const needs = unmet.flatMap((problem) => problem === undefined ? [] : [hint(`${label}: ${problem}`)]);
+  const launched = (content?.mcpServers ?? []).some(({ launchesChromium }) => launchesChromium === true);
   const servers = (content?.mcpServers ?? []).map(({ command, args }) => `${command} ${args.join(" ")}`);
-  const chromium = (content?.mcpServers ?? []).some(({ chromiumFlag }) => chromiumFlag !== undefined) ? findChromium(env, platform) : undefined;
+  const chromium = launched ? findChromium(env, platform) : undefined;
   const browser = chromium === undefined ? [] : [present2(`${label}: the headless browser is the Chromium at ${chromium}`)];
   const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env, platform).pipe(map5((state) => {
     const { text, fix } = describeBrowseState(state);
     return state.state === "paired" ? present2(`${label}: ${text}`) : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`);
   }), catchTag2("SetupFailure", (error) => succeed6(hint(`${label}: cannot tell whether a browser is paired: ${error.message}`))), map5((line) => [line])) : [];
   return [
-    withheld === undefined ? present2(`${label}: ${form} form; the extension registers \`${servers.join("`, `")}\` for screen specialists and writes no file for it`) : hint(`${label}: ${form} form; ${withheld}`),
+    withheld === undefined ? present2(`${label}: ${form} form; the extension registers \`${servers.join("`, `")}\` for screen specialists${launched ? " through `holyagent browser-server`, which starts the headless browser and stops it with the server" : ""} and writes no file for it`) : hint(`${label}: ${form} form; ${withheld}`),
     ...needs,
     ...browser,
     ...pairing
@@ -25970,8 +26388,8 @@ var init_browser_use = __esm(() => {
   });
 });
 
-import { join as join19 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join19(stateDirectory(cwd), CONFIG_FILE), objectAt = (parent, key, file, path) => {
+import { join as join20 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join20(stateDirectory(cwd), CONFIG_FILE), objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
     return succeed6({});
@@ -26108,7 +26526,7 @@ var init_pi_install = __esm(() => {
         continue;
       }
       const result = yield* shell.run("pi", args, { cwd });
-      lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
+      lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed3(command, result));
     }
     for (const name of removals) {
       const args = withScope(["remove", `npm:${name}`]);
@@ -26118,17 +26536,17 @@ var init_pi_install = __esm(() => {
         continue;
       }
       const result = yield* shell.run("pi", args, { cwd });
-      lines.push(result.exitCode === 0 ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`) : failed2(command, result));
+      lines.push(result.exitCode === 0 ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`) : failed3(command, result));
     }
     return lines;
   });
 });
 
 import { stat as stat3 } from "fs/promises";
-import { join as join20 } from "path";
+import { join as join21 } from "path";
 var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 = "t3 settings", restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false)), writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
-})))), t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join20(homeDirectory(env), ".t3"), t3SettingsFile = (env) => join20(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
+})))), t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join21(homeDirectory(env), ".t3"), t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
   {
     name: "Pi provider",
     choice: "pi",
@@ -26281,14 +26699,14 @@ var init_t3_settings = __esm(() => {
     const home = homeDirectory(env);
     if (platform === "darwin") {
       const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-      const simulator = join20(developer, "Platforms", "iPhoneSimulator.platform");
+      const simulator = join21(developer, "Platforms", "iPhoneSimulator.platform");
       if (yield* isDirectory2(simulator))
         return `Xcode (${developer})`;
     }
     const sdkFolders = [
       firstNonEmpty(env["ANDROID_HOME"]),
       firstNonEmpty(env["ANDROID_SDK_ROOT"]),
-      platform === "darwin" ? join20(home, "Library", "Android", "sdk") : platform === "win32" ? join20(firstNonEmpty(env["LOCALAPPDATA"]) ?? join20(home, "AppData", "Local"), "Android", "Sdk") : join20(home, "Android", "Sdk")
+      platform === "darwin" ? join21(home, "Library", "Android", "sdk") : platform === "win32" ? join21(firstNonEmpty(env["LOCALAPPDATA"]) ?? join21(home, "AppData", "Local"), "Android", "Sdk") : join21(home, "Android", "Sdk")
     ];
     for (const folder of sdkFolders) {
       if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -26442,7 +26860,7 @@ var init_t3_settings = __esm(() => {
   });
 });
 
-import { join as join21 } from "path";
+import { join as join22 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on", neutralDirectory = (env) => homeDirectory(env), ensureGlobal, installCtx7, asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))), setup;
 var init_steps = __esm(() => {
   init_dist();
@@ -26457,6 +26875,7 @@ var init_steps = __esm(() => {
   init_pi_install();
   init_pi_settings();
   init_scope();
+  init_search_tools();
   init_settings3();
   init_shell();
   init_t3_settings();
@@ -26473,7 +26892,7 @@ var init_steps = __esm(() => {
     }
     const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
     if (result.exitCode !== 0)
-      return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
+      return { usable: false, lines: [failed3(`bun add -g ${packageName}`, result)] };
     const lines = [added(`${command}: installed with bun add -g ${packageName}`)];
     const onPath = yield* shell.which(command);
     const anywhere = yield* shell.which(command, { includeBunBin: true });
@@ -26488,7 +26907,7 @@ var init_steps = __esm(() => {
     const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
     if (!global.usable)
       return global.lines;
-    const skillReady = (yield* fileExists2(join21(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join21(files.claudeDir, "rules", "context7.md")));
+    const skillReady = (yield* fileExists2(join22(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join22(files.claudeDir, "rules", "context7.md")));
     if (skillReady)
       return [...global.lines, present2("ctx7 skill: already installed")];
     const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -26506,7 +26925,7 @@ var init_steps = __esm(() => {
     const result = yield* shell.run("ctx7", args, { cwd: neutralDirectory(env) });
     return [
       ...global.lines,
-      result.exitCode === 0 ? added("ctx7 skill: installed with ctx7 setup --cli --claude") : failed2("ctx7 setup", result)
+      result.exitCode === 0 ? added("ctx7 skill: installed with ctx7 setup --cli --claude") : failed3("ctx7 setup", result)
     ];
   });
   setup = fn2("setup")(function* (env, options) {
@@ -26560,6 +26979,7 @@ var init_steps = __esm(() => {
         ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
         ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
       })) : [],
+      ...yield* searchToolLines(piOptions.cwd, setupToolLine),
       ...yield* onSettings((file) => mergeUserSettings({
         env,
         file,
@@ -26589,6 +27009,7 @@ var init_doctor = __esm(() => {
   init_pi_check();
   init_pi_settings();
   init_scope();
+  init_search_tools();
   init_settings3();
   init_shell();
   init_steps();
@@ -26614,7 +27035,10 @@ var init_doctor = __esm(() => {
         checkCommand(env, "ctx7"),
         succeed6(fail6("settings", located.message))
       ]);
-      return { lines: [...lines, ...pi], ok: false };
+      return {
+        lines: [...lines, ...pi, ...yield* searchToolLines(cwd, doctorToolLine)],
+        ok: false
+      };
     }
     const { file, notice } = located;
     const noted = (lines) => notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines];
@@ -26625,7 +27049,8 @@ var init_doctor = __esm(() => {
     const ran = [...fixes, ...settingsFixes];
     const lines = noted([
       ...ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)],
-      ...pi
+      ...pi,
+      ...yield* searchToolLines(cwd, doctorToolLine)
     ]);
     return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
   });
@@ -27304,10 +27729,10 @@ var TUI_PACKAGES = {
       "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
     ],
     "electron-to-chromium": [
-      "electron-to-chromium@1.5.478",
+      "electron-to-chromium@1.5.479",
       "",
       {},
-      "sha512-pftG+ma5Lm8O6/p45bhYT6StBN5ziQymaRzmCZwFl8DwWHKPPD93FdOmP1aqftcepolQYvrcyTLa17kE8Yf+jg=="
+      "sha512-uAJdJQ7vHa4TvPfzt1TOqoRgHmav5gwmqHMPLxBH6m8Cbj5R9/z/rygTOQiZ8pe5g0ZAEogga1bP6HoKcOzx/Q=="
     ],
     "emoji-regex": [
       "emoji-regex@10.6.0",
@@ -27587,6 +28012,17 @@ var TUI_PACKAGES = {
       {},
       "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
     ],
+    "typescript": [
+      "typescript@5.9.3",
+      "",
+      {
+        "bin": {
+          "tsc": "bin/tsc",
+          "tsserver": "bin/tsserver"
+        }
+      },
+      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    ],
     "update-browserslist-db": [
       "update-browserslist-db@1.3.4",
       "",
@@ -27678,17 +28114,6 @@ var TUI_PACKAGES = {
       "",
       {},
       "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
-    ],
-    "bun-ffi-structs/typescript": [
-      "typescript@5.9.3",
-      "",
-      {
-        "bin": {
-          "tsc": "bin/tsc",
-          "tsserver": "bin/tsserver"
-        }
-      },
-      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
     ],
     "glob/minimatch": [
       "minimatch@8.0.7",
@@ -27785,11 +28210,11 @@ var TUI_PACKAGES = {
 }
 `;
 
-import { lstat as lstat5, mkdir as mkdir5, mkdtemp, readdir as readdir2, rename as rename5, rm as rm6, stat as stat4, writeFile as writeFile2 } from "fs/promises";
+import { lstat as lstat5, mkdir as mkdir6, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile2 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join22, posix as posix2, win32 as win322 } from "path";
+import { basename as basename5, dirname as dirname5, join as join23, posix as posix3, win32 as win323 } from "path";
 import { pathToFileURL } from "url";
-var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : posix2, cacheHome = (env, platform = process.platform) => {
+var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : posix3, cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory(env);
   const { join } = pathModule(platform);
   if (platform === "win32")
@@ -27822,8 +28247,8 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : p
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join22(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join22(directory, file)}`, cause)
+      try: () => Bun.write(join23(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join23(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -27840,13 +28265,13 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : p
 }), importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
-}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join22(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join23(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
-})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join22(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join23(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", fileSystem = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
-    yield* fileSystem(`cannot create ${folder}`, () => mkdir5(folder, { recursive: true, mode: 448 }));
+    yield* fileSystem(`cannot create ${folder}`, () => mkdir6(folder, { recursive: true, mode: 448 }));
   const found = yield* tryPromise2({
     try: () => lstat5(folder),
     catch: (cause) => cause
@@ -27874,7 +28299,7 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : p
   const name = userName ?? (yield* try_2(() => userInfo2().username));
   const text = yield* tryPromise2(() => Bun.file(groupFile).text());
   return namesPrivateGroup(text, gid, name);
-}).pipe(orElseSucceed2(() => false)), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm6(temporary, { force: true }))), remove = (path) => promise2(() => rm6(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
+}).pipe(orElseSucceed2(() => false)), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm7(temporary, { force: true }))), remove = (path) => promise2(() => rm7(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
   for (let attempt = 0;attempt < 3; attempt += 1) {
     const moved = yield* exit2(fileSystem(`cannot move ${temporary}`, () => rename5(temporary, directory)));
     if (moved._tag === "Success")
@@ -27886,8 +28311,8 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : p
   return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
 }), STALE_AFTER_MS, newestChange = (path) => gen2(function* () {
   const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map5((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map5((names) => names.map((name) => join22(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join22(path, "node_modules"))];
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map5((names) => names.map((name) => join23(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join23(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 }), sweepStale = (directory, uid) => gen2(function* () {
@@ -27896,24 +28321,24 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : p
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir2(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join22(parent, name);
+    const path = join23(parent, name);
     const found = yield* tryPromise2(() => lstat5(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
-}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp(join22(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join23(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join22(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join23(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove), loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join22(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join23(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -27932,9 +28357,9 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : p
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join22(directory, TUI_BUNDLE);
+  const target = join23(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join22(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join23(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -28343,65 +28768,43 @@ var init_state = __esm(() => {
   ];
 });
 
-import { join as join23 } from "path";
 var {$: $5 } = globalThis.Bun;
-var TARGETS, BUNDLED_TOOLS, UnsupportedPlatform, ToolMissing, selectTarget = (platform, arch) => {
-  const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
-  return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-}, toolPath = (directory, tool, target) => join23(directory, target.id, `${tool}${target.suffix}`), runTool = (options) => gen2(function* () {
-  const path = toolPath(options.directory, options.tool, options.target);
-  if (!(yield* promise2(() => Bun.file(path).exists())))
-    return yield* new ToolMissing({ tool: options.tool, path });
+var ToolMissing, runTool = (options) => gen2(function* () {
+  const found = yield* locateTool(options.tool, options.cwd, (command, whichOptions) => sync2(() => findCommand(options.env, command, whichOptions)));
+  if (isNone2(found))
+    return yield* new ToolMissing({ tool: options.tool });
+  const path = found.value;
   const output = yield* promise2(() => $5`${path} ${options.args}`.cwd(options.cwd).env(definedEnv(options.env)).nothrow());
   return output.exitCode;
 }), toolCommand = (tool, summary) => ({
   path: [tool],
-  usage: `${tool} <${tool === "rg" ? "ripgrep" : "fd"} arguments\u2026>`,
+  usage: `${tool} <${SEARCH_TOOLS[tool].title} arguments\u2026>`,
   summary,
   notes: [
     `the arguments, stdin, stdout, stderr and exit code are the program's own, so \`holyagent ${tool} --help\` prints its help and its exit codes keep their meaning`,
-    "a failure of holyagent itself (ToolMissing, UnsupportedPlatform) exits 4 with an `error:` line on stderr"
+    "the program is the one on PATH (fd also as fdfind, its name on Debian and Ubuntu); when it is not installed, holyagent itself fails with ToolMissing, exits 4 and prints an `error:` line on stderr with the install commands"
   ],
   flags: {},
   stateless: true,
   raw: true,
   passthrough: true,
   positionals: 0,
-  run: (call) => gen2(function* () {
-    const target = yield* selectTarget(process.platform, process.arch);
-    const code = yield* runTool({
-      tool,
-      directory: call.tools,
-      target,
-      args: call.args.positionals,
-      cwd: call.cwd,
-      env: call.env
-    });
-    return new Verbatim("", "", code);
-  })
+  run: (call) => runTool({ tool, args: call.args.positionals, cwd: call.cwd, env: call.env }).pipe(map5((code) => new Verbatim("", "", code)))
 }), TOOL_COMMANDS;
 var init_tools2 = __esm(() => {
   init_dist();
   init_environment();
-  TARGETS = [
-    { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
-    { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
-    { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
-  ];
-  BUNDLED_TOOLS = join23(import.meta.dir, "vendor");
-  UnsupportedPlatform = class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
-    get message() {
-      return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;
-    }
-  };
+  init_search_tools();
+  init_shell();
   ToolMissing = class ToolMissing extends TaggedError2("ToolMissing") {
     get message() {
-      return `The bundled ${this.tool} is missing: ${this.path} does not exist`;
+      const { title, commands } = SEARCH_TOOLS[this.tool];
+      return `${title} (${commands.join(" or ")}) is not on PATH; ${installAdvice}`;
     }
   };
   TOOL_COMMANDS = [
-    toolCommand("rg", "Search file contents with the ripgrep bundled with the plugin; runs it for this platform with your arguments"),
-    toolCommand("fd", "Find files and folders by name with the fd bundled with the plugin; runs it for this platform with your arguments")
+    toolCommand("rg", "Search file contents with the ripgrep installed on this machine; runs it with your arguments"),
+    toolCommand("fd", "Find files and folders by name with the fd installed on this machine (fdfind on Debian and Ubuntu); runs it with your arguments")
   ];
 });
 
@@ -28409,6 +28812,7 @@ var COMMANDS;
 var init_commands2 = __esm(() => {
   init_commands();
   init_assignment2();
+  init_browser_server();
   init_hook();
   init_intent2();
   init_migrate();
@@ -28424,6 +28828,7 @@ var init_commands2 = __esm(() => {
     ...SETUP_COMMANDS,
     ...STATE_COMMANDS,
     ...TOOL_COMMANDS,
+    ...BROWSER_SERVER_COMMANDS,
     ...VCS_COMMANDS,
     ...HOOK_COMMANDS
   ];
@@ -28461,7 +28866,6 @@ var forWords = (command, words) => command.forHost === undefined ? command : { .
     text: readReport(host),
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
-    tools: host.tools ?? BUNDLED_TOOLS,
     terminal: host.terminal,
     setupTui: host.setupTui,
     input: (schema) => readInput(host, schema, inline),
@@ -28525,12 +28929,12 @@ ${output.text}
 ` : `${encode2(output)}
 `;
   return { stdout, stderr: "", code: 0 };
-}), failed3 = (error, env) => hostForText(env).pipe(map5((agent) => {
+}), failed4 = (error, env) => hostForText(env).pipe(map5((agent) => {
   const { tag, message, hint, code } = describeFailure(error, wordsFor(agent));
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
-})), run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => failed3(error, host.env)), catchCause2((cause) => failed3({ _tag: "Defect", message: pretty(cause) }, host.env)));
+})), run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => failed4(error, host.env)), catchCause2((cause) => failed4({ _tag: "Defect", message: pretty(cause) }, host.env)));
 var init_program = __esm(() => {
   init_dist2();
   init_dist();
@@ -28546,7 +28950,6 @@ var init_program = __esm(() => {
   init_config();
   init_context();
   init_errors3();
-  init_tools2();
 });
 
 var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause)));

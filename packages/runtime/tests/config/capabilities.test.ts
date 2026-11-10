@@ -6,6 +6,11 @@ import { Effect, Schema } from "effect"
 import {
   BROWSE_MCP_SERVER,
   BROWSE_TOOLS,
+  BROWSER_SERVER_COMMAND,
+  BROWSER_USE_ALL_TOOLS,
+  BROWSER_USE_MCP_SERVER,
+  BROWSER_USE_PACKAGE,
+  BROWSER_USE_TOOLS,
   CAPABILITIES,
   type CapabilityDefinition,
   capabilityPackages,
@@ -18,17 +23,17 @@ import {
   managedCapabilityPackages,
   NPM_REGISTRY,
   npxServerArgs,
-  PLAYWRIGHT_MCP_SERVER,
-  PLAYWRIGHT_PACKAGE,
-  PLAYWRIGHT_TOOLS,
+  PYPI_INDEX,
   screenTools,
   serversWithheld,
   T3_PREVIEW_TOOLS,
   T3_VISUAL_TOOLS,
   unavailableIn,
+  uvxServerArgs,
 } from "../../src/config/capabilities.ts"
 import { piPackages } from "../../src/config/packages.ts"
 import { PI_PACKAGE_VERSIONS, piPackageSource } from "../../src/config/pi-packages.ts"
+import { PYPI_PACKAGE_VERSIONS } from "../../src/config/pypi-packages.ts"
 import { Config, ConfigFile } from "../../src/config/schema.ts"
 import { toolSettings } from "../../src/pi/tools.ts"
 import { DEFAULT_CONFIG } from "./defaults.ts"
@@ -310,7 +315,7 @@ describe("the browser-use capability entry", () => {
   const entry = CAPABILITIES.find((capability) => capability.name === "browser-use")
   if (entry === undefined) throw new Error("the registry has no browser-use capability")
 
-  test("is on by default for the specialists, with browse in the normal form and Playwright in the headless one", () => {
+  test("is on by default for the specialists, with browse in the normal form and browser-use in the headless one", () => {
     expect(entry).toMatchObject({
       feature: "browserUse",
       defaultOn: true,
@@ -327,33 +332,49 @@ describe("the browser-use capability entry", () => {
       mcpServers: [BROWSE_MCP_SERVER],
       pairing: true,
     })
-    expect(needsOf("normal")).toEqual(["display", [22, 19, 0]])
+    expect(needsOf("normal")).toEqual(["command", "display", [22, 19, 0]])
     expect(entry.forms.headless).toMatchObject({
       packages: [],
-      mcpServers: [PLAYWRIGHT_MCP_SERVER],
+      mcpServers: [BROWSER_USE_MCP_SERVER],
     })
-    expect(needsOf("headless")).toEqual([[18, 0, 0]])
+    expect(needsOf("headless")).toEqual(["command", "chromium"])
     expect(entry.forms.headless).not.toHaveProperty("pairing")
     expect(DEFAULT_CONFIG.pi.features.browserUse).toBe(true)
   })
 
-  test("the headless server is the pinned Playwright MCP server, headless, isolated and on Chromium", () => {
-    expect(PI_PACKAGE_VERSIONS[PLAYWRIGHT_PACKAGE]).toMatch(/^\d+\.\d+\.\d+$/)
-    expect(PLAYWRIGHT_MCP_SERVER).toEqual({
-      name: "playwright",
-      command: "npx",
+  test("the headless server is browser-use at an exact PyPI pin, run by uvx with no uv config and the public index", () => {
+    expect(PYPI_PACKAGE_VERSIONS[BROWSER_USE_PACKAGE]).toBe("1.0.0")
+    expect(PYPI_INDEX).toBe("https://pypi.org/simple")
+    expect(BROWSER_USE_MCP_SERVER).toEqual({
+      name: "browser_use",
+      command: "uvx",
       args: [
-        "--registry=https://registry.npmjs.org/",
-        "--@playwright:registry=https://registry.npmjs.org/",
-        "-y",
-        `@playwright/mcp@${PI_PACKAGE_VERSIONS[PLAYWRIGHT_PACKAGE]}`,
-        "--headless",
-        "--isolated",
-        "--browser",
-        "chromium",
+        "--no-config",
+        "--default-index",
+        "https://pypi.org/simple",
+        "--from",
+        "browser-use==1.0.0",
+        "browser-use",
+        "--cli-mcp",
       ],
-      chromiumFlag: "--executable-path",
+      launchesChromium: true,
     })
+    expect(BROWSER_SERVER_COMMAND).toBe("browser-server")
+  })
+
+  test("uvxServerArgs puts every uv option before the package, so uvx reads them as its own", () => {
+    const args = uvxServerArgs("browser-use", ["browser-use", "--cli-mcp", "--extra"])
+    expect(args.indexOf("--no-config")).toBe(0)
+    expect(
+      args.slice(args.indexOf("--default-index"), args.indexOf("--default-index") + 2),
+    ).toEqual(["--default-index", PYPI_INDEX])
+    expect(args.slice(args.indexOf("--from"))).toEqual([
+      "--from",
+      `browser-use==${PYPI_PACKAGE_VERSIONS["browser-use"]}`,
+      "browser-use",
+      "--cli-mcp",
+      "--extra",
+    ])
   })
 
   test("every npx launch of a screen MCP server passes the public registry, for the scope and for the rest", () => {
@@ -362,9 +383,8 @@ describe("the browser-use capability entry", () => {
         (form) => formContent(capability, form)?.mcpServers ?? [],
       ),
     )
-    expect(servers.map(({ name }) => name).toSorted()).toEqual(["browse", "playwright"])
-    for (const server of servers) {
-      expect(server.command).toBe("npx")
+    expect(servers.map(({ name }) => name).toSorted()).toEqual(["browse", "browser_use"])
+    for (const server of servers.filter(({ command }) => command === "npx")) {
       // Before the package, so npx reads them as its own options and not the package's.
       const package_ = server.args.findIndex((argument) => /^@[^/]+\/[^@]+@/.test(argument))
       expect(server.args.slice(0, package_)).toContain(`--registry=${NPM_REGISTRY}`)
@@ -381,28 +401,31 @@ describe("the browser-use capability entry", () => {
     ])
   })
 
-  test("needs npx in both forms and a graphical session in the normal form only", () => {
-    expect(entry.needs.map((need) => (need.kind === "command" ? need.command : need.kind))).toEqual(
-      ["npx"],
-    )
-    expect(formNeeds(entry, "normal").map(({ kind }) => kind)).toEqual([
-      "command",
-      "display",
-      "node",
-    ])
-    expect(formNeeds(entry, "headless").map(({ kind }) => kind)).toEqual(["command", "node"])
+  test("needs npx, a graphical session and Node.js in the normal form, and uvx and a Chromium in the headless one", () => {
+    const named = (form: "headless" | "normal") =>
+      formNeeds(entry, form).map((need) => (need.kind === "command" ? need.command : need.kind))
+    expect(entry.needs).toEqual([])
+    expect(named("normal")).toEqual(["npx", "display", "node"])
+    expect(named("headless")).toEqual(["uvx", "chromium"])
     expect(entry.health).toEqual(["needs"])
   })
 
   test("grants the server's tools of the form to a screen Assignment, never both, and keeps them from the root", () => {
     expect(entry.tools).toEqual({
-      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      rootExclude: [...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS],
       visual: [],
-      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      screen: [...BROWSE_TOOLS, ...BROWSER_USE_TOOLS],
     })
     expect(screenTools(entry, "normal")).toEqual(BROWSE_TOOLS)
-    expect(screenTools(entry, "headless")).toEqual(PLAYWRIGHT_TOOLS)
-    expect(PLAYWRIGHT_TOOLS).toEqual(["mcp__playwright__browser_*"])
+    expect(screenTools(entry, "headless")).toEqual(BROWSER_USE_TOOLS)
+    // Specialists get the two tools by name: browser_login, which opens a browser for a person to
+    // approve, is not granted, and the root is kept from every tool of the server.
+    expect(BROWSER_USE_TOOLS).toEqual([
+      "mcp__browser_use__browser_exec",
+      "mcp__browser_use__browser_screenshot",
+    ])
+    expect(BROWSER_USE_TOOLS).not.toContain("mcp__browser_use__browser_login")
+    expect(BROWSER_USE_ALL_TOOLS).toEqual(["mcp__browser_use__*"])
     // The capabilities that have no server keep their screen tools whatever the form.
     const computerUse = CAPABILITIES.find(({ name }) => name === "computer-use")
     const mcp = CAPABILITIES.find(({ name }) => name === "mcp")
@@ -422,11 +445,11 @@ describe("the browser-use capability entry", () => {
     expect(todo && serversWithheld(todo, "normal", { mcp: false })).toBeUndefined()
   })
 
-  test("loads no Pi package in either form: the server runs through npx at the pin", () => {
+  test("loads no Pi package in either form: the servers run through npx and uvx at their pins", () => {
     for (const form of ["headless", "normal"] as const)
       expect(capabilityPackages({ browserUse: true }, form)).toEqual([])
     expect(managedCapabilityPackages()).not.toContain("@opencode/browse")
-    expect(managedCapabilityPackages()).not.toContain("@playwright/mcp")
+    expect(managedCapabilityPackages()).not.toContain("browser-use")
   })
 
   test("only computer use, browser use and T3's preview tools are granted by the screen capability", () => {
@@ -436,7 +459,12 @@ describe("the browser-use capability entry", () => {
       ),
     ).toEqual(["mcp", "computer-use", "browser-use"])
     expect(CAPABILITIES.flatMap((capability) => capability.tools.screen).toSorted()).toEqual(
-      [...T3_PREVIEW_TOOLS, ...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS].toSorted(),
+      [
+        ...T3_PREVIEW_TOOLS,
+        ...COMPUTER_USE_TOOLS,
+        ...BROWSE_TOOLS,
+        ...BROWSER_USE_TOOLS,
+      ].toSorted(),
     )
     for (const tool of T3_PREVIEW_TOOLS) expect(T3_VISUAL_TOOLS).toContain(tool)
   })

@@ -232,11 +232,12 @@ const SCREEN_LINE =
 
 /**
  * What a headless screen specialist is told (its agent name ends in `-headless-screen`): the
- * machine has no graphical session, so it drives a headless browser through the Playwright MCP
- * tools and has no desktop.
+ * machine has no graphical session, so it drives a headless browser (the browser-use MCP tools, or
+ * T3's preview tools where T3 hosts the session, which HolyAgent starts no browser-use for) and has
+ * no desktop.
  */
 export const HEADLESS_SCREEN_LINE =
-  "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (the mcp__playwright__browser_* tools, an isolated profile) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it."
+  "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (outside T3 the mcp__browser_use__browser_exec and mcp__browser_use__browser_screenshot tools, a temporary profile; where T3 hosts the session, T3's preview tools, and browser-use is not available) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it."
 
 /**
  * The Assignment as the specialist reads it, in a fixed order: the role line (the marker

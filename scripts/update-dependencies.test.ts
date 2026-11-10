@@ -5,23 +5,26 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
+import { parseMiseTools } from "./dependency-pins.ts"
 import {
-  ChecksumMismatch,
   execute,
-  fetchVendored,
   main,
   manifestFiles,
+  MISE_SOURCES,
   PI_PACKAGE_PINS,
   type Pin,
   PinsBehind,
+  PYPI_PACKAGE_PINS,
+  pypiReleaseOf,
   releaseOf,
   renderPiPins,
+  renderPypiPins,
   SourceError,
   type Steps,
   type Survey,
   surveyPiPackages,
+  surveyPypiPackages,
   Usage,
-  verifyChecksum,
 } from "./update-dependencies.ts"
 
 const pin = (current: string, next: string): Pin => ({
@@ -36,10 +39,10 @@ const survey = (...pins: ReadonlyArray<Pin>): Survey => ({
   pins,
   skipped: [],
   actions: new Map(),
-  vendored: new Map(),
   mise: new Map(),
   packages: new Map(),
   piPackages: new Map(),
+  pypiPackages: new Map(),
 })
 
 /** Steps that read a fixed survey and count the writes asked for. */
@@ -150,21 +153,20 @@ describe("manifestFiles", () => {
   })
 })
 
-describe("verifyChecksum", () => {
-  const published = { hash: "a".repeat(64), via: "the release" }
+describe("the mise tools of this repository", () => {
+  const tools = async () =>
+    parseMiseTools(await Bun.file(join(import.meta.dir, "..", "mise.toml")).text())
 
-  test("passes on the published hash", async () => {
-    await Effect.runPromise(verifyChecksum("https://x/y.tar.gz", "a".repeat(64), published))
+  test("provide ripgrep and fd at exact versions, for holyagent rg and holyagent fd", async () => {
+    const versions = new Map((await tools()).map(({ name, version }) => [name, version]))
+    expect(versions.get("aqua:BurntSushi/ripgrep")).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(versions.get("aqua:sharkdp/fd")).toMatch(/^\d+\.\d+\.\d+$/)
   })
 
-  test("fails with ChecksumMismatch naming both hashes and where the expected one came from", async () => {
-    const error = await Effect.runPromise(
-      Effect.flip(verifyChecksum("https://x/y.tar.gz", "b".repeat(64), published)),
-    )
-    expect(error).toBeInstanceOf(ChecksumMismatch)
-    expect(error.message).toContain("b".repeat(64))
-    expect(error.message).toContain("a".repeat(64))
-    expect(error.message).toContain("the release")
+  test("have a release source for every pinned version, so the updater moves them", async () => {
+    const pinned = (await tools()).filter(({ version }) => /^\d+\.\d+\.\d+$/.test(version))
+    expect(pinned.length).toBeGreaterThanOrEqual(3)
+    for (const { name } of pinned) expect(MISE_SOURCES[name]).toBeDefined()
   })
 })
 
@@ -180,96 +182,6 @@ describe("releaseOf", () => {
     } finally {
       await stalled.stop(true)
     }
-  })
-})
-
-describe("fetchVendored", () => {
-  const encode = (text: string) => new TextEncoder().encode(text)
-  const damaged = encode("not an archive")
-  const hashOfDamaged = new Bun.CryptoHasher("sha256").update(damaged).digest("hex")
-
-  /** A network that serves a damaged archive for every download and the given text for the rest. */
-  const network = (other: (url: string) => string | undefined) => (url: string) =>
-    Effect.sync(() => {
-      const text = other(url)
-      return text === undefined ? damaged : encode(text)
-    })
-
-  test("ripgrep: refuses an archive that differs from its published .sha256", async () => {
-    const get = network((url) =>
-      url.endsWith(".sha256") ? `${"0".repeat(64)}  file\n` : undefined,
-    )
-    const error = await Effect.runPromise(
-      Effect.flip(fetchVendored("ripgrep", "15.2.0", "15.3.0", get)),
-    )
-    expect(error).toBeInstanceOf(ChecksumMismatch)
-    expect(error.message).toContain(".sha256")
-    expect(error.message).toContain(hashOfDamaged)
-  })
-
-  test("ripgrep: refuses an archive whose release publishes no .sha256", async () => {
-    const get = network((url) => (url.endsWith(".sha256") ? "Not Found" : undefined))
-    const error = await Effect.runPromise(
-      Effect.flip(fetchVendored("ripgrep", "15.2.0", "15.3.0", get)),
-    )
-    expect(error).toBeInstanceOf(SourceError)
-    expect(error.message).toContain("publishes no SHA-256")
-  })
-
-  test("ripgrep: reads an archive only after its hash matches the published one", async () => {
-    const get = network((url) => (url.endsWith(".sha256") ? `${hashOfDamaged}  file\n` : undefined))
-    const error = await Effect.runPromise(
-      Effect.flip(fetchVendored("ripgrep", "15.2.0", "15.3.0", get)),
-    )
-    // The hash matched, so the failure is the unreadable archive, not a checksum.
-    expect(error).toBeInstanceOf(SourceError)
-    expect(error).not.toBeInstanceOf(ChecksumMismatch)
-  })
-
-  const release = (digest: string | null | undefined) =>
-    JSON.stringify({
-      id: 1,
-      assets: [
-        "fd-v10.6.0-aarch64-apple-darwin.tar.gz",
-        "fd-v10.6.0-x86_64-unknown-linux-musl.tar.gz",
-        "fd-v10.6.0-x86_64-pc-windows-msvc.zip",
-      ].map((name) => ({ id: 2, name, ...(digest === undefined ? {} : { digest }) })),
-    })
-  const api = (text: string) => (url: string) =>
-    url.startsWith("https://api.github.com/repos/sharkdp/fd/releases/tags/v10.6.0")
-      ? text
-      : undefined
-
-  test("fd: refuses an archive that differs from the digest of the release asset", async () => {
-    const get = network(api(release(`sha256:${"0".repeat(64)}`)))
-    const error = await Effect.runPromise(Effect.flip(fetchVendored("fd", "10.5.1", "10.6.0", get)))
-    expect(error).toBeInstanceOf(ChecksumMismatch)
-    expect(error.message).toContain("GitHub release API")
-  })
-
-  test.each([null, undefined])(
-    "fd: refuses an asset the API gives no digest (%p)",
-    async (digest) => {
-      const get = network(api(release(digest)))
-      const error = await Effect.runPromise(
-        Effect.flip(fetchVendored("fd", "10.5.1", "10.6.0", get)),
-      )
-      expect(error).toBeInstanceOf(SourceError)
-      expect(error.message).toContain("publishes no SHA-256")
-    },
-  )
-
-  test("fd: reads an archive only after its hash matches the digest", async () => {
-    const get = network(api(release(`sha256:${hashOfDamaged}`)))
-    const error = await Effect.runPromise(Effect.flip(fetchVendored("fd", "10.5.1", "10.6.0", get)))
-    expect(error).toBeInstanceOf(SourceError)
-    expect(error).not.toBeInstanceOf(ChecksumMismatch)
-  })
-
-  test("fd: refuses a release answer that lists no assets", async () => {
-    const get = network(api("{}"))
-    const error = await Effect.runPromise(Effect.flip(fetchVendored("fd", "10.5.1", "10.6.0", get)))
-    expect(error).toBeInstanceOf(SourceError)
   })
 })
 
@@ -403,5 +315,148 @@ describe("Pi package pins", () => {
     const repository = join(import.meta.dir, "..")
     const text = await Bun.file(join(repository, PI_PACKAGE_PINS)).text()
     expect(await Effect.runPromise(renderPiPins(repository, new Map()))).toBe(text)
+  })
+})
+
+describe("PyPI package pins", () => {
+  const write = (file: string, text: string) => Bun.write(join(root, file), text)
+
+  /** The JSON API's answer for one project: each version with its files, some yanked. */
+  const project = (releases: Record<string, ReadonlyArray<boolean>>) =>
+    JSON.stringify({
+      info: { name: "browser-use", version: "1.2.0" },
+      urls: [],
+      releases: Object.fromEntries(
+        Object.entries(releases).map(([version, yanked]) => [
+          version,
+          yanked.map((flag) => ({ filename: `${version}.whl`, yanked: flag })),
+        ]),
+      ),
+    })
+
+  /** An index serving fixtures by project; the path is `/pypi/<name>/json`. */
+  const index = (answers: Record<string, string>) =>
+    Bun.serve({
+      port: 0,
+      fetch: (request) => {
+        const answer = answers[new URL(request.url).pathname]
+        return answer === undefined ? new Response("", { status: 404 }) : new Response(answer)
+      },
+    })
+
+  const FIXTURE = {
+    "/pypi/browser-use/json": project({
+      "1.0.0": [false],
+      "1.1.0": [false],
+      "1.2.0": [true],
+      "1.3.0rc1": [false],
+      "1.2.1.post1": [false],
+      "2.0.0.dev4": [false],
+    }),
+    "/pypi/old-line/json": project({ "1.0.0": [false], "2.0.0": [false] }),
+  }
+
+  const seed = () =>
+    write(PYPI_PACKAGE_PINS, JSON.stringify({ "browser-use": "1.0.0", "old-line": "3.0.0" }))
+
+  test("the repository pins browser-use exactly, in the form the updater writes", async () => {
+    const repository = join(import.meta.dir, "..")
+    const text = await Bun.file(join(repository, PYPI_PACKAGE_PINS)).text()
+    expect(JSON.parse(text)).toEqual({ "browser-use": "1.0.0" })
+    expect(await Effect.runPromise(renderPypiPins(repository, new Map()))).toBe(text)
+  })
+
+  test("moves each pin to the newest stable release that is not yanked, never down", async () => {
+    await seed()
+    const server = index(FIXTURE)
+    try {
+      const { pins, latest } = await Effect.runPromise(
+        surveyPypiPackages(root, `http://127.0.0.1:${server.port}`),
+      )
+      expect(pins.map(({ kind, name, current, next }) => ({ kind, name, current, next }))).toEqual([
+        // 1.2.0 is yanked, 1.3.0rc1, 1.2.1.post1 and 2.0.0.dev4 are not stable.
+        { kind: "pypi", name: "browser-use", current: "1.0.0", next: "1.1.0" },
+        // The newest release is behind the pin: the pin stays.
+        { kind: "pypi", name: "old-line", current: "3.0.0", next: "3.0.0" },
+      ])
+      expect(Object.fromEntries(latest)).toEqual({ "browser-use": "1.1.0", "old-line": "3.0.0" })
+      expect(pins.every(({ file }) => file === PYPI_PACKAGE_PINS)).toBe(true)
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("--check fails when a PyPI pin is behind and passes once it is current", async () => {
+    await seed()
+    const server = index(FIXTURE)
+    try {
+      const found = await Effect.runPromise(
+        surveyPypiPackages(root, `http://127.0.0.1:${server.port}`),
+      )
+      const error = await Effect.runPromise(
+        Effect.flip(execute(["--check", root], steps(survey(...found.pins)).stand)),
+      )
+      expect(error).toBeInstanceOf(PinsBehind)
+      expect((error as PinsBehind).count).toBe(1)
+      expect(logged.join("\n")).toContain("browser-use")
+
+      const current = survey(...found.pins.map((pin) => ({ ...pin, current: pin.next })))
+      await Effect.runPromise(execute(["--check", root], steps(current).stand))
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("a project with no stable, installable release fails the survey", async () => {
+    const server = index({
+      "/pypi/browser-use/json": project({ "1.0.0": [true], "1.1.0rc1": [false] }),
+    })
+    try {
+      const error = await Effect.runPromise(
+        Effect.flip(pypiReleaseOf("browser-use", `http://127.0.0.1:${server.port}`)),
+      )
+      expect(error).toBeInstanceOf(SourceError)
+      expect(error.message).toContain("no stable release that is not yanked")
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("an unknown project, an answer of another shape and a stalled index fail with a SourceError", async () => {
+    const server = index({ "/pypi/odd/json": JSON.stringify({ releases: [] }) })
+    const stalled = Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) })
+    try {
+      const base = `http://127.0.0.1:${server.port}`
+      expect(await Effect.runPromise(Effect.flip(pypiReleaseOf("missing", base)))).toBeInstanceOf(
+        SourceError,
+      )
+      expect(await Effect.runPromise(Effect.flip(pypiReleaseOf("odd", base)))).toBeInstanceOf(
+        SourceError,
+      )
+      expect(
+        await Effect.runPromise(
+          Effect.flip(pypiReleaseOf("browser-use", `http://127.0.0.1:${stalled.port}`, 50)),
+        ),
+      ).toBeInstanceOf(SourceError)
+    } finally {
+      await server.stop(true)
+      await stalled.stop(true)
+    }
+  })
+
+  test("a pin file that is not a table of strings fails with a FileError", async () => {
+    await write(PYPI_PACKAGE_PINS, JSON.stringify({ "browser-use": 1 }))
+    const error = await Effect.runPromise(
+      Effect.flip(surveyPypiPackages(root, "http://127.0.0.1:1")),
+    )
+    expect(error._tag).toBe("FileError")
+  })
+
+  test("renders the moved versions into the file text, keeping the key order", async () => {
+    await seed()
+    const text = await Effect.runPromise(renderPypiPins(root, new Map([["browser-use", "1.1.0"]])))
+    expect(JSON.parse(text)).toEqual({ "browser-use": "1.1.0", "old-line": "3.0.0" })
+    expect(Object.keys(JSON.parse(text) as object)).toEqual(["browser-use", "old-line"])
+    expect(text.endsWith("}\n")).toBe(true)
   })
 })

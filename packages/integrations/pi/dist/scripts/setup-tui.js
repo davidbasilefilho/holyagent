@@ -84,12 +84,17 @@ var constFalse = /* @__PURE__ */ constant(false);
 var constUndefined = /* @__PURE__ */ constant(undefined);
 var constVoid = constUndefined;
 
+var errorSiteKeys = ["line", "column", "sourceURL", "originalLine", "originalColumn"];
 var getAllObjectKeys = (obj) => {
   const keys = new Set(Reflect.ownKeys(obj));
   if (obj.constructor === Object)
     return keys;
   if (obj instanceof Error) {
     keys.delete("stack");
+    for (const key of errorSiteKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(obj, key))
+        keys.delete(key);
+    }
   }
   const proto = Object.getPrototypeOf(obj);
   let current = proto;
@@ -779,11 +784,10 @@ var StructuralProto = {
   },
   [symbol2](that) {
     const selfKeys = Object.keys(this);
-    const thatKeys = Object.keys(that);
-    if (selfKeys.length !== thatKeys.length)
+    if (selfKeys.length !== Object.keys(that).length)
       return false;
-    for (let i = 0;i < selfKeys.length; i++) {
-      if (selfKeys[i] !== thatKeys[i] || !equals(this[selfKeys[i]], that[selfKeys[i]])) {
+    for (const key of selfKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
         return false;
       }
     }
@@ -2297,6 +2301,7 @@ class FiberImpl {
     this._children = undefined;
     this._interruptedCause = undefined;
     this._yielded = undefined;
+    this._autoYielded = false;
     this._running = false;
     this._deferredInterrupt = false;
     this._parent = undefined;
@@ -2411,8 +2416,10 @@ class FiberImpl {
     const prevRunning = this._running;
     this._running = true;
     let yielding = false;
+    let resuming = this._autoYielded;
+    this._autoYielded = false;
     let current = effect;
-    this.currentOpCount = 0;
+    this.currentOpCount = resuming ? 1 : 0;
     try {
       while (true) {
         try {
@@ -2422,12 +2429,13 @@ class FiberImpl {
           }
           this.currentOpCount++;
           const cache = this.cache;
-          if (!yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
+          if (!resuming && !yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
             yielding = true;
-            const prev = current;
-            current = flatMap(yieldNow, () => prev);
+            current = this.yieldNow(current, 0, true);
+          } else {
+            resuming = false;
+            current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
           }
-          current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
           if (current === Yield) {
             const yielded = this._yielded;
             if (ExitTypeId in yielded) {
@@ -2484,6 +2492,18 @@ class FiberImpl {
   yieldWith(value) {
     this._yielded = value;
     return Yield;
+  }
+  yieldNow(effect, priority = 0, automatic = false) {
+    let resumed = false;
+    this.currentDispatcher.scheduleTask(() => {
+      if (resumed)
+        return;
+      this._autoYielded = automatic;
+      this.evaluate(effect);
+    }, priority);
+    return this.yieldWith(() => {
+      resumed = true;
+    });
   }
   children() {
     return this._children ??= new Set;
@@ -2597,15 +2617,7 @@ var suspend = /* @__PURE__ */ makePrimitive({
 var yieldNowWith = /* @__PURE__ */ makePrimitive({
   op: "Yield",
   [evaluate](fiber) {
-    let resumed = false;
-    fiber.currentDispatcher.scheduleTask(() => {
-      if (resumed)
-        return;
-      fiber.evaluate(exitVoid);
-    }, this[args] ?? 0);
-    return fiber.yieldWith(() => {
-      resumed = true;
-    });
+    return fiber.yieldNow(exitVoid, this[args] ?? 0);
   }
 });
 var yieldNow = /* @__PURE__ */ yieldNowWith(0);
@@ -2747,8 +2759,9 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
         const isWinner = !done;
         done = true;
         resume(exit);
-        if (isWinner && options?.onWinner) {
-          options.onWinner({
+        if (isWinner) {
+          interruptRaceLosers(fibers, parent);
+          options?.onWinner?.({
             fiber,
             index,
             parentFiber: parent
@@ -2758,6 +2771,12 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
     }
   });
 });
+var interruptRaceLosers = (fibers, parent) => {
+  const annotations = fiberStackAnnotations(parent);
+  for (const fiber of fibers) {
+    fiber.interruptUnsafe(parent.id, annotations);
+  }
+};
 var raceFirst = /* @__PURE__ */ dual((args) => isEffect(args[1]), (self, that, options) => raceAllFirst([self, that], options));
 var flatMap = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, andThenCont, f));
 var map = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, mapCont, f));
@@ -3388,7 +3407,7 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
-var FFF_OVERRIDE_SETTINGS = { mode: "override", followSymlinks: false };
+var FFF_OVERRIDE_SETTINGS = { mode: "override" };
 var FFF_TOOLS = [
   "grep",
   "find",
@@ -3409,19 +3428,24 @@ var FFF_NATIVE_HOSTS = [
 
 var pi_packages_default = {
   "pi-provider-kimi-code": "0.6.13",
-  "@tintinweb/pi-subagents": "0.23.1",
-  "billion-context": "0.1.212",
+  "@tintinweb/pi-subagents": "0.23.2",
+  "billion-context": "0.1.213",
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.6",
-  "@amaster.ai/pi-computer-use": "0.1.36",
+  "@amaster.ai/pi-computer-use": "0.1.38",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.15",
-  "@playwright/mcp": "0.0.85"
+  "@opencode/browse": "0.0.16"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
+
+var pypi_packages_default = {
+  "browser-use": "1.0.0"
+};
+
+var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
 
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
 var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
@@ -3456,18 +3480,30 @@ var BROWSE_MCP_SERVER = {
   command: "npx",
   args: npxServerArgs(BROWSE_PACKAGE, ["mcp"])
 };
-var PLAYWRIGHT_PACKAGE = "@playwright/mcp";
-var PLAYWRIGHT_SERVER = "playwright";
-var PLAYWRIGHT_TOOLS = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`];
-var PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path";
-var PLAYWRIGHT_MCP_SERVER = {
-  name: PLAYWRIGHT_SERVER,
-  command: "npx",
-  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
-  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG
+var BROWSER_USE_PACKAGE = "browser-use";
+var BROWSER_USE_SERVER = "browser_use";
+var BROWSER_USE_TOOLS = [
+  `mcp__${BROWSER_USE_SERVER}__browser_exec`,
+  `mcp__${BROWSER_USE_SERVER}__browser_screenshot`
+];
+var BROWSER_USE_ALL_TOOLS = [`mcp__${BROWSER_USE_SERVER}__*`];
+var PYPI_INDEX = "https://pypi.org/simple";
+var uvxServerArgs = (name, rest) => [
+  "--no-config",
+  "--default-index",
+  PYPI_INDEX,
+  "--from",
+  `${name}==${PYPI_PACKAGE_VERSIONS[name]}`,
+  ...rest
+];
+var BROWSER_USE_MCP_SERVER = {
+  name: BROWSER_USE_SERVER,
+  command: "uvx",
+  args: uvxServerArgs(BROWSER_USE_PACKAGE, ["browser-use", "--cli-mcp"]),
+  launchesChromium: true
 };
 var BROWSE_MINIMUM_NODE = [22, 19, 0];
-var PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0];
+var CHROMIUM_FIX = "set HOLYAGENT_CHROMIUM_PATH to a Chromium executable, or put a Playwright Chromium build in the folder PLAYWRIGHT_BROWSERS_PATH names (PLAYWRIGHT_BROWSERS_PATH=<folder> uvx playwright install chromium)";
 var nodeNeed = (minimum) => ({
   kind: "node",
   minimum,
@@ -3584,34 +3620,43 @@ var CAPABILITIES = [
   {
     name: "browser-use",
     feature: "browserUse",
-    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+    description: "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the browser-use MCP server (browser-use) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
-    needs: [
-      {
-        kind: "command",
-        command: "npx",
-        fix: "install Node.js from https://nodejs.org, which ships npx"
-      }
-    ],
+    needs: [],
     forms: {
       headless: {
         packages: [],
-        mcpServers: [PLAYWRIGHT_MCP_SERVER],
-        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)]
+        mcpServers: [BROWSER_USE_MCP_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: "uvx",
+            fix: "install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs"
+          },
+          { kind: "chromium", fix: CHROMIUM_FIX }
+        ]
       },
       normal: {
         packages: [],
         mcpServers: [BROWSE_MCP_SERVER],
-        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        needs: [
+          {
+            kind: "command",
+            command: "npx",
+            fix: "install Node.js from https://nodejs.org, which ships npx"
+          },
+          { kind: "display" },
+          nodeNeed(BROWSE_MINIMUM_NODE)
+        ],
         pairing: true
       }
     },
     tools: {
-      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      rootExclude: [...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS],
       visual: [],
-      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS]
+      screen: [...BROWSE_TOOLS, ...BROWSER_USE_TOOLS]
     },
     settings: [],
     health: ["needs"]

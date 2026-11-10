@@ -1,8 +1,13 @@
 import { describe, expect, test } from "bun:test"
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import {
+  CHROMIUM_EXECUTABLE_VARIABLE,
+  chromiumFixFor,
   findChromium,
-  PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE,
+  LEGACY_CHROMIUM_EXECUTABLE_VARIABLE,
   PREINSTALLED_BROWSERS,
 } from "../src/setup/chromium.ts"
 
@@ -20,11 +25,13 @@ const machine = (files: ReadonlyArray<string>) => ({
   ],
 })
 
+// No command is on the PATH unless a test says so, so that the host's own PATH never decides.
 const find = (
   env: Record<string, string>,
   files: ReadonlyArray<string>,
   platform: string = "linux",
-) => findChromium(env, platform, machine(files).exists, machine(files).list)
+  which: (command: string) => string | undefined = () => undefined,
+) => findChromium(env, platform, machine(files).exists, machine(files).list, which)
 
 describe("the Chromium a machine provides for the headless browser", () => {
   test("is the chromium entry of the preinstalled browsers folder when it exists", () => {
@@ -79,11 +86,98 @@ describe("the Chromium a machine provides for the headless browser", () => {
     expect(find({ PLAYWRIGHT_BROWSERS_PATH: "" }, files)).toBe(`${PREINSTALLED_BROWSERS}/chromium`)
   })
 
-  test("the path the person set for the server wins, existing or not", () => {
+  test("the path the person set wins over the folders when it exists, and HOLYAGENT_CHROMIUM_PATH is its variable", () => {
+    expect(CHROMIUM_EXECUTABLE_VARIABLE).toBe("HOLYAGENT_CHROMIUM_PATH")
     expect(
-      find({ [PLAYWRIGHT_MCP_EXECUTABLE_VARIABLE]: "/mine/chrome" }, [
+      find({ [CHROMIUM_EXECUTABLE_VARIABLE]: "/mine/chrome" }, [
+        "/mine/chrome",
         `${PREINSTALLED_BROWSERS}/chromium`,
       ]),
     ).toBe("/mine/chrome")
+  })
+
+  test("the old PLAYWRIGHT_MCP_EXECUTABLE_PATH is read when the new variable is unset or empty, and loses to it otherwise", () => {
+    expect(LEGACY_CHROMIUM_EXECUTABLE_VARIABLE).toBe("PLAYWRIGHT_MCP_EXECUTABLE_PATH")
+    const files = ["/old/chrome", "/new/chrome"]
+    expect(find({ PLAYWRIGHT_MCP_EXECUTABLE_PATH: "/old/chrome" }, files)).toBe("/old/chrome")
+    expect(
+      find({ HOLYAGENT_CHROMIUM_PATH: "", PLAYWRIGHT_MCP_EXECUTABLE_PATH: "/old/chrome" }, files),
+    ).toBe("/old/chrome")
+    expect(
+      find(
+        { HOLYAGENT_CHROMIUM_PATH: "/new/chrome", PLAYWRIGHT_MCP_EXECUTABLE_PATH: "/old/chrome" },
+        files,
+      ),
+    ).toBe("/new/chrome")
+  })
+
+  test("a configured path that does not exist is no Chromium, and no other one stands in for it", () => {
+    const files = [`${PREINSTALLED_BROWSERS}/chromium`]
+    expect(find({ HOLYAGENT_CHROMIUM_PATH: "/mine/gone" }, files)).toBeUndefined()
+    expect(find({ PLAYWRIGHT_MCP_EXECUTABLE_PATH: "/old/gone" }, files)).toBeUndefined()
+  })
+
+  test("a configured bare command name is found on the PATH and resolves to that file, and one that is not there is no Chromium", () => {
+    const onPath = (command: string) => (command === "chromium" ? "/usr/bin/chromium" : undefined)
+    const files = [`${PREINSTALLED_BROWSERS}/chromium`]
+    expect(find({ HOLYAGENT_CHROMIUM_PATH: "chromium" }, files, "linux", onPath)).toBe(
+      "/usr/bin/chromium",
+    )
+    expect(find({ PLAYWRIGHT_MCP_EXECUTABLE_PATH: "chromium" }, files, "linux", onPath)).toBe(
+      "/usr/bin/chromium",
+    )
+    expect(
+      find({ HOLYAGENT_CHROMIUM_PATH: "chromium-browser" }, files, "linux", onPath),
+    ).toBeUndefined()
+  })
+
+  test("a configured path with a separator must exist as given and is never looked up on the PATH", () => {
+    const anywhere = () => "/usr/bin/chromium"
+    for (const configured of ["./chromium", "bin/chromium", "C:\\chrome\\chrome.exe"])
+      expect(find({ HOLYAGENT_CHROMIUM_PATH: configured }, [], "linux", anywhere)).toBeUndefined()
+    expect(
+      find({ HOLYAGENT_CHROMIUM_PATH: "bin/chromium" }, ["bin/chromium"], "linux", anywhere),
+    ).toBe("bin/chromium")
+  })
+
+  test("the PATH lookup reads the environment it is given", () => {
+    const folder = mkdtempSync(join(tmpdir(), "holyagent-chromium-"))
+    try {
+      const name = process.platform === "win32" ? "fake-chromium.cmd" : "fake-chromium"
+      const file = join(folder, name)
+      writeFileSync(file, "")
+      chmodSync(file, 0o755)
+      const env = { HOLYAGENT_CHROMIUM_PATH: "fake-chromium", PATH: folder }
+      expect(findChromium(env, process.platform)).toBe(file)
+      expect(findChromium({ ...env, PATH: join(folder, "elsewhere") })).toBeUndefined()
+    } finally {
+      rmSync(folder, { recursive: true, force: true })
+    }
+  })
+
+  test("the fix names the configured path that does not exist and the variable it is in, else it is the fix alone", () => {
+    const { exists } = machine(["/mine/chrome"])
+    expect(chromiumFixFor({ HOLYAGENT_CHROMIUM_PATH: "/gone" }, "set it", exists)).toBe(
+      "HOLYAGENT_CHROMIUM_PATH is set to /gone, which does not exist; set it",
+    )
+    expect(chromiumFixFor({ PLAYWRIGHT_MCP_EXECUTABLE_PATH: "/gone" }, "set it", exists)).toBe(
+      "PLAYWRIGHT_MCP_EXECUTABLE_PATH is set to /gone, which does not exist; set it",
+    )
+    expect(chromiumFixFor({ HOLYAGENT_CHROMIUM_PATH: "/mine/chrome" }, "set it", exists)).toBe(
+      "set it",
+    )
+    expect(chromiumFixFor({}, "set it", exists)).toBe("set it")
+    const none = () => undefined
+    expect(chromiumFixFor({ HOLYAGENT_CHROMIUM_PATH: "chromium" }, "set it", exists, none)).toBe(
+      "HOLYAGENT_CHROMIUM_PATH is set to chromium, which does not exist; set it",
+    )
+    expect(
+      chromiumFixFor(
+        { HOLYAGENT_CHROMIUM_PATH: "chromium" },
+        "set it",
+        exists,
+        () => "/bin/chromium",
+      ),
+    ).toBe("set it")
   })
 })

@@ -1,6 +1,7 @@
 import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../pi/bash/guardrails.ts"
 import { FFF_NATIVE_HOSTS, FFF_OVERRIDE_SETTINGS, FFF_TOOLS } from "../pi/fff/settings.ts"
 import { PI_PACKAGE_VERSIONS, type PiPackageName } from "./pi-packages.ts"
+import { PYPI_PACKAGE_VERSIONS, type PypiPackageName } from "./pypi-packages.ts"
 import type { PiProvider } from "./schema.ts"
 
 /**
@@ -25,11 +26,11 @@ export interface McpServer {
   /** The arguments of the command. */
   readonly args: ReadonlyArray<string>
   /**
-   * The flag that takes the path of the browser executable, for a server that launches a browser:
-   * the extension appends it and the path of the Chromium the machine provides (see
-   * `findChromium`), and leaves both out when the machine has none, so the server uses its own.
+   * True for a server that drives a Chromium it does not start: the extension registers it through
+   * `holyagent browser-server`, which starts a headless Chromium (see `findChromium`) with a
+   * temporary profile, runs the server against it and removes both when the server ends.
    */
-  readonly chromiumFlag?: string
+  readonly launchesChromium?: true
 }
 
 /** What a capability installs in one form: Pi packages (by npm name, pinned) and MCP servers. */
@@ -64,6 +65,12 @@ export type SystemNeed =
       readonly kind: "command"
       readonly command: string
       /** How the person gets it, appended to the failing line. */
+      readonly fix: string
+    }
+  | {
+      /** A Chromium executable the machine provides, as `findChromium` finds it. */
+      readonly kind: "chromium"
+      /** How the person gets one, appended to the failing line. */
       readonly fix: string
     }
   | {
@@ -264,52 +271,84 @@ export const BROWSE_MCP_SERVER: McpServer = {
 }
 
 /**
- * The npm package of the Playwright MCP server, the headless form of the `browser-use` capability.
- * It is pinned in `pi-packages.json` with the Pi packages, so the updater moves it; the MCP server
- * runs it through `npx` at that exact release.
+ * The PyPI package of the browser-use MCP server, the headless form of the `browser-use`
+ * capability. It is pinned in `pypi-packages.json`, so the updater moves it; the MCP server runs it
+ * through `uvx` at that exact release.
  */
-export const PLAYWRIGHT_PACKAGE = "@playwright/mcp" as const satisfies PiPackageName
+export const BROWSER_USE_PACKAGE = "browser-use" as const satisfies PypiPackageName
 
 /**
- * The name the Playwright MCP server is registered under; Pi names its tools
- * `mcp__playwright__<tool>`.
+ * The name the browser-use MCP server is registered under. Pi names its tools
+ * `mcp__<server>__<tool>`, with every character but letters, digits and `_` turned into `_`.
  */
-export const PLAYWRIGHT_SERVER = "playwright"
+export const BROWSER_USE_SERVER = "browser_use"
 
 /**
- * The tools of the Playwright MCP server (`browser_navigate`, `browser_snapshot`, ...), as one
- * pattern.
+ * The tools of the browser-use server that screen specialists get: `browser_exec` (Python on the
+ * browser's DevTools connection) and `browser_screenshot`. `browser_login`, which opens a browser
+ * for the person to approve, is left out.
  */
-export const PLAYWRIGHT_TOOLS: ReadonlyArray<string> = [`mcp__${PLAYWRIGHT_SERVER}__browser_*`]
+export const BROWSER_USE_TOOLS: ReadonlyArray<string> = [
+  `mcp__${BROWSER_USE_SERVER}__browser_exec`,
+  `mcp__${BROWSER_USE_SERVER}__browser_screenshot`,
+]
+
+/** Every tool of the browser-use server as one pattern, which the root excludes. */
+export const BROWSER_USE_ALL_TOOLS: ReadonlyArray<string> = [`mcp__${BROWSER_USE_SERVER}__*`]
 
 /**
- * The flag of the Playwright MCP server that takes the browser's executable path
- * (`--executable-path <path>`), which the extension passes when the machine has a Chromium
- * preinstalled.
+ * The public PyPI index. The `uvx` launch of a screen MCP server passes it explicitly ({@link
+ * uvxServerArgs}) with `--no-config`: uv reads `uv.toml` and `pyproject.toml` settings that name
+ * another index, and a repository's must not choose where the code of a server with browser control
+ * comes from.
  */
-export const PLAYWRIGHT_EXECUTABLE_FLAG = "--executable-path"
+export const PYPI_INDEX = "https://pypi.org/simple"
 
 /**
- * The Playwright MCP server at the pinned release, launched headless (`--headless`), isolated (the
- * profile stays in memory and nothing is written to disk, `--isolated`) and on Chromium (`--browser
- * chromium`). The Chromium of the machine is added to it by the extension when there is one ({@link
- * McpServer.chromiumFlag}); otherwise the server uses the browser Playwright installs.
+ * The arguments of `uvx` for an exact release of a pinned PyPI package: no uv config file, the
+ * public index as the only default, the package at its pin, then `rest` (the program of the package
+ * and its arguments).
  */
-export const PLAYWRIGHT_MCP_SERVER: McpServer = {
-  name: PLAYWRIGHT_SERVER,
-  command: "npx",
-  args: npxServerArgs(PLAYWRIGHT_PACKAGE, ["--headless", "--isolated", "--browser", "chromium"]),
-  chromiumFlag: PLAYWRIGHT_EXECUTABLE_FLAG,
+export const uvxServerArgs = (
+  name: PypiPackageName,
+  rest: ReadonlyArray<string>,
+): ReadonlyArray<string> => [
+  "--no-config",
+  "--default-index",
+  PYPI_INDEX,
+  "--from",
+  `${name}==${PYPI_PACKAGE_VERSIONS[name]}`,
+  ...rest,
+]
+
+/**
+ * The word of the `holyagent` command that runs a server with {@link McpServer.launchesChromium}:
+ * the Pi extension registers `holyagent browser-server`, since Pi's MCP configuration takes a fixed
+ * command.
+ */
+export const BROWSER_SERVER_COMMAND = "browser-server"
+
+/**
+ * The browser-use MCP server at the pinned release: `uvx --no-config --default-index <PyPI> --from
+ * browser-use==<pin> browser-use --cli-mcp`. It attaches to the Chromium that `holyagent
+ * browser-server` starts ({@link McpServer.launchesChromium}).
+ */
+export const BROWSER_USE_MCP_SERVER: McpServer = {
+  name: BROWSER_USE_SERVER,
+  command: "uvx",
+  args: uvxServerArgs(BROWSER_USE_PACKAGE, ["browser-use", "--cli-mcp"]),
+  launchesChromium: true,
 }
 
 /** The oldest Node.js release opencode browse runs on (the `engines` field of `@opencode/browse`). */
 export const BROWSE_MINIMUM_NODE = [22, 19, 0] as const
 
 /**
- * The oldest Node.js release the Playwright MCP server runs on (the `engines` field of
- * `@playwright/mcp`).
+ * How a person gets the Chromium the headless browser-use form needs; doctor appends it to the
+ * failing line and `holyagent browser-server` to its error.
  */
-export const PLAYWRIGHT_MINIMUM_NODE = [18, 0, 0] as const
+export const CHROMIUM_FIX =
+  "set HOLYAGENT_CHROMIUM_PATH to a Chromium executable, or put a Playwright Chromium build in the folder PLAYWRIGHT_BROWSERS_PATH names (PLAYWRIGHT_BROWSERS_PATH=<folder> uvx playwright install chromium)"
 
 const nodeNeed = (minimum: readonly [number, number, number]): SystemNeed => ({
   kind: "node",
@@ -446,41 +485,51 @@ export const CAPABILITIES = [
     // Browser use for screen specialists, in two forms. Normal: opencode browse (`@opencode/browse`),
     // a stdio MCP server that drives the user's own browser through the browse extension; it starts
     // no browser (the package forbids `executablePath` and has no launch code), so it needs a
-    // graphical session and a browser paired to it. Headless: the Playwright MCP server
-    // (`@playwright/mcp`), which launches an isolated headless Chromium of its own. The extension
-    // registers a form's server only in the sessions of screen specialists (`screen.ts` of the Pi
-    // integration), so no other process starts it.
+    // graphical session and a browser paired to it. Headless: the browser-use MCP server
+    // (`browser-use`, from PyPI through `uvx`), which attaches to a headless Chromium that
+    // `holyagent browser-server` starts for it. The extension registers a form's server only in the
+    // sessions of screen specialists (`screen.ts` of the Pi integration), so no other process
+    // starts it.
     name: "browser-use",
     feature: "browserUse",
     description:
-      "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the Playwright MCP server (@playwright/mcp) where there is no desktop",
+      "Lets screen specialists use a browser: the user's real one through opencode browse (@opencode/browse), or a headless Chromium through the browser-use MCP server (browser-use) where there is no desktop",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
-    needs: [
-      {
-        kind: "command",
-        command: "npx",
-        fix: "install Node.js from https://nodejs.org, which ships npx",
-      },
-    ],
+    needs: [],
     forms: {
       headless: {
         packages: [],
-        mcpServers: [PLAYWRIGHT_MCP_SERVER],
-        needs: [nodeNeed(PLAYWRIGHT_MINIMUM_NODE)],
+        mcpServers: [BROWSER_USE_MCP_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: "uvx",
+            fix: "install uv from https://docs.astral.sh/uv/, which ships uvx and provides the Python 3.11 or newer that browser-use needs",
+          },
+          { kind: "chromium", fix: CHROMIUM_FIX },
+        ],
       },
       normal: {
         packages: [],
         mcpServers: [BROWSE_MCP_SERVER],
-        needs: [{ kind: "display" }, nodeNeed(BROWSE_MINIMUM_NODE)],
+        needs: [
+          {
+            kind: "command",
+            command: "npx",
+            fix: "install Node.js from https://nodejs.org, which ships npx",
+          },
+          { kind: "display" },
+          nodeNeed(BROWSE_MINIMUM_NODE),
+        ],
         pairing: true,
       },
     },
     tools: {
-      rootExclude: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      rootExclude: [...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS],
       visual: [],
-      screen: [...BROWSE_TOOLS, ...PLAYWRIGHT_TOOLS],
+      screen: [...BROWSE_TOOLS, ...BROWSER_USE_TOOLS],
     },
     settings: [],
     health: ["needs"],
@@ -630,7 +679,7 @@ export const formNeeds = (
 /**
  * The screen tools a capability grants in a form: its `tools.screen` without the tools of an MCP
  * server that another form registers and this one does not (a tool of server `name` is named
- * `mcp__<name>__...`), so the headless form lists the Playwright server's tools and not browse's,
+ * `mcp__<name>__...`), so the headless form lists the browser-use server's tools and not browse's,
  * and the normal form the reverse. A form the capability does not offer grants none.
  */
 export const screenTools = (
