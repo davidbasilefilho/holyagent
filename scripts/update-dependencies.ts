@@ -3,16 +3,7 @@ import { join } from "node:path"
 import { $ } from "bun"
 import { Console, Data, Effect, Schema } from "effect"
 
-import { VENDOR_DIRECTORY } from "../packages/integrations/claude/src/files.ts"
 import {
-  type Asset,
-  ASSETS,
-  installAsset,
-  readArchive,
-  sha256,
-} from "../packages/integrations/claude/src/vendor.ts"
-import {
-  type Hashes,
   newestAllowedRelease,
   newestPypiRelease,
   newestTag,
@@ -21,22 +12,16 @@ import {
   packageDependencies,
   type PackageDependency,
   parseActionUses,
-  parseChecksumFile,
-  parseDigest,
   parseMiseTools,
   parseTags,
-  parseVendoredVersion,
   renderPiPackages,
   rewriteActionUses,
   rewriteMiseTools,
-  rewriteVendoredTool,
   type Tag,
   unreadableActionUses,
-  type VendoredTool,
   withPackageRanges,
   withPiPackageVersions,
 } from "./dependency-pins.ts"
-import { download } from "./vendor.ts"
 
 /** A registry, a git remote or a download could not be reached or answered something unusable. */
 export class SourceError extends Data.TaggedError("SourceError")<{
@@ -71,20 +56,6 @@ export class CommandError extends Data.TaggedError("CommandError")<{
   }
 }
 
-/** A downloaded archive does not have the SHA-256 that its release publishes. */
-export class ChecksumMismatch extends Data.TaggedError("ChecksumMismatch")<{
-  readonly url: string
-  readonly actual: string
-  readonly expected: string
-  /** Where the expected hash was published. */
-  readonly via: string
-}> {
-  /** The description shown to the user. */
-  override get message() {
-    return `${this.url} has SHA-256 ${this.actual}, but ${this.via} publishes ${this.expected}`
-  }
-}
-
 /** One or more pins are behind the newest stable release (the `--check` mode). */
 export class PinsBehind extends Data.TaggedError("PinsBehind")<{ readonly count: number }> {
   /** The description shown to the user. */
@@ -105,7 +76,7 @@ export class Usage extends Data.TaggedError("Usage")<{ readonly args: ReadonlyAr
 export type Mode = "apply" | "dry-run" | "check"
 
 /** The kinds of pin the updater moves. */
-export type PinKind = "action" | "vendor" | "mise" | "package" | "pi" | "pypi"
+export type PinKind = "action" | "mise" | "package" | "pi" | "pypi"
 
 /** One pin: where it is, what it is now and what it would become. */
 export interface Pin {
@@ -125,7 +96,6 @@ export interface Survey {
   /** Pins the updater found but cannot move, each with its reason. */
   readonly skipped: ReadonlyArray<string>
   readonly actions: ReadonlyMap<string, { readonly sha: string; readonly version: string }>
-  readonly vendored: ReadonlyMap<VendoredTool, string>
   readonly mise: ReadonlyMap<string, string>
   /** The range every registry dependency should have, by manifest. */
   readonly packages: ReadonlyMap<string, ReadonlyArray<PackageDependency>>
@@ -153,12 +123,6 @@ const PypiProject = open({
     Schema.Array(open({ yanked: Schema.optionalKey(Schema.Boolean) })),
   ),
 })
-const GithubRelease = open({
-  assets: Schema.Array(
-    open({ name: Schema.String, digest: Schema.optionalKey(Schema.NullOr(Schema.String)) }),
-  ),
-})
-
 const REGISTRY = "https://registry.npmjs.org"
 const PYPI = "https://pypi.org"
 
@@ -167,28 +131,13 @@ export const REGISTRY_TIMEOUT_MS = 60_000
 const ABBREVIATED = "application/vnd.npm.install-v1+json"
 
 const GITHUB = "https://github.com"
-const GITHUB_API = "https://api.github.com"
-
-/**
- * The GitHub remotes of the vendored tools, with the tag prefix of their releases and where a
- * release publishes the SHA-256 of its archives: a `<archive>.sha256` file, or the `digest` of the
- * asset in GitHub's release API.
- */
-const VENDORED: Record<
-  VendoredTool,
-  { repository: string; prefix: string; checksums: "file" | "release-digest" }
-> = {
-  ripgrep: { repository: "BurntSushi/ripgrep", prefix: "", checksums: "file" },
-  fd: { repository: "sharkdp/fd", prefix: "v", checksums: "release-digest" },
-}
 
 /** The mise tools whose releases are tags of a GitHub repository. */
-const MISE_SOURCES: Record<string, { repository: string; prefix: string }> = {
+export const MISE_SOURCES: Record<string, { repository: string; prefix: string }> = {
   bun: { repository: "oven-sh/bun", prefix: "bun-v" },
+  "aqua:BurntSushi/ripgrep": { repository: "BurntSushi/ripgrep", prefix: "" },
+  "aqua:sharkdp/fd": { repository: "sharkdp/fd", prefix: "v" },
 }
-
-/** The file that holds the vendored tools' pins, relative to the repository root. */
-export const VENDOR_PINS = "packages/integrations/claude/src/vendor.ts"
 
 /** The file that holds the exact version of every Pi package HolyAgent enables. */
 export const PI_PACKAGE_PINS = "packages/runtime/src/config/pi-packages.json"
@@ -362,30 +311,6 @@ const surveyActions = (root: string) =>
     return { pins, latest, skipped }
   })
 
-const surveyVendored = (root: string) =>
-  Effect.gen(function* () {
-    const text = yield* readText(root, VENDOR_PINS)
-    const tools = Object.keys(VENDORED) as Array<VendoredTool>
-    const found = yield* resolveAll(tools, (tool) => {
-      const { repository, prefix } = VENDORED[tool]
-      return tagsOf(repository).pipe(
-        Effect.flatMap((tags) => newestOrFail(`${GITHUB}/${repository}`, tags, prefix)),
-        Effect.map(({ release }) => release),
-      )
-    })
-    const pins: Array<Pin> = []
-    const latest = new Map<VendoredTool, string>()
-    for (const tool of tools) {
-      const current = parseVendoredVersion(text, tool)
-      const next = found.get(tool)
-      if (current === undefined || next === undefined)
-        return yield* Effect.fail(new FileError({ file: VENDOR_PINS, cause: `no ${tool} version` }))
-      latest.set(tool, next)
-      pins.push({ kind: "vendor", name: tool, file: VENDOR_PINS, current, next })
-    }
-    return { pins, latest }
-  })
-
 const surveyMise = (root: string) =>
   Effect.gen(function* () {
     const tools = parseMiseTools(yield* readText(root, "mise.toml"))
@@ -533,190 +458,26 @@ export const surveyPypiPackages = (root: string, index: string = PYPI) =>
 
 /**
  * Looks at every pin without writing anything: the external actions of the workflows (a tag
- * resolved to its commit), the vendored ripgrep and fd, the mise tools, the ranges of every
- * `package.json`, the exact versions of the Pi packages and those of the PyPI packages. Each pin
- * moves to the newest stable release; a prerelease is never chosen.
+ * resolved to its commit), the mise tools, the ranges of every `package.json`, the exact versions
+ * of the Pi packages and those of the PyPI packages. Each pin moves to the newest stable release; a
+ * prerelease is never chosen.
  */
 export const survey = (root: string) =>
   Effect.gen(function* () {
     const actions = yield* surveyActions(root)
-    const vendored = yield* surveyVendored(root)
     const mise = yield* surveyMise(root)
     const packages = yield* surveyPackages(root)
     const pi = yield* surveyPiPackages(root)
     const pypi = yield* surveyPypiPackages(root)
     return {
-      pins: [
-        ...actions.pins,
-        ...vendored.pins,
-        ...mise.pins,
-        ...packages.pins,
-        ...pi.pins,
-        ...pypi.pins,
-      ],
+      pins: [...actions.pins, ...mise.pins, ...packages.pins, ...pi.pins, ...pypi.pins],
       skipped: [...actions.skipped, ...mise.skipped],
       actions: actions.latest,
-      vendored: vendored.latest,
       mise: mise.latest,
       packages: packages.ranges,
       piPackages: pi.latest,
       pypiPackages: pypi.latest,
     } satisfies Survey
-  })
-
-/** What the updater reads from the network, so a test can stand in for it. */
-export type Get = (url: string) => Effect.Effect<Uint8Array, SourceError>
-
-/** The bytes at a URL, through the vendor script's download. */
-const fetchBytes: Get = (url) =>
-  Effect.tryPromise({
-    try: () => download(url),
-    catch: (cause) => new SourceError({ source: url, cause }),
-  })
-
-const fetchText = (get: Get, url: string) =>
-  get(url).pipe(Effect.map((bytes) => new TextDecoder().decode(bytes)))
-
-/** The program inside a release archive, by its path in the archive. */
-const programOf = (asset: Asset, archive: Uint8Array, path: string) =>
-  Effect.tryPromise({
-    try: () => readArchive(asset.format, archive, [path]).then((files) => files.get(path)),
-    catch: (cause) => new SourceError({ source: asset.url, cause }),
-  }).pipe(
-    Effect.flatMap((program) =>
-      program === undefined
-        ? Effect.fail(new SourceError({ source: asset.url, cause: `the archive has no ${path}` }))
-        : Effect.succeed(program),
-    ),
-  )
-
-/** Where a SHA-256 was published and what it is. */
-interface Published {
-  readonly hash: string
-  readonly via: string
-}
-
-/** Fails with `ChecksumMismatch` unless the archive's SHA-256 is the published one. */
-export const verifyChecksum = (url: string, actual: string, published: Published) =>
-  actual === published.hash
-    ? Effect.void
-    : Effect.fail(
-        new ChecksumMismatch({ url, actual, expected: published.hash, via: published.via }),
-      )
-
-const published = (
-  url: string,
-  via: string,
-  hash: string | undefined,
-): Effect.Effect<Published, SourceError> =>
-  hash === undefined
-    ? Effect.fail(new SourceError({ source: url, cause: `${via} publishes no SHA-256` }))
-    : Effect.succeed({ hash, via })
-
-/**
- * The SHA-256 that a tool's release publishes for each archive, by archive URL: ripgrep's
- * `<archive>.sha256` file, or, for fd, which publishes no file, the `digest` that GitHub's release
- * API reports for the asset. It fails when the release publishes none for an archive, because an
- * archive that nothing independent vouches for is not pinned.
- */
-const publishedChecksums = (
-  tool: VendoredTool,
-  urls: ReadonlyArray<string>,
-  tag: string,
-  get: Get,
-) =>
-  Effect.gen(function* () {
-    const { repository, checksums } = VENDORED[tool]
-    if (checksums === "file")
-      return new Map(
-        yield* Effect.forEach(urls, (url) =>
-          fetchText(get, `${url}.sha256`).pipe(
-            Effect.flatMap((text) => published(url, `${url}.sha256`, parseChecksumFile(text))),
-            Effect.map((entry) => [url, entry] as const),
-          ),
-        ),
-      )
-    const api = `${GITHUB_API}/repos/${repository}/releases/tags/${tag}`
-    const release = yield* fetchText(get, api).pipe(
-      Effect.flatMap((text) =>
-        Schema.decodeUnknownEffect(
-          Schema.fromJsonString(GithubRelease),
-          strict,
-        )(text).pipe(Effect.mapError((cause) => new SourceError({ source: api, cause }))),
-      ),
-    )
-    const digests = new Map(release.assets.map(({ name, digest }) => [name, digest ?? ""] as const))
-    return new Map(
-      yield* Effect.forEach(urls, (url) =>
-        published(
-          url,
-          `the GitHub release API (${api})`,
-          parseDigest(digests.get(url.slice(url.lastIndexOf("/") + 1)) ?? ""),
-        ).pipe(Effect.map((entry) => [url, entry] as const)),
-      ),
-    )
-  })
-
-/** A release archive of a vendored tool that was downloaded and checked. */
-export interface Downloaded {
-  /** The asset at its new version, with the hashes it has now. */
-  readonly asset: Asset
-  readonly archive: Uint8Array
-  readonly hashes: Hashes
-}
-
-/**
- * Downloads a vendored tool's release archives for every target and returns them with their hashes,
- * by target id: the SHA-256 of each archive and of the program inside. The archives are the current
- * ones with the version replaced in their URL and folder. Each archive is hashed once and compared
- * with the hash its release publishes (see `publishedChecksums`) before its contents are read, and
- * a difference fails with `ChecksumMismatch`, so no hash is pinned on the word of one download.
- */
-export const fetchVendored = (
-  tool: VendoredTool,
-  from: string,
-  to: string,
-  get: Get = fetchBytes,
-) =>
-  Effect.gen(function* () {
-    const assets = ASSETS.filter((asset) => asset.project === tool).map((asset): Asset => ({
-      ...asset,
-      url: asset.url.replaceAll(from, to),
-      folder: asset.folder.replaceAll(from, to),
-    }))
-    const checksums = yield* publishedChecksums(
-      tool,
-      assets.map((asset) => asset.url),
-      `${VENDORED[tool].prefix}${to}`,
-      get,
-    )
-    return yield* Effect.forEach(
-      assets,
-      (asset) =>
-        Effect.gen(function* () {
-          const archive = yield* get(asset.url)
-          const hash = sha256(archive)
-          const expected = checksums.get(asset.url)
-          if (expected === undefined)
-            return yield* Effect.fail(new SourceError({ source: asset.url, cause: "no checksum" }))
-          yield* verifyChecksum(asset.url, hash, expected)
-          const program = yield* programOf(
-            asset,
-            archive,
-            `${asset.folder}/${asset.tool}${asset.target.suffix}`,
-          )
-          const hashes = { archive: hash, binary: sha256(program) }
-          return [
-            asset.target.id,
-            {
-              asset: { ...asset, archiveSha256: hashes.archive, binarySha256: hashes.binary },
-              archive,
-              hashes,
-            },
-          ] as const
-        }),
-      { concurrency: 2 },
-    ).pipe(Effect.map((entries): ReadonlyMap<string, Downloaded> => new Map(entries)))
   })
 
 const run = (command: string, execute: () => Promise<{ readonly exitCode: number }>) =>
@@ -763,14 +524,11 @@ const writeRanges = (root: string, packages: Survey["packages"]) =>
 
 /**
  * Writes the moves a survey found. Everything that can fail on the network or on a file is done
- * first: the new texts of the workflows, `mise.toml`, the manifests, the Pi and PyPI package pins
- * and the vendored pins are computed, and every moved archive is downloaded and checked against its
- * release's published SHA-256. Only then is anything written, so a failed download leaves the tree
- * unchanged. The moved programs are installed from the archives already downloaded,
- * `scripts/vendor.ts` (the `vendor` task) removes what no pin names, and `bun update` then
- * refreshes the lockfile within the new ranges. The installs run with `--ignore-scripts`, so no
- * install script runs during the update; a later plain `bun install` runs the trusted ones. A
- * failure after the first write leaves the tree half moved.
+ * first: the new texts of the workflows, `mise.toml`, the manifests and the Pi and PyPI package
+ * pins are computed. Only then is anything written, and `bun update` then refreshes the lockfile
+ * within the new ranges. The installs run with `--ignore-scripts`, so no install script runs during
+ * the update; a later plain `bun install` runs the trusted ones. A failure after the first write
+ * leaves the tree half moved.
  */
 export const applySurvey = (root: string, found: Survey) =>
   Effect.gen(function* () {
@@ -785,33 +543,11 @@ export const applySurvey = (root: string, found: Survey) =>
     const ranges = yield* renderRanges(root, found.packages)
     const piPins = yield* renderPiPins(root, found.piPackages)
     const pypiPins = yield* renderPypiPins(root, found.pypiPackages)
-    const moved = found.pins.filter((pin) => pin.kind === "vendor" && isBehind(pin))
-    let vendor = yield* readText(root, VENDOR_PINS)
-    const archives: Array<Downloaded> = []
-    for (const pin of moved) {
-      const tool = pin.name as VendoredTool
-      const fetched = yield* fetchVendored(tool, pin.current, pin.next)
-      archives.push(...fetched.values())
-      const hashes = new Map([...fetched].map(([target, { hashes }]) => [target, hashes] as const))
-      vendor = yield* Effect.try({
-        try: () => rewriteVendoredTool(vendor, tool, pin.next, hashes),
-        catch: (cause) => new FileError({ file: VENDOR_PINS, cause }),
-      })
-    }
     for (const [file, text] of workflows) yield* writeText(root, file, text)
     yield* writeText(root, "mise.toml", mise)
     for (const [file, text] of ranges) yield* writeText(root, file, text)
     yield* writeText(root, PI_PACKAGE_PINS, piPins)
     yield* writeText(root, PYPI_PACKAGE_PINS, pypiPins)
-    if (moved.length > 0) {
-      yield* writeText(root, VENDOR_PINS, vendor)
-      for (const { asset, archive } of archives)
-        yield* Effect.tryPromise({
-          try: () => installAsset(join(root, VENDOR_DIRECTORY), asset, archive),
-          catch: (cause) => new FileError({ file: asset.url, cause }),
-        })
-      yield* run("bun scripts/vendor.ts", () => $`bun scripts/vendor.ts`.cwd(root).nothrow())
-    }
     // `bun update` moves the lockfile to the newest release within each range, but it also writes
     // that release into package.json as the range. The ranges are written back, and `bun install`
     // then records them in the lockfile.
@@ -849,7 +585,7 @@ export interface Steps {
   readonly apply: (
     root: string,
     found: Survey,
-  ) => Effect.Effect<void, CommandError | FileError | SourceError | ChecksumMismatch>
+  ) => Effect.Effect<void, CommandError | FileError | SourceError>
 }
 
 /**

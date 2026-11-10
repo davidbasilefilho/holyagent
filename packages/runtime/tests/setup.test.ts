@@ -9,7 +9,7 @@ import { applyDefaults } from "../src/setup/json-file.ts"
 import { userSettingsDefaults } from "../src/setup/settings.ts"
 import { EMPTY_BUNFIG } from "../src/setup/shell.ts"
 import { setup, type SetupOptions } from "../src/setup/steps.ts"
-import { fakeShell, scratch, writeCompleteSettings } from "./setup-fixture.ts"
+import { fakeShell, scratch, withoutSearchTools, writeCompleteSettings } from "./setup-fixture.ts"
 
 /** The command line of a global install: no env file, the plugin's empty config, then the add. */
 const bunAdd = (packageName: string) =>
@@ -133,7 +133,9 @@ describe("holyagent setup", () => {
     const settingsAfterFirst = await read(settingsFile())
 
     const second = fakeShell({ commands: ["bun", "ctx7"] })
-    const run2 = await Effect.runPromise(setup(env(), BOTH).pipe(Effect.provide(second.layer)))
+    const run2 = withoutSearchTools(
+      await Effect.runPromise(setup(env(), BOTH).pipe(Effect.provide(second.layer))),
+    )
     expect(second.calls).toEqual([])
     expect(run2.ok).toBe(true)
     expect(run2.lines.filter((line) => /^[+!~-] /.test(line))).toEqual([])
@@ -332,7 +334,7 @@ const NOT_IN_USE =
 describe("holyagent doctor", () => {
   test("passes when bun, ctx7 and the settings keys are in place", async () => {
     await writeCompleteSettings(claudeDirectory())
-    const shell = fakeShell({ commands: ["bun", "ctx7"] })
+    const shell = fakeShell({ commands: ["bun", "ctx7", "rg", "fd"] })
     const report = await Effect.runPromise(
       doctor(env(), { fix: false }).pipe(Effect.provide(shell.layer)),
     )
@@ -342,6 +344,8 @@ describe("holyagent doctor", () => {
       "ok   ctx7: /fake/bin/ctx7",
       `ok   settings: ${settingsFile()}`,
       NOT_IN_USE,
+      "ok   rg: /fake/bin/rg",
+      "ok   fd: /fake/bin/fd",
     ])
     expect(shell.calls).toEqual([])
   })
@@ -431,6 +435,8 @@ describe("holyagent doctor", () => {
       "FAIL ctx7:",
       "FAIL setti",
       "~ pi: not ",
+      "~ rg: rg n",
+      "~ fd: fd o",
     ])
     expect(report.lines[2]).toContain(settingsFile())
     expect(report.lines[2]).not.toContain(cwdSettings)
@@ -464,7 +470,7 @@ describe("holyagent doctor", () => {
       "ctx7 setup --cli --claude --yes --api-key ctx7sk-test",
     ])
     expect(report.ok).toBe(true)
-    expect(report.lines.slice(-4)).toEqual([
+    expect(withoutSearchTools(report).lines.slice(-4)).toEqual([
       "ok   bun: /fake/bin/bun",
       "ok   ctx7: /fake/bin/ctx7",
       `ok   settings: ${settingsFile()}`,

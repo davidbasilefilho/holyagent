@@ -35,7 +35,7 @@ import {
   SPECIALIST_SECTIONS,
   WRITING_BAR_SECTION,
 } from "../src/agents.ts"
-import { DIST_DIRECTORY, VENDOR_DIRECTORY } from "../src/files.ts"
+import { DIST_DIRECTORY } from "../src/files.ts"
 import { DESCRIPTION, generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
 import { fresh, PLUGIN, ROOT } from "./built.ts"
 import { isExecutable } from "./host.ts"
@@ -106,26 +106,20 @@ describe("the generated plugin is in step with its sources", () => {
     }
   })
 
-  test("the generated paths hold no file the build does not make, except the vendored tools", async () => {
-    const committed = (await Promise.all(GENERATED_PATHS.map(filesBelow)))
-      .flat()
-      .filter((path) => !path.startsWith(`${VENDOR_DIRECTORY}/`))
-      .toSorted()
+  test("the generated paths hold no file the build does not make", async () => {
+    const committed = (await Promise.all(GENERATED_PATHS.map(filesBelow))).flat().toSorted()
     expect(committed).toEqual(generated.map((file) => file.path))
   })
 
-  test("a build keeps the vendored tools where they are and removes any other file of the plugin", async () => {
+  test("a build removes any other file of the plugin", async () => {
     const root = await mkdtemp(join(tmpdir(), "holyagent-keep-"))
-    const kept = join(root, VENDOR_DIRECTORY, "linux-x64", "rg")
     const stale = join(root, DIST_DIRECTORY, "scripts", "stale.txt")
-    await Bun.write(kept, "program")
     await Bun.write(stale, "old")
     await build(root)
     expect({
-      kept: await Bun.file(kept).text(),
       stale: await Bun.file(stale).exists(),
       wrapper: await Bun.file(join(root, DIST_DIRECTORY, "scripts", "holyagent")).exists(),
-    }).toEqual({ kept: "program", stale: false, wrapper: true })
+    }).toEqual({ stale: false, wrapper: true })
     await rm(root, { recursive: true, force: true })
   })
 
@@ -795,7 +789,7 @@ describe("agents", () => {
 
   test("each role keeps exactly its built-in tools, with Grep and Glob only where there is no Bash", () => {
     const reading = ["Read", "Grep", "Glob"]
-    // A role with Bash searches with the bundled ripgrep and fd, so it has no Grep or Glob.
+    // A role with Bash searches with `holyagent rg` and `holyagent fd`, so it has no Grep or Glob.
     const writing = ["Read", "Write", "Edit", "Bash", "Monitor"]
     const shell = ["Read", "Bash", "Monitor"]
     const previous: Record<string, ReadonlyArray<string>> = {

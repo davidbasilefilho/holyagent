@@ -8,7 +8,7 @@ HolyAgent ships as a Claude Code plugin and as a [Pi package](docs/usage.md#pi),
 
 ## How do I install it?
 
-You need Claude Code at or above the minimum in [docs/requirements.md](docs/requirements.md#claude-code-version), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later, 22.19 or later on Windows; the optional Pi integration needs 22.19 or later on every OS, see [docs/pi/installation.md](docs/pi/installation.md)), `git` and an authenticated `gh`. On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code, and install mise only when you pass `--dev` or `-Dev` ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
+You need Claude Code at or above the minimum in [docs/requirements.md](docs/requirements.md#claude-code-version), [Bun](https://bun.sh) on your `PATH` (the plugin's hooks run it), Node.js LTS (22.13 or later, 22.19 or later on Windows; the optional Pi integration needs 22.19 or later on every OS, see [docs/pi/installation.md](docs/pi/installation.md)), `git`, an authenticated `gh`, and [ripgrep](https://github.com/BurntSushi/ripgrep) and [fd](https://github.com/sharkdp/fd), which `holyagent rg` and `holyagent fd` run (for example `brew install ripgrep fd`, or `sudo apt install ripgrep fd-find`; the other platforms are in [docs/components.md](docs/components.md#ripgrep-and-fd)). On a clean WSL Ubuntu or native Windows machine, `install/wsl-install.sh` and `install/windows-install.ps1` install everything except Claude Code, ripgrep and fd, and install mise only when you pass `--dev` or `-Dev` ([docs/usage.md](docs/usage.md#install)). The full list is in [docs/requirements.md](docs/requirements.md). Then, from a shell:
 
 ```sh
 claude plugin marketplace add davidbasilefilho/holyagent
@@ -49,7 +49,7 @@ bunx --no-install mise run verify   # type-check, lint, format check and tests
 - [HolyClaude](docs/decisions.md), the predecessor plugin whose one long session was audited to shape HolyAgent's decisions.
 - [t3dotgg/tstack](https://github.com/t3dotgg/tstack), for the inspiration.
 - Anthropic's [frontend-design](docs/attributions.md#design-skill-sources) skill, an inspiration for the design skills.
-- [Context7](https://context7.com), [Effect](https://effect.website), [Bun](https://bun.sh), [mise](https://mise.jdx.dev), [lefthook](https://lefthook.dev), [TOON](https://toonformat.dev), [acorn](https://github.com/acornjs/acorn), [ripgrep](https://github.com/BurntSushi/ripgrep) and [fd](https://github.com/sharkdp/fd), the software HolyAgent builds with, ships or installs.
+- [Context7](https://context7.com), [Effect](https://effect.website), [Bun](https://bun.sh), [mise](https://mise.jdx.dev), [lefthook](https://lefthook.dev), [TOON](https://toonformat.dev), [acorn](https://github.com/acornjs/acorn), [ripgrep](https://github.com/BurntSushi/ripgrep) and [fd](https://github.com/sharkdp/fd), the software HolyAgent builds with or needs.
 
 The full list, with licenses, is in [docs/attributions.md](docs/attributions.md).
 

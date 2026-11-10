@@ -8497,8 +8497,7 @@ var HINTS = {
   MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
   NothingToMigrate: "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
   MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
-  UnsupportedPlatform: "Search with the programs of your system instead, or run holyagent on darwin-arm64, linux-x64 or windows-x64.",
-  ToolMissing: "The plugin was built without its vendored tools: run `mise run vendor`, then `mise run build`, and reinstall the plugin.",
+  ToolMissing: "Install the program with the command the message gives for your platform; until then search with the system grep or find and report the missing program.",
   BrowserLaunchFailed: "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
   StateModeRefused: "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
@@ -14164,9 +14163,9 @@ var liveHost = {
 };
 
 import { existsSync, readdirSync } from "fs";
-import { posix, win32 } from "path";
+import { posix as posix2, win32 as win322 } from "path";
 
-import { delimiter, join as join10 } from "path";
+import { delimiter, join as join10, posix, win32 } from "path";
 var {$: $3 } = globalThis.Bun;
 var pathKey = (env, insensitive = process.platform === "win32") => {
   if (!insensitive || env.PATH !== undefined)
@@ -14179,11 +14178,23 @@ var pathWithBunBin = (env, options) => {
   const bunBin = join10(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
 };
+var isInside = (api, parent, path) => {
+  const relative = api.relative(parent, path);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
+};
+var strictWhich = (command, path, strict) => {
+  const windows = (strict.platform ?? process.platform) === "win32";
+  const api = windows ? win32 : posix;
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
+  const found = (strict.which ?? Bun.which)(command, { PATH: trusted.join(windows ? ";" : ":") });
+  if (found === null || isInside(api, strict.cwd, found))
+    return null;
+  return windows && !found.toLowerCase().endsWith(".exe") ? null : found;
+};
 var findCommand = (env, command, options) => {
   const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory(env), bunInstall: env.BUN_INSTALL });
-  return fromNullishOr(Bun.which(command, {
-    PATH: options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? ""
-  }));
+  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
+  return fromNullishOr(options?.strict === undefined ? Bun.which(command, { PATH: path }) : strictWhich(command, path, options.strict));
 };
 var EMPTY_BUNFIG = join10(import.meta.dir, "empty-bunfig.toml");
 
@@ -14215,7 +14226,7 @@ var BUILD_EXECUTABLES = {
   ],
   win32: ["chrome-win64/chrome.exe", "chrome-win/chrome.exe"]
 };
-var pathsOf = (platform) => platform === "win32" ? win32 : posix;
+var pathsOf = (platform) => platform === "win32" ? win322 : posix2;
 var revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN);
 var inFolder = (folder, platform, exists, list) => {
   const { join } = pathsOf(platform);
@@ -24139,6 +24150,35 @@ var checkPiToolSettings = (env, cwd, scope, form) => gen2(function* () {
   return lines;
 });
 
+var TOOLS = ["rg", "fd"];
+var SEARCH_TOOLS = {
+  rg: { title: "ripgrep", commands: ["rg"] },
+  fd: { title: "fd", commands: ["fd", "fdfind"] }
+};
+var INSTALL_COMMANDS = [
+  ["macOS", "brew install ripgrep fd"],
+  ["Debian/Ubuntu", "sudo apt install ripgrep fd-find"],
+  ["Fedora", "sudo dnf install ripgrep fd-find"],
+  ["Arch", "sudo pacman -S ripgrep fd"],
+  ["Windows", "winget install BurntSushi.ripgrep.MSVC", "winget install sharkdp.fd"]
+];
+var installAdvice = `install ripgrep and fd with your package manager (${INSTALL_COMMANDS.map(([platform, ...commands]) => `${platform}: ${commands.map((command) => `\`${command}\``).join(" and ")}`).join("; ")}), then open a new terminal so PATH picks them up`;
+var stopsWithout = (tool) => `\`holyagent ${tool}\` (the agents' search) fails`;
+var locateTool = (tool, cwd, which) => gen2(function* () {
+  for (const command of SEARCH_TOOLS[tool].commands) {
+    const found = yield* which(command, { strict: { cwd } });
+    if (isSome2(found))
+      return found;
+  }
+  return none2();
+});
+var doctorToolLine = (tool, found) => isSome2(found) ? pass(tool, found.value) : hint(`${tool}: ${SEARCH_TOOLS[tool].commands.join(" or ")} not found on PATH, so ${stopsWithout(tool)}; ${installAdvice}`);
+var setupToolLine = (tool, found) => isSome2(found) ? present2(`${tool}: found at ${found.value}`) : hint(`${tool}: not installed, so ${stopsWithout(tool)}; ${installAdvice}`);
+var searchToolLines = (cwd, format) => gen2(function* () {
+  const shell = yield* Shell;
+  return yield* forEach2(TOOLS, (tool) => locateTool(tool, cwd, shell.which).pipe(map4((found) => format(tool, found))));
+});
+
 import { join as join22 } from "path";
 
 var reportOne = (env, capability, features, options, platform) => gen2(function* () {
@@ -24737,6 +24777,7 @@ var setup = fn2("setup")(function* (env, options) {
       ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
       ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
     })) : [],
+    ...yield* searchToolLines(piOptions.cwd, setupToolLine),
     ...yield* onSettings((file) => mergeUserSettings({
       env,
       file,
@@ -24782,7 +24823,10 @@ var doctor = fn2("doctor")(function* (env, options) {
       checkCommand(env, "ctx7"),
       succeed6(fail6("settings", located.message))
     ]);
-    return { lines: [...lines, ...pi], ok: false };
+    return {
+      lines: [...lines, ...pi, ...yield* searchToolLines(cwd, doctorToolLine)],
+      ok: false
+    };
   }
   const { file, notice } = located;
   const noted = (lines) => notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines];
@@ -24793,14 +24837,15 @@ var doctor = fn2("doctor")(function* (env, options) {
   const ran = [...fixes, ...settingsFixes];
   const lines = noted([
     ...ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)],
-    ...pi
+    ...pi,
+    ...yield* searchToolLines(cwd, doctorToolLine)
   ]);
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
 });
 
 import { lstat as lstat5, mkdir as mkdir6, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile2 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join23, posix as posix2, win32 as win322 } from "path";
+import { basename as basename5, dirname as dirname5, join as join23, posix as posix3, win32 as win323 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -25960,7 +26005,7 @@ class TuiUnavailable extends TaggedError2("TuiUnavailable") {
     return this.reason;
   }
 }
-var pathModule = (platform) => platform === "win32" ? win322 : posix2;
+var pathModule = (platform) => platform === "win32" ? win323 : posix3;
 var cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory(env);
   const { join } = pathModule(platform);
@@ -26509,67 +26554,39 @@ var STATE_COMMANDS = [
   }
 ];
 
-import { join as join24 } from "path";
 var {$: $5 } = globalThis.Bun;
-var TARGETS = [
-  { id: "darwin-arm64", platform: "darwin", arch: "arm64", suffix: "" },
-  { id: "linux-x64", platform: "linux", arch: "x64", suffix: "" },
-  { id: "windows-x64", platform: "win32", arch: "x64", suffix: ".exe" }
-];
-var BUNDLED_TOOLS = join24(import.meta.dir, "vendor");
-
-class UnsupportedPlatform extends TaggedError2("UnsupportedPlatform") {
-  get message() {
-    return `No bundled search tools exist for ${this.platform} ${this.arch}; they exist for ${TARGETS.map((target) => target.id).join(", ")}`;
-  }
-}
-
 class ToolMissing extends TaggedError2("ToolMissing") {
   get message() {
-    return `The bundled ${this.tool} is missing: ${this.path} does not exist`;
+    const { title, commands } = SEARCH_TOOLS[this.tool];
+    return `${title} (${commands.join(" or ")}) is not on PATH; ${installAdvice}`;
   }
 }
-var selectTarget = (platform, arch) => {
-  const target = TARGETS.find((candidate) => candidate.platform === platform && candidate.arch === arch);
-  return target === undefined ? fail5(new UnsupportedPlatform({ platform, arch })) : succeed6(target);
-};
-var toolPath = (directory, tool, target) => join24(directory, target.id, `${tool}${target.suffix}`);
 var runTool = (options) => gen2(function* () {
-  const path = toolPath(options.directory, options.tool, options.target);
-  if (!(yield* promise2(() => Bun.file(path).exists())))
-    return yield* new ToolMissing({ tool: options.tool, path });
+  const found = yield* locateTool(options.tool, options.cwd, (command, whichOptions) => sync2(() => findCommand(options.env, command, whichOptions)));
+  if (isNone2(found))
+    return yield* new ToolMissing({ tool: options.tool });
+  const path = found.value;
   const output = yield* promise2(() => $5`${path} ${options.args}`.cwd(options.cwd).env(definedEnv(options.env)).nothrow());
   return output.exitCode;
 });
 var toolCommand = (tool, summary) => ({
   path: [tool],
-  usage: `${tool} <${tool === "rg" ? "ripgrep" : "fd"} arguments\u2026>`,
+  usage: `${tool} <${SEARCH_TOOLS[tool].title} arguments\u2026>`,
   summary,
   notes: [
     `the arguments, stdin, stdout, stderr and exit code are the program's own, so \`holyagent ${tool} --help\` prints its help and its exit codes keep their meaning`,
-    "a failure of holyagent itself (ToolMissing, UnsupportedPlatform) exits 4 with an `error:` line on stderr"
+    "the program is the one on PATH (fd also as fdfind, its name on Debian and Ubuntu); when it is not installed, holyagent itself fails with ToolMissing, exits 4 and prints an `error:` line on stderr with the install commands"
   ],
   flags: {},
   stateless: true,
   raw: true,
   passthrough: true,
   positionals: 0,
-  run: (call) => gen2(function* () {
-    const target = yield* selectTarget(process.platform, process.arch);
-    const code = yield* runTool({
-      tool,
-      directory: call.tools,
-      target,
-      args: call.args.positionals,
-      cwd: call.cwd,
-      env: call.env
-    });
-    return new Verbatim("", "", code);
-  })
+  run: (call) => runTool({ tool, args: call.args.positionals, cwd: call.cwd, env: call.env }).pipe(map4((code) => new Verbatim("", "", code)))
 });
 var TOOL_COMMANDS = [
-  toolCommand("rg", "Search file contents with the ripgrep bundled with the plugin; runs it for this platform with your arguments"),
-  toolCommand("fd", "Find files and folders by name with the fd bundled with the plugin; runs it for this platform with your arguments")
+  toolCommand("rg", "Search file contents with the ripgrep installed on this machine; runs it with your arguments"),
+  toolCommand("fd", "Find files and folders by name with the fd installed on this machine (fdfind on Debian and Ubuntu); runs it with your arguments")
 ];
 
 var COMMANDS = [
@@ -26621,7 +26638,6 @@ var callFor = (args, host, emit, command) => gen2(function* () {
     text: readReport(host),
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
-    tools: host.tools ?? BUNDLED_TOOLS,
     terminal: host.terminal,
     setupTui: host.setupTui,
     input: (schema) => readInput(host, schema, inline),

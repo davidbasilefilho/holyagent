@@ -9,9 +9,10 @@ import { Effect } from "effect"
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
 import { doctor } from "../src/setup/doctor.ts"
+import type { Report } from "../src/setup/report.ts"
 import { installedScope, type Scope, scopeNotices } from "../src/setup/scope.ts"
 import { setup } from "../src/setup/steps.ts"
-import { fakeShell, scratch } from "./setup-fixture.ts"
+import { fakeShell, scratch, withoutSearchTools } from "./setup-fixture.ts"
 
 let home: string
 let remove: () => Promise<void>
@@ -64,7 +65,9 @@ const options = (scope: Scope, extra: { undo?: boolean; dryRun?: boolean } = {})
 })
 
 const runSetup = (scope: Scope, extra: { undo?: boolean; dryRun?: boolean } = {}) =>
-  Effect.runPromise(setup(env(), options(scope, extra)).pipe(Effect.provide(insideRepo().layer)))
+  Effect.runPromise(
+    setup(env(), options(scope, extra)).pipe(Effect.provide(insideRepo().layer)),
+  ).then(withoutSearchTools)
 
 describe("holyagent setup --scope", () => {
   test("user writes the user settings, as before", async () => {
@@ -318,6 +321,10 @@ describe("holyagent setup --undo", () => {
   })
 })
 
+/** Runs a setup effect and returns its report without the `rg` and `fd` lines. */
+const runWithoutSearch = (effect: Effect.Effect<Report>) =>
+  Effect.runPromise(effect).then(withoutSearchTools)
+
 describe("holyagent setup --scope guards", () => {
   /** A fake shell whose git names `top` as the top-level. */
   const namingTop = (top: string) =>
@@ -331,7 +338,7 @@ describe("holyagent setup --scope guards", () => {
     // A crafted core.worktree makes git name a directory the working directory is not in.
     const elsewhere = join(home, "elsewhere")
     await mkdir(elsewhere, { recursive: true })
-    const report = await Effect.runPromise(
+    const report = await runWithoutSearch(
       setup(env(), options("project")).pipe(Effect.provide(namingTop(elsewhere).layer)),
     )
     expect(report.ok).toBe(true)
@@ -348,7 +355,7 @@ describe("holyagent setup --scope guards", () => {
     const ancestor = join(home, "plain")
     const inside = join(ancestor, "work")
     await mkdir(inside, { recursive: true })
-    const report = await Effect.runPromise(
+    const report = await runWithoutSearch(
       setup(env(), { ...options("project"), cwd: inside }).pipe(
         Effect.provide(namingTop(ancestor).layer),
       ),
@@ -368,21 +375,21 @@ describe("holyagent setup --scope guards", () => {
           ? { exitCode: 128, stderr: "fatal: not a git repository" }
           : undefined,
     })
-    const report = await Effect.runPromise(
+    const report = await runWithoutSearch(
       setup(env(), options("local")).pipe(Effect.provide(shell.layer)),
     )
     expect(report.lines[1]).toBe(`~ local settings: not inside a git repository; using ${nested()}`)
   })
 
   test("a git top-level that does not exist is ignored too", async () => {
-    const report = await Effect.runPromise(
+    const report = await runWithoutSearch(
       setup(env(), options("local")).pipe(Effect.provide(namingTop(join(home, "missing")).layer)),
     )
     expect(report.lines[2]).toBe(join(nested(), ".claude", "settings.local.json"))
   })
 
   test("the git top-level may be the working directory itself", async () => {
-    const report = await Effect.runPromise(
+    const report = await runWithoutSearch(
       setup(env(), { ...options("project"), cwd: repo() }).pipe(
         Effect.provide(namingTop(repo()).layer),
       ),
@@ -439,7 +446,7 @@ describe("holyagent setup --scope guards", () => {
         respond: (line) =>
           line === "git rev-parse --show-toplevel" ? { stdout: `${repo()}\n` } : undefined,
       })
-      const report = await Effect.runPromise(
+      const report = await runWithoutSearch(
         doctor(env(), { fix: true, scope: "local", cwd: nested() }).pipe(
           Effect.provide(shell.layer),
         ),
@@ -476,7 +483,7 @@ describe("holyagent doctor --scope", () => {
       respond: (line) =>
         line === "git rev-parse --show-toplevel" ? { stdout: `${elsewhere}\n` } : undefined,
     })
-    const report = await Effect.runPromise(
+    const report = await runWithoutSearch(
       doctor(env(), { fix: false, scope: "project", cwd: nested() }).pipe(
         Effect.provide(shell.layer),
       ),
