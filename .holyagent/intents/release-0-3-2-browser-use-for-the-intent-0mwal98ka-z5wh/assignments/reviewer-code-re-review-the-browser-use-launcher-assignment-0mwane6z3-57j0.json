@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mwane6z3-57j0",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-browser-use-launcher",
+  "objective": "Re-review the browser-use launcher repair and the T3 gate (b0ba7eb1..99a42e1).",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-browser-use, branch release/0.3.2/feat/browser-use, head 99a42e1. Review only `git diff b0ba7eb1 99a42e1` (also at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/bu-rereview.diff): commit f4869a9 repairs the earlier review findings, and commit 99a42e1 adds a new requirement.",
+    "Earlier findings f4869a9 should close: (blocking) signal handlers existed only after the server started, so a SIGINT/SIGTERM/SIGHUP during the DevTools poll or server spawn, or a second signal during stopGroup's grace, left the detached Chromium and the temp dir; (non-blocking) the freePort probe-then-bind race let another local process answer the DevTools poll; stopGroup skipped the process group once the leader exited, and win32 killed only the top process; the uvx child inherited the whole environment (UV_INDEX, PIP_*, PYTHONPATH, provider API keys); PLAYWRIGHT_MCP_EXECUTABLE_PATH was dropped with no fallback and a configured missing path passed doctor; docs understated browser_exec (host Python), the unauthenticated DevTools port on shared hosts and --no-sandbox as root.",
+    "New requirement in 99a42e1: in a session T3 Code hosts (isT3Session in packages/integrations/pi/src/t3.ts), the browser-use server is not registered whatever the form, so screen specialists use T3's preview tools; outside T3 nothing changes; the normal form's browse stays. Check the gate (withoutBrowserUseInT3 in screen.ts, registerScreen in extension.ts), the specialist text and the docs."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-browser-use; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi, uvx, browser-use or a live Chromium, and make no live Kimi, Codex or OpenAI request; unit tests only.",
+    "Mark each finding blocking or non-blocking, with file:line and a concrete failure scenario. Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "The earlier findings are closed and the T3 gate meets its requirement without regressions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Tests cover the repaired paths and the T3 gate and would fail without the change",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwamruwn-d1el",
+    "assignment-0mwan6ovt-bxgp"
+  ],
+  "followUpOf": "assignment-0mwami782-5zqu",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T12:10:00.015Z"
+  },
+  "createdAt": "2026-11-10T12:10:00.015Z"
+}
