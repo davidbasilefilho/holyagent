@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-commit-b7bc4f2-fff-follows",
   "objective": "Review commit b7bc4f2 (fff follows directory links by default) for correctness and regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /home/user/holyagent-0.3.2-fff, branch release/0.3.2/feat/fff-follow-links; review `git diff becf69e b7bc4f2`. Requirement: setup no longer writes followSymlinks: false to pi-fff.json so fff follows directory links by its own default; every other fff override is unchanged; a followSymlinks: false is removed only when the setup record names it as HolyAgent-written and it still equals false, never a value set by hand; docs/pi/search.md states the new default and its consequence.",
     "Check the revert path when the capability is turned off, the record handling, and that tests fail without the change."
@@ -40,7 +40,33 @@
     "agentId": "workflow:wf_2805f917-67b/assignment-0mwalrxf7-6jiv",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T11:24:41.587Z"
+    "startedAt": "2026-11-10T11:24:41.587Z",
+    "finishedAt": "2026-11-10T11:44:22.707Z"
+  },
+  "result": "result: no blockers. The change meets the requirement and the new tests would fail on the base.\n\nBuilt-in `/code-review` ran on `becf69e...b7bc4f2` through the Skill tool, and the loaded text was the built-in. It returned 5 findings; each is classified below.\n\nchecks-run:\n- `bun test` on setup-pi-settings, setup-capabilities and pi/tools tests -> exit 0, 171 pass, 0 fail.\n- `bunx --no-install mise run verify` in `/home/user/holyagent-0.3.2-fff` -> exit 0 (type-check and lint clean, 3401 tests pass, 0 fail). I read the output tail; I did not confirm the format check line.\n- I did not run the tests against the base. \"Fails without the change\" is from reading the diff.\n- Never run, only read: a live `pi` session with fff.\n\nfindings (blockers: none):\n- Built-in 1, `src/pi/fff/settings.ts:21`, symlink exposure: rejected as a blocker. Following links by default is the stated requirement, and both the doc and the settings comment name the consequence and the opt-out. Optional: the maintainer owns that trade-off.\n- Built-in 2, `setup/pi-settings.ts:347`, removal on upgrade without consent: rejected. The requirement asks for exactly this. The record names the key and its value, so a hand-set `false` is never removed. At project scope `locate` skips the file. In both the `pi.enable`-off path and the capability-off path the same `revertFile` removes it only when the record names it and it still equals `false`.\n- Built-in 3, `REVERTABLE` bolt-on: optional. It works. The retired leaf is never in a plan, so it is cleared while the capability is on, and the record is forgotten (tested). A `retiredSettings` field on the patch would tie it to `capabilities.ts`.\n- Built-in 4, missing tests: optional.\n  - Covered: new default written (`setup-pi-settings.test.ts` \"never writes followSymlinks\"); recorded `false` removed with the record forgotten; unrecorded `false` kept.\n  - Not covered: the retired key under capability-off, `pi.enable` off and `--dry-run`. These share the generic `revertFile` path, which is tested for `mode`, so the risk is low.\n  - Not covered: the case where the user changes the value to `true` after setup. That path (`kept followSymlinks true (setup wrote false)`) is no longer tested for `followSymlinks`.\n- Built-in 5, `docs/pi/search.md:9`, \"setup keeps it\": optional. It is accurate for a hand-set `false`, and the same paragraph says the next setup removes the 0.3.1-recorded `false`. A one-clause note that you re-add `false` after the upgrade run would remove the ambiguity.\n\nOwn review: other source and test edits are consistent. The tests drop `followSymlinks` from the expected `pi-fff.json`, the added and removed report lines, and the doctor \"lacking\" line. Generated dist files were rebuilt in the same commit. No leftover `followSymlinks` references in source.\n\nevidence:\nThe change meets the requirement without regressions in setup, revert or record handling: `FFF_OVERRIDE_SETTINGS` is `{mode:\"override\"}` (`src/pi/fff/settings.ts`). `REVERTABLE` adds `FFF_RETIRED_SETTINGS`, and `revertFile` filters by record name and value. The docs state the default and its consequence (`docs/pi/search.md`). `mise run verify` exits 0.\nTests cover the new default and the cleanup and would fail without the change: `setup-pi-settings.test.ts` has three new tests (never writes it; removes the recorded `false` with the record forgotten; keeps an unrecorded `false`). The `PI_FFF`, `setup-capabilities` and `tools.test.ts` expectations drop the key, so the base's `followSymlinks: false` write would fail them.\nchecks-run: the `bun test` and `mise run verify` runs above, both exit 0.\nfindings: no blockers; four optional notes (REVERTABLE design, retired-key test gaps, doc clause, symlink trade-off).\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "No blockers; verify 3401 pass; optional notes go to the last repair round",
+    "criteria": [
+      {
+        "criterion": "The change meets the requirement without regressions in setup, revert or record handling",
+        "support": "`FFF_OVERRIDE_SETTINGS` is `{mode:\"override\"}` (`src/pi/fff/settings.ts`). `REVERTABLE` adds `FFF_RETIRED_SETTINGS`, and `revertFile` filters by record name and value. The docs state the default and its consequence (`docs/pi/search.md`). `mise run verify` exits 0."
+      },
+      {
+        "criterion": "Tests cover the new default and the cleanup and would fail without the change",
+        "support": "`setup-pi-settings.test.ts` has three new tests (never writes it; removes the recorded `false` with the record forgotten; keeps an unrecorded `false`). The `PI_FFF`, `setup-capabilities` and `tools.test.ts` expectations drop the key, so the base's `followSymlinks: false` write would fail them."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "the `bun test` and `mise run verify` runs above, both exit 0."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers; four optional notes (REVERTABLE design, retired-key test gaps, doc clause, symlink trade-off)."
+      }
+    ]
   },
   "createdAt": "2026-11-10T11:24:41.587Z"
 }
