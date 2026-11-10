@@ -39,5 +39,26 @@
     "finishedAt": "2026-11-10T12:03:32.022Z"
   },
   "result": "result: 156f1f9 closes the three earlier notes; no blockers. Review ran on a clean tree, 631dd560...156f1f9.\n\nchanged: none (mutations ran only in a scratchpad copy made with git archive).\n\nchecks:\n- built-in /code-review (the loaded skill was the built-in) -> 4 findings, all classified optional below.\n- `bun test packages/runtime/tests/setup-pi-settings.test.ts` -> 68 pass, 0 fail.\n- `mise run lint` -> exit 0. `mise run fmt:check` -> exit 0.\n- Mutation A: drop `FFF_RETIRED_SETTINGS` from REVERTABLE -> the 4 new tests and the older cleanup test fail.\n- Mutation B: drop the value check in `take` (src/setup/settings.ts:149) -> the \"changed to true\" test fails.\n- Mutation C: write and forget the record during a dry run -> the dry-run test fails.\n- Not run: `mise run verify` as a whole, and the CI Windows job.\n\nblockers: none\n\nnotes (all optional):\n- Doc clause is accurate to the code: setup removes the key by its record, then forgets the record, so a hand-set `false` after that run stays. The wording \"that upgrade setup run\" is clumsy; \"the first setup after upgrading\" would be clearer.\n- The code-review finding that setup silently loosens a 0.3.1 user's `followSymlinks: false` is a design point from before this commit. The report line says \"removed followSymlinks false\" without noting that links are now followed. It is not a regression of this diff; a warning in the report line would be a follow-up for the root.\n- `afterOldSetup` repeats the addRecorded setup of the existing 0.3.1 test at ~line 414. The existing test could reuse the helper.\n- The new tests cover only user scope, and no case combines a retired key with a user-edited `mode`.\n\nevidence:\nThe four tests exercise the stated cases and would fail if the cleanup or its guard were removed, and the doc clause is accurate (tests): the cases covered are capability off, pi.enable off, dry run, and recorded false changed to true; mutations A–C above each fail the matching tests; doc clause at docs/pi/search.md:9 matches the `revertFile` and `take` behavior.\nchecks-run: `bun test` on setup-pi-settings.test.ts (68 pass), `mise run lint` (exit 0), `mise run fmt:check` (exit 0), 3 scratchpad mutations (/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/m).\nfindings: no blockers; four optional notes above.\n",
+  "acceptance": {
+    "revision": 3,
+    "carriedFrom": 2,
+    "rationale": "Revision 3 adds only the T3 gating requirement, which this work does not touch; its evidence still holds",
+    "criteria": [
+      {
+        "criterion": "The four tests exercise the stated cases and would fail if the cleanup or its guard were removed, and the doc clause is accurate",
+        "support": "the cases covered are capability off, pi.enable off, dry run, and recorded false changed to true; mutations A–C above each fail the matching tests; doc clause at docs/pi/search.md:9 matches the `revertFile` and `take` behavior."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`bun test` on setup-pi-settings.test.ts (68 pass), `mise run lint` (exit 0), `mise run fmt:check` (exit 0), 3 scratchpad mutations (/tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/m)."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers; four optional notes above."
+      }
+    ]
+  },
   "createdAt": "2026-11-10T11:52:37.513Z"
 }
