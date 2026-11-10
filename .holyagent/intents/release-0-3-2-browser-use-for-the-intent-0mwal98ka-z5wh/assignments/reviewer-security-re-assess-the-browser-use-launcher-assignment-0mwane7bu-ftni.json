@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwane7bu-ftni",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.security",
+  "slug": "re-assess-the-browser-use-launcher",
+  "objective": "Re-assess the browser-use launcher repair and the T3 gate (b0ba7eb1..99a42e1) for security vulnerabilities.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-browser-use, branch release/0.3.2/feat/browser-use, head 99a42e1. Review only `git diff b0ba7eb1 99a42e1` (also at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/bu-rereview.diff): commit f4869a9 repairs the earlier review findings, and commit 99a42e1 adds a new requirement.",
+    "Earlier findings f4869a9 should close: (blocking) signal handlers existed only after the server started, so a SIGINT/SIGTERM/SIGHUP during the DevTools poll or server spawn, or a second signal during stopGroup's grace, left the detached Chromium and the temp dir; (non-blocking) the freePort probe-then-bind race let another local process answer the DevTools poll; stopGroup skipped the process group once the leader exited, and win32 killed only the top process; the uvx child inherited the whole environment (UV_INDEX, PIP_*, PYTHONPATH, provider API keys); PLAYWRIGHT_MCP_EXECUTABLE_PATH was dropped with no fallback and a configured missing path passed doctor; docs understated browser_exec (host Python), the unauthenticated DevTools port on shared hosts and --no-sandbox as root.",
+    "New requirement in 99a42e1: in a session T3 Code hosts (isT3Session in packages/integrations/pi/src/t3.ts), the browser-use server is not registered whatever the form, so screen specialists use T3's preview tools; outside T3 nothing changes; the normal form's browse stays. Check the gate (withoutBrowserUseInT3 in screen.ts, registerScreen in extension.ts), the specialist text and the docs.",
+    "Read the diff file above; you have no shell. Check in particular the DevToolsActivePort read (path, parsing, trust), the environment allowlist (anything sensitive kept, anything needed dropped), the process-group signalling (could it signal an unrelated group or pid), and whether the T3 gate can be bypassed so browser-use runs beside T3."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-browser-use; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi, uvx, browser-use or a live Chromium, and make no live Kimi, Codex or OpenAI request; unit tests only.",
+    "Mark each finding blocking or non-blocking, with file:line and a concrete failure scenario. Report in under 450 words."
+  ],
+  "criteria": [
+    {
+      "text": "No validated vulnerability introduced by the change remains unreported, each finding traced from source to sink",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwamruwn-d1el",
+    "assignment-0mwan6ovt-bxgp"
+  ],
+  "followUpOf": "assignment-0mwami7ix-2xtw",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T12:10:00.474Z"
+  },
+  "createdAt": "2026-11-10T12:10:00.474Z"
+}
