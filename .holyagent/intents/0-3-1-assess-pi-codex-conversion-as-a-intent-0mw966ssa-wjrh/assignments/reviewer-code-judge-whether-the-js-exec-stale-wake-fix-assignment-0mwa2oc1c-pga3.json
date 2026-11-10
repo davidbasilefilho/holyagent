@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "judge-whether-the-js-exec-stale-wake-fix",
   "objective": "Judge whether the js-exec stale-wake fix is correct, contained and merge-ready.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Commit cef6cd84 on release/0.3.1/fix/js-exec-fallback in /home/user/holyagent-0.3.1-jsexec (head 9c916dd4 adds only a no-content merge of the integration branch); source diff without dist at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/jsexec-commit.diff; writer report /home/user/holyagent/.git/holyagent/reports/assignment-0mwa1c8xm-m5ze.md; the upstream code is under node_modules/.bun/just-bash@3.6.0/node_modules/run/dist/runtime/ (manager.js around line 959, sync-bridge-protocol.js 112-118).",
     "Judge especially: the fix replaces the process-global Atomics.waitAsync; check where runShell runs (the main Pi process or a Bun Worker, and whether other code in that process uses Atomics.waitAsync, such as Pi, Bun internals or other extensions) and whether a wrapper that ignores spurious wakes can hang or change semantics for them (timeouts, the not-equal result, the sync value form); whether the regression test is deterministic; whether a narrower fix exists.",
@@ -47,7 +47,37 @@
     "agentId": "workflow:wf_1e81366b-bf1/assignment-0mwa2oc1c-pga3",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T02:30:01.201Z"
+    "startedAt": "2026-11-10T02:30:01.201Z",
+    "finishedAt": "2026-11-10T02:35:07.266Z"
+  },
+  "result": "result: Merge-ready. No blockers; the optional findings below are cleanups. I ran the build and verify on 9c916dd4, and the regression test is deterministic and fails without the fix.\n\nBuilt-in /code-review (high, cef6cd84^...9c916dd4) ran from the built-in skill. I classified its 7 findings as follows:\n- Global patch affects other users (rejected as blocker): the shell is `packages/runtime/src/pi/bash/entry.ts`. It is a separate one-shot Bun process per bash call, started with stdin as the request. It is not the Pi host process and not a Worker. The patch lives in that process's main thread only. `Atomics` is separate per Worker, so just-bash's worker/python3 code is unaffected, and that code passes timeouts, which the wrapper passes through natively. Nothing in packages/ uses `waitAsync` apart from the new files and the bundle.\n- Semantics (rejected as blocker): the wrapper passes through timeout waits, the sync `not-equal` result and the `{async:false}` form unchanged. A timeout-less wait is re-armed only while `Atomics.load` still equals the awaited value. The re-wait registration is atomic with the value check, so no wake can be lost. If the value changed in between, it resolves `\"ok\"`. A wait with no timeout and no change can pend forever, but the native call does too. The ABA case is impossible in the Idle/Request/Response protocol, where the host is the only waiter.\n- Untested `Atomics.waitAsync` absence (optional): `bind` would throw if the function is missing. Bun always has it, and the one-shot process is Bun, so it is theoretical.\n- `Effect.runPromise` inside a source helper, against the CLAUDE.md \"integration boundaries\" rule (optional): the call is intentional, since the wrapper manufactures a Promise for a third-party API. The cost is a fiber per bridge wait, small next to a js-exec call.\n- Identical-branch ternary in `current` (optional): it only satisfies the overloads. A cast would be simpler.\n- Raw `value` compared without engine coercion (optional): the only caller passes an int32 state, so it is theoretical.\n- Test 3 patches the global for the rest of the `bun test` process and uses a POSIX cwd and PATH (optional): the leak is harmless because later `runShell` calls install it anyway. I could not run the test on Windows; `bash-shell.test.ts` uses a work dir and `HOST_DIR` instead.\n\nNarrower fix: an upstream change to `waitAsyncForSyncBridgeChange` (re-check the state after a wake), or a patch of `run`. Neither is available under the exact pin, so the process-local wrapper is the narrowest option that works. The writer's notes already say to report the defect upstream.\n\nTest determinism: `bash-atomics.test.ts` passed 3 of 3 on each of 3 consecutive runs. A native `waitAsync` wakes after a no-change notify (I ran it: \"native ended true\"), so tests 1 and 3 fail without the wrapper. Their negative assertions use a 25ms window, which can only give a false pass without the fix, not a false fail with it. I did not re-run the mutation of removing the wrapper; I relied on the native check and the writer's report.\n\nI only read the behaviour of the production `js-exec` stale-wake race; I did not run it. The writer's reproduction was 1-6 failures per 200 runs before the fix and 0 in 1600 after.\n\nchecks-run:\n- `bun install --frozen-lockfile` -> exit 0, no changes.\n- `bunx --no-install mise run build` -> exit 0, `git status --short` empty afterwards. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rev-build.log\n- `bunx --no-install mise run verify` -> exit 0, lint clean (309 files), 3398 pass / 0 fail across 113 files, tree clean afterwards. Log: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/rev-verify.log\n\nevidence:\nThe fix addresses the traced cause and cannot hang or change behaviour for other users of Atomics.waitAsync in the same process: the shell is a one-shot Bun process (`packages/runtime/src/pi/bash/entry.ts`, main thread only). Timeout and not-equal waits pass through unchanged, and the re-arm is atomic with the value check; see the semantics finding above.\nThe regression test is deterministic and fails without the fix: `bun test packages/runtime/tests/pi/bash-atomics.test.ts` gave 3 pass / 0 fail on 3 runs. The native-behaviour check at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/native.ts printed \"native ended true\".\nBuild leaves the tree unchanged and verify passes on 9c916dd4: build exit 0 with `git status` clean, verify exit 0 with 3398 pass / 0 fail.\nchecks-run: install, build and verify as listed above.\nfindings: no blockers. Optional: the bare `bind` with no existence guard, the dead ternary in `current`, no coercion of `value`, a POSIX-only cwd and PATH in test 3, and the global patch persisting in the test process.\n",
+  "acceptance": {
+    "revision": 22,
+    "rationale": "One-shot process scope traced; semantics checked; test deterministic; verify 3398 pass",
+    "criteria": [
+      {
+        "criterion": "The fix addresses the traced cause and cannot hang or change behaviour for other users of Atomics.waitAsync in the same process",
+        "support": "the shell is a one-shot Bun process (`packages/runtime/src/pi/bash/entry.ts`, main thread only). Timeout and not-equal waits pass through unchanged, and the re-arm is atomic with the value check; see the semantics finding above."
+      },
+      {
+        "criterion": "The regression test is deterministic and fails without the fix",
+        "support": "`bun test packages/runtime/tests/pi/bash-atomics.test.ts` gave 3 pass / 0 fail on 3 runs. The native-behaviour check at /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/native.ts printed \"native ended true\"."
+      },
+      {
+        "criterion": "Build leaves the tree unchanged and verify passes on 9c916dd4",
+        "support": "build exit 0 with `git status` clean, verify exit 0 with 3398 pass / 0 fail."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "install, build and verify as listed above."
+      },
+      {
+        "label": "findings",
+        "support": "no blockers. Optional: the bare `bind` with no existence guard, the dead ternary in `current`, no coercion of `value`, a POSIX-only cwd and PATH in test 3, and the global patch persisting in the test process."
+      }
+    ]
   },
   "createdAt": "2026-11-10T02:30:01.201Z"
 }
