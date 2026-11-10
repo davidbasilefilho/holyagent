@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mwazxl76-29ks",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "make-visual-work-add-and-verify-hover",
+  "objective": "Make visual work add and verify hover, pressed, focus and disabled states on every interactive element, per platform, with the gpt-6 family stating it most explicitly.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.3-states, branch release/0.3.3/feat/interaction-states, stacked on release/0.3.3/feat/handoff-ready-state. Why: the maintainer reports that GPT-family models often ship interfaces with no hover or click (pressed) states, across platforms. Today the only rule is one line of the shared design core ('Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content': packages/runtime/src/instructions/gpt-6/design-core/core.md:76, claude-5.5/design-core/core.md:50, kimi-k3.1/design-core/core.md:64); no platform capture checklist names hover or pressed captures (web packages/runtime/src/instructions/*/skills/web-design/SKILL.md:78-84 names focus traversal and key-control states; desktop :62-67 focus only; mobile :61-67 and tui :76-85 neither); the Worker.visual and Reviewer.visual texts (packages/runtime/src/instructions/*/roles/worker-visual/{design,method,purpose}.md, */roles/reviewer-visual/{design,captures}.md) do not name state captures. The requirements tree files for the platform skills (packages/runtime/src/instructions/requirements/skills/{web,mobile,desktop,tui}-design/SKILL.md) are empty scaffolds; role requirements are packages/runtime/src/instructions/requirements/roles/worker-visual/design.md (R-WVI-DESIGN), requirements/roles/reviewer-visual/captures.md (R-RV), requirements/specialist/interface-inspection.md (R-INSPECT), requirements/design-core/core.md. Coverage: packages/runtime/src/instructions/coverage.ts (per-family tables).",
+    "Change: (1) Requirements tree: add a requirement (new id, e.g. R-STATES) in the design-core and/or the visual role requirements stating, with the reason, that every interactive element (buttons, links, inputs, toggles, list rows, menu items, tabs, cards that act) gets: a hover state where a pointer can hover; a pressed/active state on click or tap; a visible keyboard focus state (focus-visible on web); a disabled state where the control can be unavailable; mapped per platform: web and desktop need hover and pressed (and hover must not be the only way to reveal something, since touch and keyboard have no hover); iOS and Android have no hover, so pressed feedback (highlight, ripple, scale or opacity, per platform convention) carries it, plus focus for hardware keyboards; terminal UIs mark focus and selection instead; and that Worker.visual drives and captures each state (hover, pressed, focus, disabled) for each kind of interactive element before reporting, and Reviewer.visual exercises them and treats a missing state as material (interaction correctness). (2) Translate into each family's design-core line, each platform skill's rules and capture checklist (add per-platform state captures: web and desktop hover/pressed/focus/disabled; mobile pressed/focus/disabled; tui focus/selection), and the worker-visual method and reviewer-visual captures text. In gpt-6, state it as a short per-element checklist with the reason, per its guide; claude-5.5 and kimi-k3.1 get the same rule in their own style, shorter. (3) Coverage entries for the new id in all three tables.",
+    "Then `bunx --no-install mise run build` and `bunx --no-install mise run verify`."
+  ],
+  "constraints": [
+    "Before anything else, run `bun install --frozen-lockfile` in your worktree, because node_modules is not shared between worktrees; the prepare step installing lefthook hooks is expected.",
+    "Make no git writes (no commit, add, checkout, stash, branch) and no edits under .git/ or .holyagent/; the root commits. Report your changed paths.",
+    "Follow the repository rules in .claude/CLAUDE.md and AGENTS.md of the worktree: Effect for effects and errors with tagged errors (no try/catch, new Promise, Promise statics or async functions in runtime and CLI source), Effect Schema at data boundaries with onExcessProperty error, Bun APIs and the Bun Shell, JSDoc on every exported function and type.",
+    "Instruction text is model-facing: follow the repo's requirements skill (.claude/skills/requirements/SKILL.md) for requirement format, per-family translation (read each family's guide.md first: gpt-6 wants outcomes and boundaries with reasons, not itineraries, per its O1/O2/O26) and coverage entries; keep each skill's existing structure and size discipline.",
+    "Testing is unit tests and recorded or synthesized fixtures only: never start pi, a Pi session, T3 Code or a Kimi request.",
+    "Gates, run in your worktree: `bunx --no-install mise run build` (commit-ready generated output; the tree must have no unexplained changes after it) and `bunx --no-install mise run verify` (type-check, lint, format check, tests) must exit 0. Give the command, exit code and test counts.",
+    "Write `git diff` of your change (after the build) to a file outside the repository in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path as diff-file evidence.",
+    "Build only what the Assignment asks; name any further improvement in the report instead of adding it.",
+    "Report in under 500 words; put long logs in a file in /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad and give its path."
+  ],
+  "criteria": [
+    {
+      "text": "The requirements tree states the interaction-states rule with its per-platform mapping and the worker and reviewer duties, and coverage maps it in all three families",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Each family's design core, the four platform skills (rules and capture checklists) and the worker-visual and reviewer-visual texts carry the rule, with the gpt-6 copy as an explicit per-element checklist",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "mise run build leaves no unexplained changes and mise run verify passes",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist",
+    "packages/runtime/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T18:01:00.306Z"
+  },
+  "createdAt": "2026-11-10T18:01:00.306Z"
+}
