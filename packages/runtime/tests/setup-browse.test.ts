@@ -130,8 +130,8 @@ describe("where browse keeps its pairings", () => {
   })
 
   test("the pinned release is the one the commands name", () => {
-    expect(BROWSE_VERSION).toBe("0.0.15")
-    expect(BROWSE_COMMAND).toBe("npx -y @opencode/browse@0.0.15")
+    expect(BROWSE_VERSION).toBe("0.0.16")
+    expect(BROWSE_COMMAND).toBe("npx -y @opencode/browse@0.0.16")
     expect(BROWSE_PAIR_FIX).toContain(`${BROWSE_COMMAND} install`)
     expect(BROWSE_PAIR_FIX).toContain(`${BROWSE_COMMAND} pair`)
   })
@@ -455,7 +455,7 @@ describe("holyagent doctor on browse", () => {
 
 describe("holyagent setup on browse", () => {
   const server =
-    "npx --registry=https://registry.npmjs.org/ --@opencode:registry=https://registry.npmjs.org/ -y @opencode/browse@0.0.15 mcp"
+    "npx --registry=https://registry.npmjs.org/ --@opencode:registry=https://registry.npmjs.org/ -y @opencode/browse@0.0.16 mcp"
 
   test("normal form, paired: says the form, the server the extension registers and the paired browser", async () => {
     await writeBrowsePairing(home)

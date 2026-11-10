@@ -65722,12 +65722,17 @@ function memoizeIdempotent(f) {
   };
 }
 
+var errorSiteKeys = ["line", "column", "sourceURL", "originalLine", "originalColumn"];
 var getAllObjectKeys = (obj) => {
   const keys = new Set(Reflect.ownKeys(obj));
   if (obj.constructor === Object)
     return keys;
   if (obj instanceof Error) {
     keys.delete("stack");
+    for (const key of errorSiteKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(obj, key))
+        keys.delete(key);
+    }
   }
   const proto = Object.getPrototypeOf(obj);
   let current = proto;
@@ -66355,11 +66360,10 @@ var StructuralProto = {
   },
   [symbol2](that) {
     const selfKeys = Object.keys(this);
-    const thatKeys = Object.keys(that);
-    if (selfKeys.length !== thatKeys.length)
+    if (selfKeys.length !== Object.keys(that).length)
       return false;
-    for (let i = 0;i < selfKeys.length; i++) {
-      if (selfKeys[i] !== thatKeys[i] || !equals(this[selfKeys[i]], that[selfKeys[i]])) {
+    for (const key of selfKeys) {
+      if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
         return false;
       }
     }
@@ -67314,6 +67318,7 @@ class FiberImpl {
     this._children = undefined;
     this._interruptedCause = undefined;
     this._yielded = undefined;
+    this._autoYielded = false;
     this._running = false;
     this._deferredInterrupt = false;
     this._parent = undefined;
@@ -67428,8 +67433,10 @@ class FiberImpl {
     const prevRunning = this._running;
     this._running = true;
     let yielding = false;
+    let resuming = this._autoYielded;
+    this._autoYielded = false;
     let current = effect;
-    this.currentOpCount = 0;
+    this.currentOpCount = resuming ? 1 : 0;
     try {
       while (true) {
         try {
@@ -67439,12 +67446,13 @@ class FiberImpl {
           }
           this.currentOpCount++;
           const cache = this.cache;
-          if (!yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
+          if (!resuming && !yielding && !cache.preventYield && cache.scheduler.shouldYield(this)) {
             yielding = true;
-            const prev = current;
-            current = flatMap(yieldNow, () => prev);
+            current = this.yieldNow(current, 0, true);
+          } else {
+            resuming = false;
+            current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
           }
-          current = cache.tracerContext ? cache.tracerContext(current, this) : current[evaluate](this);
           if (current === Yield) {
             const yielded = this._yielded;
             if (ExitTypeId in yielded) {
@@ -67501,6 +67509,18 @@ class FiberImpl {
   yieldWith(value) {
     this._yielded = value;
     return Yield;
+  }
+  yieldNow(effect, priority = 0, automatic = false) {
+    let resumed = false;
+    this.currentDispatcher.scheduleTask(() => {
+      if (resumed)
+        return;
+      this._autoYielded = automatic;
+      this.evaluate(effect);
+    }, priority);
+    return this.yieldWith(() => {
+      resumed = true;
+    });
   }
   children() {
     return this._children ??= new Set;
@@ -67618,15 +67638,7 @@ var fromResult = /* @__PURE__ */ match({
 var yieldNowWith = /* @__PURE__ */ makePrimitive({
   op: "Yield",
   [evaluate](fiber) {
-    let resumed = false;
-    fiber.currentDispatcher.scheduleTask(() => {
-      if (resumed)
-        return;
-      fiber.evaluate(exitVoid);
-    }, this[args] ?? 0);
-    return fiber.yieldWith(() => {
-      resumed = true;
-    });
+    return fiber.yieldNow(exitVoid, this[args] ?? 0);
   }
 });
 var yieldNow = /* @__PURE__ */ yieldNowWith(0);
@@ -68592,6 +68604,22 @@ var mapErrorEager2 = mapErrorEager;
 var flatMapEager2 = flatMapEager;
 var fnUntracedEager2 = fnUntracedEager;
 
+var decodeNative = (str, decodedLength, options) => {
+  if (str.length < 128)
+    return;
+  const NativeUint8Array = Uint8Array;
+  if (typeof NativeUint8Array.fromBase64 !== "function")
+    return;
+  try {
+    const bytes = NativeUint8Array.fromBase64(str, options);
+    return bytes.length === decodedLength ? bytes : null;
+  } catch {
+    return null;
+  }
+};
+var stripCrlf = (str) => str.indexOf(`
+`) === -1 && str.indexOf("\r") === -1 ? str : str.replace(/[\n\r]/g, "");
+
 var encode = (input) => encodeBytes(typeof input === "string" ? encoder.encode(input) : input);
 var decode = (str) => {
   const stripped = stripCrlf(str);
@@ -68613,9 +68641,24 @@ var decode = (str) => {
       message: "Found a '=' character, but it is not at the end"
     }));
   }
+  const missingOctets = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
+  const decodedLength = 3 * (length / 4) - missingOctets;
+  const native = decodeNative(stripped, decodedLength, undefined);
+  if (native)
+    return succeed2(native);
+  if (native === null) {
+    const invalid = invalidCharacter.exec(stripped);
+    if (invalid !== null) {
+      return fail2(new EncodingError({
+        kind: "Decode",
+        module: "Base64",
+        input: stripped,
+        message: `Invalid character ${invalid[0]}`
+      }));
+    }
+  }
   try {
-    const missingOctets = stripped.endsWith("==") ? 2 : stripped.endsWith("=") ? 1 : 0;
-    const result = new Uint8Array(3 * (length / 4) - missingOctets);
+    const result = new Uint8Array(decodedLength);
     for (let i = 0, j = 0;i < length; i += 4, j += 3) {
       const buffer = getCode(stripped.charCodeAt(i)) << 18 | getCode(stripped.charCodeAt(i + 1)) << 12 | getCode(stripped.charCodeAt(i + 2)) << 6 | getCode(stripped.charCodeAt(i + 3));
       result[j] = buffer >> 16;
@@ -68688,11 +68731,13 @@ var encodeLong = (bytes) => {
   return decoder.decode(result);
 };
 var encoder = /* @__PURE__ */ new TextEncoder;
-var decoder = /* @__PURE__ */ new TextDecoder;
-var stripCrlf = (str) => str.replace(/[\n\r]/g, "");
+var decoder = /* @__PURE__ */ new TextDecoder("utf-8", {
+  ignoreBOM: true
+});
 var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 var alphabetCodes = /* @__PURE__ */ encoder.encode(alphabet);
 var paddingCode = 61;
+var invalidCharacter = /[^A-Za-z0-9+/=]/;
 var codes = /* @__PURE__ */ new Uint8Array(123).fill(255);
 for (let i = 0;i < alphabet.length; i++)
   codes[/* @__PURE__ */ alphabet.charCodeAt(i)] = i;
@@ -68717,10 +68762,13 @@ var getExpected = /* @__PURE__ */ memoize((ast) => {
   return ast.getExpected(getExpected);
 });
 
-var missing = /* @__PURE__ */ Symbol();
+var missing = /* @__PURE__ */ Symbol.for("effect/schema/parser/missing");
 var succeed6 = succeed4;
 var missingExit = /* @__PURE__ */ succeed6(missing);
-var sameExit = /* @__PURE__ */ succeed6(missing);
+var sameExit = /* @__PURE__ */ Object.assign(/* @__PURE__ */ succeed6(missing), {
+  [missing]: true
+});
+var isSameExit = (result) => result[missing] === true;
 var toOption = (value) => value === missing ? none2() : some2(value);
 var fromOptionExit = (option) => option._tag === "None" ? missingExit : succeed6(option.value);
 
@@ -69420,7 +69468,7 @@ function stepArray(s, item, exit, i) {
   if (exit._tag === "Failure") {
     return wrapPropertyKeyIssue(s, s.ast, i, exit);
   }
-  const value = exit === sameExit ? item : exit[args];
+  const value = isSameExit(exit) ? item : exit[args];
   if (value !== missing) {
     s.output[i] = value;
   } else {
@@ -69563,7 +69611,8 @@ var Objects = class extends ASTNodeImpl {
         properties = ast.propertySignatures.map((ps) => ({
           parser: compileField(ps.type),
           name: ps.name,
-          type: ps.type
+          type: ps.type,
+          ownOnly: requiresOwnProperty(ps.name)
         }));
         indexes = indexCount ? ast.indexSignatures.map((is) => ({
           is,
@@ -69579,7 +69628,7 @@ var Objects = class extends ASTNodeImpl {
         if (exitValue._tag === "Failure") {
           return wrapPropertyKeyIssue(s, ast, key, exitValue) ?? void_2;
         }
-        const value = exitValue === sameExit ? inputValue : exitValue[args];
+        const value = isSameExit(exitValue) ? inputValue : exitValue[args];
         if (k2 !== missing && value !== missing) {
           if (hasProperties && (expectedKeys.has(key) || expectedKeys.has(typeof k2 === "number" ? globalThis.String(k2) : k2)))
             return void_2;
@@ -69598,7 +69647,7 @@ var Objects = class extends ASTNodeImpl {
         if (exitKey._tag === "Failure") {
           return wrapPropertyKeyIssue(s, ast, key, exitKey) ?? void_2;
         }
-        const k2 = exitKey === sameExit ? key : exitKey[args];
+        const k2 = isSameExit(exitKey) ? key : exitKey[args];
         const inputValue = s.input[key];
         const result = index.parserValue(inputValue, s.options);
         return effectIsExit(result) ? finishIndex(s, key, k2, inputValue, result) : flatMap2(exit2(result), (exit) => finishIndex(s, key, k2, inputValue, exit));
@@ -69744,13 +69793,13 @@ var Objects = class extends ASTNodeImpl {
         for (let index = 0;index < props.length; index++) {
           const property = props[index];
           const name = property.name;
-          const hasKey = hasPropertySignature(record, name);
+          const hasKey = property.ownOnly ? Object.hasOwn(record, name) : (name in record);
           const value = hasKey ? record[name] : missing;
           const exit = property.parser(value, options);
           if (!effectIsExit(exit)) {
             return resume(state, index, exit);
           }
-          if (exit === sameExit) {
+          if (isSameExit(exit)) {
             if (hasKey)
               assignProperty(out, name, value);
             continue;
@@ -69793,7 +69842,7 @@ function stepProperty(s, p, exit) {
   if (exit._tag === "Failure") {
     return wrapPropertyKeyIssue(s, s.ast, p.name, exit);
   }
-  if (exit === sameExit)
+  if (isSameExit(exit))
     return;
   const value = exit[args];
   if (value !== missing) {
@@ -69816,7 +69865,7 @@ function stepProperty(s, p, exit) {
 }
 var parsePropertiesOptions = {
   onItem(s, p) {
-    if (!hasPropertySignature(s.input, p.name)) {
+    if (!(p.ownOnly ? Object.hasOwn(s.input, p.name) : (p.name in s.input))) {
       return p.parser(missing, s.options);
     }
     const value = s.input[p.name];
@@ -69950,7 +69999,9 @@ function collectSentinels(ast) {
 var candidateIndexCache = /* @__PURE__ */ new WeakMap;
 var emptyCandidates = /* @__PURE__ */ Object.freeze([]);
 var getRuntimeType = (input) => input === null ? "null" : Array.isArray(input) ? "array" : typeof input;
-var hasPropertySignature = (input, key) => key === "__proto__" ? Object.hasOwn(input, key) : (key in input);
+var objectPrototypeKeys = /* @__PURE__ */ new Set(Reflect.ownKeys(Object.prototype)).add("__proto__");
+var requiresOwnProperty = (key) => objectPrototypeKeys.has(typeof key === "number" ? globalThis.String(key) : key);
+var hasPropertySignature = (input, key) => Object.hasOwn(input, key) || (key in input) && !requiresOwnProperty(key);
 function getCandidateIndex(types) {
   let index = candidateIndexCache.get(types);
   if (index)
@@ -70207,10 +70258,8 @@ function parseUnionCandidates(ast, parser, candidates, input, options) {
 }
 function resumeUnion(eff, state) {
   return flatMapEager2(eff, (_) => {
-    if (state.out === sameExit)
-      return succeed5(state.input);
     if (state.out)
-      return state.out;
+      return isSameExit(state.out) ? succeed5(state.input) : state.out;
     return fail5(new AnyOf(state.ast, state.issues ?? [], state.input, state.options));
   });
 }
@@ -70540,7 +70589,7 @@ var toType = /* @__PURE__ */ memoizeIdempotent((ast) => {
     const checks = canPreserveEncodingChecks(ast) ? type.encodingChecks : isArrays(type) || isObjects(type) || isDeclaration(type) && type.typeParameters.length > 0 ? extractStructuralChecks(type.encodingChecks) : undefined;
     return copy(type, {
       encodingChecks: undefined,
-      checks: combineChecks(type.checks, checks)
+      checks: combineChecks(checks, type.checks)
     });
   }
   return type;
@@ -70656,7 +70705,7 @@ function getConstructorDescriptor(ast) {
   return isFunction(getDescriptor) ? getDescriptor(ast.typeParameters) : undefined;
 }
 
-var flatMapTransformation = (result, current, f) => result === sameExit ? f(current) : flatMapEager2(result, f);
+var flatMapTransformation = (result, current, f) => isSameExit(result) ? f(current) : flatMapEager2(result, f);
 function compileTransformation(transformation) {
   const apply = compileTransformationUnsafe(transformation);
   return (result, current, options) => {
@@ -70670,14 +70719,14 @@ function compileTransformation(transformation) {
 function compileTransformationUnsafe(transformation) {
   if (transformation._tag === "Middleware") {
     return (result, current, options) => {
-      const transformed = result === sameExit ? transformation.decode(succeed6(toOption(current)), options) : transformation.decode(mapEager2(result, toOption), options);
+      const transformed = isSameExit(result) ? transformation.decode(succeed6(toOption(current)), options) : transformation.decode(mapEager2(result, toOption), options);
       return fromOptionalEffect(transformed);
     };
   }
   const getter = transformation.decode;
   switch (getter._tag) {
     case "Passthrough":
-      return (result, current) => result === sameExit ? succeed6(current) : result;
+      return (result, current) => isSameExit(result) ? succeed6(current) : result;
     case "Transform": {
       const transform = (value) => value === missing ? missingExit : succeed6(getter.transform(value));
       return (result, current) => flatMapTransformation(result, current, transform);
@@ -70714,11 +70763,11 @@ function withDefault(ast, parser) {
     const result = defaultValue;
     if (effectIsExit(result) && result._tag === "Success") {
       const local = parser(result[args], options);
-      return local === sameExit ? result : local;
+      return isSameExit(local) ? result : local;
     }
     return flatMapEager2(wrapEncoding(ast, input, options, result), (value) => {
       const local = parser(value, options);
-      return local === sameExit ? succeed6(value) : local;
+      return isSameExit(local) ? succeed6(value) : local;
     });
   };
 }
@@ -70747,7 +70796,7 @@ function compile(ast, compile, compileField, base, specialize) {
       if (encodingChecks && !options.disableChecks) {
         if (effectIsExit(result)) {
           if (result._tag === "Success") {
-            const output = result === sameExit ? input : result[args];
+            const output = isSameExit(result) ? input : result[args];
             if (input !== missing && output !== missing) {
               const issues = collectIssues(encodingChecks, input, undefined, ast, options);
               if (issues) {
@@ -70770,7 +70819,7 @@ function compile(ast, compile, compileField, base, specialize) {
       if (checks && !options.disableChecks) {
         if (effectIsExit(result)) {
           if (result._tag === "Success") {
-            const value = result === sameExit ? input : result[args];
+            const value = isSameExit(result) ? input : result[args];
             if (value === missing)
               return result;
             const issues = collectIssues(checks, value, undefined, ast, options);
@@ -70813,7 +70862,7 @@ function compile(ast, compile, compileField, base, specialize) {
         } else {
           result = flatMapEager2(result, (value) => {
             const nextResult = next(value, options);
-            return nextResult === sameExit ? succeed6(value) : nextResult;
+            return isSameExit(nextResult) ? succeed6(value) : nextResult;
           });
         }
       }
@@ -70821,12 +70870,12 @@ function compile(ast, compile, compileField, base, specialize) {
     if (result._tag === "Success") {
       const value = result[args];
       const local = parseLocal(value, options);
-      return local === sameExit ? result : local;
+      return isSameExit(local) ? result : local;
     }
     result = wrapEncoding(ast, input, options, result);
     return flatMapEager2(result, (value) => {
       const local = parseLocal(value, options);
-      return local === sameExit ? succeed6(value) : local;
+      return isSameExit(local) ? succeed6(value) : local;
     });
   };
 }
@@ -70976,7 +71025,7 @@ function run(ast) {
   return runWithCompiler(normalCompiler, ast);
 }
 function parserResult(result, input) {
-  if (result === sameExit) {
+  if (isSameExit(result)) {
     return succeed5(input);
   }
   if (!effectIsExit(result)) {
@@ -70988,7 +71037,7 @@ function runWithCompiler(compiler, ast) {
   let parser;
   return (input, options) => {
     const result = (parser ??= compiler(ast))(input, options ?? defaultParseOptions);
-    if (result === sameExit) {
+    if (isSameExit(result)) {
       return succeed5(input);
     }
     if (!effectIsExit(result)) {

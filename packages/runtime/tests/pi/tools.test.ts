@@ -314,7 +314,7 @@ describe("the feature switches and the tool arguments", () => {
       ...T3_VISUAL_TOOLS,
       "codemode",
     ])
-    expect(piPackages(config)).not.toContain("npm:@amaster.ai/pi-computer-use@0.1.36")
+    expect(piPackages(config)).not.toContain("npm:@amaster.ai/pi-computer-use@0.1.38")
   })
 
   test("only the two visual roles get T3 Code and computer-use tools", () => {

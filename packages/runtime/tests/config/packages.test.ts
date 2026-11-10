@@ -30,12 +30,12 @@ describe("piPackages", () => {
   test("the default config loads the provider and every feature's package, each pinned", () => {
     expect(piPackages(DEFAULT_CONFIG)).toEqual([
       "npm:pi-provider-kimi-code@0.6.13",
-      "npm:@tintinweb/pi-subagents@0.23.1",
-      "npm:billion-context@0.1.212",
+      "npm:@tintinweb/pi-subagents@0.23.2",
+      "npm:billion-context@0.1.213",
       "npm:@juicesharp/rpiv-todo@2.15.0",
       "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
       "npm:@aliou/pi-processes@0.13.6",
-      "npm:@amaster.ai/pi-computer-use@0.1.36",
+      "npm:@amaster.ai/pi-computer-use@0.1.38",
       "npm:@ff-labs/pi-fff@0.11.0",
     ])
   })

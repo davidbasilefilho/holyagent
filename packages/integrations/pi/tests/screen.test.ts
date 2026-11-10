@@ -33,7 +33,7 @@ const BROWSE = {
     ...REGISTRY,
     "--@opencode:registry=https://registry.npmjs.org/",
     "-y",
-    "@opencode/browse@0.0.15",
+    "@opencode/browse@0.0.16",
     "mcp",
   ],
 }
