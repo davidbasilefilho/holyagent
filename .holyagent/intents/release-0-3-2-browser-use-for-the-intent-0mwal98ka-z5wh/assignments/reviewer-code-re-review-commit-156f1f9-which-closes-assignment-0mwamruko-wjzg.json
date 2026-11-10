@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwamruko-wjzg",
+  "intentId": "intent-0mwal98ka-z5wh",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-commit-156f1f9-which-closes",
+  "objective": "Re-review commit 156f1f9, which closes the optional notes of the earlier fff review.",
+  "state": "Running",
+  "scope": [
+    "Worktree /home/user/holyagent-0.3.2-fff; review only `git diff 631dd560 156f1f9` (tests in packages/runtime/tests/setup-pi-settings.test.ts and one clause in docs/pi/search.md). Earlier notes it should close: no test for the retired followSymlinks key under capability off, pi.enable off and --dry-run; no test for a recorded false the person changed to true; docs/pi/search.md left ambiguous how to keep links unfollowed after upgrading from 0.3.1."
+  ],
+  "constraints": [
+    "Work only inside /home/user/holyagent-0.3.2-fff; never check out a branch, commit or make any git write in /home/user/holyagent or any other worktree, and make no edits.",
+    "Never start pi or make live Kimi, Codex or OpenAI requests.",
+    "Report in under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "The four tests exercise the stated cases and would fail if the cleanup or its guard were removed, and the doc clause is accurate",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwami6wr-hl4j"
+  ],
+  "followUpOf": "assignment-0mwalrxf7-6jiv",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-10T11:52:37.513Z"
+  },
+  "createdAt": "2026-11-10T11:52:37.513Z"
+}
