@@ -109,6 +109,7 @@
     "assignment-0mwchf7z4-gbp3"
   ],
   "specialist": {
+    "agentId": "pi-workflow:wf_af040aa48de2/assignment-0mwci3uoa-96jr",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-11T19:18:18.450Z"
