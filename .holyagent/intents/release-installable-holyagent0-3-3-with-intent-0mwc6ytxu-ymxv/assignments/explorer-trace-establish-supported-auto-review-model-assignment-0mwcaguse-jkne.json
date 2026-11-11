@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "establish-supported-auto-review-model",
   "objective": "Establish supported auto-review model substitution and concrete trusted root-to-child approval propagation options before implementation.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only source/docs investigation in C:/Users/david.basile/dev/holyagent-0.3.3-npm; prior accepted trace C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc9xulv-rrv8.md provides established facts; do not re-investigate those. Current model codex-auto-review/low in runtime/src/pi/codex/auto-review/assessment.ts, request client.ts, Pi src/auto-review.ts session-localgetBranch. User now explicitly authorizes GPT6Luna medium/high if supported, evidence selection separate publicbenchmark Assignment.",
     "Determine whether same authenticated Codex Responses endpoint supports registered GPT6Luna (verify real ID/version), medium/high effort and structured safety verdict contract; what bounded code/config change would work without disabling guard, changing credentials/provider or silently swapping unsupported aliases. Source/docs/model registry evidence, no live inference needed. Distinguish availability inference from verified support, no secrets.",
@@ -79,5 +79,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc9xulv-rrv8",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T15:44:25.054Z"
+  },
   "createdAt": "2026-11-11T15:43:41.534Z"
 }
