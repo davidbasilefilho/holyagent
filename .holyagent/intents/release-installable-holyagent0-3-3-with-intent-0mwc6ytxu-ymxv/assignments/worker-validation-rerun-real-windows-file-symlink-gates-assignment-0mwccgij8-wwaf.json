@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "rerun-real-windows-file-symlink-gates",
   "objective": "Rerun real Windows file-symlink gates after user enabled Developer Mode.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only validation in actualworktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. UserconfirmsDeveloperModejustenabled; no needmorepermissionorOSwrites. PowerShellwith explicitSet-Location provenworks; BashWindowscwdpreviouslyfails. Use actualBun test packages/runtime/tests/state-branch.test.ts scripts/bump-version.test.ts fromcorrectworktree, keepingfixtures unchanged. Prior114pass2fail1skip(exit1), blockedfile-symlinkcases state-branch.test.ts:1523,1543 EPERM-4048. Confirmcurrentexacttestnames/statusandpropernonzeroexitcapture; wrapperpreviouslywrote0despitetestsfailed. Don'trepeatanoldexitfileasproof.",
     "Otherwritersinprogress onlypromptinstructions and npmworkflow/helper/tests/docs, noneowns these2testfiles. No sourcefix/build/generatedfiles/fullverify/modelcalls/accountsettings/repo-state/VCSwrites. Isolateanyexistingtesthome accordingcurrentfixture patterns; don'trunrealPiinstall. Ifprivilegeissuepersists useonecontrolledtemp Node/Buntruefilelinkprobe and reporthostaction insteadchangingtests/skipping. Reportmax5bullets actualcommands/exits/passfail skipcounts andanyenvironmentblocker, logsoutside repo. UserasksreminddisableDeveloperModewhenfinished; rootowns reminder."
@@ -81,5 +81,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcb9hb6-em5q",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T16:40:37.253Z"
+  },
   "createdAt": "2026-11-11T16:39:24.885Z"
 }
