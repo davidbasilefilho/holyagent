@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwc758fp-m5ya",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "make-agents-md-explicitly-state",
+  "objective": "Make AGENTS.md explicitly state HolyAgent stacked-PR and beneficial worktree conventions for the current release model.",
+  "state": "Ready",
+  "scope": [
+    "Work ONLY in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Edit AGENTS.md only; main checkout remains main.",
+    "User requirements verbatim: use worktrees for the pr stack as well if beneficial and state in AGENTS.md. User also requires HolyAgent PR stack standard explicitly in AGENTS.md.",
+    "Explain one reviewable change per PR, stacking on preceding open owner PR when repository branch rules allow, PR base equals start branch, release0.3.3 first work PR targets release/0.3.3/integration and only integration targets main. Use worktrees for stack branches where helpful while preserving primary main checkout. Keep existing release convention and main/dev migration deferred0.3.4."
+  ],
+  "constraints": [
+    "Read C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md. Follow repo English prose style; minimal precise instruction with reason beside rule. Do not add dates/session state or duplicate whole HolyAgent standard.",
+    "No Git writes, commits, branch operations or .holyagent edits. Existing staged clean merge is root-owned, leave it alone. No generated/source edits beyond AGENTS.md. Scope0.3.3 minimum only; all other0.3.4 work remains deferred.",
+    "Report at most7 bullets; evidence lines exact criterion/label names; long logs and review diff outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "Stack and worktree requirements",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Release convention compatibility",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Minimal document scope",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T14:10:40.501Z"
+}
