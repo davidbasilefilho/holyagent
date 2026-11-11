@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "pack-the-public-generated-pi-package-and",
   "objective": "Pack the public generated Pi package and prove its clean CLI and Pi startup in an isolated temporary home.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Only pack/test the existing generated output in C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist. Root workspace is PRIVATE and is NOT the public artifact. Prior task erroneously packed workspace root into Temp/holyagent-0.3.3.tgz (932files); do not reuse that artifact.",
     "Verify dist/package.json name=holyagent/version=0.3.3/public status and hostpeers. Run bun pm pack with WORKING DIRECTORY exactly C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist and a unique destination in Temp. Inspect tar contents/manifest identity, record filecount and SHA512/sha256 or integrity. Never publish it.",
@@ -101,5 +101,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwchf7z4-gbp3",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T19:03:26.706Z"
+  },
   "createdAt": "2026-11-11T19:03:04.831Z"
 }
