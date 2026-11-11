@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "fix-root-prompting-to-incorporate",
   "objective": "Fix root prompting to incorporate settled answers, escalate only actionable uncertainty, and distinguish automated safety rejections from user denials.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, existing uncommitted merge preserved. Explicit current user request authorizes this focused0.3.3 instruction fix. Read instruction-writing skill C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md. Source tree packages/runtime/src/instructions: update model-agnostic behavior requirements first then each affected family root section/guide-compatible wording; preserve architecture/coverage IDs.",
     "User critique: preserve already given intent/authorization, incorporate meaningful free-form answers instead of forcing another chip selection, delegate investigation of status/ownership/heartbeats/repo first, ask only concrete unresolved risk requiring a decision or information the user can actually provide. Unknown worker status proves neither active nor inactive; runtime handles Unknown, root does not repeatedly ask users to certify inaccessible internals. User now authoritatively confirms old cloud workers cannot resume. Remove unconditional rule that any custom/clarifying answer must trigger repeat question even when it settled relevant decision.",
@@ -94,5 +94,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc9nxse-2ghh",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T15:24:35.292Z"
+  },
   "createdAt": "2026-11-11T15:23:35.712Z"
 }
