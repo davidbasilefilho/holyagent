@@ -24,9 +24,10 @@
     "yeah the root must only focus on its responsabilities",
     "Root responsibility boundary is mandatory for0.3.4: planning and delegation, user/material decisions, acceptance, version control and completion. Specialists perform investigation, research, implementation, checks and reviews; use the required wait tool when no root responsibility is ready.",
     "Prefer native web search of installed providers. Exa is only a fallback when none of the installed providers offers web search; verify actual capability exposure rather than equating a selected provider with native-search availability.",
-    "Research tooling issue: browser relay was unpaired (No browser has contacted this relay yet), blocking public MCP maintenance comparison. Preserve exact pairing/access requirement, avoid claiming verification, and do not change pairing/security/account settings without authority. Native installed Pi1.5.2 MCP/codemode integration is a candidate; public maintenance and locked1.5.0/Windows compatibility remain unverified."
+    "Research tooling issue: browser relay was unpaired (No browser has contacted this relay yet), blocking public MCP maintenance comparison. Preserve exact pairing/access requirement, avoid claiming verification, and do not change pairing/security/account settings without authority. Native installed Pi1.5.2 MCP/codemode integration is a candidate; public maintenance and locked1.5.0/Windows compatibility remain unverified.",
+    "User requires all tools to follow a single naming scheme: SubagentWorkflow is inconsistent with bash, codemode and todo. Default for0.3.4: lowercase snake_case tool names (subagent_workflow), with coherent root/specialist/codemode inventories, instructions and generated integrations. Establish compatibility for externally supplied tools rather than silently editing installed third-party packages. Preserve capability/permission enforcement."
   ],
-  "revision": 5,
+  "revision": 6,
   "state": "Open",
   "createdAt": "2026-11-11T14:05:34.610Z"
 }
