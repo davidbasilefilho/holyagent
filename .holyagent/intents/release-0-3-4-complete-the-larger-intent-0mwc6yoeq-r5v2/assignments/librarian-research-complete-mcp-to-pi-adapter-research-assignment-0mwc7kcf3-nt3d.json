@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "complete-mcp-to-pi-adapter-research",
   "objective": "Complete MCP-to-Pi adapter research through public browser sources without requiring Exa credentials.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only research for deferred0.3.4; no implementation now. Prior research failed because pi-web-kit search/fetch says exa provider requires EXA_API_KEY or apiKeys.exa in project or agent-directory pi-web-kit config. This is a missing optional search service, not a denial; use available browser tools on public sources rather than request/change credentials.",
     "User requirement: if there is an mcp-to-pi-tool extension for adapting the context-bloat from mcp to actual pi tools, we should use it if it's well maintained and not obscure, if not we shall develop it as another package pi-mcp-to-tool.",
@@ -42,5 +42,10 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwc7eskz-7hm7",
   "screen": true,
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:23:11.054Z"
+  },
   "createdAt": "2026-11-11T14:22:25.504Z"
 }
