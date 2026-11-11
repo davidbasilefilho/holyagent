@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-the-workflow-permission",
   "objective": "Correct the workflow permission regression test to distinguish contents-writing jobs from OIDC publishing jobs without weakening security assertions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Own scripts/workflows.test.ts only. The existing test named 'only the tag and release jobs hold contents: write' treats every permission value write, including id-token:write, as contents write and compares exact permission objects. It currently passes20tests on GitHub-only workflow state, but blocks user-authorized npm trusted-publishing implementation. Fix the incorrect contents-writer classification and assert correct OIDC rules.",
     "Preserve strong checks that contents:write exists only on authorized tag/release jobs, external actions are SHA pinned, no broad top-level write grants, and untrusted PR/fork jobs cannot publish. Permit intended publishing jobs id-token:write and explicitly test its required/allowed placement. Coordinate by read-only observation with concurrent Worker.integration assignment-0mwc8ny8d-po33 changing .github/workflows and adding packages/integrations/pi/publishing.test.ts; don't edit those files.",
@@ -44,5 +44,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc8fqz6-g4hb",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:56:31.960Z"
+  },
   "createdAt": "2026-11-11T14:55:58.037Z"
 }
