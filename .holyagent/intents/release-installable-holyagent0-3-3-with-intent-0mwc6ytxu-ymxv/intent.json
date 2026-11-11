@@ -33,9 +33,10 @@
     "Release evidence update: AGENTS.md writer changed only requested stack/worktree rules and diff-check/type/format passed, but full verify reported3348pass52fail52skip; Succeeded/unaccepted pending committed-range independent review. Another validator's log reported3345pass54fail52skip while wrapper exit file said0, so actual current status/exit integrity and packaged Pi startup require full-route repair assignment-0mwc88lir-pjpj. Do not count either as green.",
     "Publication-set lookup was rejected for contradictory prose. Root confirmed workspace root package.json private:true; generated packages/integrations/pi/dist/package.json public holyagent0.3.3 with Pi-host peers and no runtime dependency. Integration assignment-0mwc8fqz6-g4hb must establish corrected minimal publication-set/closure evidence before publication.",
     "Latest release state: isolated installed Pi package startup and CLI passed, no extension/skill diagnostics,11skills registered; screen test19pass, bump fixture56pass, check/lint/fmt pass. Rough progress estimate65% reported. Full Windows gate and old wrapper exit discrepancy unresolved. Runtime test repairs remain blocked by cloud writer authoritative-liveness confirmation.",
-    "Fresh security denial in assignment-0mwc8ny8d-po33 rejected id-token:write grant on two stable/dev publishing calls. No edits made, stop that publication implementation line and require user explicit approval of the scoped permission grant before retrying. Existing publication authorization is not treated as overriding the fresh denial."
+    "Fresh security denial in assignment-0mwc8ny8d-po33 rejected id-token:write grant on two stable/dev publishing calls. No edits made, stop that publication implementation line and require user explicit approval of the scoped permission grant before retrying. Existing publication authorization is not treated as overriding the fresh denial.",
+    "User explicitly approved scoped OIDC: grant id-token:write only to stable/dev npm publishing jobs and their reusable-workflow callers; exclude pull-request jobs and keep existing repository-write limits intact. This answers the prior denied permission edit; no other security/account changes approved."
   ],
-  "revision": 7,
+  "revision": 8,
   "state": "Open",
   "createdAt": "2026-11-11T14:05:41.778Z"
 }
