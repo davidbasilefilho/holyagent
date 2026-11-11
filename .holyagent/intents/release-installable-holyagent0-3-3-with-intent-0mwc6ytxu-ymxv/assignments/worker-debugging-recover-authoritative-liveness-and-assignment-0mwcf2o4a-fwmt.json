@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "recover-authoritative-liveness-and",
   "objective": "Recover authoritative liveness and resumable identity for the original release workflow through the installed host implementation and its metadata.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "An original release writer may be orphaned: assignment-0mwcdy50u-ux9c, recorded pi-workflow:wf_df270fdc0754/assignment-0mwcdy50u-ux9c. Original launch around2026-11-11T17:21:55Z from root session 01a1ca6b-447a-75e5-9485-35fa14619851. User closed an unknown window afterward. We must not duplicate its source writes or clear it based on a parent exit.",
     "Prior operations inspection found several Pi/Bun/Node processes but no trustworthy assignment-PID mapping. Expected C:/Users/david.basile/AppData/Local/Temp/pi-subagents-0/Users-david.basile-dev-holyagent/01a1ca6b-447a-75e5-9485-35fa14619851/tasks/wf_df270fdc0754.workflow.jsonl was absent. Root get_subagent_result with guessed wf_df270fdc0754#0 and role worker-debugging both returned not found; neither proves termination. Do not repeat these guessed probes or the same inventory. Determine whether workflow journals only appear on completion and find the actual child handle/registry location from installed @tintinweb/pi-subagents implementation and official local docs.",
@@ -114,7 +114,45 @@
     "agentId": "pi-workflow:wf_e985a2e57375/assignment-0mwcf2o4a-fwmt",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T17:53:02.977Z"
+    "startedAt": "2026-11-11T17:53:02.977Z",
+    "finishedAt": "2026-11-11T17:58:56.236Z"
+  },
+  "result": "result: Original release child identified and observed active through 17:55:29Z; do not duplicate its writes.\nchanged: none\nchecks: Read-only host source and session metadata inspection; build, tests, lint and format not run.\nblockers: Current liveness, full manager ID and host PID remain Unknown; no terminal report observed.\nquestions: none\nnotes: FFF returned unrelated files despite an exact external-file constraint; used direct reads instead.\nevidence:\nOriginal workflow child identity and liveness are supported by authoritative host metadata or explicitly remain Unknown: `C:/Users/david.basile/.pi/agent/sessions/--C--Users-david.basile-dev-holyagent--/2026-11-11T17-22-01-853Z_01a1cba1-81fc-7356-b52f-d0dae313ea41.jsonl:1,4,8,285` identifies the parent, assignment, child session and activity; full manager ID and PID unknown.\nWorkflow control and journal behavior are traced to installed implementation with a safe recovery recommendation: `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/index.ts:2595-2648,2800-2834` and `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/workflow/journal.ts:39-44,145-151`.\nSource workers state credentials and installed environment remain unchanged: Read-only investigation; no process control, edits, VCS or state changes.\nhost-trace: `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/workflow/host.ts:165-172,395-423` maps runtime handles to in-memory manager IDs; `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/agent-runner.ts:1286-1291` stores only the ID’s first eight characters in the session name. Journals append on each settled call, not workflow completion; a missing journal is not termination evidence.\nchild-state: Workflow `wf_df270fdc0754`, internal first-call handle `wf-agent-0`, manager ID prefix `cb435318`, child session `01a1cba1-81fc-7356-b52f-d0dae313ea41`; transcript shows activity at 17:55:29Z, not a terminal result. The session is created in-process; no distinct child PID was established.\nsafe-next-action: Preserve ownership and await the child’s terminal report. If the original live Pi instance remains accessible, inspect `/agents → Workflows → wf_df270fdc0754`, then `c` for its conversation; `x` stops the run. Do not rerun or resume while its state is unknown.\nunchanged: No credentials, installed packages, settings, source worktrees, processes or state records changed.\n",
+  "acceptance": {
+    "revision": 23,
+    "rationale": "Host implementation trace and own child transcript establish identity and recent activity without inventing a PID; the subsequent original workflow completion independently resolves terminal state. No writers were duplicated and no environment changes occurred.",
+    "criteria": [
+      {
+        "criterion": "Original workflow child identity and liveness are supported by authoritative host metadata or explicitly remain Unknown",
+        "support": "`C:/Users/david.basile/.pi/agent/sessions/--C--Users-david.basile-dev-holyagent--/2026-11-11T17-22-01-853Z_01a1cba1-81fc-7356-b52f-d0dae313ea41.jsonl:1,4,8,285` identifies the parent, assignment, child session and activity; full manager ID and PID unknown."
+      },
+      {
+        "criterion": "Workflow control and journal behavior are traced to installed implementation with a safe recovery recommendation",
+        "support": "`C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/index.ts:2595-2648,2800-2834` and `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/workflow/journal.ts:39-44,145-151`."
+      },
+      {
+        "criterion": "Source workers state credentials and installed environment remain unchanged",
+        "support": "Read-only investigation; no process control, edits, VCS or state changes."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "host-trace",
+        "support": "`C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/workflow/host.ts:165-172,395-423` maps runtime handles to in-memory manager IDs; `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/agent-runner.ts:1286-1291` stores only the ID’s first eight characters in the session name. Journals append on each settled call, not workflow completion; a missing journal is not termination evidence."
+      },
+      {
+        "label": "child-state",
+        "support": "Workflow `wf_df270fdc0754`, internal first-call handle `wf-agent-0`, manager ID prefix `cb435318`, child session `01a1cba1-81fc-7356-b52f-d0dae313ea41`; transcript shows activity at 17:55:29Z, not a terminal result. The session is created in-process; no distinct child PID was established."
+      },
+      {
+        "label": "safe-next-action",
+        "support": "Preserve ownership and await the child’s terminal report. If the original live Pi instance remains accessible, inspect `/agents → Workflows → wf_df270fdc0754`, then `c` for its conversation; `x` stops the run. Do not rerun or resume while its state is unknown."
+      },
+      {
+        "label": "unchanged",
+        "support": "No credentials, installed packages, settings, source worktrees, processes or state records changed."
+      }
+    ]
   },
   "createdAt": "2026-11-11T17:52:37.786Z"
 }
