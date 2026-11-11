@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwcbc2qt-x7zx",
+  "intentId": "intent-0mwcbbw6j-i7pz",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "determine-the-supported-way-to-continue",
+  "objective": "Determine the supported way to continue an existing external Pi TUI session inside T3 Code, with exact verified manual steps or an honest unsupported result.",
+  "state": "Ready",
+  "scope": [
+    "Pi session 01a1ca6b-447a-75e5-9485-35fa14619851; user means transferring that existing TUI session into the T3 Code app, not into the current chat.",
+    "Read installed Pi and T3 integration documentation/source as needed. Pi documentation root: C:/Users/david.basile/.bun/install/global/node_modules/@earendil-works/pi-coding-agent; T3 integration may be under C:/Users/david.basile/.pi/agent/npm/node_modules or local installed packages. Discover locations through registered FFF tools.",
+    "Find documented import/resume/adopt support and any prerequisites, especially whether a live TUI must exit first. Read relevant Pi harness documentation in full when needed."
+  ],
+  "constraints": [
+    "The user asked: if you can do that yourself do so. Direct T3 thread read was denied with: The root may not use mcp__t3-code__t3_thread_read: HolyAgent keeps T3 Code orchestration, thread and schedule tools off and delegates through its own specialists. Respect that denial: no T3 calls, no alternate API/DB mutation, no bypass, no transfer attempt. This Assignment is read-only documentation research for manual instructions.",
+    "No repository changes, no version-control writes, no edits under .git or .holyagent, no interruption of the existing TUI.",
+    "Use FFF searches through codemode, not shell search. If FFF unavailable, report that and use direct reads.",
+    "Report at most 5 bullets plus evidence; cite exact source paths/lines or authoritative URLs and quote the relevant API/command. Clearly distinguish unsupported, unknown and verified."
+  ],
+  "criteria": [
+    {
+      "text": "Supported handoff steps",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "No unsupported claims or actions",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T16:07:58.182Z"
+}
