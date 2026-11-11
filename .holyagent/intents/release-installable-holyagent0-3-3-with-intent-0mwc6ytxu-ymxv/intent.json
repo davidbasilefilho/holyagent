@@ -15,9 +15,10 @@
     "Native codemode HolyAgent tools, dual-provider/all-capability setup, Cua/browser follow-up, scoped skills/Context7 replacement, main/dev migration, deterministic dev releases and non-blocking tooling repairs belong to0.3.4. Do not dispatch their Ready implementation assignments now.",
     "if you have any trouble in the tooling, note it down in an intent to fix stuff",
     "User additionally requires AGENTS.md to explicitly state HolyAgent PR stack standards. For0.3.3, work PRs target existing integration, subsequent work stacks on preceding open PR subject to repository mergeability, and only release integration opens into main. main/dev remains0.3.4. This minimal documentation update is authorized in0.3.3.",
-    "In-flight tooling review assignment-0mwc3s7vm-q9xv remains applicable. In-flight read-only research assignment-0mwc6qszh-9ncm and assignment-0mwc6qn5g-u873 may finish and their reports are retained for0.3.4; launch no implementation from them now."
+    "In-flight tooling review assignment-0mwc3s7vm-q9xv remains applicable. In-flight read-only research assignment-0mwc6qszh-9ncm and assignment-0mwc6qn5g-u873 may finish and their reports are retained for0.3.4; launch no implementation from them now.",
+    "use worktrees for the pr stack as well if beneficial and state in AGENTS.md"
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-11T14:05:41.778Z"
 }
