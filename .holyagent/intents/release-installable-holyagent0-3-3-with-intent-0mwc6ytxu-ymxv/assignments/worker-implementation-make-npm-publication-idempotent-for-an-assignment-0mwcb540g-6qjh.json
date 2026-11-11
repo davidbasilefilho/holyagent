@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-npm-publication-idempotent-for-an",
   "objective": "Make npm publication idempotent for an identical bun-packed artifact and fail safely on conflicts or registry errors.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Single atomicfix: reliable npm publish rerun. Current stable.yml/dev.yml publishsteps unconditionally npm publish, so successfulnpm followedbyfailedGitHubstep cannotrerun. AllpriorCIwriters terminal; latest report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcam2k7-e5k5.md:26focusedpass,HTTP404vs500release lookupfixed, othergapsunimplemented. Do THIS requestedfix fully; separate GitHub ordering/trustedpublisherdocs and finalglobalfmt are roottracked, not reasons tostop thisownedwork.",
     "Own scripts/npm-publishing.ts,scripts/npm-publishing.test.ts,.github/workflows/stable.yml,.github/workflows/dev.yml,packages/integrations/pi/publishing.test.ts,scripts/workflows.test.ts. Add smallest sharedhelper ifappropriate withrepositoryEffect/Schema conventions, wire actual stable/dev npm steps to it. Input actual bunpm-packed tarball and tag. Already-published identical package/version/integrity succeeds without republish and ensures intendeddisttag pointsright; differentcontent sameversionfails. Only authoritative404 meansmissing; network/auth/othererrorsmustnotmeanabsent orsuccess. npm actualpublish usesOIDC/provenance, no tokensorcredentialfallback. Preserveexistingpermission/jobcontracts and publicGitHubrelease behavior until next separate orderingfix; no needtodocallphases here.",
@@ -99,5 +99,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcam2k7-e5k5",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T16:03:40.325Z"
+  },
   "createdAt": "2026-11-11T16:02:33.245Z"
 }
