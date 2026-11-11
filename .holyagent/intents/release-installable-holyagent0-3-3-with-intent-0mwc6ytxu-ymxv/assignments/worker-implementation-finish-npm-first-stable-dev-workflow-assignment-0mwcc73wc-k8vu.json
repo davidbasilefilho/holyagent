@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "finish-npm-first-stable-dev-workflow",
   "objective": "Finish npm-first stable/dev workflow ordering and exact packed-artifact handoff regression tests.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Own .github/workflows/stable.yml,dev.yml,.github/actions/tag-release/action.yml,scripts/workflows.test.ts,packages/integrations/pi/publishing.test.ts. Current stable.release createsGHrelease+tarball thenstable.publish needsrelease/downloadsGHasset; devanalogous. Fix thatactualdependency so npmpublication succeedsbeforeGitHubsuccessrelease. Keep publish.ymlcallercontract, scopedid-tokenonlynpmpublish/reusablecaller andcontentswriteonlytagreleasejob, SHAactions/jobIDs. Userexplicitapproval covers these exactworkflowchangesandgrants; do notactuallypublish.",
     "Use minimalpack→npmpublish→GitHubrelease dependency/artifactpath, bun pm pack publicgeneratedPi dist ONLY, exactsameinspectedtarball passedtonpm scripts/npm-publishing.ts andattachedtoGHafterpublish. Rootworkspaceprivate. Existingpublicpackageholyagent withhostpeer5/no runtimedep; helperreadsEffectsofreshjobneedsactualdepsavailability. Existingactionsupload/downloadpins canbereusedfromrepopatterns; donothandinvent/changepins or dependencyversions. GHlookup404onlytreatedmissing frompriorfixmustremain.",
@@ -100,7 +100,9 @@
     "agentId": "pi-workflow:wf_2c2c7d0afa75/assignment-0mwcc73wc-k8vu",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T16:32:35.169Z"
+    "startedAt": "2026-11-11T16:32:35.169Z",
+    "finishedAt": "2026-11-11T16:43:02.201Z"
   },
+  "result": "result: npm-first release ordering and packed-artifact handoff implemented; focused tests pass\nchanged: .github/workflows/stable.yml, .github/workflows/dev.yml, packages/integrations/pi/publishing.test.ts\nchecks: focused tests exit 0, 26 pass; mise check exit 0, 315 files; mise lint exit 0, 316 files; focused format exit 0, 3 files; diff-check exit 0; full format exit 1, unrelated scripts/root-question-policy.test.ts; full verify not run\nblockers: repository-wide format gate is not green because of the unrelated file\nquestions: none\nnotes: New upload/download action pins resolved from official GitHub release tags; no publication performed. Other writers’ files may have changed during checks.\nevidence:\nNpm succeeds before stable or prerelease GitHub release creation: Both release jobs need publish; focused tests exit 0.\nSame inspected Bun packed public Pi artifact reaches npm and GitHub: Fixture tests pack both versions, inspect manifests and compare transferred bytes; helper and GitHub commands are stubbed.\nScoped permissions dependency availability and focused regression checks pass: Permission tests pass; publish jobs install frozen dependencies; type-check and lint pass, but repository-wide format is blocked above.\nchecks-run: bun test scripts/workflows.test.ts packages/integrations/pi/publishing.test.ts -> exit 0, 26 pass; bunx --no-install mise run check -> exit 0; lint -> exit 0; fmt:check -> exit 1.\nchanged-paths: .github/workflows/stable.yml, .github/workflows/dev.yml, packages/integrations/pi/publishing.test.ts\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-npm-handoff.diff\n",
   "createdAt": "2026-11-11T16:32:06.012Z"
 }
