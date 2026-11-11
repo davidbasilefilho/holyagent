@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "recommend-gpt6luna-medium-versus-high",
   "objective": "Recommend GPT6Luna medium versus high for fast automatic safety review using benchmark quality and output-token efficiency, not price.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "User authorizes changing existing codex-auto-review/low to GPT6Luna medium or high IF supported; favors speed, high if medium insufficient. Research only, no config/source edits. Scope is auto-review, not root/specialist routing. Confirm actual current Luna model/version naming rather than conflate model generations.",
     "Find authoritative or credible independently measured medium/high same-model benchmark evidence, with output/reasoning-token counts and quality, ideally classification/instruction-following/tool safety as well as reasoning. Include latency if measured, cost only as non-decision context. User previously named mypriors.com for larger0.3.4 scoring but this request is performance-per-output-token, not monetary cost. Do not invent missing token or effort data or compare incompatible harnesses as direct controlled evidence. Re-derive ratios from cited values. Prefer medium only if evidence supports adequate review quality; otherwise high, or explicit Unknown if no decision-quality evidence.",
@@ -79,5 +79,10 @@
   "dependencies": [],
   "independentFrom": [],
   "screen": true,
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T15:44:16.356Z"
+  },
   "createdAt": "2026-11-11T15:43:35.002Z"
 }
