@@ -544,7 +544,7 @@ describe("holyagent setup on browse", () => {
     await writeBrowsePairing(home)
     const lines = await report("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })
     expect(lines).toEqual([
-      "= browser-use: headless form; the extension registers `uvx --no-config --default-index https://pypi.org/simple --from browser-use==1.0.0 browser-use --cli-mcp` for screen specialists through `holyagent browser-server`, which starts the headless browser and stops it with the server and writes no file for it",
+      "= browser-use: headless form; the extension registers `uvx --no-config --default-index https://pypi.org/simple --from browser-use==1.0.2 browser-use --cli-mcp` for screen specialists through `holyagent browser-server`, which starts the headless browser and stops it with the server and writes no file for it",
       `= browser-use: the headless browser is the Chromium at ${chromiumPath}`,
     ])
   })

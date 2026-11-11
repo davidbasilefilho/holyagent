@@ -26,9 +26,13 @@ const ALL_NAMES: ReadonlyArray<PiPackageName> = [
 const pinned = (name: keyof typeof PI_PACKAGE_VERSIONS) =>
   `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`
 
+// Exercise the complete package list on a supported platform regardless of the test host.
+const packagesOnLinux = (config: Config) =>
+  piPackages(config, undefined, "normal", undefined, "linux-x64")
+
 describe("piPackages", () => {
   test("the default config loads the provider and every feature's package, each pinned", () => {
-    expect(piPackages(DEFAULT_CONFIG)).toEqual([
+    expect(packagesOnLinux(DEFAULT_CONFIG)).toEqual([
       "npm:pi-provider-kimi-code@0.6.13",
       "npm:@tintinweb/pi-subagents@0.23.2",
       "npm:billion-context@0.1.213",
@@ -49,10 +53,17 @@ describe("piPackages", () => {
     ["contextCompression", "billion-context"],
     ["subagents", "@tintinweb/pi-subagents"],
   ] as const)("disabling %s drops %s and nothing else", (feature, name) => {
-    const all = piPackages(DEFAULT_CONFIG)
-    const without = piPackages(withFeatures({ [feature]: false }))
+    const all = packagesOnLinux(DEFAULT_CONFIG)
+    const without = packagesOnLinux(withFeatures({ [feature]: false }))
     expect(without).toEqual(all.filter((entry) => entry !== pinned(name)))
     expect(without).toHaveLength(all.length - 1)
+  })
+
+  test("Windows omits processes while Linux loads it", () => {
+    expect(piPackages(DEFAULT_CONFIG, undefined, "normal", undefined, "win32-x64")).not.toContain(
+      pinned("@aliou/pi-processes"),
+    )
+    expect(packagesOnLinux(DEFAULT_CONFIG)).toContain(pinned("@aliou/pi-processes"))
   })
 
   test("mcp is carried by Pi's built-in extension, so its switch changes no package", () => {
@@ -83,7 +94,7 @@ describe("piPackages", () => {
 describe("piPackages order and pi.enable", () => {
   test("the features follow the order of FEATURE_PACKAGES and the web kit comes last", () => {
     const config = withFeatures({ web: "pi-web-kit" })
-    expect(piPackages(config)).toEqual(ALL_NAMES.map((name) => piPackageSource(name)))
+    expect(packagesOnLinux(config)).toEqual(ALL_NAMES.map((name) => piPackageSource(name)))
   })
 
   test("pi.enable off loads nothing, whatever the features say", () => {
@@ -116,14 +127,14 @@ describe("the pin table", () => {
   })
 
   test("the PyPI table pins browser-use exactly and names nothing Pi installs", () => {
-    expect(PYPI_PACKAGE_VERSIONS).toEqual({ "browser-use": "1.0.0" })
+    expect(PYPI_PACKAGE_VERSIONS).toEqual({ "browser-use": "1.0.2" })
     for (const name of Object.keys(PYPI_PACKAGE_VERSIONS))
       expect(Object.keys(PI_PACKAGE_VERSIONS)).not.toContain(name)
   })
 
   test("every source piPackages returns reads its version from the table", () => {
     const everything = withFeatures({ web: "pi-web-kit" })
-    expect(piPackages(everything).toSorted()).toEqual(
+    expect(packagesOnLinux(everything).toSorted()).toEqual(
       named.map((name) => piPackageSource(name)).toSorted(),
     )
   })

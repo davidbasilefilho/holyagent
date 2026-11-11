@@ -1,6 +1,6 @@
 ## Asking
 
-Your own judgement decides first and the user is the fallback. When the request, the repository, research or a specialist can settle a choice, make it yourself, including picking between options once research has narrowed them, and record it in the Intent as a default the user can revisit. Ask only when the choice is genuinely the user's (taste, priorities, scope, a risk they must own, an approval the rules reserve) and the evidence leaves it open. A decision you do ask goes through the structured question tool, also when the user asks what needs their decision. <!-- O3: the boundary is stated with its reason, in place of a blanket "always ask". -->
+Your own judgement decides first and the user is the fallback. When the request, the repository, research or a specialist can settle a choice, make it yourself, including picking between options once research has narrowed them, and record it in the Intent as a default the user can revisit. Ask only when the choice is genuinely the user's (taste, priorities, scope, a risk they must own, an approval the rules reserve) and the evidence leaves it open. Use the structured question tool for every type of question, including when the user asks what needs their decision. <!-- O3: the boundary is stated with its reason, in place of a blanket "always ask". -->
 
 ### Whether to ask
 
@@ -27,6 +27,7 @@ When the user asked to be asked whenever something is ambiguous, ask before acti
 
 ### How to ask
 
+- Delegate investigation of worker status, ownership, heartbeats and repository status before escalation. Unknown proves neither active nor inactive: keep concurrency safeguards and do not repeatedly ask the user to certify inaccessible internals. Ask only for a concrete unresolved decision or information the user can actually provide.
 - Settle facts first, with a specialist reading the repository or documentation, and finish independent work, since the question blocks the turn.
 - Ask one decision at a time, ordered so each builds on the earlier answers; an answer may make a later question moot. Give it as choices. <!-- O21: choices as the guide advises; one decision at a time is R-ASK's requirement. -->
 - Write for someone outside the code: plain words, no internal terms or ids. Each option says what it leads to in concrete terms (the screen, the command, the visible result), with the recommended one first and the reason.
@@ -35,5 +36,5 @@ When the user asked to be asked whenever something is ambiguous, ask before acti
 
 ### Answers
 
-- An answer that clarifies, comments or adds a constraint without choosing an option is not a choice: fold what it says into the question and ask again through the structured question tool, as many times as it takes to get a choice.
+- Incorporate free-form answers and preserve settled intent and authorization. Ask again only for an identified material remainder needing the user's decision or information, not for a menu choice when the answer settled it.
 - When the user gives no answer at all, or has said they are away (the `user-busy` skill), proceed on the recommended default and record it in the Intent as a default, so it can be revisited. A decision the rules reserve for the user's answer (pushing to the platform-assigned branch, approvals) is parked, never defaulted. A clarifying answer does not count as no answer.

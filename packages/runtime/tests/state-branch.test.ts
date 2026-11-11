@@ -2,7 +2,7 @@ import { afterAll, afterEach, describe, expect, setDefaultTimeout, spyOn, test }
 import { writeFileSync } from "node:fs"
 import * as filesystem from "node:fs/promises"
 import { cp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 
 import { $ } from "bun"
 import { Effect, Exit } from "effect"
@@ -10,7 +10,13 @@ import { Effect, Exit } from "effect"
 import { fromGitPath, toPosix } from "../src/domain/paths.ts"
 import { deadlineIn, withFileLock } from "../src/state/lock.ts"
 import { loadProject } from "../src/state/store.ts"
-import { commitState, fetchRemoteBranch, killGroup, releaseGroup } from "../src/state/tree.ts"
+import {
+  commitState,
+  fetchEnvironment,
+  fetchRemoteBranch,
+  killGroup,
+  releaseGroup,
+} from "../src/state/tree.ts"
 import { PROCESS_TIMEOUT_MS } from "./fixtures.ts"
 import {
   cleanup,
@@ -526,7 +532,8 @@ describe("the fetch of the remote state branch", () => {
   const overSsh = async (behavior: string) => {
     const dir = await initRepo(OWNER)
     await seed(dir, { "a.txt": "a\n" })
-    await sh(dir, ["git", "remote", "add", "origin", "ssh://git@example.invalid/octo/project.git"])
+    // Even if ssh lookup fails, the fallback cannot reach an external host.
+    await sh(dir, ["git", "remote", "add", "origin", "ssh://git@127.0.0.1:1/octo/project.git"])
     const bin = await scratch("holyagent-bin-")
     // Git runs the ssh command through a POSIX shell, where a backslash escapes the next character,
     // so the paths in the command and in the script are written the way git prints them.
@@ -534,13 +541,36 @@ describe("the fetch of the remote state branch", () => {
     const script = toPosix(join(bin, "ssh"))
     await writeFile(
       script,
-      `#!/bin/sh\necho "args: $*" >> "${log}"\necho "askpass: [${"$"}{SSH_ASKPASS-unset}] [${"$"}{GIT_ASKPASS-unset}]" >> "${log}"\n${behavior}\n`,
+      `#!/bin/sh\necho "args: $*" >> "${log}"\necho "askpass: [${"$"}{SSH_ASKPASS-unset}] [${"$"}{SSH_ASKPASS_REQUIRE-unset}] [${"$"}{GIT_ASKPASS-unset}]" >> "${log}"\n${behavior}\n`,
       { mode: 0o755 },
     )
-    const env = { PATH: `${bin}:${process.env["PATH"] ?? ""}` }
     const logged = async () => ((await Bun.file(log).exists()) ? await Bun.file(log).text() : "")
+    const path = `${bin}${delimiter}${process.env["PATH"] ?? process.env["Path"] ?? ""}`
+    // Windows can inherit Path and PATH as separate object keys; Git may read either one.
+    const env = { PATH: path, ...(process.platform === "win32" ? { Path: path } : {}) }
     return { dir, bin, script, env, logged }
   }
+
+  test("the default ssh environment is non-interactive", () => {
+    const env = fetchEnvironment(
+      {
+        ...GIT_ENV,
+        GIT_SSH: undefined,
+        GIT_SSH_COMMAND: undefined,
+        SSH_ASKPASS: "/bin/false",
+        SSH_ASKPASS_REQUIRE: "force",
+        GIT_ASKPASS: "/bin/false",
+      },
+      undefined,
+    )
+
+    expect(env.GIT_SSH_COMMAND).toBe("ssh -o BatchMode=yes -o ConnectTimeout=5")
+    expect(env.SSH_ASKPASS).toBeUndefined()
+    expect(env.SSH_ASKPASS_REQUIRE).toBeUndefined()
+    expect(env.GIT_ASKPASS).toBe("")
+    expect(env.GIT_TERMINAL_PROMPT).toBe("0")
+    expect(env.GCM_INTERACTIVE).toBe("never")
+  })
 
   test("ssh runs in batch mode with a connect timeout and no askpass program", async () => {
     const { dir, env, logged } = await overSsh("exit 255")
@@ -551,14 +581,19 @@ describe("the fetch of the remote state branch", () => {
         ["intent", "create"],
         fakeGitHub().layer,
         { objective: "Ship the parser" },
-        { ...env, SSH_ASKPASS: "/bin/false", GIT_ASKPASS: "/bin/false" },
+        {
+          ...env,
+          SSH_ASKPASS: "/bin/false",
+          SSH_ASKPASS_REQUIRE: "force",
+          GIT_ASKPASS: "/bin/false",
+        },
       ),
     )
 
     const log = await logged()
     expect(log).toContain("BatchMode=yes")
-    expect(log).toContain("ConnectTimeout=")
-    expect(log).toContain("askpass: [unset] []")
+    expect(log).toContain("ConnectTimeout=5")
+    expect(log).toContain("askpass: [unset] [unset] []")
     // An unreachable remote still leaves a working state branch.
     expect((await sh(dir, ["git", "rev-parse", "--verify", STATE])).trim()).not.toBe("")
   })
@@ -745,7 +780,13 @@ describe("the fetch of the remote state branch", () => {
   })
 
   test("a hook makes no network call, and the next command fetches", async () => {
-    const { dir, env, logged } = await overSsh("exit 255")
+    const { dir, env: pathEnv, logged } = await overSsh("exit 255")
+    const env = {
+      ...pathEnv,
+      SSH_ASKPASS: "/bin/false",
+      SSH_ASKPASS_REQUIRE: "force",
+      GIT_ASKPASS: "/bin/false",
+    }
     // A work tree that already holds state is a project that keeps state, which makes the state worktree.
     await put(dir, { ".holyagent/local/note.json": "{}\n" })
     const payload = { hook_event_name: "SessionStart", source: "startup" }
@@ -758,7 +799,10 @@ describe("the fetch of the remote state branch", () => {
 
     toon(await vcs(dir, ["intent", "list"], fakeGitHub().layer, undefined, env))
 
-    expect(await logged()).toContain("BatchMode=yes")
+    const log = await logged()
+    expect(log).toContain("BatchMode=yes")
+    expect(log).toContain("ConnectTimeout=5")
+    expect(log).toContain("askpass: [unset] [unset] []")
   })
 })
 
@@ -1521,17 +1565,28 @@ describe("a state worktree that is not what it should be", () => {
     const outside = await scratch("holyagent-outside-")
     const victim = join(outside, "victim.txt")
     await symlink(victim, join(state, ".holyagent", "note.txt"))
-    await mkdir(join(outside, "shared"))
-    await symlink(join(outside, "shared"), join(state, ".holyagent", "linked"))
-    await put(tree, {
-      ".holyagent/note.txt": "attacker\n",
-      ".holyagent/linked/p.txt": "attacker\n",
-    })
+    await put(tree, { ".holyagent/note.txt": "attacker\n" })
 
     const result = await holy(tree, ["intent", "list"])
 
     expect(result.code).toBe(4)
     expect(await Bun.file(victim).exists()).toBe(false)
+  })
+
+  test("migration does not write through a linked directory in the state worktree", async () => {
+    const { tree, state } = await withLinked()
+    const outside = await scratch("holyagent-outside-")
+    await mkdir(join(outside, "shared"))
+    await symlink(
+      join(outside, "shared"),
+      join(state, ".holyagent", "linked"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
+    await put(tree, { ".holyagent/linked/p.txt": "attacker\n" })
+
+    const result = await holy(tree, ["intent", "list"])
+
+    expect(result.code).toBe(4)
     expect(await Bun.file(join(outside, "shared", "p.txt")).exists()).toBe(false)
   })
 
@@ -1555,7 +1610,11 @@ describe("a state worktree that is not what it should be", () => {
     const { tree, state } = await withLinked()
     const outside = await scratch("holyagent-outside-")
     await rm(join(state, ".holyagent"), { recursive: true })
-    await symlink(outside, join(state, ".holyagent"))
+    await symlink(
+      outside,
+      join(state, ".holyagent"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
     await put(tree, { ".holyagent/real.md": "attacker\n" })
 
     const result = await holy(tree, ["intent", "list"])
@@ -1569,7 +1628,11 @@ describe("a state worktree that is not what it should be", () => {
     const { tree, state } = await withLinked()
     const outside = await scratch("holyagent-outside-")
     await writeFile(join(outside, "secret.md"), "secret\n")
-    await symlink(outside, join(tree, ".holyagent"))
+    await symlink(
+      outside,
+      join(tree, ".holyagent"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
 
     const result = await holy(tree, ["intent", "list"])
 

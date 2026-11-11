@@ -68,9 +68,12 @@ runs:
           exit 1
         fi
 
-        if gh release view "$TAG" >/dev/null 2>&1; then
+        if release="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" 2>&1)"; then
           echo "The release ${TAG} exists; nothing to do."
           exit 0
+        elif ! grep -q "HTTP 404" <<<"$release"; then
+          echo "::error::Could not look up the release ${TAG}: ${release}"
+          exit 1
         fi
 
         args=(--target "$SHA" --title "$TITLE")

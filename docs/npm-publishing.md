@@ -1,0 +1,9 @@
+# npm publishing
+
+The public package is `holyagent`, packed from `packages/integrations/pi/dist`; the workspace root is private. Its Pi host dependencies are peers supplied by the user's Pi installation. The bundled runtime does not require publishing the internal workspaces.
+
+After the separately authorized `0.3.3-bootstrap.0` bootstrap publication, configure a GitHub Actions trusted publisher in the npm settings for `holyagent`: owner `davidbasilefilho`, repository `holyagent`, workflow filename `publish.yml`, and no environment. The reusable workflows inherit the caller's identity; grant no npm token secret. The `publish.yml` caller grants OIDC only to the stable and dev calls, which grant it only to their npm jobs.
+
+Branch pushes run validation first. Main creates a stable GitHub release and publishes its attached tarball to npm's `latest` tag. Other branches create a GitHub prerelease and publish its attached tarball under the `dev` tag. Both use `bun pm pack`; npm publishes the downloaded release artifact using trusted publishing. Pull requests have no publication permissions. A failed npm job can leave a GitHub release without an npm version; investigate before retrying.
+
+A rerun publishes only when the registry reports the packed version missing. An existing version must match the tarball's identity and SHA-512 integrity. If its tag already points to it, the rerun succeeds without publishing. Otherwise, the helper leaves the tag untouched only if it points to a strictly later publication in the same channel: a `dev` hash version for `dev`, or a higher stable version for `latest`. Missing, malformed, conflicting or inconsistent registry data fails closed. OIDC cannot repair a dist-tag without publishing a new version; investigate and correct registry state through an authorized manual process before retrying. There is no token fallback.

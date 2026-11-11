@@ -1,14 +1,18 @@
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 
 import { $ } from "bun"
 
 /**
- * Whether the repository's dev toolchain is installed under `root`: `mise` is a dev dependency, so
- * a consumer install (`npm install --omit=dev`, `bun install --production`) does not have it.
+ * Whether the repository's dev toolchain is installed under `root`: `lefthook` is a dev dependency,
+ * so a consumer install (`npm install --omit=dev`, `bun install --production`) does not have it.
  * `Bun.which` applies the platform's executable extensions to the `node_modules/.bin` shim.
  */
 export const hasDevToolchain = (root: string): boolean =>
-  Bun.which("mise", { PATH: join(root, "node_modules", ".bin"), cwd: root }) !== null
+  Bun.which("lefthook", { PATH: join(root, "node_modules", ".bin"), cwd: root }) !== null &&
+  Bun.which("mise", {
+    PATH: [join(root, "node_modules", ".bin"), process.env["PATH"] ?? ""].join(delimiter),
+    cwd: root,
+  }) !== null
 
 /**
  * The root `prepare` script: runs the `prepare` mise task (the hooks setup, whose command lives in

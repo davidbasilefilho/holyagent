@@ -6,6 +6,7 @@ import { type Config, defaultConfig } from "../../../runtime/src/config/schema.t
 import { agentFor, type Route } from "../../../runtime/src/domain/route.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { instructionsDirectory } from "../../../runtime/src/instructions/skills.ts"
+import { FFF_TOOLS } from "../../../runtime/src/pi/fff/settings.ts"
 import { providerProfile, PROVIDERS, webChoice } from "../../../runtime/src/pi/provider.ts"
 import {
   CODEMODE_TOOL,
@@ -76,6 +77,7 @@ export const agentTools = (
       // The provider's own write tool (Codex's `apply_patch`) is HolyAgent's, registered inactive:
       // the extension adds it to the specialist's active tools at its start (`activateApplyPatch`).
       if (profile.writeTools.includes(tool)) return []
+      if (FFF_TOOLS.includes(tool)) return [`ext:pi-fff/${tool}`]
       if (tool === CODEMODE_TOOL) return ["ext:builtin:codemode"]
       if (COMPUTER_USE_TOOLS.includes(tool))
         return [`ext:${extensionName(FEATURE_PACKAGES.computerUse)}`]

@@ -28,6 +28,7 @@ jobs:
     uses: ./.github/workflows/stable.yml
     permissions:
       contents: write
+      id-token: write
 
   dev:
     needs: validation
@@ -35,3 +36,4 @@ jobs:
     uses: ./.github/workflows/dev.yml
     permissions:
       contents: write
+      id-token: write

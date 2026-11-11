@@ -1,6 +1,6 @@
 ---
 name: evidence-judging
-description: Use when a specialist report carries a verdict the root must accept or reject: a blocking review finding, a research claim with conflicting sources or numbers, prose written for people, or a material design choice. Holds how the root judges each from compact evidence the specialists produce, so the heavy work stays on the smaller models.
+description: "Use when a specialist report carries a verdict the root must accept or reject: a blocking review finding, a research claim with conflicting sources or numbers, prose written for people, or a material design choice. Holds how the root judges each from compact evidence the specialists produce, so the heavy work stays on the smaller models."
 ---
 
 # Judging on evidence

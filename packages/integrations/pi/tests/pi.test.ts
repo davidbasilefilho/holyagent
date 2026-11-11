@@ -468,18 +468,20 @@ describe("the specialists", () => {
       const decided = toolArgs(config, route.roleTask).tools
       // A web tool is listed through every provider's web source: the file is shared by them all.
       const covered = decided.flatMap((tool) =>
-        tool === "codemode"
-          ? ["ext:builtin:codemode"]
-          : tool.startsWith("computer_use_")
-            ? ["ext:pi-computer-use"]
-            : tool.startsWith("moonshot_")
-              ? [
-                  "ext:pi-provider-kimi-code/moonshot_search",
-                  "ext:pi-provider-kimi-code/moonshot_fetch",
-                  "ext:pi-web-kit/web_search",
-                  "ext:pi-web-kit/web_fetch",
-                ]
-              : [tool],
+        ["multi_grep", "ffgrep", "fffind", "fff-multi-grep"].includes(tool)
+          ? [`ext:pi-fff/${tool}`]
+          : tool === "codemode"
+            ? ["ext:builtin:codemode"]
+            : tool.startsWith("computer_use_")
+              ? ["ext:pi-computer-use"]
+              : tool.startsWith("moonshot_")
+                ? [
+                    "ext:pi-provider-kimi-code/moonshot_search",
+                    "ext:pi-provider-kimi-code/moonshot_fetch",
+                    "ext:pi-web-kit/web_search",
+                    "ext:pi-web-kit/web_fetch",
+                  ]
+                : [tool],
       )
       expect(tools).toEqual([...new Set(covered)])
     }
@@ -488,7 +490,17 @@ describe("the specialists", () => {
   test("the roles differ in tools as the config decides", () => {
     const tools = (agent: string) =>
       agentTools(config, ROUTES.find((route) => route.agent === agent) as Route)
-    expect(tools("explorer-map")).toEqual(["read", "grep", "find", "ls", "ext:builtin:codemode"])
+    expect(tools("explorer-map")).toEqual([
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "ext:pi-fff/multi_grep",
+      "ext:pi-fff/ffgrep",
+      "ext:pi-fff/fffind",
+      "ext:pi-fff/fff-multi-grep",
+      "ext:builtin:codemode",
+    ])
     expect(tools("worker-implementation")).toContain("write")
     // A shell is `bash` and Windows' `powershell` together, in the agent files of every role.
     for (const agent of ["worker-implementation", "worker-operations", "reviewer-code"]) {

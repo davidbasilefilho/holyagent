@@ -3408,14 +3408,6 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
 };
 
 var FFF_OVERRIDE_SETTINGS = { mode: "override" };
-var FFF_TOOLS = [
-  "grep",
-  "find",
-  "multi_grep",
-  "ffgrep",
-  "fffind",
-  "fff-multi-grep"
-];
 var FFF_NATIVE_HOSTS = [
   "darwin-arm64",
   "darwin-x64",
@@ -3442,7 +3434,7 @@ var pi_packages_default = {
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 
 var pypi_packages_default = {
-  "browser-use": "1.0.0"
+  "browser-use": "1.0.2"
 };
 
 var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
@@ -3569,6 +3561,7 @@ var CAPABILITIES = [
   {
     name: "processes",
     feature: "processes",
+    supportedPlatforms: ["darwin", "linux"],
     description: "Gives the root tools for background processes (@aliou/pi-processes)",
     skills: [],
     applicability: "root",
@@ -3734,12 +3727,12 @@ var CAPABILITIES = [
     feature: "fff",
     description: "Replaces Pi's find and grep with fff, a fast indexed file and content search (@ff-labs/pi-fff)",
     skills: [],
-    applicability: "specialists",
+    applicability: "both",
     defaultOn: true,
     needs: [],
     nativeHosts: FFF_NATIVE_HOSTS,
     forms: sameForm(["@ff-labs/pi-fff"]),
-    tools: { rootExclude: FFF_TOOLS, visual: [], screen: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
     health: ["needs", "packages"]
   }

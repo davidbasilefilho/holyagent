@@ -1,8 +1,5 @@
 name: Stable
 
-# Called by publish.yml for a push to main, which is the only caller. Tags the commit
-# holyagent-<version> and publishes a GitHub Release from the version in the root package.json. A
-# tag on another commit fails the run: main moved on without a version bump.
 on:
   workflow_call:
 
@@ -10,7 +7,42 @@ permissions:
   contents: read
 
 jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up tools
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Pack
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version package.json)"
+          test "$(jq -r .version packages/integrations/pi/dist/package.json)" = "$version"
+          cd packages/integrations/pi/dist
+          bun pm pack --destination "$RUNNER_TEMP"
+      - name: Publish package
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version package.json)"
+          bun scripts/npm-publishing.ts "$RUNNER_TEMP/holyagent-$version.tgz" latest
+      - name: Transfer published package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/holyagent-*.tgz
+          if-no-files-found: error
+
   release:
+    needs: publish
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -20,6 +52,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
+      - name: Download published package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}
       - name: Tag and release
         uses: ./.github/actions/tag-release
+      - name: Attach package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version package.json)"
+          gh release upload "holyagent-$version" "$RUNNER_TEMP/holyagent-$version.tgz" --clobber

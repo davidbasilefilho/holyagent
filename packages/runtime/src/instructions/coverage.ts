@@ -20,6 +20,10 @@ export type Coverage =
  */
 export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<string, Coverage>>>> = {
   "claude-5.5": {
+    "R-GPT-PROSE": {
+      carriedBy: "scripts/stop-slop-policy.test.ts",
+      phrase: "other families remain unchanged",
+    },
     "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
     "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
     "R-PRECEDENCE": { section: "shared/precedence.md", phrase: "When rules conflict" },
@@ -44,7 +48,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REASK": {
       section: "root/asking.md",
-      phrase: "without choosing an option is not a choice",
+      phrase: "preserve settled intent and authorization",
     },
     "R-AMBIGUOUS": {
       section: "root/asking.md",
@@ -52,7 +56,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-NOBYPASS": {
       section: "root/identity.md",
-      phrase: "never reach the same result through another tool",
+      phrase: "required approval is obtained and any host restriction is resolved",
     },
     "R-LANG": {
       section: "root/identity.md",
@@ -305,10 +309,14 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
   },
   "kimi-k3.1": {
+    "R-GPT-PROSE": {
+      carriedBy: "scripts/stop-slop-policy.test.ts",
+      phrase: "other families remain unchanged",
+    },
     "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
     "R-NOBYPASS": {
       section: "root/identity.md",
-      phrase: "never reach the same result through another tool",
+      phrase: "required approval is obtained and any host restriction is resolved",
     },
     "R-LANG": {
       section: "root/identity.md",
@@ -333,7 +341,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REASK": {
       section: "root/asking.md",
-      phrase: "without choosing an option is not a choice",
+      phrase: "preserve settled intent and authorization",
     },
     "R-AMBIGUOUS": {
       section: "root/asking.md",
@@ -392,7 +400,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "Say what changed and why, how it was checked",
     },
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
-    "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
+    "R-SEARCH": {
+      section: "root/search.md",
+      phrase: "Search files and contents with the FFF integration",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
       phrase: "start the one target per platform that the visual specialists share",
@@ -500,7 +511,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-S-SEARCH": {
       section: "specialist/working.md",
-      phrase: "search with the system grep or find and name the missing program",
+      phrase: "Search files and contents with the FFF integration",
     },
     "R-MATERIAL": {
       section: "shared/materiality.md",
@@ -610,10 +621,14 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
   },
   "gpt-6": {
+    "R-GPT-PROSE": {
+      section: "specialist/conduct.md",
+      phrase: "For human-facing prose, write directly and specifically",
+    },
     "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
     "R-NOBYPASS": {
       section: "root/identity.md",
-      phrase: "never reach the same result through another tool",
+      phrase: "required approval is obtained and any host restriction is resolved",
     },
     "R-LANG": {
       section: "root/identity.md",
@@ -638,7 +653,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REASK": {
       section: "root/asking.md",
-      phrase: "without choosing an option is not a choice",
+      phrase: "preserve settled intent and authorization",
     },
     "R-AMBIGUOUS": {
       section: "root/asking.md",
@@ -697,7 +712,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "Say what changed and why, how it was checked",
     },
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
-    "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
+    "R-SEARCH": {
+      section: "root/search.md",
+      phrase: "Search files and contents with the FFF integration",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
       phrase: "start the one target per platform that the visual specialists share",
@@ -805,7 +823,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-S-SEARCH": {
       section: "specialist/working.md",
-      phrase: "search with the system grep or find and name the missing program",
+      phrase: "Search files and contents with the FFF integration",
     },
     "R-MATERIAL": {
       section: "shared/materiality.md",

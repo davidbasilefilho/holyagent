@@ -1,6 +1,6 @@
 ---
 name: desktop-design
-description: Use when building, reshaping or judging the visual design of a desktop app on Windows, macOS or GNOME.
+description: "Use when building, reshaping or judging the visual design of a desktop app on Windows, macOS or GNOME."
 ---
 
 # Desktop design

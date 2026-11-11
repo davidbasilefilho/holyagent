@@ -37,7 +37,7 @@ import {
 } from "../src/agents.ts"
 import { DIST_DIRECTORY } from "../src/files.ts"
 import { DESCRIPTION, generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
-import { fresh, PLUGIN, ROOT } from "./built.ts"
+import { field, fresh, PLUGIN, ROOT } from "./built.ts"
 import { isExecutable } from "./host.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
@@ -80,8 +80,6 @@ const filesBelow = async (path: string): Promise<ReadonlyArray<string>> => {
 const generated = await generate()
 const agent = (name: string) => generated.find((file) => file.path.endsWith(`agents/${name}.md`))
 const frontmatter = (text: string) => text.split("\n---\n")[0] ?? ""
-const field = (text: string, key: string) =>
-  new RegExp(`^${key}: (.*)$`, "m").exec(frontmatter(text))?.[1]
 /** The tools an agent's `disallowedTools` line lists, found by the agent file's path. */
 const deniedTools = (path: string): ReadonlyArray<string> =>
   (
@@ -397,8 +395,8 @@ describe("agents", () => {
       "Acknowledge every user message",
       "names an action",
       "Every pending decision goes through AskUserQuestion",
-      "never reach the same result through another tool",
-      "After a denial, stop that line of work",
+      "Never work around an unresolved denial through another tool, script, or link",
+      "After an explicit user denial, stop that line of work",
       "A brief acknowledgment is always allowed",
       "update_plan",
     ])
