@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "collect-decisive-current0-3-3-windows",
   "objective": "Collect decisive current0.3.3 Windows failure and packaged-Pi evidence without changing source or duplicating a running verification.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm; branch release/0.3.3/fix/npm-readiness has an uncommitted clean merge from main. Prior Worker.debugging assignment-0mwc785xx-27bc returned partial and is terminal. Its report is C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc785xx-27bc.md; full verify log C:/Users/david.basile/AppData/Local/Temp/holyagent-033-verify.log; clean tarball C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3.tgz.",
     "Determine whether the previously started verify still runs and obtain its final command/exit/counts if terminal; do not launch a second full verify concurrently. If running, use a single bounded process wait and report Unknown on timeout. Classify unique failures with exact error/path lines and actionable repair ownership.",
@@ -45,5 +45,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc785xx-27bc",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:34:20.862Z"
+  },
   "createdAt": "2026-11-11T14:33:17.135Z"
 }
