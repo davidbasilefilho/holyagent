@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "finish-reliable-oidc-only-stable-dev-npm",
   "objective": "Finish reliable OIDC-only stable/dev npm and GitHub publication ordering with tested packed-artifact handoff and safe reruns.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Actual worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, explicit bun --cwd or standalone cd; no editsmain. Current codeuncommitted, previouswritersallterminal exceptpromptwriterowns instructionsandrootquestion/stopsloptests. Ownership .github/workflows/{publish,stable,dev}.yml,.github/actions/tag-release/action.yml,scripts/npm-publishing.ts,scripts/npm-publishing.test.ts,scripts/workflows.test.ts,packages/integrations/pi/publishing.test.ts,docs/npm-publishing.md. Read currentcodeandpreviousreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcb540g-6qjh.md (partial27pass; integrityretryhelperexists) and /assignment-0mwcam2k7-e5k5.md (ghlookup404vs500regressionfixed26pass). No full build/verify untilotherwritersdone; focused tests allowed.",
     "Userexplicitlyauthorizes publish.yml orchestrating reusable stable/dev. Stable npm latest+GitHubstable; dev npm dev+GitHubprerelease. bun pm pack tarballand npm actualpublish viaCItrustedOIDC/no tokenfallback. User separately explicitly approved id-token:write onlystable/devpublishjobsandtheirreusablecallers, no PRjobs; existingrepository-write limits/SHAactions/jobIDs retained. Thisassignmentonlyeditsworkflow/helper/tests/docs; don'tactuallypublish/push/merge/account/security changes. Root holds actualreviewedbootstrap authloginpublication0.3.3-bootstrap.0/bootstrap later.",
@@ -108,5 +108,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcb540g-6qjh",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T16:24:33.913Z"
+  },
   "createdAt": "2026-11-11T16:24:02.827Z"
 }
