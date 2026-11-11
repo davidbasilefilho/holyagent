@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "compact-the-claude-session-root-core",
   "objective": "Compact the Claude session root core enough for the existing 9400-character context contract while preserving every behavioral requirement and exact approved denial wording.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm. The root inspected the two failing tests and rendering code to settle the repair boundary. This is prose/composition repair, not a budget or selection-design change. CONTEXT_BUDGET=9400 is an actual Claude host safety contract because the host truncates additionalContext at10000. Keep it fixed.",
     "Measured current ROOT_CORE6732characters, reminder383, takeover313, cloud930. The two failures demand six complete requirements of about415chars each while status narrows to counts, and one complete LONG requirement of about2160chars while later requirements truncate with a truthful count. An182-character compaction was insufficient. Aim to recover at least1000characters from the actual Claude root core (about5700characters or less), then verify both cases. This measured target is not permission to remove semantics or weaken tests.",
@@ -116,5 +116,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcg2dgl-4bm8",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T18:28:22.578Z"
+  },
   "createdAt": "2026-11-11T18:28:02.056Z"
 }
