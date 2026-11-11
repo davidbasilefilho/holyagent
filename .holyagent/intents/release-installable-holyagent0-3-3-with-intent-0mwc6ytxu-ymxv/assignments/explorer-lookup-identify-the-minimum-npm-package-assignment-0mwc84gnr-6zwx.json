@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mwc84gnr-6zwx",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 7,
+  "roleTask": "Explorer.lookup",
+  "slug": "identify-the-minimum-npm-package",
+  "objective": "Identify the minimum npm package publication set needed for a usable HolyAgent0.3.3 installation.",
+  "state": "Ready",
+  "scope": [
+    "Read-only source in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Examine root/workspace package manifests, package/export/bin entrypoints, bundling/pack/install scripts and intended npm installation docs. Determine whether root holyagent tarball is self-contained or whether workspace packages must also be published for runtime, Pi or Claude integration installation. Name each required package, canonical version, dependency/publish order and why; explicitly say if root holyagent alone suffices.",
+    "User authorizes publishing other npm packages if needed, so determine necessity from runtime/installation dependency closure rather than assuming every workspace is public. Root clean tarball CLI smoke already passed; packaged Pi startup independently being checked."
+  ],
+  "constraints": [
+    "Only minimum installable0.3.3 scope. Publication uses bun pm pack then npm; final CI OIDC, one reviewed bootstrap per actually needed initially absent package allowed by user before they configure publish.yml trusted publisher. No actual publication in this lookup.",
+    "No source/config/state/Git writes, installs, credentials reads or account operations. Keep main checkout and dirty scratch worktree unchanged. All broader routing/native-tool/wait/main-dev work deferred0.3.4.",
+    "Report at most5bullets with exact absolute path:line evidence; no long source dumps."
+  ],
+  "criteria": [
+    {
+      "text": "Minimal required npm package set",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Published dependency closure",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "publish-set",
+    "package-sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T14:38:04.120Z"
+}
