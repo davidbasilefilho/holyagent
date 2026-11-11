@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "read-effort-specific-luna-benchmark-and",
   "objective": "Read effort-specific Luna benchmark and output-token evidence using the already open Helium browser.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Userjustconfirmed 'helium browser is open'. Priorapp-launchdriverdeniedinteractiveconfirmation; thatlineisnotretried. Enumerateactualnativewindows anduseEXISTINGHeliumChromiumwindowwithcomputeruse; don'trequireEdge/Chrome-specificnameanddon'tlaunchanyapp. Userauthorizespublicbenchmarknavigationonly,no login/install/pairing/settings. Readcomputer-use skill C:/Users/david.basile/.pi/agent/npm/node_modules/@amaster.ai/pi-computer-use/skills/computer-use/SKILL.md. Availablebrowserrelayunpairedandweb-kitExakeyabsentso don'trepeatthoseknownfailures. Usewindow-nativecomputeruseforegroundescalationonlyafterdriverbackgroundunavailable.",
     "Questionexact: userauthorizesif supportedchangeCodexauto-review to gpt-6-luna medium/high, chooseusingeffort-specificbenchmarkquality andoutputtokens-to-performance, notcost. Fastmediumifadequate; highifnot. Relevantpublicsources/mypriors.compreferred, atmost3authoritativepages. Recordspecificmodel/effort/quality/tokens/task/datelimitations/sourceURLs; ifnoeffort-specificdataoronlygenericbench, sayUnknown. Neverinventmeasurementsorconflatepricingwithoutputtokenperformance. Actualaccount/strictguardian_assessmentJSONsupport isseparateunknown, don'tclaimbenchprovesit. No config/modelcalls.",
@@ -88,5 +88,10 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwcbwvko-ukxj",
   "screen": true,
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T17:10:52.508Z"
+  },
   "createdAt": "2026-11-11T17:09:26.065Z"
 }
