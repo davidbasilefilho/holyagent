@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "pack-the-public-generated-pi-package-and",
   "objective": "Pack the public generated Pi package and prove its clean CLI and Pi startup in an isolated temporary home.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Only pack/test the existing generated output in C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist. Root workspace is PRIVATE and is NOT the public artifact. Prior task erroneously packed workspace root into Temp/holyagent-0.3.3.tgz (932files); do not reuse that artifact.",
     "Verify dist/package.json name=holyagent/version=0.3.3/public status and hostpeers. Run bun pm pack with WORKING DIRECTORY exactly C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist and a unique destination in Temp. Inspect tar contents/manifest identity, record filecount and SHA512/sha256 or integrity. Never publish it.",
@@ -105,7 +105,9 @@
     "agentId": "pi-workflow:wf_e93baadd636d/assignment-0mwchl9q7-pswh",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T19:03:26.706Z"
+    "startedAt": "2026-11-11T19:03:26.706Z",
+    "finishedAt": "2026-11-11T19:10:47.625Z"
   },
+  "result": "failure: result: tarball packed and isolated install/CLI passed; successful Pi startup remains blocked by missing model credentials\nchanged: `packages/integrations/pi/diagnostics/packed-smoke.txt`\nchecks: `bun pm pack` -> exit 0, 139 files; `npm install` -> exit 0, 125 packages; CLI `--version`/`--help` -> exit 0; Pi smoke -> exit 1, “No API key found for the selected model.”\nblockers: Pi required successful startup/package-loading evidence; isolated smoke stopped at the missing-credential gate.\nquestions: none\nnotes: No authenticated request or user configuration change.\nevidence:\nThe public 0.3.3 tarball is packed from Pi dist and its isolated CLI and Pi startup pass without changing user configuration: CLI passes, but Pi startup is blocked at the credential gate.\ntarball-file: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\holyagent-0mwchl9q7-pswh.tgz\\holyagent-0.3.3.tgz`\nartifact-identity: `holyagent@0.3.3`, 139 files; SHA256 `6723C4A782EF89995DF07AF3E668360DAF4D065E5671A596C76F38E2697D50EE`; details in `packages/integrations/pi/diagnostics/packed-smoke.txt`.\nchecks-run: Pack, isolated install, CLI version/help passed; Pi smoke exit 1 due to absent selected-model API key.\nremaining-blockers: Missing isolated model credentials prevent completing Pi startup smoke.\n",
   "createdAt": "2026-11-11T19:03:04.831Z"
 }
