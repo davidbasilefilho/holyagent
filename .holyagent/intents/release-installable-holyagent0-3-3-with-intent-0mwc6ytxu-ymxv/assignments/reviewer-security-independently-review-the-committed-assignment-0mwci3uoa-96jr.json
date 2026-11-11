@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "independently-review-the-committed",
   "objective": "Independently review the committed release trust boundaries and publishing surface before any push.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Readentirecommittedpatchfromdiff-file; no shellrequired. ExamineGitHubActionspermissions/scopedid-tokenwrite/fullSHApins, reusablecallerpublish.yml trustidentity, npmOIDC-only publishing/rerunintegrity/channelvalidation/artifacthandoff, GitHubtag/releaseexistingtag/content/errorhandling. Actualnpmaccountsetup/publishingpending isexpected, noauthoritytobypass.",
     "ExamineWindowslongpathstatecopy/write/Gitcommandsandtestsforsymlink/pathescape, credentialpromptandSSHenvsafety; dev/testfixturesmustnotweakenproductionsecurity.",
@@ -112,7 +112,9 @@
     "agentId": "pi-workflow:wf_af040aa48de2/assignment-0mwci3uoa-96jr",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T19:18:18.450Z"
+    "startedAt": "2026-11-11T19:18:18.450Z",
+    "finishedAt": "2026-11-11T19:26:42.654Z"
   },
+  "result": "failure: result: Fail — the proposed npm trusted-publisher configuration permits unreviewed branches to publish stable packages.\nchanged: none\nchecks: Static security-review first pass completed on the supplied diff; no commands or tests run because this role has no shell. Build and full verify were outside scope.\nblockers: Restrict npm publication authority before configuring the trusted publisher or pushing this release.\nquestions: none\nnotes: The npm account configuration and live OIDC behavior were not inspected; the finding is conditional on configuring the publisher as documented.\nevidence:\nCommitted release changes preserve trust boundaries and introduce no validated security vulnerability: Fail; the documented trusted-publisher identity is not restricted to protected release code.\nreview-verdict: Fail — one validated, high-impact publication vulnerability; one suspected disclosure path.\nfindings:\n- Validated blocker, high: A repository writer can push an unprotected branch containing a modified `.github/workflows/publish.yml:7-9` and obtain `id-token: write` for npm publication. The proposed configuration trusts the `publish.yml` filename with no environment restriction (`docs/npm-publishing.md:5`); the attacker can replace branch-local validation and publish arbitrary bytes to `latest`, bypassing protected-main review. Precondition: repository branch-write access and the documented npm trusted publisher configured. No live publication was attempted.\n- Suspected, medium: Root search now uses FFF (`packages/runtime/src/pi/tools.ts:181-195`), whose documented default follows repository directory symlinks (`docs/pi/search.md:9-10`). A malicious repository linking to a local secret directory could cause a search result to enter model context. The installed FFF implementation was unavailable to read, so the complete path is unverified.\n- Release-integrity concern: `.github/workflows/stable.yml:33-48` publishes to npm before `.github/actions/tag-release/action.yml:53-65` checks an existing tag’s commit. A conflicting tag can therefore fail only after an immutable npm version has been published.\nchecks-run: Read the committed patch, workflow and publishing paths, state-copy containment, reviewer schema and timeout, prompt changes, and relevant fixtures. Sound checks include pinned actions, escaped release notes, strict reviewer decoding, and state-copy symlink checks. Runtime checks and a secret scan were not run.\nremaining-blockers: Publication authority; current-head gates and actual trusted-publisher setup remain unverified by this review.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-033-4ea-review.patch — assigned range c5b2ab2b..4ea9a3c.\n",
   "createdAt": "2026-11-11T19:17:31.786Z"
 }
