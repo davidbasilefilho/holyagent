@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "collect-decisive-current0-3-3-windows",
   "objective": "Collect decisive current0.3.3 Windows failure and packaged-Pi evidence without changing source or duplicating a running verification.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm; branch release/0.3.3/fix/npm-readiness has an uncommitted clean merge from main. Prior Worker.debugging assignment-0mwc785xx-27bc returned partial and is terminal. Its report is C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc785xx-27bc.md; full verify log C:/Users/david.basile/AppData/Local/Temp/holyagent-033-verify.log; clean tarball C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3.tgz.",
     "Determine whether the previously started verify still runs and obtain its final command/exit/counts if terminal; do not launch a second full verify concurrently. If running, use a single bounded process wait and report Unknown on timeout. Classify unique failures with exact error/path lines and actionable repair ownership.",
@@ -49,7 +49,9 @@
     "agentId": "pi-workflow:wf_0bf43c50f7e9/assignment-0mwc7yb7y-re9l",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T14:34:20.862Z"
+    "startedAt": "2026-11-11T14:34:20.862Z",
+    "finishedAt": "2026-11-11T14:41:07.655Z"
   },
+  "result": "failure: result: Partial evidence collected; package smoke test remains unverified\nchanged: none\nchecks: `bunx --no-install mise run verify` (original run) -> exit 0 recorded in `holyagent-033-verify.exit`, but log reports 54 failures, 3345 pass, 52 skip across 113 files; `bunx --no-install mise run verify` retry -> no exit file available, not confirmed terminal\nblockers: Isolated installed Pi-host smoke test was not run; no evidence establishes packaged extension loading, registration, or Windows CLI entrypoint behavior.\nquestions: none\nnotes: Hook check found shared Git common dir `C:/Users/david.basile/dev/holyagent/.git`, unset `core.hooksPath`, and clean `lefthook.yml` diffs in both trees; does not establish hooks were unchanged. Verify log: `C:/Users/david.basile/AppData/Local/Temp/holyagent-033-verify.log`; retry log: `C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc-verify-retry.log`. Failure ownership: Windows symlink-EPERM tests at `scripts/bump-version.test.ts:362,421` and `packages/runtime/tests/apply-patch.test.ts`; package/Pi config expectation failures in `packages/runtime/tests/*` and `packages/integrations/pi/tests/*`, repairs to their respective owners.\nevidence:\nCurrent Windows verification evidence (tests): Original log captures `EPERM: operation not permitted, symlink ...` at `scripts\\bump-version.test.ts:362,421`; 54 failures (includes 9 apply_patch link tests, browser-use and Pi package/config expectations). Retry log likewise captures symlink EPERM; no final status confirmed.\nPackaged Pi entrypoint evidence (behavior): Not run; isolated Pi host not installed/launched from tarball, so extension loading/tool/skill registration and packaged Windows CLI remain unverified.\nchecks-run: Original `bunx --no-install mise run verify` exit 0 recorded, despite log test summary of 54 fail; retry `bunx --no-install mise run verify` started, final exit unknown. Read-only hook configuration comparisons: clean `lefthook.yml` diffs; no core.hooksPath set.\nfailure-paths: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\holyagent-033-verify.log` lines 4650–4675 and earlier symlink EPERM outputs; retry `C:\\Users\\david.basile\\AppData\\Local\\Temp\\holyagent-0mwc-verify-retry.log`.\nlogs: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\holyagent-033-verify.log`, `C:\\Users\\david.basile\\AppData\\Local\\Temp\\holyagent-0mwc-verify-retry.log`, `C:\\Users\\david.basile\\AppData\\Local\\Temp\\holyagent-033-verify.exit`.\n",
   "createdAt": "2026-11-11T14:33:17.135Z"
 }
