@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "resolve-real-current-windows",
   "objective": "Resolve real current Windows verification failures and run a meaningful isolated packaged-Pi startup check for0.3.3.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Branch release/0.3.3/fix/npm-readiness carries staged tooling merge and uncommitted CI fixture repairs; AGENTS.md has a separate writer. Prior terminal assignments: assignment-0mwc785xx-27bc (source fixes) and assignment-0mwc7yb7y-re9l (failed evidence collection). Read both reports from C:/Users/david.basile/dev/holyagent/.git/holyagent/reports as needed.",
     "Get exact existing verification process status first. Log C:/Users/david.basile/AppData/Local/Temp/holyagent-033-verify.log counted3345pass54fail52skip/113files but holyagent-033-verify.exit says0. A validation agent also started C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc-verify-retry.log with final exit unknown. Do not start concurrent verification. Establish whether failure/exit discrepancy is stale output, wrapper-capture error, gate masking or product bug and fix actual owned cause if present.",
@@ -63,7 +63,9 @@
     "agentId": "pi-workflow:wf_d59fa0e07353/assignment-0mwc88lir-pjpj",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T14:41:49.307Z"
+    "startedAt": "2026-11-11T14:41:49.307Z",
+    "finishedAt": "2026-11-11T14:55:51.348Z"
   },
+  "result": "failure: result: Partial: stale Pi test expectation repaired and packaged startup passed; full Windows verification remains blocked.\nchanged: packages/integrations/pi/tests/screen.test.ts\nchecks: screen test → exit 0, 19 pass; bump-version test → exit 0, 56 pass; mise check, lint, fmt:check → exit 0; isolated Pi startup and packaged CLI → exit 0\nblockers: Full verification not rerun; prior verify exit discrepancy unresolved; runtime test failures outside ownership.\nquestions: none\nnotes: No instrumentation was added; DBG_033 search found no matches.\nevidence:\nCurrent verification status and exit integrity: Prior target log has 3348 pass, 52 fail, 52 skip; its process exit is unknown. Targeted mise test returned exit 1 on failure; this does not explain the older exit file’s 0.\nOwned release blockers fixed with regressions: packages/integrations/pi/tests/screen.test.ts failed 18/1 with stale browser-use pin; after aligning the expectation with the pin table, 19/0.\nPackaged Pi startup and CLI smoke: Installed 0.3.3 tarball in isolated temporary home; Pi session bound extensions with no extension or skill diagnostics, 11 skills and expected tools; packaged CLI status and version exited 0. No model calls.\nMinimum release scope preserved: One owned test changed; no runtime tests, generated dist or workflows edited.\nchecks-run: Full logs at C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc-verify-target.log; full verify not rerun after repair.\nchanged-paths: packages/integrations/pi/tests/screen.test.ts\nout-of-scope: Runtime test owner needed for stale pins at packages/runtime/tests/config/packages.test.ts:31,55,86,119,126 and packages/runtime/tests/setup-browse.test.ts:546; Windows capability assumptions at packages/runtime/tests/setup-tui-capabilities.test.ts:103,155; screen expectations at packages/runtime/tests/setup-tui.test.ts:81,262; symlink and SSH fixture failures in packages/runtime/tests/setup-tui-load.test.ts:891 and packages/runtime/tests/state-branch.test.ts:559,761,1523. Other failures require classification from the log.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc88lir-diff.patch\n",
   "createdAt": "2026-11-11T14:41:17.044Z"
 }
