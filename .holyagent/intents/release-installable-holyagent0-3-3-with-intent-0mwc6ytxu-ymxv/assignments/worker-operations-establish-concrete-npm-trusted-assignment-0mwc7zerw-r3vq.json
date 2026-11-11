@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "establish-concrete-npm-trusted",
   "objective": "Establish concrete npm trusted-publication prerequisites, prior publication denial and old cloud-writer liveness evidence for the minimal0.3.3 release.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Active release intent intent-0mwc6ytxu-ymxv; source of report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc785xx-27bc.md. No edits required.",
     "Inspect prior release-worker workflow transcript/journal for the exact npm workflow edit denial (run wf_fe01852a8065, journal C:/Users/david.basile/AppData/Local/Temp/pi-subagents-0/Users-david.basile-dev-holyagent/01a1ca6b-447a-75e5-9485-35fa14619851/tasks/wf_fe01852a8065.workflow.jsonl). Report actual denied trigger/effect and required approval; do not retry denied action through any tool.",
@@ -44,5 +44,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:35:00.982Z"
+  },
   "createdAt": "2026-11-11T14:34:08.396Z"
 }
