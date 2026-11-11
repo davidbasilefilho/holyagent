@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwc7n8sn-l1jk",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 4,
+  "roleTask": "Explorer.trace",
+  "slug": "verify-available-exa-mcp-and-codex",
+  "objective": "Verify available Exa MCP and Codex-native web search, the pi-codex-conversion relationship and the smallest release-relevant remedy.",
+  "state": "Ready",
+  "scope": [
+    "User asks: do you have the exa mcp server? can't you use the native codex alternative? that requires the pi-codex-conversion right? that's why I need to install holyagent now. exa must only be a fallback when there are only providers that don't offer web search installed.",
+    "Read-only source/config/package investigation. Inspect C:/Users/david.basile/.pi/agent/settings.json non-secret fields, installed extension/package sources and repo C:/Users/david.basile/dev/holyagent. Host Pi1.5.2; root openai-codex/gpt-6.1-sol. Determine if native Codex tool capability is available or exposed, whether pi-codex-conversion is real/installed/required, and Exa MCP existence vs pi-web-kit configured Exa provider. Never infer server absence solely from failed Exa web-kit search.",
+    "MCP researcher reports exact error exa provider requires EXA_API_KEY or apiKeys.exa in project or agent-directory pi-web-kit config. Identify current search provider selection and safe native alternative. Installed providers' web-search support must take priority; Exa allowed only when none installed offers web search.",
+    "Classify smallest necessary action: an already available tool invocation, installation/config requirement, code defect, or deferred0.3.4 integration. This is diagnosis only. Current minimum0.3.3 release worker running separately in C:/Users/david.basile/dev/holyagent-0.3.3-npm; no writes or steering it."
+  ],
+  "constraints": [
+    "No source/config edits, installations, credentials/auth file reads, secret output, requests to model/provider APIs or .holyagent edits. Use local source and tool definitions. Report at most7 bullets with exact file:line evidence, current availability vs supported capability and remaining unknowns."
+  ],
+  "criteria": [
+    {
+      "text": "Actual search availability",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Codex conversion requirement",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Provider-first fallback remedy",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "search-sources",
+    "release-impact"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T14:24:40.775Z"
+}
