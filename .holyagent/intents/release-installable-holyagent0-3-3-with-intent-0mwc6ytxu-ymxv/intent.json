@@ -47,9 +47,13 @@
     "User asks which model and reasoning effort auto-approval uses in HolyAgent Pi Codex. Verify separate from root/specialist routing; current user says GPT6Luna with an effort other than low/xhigh/max is acceptable and asks work continue regardless. Do not infer unknown/private reviewer settings or change security configuration from this factual query alone.",
     "All running release repairs retain their scopes after this revision; runtime tests and workflow implementation are unchanged. Root-prompt acceptance must include encouraged concrete reapproval after auto-review and recorded root-approval propagation behavior; new propagation/model trace is separate and read-only before bounded implementation.",
     "User instruction (2026-11-11): if you can change codex-auto-review to gpt 6 luna high or medium. decide based on benchmarks and output tokens-to-performance in benchmarks, not cost, well comparing gpt 6 luna high/medium cost is the same as comparing tokens but still, it's supposed to be fast, but if medium isn't good enough you should choose high. Explicit approval covers changing the review model/effort if supported; preserve the review guard and choose only after evidence, with backend identity/capability uncertainty explicit.",
-    "User explicitly selected Approve these edits after automatic review blocked root-policy source edits: retry exact changes preserving settled approvals and user denials, encouraging scoped approval requests after automatic tool rejection, and carrying approval context into delegation without bypassing review or claiming unverified cross-session authority."
+    "User explicitly selected Approve these edits after automatic review blocked root-policy source edits: retry exact changes preserving settled approvals and user denials, encouraging scoped approval requests after automatic tool rejection, and carrying approval context into delegation without bypassing review or claiming unverified cross-session authority.",
+    "User explicitly approved launching an installed browser for public benchmark research only after computer_use_launch_app required interactive permission. No login/install/settings/account changes approved. Retry that exact bounded launch once; if host still refuses, stop and report concrete host/user action rather than bypass.",
+    "btw using ask for any type of question is required",
+    "actually incorporate that skill into every relevant gpt agents' prompt, any agent that will make text that will be shown to some human either in backends, frontends, whatever",
+    "Stop Slop source: https://github.com/hardikpandya/stop-slop. Incorporate relevant guidance into GPT prompts producing human-facing prose (backend messages, frontend copy, docs, reviews/reports included), preserve machine contracts/code semantics/exact evidence and higher-priority repository rules. Inspect source/license; scope is relevant GPT agents, not indiscriminate non-GPT changes."
   ],
-  "revision": 14,
+  "revision": 15,
   "state": "Open",
   "createdAt": "2026-11-11T14:05:41.778Z"
 }
