@@ -1,0 +1,16 @@
+{
+  "id": "intent-0mwc6p2im-6one",
+  "slug": "install-and-verify-holyagent-pi-with",
+  "objective": "Install and verify HolyAgent Pi with Codex and Kimi and every Windows-supported capability on this system, and resolve the reported Cua-driver mismatch.",
+  "requirements": [
+    "also I'd like you to install holyagent pi in this system with the codex and kimi providers as well as computer use, browser use, all the capabilities",
+    "Inspect the reloaded screenshot and verify whether the installed @amaster.ai/pi-computer-use extension uses the official Cua driver or is an unrelated alternative; resolve against authoritative sources before replacing packages.",
+    "Preserve selected openai-codex/gpt-6.1-sol, existing credentials and permission/guardrail defaults. Both providers must be available; report any login needed without exposing credentials or changing accounts.",
+    "Install all supported advertised capabilities through the existing canonical HolyAgent install/setup path, preserving local committed tooling fixes; do not overwrite installed local fixes with an older remote build.",
+    "No credential operations, security-setting changes, irreversible cleanup, remote publication or protected pushes are authorized by this local-installation request. Report unsupported OS capabilities and account/browser pairing needs honestly.",
+    "Original main/dev workflow, deterministic UTC development releases, scoped skills and npm trusted publishing remain open in intent-0mwc2afl8-ry5c; independently review tooling commits074bc72a..271bfa02 under intent-0mwc2nbqi-g05p."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-11T13:58:06.334Z"
+}
