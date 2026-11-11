@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mwc7548k-s5r5",
+  "intentId": "intent-0mwc6p2im-6one",
+  "intentRevision": 1,
+  "roleTask": "Explorer.lookup",
+  "slug": "explain-the-verified-current-and-dual",
+  "objective": "Explain the verified current and dual-provider Codex/Kimi routing for this local HolyAgent Pi installation.",
+  "state": "Ready",
+  "scope": [
+    "Read C:/Users/david.basile/.holyagent/config.json and non-secret relevant provider/model fields of C:/Users/david.basile/.pi/agent/settings.json; do not expose auth files, credentials or tokens.",
+    "Find shipped route table and provider selection/overrides in C:/Users/david.basile/dev/holyagent. Explain whether installing Kimi automatically load-balances or falls back, and how root, lightweight specialists, full specialists and screen routes resolve.",
+    "Read only; this answers a question and does not authorize configuration changes or bring deferred0.3.4 implementation into scope."
+  ],
+  "constraints": [
+    "Preserve all files and credentials. Do not run model requests or change versions/settings. Report at most6 bullets including a compact role→provider/model/effort table and source paths/lines."
+  ],
+  "criteria": [
+    {
+      "text": "Routing facts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Current versus dual-provider configuration",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "routing-sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T14:10:35.060Z"
+}
