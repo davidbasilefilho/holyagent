@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "recommend-gpt6luna-medium-versus-high",
   "objective": "Recommend GPT6Luna medium versus high for fast automatic safety review using benchmark quality and output-token efficiency, not price.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "User authorizes changing existing codex-auto-review/low to GPT6Luna medium or high IF supported; favors speed, high if medium insufficient. Research only, no config/source edits. Scope is auto-review, not root/specialist routing. Confirm actual current Luna model/version naming rather than conflate model generations.",
     "Find authoritative or credible independently measured medium/high same-model benchmark evidence, with output/reasoning-token counts and quality, ideally classification/instruction-following/tool safety as well as reasoning. Include latency if measured, cost only as non-decision context. User previously named mypriors.com for larger0.3.4 scoring but this request is performance-per-output-token, not monetary cost. Do not invent missing token or effort data or compare incompatible harnesses as direct controlled evidence. Re-derive ratios from cited values. Prefer medium only if evidence supports adequate review quality; otherwise high, or explicit Unknown if no decision-quality evidence.",
@@ -83,7 +83,9 @@
     "agentId": "pi-workflow:wf_186d5f227d51/assignment-0mwcagpqy-r1qr",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-11T15:44:16.356Z"
+    "startedAt": "2026-11-11T15:44:16.356Z",
+    "finishedAt": "2026-11-11T15:50:38.416Z"
   },
+  "result": "failure: result: Unknown; insufficient evidence to choose medium or high.\nchanged: none\nchecks: Read prior auto-review report; inspected available search tools and on-screen windows. No tests or model calls run.\nblockers: Native provider search was not exposed; the brief reports Exa missing a key and the browser relay unpaired. No existing browser window was available for public-source research.\nquestions: none\nnotes: Facts and inference are separated below; no benchmark URLs or ratios could be verified.\nevidence:\nComparable medium high benchmark evidence characterized: Unknown; same-model scores, effort settings, output-token counts and latency were not obtained.\nOutput token efficiency and review suitability recommendation sourced: Unknown; neither medium’s safety-review adequacy nor high’s advantage can be established.\nbenchmark-sources: No public benchmark source accessed; actual GPT6Luna version and backend identity remain unverified.\nrecommendation: Do not select an effort on the available evidence; obtain comparable quality, token and safety-review results first. The prior report identifies the requested reviewer as `codex-auto-review` at `low`, not its underlying model identity.\n",
   "createdAt": "2026-11-11T15:43:35.002Z"
 }
