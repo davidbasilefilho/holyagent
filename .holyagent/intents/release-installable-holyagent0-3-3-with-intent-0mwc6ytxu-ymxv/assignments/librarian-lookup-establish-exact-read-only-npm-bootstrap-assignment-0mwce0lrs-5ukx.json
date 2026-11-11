@@ -5,7 +5,7 @@
   "roleTask": "Librarian.lookup",
   "slug": "establish-exact-read-only-npm-bootstrap",
   "objective": "Establish exact read-only npm bootstrap and reusable GitHub OIDC publication prerequisites for the reviewed HolyAgent0.3.3 package without publishing or changing accounts.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "User wants a reviewed bootstrap0.3.3-bootstrap.0 on bootstrap tag using existing npm login, then they will set trusted publisher and final0.3.3 must publish through publish.yml calling stable.yml/dev.yml, bun pm pack then npm OIDC. Need facts now, not speculative adoption or edits.",
     "Use C:/Users/david.basile/dev/holyagent-0.3.3-npm for explicit command cwd. Another Worker.debugging owns all source/build writes; do not run build/test/install/pack or touch files there. Read docs/npm-publishing.md and workflow files only as necessary; they may be regenerated but no semantic edits expected.",
@@ -102,7 +102,9 @@
     "agentId": "pi-workflow:wf_a93d0a1f4072/assignment-0mwce0lrs-5ukx",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T17:23:46.109Z"
+    "startedAt": "2026-11-11T17:23:46.109Z",
+    "finishedAt": "2026-11-11T17:26:00.052Z"
   },
+  "result": "errored",
   "createdAt": "2026-11-11T17:23:01.816Z"
 }
