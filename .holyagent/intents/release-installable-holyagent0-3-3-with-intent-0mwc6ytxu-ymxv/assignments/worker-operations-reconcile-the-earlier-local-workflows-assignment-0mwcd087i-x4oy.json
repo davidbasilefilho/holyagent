@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "reconcile-the-earlier-local-workflows",
   "objective": "Reconcile the earlier local workflows from authoritative terminal records without polling or altering state.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-onlyoperationalcheck, actualreleaseworktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Roothasthreeoldlocalworkflowrecordswithnocompletionnoticeswhilelateronescomplete: wf_debab34d327a assignment-0mwc3s7vm-q9xv(code-review074bc72a..271bfa02); wf_c359ad97fe92 assignment-0mwc6qszh-9ncm(native-tooltrace) andassignment-0mwc6qn5g-u873(Cua); wf_0ec7c67623e9 assignment-0mwc7n8sn-l1jk(native-search). Thisisnewmissingcompletioninvestigation, notperiodicwaiting/polling. Inspectjournals/transcriptsonceforactualresult/terminalfailure/missingentry. Journaldirectory C:/Users/david.basile/AppData/Local/Temp/pi-subagents-0/Users-david.basile-dev-holyagent/01a1ca6b-447a-75e5-9485-35fa14619851/tasks/<run-id>.workflow.jsonl, scriptsbeside; CLIrecordedagents pi-workflow:<run-id>/<id>. Rootsessionparentexit/agealoneisnotterminalproof.",
     "Needanswerforeach actualfinishedreportavailable+matchinglabel/journal OR actualterminalagenterror OR stillUnknownwithwhy. Usehost Agentstatus iftoolcanlookupexactknownagentIDsfound injournalandthatqueryisnecessarytoestablishgone, notwait/poll/sleep. No steer/resume/stop/agentlaunch/statewrites. Don'topenbriefs/re-emitoriginalprompts/credentials. Rootwillrunassignmentreportsandcloselifecycles. Reportmax5bulletswithexactpath+evidence andactionableblocker; longdataoutside repo."
@@ -80,5 +80,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T16:55:21.052Z"
+  },
   "createdAt": "2026-11-11T16:54:44.622Z"
 }
