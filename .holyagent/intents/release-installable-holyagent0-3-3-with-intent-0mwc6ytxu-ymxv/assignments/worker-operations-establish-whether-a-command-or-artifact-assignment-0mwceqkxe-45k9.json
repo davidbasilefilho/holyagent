@@ -105,6 +105,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "pi-workflow:wf_9e20126f6487/assignment-0mwceqkxe-45k9",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-11T17:43:44.387Z"
