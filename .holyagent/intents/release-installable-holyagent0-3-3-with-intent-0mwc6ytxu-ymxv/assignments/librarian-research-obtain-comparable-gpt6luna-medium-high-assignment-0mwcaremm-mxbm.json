@@ -80,6 +80,7 @@
   "followUpOf": "assignment-0mwcagpqy-r1qr",
   "screen": true,
   "specialist": {
+    "agentId": "pi-workflow:wf_1de4519e1611/assignment-0mwcaremm-mxbm",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-11T15:52:27.464Z"
