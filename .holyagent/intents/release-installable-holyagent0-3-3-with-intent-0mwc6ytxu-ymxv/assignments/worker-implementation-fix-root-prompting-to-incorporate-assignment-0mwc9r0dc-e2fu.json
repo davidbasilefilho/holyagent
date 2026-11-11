@@ -1,0 +1,98 @@
+{
+  "id": "assignment-0mwc9r0dc-e2fu",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 10,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-root-prompting-to-incorporate",
+  "objective": "Fix root prompting to incorporate settled answers, escalate only actionable uncertainty, and distinguish automated safety rejections from user denials.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, existing uncommitted merge preserved. Explicit current user request authorizes this focused0.3.3 instruction fix. Read instruction-writing skill C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md. Source tree packages/runtime/src/instructions: update model-agnostic behavior requirements first then each affected family root section/guide-compatible wording; preserve architecture/coverage IDs.",
+    "User critique: preserve already given intent/authorization, incorporate meaningful free-form answers instead of forcing another chip selection, delegate investigation of status/ownership/heartbeats/repo first, ask only concrete unresolved risk requiring a decision or information the user can actually provide. Unknown worker status proves neither active nor inactive; runtime handles Unknown, root does not repeatedly ask users to certify inaccessible internals. User now authoritatively confirms old cloud workers cannot resume. Remove unconditional rule that any custom/clarifying answer must trigger repeat question even when it settled relevant decision.",
+    "Latest nuance is binding: user says asking approval after an automatic safety review rejects is fine. Distinguish explicit user denial from tool/automated rejection. Retain prior authorization as evidence, explain exact rejected effect/risk, allow fresh specific approval when it can resolve the boundary. Do not globally forbid asking again merely because earlier broad authorization existed. Preserve explicit denials and no bypass/retry until applicable approval or host boundary resolved. A fresh request is about concrete automatic-review effect, not redundant confirmation of known facts. Exact enforcing component may remain Unknown, don't invent cause.",
+    "Illustration: root repeated cloud-status confirmation despite user's takeover instruction and unavailable subscription; meanwhile tool rejected writing stable.yml because 'omitted brief provides no verifiable authorization' despite scoped OIDC approval. Instructions should support delegated literal-denial diagnosis and concrete reapproval request if actionable without evading safety. Root retains planning/material decisions/acceptance/VCS, specialists do investigation/checks.",
+    "Add focused regression scripts/root-question-policy.test.ts (new file; concurrent debugger owns runtime/tests). Test requirements/families cover settled intent/custom answers/actionable uncertainty/Unknown/autoreview-vs-user-denial and remove obsolete unconditional loops. Actual focused test and changed-scope type/lint/format checks; no full build/verify or generated dist writes while parallel debugger works. Record generator command for later operations worker. No new runtime waiting/ownership features or naming migration (0.3.4)."
+  ],
+  "constraints": [
+    "User approved narrowing this session to the minimum for installable and correctly npm-published0.3.3. Defer the larger scope to0.3.4 in another session;0.3.4 requirements are preserved in intent-0mwc6yoeq-r5v2.",
+    "Retain and independently review existing074bc72a..271bfa02 Windows/Bun installation, state long-path, malformed skill YAML, Pi search/tool-loading and host-neutral CLI-path fixes. Local main commits were authorized only for tooling recovery; no protected/main push without approval.",
+    "Fix only0.3.3 build, validation, installation, advertised normal-use and trusted-publication blockers. Record non-blocking findings for0.3.4.",
+    "Ensure CI validates macOS(Darwin), Linux and Windows; retain required job IDs/protection contracts and SHA-pinned actions. Current-head gates, independent reviews and installation checks must actually run; unknown/failed/interrupted checks are not passed.",
+    "Version0.3.3 already exists on origin/release/0.3.3/integration at c5b2ab2b; preserve canonical bump/build convention, updater-only dependency changes and current release/integration model for0.3.3.",
+    "bun pm pack must create the npm tarball; inspect metadata/contents, test clean tarball installation and execute the packaged entrypoints for the intended install route.",
+    "Actually publish0.3.3 via CI npm trusted publishing/OIDC, with npm for actual publish and no token fallback. User authorized publication and says npm logged in. Verify trusted-publisher setup separately and report concrete account action if needed.",
+    "Merges, existing protected/base-branch pushes, credentials/security changes and destructive cleanup need explicit user authority. No bypassing protection. Finish reviewed result before asking for a required action.",
+    "Preserve selected Codex model, account credentials, permission/guardrail defaults and installed local fixes. Keep main checkout on main, work in C:/Users/david.basile/dev/holyagent-0.3.3-npm on release/0.3.3/fix/npm-readiness; preserve prior dirty scratch worktree and branches.",
+    "Native codemode HolyAgent tools, dual-provider/all-capability setup, Cua/browser follow-up, scoped skills/Context7 replacement, main/dev migration, deterministic dev releases and non-blocking tooling repairs belong to0.3.4. Do not dispatch their Ready implementation assignments now.",
+    "if you have any trouble in the tooling, note it down in an intent to fix stuff",
+    "User additionally requires AGENTS.md to explicitly state HolyAgent PR stack standards. For0.3.3, work PRs target existing integration, subsequent work stacks on preceding open PR subject to repository mergeability, and only release integration opens into main. main/dev remains0.3.4. This minimal documentation update is authorized in0.3.3.",
+    "In-flight tooling review assignment-0mwc3s7vm-q9xv remains applicable. In-flight read-only research assignment-0mwc6qszh-9ncm and assignment-0mwc6qn5g-u873 may finish and their reports are retained for0.3.4; launch no implementation from them now.",
+    "use worktrees for the pr stack as well if beneficial and state in AGENTS.md",
+    "report issues you find for me as well as in intents to fix either immediately or in0.3.4 and tell me how much of0.3.3 development is left still",
+    "do you have the exa mcp server? can't you use the native codex alternative? that requires the pi-codex-conversion right? that's why I need to install holyagent now. exa must only be a fallback when there are only providers that don't offer web search installed",
+    "Verify actual Exa MCP availability separately from pi-web-kit Exa provider, native Codex search exposure and pi-codex-conversion requirement before changing setup. Prefer native search of installed providers; Exa only when none installed offers web search. Establish release impact with read-only investigation; preserve approved minimal0.3.3/deferred0.3.4 split.",
+    "there must be a publish.yml and stable.yml and dev.yml, publish must use the other two, and stable must create a github stable release as well as a stable npm release, dev.yml must create a dev pre release and an npm pre-release updating the dev npm tag",
+    "For0.3.3 implement publish.yml orchestrating reusable stable.yml and dev.yml. Stable publishes a GitHub stable release and npm stable release (latest dist-tag); dev publishes a GitHub prerelease and npm prerelease updating npm dev dist-tag. Use bun pm pack for tarballs and npm trusted publishing/OIDC for CI publication, preserving required validation and SHA action pins.",
+    "I will put publish.yml in the npm package settings after you publish a bootstrap version so it appears on npm",
+    "User explicitly authorizes one reviewed bootstrap prerelease publication via existing authenticated npm login to establish the public package before trusted publisher configuration. Default bootstrap version0.3.3-bootstrap.0 and npm bootstrap dist-tag keep it off latest/dev. This is a deliberate prerequisite exception to CI-only publication, not an automatic token fallback. Then user configures publish.yml in npm settings; final0.3.3 and CI stable/dev releases must use trusted OIDC, no token fallback. Still no merge/protected push without authority.",
+    "Confirmed first release worker evidence: frozen install397packages/build pass; targeted fixture tests56+20pass; check310files/lint311files/fmt729files green. Full Windows verify observed>=28failures and running at report time, so not accepted. Clean tarball CLI version/help pass, Pi extension startup unknown. Automatic npm workflow edit denied; stop that action pending exact denied-effect diagnosis and subsequent explicit user authorization. New user workflow/bootstrap instructions above govern authorized future work.",
+    "also publish other npm packages if needed",
+    "keep me postd on5% or more changes in progress",
+    "Determine the minimal npm package set required by the real published installation route, publish additional packages only if needed for usable dependency closure, and apply reviewed bootstrap/trusted-publication rules to each. User authorizes needed package publications, not unnecessary workspace packages. Report progress-estimate changes of at least5percentage points; baseline estimate60% as of the bootstrap/workflow requirement, estimates are rough milestones rather than measured completion.",
+    "update the todos man that's one of your responsabilities",
+    "Root keeps the complete task list synchronized with every dispatch, result, acceptance/rejection, wait, blocker and scope deferral. Current0.3.3 work and deferred0.3.4 work must be visibly distinguished; don't mark failed/Unknown work completed.",
+    "Release evidence update: AGENTS.md writer changed only requested stack/worktree rules and diff-check/type/format passed, but full verify reported3348pass52fail52skip; Succeeded/unaccepted pending committed-range independent review. Another validator's log reported3345pass54fail52skip while wrapper exit file said0, so actual current status/exit integrity and packaged Pi startup require full-route repair assignment-0mwc88lir-pjpj. Do not count either as green.",
+    "Publication-set lookup was rejected for contradictory prose. Root confirmed workspace root package.json private:true; generated packages/integrations/pi/dist/package.json public holyagent0.3.3 with Pi-host peers and no runtime dependency. Integration assignment-0mwc8fqz6-g4hb must establish corrected minimal publication-set/closure evidence before publication.",
+    "Latest release state: isolated installed Pi package startup and CLI passed, no extension/skill diagnostics,11skills registered; screen test19pass, bump fixture56pass, check/lint/fmt pass. Rough progress estimate65% reported. Full Windows gate and old wrapper exit discrepancy unresolved. Runtime test repairs remain blocked by cloud writer authoritative-liveness confirmation.",
+    "Fresh security denial in assignment-0mwc8ny8d-po33 rejected id-token:write grant on two stable/dev publishing calls. No edits made, stop that publication implementation line and require user explicit approval of the scoped permission grant before retrying. Existing publication authorization is not treated as overriding the fresh denial.",
+    "User explicitly approved scoped OIDC: grant id-token:write only to stable/dev npm publishing jobs and their reusable-workflow callers; exclude pull-request jobs and keep existing repository-write limits intact. This answers the prior denied permission edit; no other security/account changes approved.",
+    "Cloud takeover request: user says former work was Claude Code Cloud, weekly usage exhausted, subscription ending in two days, and asks to finish its work. Preserve minimal0.3.3 scope: release-blocking leftovers now, carry larger unfinished feature work to0.3.4. Explicit terminal/quiescence confirmation is still needed before clearing old Running specialist ownership.",
+    "Workflow write remains denied after explicit scoped OIDC approval; latest worker reverted temporary publish.yml edit, made no lasting changes and ran no gates. Followup read-only assignment-0mwc9e7re-yjja traces exact actual denied tool/event/source before any further approval request or attempt. Do not work around denial.",
+    "User explicitly confirms old cloud workers cannot resume and requests takeover; old cloud writer/reviewers closed interrupted through CLI, removing stale ownership. Accept that confirmation without repeating it.",
+    "User requests root prompt revision now to prevent unnecessary questions. Preserve established intent/authorization across clarification answers; investigate available worker execution/ownership/heartbeat/repository status through specialists before escalation; ask only actionable uncertainty requiring a concrete decision or information the user can actually provide. Unknown worker status proves neither active nor inactive, and the root must not repeatedly ask the user to certify inaccessible internals. Keep approval and concurrency safeguards; no assumption that Unknown is safe.",
+    "Adopt beneficial principles from user's quoted critique as current root-prompt requirements, not a mandate to ask more questions. Clarification that settles intent is incorporated; ask again only about an explicitly identified material remainder, not because a reply was free-form rather than a menu choice. Preserve actual explicit denials; the publishing tool rejection is confirmed to lack authorization visibility, not a missing repeated user approval. Escalate exact existing authorization and rejection to host/safety operator without bypass.",
+    "User clarifies that asking approval after an automatic safety review rejects an action is appropriate. Root prompts must distinguish explicit user denial from automated/tool rejection: preserve prior intent and approvals, explain exact newly rejected effect/risk, and permit a fresh specific approval request when that can resolve the review. This refines, rather than removes, the no-redundant-questions requirement. No retries or alternate routes after denial until the applicable boundary is resolved.",
+    "Own only packages/runtime/src/instructions and scripts/root-question-policy.test.ts; no Git/state/config/account changes, no publication/workflow writes or unrequested refactors. Main/scratch/other edits preserved. Report at most8bullets with exact commands/exits/counts, requirement-map, paths and diff-file outside repository."
+  ],
+  "criteria": [
+    {
+      "text": "Settled intent and free form answers prevent redundant questions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Investigation and actionable escalation preserve Unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Automated rejection and user denial differentiated safely",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Affected requirements and families covered by actual regression",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Focused instruction scope and current checks",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "requirement-map"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "scripts/root-question-policy.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwc9nxse-2ghh",
+  "createdAt": "2026-11-11T15:23:35.712Z"
+}
