@@ -1,0 +1,22 @@
+{
+  "id": "intent-0mwc6ytxu-ymxv",
+  "slug": "release-installable-holyagent0-3-3-with",
+  "objective": "Release installable HolyAgent0.3.3 with only release-blocking fixes and publish it correctly to npm through CI trusted publishing.",
+  "requirements": [
+    "User narrowed this session: just the minimum stuff to make0.3.3 work and publish correctly on npm so it can be installed; defer the rest of the larger scope to0.3.4 in another session. User approved recording this split in two release-specific Intents.",
+    "Retain and independently review existing committed Windows/Bun installation, state long-path, skill-YAML, Pi search/tool-loading and host-neutral CLI-path fixes in074bc72a..271bfa02. They are local main commits authorized only for tooling recovery; do not push main without explicit approval.",
+    "Fix only remaining defects that prevent the0.3.3 package building, validation, installation, normal advertised use or correct trusted publishing. Record non-blocking findings for0.3.4 rather than expand this delivery.",
+    "Ensure CI validates macOS(Darwin), Linux and Windows; preserve required check names/protection contracts and SHA-pin external actions. Run relevant current-head gates, independent reviews and installation checks; failed, interrupted or unknown gates are not passed.",
+    "Use canonical version0.3.3; version changes only through mise bump and build-generated copies, dependency changes only through updater. Keep current release/integration branch convention for this release because main/dev migration is deferred.",
+    "Use bun pm pack to create the publishable npm tarball, inspect package contents/metadata, and test a clean installation from that tarball. Ensure the actual package and executable/exports work for its intended installation route.",
+    "Publish the0.3.3 package to npm through CI using npm trusted publishing/OIDC for the actual publish, without token fallback. The user explicitly requested actual npm publication and said npm is logged in; existing login is not proof OIDC publisher configuration exists. Report concrete npm/GitHub account action if required.",
+    "Merging, existing protected/base-branch pushes and account/security changes still need explicit user approval; naming publication does not approve merging or bypassing protections. Finish concrete reviewed release work first, ask only for a reserved action when needed.",
+    "Keep default selected model and local permission/guardrail settings intact. Do not overwrite locally installed fixes with older remote code. Keep main checkout on main and new development in a worktree; preserve existing dirty scratch worktree and all branches.",
+    "Native HolyAgent codemode tools, complete dual-provider/all-capability installation, Cua/browser follow-up, role-scoped skills/Context7 replacement, main/dev migration, deterministic timestamp/hash dev releases and non-blocking tooling repairs are explicitly0.3.4, not0.3.3.",
+    "if you have any trouble in the tooling, note it down in an intent to fix stuff",
+    "Existing tooling-review assignment-0mwc3s7vm-q9xv is in flight and relevant. Installation assignment-0mwc6t8fn-pcc6 is Ready and blocked by ownership; do not dispatch during narrowed scope. Larger-scope Ready assignments in earlier Intents remain deferred, not discarded."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-11T14:05:41.778Z"
+}
