@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "rerun-real-windows-file-symlink-gates",
   "objective": "Rerun real Windows file-symlink gates after user enabled Developer Mode.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Read-only validation in actualworktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. UserconfirmsDeveloperModejustenabled; no needmorepermissionorOSwrites. PowerShellwith explicitSet-Location provenworks; BashWindowscwdpreviouslyfails. Use actualBun test packages/runtime/tests/state-branch.test.ts scripts/bump-version.test.ts fromcorrectworktree, keepingfixtures unchanged. Prior114pass2fail1skip(exit1), blockedfile-symlinkcases state-branch.test.ts:1523,1543 EPERM-4048. Confirmcurrentexacttestnames/statusandpropernonzeroexitcapture; wrapperpreviouslywrote0despitetestsfailed. Don'trepeatanoldexitfileasproof.",
     "Otherwritersinprogress onlypromptinstructions and npmworkflow/helper/tests/docs, noneowns these2testfiles. No sourcefix/build/generatedfiles/fullverify/modelcalls/accountsettings/repo-state/VCSwrites. Isolateanyexistingtesthome accordingcurrentfixture patterns; don'trunrealPiinstall. Ifprivilegeissuepersists useonecontrolledtemp Node/Buntruefilelinkprobe and reporthostaction insteadchangingtests/skipping. Reportmax5bullets actualcommands/exits/passfail skipcounts andanyenvironmentblocker, logsoutside repo. UserasksreminddisableDeveloperModewhenfinished; rootowns reminder."
@@ -85,7 +85,9 @@
     "agentId": "pi-workflow:wf_231ee764235f/assignment-0mwccgij8-wwaf",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T16:40:37.253Z"
+    "startedAt": "2026-11-11T16:40:37.253Z",
+    "finishedAt": "2026-11-11T16:54:29.617Z"
   },
+  "result": "failure: result: required checks did not complete within the 60-second limit; acceptance remains unverified\nchanged: none\nchecks: `bun test packages/runtime/tests/state-branch.test.ts scripts/bump-version.test.ts` (release worktree) -> timed out after 60s; output showed 7 state-branch and 56 bump-version tests passed before timeout. `bun test packages/runtime/tests/state-branch.test.ts` -> timed out after 60s; 12 tests passed before timeout.\nblockers: focused state-branch suite exceeds the command timeout; symlink cases and trustworthy final counts not confirmed\nquestions: none\nnotes: no baseline run; tests were not altered\nevidence:\nRequired real file symlink and bump scope executes with trustworthy exit counts: not met; both invocations timed out before completion and did not confirm the symlink cases or final counts\nchecks-run: PowerShell `Set-Location 'C:\\Users\\david.basile\\dev\\holyagent-0.3.3-npm'; bun test packages/runtime/tests/state-branch.test.ts scripts/bump-version.test.ts` -> timed out after 60s; then `bun test packages/runtime/tests/state-branch.test.ts` -> timed out after 60s\nenvironment-blocker: Windows Developer Mode enabled, but required symlink-test completion and final exit/counts remain unverified because runs timed out after 60s\n",
   "createdAt": "2026-11-11T16:39:24.885Z"
 }
