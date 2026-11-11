@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "complete-approved-root-asking-policy",
   "objective": "Complete approved root asking-policy corrections and incorporate Stop Slop guidance into every relevant GPT prompt that produces human-facing text.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Set actual command cwd explicitly using bun --cwd='C:/Users/david.basile/dev/holyagent-0.3.3-npm' for Bun commands or a standalone cd before other commands. Prior mechanical worker ran frommain, testsnotfound were NOT real failureofworktreevisibility. Inspect actual current diff/files; prior promptwriterterminalErroredemptyreport mayhavepartialchanges. Rootpolicytest scripts/root-question-policy.test.ts mustbe located inassignedworktree, notmain. Own full packages/runtime/src/instructions and scripts/root-question-policy.test.ts, plusnew scripts/stop-slop-policy.test.ts ifappropriate.",
     "Read instruction-writing skill C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md. Userexplicitfreshapproval alreadycovers rootaskingpolicychangesafterautomaticdenial. Requirements-first andallrelevantfamilytranslations/coverage forrootpolicy. Preserve settled intent/approvals acrossfreeformanswers; don'trepeatquestionsbecausemenu wasn'tselected. Specialistsinvestigateexecution/status/ownership/heartbeat/repo facts beforeuser;Unknownneitheractive norinactive. Ask onlyactionableuser-ownedquestions; ALL questionsmustusethe structuredasktool. Encourageexactscopedfreshapprovalafterautomatedtoolrejectionwhencanresolve, distinguishuserdenial(stopline), preservehostboundary/nobypass. Existingauthcontextcarriedintodelegationmustretain scope/provenancebutnotclaimunsupportedsecureinheritance.",
@@ -101,5 +101,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcavd08-c345",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T16:20:31.512Z"
+  },
   "createdAt": "2026-11-11T16:19:57.088Z"
 }
