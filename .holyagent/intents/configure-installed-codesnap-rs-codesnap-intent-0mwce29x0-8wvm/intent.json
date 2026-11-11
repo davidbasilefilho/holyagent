@@ -5,10 +5,10 @@
   "requirements": [
     "setup codesnap-rs/codesnap (already installed on the machine) in a global zed task so I can take screenshots of code with the editor's colorscheme, fonts, etc",
     "don't care about the lexical token differences",
-    "Preserve unrelated global Zed settings and tasks. Make local user configuration changes only; no repository code changes or publishing.",
-    "Prefer current editor appearance settings and selected code; verify real PNG generation and clearly report unsupported appearance details."
+    "JUST PLACE THE TASKS FILE IN THE CORRECT LOCATION WITH THE CORRECT CONTENT, IT'S ONE FILE",
+    "Only change C:/Users/david.basile/AppData/Roaming/Zed/tasks.json. Preserve existing tasks and settings. No persistent helpers or font/theme assets, no repository changes. Prioritize a usable CodeSnap task now, with closest supported editor theme/font values and report any inherent limitation."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-11T17:24:19.764Z"
 }
