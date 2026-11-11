@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "identify-actual-automatic-review-model",
   "objective": "Identify actual automatic-review model/effort and the supported propagation path for user approval from root into Pi workflows and subagents.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only investigation in C:/Users/david.basile/dev/holyagent and release worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, installed Pi1.5.2 host/packages/config as needed. User says each tool call goes through cheap automatic review; screenshot C:/Users/david.basile/AppData/Local/Temp/pi-clipboard-fc79ddd4-d43d-40cf-885a-79be9266c108.png shows root CLI dispatch Automatic approval review approved (risk:medium,authorization:high). Need actual reviewer model and reasoning effort for HolyAgent Pi Codex, not specialist route GPT6Luna examples. User considers GPT6Luna with effort other than low/xhigh/max acceptable. If not observable/configurable, report Unknown with precise inspected surfaces; do not invent model/effort or expose credentials.",
     "User explicitly approved publication workflow writes/effects and asks root approval propagate to workflows and child specialists. Earlier child write stable.yml was automatically rejected because 'omitted brief provides no verifiable authorization'; exact source C:/Users/david.basile/.pi/agent/sessions/--C--Users-david.basile-dev-holyagent--/2026-11-11T15-08-49-472Z_01a1cb27-8dbf-7356-b52f-d0a3885bf7ac.jsonl:34-35; accepted trace C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc9e7re-yjja.md. Determine actual host boundary and minimal implementable path for scoped approval provenance through CLI dispatch, workflow agent(), child context and tool safety review. Repository-written brief alone was not visible to reviewer; distinguish actual permission/context propagation from merely promising it in instructions.",
@@ -46,7 +46,41 @@
     "agentId": "pi-workflow:wf_e01b15c4b16d/assignment-0mwc9xulv-rrv8",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-11T15:29:37.098Z"
+    "startedAt": "2026-11-11T15:29:37.098Z",
+    "finishedAt": "2026-11-11T15:33:42.000Z"
+  },
+  "result": "result: Auto-review requests `codex-auto-review` at `low` effort; scoped approval propagation to workflow children is not currently established.\nchanged: none\nchecks: Read-only source, installed Pi documentation, screenshot and prior denial report inspected; no tests or model requests run.\nblockers: No verified trusted channel carries root approval into workflow-child review; the prior denied action must not be retried or bypassed without resolving that boundary.\nquestions: none\nnotes: Source identifies the requested reviewer model, not the backend’s underlying model identity. Code under investigation may be changing alongside release workers.\nevidence:\nActual auto review model and effort distinguished from routing: `packages/runtime/src/pi/codex/auto-review/assessment.ts:4-16` sets `codex-auto-review` and `low`; `packages/runtime/src/pi/codex/auto-review/review.ts` passes them to the reviewer, and `packages/runtime/src/pi/codex/auto-review/client.ts:10-25` puts them in the Responses request. These are independent of specialist `agent()` model and effort.\nRoot approval propagation API and trust boundary evidenced: `packages/integrations/pi/src/auto-review.ts:145-174` reviews each qualifying call using only that session’s `sessionManager.getBranch()`; `packages/runtime/src/pi/codex/auto-review/transcript.ts` labels and truncates entries. `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/docs/workflows.md:231-254` exposes `agent(prompt, opts?)` but no approval or context-inheritance option. The brief is a file reference, not verified user-origin approval; the reviewer has no tools (`packages/runtime/src/pi/codex/auto-review/policy.ts`).\nFeasible bounded remedy and honest limits established: For 0.3.3, preserve the denial and escalate visibility to the host/safety operator; a scoped provenance channel requires a trusted host-mediated link from genuine root user messages to the child review, with explicit scope, revocation and no promotion of repository or child text. No supported workflow API for that link was verified.\nmodel-effort: `packages/runtime/src/pi/codex/auto-review/assessment.ts:4-16`; underlying backend model identity is Unknown.\npropagation-sources: `packages/runtime/src/instructions/gpt-6/root/workflows.md` passes the dispatch prompt to `agent()`; `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/docs/workflows.md:231-254` rejects unknown option keys; `packages/integrations/pi/src/auto-review.ts:178-211` provides session-local `/approve` for one exact denied-action retry, still reviewed—not transferable root authorization.\nrecommended-change: Before claiming propagation, add regression proof for genuine user-origin scope, child isolation, forged brief/tool-result rejection, revocation, exact-action denial and continued fail-closed review; implement only after a trusted cross-session host mechanism is established.\n",
+  "acceptance": {
+    "revision": 12,
+    "rationale": "Source identifies codex-auto-review/low and session-local transcript review; underlying model and trusted cross-session approval mechanism are explicitly Unknown, not claimed verified.",
+    "criteria": [
+      {
+        "criterion": "Actual auto review model and effort distinguished from routing",
+        "support": "`packages/runtime/src/pi/codex/auto-review/assessment.ts:4-16` sets `codex-auto-review` and `low`; `packages/runtime/src/pi/codex/auto-review/review.ts` passes them to the reviewer, and `packages/runtime/src/pi/codex/auto-review/client.ts:10-25` puts them in the Responses request. These are independent of specialist `agent()` model and effort."
+      },
+      {
+        "criterion": "Root approval propagation API and trust boundary evidenced",
+        "support": "`packages/integrations/pi/src/auto-review.ts:145-174` reviews each qualifying call using only that session’s `sessionManager.getBranch()`; `packages/runtime/src/pi/codex/auto-review/transcript.ts` labels and truncates entries. `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/docs/workflows.md:231-254` exposes `agent(prompt, opts?)` but no approval or context-inheritance option. The brief is a file reference, not verified user-origin approval; the reviewer has no tools (`packages/runtime/src/pi/codex/auto-review/policy.ts`)."
+      },
+      {
+        "criterion": "Feasible bounded remedy and honest limits established",
+        "support": "For 0.3.3, preserve the denial and escalate visibility to the host/safety operator; a scoped provenance channel requires a trusted host-mediated link from genuine root user messages to the child review, with explicit scope, revocation and no promotion of repository or child text. No supported workflow API for that link was verified."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "model-effort",
+        "support": "`packages/runtime/src/pi/codex/auto-review/assessment.ts:4-16`; underlying backend model identity is Unknown."
+      },
+      {
+        "label": "propagation-sources",
+        "support": "`packages/runtime/src/instructions/gpt-6/root/workflows.md` passes the dispatch prompt to `agent()`; `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/docs/workflows.md:231-254` rejects unknown option keys; `packages/integrations/pi/src/auto-review.ts:178-211` provides session-local `/approve` for one exact denied-action retry, still reviewed—not transferable root authorization."
+      },
+      {
+        "label": "recommended-change",
+        "support": "Before claiming propagation, add regression proof for genuine user-origin scope, child isolation, forged brief/tool-result rejection, revocation, exact-action denial and continued fail-closed review; implement only after a trusted cross-session host mechanism is established."
+      }
+    ]
   },
   "createdAt": "2026-11-11T15:28:54.835Z"
 }
