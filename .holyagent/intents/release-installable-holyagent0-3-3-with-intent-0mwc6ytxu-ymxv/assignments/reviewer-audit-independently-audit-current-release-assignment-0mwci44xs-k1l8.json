@@ -109,6 +109,7 @@
     "assignment-0mwchf7z4-gbp3"
   ],
   "specialist": {
+    "agentId": "pi-workflow:wf_8eef09e59496/assignment-0mwci44xs-k1l8",
     "model": "haiku",
     "effort": "high",
     "startedAt": "2026-11-11T19:18:17.600Z"
