@@ -5,7 +5,7 @@
   "roleTask": "Explorer.lookup",
   "slug": "explain-the-verified-current-and-dual",
   "objective": "Explain the verified current and dual-provider Codex/Kimi routing for this local HolyAgent Pi installation.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read C:/Users/david.basile/.holyagent/config.json and non-secret relevant provider/model fields of C:/Users/david.basile/.pi/agent/settings.json; do not expose auth files, credentials or tokens.",
     "Find shipped route table and provider selection/overrides in C:/Users/david.basile/dev/holyagent. Explain whether installing Kimi automatically load-balances or falls back, and how root, lightweight specialists, full specialists and screen routes resolve.",
@@ -36,7 +36,29 @@
     "agentId": "pi-workflow:wf_394ad70d5d46/assignment-0mwc7548k-s5r5",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T14:11:20.026Z"
+    "startedAt": "2026-11-11T14:11:20.026Z",
+    "finishedAt": "2026-11-11T14:17:39.203Z"
+  },
+  "result": "result: Verified this Pi installation routes exclusively through Codex; Kimi is not configured and installing it would not enable load-balancing or fallback.\nchanged: none\nchecks: read-only file inspection; no checks run\nblockers: none\nquestions: none\nnotes: Current local settings select `openai-codex` in both HolyAgent and Pi. The shipped config supports selecting either provider, but `routeModel` uses the one selected provider for each route. Route table (compact; model / effort): root `gpt-6.1-sol` / high; light lookup/map, validation, mechanical, operations, audit `gpt-6-luna` / low-to-high (specific roles vary); other specialists `gpt-6.1-terra` / medium-to-xhigh (specific roles vary). Codex screen routes use Terra, minimum medium. Under Kimi: root `k3.1-pro` / high; most specialists `kimi-for-coding` / high or max; visual roles use `k3.1-pro` / low. Kimi screen routes retain their role’s route.\nevidence:\nRouting facts (behavior): `packages/runtime/src/pi/provider.ts:94-110` uses the configured provider and its route row; `packages/runtime/src/pi/codex/routes.ts:11-75` gives Codex routes and screen minimum; `packages/runtime/src/config/schema.ts:56-105` gives Kimi routes.\nCurrent versus dual-provider configuration (scope): `C:/Users/david.basile/.holyagent/config.json:2-4` selects `openai-codex`; `C:/Users/david.basile/.pi/agent/settings.json:4-5` selects Codex and `gpt-6.1-sol`. `packages/runtime/src/config/schema.ts:27-33,116-126,250-258` supports either provider and fills route defaults for the selected one, not automatic provider fallback/load-balancing.\nrouting-sources: `packages/runtime/src/pi/provider.ts:13-70` describes provider profiles and screen override; `packages/runtime/src/pi/codex/routes.ts:11-75` and `packages/runtime/src/config/schema.ts:56-105,116-126` provide the route tables and provider-specific defaults.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Source traces establish current single-provider selection, route defaults and screen override; no settings changed.",
+    "criteria": [
+      {
+        "criterion": "Routing facts",
+        "support": "`packages/runtime/src/pi/provider.ts:94-110` uses the configured provider and its route row; `packages/runtime/src/pi/codex/routes.ts:11-75` gives Codex routes and screen minimum; `packages/runtime/src/config/schema.ts:56-105` gives Kimi routes."
+      },
+      {
+        "criterion": "Current versus dual-provider configuration",
+        "support": "`C:/Users/david.basile/.holyagent/config.json:2-4` selects `openai-codex`; `C:/Users/david.basile/.pi/agent/settings.json:4-5` selects Codex and `gpt-6.1-sol`. `packages/runtime/src/config/schema.ts:27-33,116-126,250-258` supports either provider and fills route defaults for the selected one, not automatic provider fallback/load-balancing."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "routing-sources",
+        "support": "`packages/runtime/src/pi/provider.ts:13-70` describes provider profiles and screen override; `packages/runtime/src/pi/codex/routes.ts:11-75` and `packages/runtime/src/config/schema.ts:56-105,116-126` provide the route tables and provider-specific defaults."
+      }
+    ]
   },
   "createdAt": "2026-11-11T14:10:35.060Z"
 }
