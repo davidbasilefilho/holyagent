@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "independently-review-the-release",
   "objective": "Independently review the release documentation and generated/model-facing instructions for fidelity and clarity.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Loadinstruction-writing skill C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md. Readcommittedpatch, requirements-firstfamilies/coverage/generatedprompts. Preserveeveryapprovedrootclarification/safetybehavior. Exactapproveddenialparagraphmustremain; freeformanswersexistingapproval, investigateinternalsbeforequestions, onlyactionableuser-owneduncertainty; unsupportedruntimeapprovalinheritancemustnotbeclaimed.",
     "Claudealwaysoncore6732→6153characterscompactionin5sourcefilesmustretainallsafety/ownership/assignment/wake/wait/approval/turnsemanticsandtestedstrings. Budget9400unchanged; do notinventunrequestedpolicy. Compareoriginalcurrentforsemanticloss, notstylepreferences.",
@@ -108,5 +108,10 @@
     "assignment-0mwcc7475-9k6v",
     "assignment-0mwchf7z4-gbp3"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T19:18:18.137Z"
+  },
   "createdAt": "2026-11-11T19:17:37.838Z"
 }
