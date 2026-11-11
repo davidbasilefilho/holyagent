@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "import-pi-tui-session-01a1ca6b-447a-75e5",
   "objective": "Import Pi TUI session 01a1ca6b-447a-75e5-9485-35fa14619851 into T3 Code through the installed t3 CLI.",
-  "state": "Ready",
+  "state": "Cancelled",
   "scope": [
     "User wants the existing live TUI session to appear and continue in T3 Code, preserving history, and explicitly says the mechanism is a t3 CLI command, not /t3. Start with t3 --help, inspect relevant help, then perform a safe documented import if supported. User authorized doing it yourself. Verify result and return link."
   ],
@@ -34,5 +34,6 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "result": "stopped",
   "createdAt": "2026-11-11T16:10:40.503Z"
 }
