@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-agents-md-explicitly-state",
   "objective": "Make AGENTS.md explicitly state HolyAgent stacked-PR and beneficial worktree conventions for the current release model.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work ONLY in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Edit AGENTS.md only; main checkout remains main.",
     "User requirements verbatim: use worktrees for the pr stack as well if beneficial and state in AGENTS.md. User also requires HolyAgent PR stack standard explicitly in AGENTS.md.",
@@ -47,7 +47,9 @@
     "agentId": "pi-workflow:wf_62a0f6b96367/assignment-0mwc758fp-m5ya",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T14:11:25.495Z"
+    "startedAt": "2026-11-11T14:11:25.495Z",
+    "finishedAt": "2026-11-11T14:46:34.335Z"
   },
+  "result": "result: Updated the stacked-PR and worktree conventions; verification failed.\nchanged: C:/Users/david.basile/dev/holyagent-0.3.3-npm/AGENTS.md\nchecks: `git diff --check -- AGENTS.md` → exit 0; `bunx --no-install mise run verify` → exit 1, 3348 pass, 52 skip, 52 fail; type-check and format passed.\nblockers: Verify failed; log: C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc-verify-target.log.\nquestions: none\nnotes: The target worktree contains root-owned staged changes; no changes outside AGENTS.md were made.\nevidence:\nStack and worktree requirements: AGENTS.md states one reviewable change per PR, permitted owner-PR stacking, base equals start branch, and worktrees for stack branches.\nRelease convention compatibility: AGENTS.md retains the integration-to-main rule and directs the first release work PR to integration.\nMinimal document scope: AGENTS.md changes three existing sections; the 0.3.4 migration remains deferred.\nchanged-paths: C:/Users/david.basile/dev/holyagent-0.3.3-npm/AGENTS.md\nchecks-run: `git diff --check -- AGENTS.md` → exit 0; `bunx --no-install mise run verify` → exit 1.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc758fp-diff.patch\n",
   "createdAt": "2026-11-11T14:10:40.501Z"
 }
