@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mwc6t8fn-pcc6",
+  "intentId": "intent-0mwc6p2im-6one",
+  "intentRevision": 1,
+  "roleTask": "Worker.operations",
+  "slug": "install-and-verify-holyagent-pi-with",
+  "objective": "Install and verify HolyAgent Pi with Codex and Kimi and every Windows-supported capability on the local system.",
+  "state": "Ready",
+  "scope": [
+    "Operational user configuration only, no repository source changes. User requests both providers, computer use, browser use, all capabilities.",
+    "Canonical local source C:/Users/david.basile/dev/holyagent main271bfa02 contains unpushed Windows tooling fixes; installed generated dist copied from there. Preserve that installation, do not update from older remote build.",
+    "Read setup/provider/capability docs and relevant Pi docs completely first, starting C:/Users/david.basile/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/docs/packages.md and docs/extensions.md and crossreferences.",
+    "Existing local packages: @tintinweb/pi-subagents0.23.2, @juicesharp/rpiv-todo2.15.0, @juicesharp/rpiv-ask-user-question2.15.0, billion-context0.1.213, @ff-labs/pi-fff0.11.0, pi-web-kit0.5.0, @amaster.ai/pi-computer-use0.1.38. Kimi now requested after previous removal. ~/.holyagent/config.json pi.provider=openai-codex, selected model openai-codex/gpt-6.1-sol; codemode only, FFF override, specialist-only subagents and BC pi.subagents=false.",
+    "Use existing canonical installation/setup path; verify both provider integrations without changing selected model or credentials. Verify every advertised capability through fresh isolated SDK/harmless real tool checks. No unnecessary paid model requests.",
+    "Browser pairing/account login/OS permissions need user; report exact one-time action if blocked. @aliou/pi-processes explicitly unsupported on native Windows; do not pretend it works or install unsupported package.",
+    "Read carrier docs to establish official Cua driver relationship before replacement. Independent researcher also investigating. User newly requires CLI functionality as actual codemode tools, implementation separate; record current inventory honestly."
+  ],
+  "constraints": [
+    "Operational ownership is the installed Pi integration and its user-level setup artifacts under C:/Users/david.basile/.pi/agent and C:/Users/david.basile/.holyagent; packages/integrations/pi is a reservation for that installation, not permission to edit repository sources.",
+    "Preserve current selected model, credentials, guardrail defaults and local fixes. Back up touched user settings outside repo. No security/credential changes, Git writes, repo .git/.holyagent writes, remote publication or destructive cleanup.",
+    "No source edits and no active-session restart. Actual user ~/.holyagent config changes are authorized operational setup, repository state writes are not.",
+    "Read C:/Users/david.basile/.pi/agent/npm/node_modules/@amaster.ai/pi-computer-use/skills/computer-use/SKILL.md before desktop tools.",
+    "Report at most10 bullets; put full capability matrix and logs outside repository, show commands/exits and concrete blockers."
+  ],
+  "criteria": [
+    {
+      "text": "Both provider integrations are installed and the selected model and permission defaults are preserved",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Every advertised capability is verified as working or honestly blocked with reason and next action",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Local fixes are preserved and unsupported packages or security settings are not silently enabled",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "capability-matrix",
+    "blockers"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "screen": true,
+  "createdAt": "2026-11-11T14:01:20.627Z"
+}
