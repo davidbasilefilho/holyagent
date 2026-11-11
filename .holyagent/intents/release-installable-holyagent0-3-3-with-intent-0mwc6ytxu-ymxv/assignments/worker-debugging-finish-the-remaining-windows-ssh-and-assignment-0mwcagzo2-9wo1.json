@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "finish-the-remaining-windows-ssh-and",
   "objective": "Finish the remaining Windows SSH and security-link fixture blockers without weakening coverage, then run the owned current test files.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Prior debugger terminal/Failed, report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc9qvp9-5pbp.md and diff C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc9qvp9-debug.diff. Six prior test repairs retained;116setup/config+3stdin+1TUIimport pass(8existing skips),check/lintgreen. SSH fixture still chooses real ssh (DNSexample.invalid), tested PATHdelimiter hypothesis refuted and instrumentation removed. Security symlink tests failEPERM due missing Windows symlink privilege. Historical52failures is stale, no freshfullverify.",
     "Own packages/runtime/tests/state-branch.test.ts and scripts/bump-version.test.ts; add a narrow fixture helper under packages/runtime/tests if essential. No runtime behavior change unless concrete production defect established (report scope need first). Repair executable fixture resolution so real SSH never contacted while default-SSH assertion remains meaningful. Use real supported Windows directory junctions where they test equivalent security semantics; preserve assertions that rejected symlinks/links protect targets. Do not replace file-symlink semantics with unrelated mocks/hardlinks or add skips to manufacture green. If real file symlink privilege is genuinely necessary and cannot be obtained without OS/security change, return exact bounded permission/device blocker, separate it from fixable fixtures, and don't alter user settings.",
@@ -89,5 +89,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc9qvp9-5pbp",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T15:44:33.713Z"
+  },
   "createdAt": "2026-11-11T15:43:47.858Z"
 }
