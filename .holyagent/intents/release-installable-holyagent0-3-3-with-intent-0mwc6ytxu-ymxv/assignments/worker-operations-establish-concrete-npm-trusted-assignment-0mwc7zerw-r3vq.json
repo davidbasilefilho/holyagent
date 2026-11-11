@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mwc7zerw-r3vq",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 5,
+  "roleTask": "Worker.operations",
+  "slug": "establish-concrete-npm-trusted",
+  "objective": "Establish concrete npm trusted-publication prerequisites, prior publication denial and old cloud-writer liveness evidence for the minimal0.3.3 release.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Active release intent intent-0mwc6ytxu-ymxv; source of report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc785xx-27bc.md. No edits required.",
+    "Inspect prior release-worker workflow transcript/journal for the exact npm workflow edit denial (run wf_fe01852a8065, journal C:/Users/david.basile/AppData/Local/Temp/pi-subagents-0/Users-david.basile-dev-holyagent/01a1ca6b-447a-75e5-9485-35fa14619851/tasks/wf_fe01852a8065.workflow.jsonl). Report actual denied trigger/effect and required approval; do not retry denied action through any tool.",
+    "Determine npm package holyagent0.3.3 availability and trusted-publishing setup prerequisites read-only. Use npm CLI public metadata and safe auth status, repository workflow/package metadata, and authoritative npm docs through available read-only tools (direct HTTP from shell is acceptable if Exa/browser tools fail). Distinguish initial package creation from OIDC subsequent publish, exact npm CLI/runner compatibility, ability to configure trusted publisher before initial publication. Do not read tokens, credential files or print sensitive data.",
+    "Find whether recorded cloud writer assignment-0mwazxl76-29ks / workflow:wf_664f4226-73d/assignment-0mwazxl76-29ks is confirmed gone or still alive from available host status or recorded transcript. Its source path /home/user/holyagent-0.3.3-states differs from local worktree, but locks currently block packages/runtime/tests and generated dist. Also identify how CLI scopes locks by worktree from source. Missing local record and exited parent are not proof. Give Unknown if no definitive evidence; do not close/stop/reassign or alter state."
+  ],
+  "constraints": [
+    "User authorized actual npm publication through CI using bun pm pack then npm OIDC, no token/manual fallback; no publication now. Merges/protected pushes/account/security settings need explicit authority. Current release model is0.3.3 integration/work branches; main/dev and larger tooling fixes deferred0.3.4.",
+    "No Git writes, source/generated edits, dependency changes, config/state writes, credentials access, installing/pairing/logging in, process termination or actual publishing. Operational reservation only; keep logs outside repository.",
+    "Use exact path:line/error/source evidence; distinguish Unknown from success. Report in at most5 bullets; long logs outside repository and give paths."
+  ],
+  "criteria": [
+    {
+      "text": "Exact publication-denial evidence",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Trusted-publishing prerequisites",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Cloud-writer liveness and lock evidence",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "publication-action",
+    "liveness",
+    "sources"
+  ],
+  "ownershipPaths": [
+    "scripts/release-prerequisites-reservation"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T14:34:08.396Z"
+}
