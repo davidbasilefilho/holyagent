@@ -80,6 +80,7 @@
   "independentFrom": [],
   "screen": true,
   "specialist": {
+    "agentId": "pi-workflow:wf_186d5f227d51/assignment-0mwcagpqy-r1qr",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-11T15:44:16.356Z"
