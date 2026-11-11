@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-the-workflow-permission",
   "objective": "Correct the workflow permission regression test to distinguish contents-writing jobs from OIDC publishing jobs without weakening security assertions.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Own scripts/workflows.test.ts only. The existing test named 'only the tag and release jobs hold contents: write' treats every permission value write, including id-token:write, as contents write and compares exact permission objects. It currently passes20tests on GitHub-only workflow state, but blocks user-authorized npm trusted-publishing implementation. Fix the incorrect contents-writer classification and assert correct OIDC rules.",
     "Preserve strong checks that contents:write exists only on authorized tag/release jobs, external actions are SHA pinned, no broad top-level write grants, and untrusted PR/fork jobs cannot publish. Permit intended publishing jobs id-token:write and explicitly test its required/allowed placement. Coordinate by read-only observation with concurrent Worker.integration assignment-0mwc8ny8d-po33 changing .github/workflows and adding packages/integrations/pi/publishing.test.ts; don't edit those files.",
@@ -48,7 +48,9 @@
     "agentId": "pi-workflow:wf_d57653c3c931/assignment-0mwc8rhat-83di",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T14:56:31.960Z"
+    "startedAt": "2026-11-11T14:56:31.960Z",
+    "finishedAt": "2026-11-11T15:08:21.485Z"
   },
+  "result": "failure: result: permission tests now distinguish contents writes from OIDC writes; OIDC assertions await the publishing workflow changes\nchanged: scripts/workflows.test.ts; diff: /tmp/assignment-0mwc8rhat-83di.diff\nchecks: `bun test scripts/workflows.test.ts` -> exit 1, 20 pass, 1 fail (OIDC permissions not yet present); `bunx --no-install mise run check` -> exit 0, no type errors; `bunx --no-install mise run lint` -> exit 0, no problems; `bunx --no-install mise run fmt:check` -> exit 0, 729 files formatted; `git diff --check -- scripts/workflows.test.ts` -> exit 0\nblockers: OIDC placement assertion is pending concurrent workflow implementation\nquestions: none\nnotes: none\nevidence:\nContents and OIDC permissions independently asserted: `scripts/workflows.test.ts`; contents classification tests only `permissions.contents === \"write\"`, OIDC test expects the four stable/dev publishing jobs; currently fails because no OIDC grants are present.\nExisting security regression coverage preserved: workflow test continues checking SHA-pinned actions, top-level permissions, and publish/PR safety assertions.\nTest-only scope and current checks: changed only `scripts/workflows.test.ts`; checks and pending OIDC assertion reported above.\nchecks-run: targeted test and check/lint/format gates run in `C:/Users/david.basile/dev/holyagent-0.3.3-npm`; test has 1 pending OIDC failure.\nchanged-paths: `scripts/workflows.test.ts`\ndiff-file: `/tmp/assignment-0mwc8rhat-83di.diff`\n",
   "createdAt": "2026-11-11T14:55:58.037Z"
 }
