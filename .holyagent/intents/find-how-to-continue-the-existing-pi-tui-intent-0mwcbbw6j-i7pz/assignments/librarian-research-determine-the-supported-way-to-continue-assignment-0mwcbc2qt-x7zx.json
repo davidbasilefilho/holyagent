@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "determine-the-supported-way-to-continue",
   "objective": "Determine the supported way to continue an existing external Pi TUI session inside T3 Code, with exact verified manual steps or an honest unsupported result.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Pi session 01a1ca6b-447a-75e5-9485-35fa14619851; user means transferring that existing TUI session into the T3 Code app, not into the current chat.",
     "Read installed Pi and T3 integration documentation/source as needed. Pi documentation root: C:/Users/david.basile/.bun/install/global/node_modules/@earendil-works/pi-coding-agent; T3 integration may be under C:/Users/david.basile/.pi/agent/npm/node_modules or local installed packages. Discover locations through registered FFF tools.",
@@ -35,5 +35,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T16:08:49.506Z"
+  },
   "createdAt": "2026-11-11T16:07:58.182Z"
 }
