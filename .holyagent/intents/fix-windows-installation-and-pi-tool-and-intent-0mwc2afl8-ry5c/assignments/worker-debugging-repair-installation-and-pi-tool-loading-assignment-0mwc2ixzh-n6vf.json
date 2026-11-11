@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mwc2ixzh-n6vf",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 1,
+  "roleTask": "Worker.debugging",
+  "slug": "repair-installation-and-pi-tool-loading",
+  "objective": "Repair installation and Pi tool loading and prepare the requested main/dev npm release flow and role-scoped skills.",
+  "state": "Ready",
+  "scope": [
+    "Dependencies, setup, instructions, skills, Windows state, CI publishing and local tools"
+  ],
+  "constraints": [
+    "User approved direct execution because specialist tools are unavailable; independent reviews waived",
+    "bun pm pack for packing and npm for actual trusted publishing through CI",
+    "main and dev branches; work PRs to dev; release PR from dev to main",
+    "This branch flow is the HolyAgent default, mergeability always takes precedence",
+    "Match CHKDSK dev release format",
+    "Scope skills by agent kind in both integrations without unnecessary prompt expansion",
+    "Fix tools locally and in repo; remove legacy context7-cli skill; install Scoop, fd and rg",
+    "Report at most 10 bullets"
+  ],
+  "criteria": [
+    {
+      "text": "Installation and local Pi tools work",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Skill frontmatter parses and skills are scoped by role",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "CI packs with Bun and publishes with npm using OIDC and main/dev flow",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regression tests and repository verification pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "scripts",
+    ".github",
+    "docs",
+    "AGENTS.md",
+    "package.json",
+    "bun.lock",
+    "mise.toml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T12:01:22.061Z"
+}
