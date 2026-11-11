@@ -1,0 +1,61 @@
+{
+  "id": "assignment-0mwc8ny8d-po33",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 7,
+  "roleTask": "Worker.integration",
+  "slug": "implement-the-explicitly-authorized0-3-3",
+  "objective": "Implement the explicitly authorized0.3.3 stable/dev npm workflows in owned files despite a separately tracked out-of-scope legacy test blocker.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Follow-up of assignment-0mwc8fqz6-g4hb which made no edits because scripts/workflows.test.ts rejects required id-token:write. That legacy test is a known required repair for a later scripts-owning writer; it does NOT block you from implementing the specified workflow files or adding/running your owned new regression test. Do not stop before implementation just because the pre-existing test cannot currently go green; report its exact failure and continue all owned work.",
+    "Read previous brief/report via assignment context as needed, but this is complete task: publish.yml must orchestrate reusable stable.yml/dev.yml after required validation. Stable produces GitHub stable release and npm canonical0.3.3 on latest. Dev produces GitHub prerelease and valid unique npm prerelease updating dev dist-tag. Use bun pm pack and npm OIDC trusted publishing, no token fallback. Preserve main-stable/current non-main-dev routing and existing dev naming (CHKDSK migration0.3.4), current release/integration branch checks, required jobIDs and macOS/Linux/Windows validation, immutable tags, SHA action pins and least privilege.",
+    "User explicitly named these automatic-publication effects after the earlier edit denial; new action authorization is the exact user requirement. Do not trigger actual publishing now. Respect any new denial as a blocker without workaround. No fresh account/security settings changes.",
+    "Publish generated public packages/integrations/pi/dist as holyagent, NOT the private workspace root. Determine whether any own npm package beyond bundled holyagent is actually needed. Smoke-check tarball dependency metadata without model/networkaccountcalls if useful; bundle closure/entrypoint smoke is separately being handled by Worker.debugging, so distinguish source evidence from integration proof.",
+    "User authorizes reviewed bootstrap0.3.3-bootstrap.0 on bootstrap tag via existing login before they configure publish.yml trusted publisher. That bootstrap is separately executed after review; CI publication remains OIDC-only. Document concrete trusted publisher package/repo/workflow and Node/npm minimums (previous report suggests npm11.5.1/Node22.14.0; verify authoritative source and reusable-workflow identity). Add tests in owned packages/integrations/pi/publishing.test.ts covering stable/dev routing, version/artifact identity, OIDC perms on actual publishing jobs, no credential fallback and no publication from untrusted PR/fork paths.",
+    "Only own .github/workflows,docs/development.md,docs/npm-publishing.md,packages/integrations/pi/publishing.test.ts. scripts/mise/Pi src/tests are owned by still-running Worker.debugging assignment-0mwc88lir-pjpj; runtime/tests/dist blocked by old cloud writer. Don't edit any of those or AGENTS.md."
+  ],
+  "constraints": [
+    "Finish owned implementation and meaningful new test run before returning. Run new targeted test and relevant existing workflow tests, capturing known failure clearly; do not weaken old tests or suppress failures. Root will route the legacy test repair after script writer terminates.",
+    "No Git/state writes, actual push/merge/publication, credential access, config/account/security changes or dependency/action pin edits outside updater. Keep logs/diff outside repository. Use bunx --no-install mise run gates and preserve main checkout/dirty scratch/model/guardrails.",
+    "Only minimum0.3.3 scope; native tools,providers,role skills,Cua,wait,mixed routing,main/dev migration and CHKDSK naming are0.3.4. Report at most8bullets with commands/exits/counts, changed paths, diff-file, exact remaining script test fix and publisher account settings."
+  ],
+  "criteria": [
+    {
+      "text": "Reusable stable/dev publication implemented",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "OIDC npm and GitHub artifact identity tested",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Minimal publication set and publisher settings evidenced",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Existing test blocker precisely isolated",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "legacy-test-repair",
+    "publisher-settings"
+  ],
+  "ownershipPaths": [
+    ".github/workflows",
+    "docs/development.md",
+    "docs/npm-publishing.md",
+    "packages/integrations/pi/publishing.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwc8fqz6-g4hb",
+  "createdAt": "2026-11-11T14:53:13.396Z"
+}
