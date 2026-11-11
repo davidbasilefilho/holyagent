@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "probe-whether-gpt6luna-medium-high",
   "objective": "Probe whether GPT6Luna medium/high supports the existing strict automatic-review verdict contract without changing code or disabling review.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. User explicitly authorizes changing codex-auto-review to GPT6Luna medium/high iffsupported and selectionbasedbenchmarks. This task checks APIcapability, notselecteffort. Prior acceptedsource report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcaguse-jkne.md: models-store.json registers gpt-6-luna, openai-codex-responses medium/high; runtime/src/pi/codex/auto-review/client.ts usesstrictguardian_assessment schema; assessment.ts validates4fields+rationale andfailsclosed. No sourcechangeyet.",
     "Use current authenticated provider through existing safe SDK/client abstractions to send at mosttwo tiny benign classification probes: gpt-6-luna medium, thenhigh if useful. This small bounded authenticated model use is explicitly authorized solely to verify requested feature. Supply the actual current strictschema/responseformat, not a weaker JSON substitute. Validate resultingverdict withexistingdecoder, reportsuccess/error and requestedID/effort/outputusage ifavailable. Do not print/read/exporttokens or authfiles; obtaincredentials onlythroughnormal provider credentialservice. No changes toprovider/model/securitysettings orfiles. Isolated temporaryscriptoutside repo allowed. No fullbenchmark, paid batch or realtool execution frommodel; benignreviewscenario read-onlygitstatus forlocaltree.",
@@ -83,7 +83,9 @@
     "agentId": "pi-workflow:wf_989a683ff08c/assignment-0mwcarjt5-7znj",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T15:52:35.412Z"
+    "startedAt": "2026-11-11T15:52:35.412Z",
+    "finishedAt": "2026-11-11T15:58:04.840Z"
   },
+  "result": "failure: result: capability probe not run; no authenticated GPT6Luna medium/high probe was safely available from this worker\nchanged: none\nchecks: `bun test packages/runtime/tests/pi/codex-auto-review-client.test.ts packages/runtime/tests/pi/codex-auto-review-capability.test.ts packages/runtime/tests/pi/codex-auto-review-gate.test.ts` -> exit 0, 31 pass, 0 fail, 110 expectations\nblockers: No established safe provider credential-service/client path in this worktree to make the authorized live probe; model/effort support remains unknown.\nquestions: none\nnotes: Existing review remains configured as `codex-auto-review` at `low`; no account configuration or fail-closed behavior changed.\nevidence:\nLuna medium high strict verdict capability probed with honest results: not run; no safe authenticated provider path established, so capability is unknown.\nExisting fail closed guard and account configuration preserved: three existing test files pass (31 pass, 0 fail); no files changed.\nprobe-results: no live requests sent; requested IDs, effort acceptance, and usage unknown.\nchecks-run: focused auto-review client/capability/gate tests -> exit 0, 31 pass, 0 fail.\n",
   "createdAt": "2026-11-11T15:52:00.521Z"
 }
