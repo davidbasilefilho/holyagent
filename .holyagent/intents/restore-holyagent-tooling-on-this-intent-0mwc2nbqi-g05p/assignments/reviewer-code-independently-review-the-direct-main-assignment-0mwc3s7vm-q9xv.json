@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwc3s7vm-q9xv",
+  "intentId": "intent-0mwc2nbqi-g05p",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-the-direct-main",
+  "objective": "Independently review the direct-main tooling restoration commit after the user reloads Pi and specialist tools become available.",
+  "state": "Ready",
+  "scope": [
+    "Review the tooling commit on main against its parent: native mise dependency migration through updater, safe production prepare, isolated canary upgrade environment, Windows long-path state writes and Git worktree checkout, valid YAML descriptions in all model families, Pi FFF root and specialist tools, mounted Windows CLI paths and regression tests",
+    "Root performed edits directly at the explicit request because Agent/SubagentWorkflow/todo/ask were unavailable in the original session; this Assignment deliberately remains Ready for a fresh properly equipped root",
+    "Verify tests currently passing against the current commit; record local Windows symlink privilege limitations as baseline, never count failed or unknown tests as passed",
+    "No push or publication in the tooling phase; main/dev migration, npm trusted publishing and scoped skills are separate ready Assignments in intent-0mwc2afl8-ry5c"
+  ],
+  "constraints": [
+    "Read-only independent review after the writer is terminal; review the committed range, not uncommitted code",
+    "Apply repository code, testing and security bars; a validated security finding blocks any subsequent push",
+    "User explicitly requested this phase be committed directly to main; do not propose rewriting or removing that commit",
+    "Report in at most 10 bullets; long logs outside repository"
+  ],
+  "criteria": [
+    {
+      "text": "Tooling changes preserve role boundaries, production install safety and atomic state writes",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Regression tests demonstrate the repaired failures and relevant checks run on current head",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Only authorized tooling work is in the direct-main commit",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks",
+    "findings",
+    "diff-file"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T12:36:34.402Z"
+}
