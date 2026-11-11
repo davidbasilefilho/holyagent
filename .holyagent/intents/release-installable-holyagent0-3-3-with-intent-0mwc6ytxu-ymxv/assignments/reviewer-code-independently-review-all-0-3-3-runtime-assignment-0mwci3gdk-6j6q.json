@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "independently-review-all-0-3-3-runtime",
   "objective": "Independently review all 0.3.3 runtime, tooling and publication code for correctness and regressions.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Readprojectrules and committedrange, including8newfiles. Runtime longpath atomicwrite/copy/Gitworktreecheckouts and core.longpaths mustpreservesymlink/migrationsafety. Environment/WindowsPATHfixture corrections and stdin/setupisolation mustnotmaskproductionerrors. FFF/Pi plugin wiring/nodeprocess settings/pins/native-mise updater changes mustmatchprojectconstraints.",
     "Reviewactualnpm-publishing.ts andworkflowlogic: npm-beforeGitHub, samepublishedtarball handoff, correctpublicPi-distidentity, OIDC-only finalpublishing, robust immutablecontent/provenanceanddisttag/rerun/channeltimestamps/errorpaths; no tokenfallback/dist-tagadd. GHpermission/actionpins/runtimeconstraints. Auto-review gpt-6-lunamedium alreadyactualstrictschemasmoked; preservefailclosedtimeouts/schemavalidation and avoidpretendinghostoutage/approvalprovenancefixed.",
@@ -112,7 +112,9 @@
     "agentId": "pi-workflow:wf_95a148cd073c/assignment-0mwci3gdk-6j6q",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T19:18:18.081Z"
+    "startedAt": "2026-11-11T19:18:18.081Z",
+    "finishedAt": "2026-11-11T19:26:28.866Z"
   },
+  "result": "failure: result: Fail — the existing-version publication path does not verify provenance.\nchanged: none\nchecks: Focused publication and workflow tests → exit 0, 28 pass; Windows long-path, Pi tools and auto-review tests → exit 0, 111 pass. Full verify and build not run, as assigned.\nblockers:\n- `scripts/npm-publishing.ts:92-99`, `publishArtifact` — blocker, regressions: if the registry already has the same version and tarball bytes published without trusted provenance, the script checks only identity and integrity, then accepts the tag and permits GitHub release creation. The existing-version fixture in `scripts/npm-publishing.test.ts` demonstrates acceptance without provenance data. Verify trusted provenance before accepting an existing version.\nquestions: none\nnotes:\n- Optional: `.github/workflows/publish.yml:16-18` and `scripts/npm-publishing.ts:85` allow different branch runs to publish concurrently. A delayed older branch run can move the shared `dev` tag after a newer branch run; per-ref concurrency does not order them.\n- No introduced duplication or material performance problem identified in the reviewed paths.\nevidence:\nCommitted release code is correct and preserves existing behavior and repository standards: Fail; existing-version provenance is unverified.\nreview-verdict: Fail.\nfindings: First-pass provenance finding verified against `publishArtifact` and its fixture; cross-branch `dev` ordering is optional.\nchecks-run: 139 focused tests passed; live npm OIDC, GitHub release creation, other operating systems and the full gate were read only or not run.\nremaining-blockers: Provenance verification and current-head full validation remain open.\ndiff-file: `C:/Users/david.basile/AppData/Local/Temp/holyagent-033-4ea-review.patch`; range read with `git diff 'c5b2ab2b...4ea9a3c'`.\n",
   "createdAt": "2026-11-11T19:17:13.256Z"
 }
