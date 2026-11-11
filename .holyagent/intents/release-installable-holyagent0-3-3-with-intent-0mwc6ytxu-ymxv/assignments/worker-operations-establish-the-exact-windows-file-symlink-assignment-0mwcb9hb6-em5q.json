@@ -43,5 +43,30 @@
     "finishedAt": "2026-11-11T16:19:43.843Z"
   },
   "result": "result: Native Node does not bypass the Windows file-symlink restriction; no supported fixture alternative was established without changing the tests’ real-link coverage.\nchanged: none\nchecks: `node --version` / `bun --version` -> exit 0, Node v26.12.1 / Bun 1.4.4; isolated temp-file probe with each runtime -> exit 0, both file-link attempts returned `EPERM` (errno -4048), while directory junctions succeeded; read-only OS checks -> exit 0.\nblockers: File symlinks are currently unavailable to both runtimes in this session. The read-only Developer Mode registry values were absent, but that alone does not establish whether Developer Mode is off or whether policy/privilege is the cause.\nquestions: none\nnotes: No repository edits, skips, mocks, or security-setting changes. Exact failing test cases attempt file links at `packages/runtime/tests/state-branch.test.ts:1523` and `:1543`; neighboring directory-link cases are not equivalent.\nevidence:\nWindows file symlink cause and supported fixture alternative established: Bun and native Node both fail creating a real file symlink with `EPERM`/`-4048`; neither provides a fixture alternative that retains the real-link assertions.\nRead only OS state and controlled probe evidence preserved: Windows 11 Pro build 26200; Developer Mode registry values absent in HKLM and HKCU; current token lacks `SeCreateSymbolicLinkPrivilege`; temp probes cleaned up.\nprobe-results: Node v26.12.1 and Bun 1.4.4 each: file `EPERM`, errno -4048; directory junction created and verified as symbolic link.\nuser-action: No OS change was made. To unblock, the user/administrator can review Windows Settings > System > For developers and enable Developer Mode if permitted by organizational policy, then rerun the tests; this changes system security settings and requires user approval.\n",
+  "acceptance": {
+    "revision": 15,
+    "carriedFrom": 14,
+    "rationale": "OS probe remains valid at revision15: no OS privilege or settings change occurred; accepted concrete Bun/Node EPERM and token capability blocker only, not test pass or a made-up fixture substitute.",
+    "criteria": [
+      {
+        "criterion": "Windows file symlink cause and supported fixture alternative established",
+        "support": "Bun and native Node both fail creating a real file symlink with `EPERM`/`-4048`; neither provides a fixture alternative that retains the real-link assertions."
+      },
+      {
+        "criterion": "Read only OS state and controlled probe evidence preserved",
+        "support": "Windows 11 Pro build 26200; Developer Mode registry values absent in HKLM and HKCU; current token lacks `SeCreateSymbolicLinkPrivilege`; temp probes cleaned up."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "probe-results",
+        "support": "Node v26.12.1 and Bun 1.4.4 each: file `EPERM`, errno -4048; directory junction created and verified as symbolic link."
+      },
+      {
+        "label": "user-action",
+        "support": "No OS change was made. To unblock, the user/administrator can review Windows Settings > System > For developers and enable Developer Mode if permitted by organizational policy, then rerun the tests; this changes system security settings and requires user approval."
+      }
+    ]
+  },
   "createdAt": "2026-11-11T16:05:57.090Z"
 }
