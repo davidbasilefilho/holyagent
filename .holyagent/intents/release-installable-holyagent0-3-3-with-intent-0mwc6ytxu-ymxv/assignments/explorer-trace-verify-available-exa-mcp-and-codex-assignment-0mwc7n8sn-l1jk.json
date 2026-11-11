@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "verify-available-exa-mcp-and-codex",
   "objective": "Verify available Exa MCP and Codex-native web search, the pi-codex-conversion relationship and the smallest release-relevant remedy.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "User asks: do you have the exa mcp server? can't you use the native codex alternative? that requires the pi-codex-conversion right? that's why I need to install holyagent now. exa must only be a fallback when there are only providers that don't offer web search installed.",
     "Read-only source/config/package investigation. Inspect C:/Users/david.basile/.pi/agent/settings.json non-secret fields, installed extension/package sources and repo C:/Users/david.basile/dev/holyagent. Host Pi1.5.2; root openai-codex/gpt-6.1-sol. Determine if native Codex tool capability is available or exposed, whether pi-codex-conversion is real/installed/required, and Exa MCP existence vs pi-web-kit configured Exa provider. Never infer server absence solely from failed Exa web-kit search.",
@@ -43,7 +43,9 @@
     "agentId": "pi-workflow:wf_0ec7c67623e9/assignment-0mwc7n8sn-l1jk",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-11T14:25:11.591Z"
+    "startedAt": "2026-11-11T14:25:11.591Z",
+    "finishedAt": "2026-11-11T17:19:20.395Z"
   },
+  "result": "failure: result: Pi exposes pi-web-kit search, but Exa failed for lack of a key; native Codex search is not verified as exposed.\nchanged: none\nchecks: Local source and configuration inspection only; no API requests or runtime tests.\nblockers: Native Codex search availability and the existence of an Exa MCP server remain unverified.\nquestions: none\nnotes: Provider-first selection across all installed providers is not implemented by the selected-profile logic.\nevidence:\nActual search availability: `C:/Users/david.basile/.pi/agent/settings.json:4-18` selects Codex and installs pi-web-kit; `C:/Users/david.basile/.pi/agent/npm/node_modules/pi-web-kit/src/config.ts:10-12,95-100` defaults to Exa and requires its key. The researcher’s missing-key error establishes a failed web-kit request, not absence of an Exa MCP server.\nCodex conversion requirement: `packages/runtime/src/pi/provider.ts:45-76` identifies Codex as Pi built-in, with no extension package and no exposed web tools; `C:/Users/david.basile/.pi/agent/npm/node_modules/@earendil-works/pi-ai/dist/providers/openai-codex.js:6-20` confirms the built-in provider. `pi-codex-conversion` is absent from the configured packages and repository references; its public existence and whether it provides native search are unverified.\nProvider-first fallback remedy: `packages/runtime/src/pi/provider.ts:171-187` chooses only the selected profile’s tools or pi-web-kit, not all installed providers; explicit pi-web-kit mode also overrides provider tools. Implement installed-provider capability discovery and routing before Exa fallback, after verifying a callable native Codex search path.\nsearch-sources: `C:/Users/david.basile/.pi/agent/npm/node_modules/pi-web-kit/extensions/index.ts:163-202` registers and dispatches `web_search`; `C:/Users/david.basile/.pi/agent/npm/node_modules/pi-web-kit/src/providers/index.ts:10-18` selects Exa, TinyFish, Brave or Firecrawl, not Codex. No Exa MCP server was confirmed.\nrelease-impact: No already-available native Codex search invocation is established; this is an integration gap rather than a demonstrated 0.3.3 install blocker. Defer provider-first routing and native-search investigation to 0.3.4; an independently configured supported search provider is a temporary alternative, subject to the user’s provider-first rule.\n",
   "createdAt": "2026-11-11T14:24:40.775Z"
 }
