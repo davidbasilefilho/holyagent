@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "restore-and-prove-end-to-end-default-ssh",
   "objective": "Restore and prove end-to-end default SSH-command coverage by fixing the Windows fake-SSH fixture at its demonstrated source, without replacing the default path with a configured command.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Previous report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcg2ike-48gv.md and repair diff C:/Users/david.basile/AppData/Local/Temp/holyagent-ssh-debug-repair.diff are NOT accepted: current hardened tests explicitly configure core.sshCommand and no longer exercise the original default ssh path. Keep their useful new environment unit test but restore genuine integration coverage.",
     "The root found a concrete candidate in the original overSsh fixture removed by that repair: const env = { PATH: `${bin}:${process.env[\"PATH\"] ?? \"\"}` }. This uses POSIX colon unconditionally in Windows tests. Investigate node:path delimiter versus Git-for-Windows/MSYS path translation, plus PATH/Path casing in merged Windows environment. This is a hypothesis requiring reproduction, not a proven root cause. Inspect the actual vcs/environment delivery and Git child environment. Do not spend another broad undirected run or present merely passing configured-command tests as resolution.",
@@ -117,5 +117,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcg2ike-48gv",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T18:41:57.631Z"
+  },
   "createdAt": "2026-11-11T18:41:38.368Z"
 }
