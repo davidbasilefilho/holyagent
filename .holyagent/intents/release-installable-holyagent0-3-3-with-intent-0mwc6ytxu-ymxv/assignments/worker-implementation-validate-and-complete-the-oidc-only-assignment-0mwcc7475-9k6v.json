@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "validate-and-complete-the-oidc-only",
   "objective": "Validate and complete the OIDC-only immutable npm rerun contract and timestamp error paths.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Own ONLY scripts/npm-publishing.ts,scripts/npm-publishing.test.ts,docs/npm-publishing.md. Currenthelperfrompartialassignment-0mwcbwr2j-cajx skipsidenticalregistryversionaftersha512match; tags via npm dist-tag ls; iftagdiffers fetch npm view <name> time --json, accept currenttagtimestamp>packedversiontimestamp elsefailclosed. Newpublish npm publish --tag --provenance; nodist-tagadd(noOIDCexchangeforthatcommand). All27currenttests passbutnewtimestampfailurepathsnotcovered. Nootherwriterownshelper;workflowownerparallel, don'teditworkflows/Pipublishingtests.",
     "Decidecorrectminimalcontract withrealregressionanddocumentit. Olderlegitdevrerunmustnotdowngrade newerdevtag; publicationtimestamporderingcanserveimmutabledevhashversions, butvalidatecrosschannel/tag data andfullerrorpaths. Existingmatchingversiontagcorrect success; matchingintegrityplusstrictlynewercorrectchanneltag maybe success; wrongchannel/missing/invalid/older/equal/inconsistenttime mustfailclosedunlessevidencejustifiesotherwise. Stablelatestmustnotaccept a later prerelease ascorrectstable channel. Don'tassumetimestampaloneprovesallowednewerchannel. Tagschema/malformedJSON,metadata lookupfailures,conflicts/non404/versionidentityfailclosed. WhennpmOIDCcannotrepairmanualregistrytaginconsistency reportactionableerror, NOTtokenfallback or broadautomaticexternalstaterepair. Userdidn'trequireeverymanualtamperstatehealed.",
@@ -94,5 +94,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcbwr2j-cajx",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T16:32:35.169Z"
+  },
   "createdAt": "2026-11-11T16:32:06.402Z"
 }
