@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwcbheku-9wj1",
+  "intentId": "intent-0mwcbbw6j-i7pz",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "make-existing-pi-tui-session-01a1ca6b",
+  "objective": "Make existing Pi TUI session 01a1ca6b-447a-75e5-9485-35fa14619851 show up in the T3 Code sidebar using installed t3 CLI.",
+  "state": "Running",
+  "scope": [
+    "The user says: I just want it to show up in the sidebar. They explicitly name a t3 CLI command, not a slash command. They authorize doing it yourself. Start with t3 --help, inspect relevant help, then execute the documented command to register/import/index the session if safe. Verify result and return link if present."
+  ],
+  "constraints": [
+    "Leave running Pi TUI alone. No handoff, transfer, new conversation, summary, continuation prompt or duplicate agent work. Only sidebar visibility is requested.",
+    "No repository changes, VCS writes, .git/.holyagent edits, hidden APIs, database surgery, overwrites or security/credential changes. Use t3 CLI only for documented session visibility. T3 MCP is blocked by harness routing; do not call it. If any command denies access, stop that action and report blocker.",
+    "Report at most 5 bullets plus evidence: exact commands/exit codes and sidebar registration result or required user steps. Do no unrelated research."
+  ],
+  "criteria": [
+    {
+      "text": "Sidebar visibility result",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Live session unchanged",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "reports/t3-session-visibility.txt"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T16:12:06.798Z"
+  },
+  "createdAt": "2026-11-11T16:12:06.798Z"
+}
