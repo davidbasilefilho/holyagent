@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwc6qszh-9ncm",
+  "intentId": "intent-0mwc6p2im-6one",
+  "intentRevision": 1,
+  "roleTask": "Explorer.trace",
+  "slug": "map-how-to-expose-holyagent-cli",
+  "objective": "Map how to expose HolyAgent CLI functionality as actual Pi tools callable from codemode and recommend a concrete integration design.",
+  "state": "Ready",
+  "scope": [
+    "User requirement verbatim: the holyagent cli functionality must be actual tools in codemode in the pi integration",
+    "Read-only trace C:/Users/david.basile/dev/holyagent packages/integrations/pi/src/extension.ts, runtime CLI command registry and effect services, codemode tool/tool visibility settings, root/specialist instruction translation and tests.",
+    "Read relevant Pi docs in full before recommending harness implementation: C:/Users/david.basile/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md and docs/codemode.md plus related examples/crossreferences.",
+    "Determine existing registered tools and codemode discovery, which commands/state operations are missing, role restrictions and ways to preserve validation/approval boundaries while using structured tools instead of bash. No shell implementation is wanted; root needs a concrete file/function ownership map and options before implementation.",
+    "Provide2-3 short options with tradeoffs; prefer existing runtime APIs with shared validation if viable, exact recommended tool contract sketch, test plan and instruction/doc surfaces. Keep current CLI for other hosts."
+  ],
+  "constraints": [
+    "Read-only, no Git writes or repository state changes. Do not open HolyAgent assignment brief files except this own brief.",
+    "Avoid overlapping running old cloud writer instructions; identify ownership concerns rather than changing anything.",
+    "Report at most10 bullets with decisive paths/line references and current checks if any; long maps outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "Trace identifies the registration codemode exposure runtime command and role-boundary integration points",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Recommendation covers every CLI functionality with tests and preserves CLI compatibility and approval boundaries",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "trace",
+    "options",
+    "ownership-map"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T13:59:27.293Z"
+}
