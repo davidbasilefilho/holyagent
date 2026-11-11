@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "independently-review-the-direct-main",
   "objective": "Independently review the direct-main tooling restoration commit after the user reloads Pi and specialist tools become available.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Review the tooling commit on main against its parent: native mise dependency migration through updater, safe production prepare, isolated canary upgrade environment, Windows long-path state writes and Git worktree checkout, valid YAML descriptions in all model families, Pi FFF root and specialist tools, mounted Windows CLI paths and regression tests",
     "Root performed edits directly at the explicit request because Agent/SubagentWorkflow/todo/ask were unavailable in the original session; this Assignment deliberately remains Ready for a fresh properly equipped root",
@@ -43,5 +43,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T13:57:38.923Z"
+  },
   "createdAt": "2026-11-11T12:36:34.402Z"
 }
