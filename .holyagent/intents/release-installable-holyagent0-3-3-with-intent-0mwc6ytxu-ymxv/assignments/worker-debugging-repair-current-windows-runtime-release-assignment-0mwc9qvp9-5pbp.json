@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "repair-current-windows-runtime-release",
   "objective": "Repair current Windows runtime release-blocking failures and establish trustworthy actual command exits and counts for0.3.3.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, branch release/0.3.3/fix/npm-readiness, canonical0.3.3, existing uncommitted merge and prior edits preserved. Old cloud workers authoritatively cannot resume; ownership reconciled. Release-blocking leftovers now only, no interaction-states feature. Root owns all VCS/state/config; main checkout and scratch untouched.",
     "Take over partial debugger report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc88lir-pjpj.md. Current log C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc-verify-target.log; original holyagent-033-verify.log same temp dir. Last full3348pass52fail52skip; wrapper0 disagrees so no green. Isolated tarball Pi startup/CLI passed11skills/no diagnostics; screen19pass,bump56pass. Prior debugger only corrected screen pin assertion.",
@@ -94,5 +94,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc88lir-pjpj",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T15:24:26.635Z"
+  },
   "createdAt": "2026-11-11T15:23:29.662Z"
 }
