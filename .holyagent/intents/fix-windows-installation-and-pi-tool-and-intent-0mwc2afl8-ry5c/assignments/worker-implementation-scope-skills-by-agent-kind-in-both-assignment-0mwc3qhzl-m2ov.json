@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mwc3qhzl-m2ov",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "scope-skills-by-agent-kind-in-both",
+  "objective": "Scope skills by agent kind in both integrations without unnecessary prompt expansion and replace legacy Context7 skill discovery with HolyAgent guidance.",
+  "state": "Ready",
+  "scope": [
+    "Research native skill visibility in Claude Code and current Pi/pi-subagents; Pi can filter advertised skills at resource and prompt boundaries, Claude can declare selected skills in agent metadata or embed concise always-needed sections where native scoping is unavailable",
+    "Classify root orchestration skills (state-mode, ci-watch, user-busy, evidence-judging, visual-judging), visual platform design skills, operations dev-server guidance, instruction-writing guidance, and Context7 lookup guidance by actual role needs",
+    "Keep situation-specific long instructions lazy; do not paste every skill body into every specialist; preserve model-family versions, supporting-file paths and user/project skills",
+    "Legacy ~/.agents/skills/context7-cli was absent when inspected during tooling repair; recheck before removing and never delete unrelated skills. Ship or wire HolyAgent Context7 guidance instead of reinstalling upstream skill as a duplicate"
+  ],
+  "constraints": [
+    "Deferred until tooling restoration is committed to main and specialist tools load",
+    "Requirements first, all three family translations and coverage, generated assets rebuilt",
+    "Do not claim that filtering advertisements is a filesystem security boundary",
+    "Follow current host docs and examples before implementation; preserve unknown user skills",
+    "Report in at most 10 bullets; long logs outside repository"
+  ],
+  "criteria": [
+    {
+      "text": "Each role discovers only relevant HolyAgent skills while unrelated user skills and family paths stay intact",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Situational skill bodies stay lazy unless concise role-specific embedding is necessary and justified",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Skill YAML, generation and role-scoping regressions are covered and current-head gates pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks",
+    "diff-file",
+    "host-support-matrix"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/pi/src",
+    "packages/runtime/tests",
+    "packages/integrations/claude/tests",
+    "packages/integrations/pi/tests",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T12:35:14.193Z"
+}
