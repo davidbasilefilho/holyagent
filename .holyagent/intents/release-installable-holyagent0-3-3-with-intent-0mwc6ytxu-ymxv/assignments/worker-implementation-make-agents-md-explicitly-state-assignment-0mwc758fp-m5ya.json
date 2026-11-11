@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-agents-md-explicitly-state",
   "objective": "Make AGENTS.md explicitly state HolyAgent stacked-PR and beneficial worktree conventions for the current release model.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work ONLY in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Edit AGENTS.md only; main checkout remains main.",
     "User requirements verbatim: use worktrees for the pr stack as well if beneficial and state in AGENTS.md. User also requires HolyAgent PR stack standard explicitly in AGENTS.md.",
@@ -43,5 +43,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T14:11:25.495Z"
+  },
   "createdAt": "2026-11-11T14:10:40.501Z"
 }
