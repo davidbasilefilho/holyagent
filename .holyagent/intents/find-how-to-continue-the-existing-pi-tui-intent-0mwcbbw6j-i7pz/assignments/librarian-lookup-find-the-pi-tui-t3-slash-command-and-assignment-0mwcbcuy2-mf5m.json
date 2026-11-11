@@ -5,7 +5,7 @@
   "roleTask": "Librarian.lookup",
   "slug": "find-the-pi-tui-t3-slash-command-and",
   "objective": "Find the Pi TUI /t3 slash command and report its exact supported session handoff syntax.",
-  "state": "Ready",
+  "state": "Cancelled",
   "scope": [
     "The user is running Pi TUI session 01a1ca6b-447a-75e5-9485-35fa14619851 and wants that existing session to continue in the T3 Code app, preserving history.",
     "The user specifically says there is a t3 command. Focus on locating the installed Pi extension that registers /t3 and its documented behavior, quickly.",
@@ -29,5 +29,6 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "result": "stopped",
   "createdAt": "2026-11-11T16:08:34.730Z"
 }
