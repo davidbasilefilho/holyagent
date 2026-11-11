@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "confirm-the-two-real-file-symlink",
   "objective": "Confirm the two real file-symlink security tests now pass without rerunning the expensive whole state suite.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Actualreleaseworktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, explicitPowerShell Set-Location. UserenabledDeveloperMode; rootwillreminddisableafterdone. Previousworkerfailedbecausewhole state-branch+bumpcommandtimedout60s, notreproducedEPERM. Don'trerunsamebroad60scommand. Readcurrentstate-branch.test.tsaround1523,1543 toidentifyEXACTtworealFILEsymlinktestnames (notdirectoryjunctioncases). Run `bun test packages/runtime/tests/state-branch.test.ts -t <exact regex matching onlybothnames>` fromcorrectworktree andreportcounts includingfiltered/skip. Expectedactualtwoexecutions; dontcountfilteredassuccess. Thenrun scripts/bump-version.test.ts separately(previous56passunder60). No weakening/skipping/sourcechanges/build/fullverify/OSchange/modelcalls.",
     "Preventnestedtimeout: PowerShelltooloptionaltimeout hasnodefaulttimeoutperdeclaration, andcodemodedefaultwrappermaycancelat60. Ifusingcodemode set its firstline `// @options: {\"timeout_ms\": 600000}` and underlyingtools.powershell timeout540. Useoneboundedawaitedcommandwithredirectedlonglogsoutside repo andactual$LASTEXITCODE immediatelyafterBun; can'ttrustoldwrapper0files. No background/parallelduplicate broadstatebuncommands. Ifearlierworkerslefttestprocessesthatinterfere, reportconcreteownedprocessID/evidence ratherthankillingunidentifiedprocesses.",
@@ -92,7 +92,33 @@
     "agentId": "pi-workflow:wf_ec570eeb8277/assignment-0mwcd02qe-qp6j",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T16:55:19.875Z"
+    "startedAt": "2026-11-11T16:55:19.875Z",
+    "finishedAt": "2026-11-11T17:12:35.657Z"
+  },
+  "result": "result: Both file-symlink security tests and the separate bump-version tests passed.\nchanged: none\nchecks: `bun test packages/runtime/tests/state-branch.test.ts -t 'migration does not write through a symlink in the state worktree|migration leaves a symlink in a work tree out of the state'` -> exit 0, 2 pass, 0 fail, 59 filtered out; `bun test scripts/bump-version.test.ts` -> exit 0, 56 pass, 0 fail\nblockers: none\nquestions: none\nnotes: Developer Mode was enabled for the symlink tests; remember to disable it when finished.\nevidence:\nBoth real file symlink security tests execute with trustworthy exit and counts: targeted test command exited 0; both named file-symlink tests executed, 2 pass, 59 filtered out.\nSeparate bump version test scope passes: `bun test scripts/bump-version.test.ts` exited 0; 56 pass.\nchecks-run: Both commands ran from `C:/Users/david.basile/dev/holyagent-0.3.3-npm`; logs at `C:/Users/david.basile/AppData/Local/Temp/holyagent-symlink-tests.log` and `C:/Users/david.basile/AppData/Local/Temp/holyagent-bump-tests.log`.\nenvironment-blocker: none.\n",
+  "acceptance": {
+    "revision": 17,
+    "rationale": "Exact two unchanged real file-symlink security tests now execute after Developer Mode: exit0,2pass59filtered; separate bump exit0,56pass. Concrete prior environmental blocker resolved; filtered tests not counted as pass.",
+    "criteria": [
+      {
+        "criterion": "Both real file symlink security tests execute with trustworthy exit and counts",
+        "support": "targeted test command exited 0; both named file-symlink tests executed, 2 pass, 59 filtered out."
+      },
+      {
+        "criterion": "Separate bump version test scope passes",
+        "support": "`bun test scripts/bump-version.test.ts` exited 0; 56 pass."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Both commands ran from `C:/Users/david.basile/dev/holyagent-0.3.3-npm`; logs at `C:/Users/david.basile/AppData/Local/Temp/holyagent-symlink-tests.log` and `C:/Users/david.basile/AppData/Local/Temp/holyagent-bump-tests.log`."
+      },
+      {
+        "label": "environment-blocker",
+        "support": "none."
+      }
+    ]
   },
   "createdAt": "2026-11-11T16:54:37.526Z"
 }
