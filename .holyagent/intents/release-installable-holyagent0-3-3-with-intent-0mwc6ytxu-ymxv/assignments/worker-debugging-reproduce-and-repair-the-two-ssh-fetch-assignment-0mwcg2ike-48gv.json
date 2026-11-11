@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "reproduce-and-repair-the-two-ssh-fetch",
   "objective": "Reproduce and repair the two SSH-fetch failures seen only in the full Windows test run while preserving batch-mode and no-network safety coverage.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Read prior full log C:/Users/david.basile/AppData/Local/Temp/holyagent-verify-ux9c.log for literal failures and source paths. Prior focused run bun test packages/runtime/tests/state-branch.test.ts --test-name-pattern 'ssh runs in batch|hook makes no network|migration does not write through a symlink|migration does not write through a linked directory|migration refuses a state worktree whose' passed5/0fail56filtered; two full-run SSH failures remain unexplained.",
     "Trace cause from assertions through fixtures and execution. Investigate shared process environment, module mocks/import cache, concurrent temp paths and fake command invocation interference; do not assume or merely rerun the focused passing tests as proof. A bounded wider combined Bun test invocation containing relevant interfering suites is allowed; do not run complete verify, build/install/pack, real external SSH/network calls or authenticated model calls.",
@@ -116,5 +116,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcfco7m-oimd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T18:20:55.343Z"
+  },
   "createdAt": "2026-11-11T18:20:30.206Z"
 }
