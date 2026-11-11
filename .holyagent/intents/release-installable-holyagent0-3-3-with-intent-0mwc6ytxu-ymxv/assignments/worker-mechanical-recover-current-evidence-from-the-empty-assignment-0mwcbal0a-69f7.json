@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwcbal0a-69f7",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 14,
+  "roleTask": "Worker.mechanical",
+  "slug": "recover-current-evidence-from-the-empty",
+  "objective": "Recover current evidence from the empty-report root-policy workflow and fix only its formatting.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Terminal assignment-0mwcavd08-c345/wf_aa3bf9f87b89 returnedemptytext, closedErrored; itmayhavewrittenpolicychanges. Approved scope rootquestion/denialpolicy acrosspackages/runtime/src/instructions +scripts/root-question-policy.test.ts. Do not rewritepolicymeaning. Inspect diffsummary and runfocusedrootpolicy/instructioncoveragetests to establishcurrentstate, not old4pass8fail. Format scripts/root-question-policy.test.ts usingrepoformatter onlyifneeded; nootheredits.",
+    "Root owns VCS/state; CIwriteractive owns workflows/helpers, do notbuild/fullverify/generatededits. Run focused policytests andscopedformattercheck; reportremainingfailure exacttestnames/policyfamily/requirementmapping toallowboundednextjudgmentrepair. No extraresearch orliveAPIs. Preserveuserdenial/nobypass/settledanswers/freshscopedautomatedreapproval wordingandexistinguserapprovalcontext. Do not remove/weaken tests to getgreen."
+  ],
+  "constraints": [
+    "Userapproved exact rootpolicyedits butthisassignmentisformatting/evidencerecoveryonly; no unapprovedsemanticsecuritychanges. No Git/state/model/network/userconfigchanges. Reportatmost5bullets command/exits/passfailcounts/changedpaths/diff-file plusexactremainingissues, longlogsoutsiderepo."
+  ],
+  "criteria": [
+    {
+      "text": "Current policy work and focused test result recovered",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Formatting only change and no semantic weakening",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "scripts/root-question-policy.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwcavd08-c345",
+  "createdAt": "2026-11-11T16:06:48.538Z"
+}
