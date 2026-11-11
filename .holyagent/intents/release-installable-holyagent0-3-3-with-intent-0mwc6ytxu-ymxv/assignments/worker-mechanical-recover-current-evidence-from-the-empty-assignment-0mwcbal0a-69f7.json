@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "recover-current-evidence-from-the-empty",
   "objective": "Recover current evidence from the empty-report root-policy workflow and fix only its formatting.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Terminal assignment-0mwcavd08-c345/wf_aa3bf9f87b89 returnedemptytext, closedErrored; itmayhavewrittenpolicychanges. Approved scope rootquestion/denialpolicy acrosspackages/runtime/src/instructions +scripts/root-question-policy.test.ts. Do not rewritepolicymeaning. Inspect diffsummary and runfocusedrootpolicy/instructioncoveragetests to establishcurrentstate, not old4pass8fail. Format scripts/root-question-policy.test.ts usingrepoformatter onlyifneeded; nootheredits.",
     "Root owns VCS/state; CIwriteractive owns workflows/helpers, do notbuild/fullverify/generatededits. Run focused policytests andscopedformattercheck; reportremainingfailure exacttestnames/policyfamily/requirementmapping toallowboundednextjudgmentrepair. No extraresearch orliveAPIs. Preserveuserdenial/nobypass/settledanswers/freshscopedautomatedreapproval wordingandexistinguserapprovalcontext. Do not remove/weaken tests to getgreen."
@@ -36,5 +36,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcavd08-c345",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T16:07:29.556Z"
+  },
   "createdAt": "2026-11-11T16:06:48.538Z"
 }
