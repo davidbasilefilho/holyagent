@@ -19,9 +19,14 @@
     "use worktrees for the pr stack as well if beneficial and state in AGENTS.md",
     "report issues you find for me as well as in intents to fix either immediately or in0.3.4 and tell me how much of0.3.3 development is left still",
     "do you have the exa mcp server? can't you use the native codex alternative? that requires the pi-codex-conversion right? that's why I need to install holyagent now. exa must only be a fallback when there are only providers that don't offer web search installed",
-    "Verify actual Exa MCP availability separately from pi-web-kit Exa provider, native Codex search exposure and pi-codex-conversion requirement before changing setup. Prefer native search of installed providers; Exa only when none installed offers web search. Establish release impact with read-only investigation; preserve approved minimal0.3.3/deferred0.3.4 split."
+    "Verify actual Exa MCP availability separately from pi-web-kit Exa provider, native Codex search exposure and pi-codex-conversion requirement before changing setup. Prefer native search of installed providers; Exa only when none installed offers web search. Establish release impact with read-only investigation; preserve approved minimal0.3.3/deferred0.3.4 split.",
+    "there must be a publish.yml and stable.yml and dev.yml, publish must use the other two, and stable must create a github stable release as well as a stable npm release, dev.yml must create a dev pre release and an npm pre-release updating the dev npm tag",
+    "For0.3.3 implement publish.yml orchestrating reusable stable.yml and dev.yml. Stable publishes a GitHub stable release and npm stable release (latest dist-tag); dev publishes a GitHub prerelease and npm prerelease updating npm dev dist-tag. Use bun pm pack for tarballs and npm trusted publishing/OIDC for CI publication, preserving required validation and SHA action pins.",
+    "I will put publish.yml in the npm package settings after you publish a bootstrap version so it appears on npm",
+    "User explicitly authorizes one reviewed bootstrap prerelease publication via existing authenticated npm login to establish the public package before trusted publisher configuration. Default bootstrap version0.3.3-bootstrap.0 and npm bootstrap dist-tag keep it off latest/dev. This is a deliberate prerequisite exception to CI-only publication, not an automatic token fallback. Then user configures publish.yml in npm settings; final0.3.3 and CI stable/dev releases must use trusted OIDC, no token fallback. Still no merge/protected push without authority.",
+    "Confirmed first release worker evidence: frozen install397packages/build pass; targeted fixture tests56+20pass; check310files/lint311files/fmt729files green. Full Windows verify observed>=28failures and running at report time, so not accepted. Clean tarball CLI version/help pass, Pi extension startup unknown. Automatic npm workflow edit denied; stop that action pending exact denied-effect diagnosis and subsequent explicit user authorization. New user workflow/bootstrap instructions above govern authorized future work."
   ],
-  "revision": 5,
+  "revision": 6,
   "state": "Open",
   "createdAt": "2026-11-11T14:05:41.778Z"
 }
