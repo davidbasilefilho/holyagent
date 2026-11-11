@@ -17,9 +17,11 @@
     "User additionally requires AGENTS.md to explicitly state HolyAgent PR stack standards. For0.3.3, work PRs target existing integration, subsequent work stacks on preceding open PR subject to repository mergeability, and only release integration opens into main. main/dev remains0.3.4. This minimal documentation update is authorized in0.3.3.",
     "In-flight tooling review assignment-0mwc3s7vm-q9xv remains applicable. In-flight read-only research assignment-0mwc6qszh-9ncm and assignment-0mwc6qn5g-u873 may finish and their reports are retained for0.3.4; launch no implementation from them now.",
     "use worktrees for the pr stack as well if beneficial and state in AGENTS.md",
-    "report issues you find for me as well as in intents to fix either immediately or in0.3.4 and tell me how much of0.3.3 development is left still"
+    "report issues you find for me as well as in intents to fix either immediately or in0.3.4 and tell me how much of0.3.3 development is left still",
+    "do you have the exa mcp server? can't you use the native codex alternative? that requires the pi-codex-conversion right? that's why I need to install holyagent now. exa must only be a fallback when there are only providers that don't offer web search installed",
+    "Verify actual Exa MCP availability separately from pi-web-kit Exa provider, native Codex search exposure and pi-codex-conversion requirement before changing setup. Prefer native search of installed providers; Exa only when none installed offers web search. Establish release impact with read-only investigation; preserve approved minimal0.3.3/deferred0.3.4 split."
   ],
-  "revision": 4,
+  "revision": 5,
   "state": "Open",
   "createdAt": "2026-11-11T14:05:41.778Z"
 }
