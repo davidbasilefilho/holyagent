@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "establish-whether-a-command-or-artifact",
   "objective": "Establish whether a command or artifact from this release session caused the Windows Defender Trojan alert the user just reported.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "The user asks: was a command you ran that triggered a windows defender \"trojan detection\"? Give a factual causal answer if evidence permits, otherwise say exactly what remains unknown. This is a read-only security incident correlation, no remediation or reproduction.",
     "Read the recent native Defender detection/history (Get-MpThreatDetection/Get-MpThreat or Microsoft-Windows-Windows Defender/Operational events 1116/1117/1118/1119 and relevant blocks), bounded to today's recent alerts or most recent 20 records. Capture exact threat name, detection timestamp/timezone, affected resource/path, reported triggering process, action success/quarantine state, active/execution flags where available. Explain what those flags do and do not prove. Admin elevation is not authorized; if access is denied, stop that read and report the user-owned gap. Do not use any other tool to bypass denial.",
@@ -104,5 +104,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T17:43:44.387Z"
+  },
   "createdAt": "2026-11-11T17:43:13.778Z"
 }
