@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "obtain-comparable-gpt6luna-medium-high",
   "objective": "Obtain comparable GPT6Luna medium/high benchmark and output-token evidence through a working public-source path.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Prior report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcagpqy-r1qr.md Unknown: no native search exposed, Exa missing key, browserrelayunpaired, no existingbrowserwindow. This does NOT block launching an installed browser normally. You are explicitly authorized to list installed apps and launch an installed Edge/Chrome/Firefox to public URLs using computer-use; no pairing/login/profile/security/config changes or installs. If no browser installed then report that exact bounded blocker. Do not stop solely because no window currently open. Never retry denied action viaanotherroute.",
     "User authorizes GPT6Luna medium orhigh automaticreview iff supported. Decide from benchmark quality and output/reasoning tokens-to-performance, not monetary cost; fast medium if adequate, high if medium insufficient. ModelID locallyregistered gpt-6-luna, openai-codex-responses medium/high, endpointstrictschema support being separatelyprobed. Research authoritative OpenAI/public independent same-model effort comparisons, including mypriors.com if relevant. No invented data; distinguish generation/version/harness and task-suitability inference. Prefer limitedrelevant comparisons and re-derive any ratio from citedvalues. If comparable evidence genuinelynotpublic identifythisratherthanpickeffortunfounded.",
@@ -83,7 +83,9 @@
     "agentId": "pi-workflow:wf_1de4519e1611/assignment-0mwcaremm-mxbm",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-11T15:52:27.464Z"
+    "startedAt": "2026-11-11T15:52:27.464Z",
+    "finishedAt": "2026-11-11T15:58:13.198Z"
   },
+  "result": "failure: result: Benchmark comparison blocked; no evidence-based effort choice available.\nchanged: none\nchecks: Installed-app listing returned 184 apps but did not expose the full list; browser launch failed before any public page was read.\nblockers: `computer_use_launch_app` returned `Error: launch_app requires interactive user confirmation.` No retry or alternate route attempted. The available web search/fetch tools use Exa, which the prior report says lacks a key.\nquestions: none\nnotes: Inference: retain the existing review guard and defer the model/effort change until comparable evidence and backend support are established; neither medium’s security-classification adequacy nor high’s advantage is known.\nevidence:\nComparable medium high benchmark and token evidence sourced or concrete absence established: Not established; browser access blocked, so public absence cannot be claimed. Medium/high scores, output tokens and latency are unknown.\nPerformance token based recommendation distinguishes facts from unknowns: No performance-per-token choice is supportable without comparable measurements; strict-schema support is separately being probed.\nbenchmark-sources: No public source was successfully accessed; no source versions or dates verified.\nrecommendation: Defer choosing medium or high; do not infer security-review performance from unrelated model generations or benchmarks.\n",
   "createdAt": "2026-11-11T15:51:53.806Z"
 }
