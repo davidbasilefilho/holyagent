@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "recommend-an-established-maintained-mcp",
   "objective": "Recommend an established maintained MCP-to-Pi tool adapter that reduces tool-schema context bloat, or establish why separate pi-mcp-to-tool is needed.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only research now; integration or new package belongs to0.3.4 after minimal0.3.3 npm release.",
     "User requirement verbatim: if there is an mcp-to-pi-tool extension for adapting the context-bloat from mcp to actual pi tools, we should use it if it's well maintained and not obscure, if not we shall develop it as another package `pi-mcp-to-tool`.",
@@ -41,5 +41,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:18:38.624Z"
+  },
   "createdAt": "2026-11-11T14:18:06.515Z"
 }
