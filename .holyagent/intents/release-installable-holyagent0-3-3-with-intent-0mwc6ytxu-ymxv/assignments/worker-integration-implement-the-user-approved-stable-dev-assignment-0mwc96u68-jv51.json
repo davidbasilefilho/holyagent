@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "implement-the-user-approved-stable-dev",
   "objective": "Implement the user-approved stable/dev GitHub and npm trusted-publishing workflows for installable HolyAgent0.3.3.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm, branch release/0.3.3/fix/npm-readiness. Existing uncommitted merge must stay intact; root alone owns VCS. Previous assignment-0mwc8ny8d-po33 made no edits because OIDC permission denied; user has now explicitly approved id-token:write only on stable/dev publishing jobs and reusable callers, excluded PR jobs, existing repository-write restrictions preserved. This task is now authorized.",
     "Implement .github/workflows/publish.yml orchestration calling reusable stable.yml/dev.yml. Both perform existing validation including macOS/Linux/Windows, pack with bun pm pack from public Pi dist package, publish actual tarball with npm trusted publishing/OIDC and no npm-token fallback, and create matching GitHub release/artifacts. Stable uses canonical0.3.3 and latest npm tag; dev uses real npm prerelease version and dev dist-tag and GitHub prerelease. Both need reliable version identity between packed tarball/npm/GitHub. Avoid republishing stable version on dev. Keep required check job IDs and existing full SHA action pins; external actions pinned full SHA/comment. contents:write only actual GitHub release/tag jobs; npm publishing jobs/callers id-token:write only as approved. No pull-request workflow gets publication privileges.",
@@ -93,5 +93,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc8ny8d-po33",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T15:08:31.822Z"
+  },
   "createdAt": "2026-11-11T15:07:54.561Z"
 }
