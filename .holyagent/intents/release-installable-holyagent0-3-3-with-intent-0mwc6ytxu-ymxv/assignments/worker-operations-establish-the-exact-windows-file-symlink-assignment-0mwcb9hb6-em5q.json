@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwcb9hb6-em5q",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 14,
+  "roleTask": "Worker.operations",
+  "slug": "establish-the-exact-windows-file-symlink",
+  "objective": "Establish the exact Windows file-symlink blocker and whether native Node can preserve the two failing real-link tests without OS changes.",
+  "state": "Ready",
+  "scope": [
+    "Read-only/probe work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Latest fixture report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcagzo2-9wo1.md:ownedstatebranch+bumpversion114pass2fail1skip;2realfile-symlinktests EPERM errno-4048, directoryjunction3pass. Before askingusersecuritysettingchange, establish actual current capability/requiredaction, not assumeEPERMmeansDeveloperModeoff.",
+    "Inspect exact2testcases, readonlyWindowsDeveloperMode/privilege status whereaccessible (noelevation/settingswrites), and tiny isolatedfilelink probe in tempoutside repo under currentBun versus existingnativeNode. Capture realcodes/errors, cleanup onlyselfcreatedprobe tempfiles. IfNode cancreate truesymlink andBun cannot, provide exact supportedfixturealternative preservingassertions forimplementation. Ifneithercan, distinguishOSprivilege fromunsupportedBunflag and identify concrete user-ownedOSaction, benefit/risk, smallestscope. No attempttogainprivileges/admin/elevation or altersecuritysettings. No newskips/mocks/coverageweakening.",
+    "No needfullgates,No network/models/source/Git/statechanges. Relevantroot requirements preserveuserguardrails, actualtestcoverage and noOSsecuritychangewithoutapproval. Provideonlyfactsnecessarytodecidepermissionquestion."
+  ],
+  "constraints": [
+    "Preserve main/scratch/userconfig and existingguardrails. No securitysetting/privilege/credentialchanges. Temporaryownedprobe filesonly; no repositoryedits. Reportatmost5bullets with exactprobecommands/exits, Node/Bun versions/capability andconcreteremedy/Unknown; longlogsoutside repo."
+  ],
+  "criteria": [
+    {
+      "text": "Windows file symlink cause and supported fixture alternative established",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Read only OS state and controlled probe evidence preserved",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "probe-results",
+    "user-action"
+  ],
+  "ownershipPaths": [
+    "scripts/windows-symlink-probe-reservation"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T16:05:57.090Z"
+}
