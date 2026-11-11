@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mwc88lir-pjpj",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 7,
+  "roleTask": "Worker.debugging",
+  "slug": "resolve-real-current-windows",
+  "objective": "Resolve real current Windows verification failures and run a meaningful isolated packaged-Pi startup check for0.3.3.",
+  "state": "Ready",
+  "scope": [
+    "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Branch release/0.3.3/fix/npm-readiness carries staged tooling merge and uncommitted CI fixture repairs; AGENTS.md has a separate writer. Prior terminal assignments: assignment-0mwc785xx-27bc (source fixes) and assignment-0mwc7yb7y-re9l (failed evidence collection). Read both reports from C:/Users/david.basile/dev/holyagent/.git/holyagent/reports as needed.",
+    "Get exact existing verification process status first. Log C:/Users/david.basile/AppData/Local/Temp/holyagent-033-verify.log counted3345pass54fail52skip/113files but holyagent-033-verify.exit says0. A validation agent also started C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc-verify-retry.log with final exit unknown. Do not start concurrent verification. Establish whether failure/exit discrepancy is stale output, wrapper-capture error, gate masking or product bug and fix actual owned cause if present.",
+    "Diagnose/fix release-blocking failures in owned paths and add real regressions. Prior fixtures scripts/bump-version.test.ts are56passing individually but full log reports EPERM at362,421; avoid assuming old logs represent current tree. Other known groups include browser-use stale expectations, Pi config expectations, TUI Windows assumptions, apply_patch symlink fixtures. Runtime/tests are outside ownership owing unresolved old cloud writer lock: report exact required changes there without editing those paths; do not weaken tests or add indiscriminate skips.",
+    "Complete packaged Pi extension startup using actual holyagent tarball installed into temporary home/PI_CODING_AGENT_DIR and installed Pi host, not workspace imports. Confirm no extension/skill diagnostics, expected tools/skills registration and actual packaged Windows CLI invocation. No model calls. Use existing C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3.tgz only if current enough; if repacking bun pm pack and rebuild first when appropriate. Published contents must reflect canonical0.3.3.",
+    "No npm publishing/workflow edits in this assignment. Later workflow work is separately scoped to publish.yml calling stable.yml/dev.yml with GitHub and npm stable/dev publication. Package bootstraps need reviewed result before publication."
+  ],
+  "constraints": [
+    "Only release-blocking0.3.3 fixes. Native tools, dual providers, role skills, mixed routing, wait tool, main/dev migration are0.3.4. User explicitly wants specialists to do investigation, implementation and tests.",
+    "Own scripts,mise.toml,packages/integrations/pi/src,packages/integrations/pi/tests,packages/runtime/src/setup,packages/runtime/src/state,packages/runtime/src/tui. No runtime/tests,dist,AGENTS.md,.github/workflows edits. No Git/state writes, config/account/security changes, credential access or actual publication. Store harnesses/logs outside repository. Do not terminate unrelated processes.",
+    "Use bunx --no-install mise run tasks and dependency updater convention. Preserve main checkout, dirty scratch, selected Codex model, guardrails and credentials. Inspect child temp-home isolation before testing installers. Record actual command/exit/counts and error paths; don't count syntax-only/Unknown/waived as pass.",
+    "Report at most8bullets with exact failing test path:line and necessary out-of-scope ownership; put long logs outside repository and provide paths. Include small diff-file for independent review."
+  ],
+  "criteria": [
+    {
+      "text": "Current verification status and exit integrity",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Owned release blockers fixed with regressions",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Packaged Pi startup and CLI smoke",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Minimum release scope preserved",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "out-of-scope",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "scripts",
+    "mise.toml",
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/state",
+    "packages/runtime/src/tui"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwc7yb7y-re9l",
+  "createdAt": "2026-11-11T14:41:17.044Z"
+}
