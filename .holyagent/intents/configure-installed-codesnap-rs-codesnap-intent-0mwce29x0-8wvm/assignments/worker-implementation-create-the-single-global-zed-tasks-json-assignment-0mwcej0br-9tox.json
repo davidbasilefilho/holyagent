@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mwcej0br-9tox",
+  "intentId": "intent-0mwce29x0-8wvm",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "create-the-single-global-zed-tasks-json",
+  "objective": "Create the single global Zed tasks.json file with a usable CodeSnap screenshot task now.",
+  "state": "Running",
+  "scope": [
+    "Only C:/Users/david.basile/AppData/Roaming/Zed/tasks.json. User explicitly says JUST PLACE THE TASKS FILE IN THE CORRECT LOCATION WITH THE CORRECT CONTENT, IT IS ONE FILE.",
+    "Installed codesnap C:/Users/david.basile/.cargo/bin/codesnap.exe v0.14.0; Zed uses One Dark/One Light system theme and 15px .ZedMono font. You have already inspected source in prior context. Use closest actually supported native palette/font options; do not create helpers or download assets. Can use a small inline PowerShell task if needed for safe env selection and output paths. File fallback acceptable if selection unavailable.",
+    "Preserve any existing tasks. Generate and verify one PNG with the task command using representative env input. Do not mutate clipboard for tests. Save full report C:/Users/david.basile/AppData/Local/Temp/zed-codesnap-single-file-report.md with exact task label, usage, limits, command/exit and PNG evidence. Finish implementation, do not stop at investigation."
+  ],
+  "constraints": [
+    "User asks global codesnap-rs/codesnap task with editor colorscheme/fonts; lexical token differences irrelevant. Latest explicit constraint: one persistent tasks.json file only.",
+    "No helpers/assets, installs, GUI windows, repository edits, version-control/state writes or security changes. Only tasks.json persistent change; probe/report files in Temp allowed.",
+    "Report at most 5 bullets plus evidence. Keep working to installed tested result, not another research plan."
+  ],
+  "criteria": [
+    {
+      "text": "Single global task installed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Screenshot generation verified",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Appearance and limitations stated",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Other configuration preserved",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "report-file"
+  ],
+  "ownershipPaths": [
+    "local-user-zed-global-codesnap"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwce9alk-xj0f",
+  "specialist": {
+    "agentId": "pi:7061f4ea-63f8-40c",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T17:37:20.488Z"
+  },
+  "createdAt": "2026-11-11T17:37:20.488Z"
+}
