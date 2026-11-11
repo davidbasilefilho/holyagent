@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "compact-the-claude-session-root-core",
   "objective": "Compact the Claude session root core enough for the existing 9400-character context contract while preserving every behavioral requirement and exact approved denial wording.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm. The root inspected the two failing tests and rendering code to settle the repair boundary. This is prose/composition repair, not a budget or selection-design change. CONTEXT_BUDGET=9400 is an actual Claude host safety contract because the host truncates additionalContext at10000. Keep it fixed.",
     "Measured current ROOT_CORE6732characters, reminder383, takeover313, cloud930. The two failures demand six complete requirements of about415chars each while status narrows to counts, and one complete LONG requirement of about2160chars while later requirements truncate with a truthful count. An182-character compaction was insufficient. Aim to recover at least1000characters from the actual Claude root core (about5700characters or less), then verify both cases. This measured target is not permission to remove semantics or weaken tests.",
@@ -120,7 +120,9 @@
     "agentId": "pi-workflow:wf_9671bfb16217/assignment-0mwcgc77s-cafq",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T18:28:22.578Z"
+    "startedAt": "2026-11-11T18:28:22.578Z",
+    "finishedAt": "2026-11-11T18:45:10.351Z"
   },
+  "result": "result: Claude root core compacted; both previously failing selection tests pass\nchanged: packages/runtime/src/instructions/claude-5.5/root/{identity,delegating,dispatch,task-list}.md, packages/runtime/src/instructions/claude-5.5/shared/precedence.md\nchecks: combined session-context, instruction-composition and root-policy tests → exit 0, 63 pass; mise check → exit 0, 317 files; mise lint → exit 0, 318 files; mise fmt → exit 0, 737 unchanged; git diff --check → exit 0\nblockers: none within this assignment\nquestions: none\nnotes: Build and full verify not run as instructed; compaction recovered 579 characters, below the requested 1,000-character aim.\nevidence:\nExisting session context budget and required selection contracts pass without relaxed budgets or weakened coverage: existing regression cases now pass; six of six short requirements fit and the first long requirement fits with a truthful omitted count.\nApproved instruction semantics safety boundaries and host neutral CLI execution remain intact: identity retains branch, approval and exact denial rules; precedence retains hierarchy; delegating retains specialist ownership and approval provenance; dispatch retains CLI, lifecycle, wake and interruption rules; task-list retains progress, question and turn boundaries.\nThe fix has a meaningful regression and changed scope checks pass: unchanged session-context tests failed before repair with 26 pass, 2 fail; combined tests pass with 63 pass, 0 fail.\nmeasured-composition: ROOT_CORE 6,732 → 6,153 characters; budget remains 9,400.\nchecks-run: `bun test packages/runtime/tests/sessioncontext.test.ts packages/runtime/tests/instructions.test.ts scripts/root-question-policy.test.ts` → exit 0, 63 pass, 0 fail; formatting, type and lint checks passed as listed above.\nchanged-paths: five Claude instruction files listed in changed; no tests or budgets modified.\nrepair-diff-file: C:/Users/david.basile/AppData/Local/Temp/ha-core-repair.diff; full owned-path diff: C:/Users/david.basile/AppData/Local/Temp/ha-core-owned.diff.\nremaining-blockers: Current-head full verification and independent review remain for the root.\n",
   "createdAt": "2026-11-11T18:28:02.056Z"
 }
