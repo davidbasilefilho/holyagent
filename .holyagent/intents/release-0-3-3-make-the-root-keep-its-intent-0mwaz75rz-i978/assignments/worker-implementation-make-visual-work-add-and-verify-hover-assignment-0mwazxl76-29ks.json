@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-visual-work-add-and-verify-hover",
   "objective": "Make visual work add and verify hover, pressed, focus and disabled states on every interactive element, per platform, with the gpt-6 family stating it most explicitly.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Worktree /home/user/holyagent-0.3.3-states, branch release/0.3.3/feat/interaction-states, stacked on release/0.3.3/feat/handoff-ready-state. Why: the maintainer reports that GPT-family models often ship interfaces with no hover or click (pressed) states, across platforms. Today the only rule is one line of the shared design core ('Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content': packages/runtime/src/instructions/gpt-6/design-core/core.md:76, claude-5.5/design-core/core.md:50, kimi-k3.1/design-core/core.md:64); no platform capture checklist names hover or pressed captures (web packages/runtime/src/instructions/*/skills/web-design/SKILL.md:78-84 names focus traversal and key-control states; desktop :62-67 focus only; mobile :61-67 and tui :76-85 neither); the Worker.visual and Reviewer.visual texts (packages/runtime/src/instructions/*/roles/worker-visual/{design,method,purpose}.md, */roles/reviewer-visual/{design,captures}.md) do not name state captures. The requirements tree files for the platform skills (packages/runtime/src/instructions/requirements/skills/{web,mobile,desktop,tui}-design/SKILL.md) are empty scaffolds; role requirements are packages/runtime/src/instructions/requirements/roles/worker-visual/design.md (R-WVI-DESIGN), requirements/roles/reviewer-visual/captures.md (R-RV), requirements/specialist/interface-inspection.md (R-INSPECT), requirements/design-core/core.md. Coverage: packages/runtime/src/instructions/coverage.ts (per-family tables).",
     "Change: (1) Requirements tree: add a requirement (new id, e.g. R-STATES) in the design-core and/or the visual role requirements stating, with the reason, that every interactive element (buttons, links, inputs, toggles, list rows, menu items, tabs, cards that act) gets: a hover state where a pointer can hover; a pressed/active state on click or tap; a visible keyboard focus state (focus-visible on web); a disabled state where the control can be unavailable; mapped per platform: web and desktop need hover and pressed (and hover must not be the only way to reveal something, since touch and keyboard have no hover); iOS and Android have no hover, so pressed feedback (highlight, ripple, scale or opacity, per platform convention) carries it, plus focus for hardware keyboards; terminal UIs mark focus and selection instead; and that Worker.visual drives and captures each state (hover, pressed, focus, disabled) for each kind of interactive element before reporting, and Reviewer.visual exercises them and treats a missing state as material (interaction correctness). (2) Translate into each family's design-core line, each platform skill's rules and capture checklist (add per-platform state captures: web and desktop hover/pressed/focus/disabled; mobile pressed/focus/disabled; tui focus/selection), and the worker-visual method and reviewer-visual captures text. In gpt-6, state it as a short per-element checklist with the reason, per its guide; claude-5.5 and kimi-k3.1 get the same rule in their own style, shorter. (3) Coverage entries for the new id in all three tables.",
@@ -56,7 +56,9 @@
     "agentId": "workflow:wf_664f4226-73d/assignment-0mwazxl76-29ks",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T18:01:00.306Z"
+    "startedAt": "2026-11-10T18:01:00.306Z",
+    "finishedAt": "2026-11-11T15:18:10.113Z"
   },
+  "result": "interrupted",
   "createdAt": "2026-11-10T18:01:00.306Z"
 }
