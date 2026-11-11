@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "revise-holyagent-root-prompts-to",
   "objective": "Revise HolyAgent root prompts to preserve settled user intent and eliminate redundant, non-actionable clarification questions while retaining real approval and concurrency safeguards.",
-  "state": "Ready",
+  "state": "Cancelled",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm; current0.3.3 minimal source/instruction fix explicitly requested now. Source of truth requirements tree and family instructions under packages/runtime/src/instructions; read instruction-writing skill at C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md and each family guide applicable. Update model-agnostic requirement first and each affected family root asking/answer/wait/concurrency instruction consistently. Preserve section architecture and requirement coverage IDs.",
     "Failure: user authorized taking over Claude Code Cloud work, explained exhausted usage/subscription ending. Root asked again to certify internal worker state, even though user cannot usefully inspect cloud internals. User now confirms no workers can resume, record is settled. Their critique: preserve established intent/authorization; delegate investigation of status/ownership/heartbeats/repo before escalation; ask only unresolved concrete risk requiring information or decision the user can provide. Unknown status neither active nor inactive; handle explicit Unknown rather than repeated user certification. Do not infer unsafe permission to write concurrently merely from Unknown.",
@@ -93,5 +93,6 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "result": "stopped",
   "createdAt": "2026-11-11T15:21:12.398Z"
 }
