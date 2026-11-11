@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "complete-the-offline-installed-pi",
   "objective": "Complete the offline installed Pi resource-loader smoke and relocate the two task-created diagnostic files out of the repository.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only source. Existing publictarball C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwchl9q7-pswh.tgz/holyagent-0.3.3.tgz,installedin C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwchl9q7-pswh-smoke/node_modules/holyagent. Alreadyverifiedholyagent@0.3.3/139files/CLIversion+help. Do NOT rebuild/repack/reinstall; use this existing output.",
     "Do NOT run pi --print/model prompts: they unnecessarily require credentials. Use actual installed Pi SDK DefaultResourceLoader.reload or equivalent official package/resource loading API to load the INSTALLED tarball extension and skills from package manifest in a unique isolated agentconfigdir. Instantiate the real loader, collect its extension load errors/resource diagnostics and skill count, assertzeroerrorsand11skills (or justifyactualmanifestcount). No authstorecopy/read, dummycredentials, API requests, skipped diagnosticassertions, credentialchanges or realuserconfig. Prior worker achievedthisoffline; seeinstalledSDKdocs/examples ifneeded. The desiredproofis actualresource/extensionload, notamodelresponse or manifest-onlycheck.",
@@ -108,5 +108,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwchl9q7-pswh",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T19:11:53.140Z"
+  },
   "createdAt": "2026-11-11T19:11:23.910Z"
 }
