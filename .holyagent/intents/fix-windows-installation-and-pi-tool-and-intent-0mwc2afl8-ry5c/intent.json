@@ -8,9 +8,16 @@
     "find other issues you may find with holyagent",
     "please prepare for npm release with trusted publishing via ci: bun pm pack for packing and npm for the actual trusted publishing. npm is logged in if you need and already prepare for release, I want it released there",
     "can you fix those tools problems both in this system and the repo?",
-    "User approved continuing direct work after being told specialist tools are unavailable; independent specialist review is waived. Keep main unchanged and use a worktree based on release/0.3.3/integration. Do not merge without explicit approval."
+    "main and dev branches; prs to dev using the holyagent standards; then pr to main once the release is ready; this must be a default in holyagent (mergeability always takes precedence)",
+    "Scope skills by agent kind in all integrations; embed only useful concise guidance where native scoping is unavailable, at least scope skills in Pi",
+    "please install scoop and fd and rg",
+    "dev releases must use the same format as: https://github.com/davidbasilefilho/chkdsk/releases",
+    "in holyagent can we just have codemode, and use the just-bash integration as its bash stuff?",
+    "a commit must not have more than one dev commit. the dev timestamp must use the commit timestamp in utc. Interpreted as one deterministic dev release per commit.",
+    "we must use fff integration via codemode instead of fd and ripgrep for pi",
+    "User approved direct work after being told specialist tools are unavailable; independent reviews waived. Preserve main, use a worktree, and do not merge without approval."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-11T11:54:44.974Z"
 }
