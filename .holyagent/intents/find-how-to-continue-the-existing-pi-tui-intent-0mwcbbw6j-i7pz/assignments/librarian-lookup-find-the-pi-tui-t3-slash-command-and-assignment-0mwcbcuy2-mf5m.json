@@ -1,0 +1,33 @@
+{
+  "id": "assignment-0mwcbcuy2-mf5m",
+  "intentId": "intent-0mwcbbw6j-i7pz",
+  "intentRevision": 1,
+  "roleTask": "Librarian.lookup",
+  "slug": "find-the-pi-tui-t3-slash-command-and",
+  "objective": "Find the Pi TUI /t3 slash command and report its exact supported session handoff syntax.",
+  "state": "Ready",
+  "scope": [
+    "The user is running Pi TUI session 01a1ca6b-447a-75e5-9485-35fa14619851 and wants that existing session to continue in the T3 Code app, preserving history.",
+    "The user specifically says there is a t3 command. Focus on locating the installed Pi extension that registers /t3 and its documented behavior, quickly.",
+    "Read installed extension source/documentation; likely under C:/Users/david.basile/.pi/agent/npm/node_modules or C:/Users/david.basile/.bun/install/global/node_modules/@earendil-works/pi-coding-agent. Use registered FFF searches and direct reads."
+  ],
+  "constraints": [
+    "Read only: no calls to T3 thread APIs or mutations; a direct thread read was denied by this harness, so do not bypass it. Determine documented /t3 usage for the user to invoke.",
+    "Do not modify code, session state, .git or .holyagent, and do not interrupt any TUI.",
+    "Report at most 5 bullets plus evidence, prioritizing the exact /t3 invocation and whether the user must enter it themselves; cite source paths and line numbers."
+  ],
+  "criteria": [
+    {
+      "text": "Exact t3 command behavior",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T16:08:34.730Z"
+}
