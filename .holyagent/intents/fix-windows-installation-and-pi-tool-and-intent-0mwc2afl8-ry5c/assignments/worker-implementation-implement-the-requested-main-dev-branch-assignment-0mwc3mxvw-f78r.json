@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mwc3mxvw-f78r",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-the-requested-main-dev-branch",
+  "objective": "Implement the requested main/dev branch and PR model as this repository workflow and HolyAgent default, with mergeability taking precedence.",
+  "state": "Ready",
+  "scope": [
+    "Replace release/<version>/integration as the active integration base with dev; work PRs target dev; once release ready open dev to main",
+    "Update branch-model checks and tests, CI trigger rules, contribution documentation, root stack-plan requirements and all three model families with coverage",
+    "Preserve historical branches and tags; do not delete or force-push; inspect and reconcile existing release/0.3.3 bump on the legacy integration branch"
+  ],
+  "constraints": [
+    "Deferred until tooling restoration is committed to main and a properly equipped root resumes",
+    "User says: main and dev branches; prs to dev using the holyagent standards; then pr to main once the release is ready; this must be a default in holyagent (mergeability always takes precedence)",
+    "A dev-to-main PR is the release PR, not an aggregate of otherwise unrelated branches",
+    "Update requirements first and translate all families; use repository gates",
+    "User authorized a direct main tooling commit only, not merges or security-setting changes",
+    "Report in at most 10 bullets; logs outside repository"
+  ],
+  "criteria": [
+    {
+      "text": "Only dev may open a release PR to main and work PRs target dev with tested enforcement",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "All instruction families implement main/dev by default while repository mergeability wins",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Repository gates pass on the current head",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "scripts/pr-checks.ts",
+    "scripts/pr-checks.test.ts",
+    "packages/runtime/src/instructions",
+    "AGENTS.md",
+    "docs/development.md",
+    ".github/workflows"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T12:32:28.172Z"
+}
