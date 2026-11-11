@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.audit",
   "slug": "independently-audit-current-release",
   "objective": "Independently audit current-release changes against user scope and identify only concrete remaining acceptance obligations.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Readcommittedpatchandbindingrequirements; auditactualscopeoneinstallable/publishable0.3.3, minimalcorrectness+laterexplicitprompt/StopSlop/Codexrequests. Benchmarksandlargerfeatures0.3.4, releaseintegrationmodelpreserved. No unrelatedrefactors/features. Release289paths165generated124handwritten8new; secretpatternscan0matches butsecurityreviewseparate.",
     "Distinguishimplementedsourcefromunfinishedoutwardwork. Currenthead4ea9a3c committed/clean;build/check317/lint318/fmt737green,prioractualCodexguardianschemasmokeaccepted. Remote3platformCI/finalverify/npmbootstrap/accountpublisherconfig/OIDCfinalpublication/localinstallNOTcomplete. UserawayapprovedsafePRcreation+merges, publicationbootstrappreviouslyapproved, no security/credentialbypass. Explicituserdenialsremainbinding.",
@@ -108,5 +108,10 @@
     "assignment-0mwcc7475-9k6v",
     "assignment-0mwchf7z4-gbp3"
   ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-11T19:18:17.600Z"
+  },
   "createdAt": "2026-11-11T19:17:45.088Z"
 }
