@@ -2028,6 +2028,12 @@ describe("telling a child from the root", () => {
     expect(results).toEqual([undefined])
   })
 
+  test("host-neutral CLI examples are wired to the installed package too", () => {
+    expect(fillPackageRoot("Run \u0060holyagent status\u0060.", "C:\\pkg", win32)).toBe(
+      "Run \u0060bun --no-env-file --config='C:/pkg/scripts/empty-bunfig.toml' 'C:/pkg/scripts/holyagent.js' status\u0060.",
+    )
+  })
+
   test("Windows CLI prompts use isolated Bun rather than a non-executable shell wrapper", () => {
     const prompt = fillPackageRoot(
       PI_ROOT_PLACEHOLDER + "/scripts/holyagent --version",

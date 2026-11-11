@@ -19309,7 +19309,7 @@ var fillPackageRoot = (prompt, packageRoot, platformPath = nodePath2) => {
   const root = toPosix(packageRoot, platformPath.sep);
   const quote = (value) => "'" + value.replaceAll("'", `'"'"'`) + "'";
   const command = platformPath.sep === "\\" ? "bun --no-env-file --config=" + quote(root + "/scripts/empty-bunfig.toml") + " " + quote(root + "/scripts/holyagent.js") : root + "/scripts/holyagent";
-  return prompt.replaceAll(PI_ROOT_PLACEHOLDER + "/scripts/holyagent", () => command).replaceAll(PI_ROOT_PLACEHOLDER, () => root);
+  return prompt.replaceAll(/`holyagent (?=[^`])/g, () => "`" + command + " ").replaceAll(PI_ROOT_PLACEHOLDER + "/scripts/holyagent", () => command).replaceAll(PI_ROOT_PLACEHOLDER, () => root);
 };
 var refuseNonSpecialist = (event) => {
   if (event.toolName !== AGENT_TOOL)

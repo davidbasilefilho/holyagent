@@ -199,9 +199,13 @@ export const fillPackageRoot = (
         " " +
         quote(root + "/scripts/holyagent.js")
       : root + "/scripts/holyagent"
-  return prompt
-    .replaceAll(PI_ROOT_PLACEHOLDER + "/scripts/holyagent", () => command)
-    .replaceAll(PI_ROOT_PLACEHOLDER, () => root)
+  return (
+    prompt
+      // Host-neutral families name the CLI in inline code rather than carrying a package placeholder.
+      .replaceAll(/`holyagent (?=[^`])/g, () => "`" + command + " ")
+      .replaceAll(PI_ROOT_PLACEHOLDER + "/scripts/holyagent", () => command)
+      .replaceAll(PI_ROOT_PLACEHOLDER, () => root)
+  )
 }
 
 /**
