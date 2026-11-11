@@ -16,9 +16,10 @@
     "if you have any trouble in the tooling, note it down in an intent to fix stuff",
     "User additionally requires AGENTS.md to explicitly state HolyAgent PR stack standards. For0.3.3, work PRs target existing integration, subsequent work stacks on preceding open PR subject to repository mergeability, and only release integration opens into main. main/dev remains0.3.4. This minimal documentation update is authorized in0.3.3.",
     "In-flight tooling review assignment-0mwc3s7vm-q9xv remains applicable. In-flight read-only research assignment-0mwc6qszh-9ncm and assignment-0mwc6qn5g-u873 may finish and their reports are retained for0.3.4; launch no implementation from them now.",
-    "use worktrees for the pr stack as well if beneficial and state in AGENTS.md"
+    "use worktrees for the pr stack as well if beneficial and state in AGENTS.md",
+    "report issues you find for me as well as in intents to fix either immediately or in0.3.4 and tell me how much of0.3.3 development is left still"
   ],
-  "revision": 3,
+  "revision": 4,
   "state": "Open",
   "createdAt": "2026-11-11T14:05:41.778Z"
 }
