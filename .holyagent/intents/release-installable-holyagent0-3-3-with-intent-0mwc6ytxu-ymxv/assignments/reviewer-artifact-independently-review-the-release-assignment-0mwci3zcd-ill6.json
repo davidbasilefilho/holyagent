@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "independently-review-the-release",
   "objective": "Independently review the release documentation and generated/model-facing instructions for fidelity and clarity.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Loadinstruction-writing skill C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md. Readcommittedpatch, requirements-firstfamilies/coverage/generatedprompts. Preserveeveryapprovedrootclarification/safetybehavior. Exactapproveddenialparagraphmustremain; freeformanswersexistingapproval, investigateinternalsbeforequestions, onlyactionableuser-owneduncertainty; unsupportedruntimeapprovalinheritancemustnotbeclaimed.",
     "Claudealwaysoncore6732→6153characterscompactionin5sourcefilesmustretainallsafety/ownership/assignment/wake/wait/approval/turnsemanticsandtestedstrings. Budget9400unchanged; do notinventunrequestedpolicy. Compareoriginalcurrentforsemanticloss, notstylepreferences.",
@@ -112,7 +112,9 @@
     "agentId": "pi-workflow:wf_a7ba882040f7/assignment-0mwci3zcd-ill6",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T19:18:18.137Z"
+    "startedAt": "2026-11-11T19:18:18.137Z",
+    "finishedAt": "2026-11-11T19:26:49.266Z"
   },
+  "result": "failure: result: Fail — release prose and instruction coverage have blocking gaps; review incomplete\nchanged: none\nchecks: Read-only inspection; no shell available, so no checks were run. Build and full verify were prohibited by the assignment.\nblockers: Correct the publishing documentation and Claude coverage mapping; complete the remaining artifact review.\nquestions: none\nnotes: The diff exceeds the read tool’s per-call output limit; I did not review all changed artifacts and cannot give an all-clear.\nevidence:\nRelease prose and instructions preserve approved behavior and accurately describe the install and publishing contracts: gap — `docs/npm-publishing.md:7` says “npm publishes the downloaded release artifact” and “A failed npm job can leave a GitHub release without an npm version.” The committed `.github/workflows/stable.yml` and `.github/workflows/dev.yml` publish the packed tarball first; their GitHub release jobs depend on publication and download the artifact afterward. A release-job failure can instead leave an npm version without a GitHub release.\nreview-verdict: Fail; remaining changed prompts, generated files and installation documentation are not fully reviewed.\nfindings: `packages/runtime/src/instructions/coverage.ts:28` requires the literal “You own the user relationship” in Claude `root/identity.md`, but `packages/runtime/src/instructions/claude-5.5/root/identity.md:5` now says “Own the user relationship”; the mapping no longer matches its source. This is a blocking coverage inconsistency; execution was not available to establish its test result.\nchecks-run: Read the supplied patch in part, the instruction-writing skill, repository instructions, publishing documentation and Claude prompt changes; no command exit codes or test counts are available.\nremaining-blockers: Repair both findings and independently review the unexamined committed-range artifacts and generated coverage; current-head gates remain unverified.\ndiff-file: `C:/Users/david.basile/AppData/Local/Temp/holyagent-033-4ea-review.patch`\n",
   "createdAt": "2026-11-11T19:17:37.838Z"
 }
