@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "use-the-freshly-approved-browser-launch",
   "objective": "Use the freshly approved browser launch to obtain public Luna medium versus high benchmark and output-token efficiency evidence.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Freshspecificuserapproval: userselected 'Approve browser launch' throughasktoolafterprior computer_use_launch_app rejection. You may now retryexactnormalbrowserlaunch Edge/Chrome topublicbenchmarkpages only, nologin/installation/settingschanges. The originaldenialwasrequiresinteractiveuserconfirmation; do notattemptalternatewaysaroundanystillunresolvedhostboundary. Load computer-use skill C:/Users/david.basile/.pi/agent/npm/node_modules/@amaster.ai/pi-computer-use/skills/computer-use/SKILL.md. Firstinspectcurrentbrowserwindows; ifnone launchusualinstalledEdge/Chrome usingdiscoveredtoolcorrectschema. Prior184appslisttruncated; installednormalbrowserpathmaybeinlist, don'tguessarbitraryexecutables. Ifstillrequiresinteractiveconfirmationstopwithexactuseraction needed; don'tagaintryWebKitExa(whichrequireskey)orunpairedrelay.",
     "Actualquestion: userexplicitlyauthorizesif supportedchangeCodexauto-review from codex-auto-review/low to gpt-6-luna medium/high. Choosequality andoutput-token-performance fromrelevantbenchmarks (notcost); fastmediumifadequate/highifnot. Modelregistry C:/Users/david.basile/.pi/agent/models-store.json registersmedium/high, butnotproofbackendstrictJSONsupport. No configchanges/modelcalls here. Usepublicauthoritativebenchmarks,mypriors.comwhereapplicable, directmeasurementsmodel+effort+tokens+taskrelevance/sourceURL/date. Ifbenchmarks don'tseparateeffortsoronlyoverallintelligence, reportnoconclusioninsteadinventing. Atmost3specificsources; highestrelevance safetystructuredclassification, notgenericcodebenchalone.",
@@ -88,7 +88,9 @@
     "agentId": "pi-workflow:wf_b52f861770ad/assignment-0mwcbwvko-ukxj",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-11T16:24:35.914Z"
+    "startedAt": "2026-11-11T16:24:35.914Z",
+    "finishedAt": "2026-11-11T16:30:39.648Z"
   },
+  "result": "failure: result: Benchmark research blocked; no medium-versus-high recommendation.\nchanged: none\nchecks: Browser-window inspection found no Edge or Chrome windows; browser launch failed.\nblockers: `launch_app requires interactive user confirmation.` The user must complete the host’s interactive launch confirmation for Microsoft Edge; the earlier approval did not clear that boundary.\nquestions: none\nnotes: Sourced facts: no benchmark pages were obtained. Inference: do not change the review model or effort without relevant evidence.\nevidence:\nPublic medium high benchmark and output token evidence established: Not established; public sources could not be accessed through the approved launch.\nRecommendation distinguishes measured evidence from unknown strict schema support: No measured comparison; backend strict JSON schema support remains unknown.\nbenchmark-sources: None obtained.\nrecommendation: Defer the choice pending effort-specific quality and output-token evidence and separate strict-schema verification.\n",
   "createdAt": "2026-11-11T16:24:08.664Z"
 }
