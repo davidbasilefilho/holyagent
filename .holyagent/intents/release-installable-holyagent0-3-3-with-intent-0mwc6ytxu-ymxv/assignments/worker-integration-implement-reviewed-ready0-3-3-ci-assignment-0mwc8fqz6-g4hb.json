@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mwc8fqz6-g4hb",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 7,
+  "roleTask": "Worker.integration",
+  "slug": "implement-reviewed-ready0-3-3-ci",
+  "objective": "Implement reviewed-ready0.3.3 CI publication using publish.yml to call stable.yml/dev.yml for GitHub and npm stable/dev releases.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, branch release/0.3.3/fix/npm-readiness. User now explicitly requires: 'there must be a publish.yml and stable.yml and dev.yml, publish must use the other two, and stable must create a github stable release as well as a stable npm release, dev.yml must create a dev pre release and an npm pre-release updating the dev npm tag'. Earlier worker reported an automatic-publication edit denial before this new explicit user authorization; respect any fresh denial and report rather than working around it. Do not actually trigger publication in this assignment.",
+    "Build on existing workflows and0.3.3 release/integration conventions: main stable, current repository non-main dev behavior unless mergeability/security rules require narrower trigger. Preserve required validation/job IDs including check,windows,installers,branch-model and version-on-main, retain macOS addition. publish.yml must orchestrate reusable stable.yml and dev.yml after appropriate green checks. Preserve protected branch/immutable tag controls and action full-SHA pins.",
+    "Use bun pm pack for the exact generated public Pi package tarball and npm for actual trusted/OIDC publish. Stable publishes canonical0.3.3 on npm latest plus stable GitHub release; dev generates a valid unique npm prerelease and GitHub prerelease and updates npm dev dist-tag. Retain existing dev naming semantics; CHKDSK timestamp-format migration is0.3.4. Test version/tarball identity, guards against duplicate/incorrect-version publication, required checks, workflow-call OIDC permission ownership and untrusted fork/PR paths. No token fallback.",
+    "Publication package facts from root inspection: workspace root package.json is private:true and is NOT publishable. packages/integrations/pi/dist/package.json is public holyagent@0.3.3 with peerDependencies for Pi host and typebox but no @holyagent/runtime dependency. Correct prior lookup assignment-0mwc84gnr-6zwx's contradictory first-sentence claim; determine minimal required additional own npm packages from bundled installation dependency closure. User permits other npm packages only if needed; do not publish extra internal workspaces just because present.",
+    "User explicitly authorized one reviewed bootstrap via existing npm login to create missing package before they configure publish.yml in npm settings. Default0.3.3-bootstrap.0 on bootstrap tag, off latest/dev; final CI must stay OIDC-only. Document exact package/repository/workflow settings and any npm/Node minimum versions from authoritative evidence, distinguish pending user account steps, and ensure the configured publisher identity refers to publish.yml despite reusable workflows. Do not publish/bootstrap/configure accounts now.",
+    "Add regression coverage in a disjoint test file packages/integrations/pi/publishing.test.ts (or owned file there), run actual targeted checks and relevant existing workflow tests read-only. Another active debugging writer owns scripts,mise.toml,Pi src/tests and runtime source; don't edit those or generated dist/runtime tests. AGENTS.md writer terminal; its change reserved for review."
+  ],
+  "constraints": [
+    "Own only .github/workflows,docs/development.md,docs/npm-publishing.md,packages/integrations/pi/publishing.test.ts. Source edits only there. No Git/state writes, actual publication/push/merge, account/security settings, credentials reads or dependency pin changes. Logs and diff outside repository. If exact requested trigger conflicts with trusted-publishing restrictions, establish evidence and report concrete remaining choice.",
+    "Only minimum0.3.3 release blockers; main/dev migration, native tools, providers/scoped skills/Cua,wait tool,mixed routing and CHKDSK dev naming are0.3.4. Keep main checkout and dirty scratch untouched. Preserve current Codex model and guardrails.",
+    "External dependencies/actions change only through updater; reuse current pinned actions where possible, do not hand-edit pins. Root owns VCS and publication. Tests must exercise error paths and fail without the behavior; no weakened tests/indiscriminate skips.",
+    "Report at most8bullets with actual command/exit/counts, changed paths, concrete user npm settings and unresolved blocker; include review diff-file outside repository. Long logs outside repository."
+  ],
+  "criteria": [
+    {
+      "text": "Reusable publication workflow structure",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Stable and dev GitHub/npm artifact identity",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Trusted npm publishing security and regression coverage",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Correct minimal npm package set",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Repository release conventions preserved",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "publisher-settings",
+    "publish-set"
+  ],
+  "ownershipPaths": [
+    ".github/workflows",
+    "docs/development.md",
+    "docs/npm-publishing.md",
+    "packages/integrations/pi/publishing.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwc785xx-27bc",
+  "createdAt": "2026-11-11T14:46:50.706Z"
+}
