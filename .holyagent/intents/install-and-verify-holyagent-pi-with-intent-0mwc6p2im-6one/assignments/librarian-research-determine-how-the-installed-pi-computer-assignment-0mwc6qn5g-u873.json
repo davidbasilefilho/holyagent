@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwc6qn5g-u873",
+  "intentId": "intent-0mwc6p2im-6one",
+  "intentRevision": 1,
+  "roleTask": "Librarian.research",
+  "slug": "determine-how-the-installed-pi-computer",
+  "objective": "Determine how the installed Pi computer-use carrier relates to the official Cua driver and what the correct supported Windows installation is.",
+  "state": "Ready",
+  "scope": [
+    "Read-only investigation of C:/Users/david.basile/dev/holyagent current source config/docs, installed C:/Users/david.basile/.pi/agent/npm/node_modules/@amaster.ai/pi-computer-use and authoritative upstream Cua material.",
+    "User after reload says weird extension instead of official Cua driver. Screenshot C:/Users/david.basile/AppData/Local/Temp/pi-clipboard-5bdc84b0-38b4-46eb-bc63-114c0b3999e4.png lists @amaster.ai/pi-computer-use0.1.38, pi-web-kit0.5.0; identify whether this is expected transport/plugin versus official native driver. Citation must establish facts rather than name resemblance.",
+    "User now wants Codex+Kimi and all capabilities on Windows. Compare existing T3/Cua integration, native-driver and Pi extension support and explain concrete discrepancy if any. Provide2-3 short options only if a material unresolved dependency change is necessary."
+  ],
+  "constraints": [
+    "No edits, credential reads, security-setting changes or remote messages. Do not operate browser or desktop; use documentation and authoritative material.",
+    "Separate verified facts from inference; include authoritative source paths/URLs and compact direct quotes establishing official relationship.",
+    "Report at most8 bullets; long notes outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "Computer-use extension and official driver relationship is established from authoritative evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Recommended Windows path respects current integration contracts and names any unresolved requirement",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "recommendation"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T13:59:19.732Z"
+}
