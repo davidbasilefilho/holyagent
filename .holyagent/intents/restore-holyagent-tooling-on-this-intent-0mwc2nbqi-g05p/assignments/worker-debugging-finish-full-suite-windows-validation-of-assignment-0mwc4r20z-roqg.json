@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mwc4r20z-roqg",
+  "intentId": "intent-0mwc2nbqi-g05p",
+  "intentRevision": 1,
+  "roleTask": "Worker.debugging",
+  "slug": "finish-full-suite-windows-validation-of",
+  "objective": "Finish full-suite Windows validation of the recovered tooling and determine a supported background-process path before release.",
+  "state": "Ready",
+  "scope": [
+    "Read the direct-main tooling handoff in this Intent and review commits 074bc72a..271bfa0 before any push",
+    "Run full mise verify with proper filesystem/process isolation; native Windows lacks file-symlink privilege, and the earlier run also exposed a TUI bundle import fixture failure. The full gate is unknown, not passed.",
+    "Changed-scope tests and type/lint/format checks pass; do not weaken tests to make the full suite green. Use directory junctions for directory-only fixtures where semantically equivalent, or report an OS privilege blocker without changing security settings.",
+    "The pinned @aliou/pi-processes supports macOS and Linux, not native Windows; registry and doctor now report that. Investigate a Windows-capable existing package or honest native-shell fallback before implementing a replacement.",
+    "Preserve all new package and user settings, and keep test homes and PI_CODING_AGENT_DIR isolated from the real account"
+  ],
+  "constraints": [
+    "Ready for the next root after user reloads; do not run in the original tool-limited session",
+    "No push, release or security-setting changes without required approval and independent review",
+    "Dependencies change only through the updater; do not add redundant tools or unrequested refactors",
+    "Report at most 10 bullets; logs outside repo"
+  ],
+  "criteria": [
+    {
+      "text": "Full verify either passes on current head or each remaining OS blocker is reproduced and reported honestly",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Tests cannot install into real Pi settings when given a sandbox home",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Windows background-process availability is accurate and does not claim an unsupported package works",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks",
+    "diff-file",
+    "baseline-and-blockers"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests",
+    "scripts/bump-version.test.ts",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/config",
+    "packages/integrations/pi/tests",
+    "docs/pi"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T13:03:39.780Z"
+}
