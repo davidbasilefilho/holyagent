@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "independently-review-the-direct-main",
   "objective": "Independently review the direct-main tooling restoration commit after the user reloads Pi and specialist tools become available.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Review the tooling commit on main against its parent: native mise dependency migration through updater, safe production prepare, isolated canary upgrade environment, Windows long-path state writes and Git worktree checkout, valid YAML descriptions in all model families, Pi FFF root and specialist tools, mounted Windows CLI paths and regression tests",
     "Root performed edits directly at the explicit request because Agent/SubagentWorkflow/todo/ask were unavailable in the original session; this Assignment deliberately remains Ready for a fresh properly equipped root",
@@ -47,7 +47,9 @@
     "agentId": "pi-workflow:wf_debab34d327a/assignment-0mwc3s7vm-q9xv",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T13:57:38.923Z"
+    "startedAt": "2026-11-11T13:57:38.923Z",
+    "finishedAt": "2026-11-11T17:17:21.995Z"
   },
+  "result": "failure: result: Not merge-ready; Windows long-path worktree restoration lacks a regression test.\nchanged: none\nchecks: Targeted `bun test` → exit 0, 514 passed, 0 failed; `bunx --no-install mise run verify` → timed out after 60s, so no final suite result; check, lint and format had completed successfully before timeout.\nblockers: tests — `packages/runtime/src/state/tree.ts:105` and `packages/runtime/src/state/tree.ts:768`: neither the Git long-path checkout nor the Windows copy path has a regression test. Add a Windows worktree test with state paths over MAX_PATH that fails on the parent and verifies checkout and copied state on the commit.\nquestions: none\nnotes: The timed-out verify run had already reported two `EPERM` symlink failures caused by local Windows privilege limitations; they are not passes. Live Pi specialist tool dispatch and Windows long-path worktree checkout were read but not run. No duplication or performance blocker identified.\nevidence:\nTooling changes preserve role boundaries, production install safety and atomic state writes: Reviewed `packages/runtime/src/pi/tools.ts`, `packages/runtime/src/state/files.ts` and `scripts/prepare-dev.ts`; targeted tests passed, but live Pi dispatch and long-path checkout remain unverified.\nRegression tests demonstrate the repaired failures and relevant checks run on current head: `packages/runtime/tests/store.test.ts:89` covers `commitFile`, not worktree checkout or `copyInto`; targeted tests passed, while full verify timed out.\nOnly authorized tooling work is in the direct-main commit: Reviewed `1a5e6b55^...1a5e6b55`; changes align with the stated tooling scope.\nchecks: Targeted test log: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\pi-powershell-1cb8a65b1b1e50d1.log`; full verify did not finish.\nfindings: First-pass candidate confirmed as the missing worktree regression test; no other blocker confirmed.\ndiff-file: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\pi-powershell-7bb66c6f7bd8d841.log` — `git diff '1a5e6b55^...1a5e6b55'`.\n",
   "createdAt": "2026-11-11T12:36:34.402Z"
 }
