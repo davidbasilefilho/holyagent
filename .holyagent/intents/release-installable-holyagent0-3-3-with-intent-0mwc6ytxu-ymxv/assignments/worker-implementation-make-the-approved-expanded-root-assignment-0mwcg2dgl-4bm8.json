@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-approved-expanded-root",
   "objective": "Make the approved expanded root instructions and session-context requirements fit the existing context-budget contracts without weakening behavior or tests.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Known reproduction: bun test packages/runtime/tests/sessioncontext.test.ts exits1 with26pass2fail. Prior writer tried two prose compactions and reverted them as insufficient. Read source/tests and logs C:/Users/david.basile/AppData/Local/Temp/holyagent-verify-ux9c.log plus previous report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcfco7m-oimd.md. Diagnose measured prompt composition and allocation, then implement regression-safe fix.",
     "Keep existing budget thresholds, required context selection and approved safety/clarification/StopSlop semantics. Do not just raise budgets, remove required context, weaken assertions, mask truncation or remove protection. Routine consolidation, delivery or correct allocation is allowed when tests show preserved behavior. Investigate repeated verbose host-neutral resolved CLI expansion as a possible redundancy, not an assumed cause: if important, a single exact command definition with unambiguous example notation can preserve actual executable CLI resolution, but do not leave literal placeholders that an agent would run or assume a missing PATH command exists.",
@@ -122,5 +122,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcfco7m-oimd",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T18:20:54.829Z"
+  },
   "createdAt": "2026-11-11T18:20:23.590Z"
 }
