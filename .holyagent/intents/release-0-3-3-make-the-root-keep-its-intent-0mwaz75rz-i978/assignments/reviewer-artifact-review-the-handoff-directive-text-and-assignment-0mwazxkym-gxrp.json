@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-handoff-directive-text-and",
   "objective": "Review the handoff directive text and docs in commit 0167e289 against the requirements.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Diff file: /tmp/claude-0/-home-user-holyagent/43946df6-456d-58c6-bea3-7e958fcb9495/scratchpad/handoff-text.diff (docs/ and packages/runtime/src/instructions/ only, from /home/user/holyagent-0.3.3-handoff). Read the full files in that worktree for context: the requirements tree packages/runtime/src/instructions/requirements/root/{version-control,identity}.md, each family's root/version-control.md and guide.md, and docs/usage.md.",
     "Requirements (Intent intent-0mwaz75rz-i978): a root directive in every family (claude-5.5, gpt-6, kimi-k3.1) that (1) pushes holyagent/state in the branch state mode after each Assignment close, each merge and before ending a turn; (2) keeps one Intent requirement starting 'Status and open items (<date>):', replaced in place at each merge, new blocker and before the final report, with merged PRs, open PRs and CI, next step, residuals and untested-live items, detailed enough for an agent with no session context; (3) a read-only `holyagent handoff` command printing open Intents with requirements, Assignments with state and outcome, recorded branches and PRs, from local state only. The reader may be another host or model (Pi with Kimi or GPT), so the text names no Claude-only tool.",
@@ -34,7 +34,9 @@
     "agentId": "workflow:wf_664f4226-73d/assignment-0mwazxkym-gxrp",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-10T18:00:59.998Z"
+    "startedAt": "2026-11-10T18:00:59.998Z",
+    "finishedAt": "2026-11-11T15:18:23.259Z"
   },
+  "result": "interrupted",
   "createdAt": "2026-11-10T18:00:59.998Z"
 }
