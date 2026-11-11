@@ -1,0 +1,20 @@
+{
+  "id": "intent-0mwc6yoeq-r5v2",
+  "slug": "release-0-3-4-complete-the-larger",
+  "objective": "Release 0.3.4: complete the larger HolyAgent Pi capability, native codemode-tool, workflow and skills improvements deferred from the 0.3.3 npm release.",
+  "requirements": [
+    "Deferred by explicit user decision: perform in a new session after the minimal0.3.3 release; do not launch implementation during the0.3.3 session.",
+    "the holyagent cli functionality must be actual tools in codemode in the pi integration",
+    "Install HolyAgent Pi locally with both Codex and Kimi providers, computer use, browser use and all supported capabilities; preserve existing selected model and permission/guardrail defaults, report unsupported OS/account/pairing blockers honestly.",
+    "Resolve the reported mismatch between @amaster.ai/pi-computer-use and the expected official Cua driver using authoritative evidence before replacing packages.",
+    "Remove standalone ~/.agents/skills/context7-cli and use HolyAgent guidance; scope skills appropriately per role in both integrations without unnecessary embedding.",
+    "Adopt main/dev branches: work PRs target dev and release-ready changes go through a dev-to-main PR, preserving required mergeability controls.",
+    "Match CHKDSK-style deterministic development release versions, for example v0.1.0-dev.2026-11-10.19-14-04.gcdcb19b; derive timestamp from commit UTC and create one development release per commit.",
+    "Fix recorded non-release-blocking tooling issues: safe operational ownership for user files outside the repository; align workflow examples using computed agentType with the validator requiring literal specialist names; keep repository ownership locks and specialist restrictions intact.",
+    "Continue the broader HolyAgent audit and other improvements only after0.3.3. Source prior requirements/evidence: intent-0mwc2afl8-ry5c, intent-0mwc6p2im-6one, intent-0mwc6vsv1-fxrs. Read-only in-flight research assignments assignment-0mwc6qszh-9ncm and assignment-0mwc6qn5g-u873 may finish; preserve their reports, do not launch follow-up implementation now.",
+    "Independent review, tests, current-head evidence and existing approval boundaries apply. No merges, protected pushes, security-setting changes, credential operations or destructive cleanup without user authority."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-11T14:05:34.610Z"
+}
