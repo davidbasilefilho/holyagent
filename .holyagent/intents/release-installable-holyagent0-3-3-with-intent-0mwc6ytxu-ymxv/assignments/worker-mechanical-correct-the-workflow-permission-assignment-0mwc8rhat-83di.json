@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mwc8rhat-83di",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 7,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-the-workflow-permission",
+  "objective": "Correct the workflow permission regression test to distinguish contents-writing jobs from OIDC publishing jobs without weakening security assertions.",
+  "state": "Ready",
+  "scope": [
+    "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Own scripts/workflows.test.ts only. The existing test named 'only the tag and release jobs hold contents: write' treats every permission value write, including id-token:write, as contents write and compares exact permission objects. It currently passes20tests on GitHub-only workflow state, but blocks user-authorized npm trusted-publishing implementation. Fix the incorrect contents-writer classification and assert correct OIDC rules.",
+    "Preserve strong checks that contents:write exists only on authorized tag/release jobs, external actions are SHA pinned, no broad top-level write grants, and untrusted PR/fork jobs cannot publish. Permit intended publishing jobs id-token:write and explicitly test its required/allowed placement. Coordinate by read-only observation with concurrent Worker.integration assignment-0mwc8ny8d-po33 changing .github/workflows and adding packages/integrations/pi/publishing.test.ts; don't edit those files.",
+    "Use precise contents permission test rather than generic Object.values(...).includes(write) behavior. Run actual targeted bun test scripts/workflows.test.ts and changed-scope type/lint/format gates. Do not run full verify concurrently with publication writer or fix unrelated tests. If workflows aren't implemented yet, report exactly which assertions are pending rather than weakening expected behavior."
+  ],
+  "constraints": [
+    "Only minimum0.3.3 publication regression test repair. No source outside owned file, no Git/state/lock/config/account/credentials writes, no publication/push. Earlier broad scripts owner assignment-0mwc88lir-pjpj is terminal now.",
+    "Preserve existing release/integration model, required job IDs and action pins. OIDC must have no token fallback. Keep main checkout and dirty scratch untouched; root owns VCS. Use bunx --no-install mise run tasks for gates.",
+    "Report at most5bullets with exact commands/exits/counts, changed path and diff-file outside repository; long logs outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "Contents and OIDC permissions independently asserted",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing security regression coverage preserved",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Test-only scope and current checks",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "scripts/workflows.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwc8fqz6-g4hb",
+  "createdAt": "2026-11-11T14:55:58.037Z"
+}
