@@ -1,0 +1,14 @@
+{
+  "id": "intent-0mwce29x0-8wvm",
+  "slug": "configure-installed-codesnap-rs-codesnap",
+  "objective": "Configure installed codesnap-rs/codesnap as a global Zed task that captures code using the editor theme and fonts.",
+  "requirements": [
+    "setup codesnap-rs/codesnap (already installed on the machine) in a global zed task so I can take screenshots of code with the editor's colorscheme, fonts, etc",
+    "don't care about the lexical token differences",
+    "Preserve unrelated global Zed settings and tasks. Make local user configuration changes only; no repository code changes or publishing.",
+    "Prefer current editor appearance settings and selected code; verify real PNG generation and clearly report unsupported appearance details."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-11T17:24:19.764Z"
+}
