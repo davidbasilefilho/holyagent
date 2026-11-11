@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "map-how-to-expose-holyagent-cli",
   "objective": "Map how to expose HolyAgent CLI functionality as actual Pi tools callable from codemode and recommend a concrete integration design.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "User requirement verbatim: the holyagent cli functionality must be actual tools in codemode in the pi integration",
     "Read-only trace C:/Users/david.basile/dev/holyagent packages/integrations/pi/src/extension.ts, runtime CLI command registry and effect services, codemode tool/tool visibility settings, root/specialist instruction translation and tests.",
@@ -38,5 +38,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:00:40.788Z"
+  },
   "createdAt": "2026-11-11T13:59:27.293Z"
 }
