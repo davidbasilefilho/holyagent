@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "verify-available-exa-mcp-and-codex",
   "objective": "Verify available Exa MCP and Codex-native web search, the pi-codex-conversion relationship and the smallest release-relevant remedy.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "User asks: do you have the exa mcp server? can't you use the native codex alternative? that requires the pi-codex-conversion right? that's why I need to install holyagent now. exa must only be a fallback when there are only providers that don't offer web search installed.",
     "Read-only source/config/package investigation. Inspect C:/Users/david.basile/.pi/agent/settings.json non-secret fields, installed extension/package sources and repo C:/Users/david.basile/dev/holyagent. Host Pi1.5.2; root openai-codex/gpt-6.1-sol. Determine if native Codex tool capability is available or exposed, whether pi-codex-conversion is real/installed/required, and Exa MCP existence vs pi-web-kit configured Exa provider. Never infer server absence solely from failed Exa web-kit search.",
@@ -39,5 +39,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:25:11.591Z"
+  },
   "createdAt": "2026-11-11T14:24:40.775Z"
 }
