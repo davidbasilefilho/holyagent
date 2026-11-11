@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "repair-the-ten-remaining-release",
   "objective": "Repair the ten remaining release verification failures and prove the Windows copy-fallback regression, then regenerate the canonical 0.3.3 artifacts for committed review.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm on release/0.3.3/fix/npm-readiness. Original writer is terminal and root closed its Assignment Failed for incomplete acceptance; no competing writer in this worktree. Preserve staged merge of local-main fixes and all existing dirty release/prompt/publication changes. Root owns all Git/state writes.",
     "Full prior verification actually exited1:3431pass10fail52skip. Read sanitized C:/Users/david.basile/AppData/Local/Temp/holyagent-verify-ux9c.log to identify exact failures. Prior report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcdy50u-ux9c.md is available, not a brief. The ten failures comprise two session-context budget tests, two SSH-fetch tests, five quoted-YAML field assertions and one root-policy wording assertion. Diagnose cause and repair source/fixtures or semantic assertions as warranted. Preserve test intent, meaningful budgets and security/error-path coverage; do not merely raise budgets, relax assertions or declare baseline without evidence.",
@@ -128,5 +128,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcdy50u-ux9c",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T18:01:11.885Z"
+  },
   "createdAt": "2026-11-11T18:00:24.538Z"
 }
