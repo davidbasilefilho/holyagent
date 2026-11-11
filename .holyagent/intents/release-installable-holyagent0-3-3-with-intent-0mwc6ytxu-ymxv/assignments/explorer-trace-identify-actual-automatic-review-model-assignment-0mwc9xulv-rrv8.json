@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "identify-actual-automatic-review-model",
   "objective": "Identify actual automatic-review model/effort and the supported propagation path for user approval from root into Pi workflows and subagents.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only investigation in C:/Users/david.basile/dev/holyagent and release worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, installed Pi1.5.2 host/packages/config as needed. User says each tool call goes through cheap automatic review; screenshot C:/Users/david.basile/AppData/Local/Temp/pi-clipboard-fc79ddd4-d43d-40cf-885a-79be9266c108.png shows root CLI dispatch Automatic approval review approved (risk:medium,authorization:high). Need actual reviewer model and reasoning effort for HolyAgent Pi Codex, not specialist route GPT6Luna examples. User considers GPT6Luna with effort other than low/xhigh/max acceptable. If not observable/configurable, report Unknown with precise inspected surfaces; do not invent model/effort or expose credentials.",
     "User explicitly approved publication workflow writes/effects and asks root approval propagate to workflows and child specialists. Earlier child write stable.yml was automatically rejected because 'omitted brief provides no verifiable authorization'; exact source C:/Users/david.basile/.pi/agent/sessions/--C--Users-david.basile-dev-holyagent--/2026-11-11T15-08-49-472Z_01a1cb27-8dbf-7356-b52f-d0a3885bf7ac.jsonl:34-35; accepted trace C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc9e7re-yjja.md. Determine actual host boundary and minimal implementable path for scoped approval provenance through CLI dispatch, workflow agent(), child context and tool safety review. Repository-written brief alone was not visible to reviewer; distinguish actual permission/context propagation from merely promising it in instructions.",
@@ -42,5 +42,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc9e7re-yjja",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T15:29:37.098Z"
+  },
   "createdAt": "2026-11-11T15:28:54.835Z"
 }
