@@ -1,0 +1,16 @@
+{
+  "id": "intent-0mwc2afl8-ry5c",
+  "slug": "fix-windows-installation-and-pi-tool-and",
+  "objective": "Fix Windows installation and Pi tool and skill loading locally and in the repository, and prepare a validated npm release using CI trusted publishing.",
+  "requirements": [
+    "try to install deps with bun i fix issues and fix these: C:\\Users\\david.basile\\AppData\\Local\\Temp\\pi-clipboard-9a8c1da9-0dce-4305-b053-3c19e2e59710.png",
+    "please remove context7-cli from ~/.agents/skills and use the holyagent one",
+    "find other issues you may find with holyagent",
+    "please prepare for npm release with trusted publishing via ci: bun pm pack for packing and npm for the actual trusted publishing. npm is logged in if you need and already prepare for release, I want it released there",
+    "can you fix those tools problems both in this system and the repo?",
+    "User approved continuing direct work after being told specialist tools are unavailable; independent specialist review is waived. Keep main unchanged and use a worktree based on release/0.3.3/integration. Do not merge without explicit approval."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-11T11:54:44.974Z"
+}
