@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "confirm-the-two-real-file-symlink",
   "objective": "Confirm the two real file-symlink security tests now pass without rerunning the expensive whole state suite.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Actualreleaseworktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, explicitPowerShell Set-Location. UserenabledDeveloperMode; rootwillreminddisableafterdone. Previousworkerfailedbecausewhole state-branch+bumpcommandtimedout60s, notreproducedEPERM. Don'trerunsamebroad60scommand. Readcurrentstate-branch.test.tsaround1523,1543 toidentifyEXACTtworealFILEsymlinktestnames (notdirectoryjunctioncases). Run `bun test packages/runtime/tests/state-branch.test.ts -t <exact regex matching onlybothnames>` fromcorrectworktree andreportcounts includingfiltered/skip. Expectedactualtwoexecutions; dontcountfilteredassuccess. Thenrun scripts/bump-version.test.ts separately(previous56passunder60). No weakening/skipping/sourcechanges/build/fullverify/OSchange/modelcalls.",
     "Preventnestedtimeout: PowerShelltooloptionaltimeout hasnodefaulttimeoutperdeclaration, andcodemodedefaultwrappermaycancelat60. Ifusingcodemode set its firstline `// @options: {\"timeout_ms\": 600000}` and underlyingtools.powershell timeout540. Useoneboundedawaitedcommandwithredirectedlonglogsoutside repo andactual$LASTEXITCODE immediatelyafterBun; can'ttrustoldwrapper0files. No background/parallelduplicate broadstatebuncommands. Ifearlierworkerslefttestprocessesthatinterfere, reportconcreteownedprocessID/evidence ratherthankillingunidentifiedprocesses.",
@@ -88,5 +88,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwccgij8-wwaf",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T16:55:19.875Z"
+  },
   "createdAt": "2026-11-11T16:54:37.526Z"
 }
