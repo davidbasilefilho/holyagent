@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "finish-the-freshly-approved-exact",
   "objective": "Finish the freshly approved exact rejection-handling rule and remaining root question-policy coverage/format gates.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Actualworktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, allwritersnowterminalsoownpackages/runtime/src/instructions+scripts/root-question-policy.test.ts. StopSlopstyleisalreadyimplementedinrequirements/specialist/conduct.md,coverage.ts,gpt-6/root/user-messages.md,gpt-6/specialist/conduct.md plus scripts/stop-slop-policy.test.ts. Preserveitandits16passingcompositiontests. No generated/fullbuild/fullverifyhere; rootlaterstartsbuild/validationthencommit/reviews.",
     "Newfreshspecificuserapproval exactpreview: After an explicit user denial, stop that line of work. After an automatic tool rejection, report the exact blocked effect and existing authorization; ask for fresh scoped approval when it can resolve the block. Retry only after the required approval is obtained and any host restriction is resolved. Never work around an unresolved denial through another tool, script, or link. Rootasknowexplicitlyexplainedpersistentagentsecuritypolicycouldweakenboundary,userselectedApproveboundedrule. KeepthistextatcanonicalR-NOBYPASSandfaithfulallapplicablefamilytranslations; AND approvalANDhostresolution, neverOR/overridehost. Userdenialstillstop. Freshhostdenialstillstopreportexacttoolpayload/reason.",
@@ -97,5 +97,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcbrhgf-t0y5",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T16:52:50.575Z"
+  },
   "createdAt": "2026-11-11T16:51:42.701Z"
 }
