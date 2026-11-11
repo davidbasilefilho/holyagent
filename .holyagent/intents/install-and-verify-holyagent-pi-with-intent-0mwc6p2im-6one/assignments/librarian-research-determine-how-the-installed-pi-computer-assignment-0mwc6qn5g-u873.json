@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "determine-how-the-installed-pi-computer",
   "objective": "Determine how the installed Pi computer-use carrier relates to the official Cua driver and what the correct supported Windows installation is.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only investigation of C:/Users/david.basile/dev/holyagent current source config/docs, installed C:/Users/david.basile/.pi/agent/npm/node_modules/@amaster.ai/pi-computer-use and authoritative upstream Cua material.",
     "User after reload says weird extension instead of official Cua driver. Screenshot C:/Users/david.basile/AppData/Local/Temp/pi-clipboard-5bdc84b0-38b4-46eb-bc63-114c0b3999e4.png lists @amaster.ai/pi-computer-use0.1.38, pi-web-kit0.5.0; identify whether this is expected transport/plugin versus official native driver. Citation must establish facts rather than name resemblance.",
@@ -35,5 +35,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:00:41.860Z"
+  },
   "createdAt": "2026-11-11T13:59:19.732Z"
 }
