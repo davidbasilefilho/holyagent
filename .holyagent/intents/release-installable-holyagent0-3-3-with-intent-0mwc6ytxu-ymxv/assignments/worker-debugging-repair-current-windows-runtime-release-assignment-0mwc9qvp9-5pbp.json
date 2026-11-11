@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "repair-current-windows-runtime-release",
   "objective": "Repair current Windows runtime release-blocking failures and establish trustworthy actual command exits and counts for0.3.3.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, branch release/0.3.3/fix/npm-readiness, canonical0.3.3, existing uncommitted merge and prior edits preserved. Old cloud workers authoritatively cannot resume; ownership reconciled. Release-blocking leftovers now only, no interaction-states feature. Root owns all VCS/state/config; main checkout and scratch untouched.",
     "Take over partial debugger report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc88lir-pjpj.md. Current log C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc-verify-target.log; original holyagent-033-verify.log same temp dir. Last full3348pass52fail52skip; wrapper0 disagrees so no green. Isolated tarball Pi startup/CLI passed11skills/no diagnostics; screen19pass,bump56pass. Prior debugger only corrected screen pin assertion.",
@@ -98,7 +98,9 @@
     "agentId": "pi-workflow:wf_aee29df0ea03/assignment-0mwc9qvp9-5pbp",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T15:24:26.635Z"
+    "startedAt": "2026-11-11T15:24:26.635Z",
+    "finishedAt": "2026-11-11T15:41:46.537Z"
   },
+  "result": "failure: result: Partial repair; Windows runtime validation remains blocked.\nchanged: `packages/runtime/tests/{config/packages,setup-browse,setup-tui-capabilities,setup-tui-load,setup-tui,stdin}.test.ts`\nchecks: Four setup/config files → exit 0, 116 pass; stdin → exit 0, 3 pass; TUI bundle import → exit 0, 1 pass, 8 skip; `mise run check` → exit 0, 312 files; `mise run lint` → exit 0, 313 files; `mise run fmt:check` → exit 1, one unowned file.\nblockers: SSH fixture resolves real `ssh` instead of its fake; security symlink tests fail with Windows `EPERM`; `scripts/root-question-policy.test.ts` needs formatting; full current verify not run while the prompt writer is active.\nquestions: none\nnotes: SSH PATH-delimiter hypothesis was tested and refuted; next isolate Git for Windows executable lookup without weakening default-SSH coverage. Test instrumentation was removed.\nevidence:\nRuntime failures repaired without weakening coverage: Incomplete; stale pins, platform assumptions, viewport assertions, stdin host isolation and TUI-import fixture repaired; SSH and security-link failures remain.\nWindows fixture isolation and supported behavior preserved: stdin now isolates `PI_CODING_AGENT_DIR` and host; TUI import uses a Windows junction without skipping the import.\nTrustworthy current command exits and counts: Targeted commands above used actual child exits; SSH tests each exit 1, 0 pass, 1 fail, 59 filtered; symlink migration test likewise exits 1 with `EPERM`.\nMinimum release scope preserved: Six test files only; no runtime, dependency, configuration or publication changes.\nchecks-run: The TUI-import test was red with `EPERM` before the junction and green afterward; stdin was red under inherited Pi host and green after isolation. Full build and verify remain unrun.\nchanged-paths: `packages/runtime/tests/config/packages.test.ts`, `packages/runtime/tests/setup-browse.test.ts`, `packages/runtime/tests/setup-tui-capabilities.test.ts`, `packages/runtime/tests/setup-tui-load.test.ts`, `packages/runtime/tests/setup-tui.test.ts`, `packages/runtime/tests/stdin.test.ts`\ndiff-file: `C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc9qvp9-debug.diff`\nremaining-failures: SSH fixture selected real SSH, confirmed by DNS error for `example.invalid`; symlink privilege is absent; historical full-suite count of 52 failures is not a current result.\n",
   "createdAt": "2026-11-11T15:23:29.662Z"
 }
