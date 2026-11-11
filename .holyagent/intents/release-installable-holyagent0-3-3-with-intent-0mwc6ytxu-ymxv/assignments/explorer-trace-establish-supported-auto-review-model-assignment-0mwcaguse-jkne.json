@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "establish-supported-auto-review-model",
   "objective": "Establish supported auto-review model substitution and concrete trusted root-to-child approval propagation options before implementation.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only source/docs investigation in C:/Users/david.basile/dev/holyagent-0.3.3-npm; prior accepted trace C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc9xulv-rrv8.md provides established facts; do not re-investigate those. Current model codex-auto-review/low in runtime/src/pi/codex/auto-review/assessment.ts, request client.ts, Pi src/auto-review.ts session-localgetBranch. User now explicitly authorizes GPT6Luna medium/high if supported, evidence selection separate publicbenchmark Assignment.",
     "Determine whether same authenticated Codex Responses endpoint supports registered GPT6Luna (verify real ID/version), medium/high effort and structured safety verdict contract; what bounded code/config change would work without disabling guard, changing credentials/provider or silently swapping unsupported aliases. Source/docs/model registry evidence, no live inference needed. Distinguish availability inference from verified support, no secrets.",
@@ -83,7 +83,33 @@
     "agentId": "pi-workflow:wf_186d5f227d51/assignment-0mwcaguse-jkne",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-11T15:44:25.054Z"
+    "startedAt": "2026-11-11T15:44:25.054Z",
+    "finishedAt": "2026-11-11T15:50:45.580Z"
+  },
+  "result": "result: GPT-6 Luna is registered for Codex, but structured-verdict support and trusted approval propagation remain unverified; no safe substitution or propagation fix established.\nchanged: none\nchecks: Read-only source and registry inspection; no gates, tests, or network requests run.\nblockers: Codex endpoint acceptance of Luna’s strict safety schema and a trusted root-to-child approval channel are unverified.\nquestions: none\nnotes: FFF searches against some installed-package paths returned unrelated results; direct reads were used. Source may be changing alongside release work.\nevidence:\nLuna substitution support and bounded change grounded: `C:/Users/david.basile/.pi/agent/models-store.json:1719-1753` registers `gpt-6-luna` as `openai-codex-responses` with medium/high mappings; this is local registration, not proof of account availability or strict-schema acceptance. Conditional seam: change only `REVIEW_MODEL` and `REVIEW_REASONING_EFFORT` in `packages/runtime/src/pi/codex/auto-review/assessment.ts:4-16` after support and benchmark selection are established; preserve fail-closed behavior.\nTrusted approval propagation options and test boundaries evidenced: (1) Recommend 0.3.3 retain session-local review and escalate a rejected effect—safe but no propagation. (2) Upstream host-mediated delegation must bind genuine user-origin approval, exact effect/scope, parent and child identities, revocation and nested delegation to reviewer context—not brief text; requires an authenticated lifecycle API, currently unverified. Test forged brief/repository/tool text, sibling and nested isolation, revoked or changed scope, fresh denials and continued review.\nmodel-support: `packages/runtime/src/pi/codex/auto-review/client.ts:6-25` sends strict `guardian_assessment` JSON schema and effort to Codex Responses; `packages/runtime/src/pi/codex/auto-review/assessment.ts:28-53,75-84` validates four fields and rationale. Endpoint support for this contract on Luna is Unknown; failed/invalid responses deny at `packages/runtime/src/pi/codex/auto-review/assessment.ts:114-120`.\npropagation-options: `C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/agent-runner.ts:1237-1260` creates persisted children with optional parent-session path, but nested children default to in-memory; `C:/Users/david.basile/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js:693-705` stores that path as header metadata, not verified authorization. `packages/integrations/pi/src/auto-review.ts:145-174` reviews the child’s own branch; a parent path alone supplies neither genuine-user provenance nor scoped, revocable authority.\n",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Accept bounded source findings and options only: registered gpt-6-luna medium/high mappings and strict-verdict/fail-closed seam; backend acceptance and trusted parent-child authorization remain explicitly Unknown, with no implementation or proof claimed.",
+    "criteria": [
+      {
+        "criterion": "Luna substitution support and bounded change grounded",
+        "support": "`C:/Users/david.basile/.pi/agent/models-store.json:1719-1753` registers `gpt-6-luna` as `openai-codex-responses` with medium/high mappings; this is local registration, not proof of account availability or strict-schema acceptance. Conditional seam: change only `REVIEW_MODEL` and `REVIEW_REASONING_EFFORT` in `packages/runtime/src/pi/codex/auto-review/assessment.ts:4-16` after support and benchmark selection are established; preserve fail-closed behavior."
+      },
+      {
+        "criterion": "Trusted approval propagation options and test boundaries evidenced",
+        "support": "(1) Recommend 0.3.3 retain session-local review and escalate a rejected effect—safe but no propagation. (2) Upstream host-mediated delegation must bind genuine user-origin approval, exact effect/scope, parent and child identities, revocation and nested delegation to reviewer context—not brief text; requires an authenticated lifecycle API, currently unverified. Test forged brief/repository/tool text, sibling and nested isolation, revoked or changed scope, fresh denials and continued review."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "model-support",
+        "support": "`packages/runtime/src/pi/codex/auto-review/client.ts:6-25` sends strict `guardian_assessment` JSON schema and effort to Codex Responses; `packages/runtime/src/pi/codex/auto-review/assessment.ts:28-53,75-84` validates four fields and rationale. Endpoint support for this contract on Luna is Unknown; failed/invalid responses deny at `packages/runtime/src/pi/codex/auto-review/assessment.ts:114-120`."
+      },
+      {
+        "label": "propagation-options",
+        "support": "`C:/Users/david.basile/.pi/agent/npm/node_modules/@tintinweb/pi-subagents/src/agent-runner.ts:1237-1260` creates persisted children with optional parent-session path, but nested children default to in-memory; `C:/Users/david.basile/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js:693-705` stores that path as header metadata, not verified authorization. `packages/integrations/pi/src/auto-review.ts:145-174` reviews the child’s own branch; a parent path alone supplies neither genuine-user provenance nor scoped, revocable authority."
+      }
+    ]
   },
   "createdAt": "2026-11-11T15:43:41.534Z"
 }
