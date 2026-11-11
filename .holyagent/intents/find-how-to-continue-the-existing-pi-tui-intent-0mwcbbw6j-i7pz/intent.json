@@ -1,0 +1,14 @@
+{
+  "id": "intent-0mwcbbw6j-i7pz",
+  "slug": "find-how-to-continue-the-existing-pi-tui",
+  "objective": "Find how to continue the existing Pi TUI session in T3 Code and perform an authorized supported handoff if accessible.",
+  "requirements": [
+    "The user is currently running the session in the Pi TUI and wants to switch it into T3 Code, preserving the session rather than this chat.",
+    "Session identifier supplied: 01a1ca6b-447a-75e5-9485-35fa14619851.",
+    "Direct T3 thread access was denied by the harness; do not bypass that denial through another tool, agent, script or API. Research documented manual handoff steps only where direct access is blocked.",
+    "Do not modify repository code or interrupt the existing session."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-11T16:07:49.800Z"
+}
