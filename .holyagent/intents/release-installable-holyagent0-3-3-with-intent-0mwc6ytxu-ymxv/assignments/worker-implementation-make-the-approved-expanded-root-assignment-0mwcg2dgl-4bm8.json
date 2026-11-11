@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-approved-expanded-root",
   "objective": "Make the approved expanded root instructions and session-context requirements fit the existing context-budget contracts without weakening behavior or tests.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Work in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Known reproduction: bun test packages/runtime/tests/sessioncontext.test.ts exits1 with26pass2fail. Prior writer tried two prose compactions and reverted them as insufficient. Read source/tests and logs C:/Users/david.basile/AppData/Local/Temp/holyagent-verify-ux9c.log plus previous report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcfco7m-oimd.md. Diagnose measured prompt composition and allocation, then implement regression-safe fix.",
     "Keep existing budget thresholds, required context selection and approved safety/clarification/StopSlop semantics. Do not just raise budgets, remove required context, weaken assertions, mask truncation or remove protection. Routine consolidation, delivery or correct allocation is allowed when tests show preserved behavior. Investigate repeated verbose host-neutral resolved CLI expansion as a possible redundancy, not an assumed cause: if important, a single exact command definition with unambiguous example notation can preserve actual executable CLI resolution, but do not leave literal placeholders that an agent would run or assume a missing PATH command exists.",
@@ -126,7 +126,9 @@
     "agentId": "pi-workflow:wf_f3b369ea8002/assignment-0mwcg2dgl-4bm8",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-11T18:20:54.829Z"
+    "startedAt": "2026-11-11T18:20:54.829Z",
+    "finishedAt": "2026-11-11T18:26:54.160Z"
   },
+  "result": "failure: result: Budget repair remains blocked; experimental compaction was reverted.\nchanged: none; pre-existing working-tree changes preserved.\nchecks: `bun test packages/runtime/tests/sessioncontext.test.ts` → exit 1, 26 pass, 2 fail, both before and during the reverted experiment; composition, policy, CLI-resolution, type and lint checks not run.\nblockers: Core size leaves insufficient room for required fixtures; a larger behavior-preserving repair remains needed.\nquestions: none\nnotes: Selection logic and budget thresholds were not changed; generated output was not rebuilt.\nevidence:\nExisting session context budget and required selection contracts pass without relaxed budgets or weakened coverage: Not met; both requirements-selection tests fail.\nApproved instruction semantics safety boundaries and host neutral CLI execution remain intact: No repair retained; independent composition and CLI-resolution checks not run.\nThe fix has a meaningful regression and changed scope checks pass: Not met; no fix retained. Existing failing tests are the reproduction.\nmeasured-composition: Original core 6,732 characters; reminder 383, takeover 313, cloud identity 930, budget 9,400. Experimental core 6,550 still failed both tests; reverted to 6,732. Selection behavior unchanged.\nchecks-run: Session-context reproduction exit 1, 26 pass and 2 fail.\nchanged-paths: No retained edits.\nrepair-diff-file: `C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwcg2dgl-4bm8.diff` contains pre-existing ownership-path changes, not a repair.\nremaining-blockers: Preserve all instruction semantics while recovering sufficient context space; rerun focused policy, composition, CLI-resolution and scope checks.\n",
   "createdAt": "2026-11-11T18:20:23.590Z"
 }
