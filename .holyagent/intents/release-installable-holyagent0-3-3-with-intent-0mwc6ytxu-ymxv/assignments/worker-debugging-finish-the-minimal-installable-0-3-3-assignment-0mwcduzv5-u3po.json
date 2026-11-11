@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "finish-the-minimal-installable-0-3-3",
   "objective": "Finish the minimal installable 0.3.3 release's generated build, missing Windows long-path regression and trustworthy complete verification in the existing release worktree, repairing only demonstrated release blockers.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work exclusively in C:/Users/david.basile/dev/holyagent-0.3.3-npm on release/0.3.3/fix/npm-readiness, with explicit PowerShell Set-Location or Bun --cwd for every command. Main C:/Users/david.basile/dev/holyagent remains unchanged on main; the other dirty release-readiness scratch worktree is unrelated. The release worktree has an intentional staged merge of main tooling fixes atop origin/release/0.3.3/integration plus terminal writers' uncommitted release repairs. Preserve all existing work. Do not alter the merge.",
     "Recovered committed tooling review found missing regressions for packages/runtime/src/state/tree.ts core.longpaths Git checkout and Windows copy fallback. Add focused Windows worktree tests with real state paths beyond MAX_PATH, verifying checkout and copied state; demonstrate red without the relevant repair and green on current source without modifying the working production implementation for that demonstration (use an isolated fixture/temp copy or controlled subprocess). Developer Mode is now enabled; exact file symlink security tests recently 2pass and bump56pass, exit0.",
@@ -114,5 +114,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc9qvp9-5pbp",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T17:19:27.823Z"
+  },
   "createdAt": "2026-11-11T17:18:40.148Z"
 }
