@@ -5,7 +5,7 @@
   "roleTask": "Explorer.lookup",
   "slug": "identify-the-minimum-npm-package",
   "objective": "Identify the minimum npm package publication set needed for a usable HolyAgent0.3.3 installation.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only source in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Examine root/workspace package manifests, package/export/bin entrypoints, bundling/pack/install scripts and intended npm installation docs. Determine whether root holyagent tarball is self-contained or whether workspace packages must also be published for runtime, Pi or Claude integration installation. Name each required package, canonical version, dependency/publish order and why; explicitly say if root holyagent alone suffices.",
     "User authorizes publishing other npm packages if needed, so determine necessity from runtime/installation dependency closure rather than assuming every workspace is public. Root clean tarball CLI smoke already passed; packaged Pi startup independently being checked."
@@ -34,5 +34,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:38:38.369Z"
+  },
   "createdAt": "2026-11-11T14:38:04.120Z"
 }
