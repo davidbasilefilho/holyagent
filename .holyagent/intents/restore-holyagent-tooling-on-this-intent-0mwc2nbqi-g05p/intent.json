@@ -1,0 +1,16 @@
+{
+  "id": "intent-0mwc2nbqi-g05p",
+  "slug": "restore-holyagent-tooling-on-this",
+  "objective": "Restore HolyAgent tooling on this Windows system and in the repository, validate the fixes and commit them directly to main.",
+  "requirements": [
+    "actually your first goal is to fix the tool stuff we have discovered then commit directly to main",
+    "and then the rest can be done once a holyagent agent has the right tools, and document in intents and assignments",
+    "Fix bun i on Windows, state long-path writes, malformed skill YAML, missing Agent/SubagentWorkflow/todo/ask tools, codemode-only just-bash and FFF tool access for Pi",
+    "Scoop, fd and rg were requested and are installed and verified; Pi must search with FFF via codemode instead",
+    "User authorized direct execution while specialist tools are missing and a direct main commit. Do not push main or publish in this phase.",
+    "Keep release, main/dev workflow, dev version format, npm trusted publishing and role-scoped skills as deferred handoff work in intent-0mwc2afl8-ry5c"
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-11T12:04:46.506Z"
+}
