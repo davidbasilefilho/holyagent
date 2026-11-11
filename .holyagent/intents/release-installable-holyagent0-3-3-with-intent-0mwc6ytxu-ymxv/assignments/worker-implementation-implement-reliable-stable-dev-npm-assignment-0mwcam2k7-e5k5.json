@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "implement-reliable-stable-dev-npm",
   "objective": "Implement reliable stable/dev npm publication with executable artifact, retry and failure coverage, extending the release-action ownership needed to finish.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Prior assignment-0mwc9u6cr-h7gc is terminal/Failed but left six owned workflow/doc/test drafts. Read its report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc9u6cr-h7gc.md and diff C:/Users/david.basile/AppData/Local/Temp/holyagent-publishing.diff. Focused23pass,check312/lint313green; fmt failed concurrently owned root-question-policy.test.ts (don't edit it). bunpack139files succeeded, no actual publication. Full validation/generation separate.",
     "Fix concrete retry behavior and GitHub/npm artifact seam. A rerun after successful npm publish must recognize same version+integrity and complete GitHub steps without another failing publish; do not swallow network/auth/conflict errors or skip differing content. A GitHub public release should not announce npm success before matching npm publication succeeds; use order/draft staging consistent with least privilege and repo conventions. Add executable tests that cross the actual pack/version/workflow-command boundary with local controlled subprocesses/fixtures and fake external commands as needed, no network/publication, not just regex assertions. Prove packed package name/version/contents and same artifact used by npm and GitHub. Retain user requirements stable=latest,dev=dev npm prerelease+GitHub prerelease, bunpm pack thennpmOIDC,no token fallback,3OSrequiredCI/SHAactions/limitedpermissions.",
@@ -107,5 +107,10 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwca9786-hwrn",
   "screen": true,
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T15:48:12.173Z"
+  },
   "createdAt": "2026-11-11T15:47:44.887Z"
 }
