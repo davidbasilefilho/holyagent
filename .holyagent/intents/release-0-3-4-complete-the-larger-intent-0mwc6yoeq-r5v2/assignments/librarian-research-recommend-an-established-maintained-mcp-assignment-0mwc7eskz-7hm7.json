@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mwc7eskz-7hm7",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 2,
+  "roleTask": "Librarian.research",
+  "slug": "recommend-an-established-maintained-mcp",
+  "objective": "Recommend an established maintained MCP-to-Pi tool adapter that reduces tool-schema context bloat, or establish why separate pi-mcp-to-tool is needed.",
+  "state": "Ready",
+  "scope": [
+    "Read-only research now; integration or new package belongs to0.3.4 after minimal0.3.3 npm release.",
+    "User requirement verbatim: if there is an mcp-to-pi-tool extension for adapting the context-bloat from mcp to actual pi tools, we should use it if it's well maintained and not obscure, if not we shall develop it as another package `pi-mcp-to-tool`.",
+    "Search public authoritative npm/GitHub/Pi package documentation for existing MCP bridges. Identify at most3 credible candidates, including lazy/discovery or codemode approaches where present. Distinguish actual Pi-native callable tools from merely stuffing all MCP schemas into context.",
+    "Evaluate maintenance with dated releases/recent substantive commits, documented compatibility with current Pi1.5.x, issue responsiveness, provenance/maintainer/community signals and architecture. Avoid invented popularity or arbitrary stars threshold. State supported OS/transports and credential handling as sourced facts or unknown.",
+    "Produce a concrete recommendation with reasons, integration concerns, and a small fallback package contract only if no maintained established option fits. Cite source URLs, exact versions and dates. No installation, source edits or account changes."
+  ],
+  "constraints": [
+    "Do not read or expose tokens/auth files. No global changes, model calls, publish, messages or .holyagent edits. Preserve current installation.",
+    "Report at most8 bullets; at most3 candidates with evidence URLs; separate facts/inference/unknown. Long notes outside repo. End with exact criterion/evidence labels."
+  ],
+  "criteria": [
+    {
+      "text": "Candidate maintenance and provenance",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Actual context and Pi tool behavior",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Evidence-backed adoption or fallback",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "recommendation"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T14:18:06.515Z"
+}
