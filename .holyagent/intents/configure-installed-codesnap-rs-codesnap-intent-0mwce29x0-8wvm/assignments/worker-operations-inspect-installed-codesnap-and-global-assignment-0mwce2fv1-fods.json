@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mwce2fv1-fods",
+  "intentId": "intent-0mwce29x0-8wvm",
+  "intentRevision": 1,
+  "roleTask": "Worker.operations",
+  "slug": "inspect-installed-codesnap-and-global",
+  "objective": "Inspect installed CodeSnap and global Zed configuration and determine the smallest reliable global screenshot task integration.",
+  "state": "Running",
+  "scope": [
+    "Read local Zed settings, themes, existing tasks and installed codesnap CLI/version/help; inspect official Zed task variables and CodeSnap configuration documentation where necessary.",
+    "Return exact user configuration paths, current appearance settings, command interface, task input and quoting strategy, limitations, and recommended implementation. Read-only except temporary probe output outside repository."
+  ],
+  "constraints": [
+    "User asks: setup codesnap-rs/codesnap (already installed on the machine) in a global zed task so I can take screenshots of code with the editor's colorscheme, fonts, etc; don't care about the lexical token differences.",
+    "Preserve settings/tasks; no edits to repository, version-control writes, security configuration or global installation changes.",
+    "Use FFF file search when available; if absent report setup limitation and use direct reads.",
+    "Report in at most 8 bullets; put long logs outside the repository and give the path."
+  ],
+  "criteria": [
+    {
+      "text": "Integration facts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Appearance mapping",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Preserved scope",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "recommended-paths"
+  ],
+  "ownershipPaths": [
+    "local-user-zed-inspection"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T17:24:27.469Z"
+  },
+  "createdAt": "2026-11-11T17:24:27.469Z"
+}
