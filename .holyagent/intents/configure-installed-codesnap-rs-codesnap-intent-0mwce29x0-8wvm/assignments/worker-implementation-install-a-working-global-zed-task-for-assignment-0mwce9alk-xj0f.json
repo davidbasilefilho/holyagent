@@ -60,6 +60,7 @@
   ],
   "independentFrom": [],
   "specialist": {
+    "agentId": "pi:7061f4ea-63f8-40c",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-11T17:29:47.240Z"
