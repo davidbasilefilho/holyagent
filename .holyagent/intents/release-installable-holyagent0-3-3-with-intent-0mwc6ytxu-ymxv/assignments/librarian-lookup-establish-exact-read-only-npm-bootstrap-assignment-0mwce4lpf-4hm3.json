@@ -5,7 +5,7 @@
   "roleTask": "Librarian.lookup",
   "slug": "establish-exact-read-only-npm-bootstrap",
   "objective": "Establish exact read-only npm bootstrap and reusable GitHub OIDC publication prerequisites for the reviewed HolyAgent0.3.3 package without publishing or changing accounts.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "User wants a reviewed bootstrap0.3.3-bootstrap.0 on bootstrap tag using existing npm login, then they will set trusted publisher and final0.3.3 must publish through publish.yml calling stable.yml/dev.yml, bun pm pack then npm OIDC. Need facts now, not speculative adoption or edits.",
     "Use C:/Users/david.basile/dev/holyagent-0.3.3-npm for explicit command cwd. Another Worker.debugging owns all source/build writes; do not run build/test/install/pack or touch files there. Read docs/npm-publishing.md and workflow files only as necessary; they may be regenerated but no semantic edits expected.",
@@ -103,7 +103,9 @@
     "agentId": "pi-workflow:wf_9198ebed10e4/assignment-0mwce4lpf-4hm3",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T17:26:44.699Z"
+    "startedAt": "2026-11-11T17:26:44.699Z",
+    "finishedAt": "2026-11-11T17:34:54.880Z"
   },
+  "result": "failure: result: Partial research only; publication prerequisites remain unverified\nchanged: none\nchecks: no npm CLI or registry commands run; no source/build/install/pack commands run\nblockers: Web search and fetch failed because pi-web-kit Exa provider requires `EXA_API_KEY` or `apiKeys.exa`; no supported npm CLI access was available to check login, installed npm version, registry package metadata, or account ownership\nquestions: none\nnotes: The prescribed `holyagent-0.3.3-npm` checkout was read-only. Its root manifest is private; that alone does not establish public package availability or ownership. Its workflow and generated package cannot establish current registry state or npm’s current trusted-publisher requirements.\nevidence:\n[blocking] Exact npm package availability account ownership and minimum required publication set are established: Not established; no registry metadata or supported `npm whoami` result. `holyagent-0.3.3-npm/package.json` is `private:true`; `holyagent-0.3.3-npm/packages/integrations/pi/dist/package.json` describes `holyagent` 0.3.2 with peer dependencies, but is not authoritative for current published metadata.\n[blocking] Authoritative trusted publisher reusable workflow identity and npm version prerequisites are established: Not established; official docs URL `https://docs.npmjs.com/trusted-publishers/` could not be fetched due to missing Exa access.\n[blocking] Remaining user setup is concrete and no publication account or credential changes occur: No account/credential changes occurred; cannot specify setup values or remaining actions without registry, account, remote, and authoritative documentation evidence.\nsources: `holyagent-0.3.3-npm/package.json`; `holyagent-0.3.3-npm/packages/integrations/pi/dist/package.json`; `.github/workflows/publish.yml` (main checkout, reusable workflow calls); official URL attempted: `https://docs.npmjs.com/trusted-publishers/` (fetch unavailable).\ncommands-and-exits: No CLI commands run; npm identity/version and registry metadata are unknown.\nuser-action: Provide a working supported public web-search/fetch provider or authorize the research environment repair; then rerun read-only registry/account and official documentation checks.\n",
   "createdAt": "2026-11-11T17:26:08.355Z"
 }
