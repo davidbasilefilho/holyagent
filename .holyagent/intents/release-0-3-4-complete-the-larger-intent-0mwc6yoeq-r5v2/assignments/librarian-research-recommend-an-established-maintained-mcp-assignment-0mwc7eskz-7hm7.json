@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "recommend-an-established-maintained-mcp",
   "objective": "Recommend an established maintained MCP-to-Pi tool adapter that reduces tool-schema context bloat, or establish why separate pi-mcp-to-tool is needed.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Read-only research now; integration or new package belongs to0.3.4 after minimal0.3.3 npm release.",
     "User requirement verbatim: if there is an mcp-to-pi-tool extension for adapting the context-bloat from mcp to actual pi tools, we should use it if it's well maintained and not obscure, if not we shall develop it as another package `pi-mcp-to-tool`.",
@@ -45,7 +45,9 @@
     "agentId": "pi-workflow:wf_5647ecc241bd/assignment-0mwc7eskz-7hm7",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-11T14:18:38.624Z"
+    "startedAt": "2026-11-11T14:18:38.624Z",
+    "finishedAt": "2026-11-11T14:22:18.602Z"
   },
+  "result": "failure: result: Research blocked; insufficient public evidence to select an adapter or justify building one.\nchanged: none\nchecks: Web search and npm page fetch failed to start: `exa provider requires EXA_API_KEY or apiKeys.exa in project or agent-directory pi-web-kit config.` No installation or code checks run.\nblockers: Web search and fetch require unavailable authentication; no auth files were accessed.\nquestions: Can authenticated web access be provided?\nnotes: Facts: `bun.lock:178-182` records `@earendil-works/pi-codemode` and `@earendil-works/pi-mcp` 1.5.0 as dependencies of Pi 1.5.0. Inference: these warrant investigation, but their names and dependency status do not establish suitability.\nevidence:\nCandidate maintenance and provenance: Unknown; releases, commits, issue responsiveness, community and provenance could not be verified.\nActual context and Pi tool behavior: Unknown; native tool registration, schema exposure, transports, OS support and credential handling could not be verified.\nEvidence-backed adoption or fallback: Neither adoption nor a new package is justified by the available evidence.\nsources: `bun.lock:178-182`; attempted https://www.npmjs.com/search?q=pi%20mcp, blocked by the authentication error above.\nrecommendation: Defer the 0.3.4 decision until public candidate documentation and maintenance evidence can be checked; first investigate the two existing Pi dependencies.\n",
   "createdAt": "2026-11-11T14:18:06.515Z"
 }
