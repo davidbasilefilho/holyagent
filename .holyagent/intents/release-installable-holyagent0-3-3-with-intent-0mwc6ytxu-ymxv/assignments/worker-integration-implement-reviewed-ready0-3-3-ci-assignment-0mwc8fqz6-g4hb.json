@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "implement-reviewed-ready0-3-3-ci",
   "objective": "Implement reviewed-ready0.3.3 CI publication using publish.yml to call stable.yml/dev.yml for GitHub and npm stable/dev releases.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, branch release/0.3.3/fix/npm-readiness. User now explicitly requires: 'there must be a publish.yml and stable.yml and dev.yml, publish must use the other two, and stable must create a github stable release as well as a stable npm release, dev.yml must create a dev pre release and an npm pre-release updating the dev npm tag'. Earlier worker reported an automatic-publication edit denial before this new explicit user authorization; respect any fresh denial and report rather than working around it. Do not actually trigger publication in this assignment.",
     "Build on existing workflows and0.3.3 release/integration conventions: main stable, current repository non-main dev behavior unless mergeability/security rules require narrower trigger. Preserve required validation/job IDs including check,windows,installers,branch-model and version-on-main, retain macOS addition. publish.yml must orchestrate reusable stable.yml and dev.yml after appropriate green checks. Preserve protected branch/immutable tag controls and action full-SHA pins.",
@@ -63,5 +63,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc785xx-27bc",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T14:47:48.234Z"
+  },
   "createdAt": "2026-11-11T14:46:50.706Z"
 }
