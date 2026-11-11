@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mwce9alk-xj0f",
+  "intentId": "intent-0mwce29x0-8wvm",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "install-a-working-global-zed-task-for",
+  "objective": "Install a working global Zed task for CodeSnap screenshots matching the current Zed theme and fonts.",
+  "state": "Running",
+  "scope": [
+    "Global user configuration only: C:/Users/david.basile/AppData/Roaming/Zed/tasks.json and minimal helper/theme assets underneath that Zed folder; temporary tests/reports outside repository.",
+    "Known facts: C:/Users/david.basile/.cargo/bin/codesnap.exe is codesnap-cli 0.14.0 and supports --from-file, --output, --code-font-family, --code-theme, --config. Zed settings.json uses theme mode system, One Light/One Dark, buffer_font_size 15, no explicit buffer font family. No tasks.json exists there. Read local instructions before editing.",
+    "Map actual Zed palette and effective editor font into custom CodeSnap theme/config. Minimal helper may read configuration at invocation to follow future changes. Use selected code through safe task environment handling where supported, with active-file fallback. Never interpolate code into shell syntax. Use absolute helper/executable paths and robust quoting.",
+    "Confirm platform global task path from sources. Generate actual PNGs. Default timestamped files in Pictures/CodeSnap, print output path. Preserve unrelated tasks/settings. Test selection/full-file, multiline Unicode and metacharacters, spaced paths, missing input, theme/font/size values.",
+    "Save before/after diff artifact outside repository for review. Save full report to C:/Users/david.basile/AppData/Local/Temp/zed-codesnap-implementation-report.md; return compact evidence and its path."
+  ],
+  "constraints": [
+    "User asks: setup codesnap-rs/codesnap (already installed on the machine) in a global zed task so I can take screenshots of code with the editor's colorscheme, fonts, etc; don't care about the lexical token differences.",
+    "Local config only; preserve unrelated settings and tasks. No repository edits, version-control writes, security settings changes, package installs, publishing, opening GUI windows or clipboard mutation.",
+    "No lexical equivalence work. Do not settle for arbitrary built-in palette/font when actual Zed values can be mapped. Report unsupported appearance details.",
+    "Back up existing files before editing. Report in at most 10 bullets; long logs outside repository with path."
+  ],
+  "criteria": [
+    {
+      "text": "Global task installed",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Editor appearance matched",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Safe code input",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "PNG generation tested",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Unrelated configuration preserved",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "report-file"
+  ],
+  "ownershipPaths": [
+    "local-user-zed-global-codesnap"
+  ],
+  "dependencies": [
+    "assignment-0mwce2fv1-fods"
+  ],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T17:29:47.240Z"
+  },
+  "createdAt": "2026-11-11T17:29:47.240Z"
+}
