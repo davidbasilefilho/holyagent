@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "finish-npm-first-stable-dev-workflow",
   "objective": "Finish npm-first stable/dev workflow ordering and exact packed-artifact handoff regression tests.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Own .github/workflows/stable.yml,dev.yml,.github/actions/tag-release/action.yml,scripts/workflows.test.ts,packages/integrations/pi/publishing.test.ts. Current stable.release createsGHrelease+tarball thenstable.publish needsrelease/downloadsGHasset; devanalogous. Fix thatactualdependency so npmpublication succeedsbeforeGitHubsuccessrelease. Keep publish.ymlcallercontract, scopedid-tokenonlynpmpublish/reusablecaller andcontentswriteonlytagreleasejob, SHAactions/jobIDs. Userexplicitapproval covers these exactworkflowchangesandgrants; do notactuallypublish.",
     "Use minimalpack→npmpublish→GitHubrelease dependency/artifactpath, bun pm pack publicgeneratedPi dist ONLY, exactsameinspectedtarball passedtonpm scripts/npm-publishing.ts andattachedtoGHafterpublish. Rootworkspaceprivate. Existingpublicpackageholyagent withhostpeer5/no runtimedep; helperreadsEffectsofreshjobneedsactualdepsavailability. Existingactionsupload/downloadpins canbereusedfromrepopatterns; donothandinvent/changepins or dependencyversions. GHlookup404onlytreatedmissing frompriorfixmustremain.",
@@ -96,5 +96,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwcbwr2j-cajx",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T16:32:35.169Z"
+  },
   "createdAt": "2026-11-11T16:32:06.012Z"
 }
