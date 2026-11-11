@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "prepare-a-minimally-changed-installable0",
   "objective": "Prepare a minimally changed installable0.3.3 release: diagnose and fix release-blocking build/install, cross-platform CI and npm trusted-publishing gaps.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm, branch release/0.3.3/fix/npm-readiness. Root has clean --no-commit merge of main tooling fixes into0.3.3 integration base; MERGE_HEAD/staged files are root-owned. Main checkout must remain main; dirty other scratch worktree is unrelated and preserved.",
     "Run bun i (use frozen lockfile unless a proven permitted updater change requires lock update), build via bunx --no-install mise run build and full verification via bunx --no-install mise run verify. Find and fix only release blockers. Earlier incomplete Windows verify had symlink EPERM and TUI import fixture failure; establish current failures, real error paths and safe fixtures. Do not weaken tests or count skipped gates as passed.",
@@ -67,5 +67,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T14:13:28.582Z"
+  },
   "createdAt": "2026-11-11T14:12:57.237Z"
 }
