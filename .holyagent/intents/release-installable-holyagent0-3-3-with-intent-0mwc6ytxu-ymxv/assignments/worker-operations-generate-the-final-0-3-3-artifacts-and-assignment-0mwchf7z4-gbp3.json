@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "generate-the-final-0-3-3-artifacts-and",
   "objective": "Generate the final 0.3.3 artifacts and provide reliable changed-scope gates and a safe commit inventory for independent review.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Work in C:/Users/david.basile/dev/holyagent-0.3.3-npm; all source writers are now terminal. Branch release/0.3.3/fix/npm-readiness still has the preserved staged main-tooling merge and release source/test/docs/workflow changes. Preserve every prior change. Do not write Git/state records.",
     "Run canonical bunx --no-install mise run build and changed-scope check/lint/fmt:check with actual child exit status. Formatting fixes only for generated artifacts if canonical build needs them; source edits require reporting exact issue, do not silently change semantics. Run focused sessioncontext/instruction/rootpolicy/StopSlop/Codex/publication/workflow/longpath/SSH/state regressions sufficient to cover current sources. Fullverify is reserved for the final reviewed committed head, so do not run it now. Use bounded ample child timeouts; no zero-exit wrappers on failed/timedout children.",
@@ -119,7 +119,9 @@
     "agentId": "pi-workflow:wf_3945188d237c/assignment-0mwchf7z4-gbp3",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T18:58:46.561Z"
+    "startedAt": "2026-11-11T18:58:46.561Z",
+    "finishedAt": "2026-11-11T19:02:51.448Z"
   },
+  "result": "failure: result: Build and scope gates pass, but full requested release-artifact, inventory, and packaged-install evidence is incomplete\nchanged: generated outputs under `packages/integrations/claude/dist`, `packages/integrations/pi/dist`\nchecks: `bunx --no-install mise run build` -> exit 0, Claude 39 files and Pi 139 files built; `bunx --no-install mise run check` -> exit 0, 317 files; `bunx --no-install mise run lint` -> exit 0, 318 files; `bunx --no-install mise run fmt:check` -> exit 0, 737 files formatted; `bun pm pack --destination ...\\Temp` -> produced 932-file, 14.40 MB unpacked tarball (not verified as the intended Pi-package tarball)\nblockers: Full diff/secret inventory and intended commit-path manifest not established; clean tarball installation, CLI checks, and isolated Pi startup not exercised in this task\nquestions: none\nnotes: Pi dist reports version 0.3.3; Claude dist has no package.json. Fullverify was not run as instructed. No source semantics changed.\nevidence:\nCanonical 0.3.3 artifacts match current source and changed scope gates pass (tests): Build/check/lint/fmt pass; `packages/integrations/pi/dist/package.json` version is 0.3.3; full artifact-specific tests remain unverified.\nThe complete intended diff and exact commit paths exclude secrets and unrelated files (scope): Not established; shared tree contains broad staged/unstaged changes and untracked files. No full diff/secret scan or commit-path manifest produced.\nPacked artifact CLI and isolated Pi startup are usable without altering user configuration (behavior): Not verified; `bun pm pack` created `C:\\Users\\david.basile\\AppData\\Local\\Temp\\holyagent-0.3.3.tgz`, but no clean install or startup exercise.\nchecks-run: Build, check, lint, fmt:check commands and actual exits listed above; fullverify not run by instruction.\ndiff-file: Not produced.\ncommit-paths-file: Not produced.\ntarball-file: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\holyagent-0.3.3.tgz` (932 files; package identity not validated as intended target).\nsecret-scan: Not performed; no claim that diff or intended paths are secret-free.\nremaining-blockers: Full diff/secret review and commit inventory; intended package-specific tarball validation; clean installation, CLI version/help, and isolated Pi startup.\n",
   "createdAt": "2026-11-11T18:58:22.624Z"
 }
