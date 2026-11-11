@@ -1,0 +1,60 @@
+{
+  "id": "assignment-0mwc3pt2d-q3pk",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "publish-holyagent-npm-artifacts-through",
+  "objective": "Publish HolyAgent npm artifacts through CI trusted publishing, with deterministic CHKDSK-style development versions and at most one dev release per commit.",
+  "state": "Ready",
+  "scope": [
+    "bun pm pack for packing the generated publishable Pi package, npm for actual OIDC trusted publishing; root package remains private",
+    "Match CHKDSK examples v0.1.0-dev.2026-11-10.19-14-04.gcdcb19b: timestamp is the committer timestamp in UTC, not the CI clock; reruns and branches for one full commit SHA must not create a second dev release",
+    "Stage ephemeral dev manifest versions without changing the one authoritative source version; validate tarball contents and npm install smoke test",
+    "Integrate with main/dev workflow: validated dev prereleases and stable main releases; inspect existing npm trusted publisher configuration and repository metadata; never fall back to a long-lived npm token"
+  ],
+  "constraints": [
+    "User explicitly requests npm release and CI trusted publishing; approval does not authorize merging PRs, force-pushing, pushing protected branches or changing security settings",
+    "Deferred until tooling restoration is committed to main and root specialist tools load",
+    "Use exact SHA pins with version comments for new external actions; dependencies only through updater",
+    "Before publishing require current-head tests, independent code and security reviews and successful CI; open dev-to-main release PR once ready, wait for merge approval",
+    "Keep existing tags and branches; do not rewrite published history",
+    "Report in at most 10 bullets; long logs outside repository"
+  ],
+  "criteria": [
+    {
+      "text": "CI packs with bun pm pack and publishes the reviewed tarball using npm trusted publishing with least privilege",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Dev tag and package version use the commit UTC timestamp and a deterministic hash suffix and reruns create no duplicate release",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Current-head gates and independent code and security reviews pass before any publication",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks",
+    "diff-file",
+    "tarball",
+    "publisher-configuration",
+    "release-url"
+  ],
+  "ownershipPaths": [
+    ".github/workflows",
+    ".github/actions/tag-release",
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/tests/pi.test.ts",
+    "scripts/workflows.test.ts",
+    "scripts",
+    "docs/development.md",
+    "docs/pi/installation.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T12:34:41.893Z"
+}
