@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "produce-the-exact-intended-0-3-3-commit",
   "objective": "Produce the exact intended 0.3.3 commit-path inventory and complete review diff without changing the checkout.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work in C:/Users/david.basile/dev/holyagent-0.3.3-npm. All writers terminal. Canonical build/check/lint/fmt just passed (317/318/737), so do NOT build/run gates/pack. Root needs two external files before committing: exact paths JSON list and full diff including new files.",
     "Enumerate tracked changes relative to HEAD c5b2ab2b plus untracked nonignored paths. Include preserved stagedtoolingmerge from271bfa02 and all release sources/tests/docs/workflows/generatedoutputs in existing assignment scope. Explicitly inventory every file under untracked packages/runtime/tests/fixtures rather than stage the directory blindly. Exclude .git/.holyagent, environment/credentials/privatekey material and unrelated runtime/log/tarball/scratch files. Do not silentlyexclude a legitimate release file; flag uncertainty.",
@@ -101,5 +101,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwchf7z4-gbp3",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T19:03:26.832Z"
+  },
   "createdAt": "2026-11-11T19:02:58.499Z"
 }
