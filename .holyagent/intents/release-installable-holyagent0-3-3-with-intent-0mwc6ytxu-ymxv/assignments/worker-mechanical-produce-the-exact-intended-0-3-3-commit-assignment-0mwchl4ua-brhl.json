@@ -102,6 +102,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwchf7z4-gbp3",
   "specialist": {
+    "agentId": "pi-workflow:wf_e93baadd636d/assignment-0mwchl4ua-brhl",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-11T19:03:26.832Z"
