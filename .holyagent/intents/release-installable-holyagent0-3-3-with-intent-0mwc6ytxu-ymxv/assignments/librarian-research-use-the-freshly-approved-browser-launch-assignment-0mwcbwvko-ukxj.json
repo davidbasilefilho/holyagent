@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "use-the-freshly-approved-browser-launch",
   "objective": "Use the freshly approved browser launch to obtain public Luna medium versus high benchmark and output-token efficiency evidence.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Freshspecificuserapproval: userselected 'Approve browser launch' throughasktoolafterprior computer_use_launch_app rejection. You may now retryexactnormalbrowserlaunch Edge/Chrome topublicbenchmarkpages only, nologin/installation/settingschanges. The originaldenialwasrequiresinteractiveuserconfirmation; do notattemptalternatewaysaroundanystillunresolvedhostboundary. Load computer-use skill C:/Users/david.basile/.pi/agent/npm/node_modules/@amaster.ai/pi-computer-use/skills/computer-use/SKILL.md. Firstinspectcurrentbrowserwindows; ifnone launchusualinstalledEdge/Chrome usingdiscoveredtoolcorrectschema. Prior184appslisttruncated; installednormalbrowserpathmaybeinlist, don'tguessarbitraryexecutables. Ifstillrequiresinteractiveconfirmationstopwithexactuseraction needed; don'tagaintryWebKitExa(whichrequireskey)orunpairedrelay.",
     "Actualquestion: userexplicitlyauthorizesif supportedchangeCodexauto-review from codex-auto-review/low to gpt-6-luna medium/high. Choosequality andoutput-token-performance fromrelevantbenchmarks (notcost); fastmediumifadequate/highifnot. Modelregistry C:/Users/david.basile/.pi/agent/models-store.json registersmedium/high, butnotproofbackendstrictJSONsupport. No configchanges/modelcalls here. Usepublicauthoritativebenchmarks,mypriors.comwhereapplicable, directmeasurementsmodel+effort+tokens+taskrelevance/sourceURL/date. Ifbenchmarks don'tseparateeffortsoronlyoverallintelligence, reportnoconclusioninsteadinventing. Atmost3specificsources; highestrelevance safetystructuredclassification, notgenericcodebenchalone.",
@@ -84,5 +84,10 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwcaremm-mxbm",
   "screen": true,
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T16:24:35.914Z"
+  },
   "createdAt": "2026-11-11T16:24:08.664Z"
 }
