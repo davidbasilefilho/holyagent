@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "resolve-real-current-windows",
   "objective": "Resolve real current Windows verification failures and run a meaningful isolated packaged-Pi startup check for0.3.3.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Branch release/0.3.3/fix/npm-readiness carries staged tooling merge and uncommitted CI fixture repairs; AGENTS.md has a separate writer. Prior terminal assignments: assignment-0mwc785xx-27bc (source fixes) and assignment-0mwc7yb7y-re9l (failed evidence collection). Read both reports from C:/Users/david.basile/dev/holyagent/.git/holyagent/reports as needed.",
     "Get exact existing verification process status first. Log C:/Users/david.basile/AppData/Local/Temp/holyagent-033-verify.log counted3345pass54fail52skip/113files but holyagent-033-verify.exit says0. A validation agent also started C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwc-verify-retry.log with final exit unknown. Do not start concurrent verification. Establish whether failure/exit discrepancy is stale output, wrapper-capture error, gate masking or product bug and fix actual owned cause if present.",
@@ -59,5 +59,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc7yb7y-re9l",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-11T14:41:49.307Z"
+  },
   "createdAt": "2026-11-11T14:41:17.044Z"
 }
