@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "generate-the-final-0-3-3-artifacts-and",
   "objective": "Generate the final 0.3.3 artifacts and provide reliable changed-scope gates and a safe commit inventory for independent review.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Work in C:/Users/david.basile/dev/holyagent-0.3.3-npm; all source writers are now terminal. Branch release/0.3.3/fix/npm-readiness still has the preserved staged main-tooling merge and release source/test/docs/workflow changes. Preserve every prior change. Do not write Git/state records.",
     "Run canonical bunx --no-install mise run build and changed-scope check/lint/fmt:check with actual child exit status. Formatting fixes only for generated artifacts if canonical build needs them; source edits require reporting exact issue, do not silently change semantics. Run focused sessioncontext/instruction/rootpolicy/StopSlop/Codex/publication/workflow/longpath/SSH/state regressions sufficient to cover current sources. Fullverify is reserved for the final reviewed committed head, so do not run it now. Use bounded ample child timeouts; no zero-exit wrappers on failed/timedout children.",
@@ -115,5 +115,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-11T18:58:46.561Z"
+  },
   "createdAt": "2026-11-11T18:58:22.624Z"
 }
