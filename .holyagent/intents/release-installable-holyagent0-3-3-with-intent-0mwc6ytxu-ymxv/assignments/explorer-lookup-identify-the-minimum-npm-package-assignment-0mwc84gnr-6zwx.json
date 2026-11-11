@@ -5,7 +5,7 @@
   "roleTask": "Explorer.lookup",
   "slug": "identify-the-minimum-npm-package",
   "objective": "Identify the minimum npm package publication set needed for a usable HolyAgent0.3.3 installation.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Read-only source in C:/Users/david.basile/dev/holyagent-0.3.3-npm. Examine root/workspace package manifests, package/export/bin entrypoints, bundling/pack/install scripts and intended npm installation docs. Determine whether root holyagent tarball is self-contained or whether workspace packages must also be published for runtime, Pi or Claude integration installation. Name each required package, canonical version, dependency/publish order and why; explicitly say if root holyagent alone suffices.",
     "User authorizes publishing other npm packages if needed, so determine necessity from runtime/installation dependency closure rather than assuming every workspace is public. Root clean tarball CLI smoke already passed; packaged Pi startup independently being checked."
@@ -38,7 +38,9 @@
     "agentId": "pi-workflow:wf_bc3646eee7a2/assignment-0mwc84gnr-6zwx",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T14:38:38.369Z"
+    "startedAt": "2026-11-11T14:38:38.369Z",
+    "finishedAt": "2026-11-11T14:46:39.781Z"
   },
+  "result": "failure: result: Minimum 0.3.3 install set is the root `holyagent` package for Claude Code and the generated Pi `holyagent` package for Pi; the root manifest is private and is not publishable as the npm CLI.  \nchanged: none  \nchecks: Read-only manifest, build-script, bundled-entrypoint and installation-doc inspection; no tests run.  \nblockers: none  \nquestions: none  \nnotes: No publication performed. Publish `@holyagent/runtime` only if an installable artifact directly depends on it; the examined Pi generated package contains a bundled runtime entrypoint, and the README documents Claude plugin marketplace installation.  \nevidence:  \nMinimal required npm package set (scope): `C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist/package.json:2-3` names generated Pi package `holyagent@0.3.3`; `C:/Users/david.basile/dev/holyagent-0.3.3-npm/README.md:15` documents Claude plugin marketplace install. Root `C:/Users/david.basile/dev/holyagent-0.3.3-npm/package.json:2-4` is `holyagent@0.3.3` and `\"private\": true`, so it cannot be the npm publication.  \nPublished dependency closure (behavior): `C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist/package.json:15-21` lists Pi host peer dependencies; `C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/build.ts:20-36` builds generated package files, while `C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist/scripts/holyagent.js:1-3` identifies the bundled runtime-derived CLI entrypoint.  \npublish-set: `C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist/package.json:2-3,15-21`; `C:/Users/david.basile/dev/holyagent-0.3.3-npm/README.md:15`.  \npackage-sources: `C:/Users/david.basile/dev/holyagent-0.3.3-npm/package.json:2-4`; `C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/runtime/package.json:2-16`; `C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/build.ts:20-36`; `C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/integrations/pi/dist/package.json:2-21`.\n",
   "createdAt": "2026-11-11T14:38:04.120Z"
 }
