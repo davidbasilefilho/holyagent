@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "establish-the-exact-origin-and-required",
   "objective": "Establish the exact origin and required remedy of repeated publishing-workflow write denials despite explicit user authorization.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only investigation; do not attempt edits or reproduce publication writes. Main repo C:/Users/david.basile/dev/holyagent; release worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm. Actual user explicitly required publish.yml using stable.yml/dev.yml for GitHub releases and npm trusted publishing, and most recently explicitly approved id-token:write only on stable/dev publication jobs and reusable callers excluding PR jobs. No actual publication was asked of the denied implementation worker. Nevertheless assignment-0mwc96u68-jv51 reported stable.yml write rejected as granting OIDC/enabling public npm publication. Earlier assignments-0mwc8ny8d-po33 and0mwc8fqz6-g4hb were similarly blocked. Resolve actual denial cause before another approval or retry.",
     "Inspect latest workflow wf_babe43429c6d journal and its underlying specialist transcript/tool-result messages. Journal C:/Users/david.basile/AppData/Local/Temp/pi-subagents-0/Users-david.basile-dev-holyagent/01a1ca6b-447a-75e5-9485-35fa14619851/tasks/wf_babe43429c6d.workflow.jsonl. Latest report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc96u68-jv51.md. Establish exact tool name, denied path, literal error/denial text and source (actual user denial, host/hook/safety config, specialist self-imposed refusal, or unknown). Cite authoritative transcript offsets/line numbers. Inspect instruction/config code only as needed, never credentials.",
@@ -40,5 +40,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwc96u68-jv51",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T15:14:04.614Z"
+  },
   "createdAt": "2026-11-11T15:13:38.762Z"
 }
