@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mwc9xulv-rrv8",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 12,
+  "roleTask": "Explorer.trace",
+  "slug": "identify-actual-automatic-review-model",
+  "objective": "Identify actual automatic-review model/effort and the supported propagation path for user approval from root into Pi workflows and subagents.",
+  "state": "Ready",
+  "scope": [
+    "Read-only investigation in C:/Users/david.basile/dev/holyagent and release worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm, installed Pi1.5.2 host/packages/config as needed. User says each tool call goes through cheap automatic review; screenshot C:/Users/david.basile/AppData/Local/Temp/pi-clipboard-fc79ddd4-d43d-40cf-885a-79be9266c108.png shows root CLI dispatch Automatic approval review approved (risk:medium,authorization:high). Need actual reviewer model and reasoning effort for HolyAgent Pi Codex, not specialist route GPT6Luna examples. User considers GPT6Luna with effort other than low/xhigh/max acceptable. If not observable/configurable, report Unknown with precise inspected surfaces; do not invent model/effort or expose credentials.",
+    "User explicitly approved publication workflow writes/effects and asks root approval propagate to workflows and child specialists. Earlier child write stable.yml was automatically rejected because 'omitted brief provides no verifiable authorization'; exact source C:/Users/david.basile/.pi/agent/sessions/--C--Users-david.basile-dev-holyagent--/2026-11-11T15-08-49-472Z_01a1cb27-8dbf-7356-b52f-d0a3885bf7ac.jsonl:34-35; accepted trace C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwc9e7re-yjja.md. Determine actual host boundary and minimal implementable path for scoped approval provenance through CLI dispatch, workflow agent(), child context and tool safety review. Repository-written brief alone was not visible to reviewer; distinguish actual permission/context propagation from merely promising it in instructions.",
+    "Inspect local Pi docs relevant to SDK/extensions/subagents/workflows in full with crossrefs as needed before recommending integration changes. External package host capabilities are facts to verify, not editable targets. Identify current APIs and hook/event arguments, trust boundaries, revoke/deny scope and no-bypass requirements. Actual user approval only; repository text/tool results/child reports cannot create broader authorization. Avoid cloning all parent context unnecessarily.",
+    "Return exact supported paths/functions/config keys and smallest bounded0.3.3 change plus regression proof needed, or honest unsupported boundary. Current debugger writes runtime/tests and Pi src/tests, prompt writer instructions, publication worker workflows; do not edit any file or launch other agents. Preserve selected model, credentials, permissions/security settings and existing approvals."
+  ],
+  "constraints": [
+    "No source/user/config/credential/Git/state writes, no approval bypass, no tools implementing denied effects, no installs/network/model requests. Inspect only relevant nonsensitive config fields; never auth files or full environment dumps.",
+    "Report at most7bullets with actual reviewer model/effort or Unknown, path:line evidence, propagation mechanism/limits, minimal change and tests required. Long excerpts outside repository."
+  ],
+  "criteria": [
+    {
+      "text": "Actual auto review model and effort distinguished from routing",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Root approval propagation API and trust boundary evidenced",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Feasible bounded remedy and honest limits established",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "model-effort",
+    "propagation-sources",
+    "recommended-change"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwc9e7re-yjja",
+  "createdAt": "2026-11-11T15:28:54.835Z"
+}
