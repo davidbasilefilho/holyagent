@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "inspect-installed-codesnap-and-global",
   "objective": "Inspect installed CodeSnap and global Zed configuration and determine the smallest reliable global screenshot task integration.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read local Zed settings, themes, existing tasks and installed codesnap CLI/version/help; inspect official Zed task variables and CodeSnap configuration documentation where necessary.",
     "Return exact user configuration paths, current appearance settings, command interface, task input and quoting strategy, limitations, and recommended implementation. Read-only except temporary probe output outside repository."
@@ -46,7 +46,37 @@
     "agentId": "pi:f30c8311-dbe3-4eb",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-11T17:24:27.469Z"
+    "startedAt": "2026-11-11T17:24:27.469Z",
+    "finishedAt": "2026-11-11T17:29:14.368Z"
+  },
+  "result": "result: Smallest reliable integration is one global Zed task invoking CodeSnap on the active file; no configuration was changed.\nchanged: none\nchecks: `codesnap --version` -> exit 0, `codesnap-cli 0.14.0`; `codesnap --help` -> exit 0, supports `--from-file`, `--output`, `--code-font-family`, `--code-theme`, `--config`; snapshot probe -> exit 0, saved a 527,475-byte SVG.\nblockers: none\nquestions: none\nnotes: CodeSnap does not inherit Zed’s editor theme or fonts automatically; matching them requires explicit CodeSnap theme/font settings. It renders a snapshot, not a pixel-accurate capture of Zed.\nevidence:\nIntegration facts (behavior): Installed at `C:\\Users\\david.basile\\.cargo\\bin\\codesnap.exe`; `codesnap --from-file \"$ZED_FILE\" --output clipboard` is a simple task command. Prefer task `args` (`[\"--from-file\", \"$ZED_FILE\", \"--output\", \"clipboard\"]`) to protect paths with spaces; alternatively use a quoted variable in the command. Zed exposes `$ZED_FILE`. A clipboard destination avoids a fixed output file collision; the task is manually run on the active file.\nAppearance mapping (behavior): `C:\\Users\\david.basile\\AppData\\Roaming\\Zed\\settings.json` sets theme mode `system`, light `One Light`, dark `One Dark`, and `buffer_font_size: 15`; no buffer font family is specified. CodeSnap provides independent `--code-theme` and `--code-font-family` options but no evidence of automatic Zed setting/theme integration. Set them explicitly to chosen equivalents; exact colors and font may need manual matching.\nPreserved scope (scope): Read-only inspection; existing settings left unchanged, no global tasks file exists at `C:\\Users\\david.basile\\AppData\\Roaming\\Zed\\tasks.json`. Zed documentation identifies global tasks in `~/.config/zed/tasks.json` and supports opening them via `zed: open tasks`; on this machine use Zed’s action to confirm its platform-specific location.\nchecks-run: `codesnap --version`, `codesnap --help`, successful SVG generation probe; read `C:\\Users\\david.basile\\AppData\\Roaming\\Zed\\settings.json` and `C:\\Users\\david.basile\\AppData\\Roaming\\Zed\\AGENTS.md`; fetched official Zed task docs covering global task templates, variables and quoting. No edits made.\nrecommended-paths: Add one global task through Zed’s `zed: open tasks` action, command `C:\\Users\\david.basile\\.cargo\\bin\\codesnap.exe`, args `[\"--from-file\", \"$ZED_FILE\", \"--output\", \"clipboard\"]`; optionally add explicit `--code-theme` and `--code-font-family`. The absolute executable path avoids depending on task-shell PATH.\r\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Installed executable, appearance settings and non-mutating probe established; implementation will resolve palette mapping and PNG output.",
+    "criteria": [
+      {
+        "criterion": "Integration facts",
+        "support": "Installed at `C:\\Users\\david.basile\\.cargo\\bin\\codesnap.exe`; `codesnap --from-file \"$ZED_FILE\" --output clipboard` is a simple task command. Prefer task `args` (`[\"--from-file\", \"$ZED_FILE\", \"--output\", \"clipboard\"]`) to protect paths with spaces; alternatively use a quoted variable in the command. Zed exposes `$ZED_FILE`. A clipboard destination avoids a fixed output file collision; the task is manually run on the active file."
+      },
+      {
+        "criterion": "Appearance mapping",
+        "support": "`C:\\Users\\david.basile\\AppData\\Roaming\\Zed\\settings.json` sets theme mode `system`, light `One Light`, dark `One Dark`, and `buffer_font_size: 15`; no buffer font family is specified. CodeSnap provides independent `--code-theme` and `--code-font-family` options but no evidence of automatic Zed setting/theme integration. Set them explicitly to chosen equivalents; exact colors and font may need manual matching."
+      },
+      {
+        "criterion": "Preserved scope",
+        "support": "Read-only inspection; existing settings left unchanged, no global tasks file exists at `C:\\Users\\david.basile\\AppData\\Roaming\\Zed\\tasks.json`. Zed documentation identifies global tasks in `~/.config/zed/tasks.json` and supports opening them via `zed: open tasks`; on this machine use Zed’s action to confirm its platform-specific location."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "`codesnap --version`, `codesnap --help`, successful SVG generation probe; read `C:\\Users\\david.basile\\AppData\\Roaming\\Zed\\settings.json` and `C:\\Users\\david.basile\\AppData\\Roaming\\Zed\\AGENTS.md`; fetched official Zed task docs covering global task templates, variables and quoting. No edits made."
+      },
+      {
+        "label": "recommended-paths",
+        "support": "Add one global task through Zed’s `zed: open tasks` action, command `C:\\Users\\david.basile\\.cargo\\bin\\codesnap.exe`, args `[\"--from-file\", \"$ZED_FILE\", \"--output\", \"clipboard\"]`; optionally add explicit `--code-theme` and `--code-font-family`. The absolute executable path avoids depending on task-shell PATH."
+      }
+    ]
   },
   "createdAt": "2026-11-11T17:24:27.469Z"
 }
