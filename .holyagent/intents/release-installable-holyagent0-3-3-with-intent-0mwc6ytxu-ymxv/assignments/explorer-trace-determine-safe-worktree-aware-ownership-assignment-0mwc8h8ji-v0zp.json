@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "determine-safe-worktree-aware-ownership",
   "objective": "Determine safe worktree-aware ownership and actual evidence for the old cloud writer lock blocking0.3.3 test repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only repository code and state metadata in C:/Users/david.basile/dev/holyagent. The0.3.3 release writes are physically in C:/Users/david.basile/dev/holyagent-0.3.3-npm; CLI assignment create/dispatch has been invoked from main checkout C:/Users/david.basile/dev/holyagent with absolute worktree scope only in briefs. Shared state branch holyagent/state includes old cloud writer assignment-0mwazxl76-29ks recorded workflow:wf_664f4226-73d/assignment-0mwazxl76-29ks, from /home/user/holyagent-0.3.3-states on2026-11-10. It owns runtime instructions/tests and both generated dist trees; no definitive current liveness evidence.",
     "Trace ownership conflict calculation and worktree identity recording: does CLI invocation cwd set writer worktree identity, and would correctly dispatching from actual release worktree scope locks legitimately to disjoint physical trees? Identify exact invocation and limits from source; do not infer just from different brief text or bypass a lock. If allclone lock intentional, state why and the supported operation needed.",
@@ -45,7 +45,41 @@
     "agentId": "pi-workflow:wf_1ae2c86610fc/assignment-0mwc8h8ji-v0zp",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-11T14:48:33.294Z"
+    "startedAt": "2026-11-11T14:48:33.294Z",
+    "finishedAt": "2026-11-11T14:53:05.638Z"
+  },
+  "result": "result: Old cloud writer’s liveness is unknown; its missing local worktree key conservatively blocks overlapping writers from every worktree in this clone.\nchanged: none\nchecks: Read-only source and state inspection; no commands or tests run.\nblockers: Obtain authoritative status or a terminal result for workflow `wf_664f4226-73d` from its cloud host or session owner before resolving its Running assignments.\nquestions: none\nnotes: The adjacent artifact and code reviewers are also recorded Running; their current liveness is unknown. They have no ownership paths.\nevidence:\nWorktree-aware ownership source evidence: `C:/Users/david.basile/dev/holyagent/packages/runtime/src/cli/program.ts:58-69`, `C:/Users/david.basile/dev/holyagent/packages/runtime/src/state/tree.ts:1032-1040,1072-1091,1150-1151` resolve invocation cwd to Git’s worktree top; `C:/Users/david.basile/dev/holyagent/packages/runtime/src/cli/assignment.ts:350-359` dispatches with its key; `C:/Users/david.basile/dev/holyagent/packages/runtime/src/state/local.ts:27-33` hashes the path with SHA-1 truncated to 16 hex characters.\nCloud writer liveness evidence: `C:/Users/david.basile/dev/holyagent/.git/holyagent/holyagent-state-c9bdc9d6fc/.holyagent/intents/release-0-3-3-make-the-root-keep-its-intent-0mwaz75rz-i978/assignments/worker-implementation-make-visual-work-add-and-verify-hover-assignment-0mwazxl76-29ks.json:7-8,78-93` records Running, cloud worktree and workflow ID, not live host status; no matching local Pi session was found.\nSupported safe unblocking operation: Confirm the cloud run’s terminal outcome with its host or owner, then have the root use the supported assignment lifecycle to record that outcome and release ownership. Until then, do not override the refusal.\nlock-sources: `C:/Users/david.basile/dev/holyagent/packages/runtime/src/domain/readiness.ts:65-72` skips a Running writer only when **both** worktree keys exist and differ; otherwise `C:/Users/david.basile/dev/holyagent/packages/runtime/src/domain/paths.ts:27-38` checks case-insensitive equal or directory-prefix overlap. `C:/Users/david.basile/dev/holyagent/packages/runtime/src/state/store.ts:173-190` restores keys from clone-local state, not shared assignment records.\nliveness: `C:/Users/david.basile/dev/holyagent/.git/holyagent/holyagent-state-c9bdc9d6fc/.holyagent/local/work-trees.json:1-11` has no key for the cloud writer; absence is neither proof of exit nor proof its cloud files are disjoint. The two adjacent reviewer records likewise say Running, not whether their host is active.\nnext-operation: Dispatching from `C:/Users/david.basile/dev/holyagent-0.3.3-npm` would correctly identify that worktree for a new run, but cannot bypass an unknown old key. Brief text alone does not set identity; wait for authoritative cloud evidence and a legitimate lifecycle transition.\n",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Source establishes conservative cross-clone lock from missing old worktree key; liveness remains explicitly Unknown and only authoritative terminal evidence can release it.",
+    "criteria": [
+      {
+        "criterion": "Worktree-aware ownership source evidence",
+        "support": "`C:/Users/david.basile/dev/holyagent/packages/runtime/src/cli/program.ts:58-69`, `C:/Users/david.basile/dev/holyagent/packages/runtime/src/state/tree.ts:1032-1040,1072-1091,1150-1151` resolve invocation cwd to Git’s worktree top; `C:/Users/david.basile/dev/holyagent/packages/runtime/src/cli/assignment.ts:350-359` dispatches with its key; `C:/Users/david.basile/dev/holyagent/packages/runtime/src/state/local.ts:27-33` hashes the path with SHA-1 truncated to 16 hex characters."
+      },
+      {
+        "criterion": "Cloud writer liveness evidence",
+        "support": "`C:/Users/david.basile/dev/holyagent/.git/holyagent/holyagent-state-c9bdc9d6fc/.holyagent/intents/release-0-3-3-make-the-root-keep-its-intent-0mwaz75rz-i978/assignments/worker-implementation-make-visual-work-add-and-verify-hover-assignment-0mwazxl76-29ks.json:7-8,78-93` records Running, cloud worktree and workflow ID, not live host status; no matching local Pi session was found."
+      },
+      {
+        "criterion": "Supported safe unblocking operation",
+        "support": "Confirm the cloud run’s terminal outcome with its host or owner, then have the root use the supported assignment lifecycle to record that outcome and release ownership. Until then, do not override the refusal."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "lock-sources",
+        "support": "`C:/Users/david.basile/dev/holyagent/packages/runtime/src/domain/readiness.ts:65-72` skips a Running writer only when **both** worktree keys exist and differ; otherwise `C:/Users/david.basile/dev/holyagent/packages/runtime/src/domain/paths.ts:27-38` checks case-insensitive equal or directory-prefix overlap. `C:/Users/david.basile/dev/holyagent/packages/runtime/src/state/store.ts:173-190` restores keys from clone-local state, not shared assignment records."
+      },
+      {
+        "label": "liveness",
+        "support": "`C:/Users/david.basile/dev/holyagent/.git/holyagent/holyagent-state-c9bdc9d6fc/.holyagent/local/work-trees.json:1-11` has no key for the cloud writer; absence is neither proof of exit nor proof its cloud files are disjoint. The two adjacent reviewer records likewise say Running, not whether their host is active."
+      },
+      {
+        "label": "next-operation",
+        "support": "Dispatching from `C:/Users/david.basile/dev/holyagent-0.3.3-npm` would correctly identify that worktree for a new run, but cannot bypass an unknown old key. Brief text alone does not set identity; wait for authoritative cloud evidence and a legitimate lifecycle transition."
+      }
+    ]
   },
   "createdAt": "2026-11-11T14:48:00.126Z"
 }
