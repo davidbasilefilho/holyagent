@@ -1,4 +1,14 @@
-import { lstat, mkdir, readdir, realpath, rename, rm, rmdir, stat } from "node:fs/promises"
+import {
+  copyFile,
+  lstat,
+  mkdir,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  rmdir,
+  stat,
+} from "node:fs/promises"
 import { basename, dirname, join, relative, sep } from "node:path"
 
 import { $ } from "bun"
@@ -92,7 +102,11 @@ interface Ran {
  * reaches it without a command line that can outgrow the system's limit.
  */
 const git = (cwd: string, env: Environment, args: ReadonlyArray<string>, input?: string) =>
-  spawn("git", args, { cwd, env: gitEnvironment(env), stdin: input }).pipe(
+  spawn("git", process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args, {
+    cwd,
+    env: gitEnvironment(env),
+    stdin: input,
+  }).pipe(
     Effect.catchDefect((cause) => Effect.fail(new StateIo({ path: cwd, cause }))),
     Effect.map((output): Ran => ({
       code: output.code,
@@ -751,7 +765,11 @@ const copyInto = (root: string, relative: string, from: string) =>
     if (folder !== base && !folder.startsWith(`${base}${sep}`))
       return yield* new StateIo({ path: to, cause: `${folder} is outside the state worktree` })
     const temporary = `${to}.${process.pid}.${crypto.randomUUID()}.tmp`
-    yield* io(to, () => Bun.write(temporary, Bun.file(from))).pipe(
+    yield* io<void | number>(to, () =>
+      process.platform === "win32"
+        ? copyFile(from, temporary)
+        : Bun.write(temporary, Bun.file(from)),
+    ).pipe(
       Effect.andThen(io(to, () => rename(temporary, to))),
       Effect.tapError(() =>
         io(temporary, () => rm(temporary, { force: true })).pipe(Effect.ignore),

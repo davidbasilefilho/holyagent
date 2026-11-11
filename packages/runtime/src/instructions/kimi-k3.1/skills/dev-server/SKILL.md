@@ -1,6 +1,6 @@
 ---
 name: dev-server
-description: Use when visual work needs a running, capturable render target: a web app or a static build over a URL, a terminal UI, a desktop app, or an Android or iOS app. Has Worker.operations detect the platform, start one target the visual specialists share and record how to reach, capture, vary and stop it, or report it blocked in this environment.
+description: "Use when visual work needs a running, capturable render target: a web app or a static build over a URL, a terminal UI, a desktop app, or an Android or iOS app. Has Worker.operations detect the platform, start one target the visual specialists share and record how to reach, capture, vary and stop it, or report it blocked in this environment."
 ---
 
 # Render targets

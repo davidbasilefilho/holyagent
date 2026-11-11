@@ -1,6 +1,6 @@
 ---
 name: instruction-writing
-description: Use when you write or review model-facing text other than a brief: agent prompts, skills, instruction files and workflow-script prompts. Holds the rules drawn from Moonshot's prompting guidance for Kimi K3.1, each tagged with its source page.
+description: "Use when you write or review model-facing text other than a brief: agent prompts, skills, instruction files and workflow-script prompts. Holds the rules drawn from Moonshot's prompting guidance for Kimi K3.1, each tagged with its source page."
 ---
 
 # Writing instructions

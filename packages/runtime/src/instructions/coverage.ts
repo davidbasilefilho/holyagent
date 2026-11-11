@@ -392,7 +392,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "Say what changed and why, how it was checked",
     },
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
-    "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
+    "R-SEARCH": {
+      section: "root/search.md",
+      phrase: "Search files and contents with the FFF integration",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
       phrase: "start the one target per platform that the visual specialists share",
@@ -500,7 +503,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-S-SEARCH": {
       section: "specialist/working.md",
-      phrase: "search with the system grep or find and name the missing program",
+      phrase: "Search files and contents with the FFF integration",
     },
     "R-MATERIAL": {
       section: "shared/materiality.md",
@@ -697,7 +700,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "Say what changed and why, how it was checked",
     },
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
-    "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
+    "R-SEARCH": {
+      section: "root/search.md",
+      phrase: "Search files and contents with the FFF integration",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
       phrase: "start the one target per platform that the visual specialists share",
@@ -805,7 +811,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-S-SEARCH": {
       section: "specialist/working.md",
-      phrase: "search with the system grep or find and name the missing program",
+      phrase: "Search files and contents with the FFF integration",
     },
     "R-MATERIAL": {
       section: "shared/materiality.md",

@@ -188,7 +188,21 @@ export const fillPackageRoot = (
   prompt: string,
   packageRoot: string,
   platformPath: Pick<typeof nodePath, "sep"> = nodePath,
-): string => prompt.replaceAll(PI_ROOT_PLACEHOLDER, () => toPosix(packageRoot, platformPath.sep))
+): string => {
+  const root = toPosix(packageRoot, platformPath.sep)
+  // Windows shell scripts may have no executable bit; start the same isolated Bun entry directly.
+  const quote = (value: string) => "'" + value.replaceAll("'", "'\"'\"'") + "'"
+  const command =
+    platformPath.sep === "\\"
+      ? "bun --no-env-file --config=" +
+        quote(root + "/scripts/empty-bunfig.toml") +
+        " " +
+        quote(root + "/scripts/holyagent.js")
+      : root + "/scripts/holyagent"
+  return prompt
+    .replaceAll(PI_ROOT_PLACEHOLDER + "/scripts/holyagent", () => command)
+    .replaceAll(PI_ROOT_PLACEHOLDER, () => root)
+}
 
 /**
  * Refuses an `Agent` call whose `subagent_type` is not one of the 18 specialists or its `-screen`

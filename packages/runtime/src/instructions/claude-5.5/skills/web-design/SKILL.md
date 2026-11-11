@@ -1,6 +1,6 @@
 ---
 name: web-design
-description: Use when building, reshaping or judging the visual design of a web page or web app. Holds the shared design core, web rules for systems, hierarchy, semantics, edge cases and motion, a refuse list and the capture checklist.
+description: "Use when building, reshaping or judging the visual design of a web page or web app. Holds the shared design core, web rules for systems, hierarchy, semantics, edge cases and motion, a refuse list and the capture checklist."
 ---
 
 # Web design

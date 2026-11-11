@@ -1,6 +1,6 @@
 ---
 name: tui-design
-description: Use when building, reshaping or judging a terminal UI or a command-line tool's interactive and piped output.
+description: "Use when building, reshaping or judging a terminal UI or a command-line tool's interactive and piped output."
 ---
 
 # Terminal UI design

@@ -1,5 +1,5 @@
 import { BILLION_CONTEXT_GUARDRAILS_FILE } from "../pi/bash/guardrails.ts"
-import { FFF_NATIVE_HOSTS, FFF_OVERRIDE_SETTINGS, FFF_TOOLS } from "../pi/fff/settings.ts"
+import { FFF_NATIVE_HOSTS, FFF_OVERRIDE_SETTINGS } from "../pi/fff/settings.ts"
 import { PI_PACKAGE_VERSIONS, type PiPackageName } from "./pi-packages.ts"
 import { PYPI_PACKAGE_VERSIONS, type PypiPackageName } from "./pypi-packages.ts"
 import type { PiProvider } from "./schema.ts"
@@ -141,6 +141,8 @@ export interface CapabilityDefinition {
    * tools.
    */
   readonly nativeHosts?: ReadonlyArray<string>
+  /** Operating systems supported by the package; absent when the package supports every OS. */
+  readonly supportedPlatforms?: ReadonlyArray<string>
   /** What it installs on a headless machine, or why it is not offered there. */
   readonly forms: {
     readonly headless: FormContent | FormUnavailable
@@ -429,6 +431,8 @@ export const CAPABILITIES = [
   {
     name: "processes",
     feature: "processes",
+    // The pinned package explicitly supports macOS and Linux, not native Windows.
+    supportedPlatforms: ["darwin", "linux"],
     description: "Gives the root tools for background processes (@aliou/pi-processes)",
     skills: [],
     applicability: "root",
@@ -624,8 +628,7 @@ export const CAPABILITIES = [
   {
     // `@ff-labs/pi-fff` in override mode: its `grep` and `find` take the place of Pi's. Its native
     // library covers `FFF_NATIVE_HOSTS` only; elsewhere the capability is not offered and Pi keeps its
-    // own tools. The root does not use the tools (`FFF_TOOLS`); the specialists' `grep` and
-    // `find` are the package's. The override is a key of the package's own file, which setup takes
+    // own tools. The root and specialists use the indexed tools through codemode. The override is a key of the package's own file, which setup takes
     // back out when the capability goes off so that a package the user installs later is not
     // switched into override mode.
     name: "fff",
@@ -633,12 +636,12 @@ export const CAPABILITIES = [
     description:
       "Replaces Pi's find and grep with fff, a fast indexed file and content search (@ff-labs/pi-fff)",
     skills: [],
-    applicability: "specialists",
+    applicability: "both",
     defaultOn: true,
     needs: [],
     nativeHosts: FFF_NATIVE_HOSTS,
     forms: sameForm(["@ff-labs/pi-fff"]),
-    tools: { rootExclude: FFF_TOOLS, visual: [], screen: [] },
+    tools: { rootExclude: [], visual: [], screen: [] },
     settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
     health: ["needs", "packages"],
   },
@@ -751,6 +754,12 @@ export const unavailableIn = (
 ): string | undefined => {
   const entry = capability.forms[form]
   if ("unavailable" in entry) return entry.unavailable
+  const system = platform.split("-", 1)[0] ?? platform
+  if (
+    capability.supportedPlatforms !== undefined &&
+    !capability.supportedPlatforms.includes(system)
+  )
+    return `its package does not support ${system}, only ${capability.supportedPlatforms.join(", ")}`
   return capability.nativeHosts === undefined || capability.nativeHosts.includes(platform)
     ? undefined
     : `its native library does not cover ${platform}, only ${capability.nativeHosts.join(", ")}`

@@ -10730,11 +10730,13 @@ var init_errors4 = __esm(() => {
   };
 });
 
-import { rename, rm } from "fs/promises";
+import { mkdir, rename, rm, writeFile } from "fs/promises";
+import { dirname } from "path";
 var io = (path, run) => tryPromise2({ try: run, catch: (cause) => new StateIo({ path, cause }) }), hasCode = (cause, code) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === code, readText = (path) => io(path, () => Bun.file(path).exists()).pipe(flatMap2((exists) => exists ? io(path, () => Bun.file(path).text()) : succeed6(undefined))), strict, readJson = (schema, path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(fromJsonString2(schema), strict)(text).pipe(mapError2((error) => new CorruptRecord({ path, reason: error.message }))))), encodeJson = (schema, value) => encodeEffect(schema)(value).pipe(map5((encoded) => `${JSON.stringify(encoded, null, 2)}
 `)), commitFile = (path, content) => {
   const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  return io(path, () => Bun.write(temporary, content)).pipe(andThen2(io(path, () => rename(temporary, path))), tapError2(() => io(temporary, () => rm(temporary, { force: true })).pipe(ignore2)));
+  const write = process.platform === "win32" ? io(path, () => mkdir(dirname(temporary), { recursive: true })).pipe(andThen2(io(path, () => writeFile(temporary, content)))) : io(path, () => Bun.write(temporary, content));
+  return write.pipe(andThen2(io(path, () => rename(temporary, path))), tapError2(() => io(temporary, () => rm(temporary, { force: true })).pipe(ignore2)));
 };
 var init_files = __esm(() => {
   init_dist();
@@ -10807,18 +10809,10 @@ var init_guardrails = __esm(() => {
   };
 });
 
-var FFF_OVERRIDE_SETTINGS, FFF_RETIRED_SETTINGS, FFF_TOOLS, FFF_NATIVE_HOSTS;
+var FFF_OVERRIDE_SETTINGS, FFF_RETIRED_SETTINGS, FFF_NATIVE_HOSTS;
 var init_settings = __esm(() => {
   FFF_OVERRIDE_SETTINGS = { mode: "override" };
   FFF_RETIRED_SETTINGS = { followSymlinks: false };
-  FFF_TOOLS = [
-    "grep",
-    "find",
-    "multi_grep",
-    "ffgrep",
-    "fffind",
-    "fff-multi-grep"
-  ];
   FFF_NATIVE_HOSTS = [
     "darwin-arm64",
     "darwin-x64",
@@ -10855,7 +10849,7 @@ var init_pi_packages2 = __esm(() => {
 var pypi_packages_default;
 var init_pypi_packages = __esm(() => {
   pypi_packages_default = {
-    "browser-use": "1.0.0"
+    "browser-use": "1.0.2"
   };
 });
 
@@ -10895,6 +10889,9 @@ var CAPABILITY_FORMS, BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-
   const entry = capability.forms[form];
   if ("unavailable" in entry)
     return entry.unavailable;
+  const system = platform.split("-", 1)[0] ?? platform;
+  if (capability.supportedPlatforms !== undefined && !capability.supportedPlatforms.includes(system))
+    return `its package does not support ${system}, only ${capability.supportedPlatforms.join(", ")}`;
   return capability.nativeHosts === undefined || capability.nativeHosts.includes(platform) ? undefined : `its native library does not cover ${platform}, only ${capability.nativeHosts.join(", ")}`;
 }, enabledCapabilities = (features, options = {}) => (options.definitions ?? CAPABILITIES).filter((capability) => features[capability.feature] === true && (options.form === undefined || unavailableIn(capability, options.form, options.platform) === undefined) && (options.provider === undefined || capability.provider === undefined || capability.provider === options.provider)), capabilityPackages = (features, form, definitions = CAPABILITIES, platform) => enabledCapabilities(features, { form, platform, definitions }).flatMap((capability) => formContent(capability, form)?.packages ?? []), managedCapabilityPackages = (definitions = CAPABILITIES) => [
   ...new Set(definitions.flatMap((capability) => CAPABILITY_FORMS.flatMap((form) => formContent(capability, form)?.packages ?? [])))
@@ -10991,6 +10988,7 @@ var init_capabilities = __esm(() => {
     {
       name: "processes",
       feature: "processes",
+      supportedPlatforms: ["darwin", "linux"],
       description: "Gives the root tools for background processes (@aliou/pi-processes)",
       skills: [],
       applicability: "root",
@@ -11156,12 +11154,12 @@ var init_capabilities = __esm(() => {
       feature: "fff",
       description: "Replaces Pi's find and grep with fff, a fast indexed file and content search (@ff-labs/pi-fff)",
       skills: [],
-      applicability: "specialists",
+      applicability: "both",
       defaultOn: true,
       needs: [],
       nativeHosts: FFF_NATIVE_HOSTS,
       forms: sameForm(["@ff-labs/pi-fff"]),
-      tools: { rootExclude: FFF_TOOLS, visual: [], screen: [] },
+      tools: { rootExclude: [], visual: [], screen: [] },
       settings: [{ file: PI_FFF_FILE, content: FFF_OVERRIDE_SETTINGS, revertWhenOff: true }],
       health: ["needs", "packages"]
     }
@@ -13310,8 +13308,8 @@ var init_links = __esm(() => {
   });
 });
 
-import { link as link2, lstat, mkdir, open, rename as rename2, rm as rm2 } from "fs/promises";
-import { dirname } from "path";
+import { link as link2, lstat, mkdir as mkdir2, open, rename as rename2, rm as rm2 } from "fs/promises";
+import { dirname as dirname2 } from "path";
 var LockOwner, UNREADABLE_STALE_MS = 30000, readOwner = (file) => readJson(LockOwner, file).pipe(orElseSucceed2(() => {
   return;
 })), processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ESRCH")))), inTheWay = (file) => tryPromise2({ try: () => lstat(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT")))), putBack = (taken, file) => io(file, () => link2(taken, file)).pipe(catch_2((error) => hasCode(error.cause, "EEXIST") ? void_3 : inTheWay(file).pipe(flatMap2((present) => present ? void_3 : io(file, () => rename2(taken, file))))), ignore2), breakIfStale = (file) => gen2(function* () {
@@ -13360,7 +13358,7 @@ var LockOwner, UNREADABLE_STALE_MS = 30000, readOwner = (file) => readJson(LockO
       return stuck ? yield* holderBusy(file, limit) : true;
     })
   }));
-}, release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2), withFileLock = (file, use, patience = STATE_PATIENCE) => acquireUseRelease2(io(file, () => mkdir(dirname(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token)), withStateLock = (directory, use, patience = STATE_PATIENCE) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock"), patience))), () => use, (token) => release(localFile(directory, "lock"), token));
+}, release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2), withFileLock = (file, use, patience = STATE_PATIENCE) => acquireUseRelease2(io(file, () => mkdir2(dirname2(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token)), withStateLock = (directory, use, patience = STATE_PATIENCE) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock"), patience))), () => use, (token) => release(localFile(directory, "lock"), token));
 var init_lock = __esm(() => {
   init_dist();
   init_errors4();
@@ -13412,10 +13410,24 @@ var init_mode = __esm(() => {
   StateMode = Literals(["branch", "work", "local"]);
 });
 
-import { lstat as lstat2, mkdir as mkdir2, readdir, realpath, rename as rename3, rm as rm3, rmdir, stat } from "fs/promises";
-import { basename, dirname as dirname2, join as join4, relative, sep as sep2 } from "path";
+import {
+  copyFile,
+  lstat as lstat2,
+  mkdir as mkdir3,
+  readdir,
+  realpath,
+  rename as rename3,
+  rm as rm3,
+  rmdir,
+  stat
+} from "fs/promises";
+import { basename, dirname as dirname3, join as join4, relative, sep as sep2 } from "path";
 var {$: $2 } = globalThis.Bun;
-var DEFAULT_STATE_BRANCH = "holyagent/state", BRANCH_KEY = "holyagent.stateBranch", REPOSITORY_VARIABLES, gitEnvironment = (env) => definedEnv({ ...process.env, ...env }, REPOSITORY_VARIABLES), git = (cwd, env, args, input) => spawn("git", args, { cwd, env: gitEnvironment(env), stdin: input }).pipe(catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause }))), map5((output) => ({
+var DEFAULT_STATE_BRANCH = "holyagent/state", BRANCH_KEY = "holyagent.stateBranch", REPOSITORY_VARIABLES, gitEnvironment = (env) => definedEnv({ ...process.env, ...env }, REPOSITORY_VARIABLES), git = (cwd, env, args, input) => spawn("git", process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args, {
+  cwd,
+  env: gitEnvironment(env),
+  stdin: input
+}).pipe(catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause }))), map5((output) => ({
   code: output.code,
   stdout: new TextDecoder("utf-8", { ignoreBOM: true }).decode(output.stdout),
   stderr: output.stderr
@@ -13585,11 +13597,11 @@ ${ran.stdout}`.trim().split(`
     return { kind: "deferred" };
   yield* io(ready, () => rm3(ready, { force: true }));
   yield* io(path, () => rm3(path, { recursive: true, force: true }));
-  yield* io(path, () => mkdir2(dirname2(path), { recursive: true }));
+  yield* io(path, () => mkdir3(dirname3(path), { recursive: true }));
   yield* gitText(top, env, [...add, ...target]);
   yield* io(ready, () => Bun.write(ready, ""));
   return { kind: "ready", path, created: true };
-}), patience), LOCAL_FILES, sameBytes = (a, b) => all2([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(map5(([left, right]) => Buffer.from(left).equals(Buffer.from(right)))), fileExists = (path) => io(path, () => Bun.file(path).exists()), kindAt = (path) => io(path, () => lstat2(path)).pipe(map5((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined))), realStateFolder = (root) => canonical(dirname2(root)).pipe(map5((parent) => join4(parent, basename(root)))), requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
+}), patience), LOCAL_FILES, sameBytes = (a, b) => all2([io(a, () => Bun.file(a).bytes()), io(b, () => Bun.file(b).bytes())]).pipe(map5(([left, right]) => Buffer.from(left).equals(Buffer.from(right)))), fileExists = (path) => io(path, () => Bun.file(path).exists()), kindAt = (path) => io(path, () => lstat2(path)).pipe(map5((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined))), realStateFolder = (root) => canonical(dirname3(root)).pipe(map5((parent) => join4(parent, basename(root)))), requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
   path: root,
   cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`
 })))), isPlainFile = (root, relative) => gen2(function* () {
@@ -13616,12 +13628,12 @@ ${ran.stdout}`.trim().split(`
 }), copyInto = (root, relative, from) => gen2(function* () {
   yield* requirePlainTarget(root, relative);
   const to = join4(root, relative);
-  yield* io(to, () => mkdir2(dirname2(to), { recursive: true }));
-  const [folder, base] = yield* all2([canonical(dirname2(to)), realStateFolder(root)]);
+  yield* io(to, () => mkdir3(dirname3(to), { recursive: true }));
+  const [folder, base] = yield* all2([canonical(dirname3(to)), realStateFolder(root)]);
   if (folder !== base && !folder.startsWith(`${base}${sep2}`))
     return yield* new StateIo({ path: to, cause: `${folder} is outside the state worktree` });
   const temporary = `${to}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  yield* io(to, () => Bun.write(temporary, Bun.file(from))).pipe(andThen2(io(to, () => rename3(temporary, to))), tapError2(() => io(temporary, () => rm3(temporary, { force: true })).pipe(ignore2)));
+  yield* io(to, () => process.platform === "win32" ? copyFile(from, temporary) : Bun.write(temporary, Bun.file(from))).pipe(andThen2(io(to, () => rename3(temporary, to))), tapError2(() => io(temporary, () => rm3(temporary, { force: true })).pipe(ignore2)));
 }), workTreeEntries = (top, env) => gen2(function* () {
   const folder = stateDirectory(top);
   if (!(yield* isDirectory(folder)))
@@ -13654,7 +13666,7 @@ ${ran.stdout}`.trim().split(`
     if (names.length > 0)
       return;
     yield* io(current, () => rmdir(current)).pipe(ignore2);
-    current = dirname2(current);
+    current = dirname3(current);
   }
 }), migrationMarker = (common, top) => io(top, () => realpath(top)).pipe(map5((real) => join4(common, "holyagent", "migrated", new Bun.CryptoHasher("sha1").update(real).digest("hex").slice(0, 16)))), migrateWorkTree = (top, common, worktree, env, commit, patience = STATE_PATIENCE) => {
   const source = stateDirectory(top);
@@ -13703,7 +13715,7 @@ ${ran.stdout}`.trim().split(`
           "--",
           `${STATE_DIRECTORY}/${entry.path}`
         ]);
-      yield* pruneEmpty(source, dirname2(from));
+      yield* pruneEmpty(source, dirname3(from));
     }
     yield* io(source, () => rmdir(source)).pipe(ignore2);
     yield* io(marker, () => Bun.write(marker, ""));
@@ -13724,7 +13736,7 @@ ${ran.stdout}`.trim().split(`
   if (wanted.length > 0)
     yield* gitText(worktree, env, ["--literal-pathspecs", "add", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"], wanted.map((path) => `${path}\x00`).join(""));
 }), commitState = (directory, env, message, copied = [], resolved) => gen2(function* () {
-  const worktree = dirname2(directory);
+  const worktree = dirname3(directory);
   if (!(yield* isDirectory(worktree)))
     return false;
   const top = yield* git(worktree, env, ["rev-parse", "--show-toplevel"]);
@@ -16206,7 +16218,7 @@ var init_assignment2 = __esm(() => {
   ];
 });
 
-import { mkdir as mkdir3, mkdtemp, rm as rm5 } from "fs/promises";
+import { mkdir as mkdir4, mkdtemp, rm as rm5 } from "fs/promises";
 import { tmpdir } from "os";
 import { join as join9 } from "path";
 var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS = 3000, FOLDERS, chromiumArguments = (profile, sandbox) => [
@@ -16367,7 +16379,7 @@ var init_browser_launch = __esm(() => {
       catch: (cause) => failed2(`cannot create a temporary directory: ${reason(cause)}`)
     }),
     makeDirectory: (path) => tryPromise2({
-      try: () => mkdir3(path, { recursive: true }),
+      try: () => mkdir4(path, { recursive: true }),
       catch: (cause) => failed2(`cannot create ${path}: ${reason(cause)}`)
     }).pipe(asVoid2),
     removeDirectory: (path) => tryPromise2(() => rm5(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
@@ -16424,7 +16436,7 @@ var init_shell = __esm(() => {
       return succeed5(Shell, Shell.of({
         which: (command, options) => sync2(() => findCommand(env, command, options)),
         run: (command, args, options) => tryPromise2({
-          try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+          try: () => $3`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
             exitCode: result.exitCode,
             stdout: result.stdout.toString(),
             stderr: result.stderr.toString()
@@ -16583,8 +16595,8 @@ var init_errors6 = __esm(() => {
   };
 });
 
-import { chmod, mkdir as mkdir4, realpath as realpath3, rename as rename4, rm as rm6, writeFile } from "fs/promises";
-import { basename as basename4, dirname as dirname3, join as join11 } from "path";
+import { chmod, mkdir as mkdir5, realpath as realpath3, rename as rename4, rm as rm6, writeFile as writeFile2 } from "fs/promises";
+import { basename as basename4, dirname as dirname4, join as join11 } from "path";
 var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPromise2({
   try: run,
   catch: (cause) => new SetupFailure({
@@ -16613,10 +16625,10 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join11(dirname3(target), `.${basename4(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname3(target), "write", () => mkdir4(dirname3(target), { recursive: true }));
+  const temporary = join11(dirname4(target), `.${basename4(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname4(target), "write", () => mkdir5(dirname4(target), { recursive: true }));
   yield* tryPromise2({
-    try: () => writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
+    try: () => writeFile2(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
   }).pipe(catch_2((error) => (error.code === "EEXIST" ? void_3 : ignore2(fileOperation(temporary, "remove", () => rm6(temporary, { force: true })))).pipe(andThen2(fail5(new SetupFailure({
     message: `cannot write ${temporary}: ${error instanceof Error ? error.message : String(error)}`
@@ -16882,7 +16894,7 @@ var init_settings3 = __esm(() => {
 });
 
 import { lstat as lstat3, realpath as realpath4 } from "fs/promises";
-import { dirname as dirname4, isAbsolute as isAbsolute2, join as join13, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
+import { dirname as dirname5, isAbsolute as isAbsolute2, join as join13, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
 var SCOPES, within = (parent, child) => {
   const path = relative4(parent, child);
   return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
@@ -16952,13 +16964,13 @@ var init_scope = __esm(() => {
   });
   projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
     const roots = [resolve6(cwd)];
-    for (let folder = resolve6(cwd);; folder = dirname4(folder)) {
+    for (let folder = resolve6(cwd);; folder = dirname5(folder)) {
       if (yield* present3(join13(folder, ".git"))) {
         if (folder !== roots[0])
           roots.push(folder);
         break;
       }
-      if (dirname4(folder) === folder)
+      if (dirname5(folder) === folder)
         break;
     }
     return roots.flatMap((root) => [
@@ -17072,13 +17084,13 @@ var init_check = __esm(() => {
   init_shell();
 });
 
-import { lstat as lstat4, mkdir as mkdir5, open as open3 } from "fs/promises";
+import { lstat as lstat4, mkdir as mkdir6, open as open3 } from "fs/promises";
 import { tmpdir as tmpdir2, userInfo } from "os";
 import { join as join14 } from "path";
 var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id), markers = () => join14(tmpdir2(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`), markerOf = (sessionId) => join14(markers(), sessionId), ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir5(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat4(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir6(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat4(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -26005,6 +26017,7 @@ var init_tools = __esm(() => {
   init_capabilities();
   init_route();
   init_settings4();
+  init_settings();
   init_provider();
   T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
   T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
@@ -26525,7 +26538,10 @@ var init_pi_install = __esm(() => {
         lines.push(added(`pi ${source}: would install with ${command}`));
         continue;
       }
-      const result = yield* shell.run("pi", args, { cwd });
+      const result = yield* shell.run("pi", args, {
+        cwd,
+        env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
+      });
       lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed3(command, result));
     }
     for (const name of removals) {
@@ -26535,7 +26551,10 @@ var init_pi_install = __esm(() => {
         lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`));
         continue;
       }
-      const result = yield* shell.run("pi", args, { cwd });
+      const result = yield* shell.run("pi", args, {
+        cwd,
+        env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
+      });
       lines.push(result.exitCode === 0 ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`) : failed3(command, result));
     }
     return lines;
@@ -27079,9 +27098,9 @@ var init_lock2 = __esm(() => {
 });
 
 var TUI_PACKAGES = {
-  "@opentui/core": "0.8.3",
-  "@opentui/solid": "0.8.3",
-  "solid-js": "1.9.18"
+  "@opentui/core": "0.8.4",
+  "@opentui/solid": "0.8.4",
+  "solid-js": "1.9.19"
 }, TUI_LOCK = `{
   "lockfileVersion": 2,
   "configVersion": 1,
@@ -27089,9 +27108,9 @@ var TUI_PACKAGES = {
     "": {
       "name": "holyagent-setup-tui",
       "dependencies": {
-        "@opentui/core": "0.8.3",
-        "@opentui/solid": "0.8.3",
-        "solid-js": "1.9.18"
+        "@opentui/core": "0.8.4",
+        "@opentui/solid": "0.8.4",
+        "solid-js": "1.9.19"
       }
     }
   },
@@ -27479,7 +27498,7 @@ var TUI_PACKAGES = {
       "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
     ],
     "@opentui/core": [
-      "@opentui/core@0.8.3",
+      "@opentui/core@0.8.4",
       "",
       {
         "dependencies": {
@@ -27489,103 +27508,103 @@ var TUI_PACKAGES = {
           "string-width": "7.2.0"
         },
         "optionalDependencies": {
-          "@opentui/core-darwin-arm64": "0.8.3",
-          "@opentui/core-darwin-x64": "0.8.3",
-          "@opentui/core-linux-arm64": "0.8.3",
-          "@opentui/core-linux-arm64-musl": "0.8.3",
-          "@opentui/core-linux-x64": "0.8.3",
-          "@opentui/core-linux-x64-musl": "0.8.3",
-          "@opentui/core-win32-arm64": "0.8.3",
-          "@opentui/core-win32-x64": "0.8.3"
+          "@opentui/core-darwin-arm64": "0.8.4",
+          "@opentui/core-darwin-x64": "0.8.4",
+          "@opentui/core-linux-arm64": "0.8.4",
+          "@opentui/core-linux-arm64-musl": "0.8.4",
+          "@opentui/core-linux-x64": "0.8.4",
+          "@opentui/core-linux-x64-musl": "0.8.4",
+          "@opentui/core-win32-arm64": "0.8.4",
+          "@opentui/core-win32-x64": "0.8.4"
         },
         "peerDependencies": {
           "web-tree-sitter": "0.25.10"
         }
       },
-      "sha512-6Ng2jyiZZhGUTNbF8wXmjztihdGdx7uZq8O5bBgG/2XaCANw/BJgSxYb/nVFtorzShE9JcjszRhzh8XNxQ3yuA=="
+      "sha512-s2z2FFEWxsQ6IPVEiAjlHHY5yssnCI+dIltL54+ZhVz1EWxylaB0HER+ypPL2goot0DKwKqrM57rnomh19/2rQ=="
     ],
     "@opentui/core-darwin-arm64": [
-      "@opentui/core-darwin-arm64@0.8.3",
+      "@opentui/core-darwin-arm64@0.8.4",
       "",
       {
         "os": "darwin",
         "cpu": "arm64"
       },
-      "sha512-9YaOiVlld+J/POWW0TnUe9kX5+/9B0iEszdTAfgHFqSkVz4ndnYnFJTCC9fnwLrS+WOCked+7M9sS2DXiPpFQw=="
+      "sha512-kAWCmLsGuxQANeq4AjjX0Yodca2VIofQGUfIH9Edg9BKajYpf941heZfMJkkkJUXawYTNFTR2lBYsdneUUJBrg=="
     ],
     "@opentui/core-darwin-x64": [
-      "@opentui/core-darwin-x64@0.8.3",
+      "@opentui/core-darwin-x64@0.8.4",
       "",
       {
         "os": "darwin",
         "cpu": "x64"
       },
-      "sha512-rHW+b4mnUgdy7cs1jxFOQqd/C0n+sumjJaNVKIPKvk+EuVr+HM2pIdhFvOThnKWTyp2GlNZtIJNKCaAf+QxvkA=="
+      "sha512-0S62YHtIh1Q9tTun7065njEtYUUtf1zXwllDKXr63R1cVgq+8eRdVQ2PsAGNOqB5OYYno+M8o2tuK/Es2uvmBA=="
     ],
     "@opentui/core-linux-arm64": [
-      "@opentui/core-linux-arm64@0.8.3",
+      "@opentui/core-linux-arm64@0.8.4",
       "",
       {
         "os": "linux",
         "cpu": "arm64"
       },
-      "sha512-1GeV1UZqzMTfOUKuymGUhCHD5XTJC4w2eA+zPDs/jBVgv2NqPL7sofoBHLzkyhlxZpuptQR+vVPs4sW4T+7YVg=="
+      "sha512-VGnBN3ItBwZog109wtPIou8pn93TseZwA5OZ05X2PYIYPw+IC6mVeO2Dn0qwwozLBDxeyH3ydbHMFlwzS4/fLg=="
     ],
     "@opentui/core-linux-arm64-musl": [
-      "@opentui/core-linux-arm64-musl@0.8.3",
+      "@opentui/core-linux-arm64-musl@0.8.4",
       "",
       {
         "os": "linux",
         "cpu": "arm64",
         "libc": "musl"
       },
-      "sha512-U2IbCGI7sjUZoO8h8UizREHRDWk0u/bOAmJ0L46xB3uyMWKfNU9f8x5jQF4v6apMMmb56/TPl/PUoVR1sQg15A=="
+      "sha512-IG887NHjPJEw5D1dvNl9jPbcwNFREFKj2fnqEjdrwCnDRywtjNL7k7GgTo24NNlyMAZAq0OkoM0M0Sn6ex/Adg=="
     ],
     "@opentui/core-linux-x64": [
-      "@opentui/core-linux-x64@0.8.3",
+      "@opentui/core-linux-x64@0.8.4",
       "",
       {
         "os": "linux",
         "cpu": "x64"
       },
-      "sha512-DIhEmsACFqucaqSMYZqQKXi10WmGuO0TpmqEz9hScqktcRlNAPpsB5qmO6qCEyXxTIbfaVxxlABcq1Xn3eB0aQ=="
+      "sha512-N/uxyaPpWkCZlDXz3fgHMfMuj1L3IVZ/xZ4JifUc4NW9bwa/CYWFJ5J5jBoy2QsAIqoqo8/OD3iFpXR4o12mNQ=="
     ],
     "@opentui/core-linux-x64-musl": [
-      "@opentui/core-linux-x64-musl@0.8.3",
+      "@opentui/core-linux-x64-musl@0.8.4",
       "",
       {
         "os": "linux",
         "cpu": "x64",
         "libc": "musl"
       },
-      "sha512-MJoGBVxNtmaQSu8rvzHrJKjS0Fd/ER/Sf9NKD+ep8nPanlffJPhRbX0cT0gvkKhK3G2Od+RXUr/tlUqy0U69ow=="
+      "sha512-FAiH7wMt/ZbpP2w6TL62deNExTg5w6mujKUBSK89+gJV8FN4jk/K2xz9f522aYhC6SdbpyIKwS0oGIJldYLkcg=="
     ],
     "@opentui/core-win32-arm64": [
-      "@opentui/core-win32-arm64@0.8.3",
+      "@opentui/core-win32-arm64@0.8.4",
       "",
       {
         "os": "win32",
         "cpu": "arm64"
       },
-      "sha512-g0R4PrOI93z7KaWXFw/PdA6DGWDcaK9aH88ECmnsI9At1KZoEb+Jik137qEz7bGWKGOXtn+JaHsne3vipB3vwQ=="
+      "sha512-vjDuuIcmanoipIKdME8A7ZuBgIw2E1fv4pRJp6M19+Zfx0HIUmtA8bv+mT/kaz8Cpad9EUzJkNI5fV8P2p/iKg=="
     ],
     "@opentui/core-win32-x64": [
-      "@opentui/core-win32-x64@0.8.3",
+      "@opentui/core-win32-x64@0.8.4",
       "",
       {
         "os": "win32",
         "cpu": "x64"
       },
-      "sha512-yjpxLUXeBc1eMW3pr4Fl9tpNuA7a4JdcGNVved9zFD3HZ07mM2YVfreLJeDn4n61jXUJKM8XtXVWBZM8RHF4gg=="
+      "sha512-I4XnzUmyKCb8cRD1UntQXRkIEl0fxfQnzS3bTODWbENAOdRsK2c7Ff07DG2qTAqNijyTuk63C+uLmAT9ObOQ1Q=="
     ],
     "@opentui/solid": [
-      "@opentui/solid@0.8.3",
+      "@opentui/solid@0.8.4",
       "",
       {
         "dependencies": {
           "@babel/core": "7.29.7",
           "@babel/preset-typescript": "7.27.1",
-          "@opentui/core": "0.8.3",
+          "@opentui/core": "0.8.4",
           "babel-plugin-module-resolver": "5.0.2",
           "babel-preset-solid": "1.9.16",
           "entities": "7.0.1",
@@ -27595,7 +27614,7 @@ var TUI_PACKAGES = {
           "solid-js": "^1.9.12"
         }
       },
-      "sha512-bhilJzWY4/Mh/7xxJa6FDOXeGbThCr7IjA1Vbr+OVTkzidmJzgATInwemnrepcPefAm0117AoQlHgc8jlP3lXQ=="
+      "sha512-QyaWIAtZTaAdYJiP4K2cG6hbXQkNUBfa0hjYQwvvr/V2OFIZWZ7l+SP8CYM05lBqVDfOraeThvSrhX+IuvKySA=="
     ],
     "ansi-regex": [
       "ansi-regex@6.6.0",
@@ -27604,7 +27623,7 @@ var TUI_PACKAGES = {
       "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
     ],
     "babel-plugin-jsx-dom-expressions": [
-      "babel-plugin-jsx-dom-expressions@0.40.11",
+      "babel-plugin-jsx-dom-expressions@0.40.14",
       "",
       {
         "dependencies": {
@@ -27618,7 +27637,7 @@ var TUI_PACKAGES = {
           "@babel/core": "^7.20.12"
         }
       },
-      "sha512-k7TkOv7uVYnrq/bYyVvG5cWOC9IObAGfmyW3aMkG8l2sq2qt/5THkUBja69PMLEGGi8G+fXB2Fh7eS4OwZRBoQ=="
+      "sha512-5RDcd9lN4eVJyvIrkV7xwuGT+EYVTnWmqO9A8alGRVVLY95aA/U0cNGWv3ThWeI+/ufe2MMS6lILyuWsHmFBgA=="
     ],
     "babel-plugin-module-resolver": [
       "babel-plugin-module-resolver@5.0.2",
@@ -27689,10 +27708,10 @@ var TUI_PACKAGES = {
       "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
     ],
     "caniuse-lite": [
-      "caniuse-lite@1.0.30001823",
+      "caniuse-lite@1.0.30001826",
       "",
       {},
-      "sha512-TQ5s/djDjNk1axreUW+4rULH+BmdCMLiJkhaXnO5wqivG7tITkSUj4ItIdzqdZHKaXcHAV8dhH3JxOM7/7bwqw=="
+      "sha512-wTB+9tIbLro/BCXwLuNV1meHE4L9dS6dArMDwgYfNBPMYScqClHyGunhkCSDtHhe/69Xl0sHlKgBVZ+fNsYtWA=="
     ],
     "convert-source-map": [
       "convert-source-map@2.0.0",
@@ -27729,10 +27748,10 @@ var TUI_PACKAGES = {
       "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
     ],
     "electron-to-chromium": [
-      "electron-to-chromium@1.5.479",
+      "electron-to-chromium@1.5.481",
       "",
       {},
-      "sha512-uAJdJQ7vHa4TvPfzt1TOqoRgHmav5gwmqHMPLxBH6m8Cbj5R9/z/rygTOQiZ8pe5g0ZAEogga1bP6HoKcOzx/Q=="
+      "sha512-dNUsbAP6E2S1dHIYEuN3cQ0dViThjMtpVRheGdvv5HgHFtzLi4Cu4Mbzms85YggP3Eh2VVZTl5+XxEN8ofCbmQ=="
     ],
     "emoji-regex": [
       "emoji-regex@10.6.0",
@@ -27973,7 +27992,7 @@ var TUI_PACKAGES = {
       "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
     ],
     "solid-js": [
-      "solid-js@1.9.18",
+      "solid-js@1.9.19",
       "",
       {
         "dependencies": {
@@ -27982,7 +28001,7 @@ var TUI_PACKAGES = {
           "seroval-plugins": "~1.6.8"
         }
       },
-      "sha512-CHGO5YFk6Y9m/1YSxVtKnXfrW7JD3Tmof8HmR4z6TmCPsS8efo8LnzIR8CQh3cUvffqYm6DWyBFfk8dQw1CNQQ=="
+      "sha512-NIrV/6o1FtmrA9iuAAYvnQJZaHrGcaH3LKSVj4kCiZfwqjCtJNDgIgR9XcqYl6KR/Lb3oRx1HrlyswPWR8SRvw=="
     ],
     "string-width": [
       "string-width@7.2.0",
@@ -28210,9 +28229,9 @@ var TUI_PACKAGES = {
 }
 `;
 
-import { lstat as lstat5, mkdir as mkdir6, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile2 } from "fs/promises";
+import { lstat as lstat5, mkdir as mkdir7, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile3 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname5, join as join23, posix as posix3, win32 as win323 } from "path";
+import { basename as basename5, dirname as dirname6, join as join23, posix as posix3, win32 as win323 } from "path";
 import { pathToFileURL } from "url";
 var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : posix3, cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory(env);
@@ -28271,7 +28290,7 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", fileSystem = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
-    yield* fileSystem(`cannot create ${folder}`, () => mkdir6(folder, { recursive: true, mode: 448 }));
+    yield* fileSystem(`cannot create ${folder}`, () => mkdir7(folder, { recursive: true, mode: 448 }));
   const found = yield* tryPromise2({
     try: () => lstat5(folder),
     catch: (cause) => cause
@@ -28299,7 +28318,7 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
   const name = userName ?? (yield* try_2(() => userInfo2().username));
   const text = yield* tryPromise2(() => Bun.file(groupFile).text());
   return namesPrivateGroup(text, gid, name);
-}).pipe(orElseSucceed2(() => false)), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile2(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm7(temporary, { force: true }))), remove = (path) => promise2(() => rm7(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
+}).pipe(orElseSucceed2(() => false)), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile3(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm7(temporary, { force: true }))), remove = (path) => promise2(() => rm7(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
   for (let attempt = 0;attempt < 3; attempt += 1) {
     const moved = yield* exit2(fileSystem(`cannot move ${temporary}`, () => rename5(temporary, directory)));
     if (moved._tag === "Success")
@@ -28316,7 +28335,7 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 }), sweepStale = (directory, uid) => gen2(function* () {
-  const parent = dirname5(directory);
+  const parent = dirname6(directory);
   const prefix = `.${basename5(directory)}-`;
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir2(parent));
@@ -28326,7 +28345,7 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
-}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join23(dirname5(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join23(dirname6(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
@@ -28348,7 +28367,7 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
   });
   if (options.directory === undefined)
     yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
-  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname5(directory)])
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname6(directory)])
     yield* privateFolder(folder, uid, true);
   yield* privateFolder(directory, uid, false);
   if (!(yield* installed(directory, packages, lock))) {

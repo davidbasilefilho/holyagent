@@ -7,9 +7,8 @@ commit-msg:
         bun --no-env-file --config=packages/integrations/claude/dist/scripts/empty-bunfig.toml
         packages/integrations/claude/dist/scripts/holyagent.js hook commit-msg {1}
 
-# Hooks run the same mise tasks as CI, through the repository's own mise (`mise`, a dev dependency
-# that `bunx` finds in node_modules/.bin, so no mise on PATH is needed); `--no-install` makes a
-# missing local binary fail instead of fetching the package from the registry. Arguments after `--`
+# Hooks use the same tasks as CI through native mise on PATH (see docs/development.md).
+# `bunx --no-install` never downloads the unsupported npm wrapper. Arguments after `--`
 # go to the underlying Bun command.
 # `--staged` limits lint and fmt to the staged files, and Bun leaves a partly staged file unwritten
 # rather than committing its unstaged changes. `stage_fixed` re-stages what lint fixed, since the

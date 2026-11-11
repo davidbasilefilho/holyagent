@@ -1,6 +1,6 @@
 ---
 name: tui-design
-description: Use when building, reshaping or judging a terminal UI or a command-line tool's interactive and piped output. Holds the shared design core, terminal rules for layout, input, state, hygiene, width, glyphs, color and accessibility, a refuse list and the capture checklist.
+description: "Use when building, reshaping or judging a terminal UI or a command-line tool's interactive and piped output. Holds the shared design core, terminal rules for layout, input, state, hygiene, width, glyphs, color and accessibility, a refuse list and the capture checklist."
 ---
 
 # Terminal UI design

@@ -1,6 +1,6 @@
 ---
 name: web-design
-description: Use when building, reshaping or judging the visual design of a web page or web app.
+description: "Use when building, reshaping or judging the visual design of a web page or web app."
 ---
 
 # Web design

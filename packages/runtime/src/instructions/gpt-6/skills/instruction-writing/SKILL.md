@@ -1,6 +1,6 @@
 ---
 name: instruction-writing
-description: Use when you write or review model-facing text other than a brief: agent prompts, skills, instruction files and workflow-script prompts.
+description: "Use when you write or review model-facing text other than a brief: agent prompts, skills, instruction files and workflow-script prompts."
 ---
 
 # Writing instructions
