@@ -1,0 +1,71 @@
+{
+  "id": "assignment-0mwc785xx-27bc",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 3,
+  "roleTask": "Worker.debugging",
+  "slug": "prepare-a-minimally-changed-installable0",
+  "objective": "Prepare a minimally changed installable0.3.3 release: diagnose and fix release-blocking build/install, cross-platform CI and npm trusted-publishing gaps.",
+  "state": "Ready",
+  "scope": [
+    "Work only in C:/Users/david.basile/dev/holyagent-0.3.3-npm, branch release/0.3.3/fix/npm-readiness. Root has clean --no-commit merge of main tooling fixes into0.3.3 integration base; MERGE_HEAD/staged files are root-owned. Main checkout must remain main; dirty other scratch worktree is unrelated and preserved.",
+    "Run bun i (use frozen lockfile unless a proven permitted updater change requires lock update), build via bunx --no-install mise run build and full verification via bunx --no-install mise run verify. Find and fix only release blockers. Earlier incomplete Windows verify had symlink EPERM and TUI import fixture failure; establish current failures, real error paths and safe fixtures. Do not weaken tests or count skipped gates as passed.",
+    "Ensure CI validates Darwin/macOS, Linux and Windows retaining job IDs check/windows/installers/branch-model/version and external full action SHA pins. Inspect existing publish workflows and prepare correct npm trusted-publishing through CI: pack with bun pm pack, publish tarball with npm using OIDC, never token fallback. User authorized actual npm publication, but root owns outward actions and merges require further approval.",
+    "Inspect tarball metadata/content and clean-install/run packaged entrypoints in isolated temp home. Verify actual npm package name, public release state and trusted-publisher prerequisites using read-only npm/account metadata where available; no credentials or authfile output. User says npm logged in, which alone does not establish trusted-publisher setup.",
+    "Preserve canonical version0.3.3 from integration; dependencies only updater. Role-scoped skills, native codemode tools, dual-provider setup, Cua/browser changes, main/dev migration, deterministic dev tags and general audit are deferred0.3.4. AGENTS.md is owned by separate writer."
+  ],
+  "constraints": [
+    "Own only listed paths; if a minimal needed repair is outside them, identify precise path and stop that repair while finishing independent checks. No Git writes, commit, branch operations or edits in .git/.holyagent. Do not alter global/local credentials, selected model, permission/security defaults, user installation or trusted-publisher settings.",
+    "Testing uses isolated fixture homes, PI_CODING_AGENT_DIR explicitly for Pi fixtures on Windows; avoid real Pi installs/model sessions/network credential use in tests. Preserve installed local fixes.",
+    "Capture changed paths, git diff to an outside-repo file (include initially merged scope separately from your edits), exact commands, exits and counts. Report at most10 bullets; long logs outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "Install and current-head gates",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Three-platform CI validation",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Trusted npm tarball publication",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Clean tarball installation",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Minimum0.3.3 scope",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "publication-prerequisites"
+  ],
+  "ownershipPaths": [
+    ".github/workflows",
+    "scripts",
+    "package.json",
+    "bun.lock",
+    "mise.toml",
+    "docs/development.md",
+    "docs/pi",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/state",
+    "packages/runtime/src/tui",
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "createdAt": "2026-11-11T14:12:57.237Z"
+}
