@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "obtain-comparable-gpt6luna-medium-high",
   "objective": "Obtain comparable GPT6Luna medium/high benchmark and output-token evidence through a working public-source path.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Prior report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwcagpqy-r1qr.md Unknown: no native search exposed, Exa missing key, browserrelayunpaired, no existingbrowserwindow. This does NOT block launching an installed browser normally. You are explicitly authorized to list installed apps and launch an installed Edge/Chrome/Firefox to public URLs using computer-use; no pairing/login/profile/security/config changes or installs. If no browser installed then report that exact bounded blocker. Do not stop solely because no window currently open. Never retry denied action viaanotherroute.",
     "User authorizes GPT6Luna medium orhigh automaticreview iff supported. Decide from benchmark quality and output/reasoning tokens-to-performance, not monetary cost; fast medium if adequate, high if medium insufficient. ModelID locallyregistered gpt-6-luna, openai-codex-responses medium/high, endpointstrictschema support being separatelyprobed. Research authoritative OpenAI/public independent same-model effort comparisons, including mypriors.com if relevant. No invented data; distinguish generation/version/harness and task-suitability inference. Prefer limitedrelevant comparisons and re-derive any ratio from citedvalues. If comparable evidence genuinelynotpublic identifythisratherthanpickeffortunfounded.",
@@ -79,5 +79,10 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwcagpqy-r1qr",
   "screen": true,
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-11T15:52:27.464Z"
+  },
   "createdAt": "2026-11-11T15:51:53.806Z"
 }
