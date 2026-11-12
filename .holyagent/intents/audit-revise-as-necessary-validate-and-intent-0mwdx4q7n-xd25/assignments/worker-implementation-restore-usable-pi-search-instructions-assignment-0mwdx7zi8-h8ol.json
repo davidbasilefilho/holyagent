@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mwdx7zi8-h8ol",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "restore-usable-pi-search-instructions",
+  "objective": "Restore usable Pi search instructions for supported configurations with FFF unavailable or disabled.",
+  "state": "Running",
+  "scope": [
+    "packages/runtime/src/instructions",
+    "scripts/root-question-policy.test.ts",
+    "packages/runtime/tests/skills.test.ts",
+    "scripts/search-policy.test.ts"
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and packages/integrations/claude/dist/agents/worker-implementation.md. Work in /workspace/work/holyagent-pr120. User authorizes revise and merge PR120; explicitly gpt-6.1-terra low-xhigh; Workflow unavailable so direct HolyAgent fallback. No VCS or .holyagent writes. Parallel writers have disjoint source scope; do not build generated outputs (root schedules single build after writers finish). Read relevant repo AGENTS. Run focused meaningful regression tests through available pinned Bun/mise. Use MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH for commands. Report under 300 words, save full report at specified /workspace/work path; logs outside repo.",
+    "Read packages/runtime/AGENTS.md, .claude/skills/requirements/SKILL.md and instruction-writing skill before any edits. Requirements first, translate all families and maintain coverage ids; generated rebuild deferred. Reviewer trace: requirements/root/search.md:1 and specialist/working.md:2 mandate FFF always, gpt-6,kimi root/search and specialist/working route missing FFF to setup failure; docs/pi/search.md:11,15 explicitly support FFF off or unsupported host; config/capabilities.ts filters unsupported platform, pi/tools.ts installs FFF only when enabled and retains built-in find/grep for specialists. Base supported shell search fallback. Repair narrowly: prefer FFF when enabled/available; if intentionally disabled/not offered, use role-available built-in or shell search. Preserve unexpected FFF error reporting and avoid declaring valid setup broken. Inspect actual root/specialist tool access before choosing fallbacks. Add meaningful policy regression covering FFF unavailable; minimize churn. Do not edit docs or unrelated source. Save report /workspace/work/repair-search.md."
+  ],
+  "criteria": [
+    {
+      "text": "Pi search remains usable with FFF disabled or unsupported and respects role tool access",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Requirements and every affected family stay aligned with regression coverage",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "scripts/root-question-policy.test.ts",
+    "packages/runtime/tests/skills.test.ts",
+    "scripts/search-policy.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T19:08:25.088Z"
+  },
+  "createdAt": "2026-11-12T19:08:25.088Z"
+}
