@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "regenerate0-3-3-artifacts-from-the-now",
   "objective": "Regenerate0.3.3 artifacts from the now-terminal repair sources and provide a precise clean repair inventory for commit.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Releaseworktree C:/Users/david.basile/dev/holyagent-0.3.3-npm branchrelease/0.3.3/fix/npm-readiness HEAD4ea9a3c. Allsourcewriters terminal. Uncommitted instructionrepair touches coverage.ts and Claudeplugin tests; publicationrepairs touch npmhelper/tests/workflows/docs. Preserveall. Need canonical generatedartifacts BEFORE rootcommits repairrange for independentreview.",
     "Run repository canonical bunx --no-install mise run build with actualcwd and sufficienttimeout. MaywriteONLY canonicalgeneratedpaths/manifests owned. No sourcefix, dependencyupdate, versionbump or globalformatter. Ifbuildrequiresothergeneratedpath beyondownership, report exactpath rather than editunexpectedsource.",
@@ -126,7 +126,45 @@
     "agentId": "pi-workflow:wf_85e44fa9849c/assignment-0mwdjtlo6-uly8",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T12:53:41.568Z"
+    "startedAt": "2026-11-12T12:53:41.568Z",
+    "finishedAt": "2026-11-12T12:59:07.651Z"
+  },
+  "result": "result: canonical build and bounded checks passed; repair inventory exposes an ownership-scope blocker\nchanged: none\nchecks: `bunx --no-install mise run build` -> exit 0, built 39 Claude files and 139 Pi files; `mise run check` -> exit 0, 317 files; `mise run lint` -> exit 0, 318 files; `mise run fmt:check` -> exit 0, 737 files; targeted `bun test` -> exit 0, 169 pass, 0 fail across 8 files; `git diff --check` -> exit 0\nblockers: all 10 pre-existing modified source paths are outside my assigned ownership paths; preserved without edits\nquestions: none\nnotes: No canonical generated paths changed. Secret-pattern scan: 0 matches across five patterns. No untracked files.\nevidence:\nCanonical0.3.3 generation and changed-scope repair checks pass on the actual release worktree (tests): Build and all listed checks passed; targeted suite 169 pass, 0 fail\nRepair inventory contains only authorized source and canonical generated paths with no secret or whitespace findings (scope): Inventory has no secret or whitespace findings, but all 10 source paths violate assigned ownership; blocker remains\nchanged-paths: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\assignment-0mwdjtlo6-paths.json`\nchecks-run: build/check/lint/fmt:check/targeted bun test and `git diff --check`; outputs above\ndiff-file: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\assignment-0mwdjtlo6-repair.diff`\npath-manifest: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\assignment-0mwdjtlo6-path-manifest.json`\nremaining-blockers: 10 modified source paths outside assigned ownership; listed in manifest\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "Canonical build and current focused checks passed:169tests, check317/lint318/fmt737, no generated deltas and zero secret matches. Reject the reported ownership blocker: all ten unchanged pre-existing paths belong to the completed authorized source repair Assignments, not this generation-only writer; it reports no edits. Inventory scope covers the complete repair, not only paths this writer owns.",
+    "criteria": [
+      {
+        "criterion": "Canonical0.3.3 generation and changed-scope repair checks pass on the actual release worktree",
+        "support": "Build and all listed checks passed; targeted suite 169 pass, 0 fail"
+      },
+      {
+        "criterion": "Repair inventory contains only authorized source and canonical generated paths with no secret or whitespace findings",
+        "support": "Inventory has no secret or whitespace findings, but all 10 source paths violate assigned ownership; blocker remains"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "`C:\\Users\\david.basile\\AppData\\Local\\Temp\\assignment-0mwdjtlo6-paths.json`"
+      },
+      {
+        "label": "checks-run",
+        "support": "build/check/lint/fmt:check/targeted bun test and `git diff --check`; outputs above"
+      },
+      {
+        "label": "diff-file",
+        "support": "`C:\\Users\\david.basile\\AppData\\Local\\Temp\\assignment-0mwdjtlo6-repair.diff`"
+      },
+      {
+        "label": "path-manifest",
+        "support": "`C:\\Users\\david.basile\\AppData\\Local\\Temp\\assignment-0mwdjtlo6-path-manifest.json`"
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "10 modified source paths outside assigned ownership; listed in manifest"
+      }
+    ]
   },
   "createdAt": "2026-11-12T12:53:18.966Z"
 }
