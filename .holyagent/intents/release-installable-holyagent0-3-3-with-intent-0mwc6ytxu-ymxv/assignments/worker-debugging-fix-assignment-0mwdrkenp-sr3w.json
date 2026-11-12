@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "fix",
   "objective": "Fix ONLYthefouractualmacOSCIreleasefailures in0.3.3withreproductionsandpreservedmeaningfulcoverage.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "WorktreeC:/Users/david.basile/dev/holyagent-0.3.3-npm,HEADb00eab296a492ea28a9012b29c842cd3e78b0f09,version0.3.3,currentbranchrelease/0.3.3/fix/npm-readiness. PR120https://github.com/davidbasilefilho/holyagent/pull/120targetintegration. PriorfullWindows3444pass52skip0fail,reviewedallsource. HostedWindowsgreen; macOSbothpush+PR4fail3495tests3488pass3skip4fail. No sourcewriteractive. PakagestarballsbootstrapalreadyTempverified, ifproductionpayloadchangesmarkstaleexact affected.",
     "FirstreadcurrentfailedmacOSlogs via`gh run view43256495387--repo davidbasilefilho/holyagent--log-failed` and43256467503ifneeded. Report4EXACTfailedtestnames/expectedactualerrors/path:line fromcurrentattempt. Jobs https://github.com/davidbasilefilho/holyagent/actions/runs/43256495387/job/131316138721 and https://github.com/davidbasilefilho/holyagent/actions/runs/43256467503/job/131315926683 . Priorwatch report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdr1l3v-y4xu.md onlyidentifiesT3device-access,twosetupdevice-rowtests,CLIargumentpassthrough. UnderlyingactualcauseUNKNOWN; do notguessorblindrelaxassertions. Traceall4tocompletion. GetONEjobmetadataforLinuxcheckrunnerplatform+result+testcountusingghAPI/currentrunlogs; notCIwatch/poll(no newpushyet). DistinguishactualLinuxcheckjobfromnonvalidationpublishskips.",
@@ -133,5 +133,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T16:30:18.723Z"
+  },
   "createdAt": "2026-11-12T16:30:06.901Z"
 }
