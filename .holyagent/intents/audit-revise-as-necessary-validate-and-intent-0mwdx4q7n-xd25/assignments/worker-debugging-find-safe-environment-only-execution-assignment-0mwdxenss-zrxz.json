@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "find-safe-environment-only-execution",
   "objective": "Find safe environment-only execution remedy for pre-existing Pi cancellation timeout in this cloud container.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "packages/integrations/pi/tests/bash.test.ts cancellation test; diagnostic scripts outside repository"
   ],
@@ -38,7 +38,37 @@
     "agentId": "/root/diagnose_cancel",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:13:36.508Z"
+    "startedAt": "2026-11-12T19:13:36.508Z",
+    "finishedAt": "2026-11-12T19:15:37.845Z"
+  },
+  "result": "result: Baseline failure is an unreaped zombie; per-command Linux subreaper makes the unmodified focused test pass.\nchanged: /workspace/work/cancel-supervisor.py, /workspace/work/cancel-observe.py, /workspace/work/cancel-observe.log, /workspace/work/cancel-supervised.log, this report; no repository files.\nchecks: Pristine base focused test unsupervised exit 1, 0 pass/1 fail: recorded PID 26401 was defunct (Z), PPID 1 (`tail -f /dev/null`), before line 238 timed out. Same test under supervisor exit 0, 1 pass/0 fail, 17 filtered. Earlier pristine head and base failures: /workspace/work/review-validation.md. Full verify not run by this worker.\nblockers: none for diagnosis; full verify remains for root.\nquestions: none.\nnotes: Hypotheses: surviving live process (refuted by Z state); delayed process startup (refuted by marker and abort rejection); zombie retained by non-reaping PID 1 (supported by PPID/state and supervised pass); timeout too short (disfavored by persistent zombie and immediate supervised pass). The supervisor sets PR_SET_CHILD_SUBREAPER only on itself, reaps its own adopted descendants, and returns the command status; it does not signal unrelated processes or alter global settings. Use `python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify` with the assignment's mise environment.\nevidence:\nCancellation failure cause supported by reproduction and baseline evidence: /workspace/work/cancel-observe.log and /workspace/work/review-validation.md.\nAny remedy preserves unmodified tests and normal runtime semantics: /workspace/work/cancel-supervisor.py wraps and reaps descendants only; focused test passes in /workspace/work/cancel-supervised.log.\nchecks-run: focused unsupervised and supervised base tests, exits 1 and 0 respectively; logs above.\nchanged-paths: diagnostic files under /workspace/work only; no source/VCS/state writes.\nremedy: per-command subreaper wrapper above; full verify still required.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Baseline zombie PID observed under non-reaping PID1; unmodified focused test passes under per-command subreaper without source or test changes.",
+    "criteria": [
+      {
+        "criterion": "Cancellation failure cause supported by reproduction and baseline evidence",
+        "support": "/workspace/work/cancel-observe.log and /workspace/work/review-validation.md."
+      },
+      {
+        "criterion": "Any remedy preserves unmodified tests and normal runtime semantics",
+        "support": "/workspace/work/cancel-supervisor.py wraps and reaps descendants only; focused test passes in /workspace/work/cancel-supervised.log."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "focused unsupervised and supervised base tests, exits 1 and 0 respectively; logs above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "diagnostic files under /workspace/work only; no source/VCS/state writes."
+      },
+      {
+        "label": "remedy",
+        "support": "per-command subreaper wrapper above; full verify still required."
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:13:36.508Z"
 }
