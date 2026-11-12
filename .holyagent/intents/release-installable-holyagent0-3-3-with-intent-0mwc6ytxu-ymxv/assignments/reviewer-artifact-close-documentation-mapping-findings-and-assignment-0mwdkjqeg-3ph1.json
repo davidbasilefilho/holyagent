@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "close-documentation-mapping-findings-and",
   "objective": "Close documentation/mapping findings and finish previously truncated0.3.3 artifact and instruction review.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Prior blockers: docs reversed npm-first order and ClaudeR-ROLE mapping stale. Repair aligns coverage/tests with unchanged compact prompts and preserves semantic assertions/corebudget9400. docs now describe npm-first same-tarball, protectedheads/realenvironment prerequisite, preflight/race limitations, reject every existing-version rerun and manual recovery. Verify matches implementation.",
     "Finish remaining original prose/prompt/style scope from full diff in bounded chunks. Load instruction-writing. Approved distinction userdenial vs automaticrejection, meaningful freeform answers, GPT-only human-facing StopSlop source/MIT2025HardikPandya attribution, preserve code/protocol/exactevidence/nonGPTstyle/familysemantics. No fictitious runtime approval inheritance. Frontend/visual work is deferred0.3.4."
@@ -126,5 +126,10 @@
     "assignment-0mwdk18nm-45l5"
   ],
   "followUpOf": "assignment-0mwci3zcd-ill6",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T13:14:22.713Z"
+  },
   "createdAt": "2026-11-12T13:13:38.152Z"
 }
