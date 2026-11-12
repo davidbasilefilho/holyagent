@@ -38,6 +38,7 @@
   ],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/build_repairs",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-12T19:10:54.121Z"
