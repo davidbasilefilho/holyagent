@@ -138,5 +138,45 @@
     "finishedAt": "2026-11-12T15:43:16.039Z"
   },
   "result": "result: Minimal lock-test harness repair applied; both affected test files pass.\nchanged: packages/integrations/claude/tests/hook-locks.test.ts\nchecks: `bun test packages/integrations/claude/tests/hook-locks.test.ts` → exit 0, 3 pass; `bun test packages/integrations/claude/tests/plugin.test.ts` → exit 0, 76 pass; `bunx --no-install mise run check` → exit 0, 317 files; `bunx --no-install mise run lint` → exit 0, 318 files; `bunx --no-install mise run fmt:check` → exit 0, 737 files; exact-file lint and format → exit 0, 2 files each; `git diff --check` → exit 0.\nblockers: Independent review and the final full gate remain with the root.\nquestions: none\nnotes: The original delay’s precise cause remains unknown. The plugin test belonged to another writer and may have been changing during this work.\nevidence:\nMinimal harness repair applied: Removed only the contended-hook parent elapsed assertion and added the proposed two-line explanation.\nAffected files pass: Native Bun tests exited 0 with 3 and 76 passes respectively.\nLock contract retained: Native host timeout and kill detection bound process completion; clean exit and record-or-StateLocked output remain asserted; CLI deadline, all three intents, clean committed state, and both held-lock deadline tests remain intact.\nOwned scope: Only packages/integrations/claude/tests/hook-locks.test.ts was edited by this worker.\nchanged-paths: packages/integrations/claude/tests/hook-locks.test.ts\nchecks-run: Commands and counts listed above; full verify not run as instructed.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-033-two-tests.patch contains both current test-file diffs.\nremaining-blockers: Independent review and current-head full gate remain.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "Actual2affectedfiles3+76pass/type317lint318fmt737green; independentlyreviewedcommittedb00eab2bycodeandtesting79pass. Onlydemonstratedredundantparent-observationassertremoved, actualnativehardkill/sharedwait/statecontractretained.",
+    "criteria": [
+      {
+        "criterion": "Minimal harness repair applied",
+        "support": "Removed only the contended-hook parent elapsed assertion and added the proposed two-line explanation."
+      },
+      {
+        "criterion": "Affected files pass",
+        "support": "Native Bun tests exited 0 with 3 and 76 passes respectively."
+      },
+      {
+        "criterion": "Lock contract retained",
+        "support": "Native host timeout and kill detection bound process completion; clean exit and record-or-StateLocked output remain asserted; CLI deadline, all three intents, clean committed state, and both held-lock deadline tests remain intact."
+      },
+      {
+        "criterion": "Owned scope",
+        "support": "Only packages/integrations/claude/tests/hook-locks.test.ts was edited by this worker."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/claude/tests/hook-locks.test.ts"
+      },
+      {
+        "label": "checks-run",
+        "support": "Commands and counts listed above; full verify not run as instructed."
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/holyagent-033-two-tests.patch contains both current test-file diffs."
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Independent review and current-head full gate remain."
+      }
+    ]
+  },
   "createdAt": "2026-11-12T15:38:12.420Z"
 }
