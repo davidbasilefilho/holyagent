@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "verify-pinned-stop-slop-source-license",
   "objective": "Verify pinned Stop Slop source/license and current attribution via two literal public GitHub URLs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only source; ownership merely reserves a path, do noteditit. Librarian webtool failed solely because ExaAPIkey is unset, NOT a toolauthorizationdenial. No Exaconfiguration/APIkey needed; fetch literalpublic URLs using nativePowerShell Invoke-WebRequest or ordinarypublicHTTP: https://raw.githubusercontent.com/hardikpandya/stop-slop/8da1f030185bdfe8471220585162991eaeb970e9/SKILL.md and same pinnedprefix LICENSE. No search/browser/benchmarks, no credential access/accountchanges. Store downloadedmaterialandHTTPstatus/hash inTemp. Checkactual sourceMITcopyrightauthor/year, orreport exactsource ifdiffers.",
     "Find currentGPTStopSlop attribution via registered FFF (or direct knownsourcefrom scripts/stop-slop-policy.test.ts) and compare exactsource/commit/licensecredit. Report twoURL/status/sourceexcerpts and currentattributionpathline. No sourcechanges, no broadtest execution. Do not callmissingExatoolagain andstopwithoutattemptingknownpublicHTTP."
@@ -111,5 +111,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdlgvkj-ewn8",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T13:49:08.212Z"
+  },
   "createdAt": "2026-11-12T13:48:37.276Z"
 }
