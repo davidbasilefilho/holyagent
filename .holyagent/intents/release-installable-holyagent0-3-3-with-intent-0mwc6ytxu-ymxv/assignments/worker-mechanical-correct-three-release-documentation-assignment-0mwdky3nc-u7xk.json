@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-three-release-documentation",
   "objective": "Correct three release documentation contradictions about npm distribution and allowed publication branches.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Reviewers found docs/pi/installation.md:23,30 says publishes no npm/no npm Pi publishing; docs/pi/README.md:59 says git-only/no npm; AGENTS.md:23 dev.yml elsewhere is nowfalse. Replace only these contradictory statements/closely required installation text with the actual planned public holyagent npm package, supported Pi npm installation route and protected release-integration dev publication. Check command syntax against project package/host conventions, preserve supported git routes. Publication hasn't occurred, so distinguish release-intended route from already published claim. Load instruction-writing for AGENTS.md. No new generic instructions/features/restructure. Verify formatter/diff and any existing applicable doc contract check; produce Temp diff."
   ],
@@ -119,5 +119,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdivbjo-epaq",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T13:27:14.152Z"
+  },
   "createdAt": "2026-11-12T13:24:48.504Z"
 }
