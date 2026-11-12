@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "regenerate0-3-3-artifacts-from-the-now",
   "objective": "Regenerate0.3.3 artifacts from the now-terminal repair sources and provide a precise clean repair inventory for commit.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Releaseworktree C:/Users/david.basile/dev/holyagent-0.3.3-npm branchrelease/0.3.3/fix/npm-readiness HEAD4ea9a3c. Allsourcewriters terminal. Uncommitted instructionrepair touches coverage.ts and Claudeplugin tests; publicationrepairs touch npmhelper/tests/workflows/docs. Preserveall. Need canonical generatedartifacts BEFORE rootcommits repairrange for independentreview.",
     "Run repository canonical bunx --no-install mise run build with actualcwd and sufficienttimeout. MaywriteONLY canonicalgeneratedpaths/manifests owned. No sourcefix, dependencyupdate, versionbump or globalformatter. Ifbuildrequiresothergeneratedpath beyondownership, report exactpath rather than editunexpectedsource.",
@@ -122,5 +122,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdjh5b1-szbc",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T12:53:41.568Z"
+  },
   "createdAt": "2026-11-12T12:53:18.966Z"
 }
