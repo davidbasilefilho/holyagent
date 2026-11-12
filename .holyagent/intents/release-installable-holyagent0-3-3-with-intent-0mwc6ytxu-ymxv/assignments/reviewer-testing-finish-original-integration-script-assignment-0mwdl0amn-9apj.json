@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "finish-original-integration-script",
   "objective": "Finish original integration/script changed-assertion comparison apart from npmhelper repair.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Only frozen patch C:/Users/david.basile/AppData/Local/Temp/holyagent-033-test-integrations.patch includes integrationtests and scripts/*test.ts EXCEPT npm-publishing.test.ts. Everyhunk: meaningful assertions/pins/Windowsfixtures; rootpolicy/StopSlop semanticandbudget assertions preserved. Current helper/newpublishingregression getsseparatecommittedreview. Existingactualfocusedpasses stand; no broadrepeat/fullverify, onlyspecificrepro. Report pathcount/allhunkscompared and exactgaps."
   ],
@@ -124,7 +124,9 @@
     "agentId": "pi-workflow:wf_19c292895217/assignment-0mwdl0amn-9apj",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-12T13:27:13.770Z"
+    "startedAt": "2026-11-12T13:27:13.770Z",
+    "finishedAt": "2026-11-12T13:37:40.342Z"
   },
+  "result": "failure: result: Blocking assertion-coverage gaps remain in the 14-path frozen comparison.\nchanged: none\nchecks: no tests run; base run not done; review was limited to the frozen patch and targeted source reads\nblockers: `scripts/workflows.test.ts` no longer rejects unrelated job-level `write` permissions; `packages/integrations/claude/tests/plugin.test.ts` no longer asserts that scheduled check-ins or wait loops are prohibited.\nquestions: none\nnotes: Optional: `packages/integrations/pi/tests/extension.test.ts` computes the child-prompt expected value with `fillPackageRoot`; the new literal-output tests protect the helper, but a literal delivered-prompt assertion would independently protect the wiring.\nevidence:\nIntegration comparison: All scoped integration/script test hunks compared; behavioral coverage preserved without unexplained assertion weakening.: All 14 paths and their hunks compared. Restore a permissions assertion rejecting writes other than the authorized `contents` and `id-token` grants; restore the negative check-in/wait-loop policy assertion. The screen pin remains independently fixed at `1.0.2` in `scripts/update-dependencies.test.ts`; Windows junction fixtures, FFF access, root-question and Stop Slop assertions remain represented.\nchanged-paths: none\nchecks-run: targeted reads only; no executable checks or base reproduction\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-033-test-integrations.patch\nremaining-blockers: Two assertion weakenings above; base-failing reproduction not performed.\n",
   "createdAt": "2026-11-12T13:26:30.863Z"
 }
