@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwdx9hqq-7bev",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-installation-requirements",
+  "objective": "Correct installation requirements documentation to distinguish Pi FFF search from Claude shell search.",
+  "state": "Running",
+  "scope": [
+    "docs/requirements.md",
+    "docs/pi/search.md"
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and packages/integrations/claude/dist/agents/worker-mechanical.md in /workspace/work/holyagent-pr120. User authorizes PR120 audit/revise/merge, explicitly Terra low-xhigh; direct fallback as Workflow unavailable. No VCS or .holyagent writes. Own docs/requirements.md and docs/pi/search.md only. Reviewer found docs/requirements.md:10 still says ripgrep/fd are all roots and specialists search, while Pi prefers FFF. Another writer repairing requirements/family instruction fallback: prefer FFF when enabled and available; intentionally disabled/unsupported must use role-available built-in or shell search; unexpected failure reported. Read actual tools and family source to make docs accurate without claiming root has built-in grep/find. Keep minimal, maybe only requirements.md needs update. Do not change unrelated docs. Save report /workspace/work/repair-docs.md under 150 words, include checks and diff-file."
+  ],
+  "criteria": [
+    {
+      "text": "Documentation accurately describes integration-specific search and fallback",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "docs/requirements.md",
+    "docs/pi/search.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T19:09:35.379Z"
+  },
+  "createdAt": "2026-11-12T19:09:35.379Z"
+}
