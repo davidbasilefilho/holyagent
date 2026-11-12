@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "prove-or-retract-the-two-reported",
   "objective": "Prove or retract the two reported weakened assertions with isolated current-test mutants.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Your prior review identified scripts/workflows.test.ts generic writegrantcoverage replaced by contents/idtokenonly, and packages/integrations/claude/tests/plugin.test.ts positivephrase scheduled check-ins or wait loops no longerasserts prohibition. Rootdiff confirms weakertext but blocking finding needs executableproof from shellreviewer. In Temp mirror/copy or other reversible memory fixture WITHOUTeditingrealrepo, execute currentrelevanttests with unauthorized e.g. issues:write workflow job and with pollingpolicy inverted to require waits/checkins. Show currenttest incorrectlypasses and prerequisite normalbaselinepasses, or retract if otherassertioncatchesmutant. No actual token/workflowrun; onlyfakeYAML/prompt. Scope2findings, nofullverify/broadrepeats. Give exactfilelines/commands/exits and smallestrepairrecommendation. Optionaldeliveredpromptliteralassertion alreadyrequestaddtoreport, no implementation."
   ],
@@ -112,5 +112,10 @@
     "assignment-0mwdj9a8d-ecua"
   ],
   "followUpOf": "assignment-0mwdl0amn-9apj",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T13:39:54.959Z"
+  },
   "createdAt": "2026-11-12T13:39:17.852Z"
 }
