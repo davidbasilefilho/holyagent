@@ -126,6 +126,7 @@
   ],
   "followUpOf": "assignment-0mwci3gdk-6j6q",
   "specialist": {
+    "agentId": "pi-workflow:wf_29e1abfd68ba/assignment-0mwdkewcm-pw17",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-12T13:14:21.620Z"
