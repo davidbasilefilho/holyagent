@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "fix-exactly-the-two-remaining-fullverify",
   "objective": "Fix exactly the two remaining fullverify failures so0.3.3 can finish, with minimal correct changes and focused real checks.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "CurrentreviewedcleanHEADc6a9fd913f0d8285e3faaa3cffd1ea84f99be46f version0.3.3. One actualfullverifyjustfinished atrealreleasecwd:3442pass52skip2fail exit1. Exactfailingtests: `the core of the root rules > stands alone for a root that gets only the core`; `hook session-start > gives another main thread the root rules with the CLI path in a project with no state and no legacy folder`. ReadEXACTerror/assertioncontext in C:/Users/david.basile/AppData/Local/Temp/holyagent-verify-851b3e56bfe546bc999b6ab19ec10021/stderr.log and stdout.log; no rediscovery/research. Locate test sources withFFF/reads. Knownreproduction => fix minimalunderlyingcause andregression. If stale literalexpectedwhilecurrentrulescorrect, alignassertion preservingstrictsemanticcoverage; never weaken/skiptests orraise corebudgets. If actualpolicytextmissingrequiredmeaning, fixrequirements-first acrossfamiliesonlyasneeded, reportthenrootgeneration. Mostrecentaskingqualificationintendedtoscopeworker/repostatequestions, not weakenstandalonecore orCLIpath.",
     "Reproduce2failuresfocused BEFOREfix, fix, rerun2fulltestfileswith enoughnative timeouts andtrueLASTEXITCODE. Run changed-scope lint/format/typechecks asappropriate (nativecorrectcwd). No packageinstall/dependencychange, no build/fullverify unless sourcepromptchangesrequire you toreportgenerationneeded(notgenerateyourself). Frozenprevious4reviewsaccepted99focused+471; don'trepeatalreadygreenunrelatedsuites. Reportchangedpaths andcompleteTempdiff, exact2before/afterfailures, whether sourcevsassertiononly andneededgeneration/reviewkind. Stoponcompletion; no selflaunchedreviewers. Preserveallpriorwork."
@@ -117,5 +117,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T14:35:16.697Z"
+  },
   "createdAt": "2026-11-12T14:35:01.315Z"
 }
