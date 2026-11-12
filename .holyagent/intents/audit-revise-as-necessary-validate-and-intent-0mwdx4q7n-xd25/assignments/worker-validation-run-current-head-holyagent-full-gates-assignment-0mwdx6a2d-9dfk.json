@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwdx6a2d-9dfk",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "run-current-head-holyagent-full-gates",
+  "objective": "Run current-head HolyAgent full gates and verify generated artifacts are fresh for PR120.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/holyagent-pr120 at 54f6647052b5ae7a184508b480ad88d808b428bf"
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and packages/integrations/claude/dist/agents/worker-validation.md. User authorizes audit/revise/merge PR120 and explicitly gpt-6.1-terra low-xhigh; direct fallback because Workflow tool unavailable. No source, VCS or .holyagent writes. Tools are ready. Use MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH bunx --no-install mise run verify. Frozen install 397 packages completed --ignore-scripts to honor specialist .git write ban; report if skipped postinstall affects gate. Full logs outside repo /workspace/work/validation-logs. Inspect build sync via existing meaningful tests; do not rebuild in shared tree while reviewers audit immutable head. Also read current CI with gh pr checks 120 and merge state. Diagnose failures with base comparison before calling environmental. Report under 150 words and save /workspace/work/review-validation.md."
+  ],
+  "criteria": [
+    {
+      "text": "Full current-head verify passes",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Current-head hosted CI passes",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "head-sha",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T19:07:05.462Z"
+  },
+  "createdAt": "2026-11-12T19:07:05.462Z"
+}
