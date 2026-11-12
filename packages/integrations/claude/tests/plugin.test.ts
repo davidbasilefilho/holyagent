@@ -591,7 +591,8 @@ describe("agents", () => {
       "whether to delete branches",
       "confirmation of a plan the user did not ask for",
       "whether to continue or to wait",
-      "Send every pending decision through AskUserQuestion (options, a recommended default), not a plain-text list; apply the boundary in Asking.",
+      "Send every pending decision through AskUserQuestion (options, a recommended default), not a plain-text list.",
+      "Use AskUserQuestion for every type of question, including when the user asks what needs their decision.",
     ])
       expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
     expect(content).not.toContain("Ask only when the answer materially changes the result")
