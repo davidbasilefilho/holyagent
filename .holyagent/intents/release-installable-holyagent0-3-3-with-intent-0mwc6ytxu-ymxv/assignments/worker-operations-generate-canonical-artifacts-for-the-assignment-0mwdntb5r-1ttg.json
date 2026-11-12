@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "generate-canonical-artifacts-for-the",
   "objective": "Generate canonical artifacts for the four-file final0.3.3 gate repair and return exact commit inventory.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Fourcompletedsourceedits from assignment-0mwdnge9v-bsh6: requirements/root/task-list.md,claude-5.5/root/task-list.md,runtime/tests/sessioncontext.test.ts,claude/tests/hooks.test.ts. Exactdiff C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwdnge9v.diff. Repaired2exactfailures before0pass1fail each, after58runtime+370hooks(2skip)+20policy pass; check317/lint318/fmt737pass. NewClaude standalonecore guidance restoresworkerstate/unknown/trustboundaryasking; staleCLIis→meansassertionretainsactualcommand. Budgetsunchangedandpass. Generate canonical `bunx --no-install mise run build` once, then affected generatedsync/sessioncontext/hooks suite enough native timeout+trueexit (do notrun unrelatedalreadygreen tests/fullverify). Checkdiff/sync/status, formatterchangedoutputs only ifneeded canonically. No handsource edits.",
     "ReturnALLauthorizedchanges (4sources+canonicalgenerated) exactbarepathsJSONinTemp+completepatch, no unrelated/missingownerfalseblocker:4sourceedits belongfinishedauthorizedwriter. Basicsecretpatternscan0expected. Rootwillcommit thenindependentreviewcode/testing/artifact/security boundedrepair; fullverifyafterthose. Do not pack/install/publish orstartreviewers."
@@ -122,5 +122,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T14:45:17.151Z"
+  },
   "createdAt": "2026-11-12T14:45:03.807Z"
 }
