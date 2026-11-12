@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "repaironlythe2actualfullverifyfailures",
   "objective": "RepairONLYthe2actualfullverifyfailures of0.3.3 at56ee626 with minimal red/greenfix and exactscope evidence.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read fullfailure diagnosticsfrom C:/Users/david.basile/AppData/Local/Temp/holyagent-final-verify-56ee626.stderr.log and C:/Users/david.basile/AppData/Local/Temp/holyagent-final-verify-56ee626.stdout.log. Exactfailednames inrequirements. Findtheir actualfiles; useFFFsearchifavailable then literalreads. Fullrunlasted~14min,3442pass52skip2fail/3496; sourceHEADclean. Bothpreviouscore/session-startfailureswerefixedredgreen+independentlyreviewed andarenotcurrent2. Avoidendingafteronlyonefix: completebothdiagnosis+minimumrepair+regressions. ConfirmbaselinefailurefromcurrentHEAD usingboundedreproduction, includefullaffectedtestfilesafterrepair withADEQUATEnativeandoutertimeouts (hooks/statecanneed>60s). No60stimeout mistakenpass. If fullsuiteenvironment/load isessential reproduceonlythe necessarysmall context, notanotherfullverify. CapturechildtrueLASTEXITCODE. If counterexamplecannotreproduce, usefailtraceandfocusedstress of boundediterations, explicitlydistinguishUnknownfromPassed; don'twidenclocktimeouts without evidence oflegitimatebudget and preservedlockcontract. Fix semanticassertion forrootasking onlyif stale wording actuallycausesfailure while checking samebehavior, notmerelyassertingphrasepresence.",
     "Afterbothfixed check/lint/format CHANGEDscope viarepo commands and diffcheck; listallchangedpathsandfullpatchTemppath. Do notcanonicalbuild/generatededits; sourceonlygate mayhaveexpectedgeneratedsyncfailure, reporthonestlyinsteadweakeningorregen. Includeanyrealnewblockerifblocked but no optionalcleanup. Remainat workuntilallaskedcomplete; stoponlyrequiredownership/approvaltrulyblocks."
@@ -131,5 +131,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T15:20:42.514Z"
+  },
   "createdAt": "2026-11-12T15:20:24.710Z"
 }
