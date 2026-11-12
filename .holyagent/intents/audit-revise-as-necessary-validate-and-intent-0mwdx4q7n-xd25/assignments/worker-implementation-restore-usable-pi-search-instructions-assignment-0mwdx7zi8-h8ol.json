@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "restore-usable-pi-search-instructions",
   "objective": "Restore usable Pi search instructions for supported configurations with FFF unavailable or disabled.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "packages/runtime/src/instructions",
     "scripts/root-question-policy.test.ts",
@@ -45,7 +45,37 @@
     "agentId": "/root/repair_search",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:08:25.088Z"
+    "startedAt": "2026-11-12T19:08:25.088Z",
+    "finishedAt": "2026-11-12T19:10:53.478Z"
+  },
+  "result": "result: Restored Pi search fallback for disabled or unsupported FFF while preserving unexpected failure reporting.\nchanged: packages/runtime/src/instructions/requirements/{root/search,specialist/working}.md; packages/runtime/src/instructions/{gpt-6,kimi-k3.1}/{root/search,specialist/working}.md; packages/runtime/src/instructions/coverage.ts; scripts/search-policy.test.ts\nchecks: `bunx --no-install mise run test -- scripts/search-policy.test.ts packages/runtime/tests/requirements.test.ts` -> exit 0, 19 passed; `bunx --no-install mise run fmt:check -- scripts/search-policy.test.ts packages/runtime/src/instructions/coverage.ts` -> exit 0, 2 files formatted. Both used the assigned pinned tool environment. Build and full verify deferred to root as assigned.\nblockers: none\nquestions: none\nnotes: Recommend docs/requirements.md:10 describe Pi's FFF preference and role-available fallback, retaining holyagent rg/fd for other integrations. Claude translation remains unchanged because it describes the other integration. The regression checks assert the fallback conditions and role-specific tools in both Pi families; the previous instructions fail those assertions.\nevidence:\nPi search remains usable with FFF disabled or unsupported and respects role tool access: Pi root instructions use shell search; specialists use built-in find/grep; packages/runtime/src/pi/tools.ts documents root shell and READ_TOOLS for specialists.\nRequirements and every affected family stay aligned with regression coverage: both requirements and both Pi families updated; requirements and new policy tests pass (19 tests).\nchecks-run: focused test and format checks above, exit 0; build and full verify deferred.\nchanged-paths: paths listed under changed above.\ndiff-file: /workspace/work/repair-search.diff\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Requirement-first fallback accounts for actual root/specialist tool access and coverage remains aligned; 19 focused tests passed.",
+    "criteria": [
+      {
+        "criterion": "Pi search remains usable with FFF disabled or unsupported and respects role tool access",
+        "support": "Pi root instructions use shell search; specialists use built-in find/grep; packages/runtime/src/pi/tools.ts documents root shell and READ_TOOLS for specialists."
+      },
+      {
+        "criterion": "Requirements and every affected family stay aligned with regression coverage",
+        "support": "both requirements and both Pi families updated; requirements and new policy tests pass (19 tests)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "focused test and format checks above, exit 0; build and full verify deferred."
+      },
+      {
+        "label": "changed-paths",
+        "support": "paths listed under changed above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/repair-search.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:08:25.088Z"
 }
