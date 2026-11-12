@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "finish-formatting-and-checking-the-three",
   "objective": "Finish formatting and checking the three documentation edits already present in the correct release worktree.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Root confirmed your prior edits ARE PRESENT via git -C release; don't reapply blindly or call them missing. Current docs/pi/README.md table row fails globalformatter. Format only owned docs, verify actualsupported pi install npm:holyagent@<version> and git route, protectedreleasepublicationtext. Run real applicable formatter/check from explicit nativecwd, capture exact3pathdiff plus status using git-C; existingno-npm contradictions gone, no claims published. Read instruction-writing skill C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md for AGENTS."
   ],
@@ -113,5 +113,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdky3nc-u7xk",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T13:39:54.977Z"
+  },
   "createdAt": "2026-11-12T13:39:05.489Z"
 }
