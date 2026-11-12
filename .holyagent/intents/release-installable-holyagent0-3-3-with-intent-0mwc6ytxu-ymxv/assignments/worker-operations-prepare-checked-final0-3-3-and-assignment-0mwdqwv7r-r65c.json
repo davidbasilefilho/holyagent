@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "prepare-checked-final0-3-3-and",
   "objective": "Prepare checked final0.3.3 and approvedbootstrap0.3.3-bootstrap.0 npm tarballs from reviewedhead in Temp withoutpublishing.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "ReadonlyOWNERSHIPreservationONLY; NOcheckoutfilesedited,Tempwritesonly. ActualnativecwdC:/Users/david.basile/dev/holyagent-0.3.3-npm HEADb00eab296a492ea28a9012b29c842cd3e78b0f09, fullverifygreen3444pass52skip0fail+allreviews. Publicgeneratedpackageispackages/integrations/pi/dist/package.json holyagent0.3.3 (privateworkspacerootmustNEVERpacked/published). Correctfinaltarballpack using`bun pm pack` fromPUBLICDIST withoutputinTemp; nativePSSetLocation mandatory. Rootmaytemporarilyadduntracked.pr-body-0.3.3.md; thisauthorizedPRscratchNOTsourceissue, nootherworkingcopyeditsallowed. No build/generation/fulltestsuite/versionbump/dependencyupdates.",
     "Prepare SECONDbootstrapvariantONLY innewTempdir: copypublicdistpayload, editONLYcopiedpackage.jsonversionto0.3.3-bootstrap.0 (useralreadyapprovedbootstrapnewpackagewithtagbootstrap/existinglogin). `bun pm pack` therewithTempoutput. Verify publicnameholyagent/nonprivate/no runtime deps/5hostpeers,139ishfiles andno secrets/unrelatedrootfiles. Compare unpackedvariant/finalcontentEVERYfile excludingpackage.json, requirebyteidentical; comparepackage.jsonrequiresONLYversiondifference. ComputeSHA256+SHA512/integrity+filenamesize/filecounts forboth, manifestreadfromTARBALLnotjustsource. No `npm publish`, no login/whoami/credential/network/accountsecurity action. Tarballsreadyforroot-reviewedbootstrappublicationafterE401loginresolved.",
@@ -126,5 +126,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T16:12:01.499Z"
+  },
   "createdAt": "2026-11-12T16:11:48.615Z"
 }
