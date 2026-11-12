@@ -5,7 +5,7 @@
   "roleTask": "Librarian.lookup",
   "slug": "close-two-narrow-prose-evidence-gaps",
   "objective": "Close two narrow prose evidence gaps using authoritative attribution and a precise GPT asking-context trace.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Read only changed StopSlop composition/source plus official upstream https://github.com/hardikpandya/stop-slop at SKILL.md commit8da1f030185bdfe8471220585162991eaeb970e9 and LICENSE. Verify sourceMITcopyright2025HardikPandya and attribution in currentGPTguidance; no benchmarks. Current GPTasking C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/runtime/src/instructions/gpt-6/root/asking.md:30 standalone first Howtoask bullet says Delegate investigation of worker status, ownership, heartbeats and repository status before escalation. Determine with quotedcontext whether genericunrelatedquestionswouldbeforcedtoinvestigateworkers; propose minimal contextualqualifier if ambiguous and map requirement/otherfamilies' correspondingtext (read-only). Do not demand fullunchangedskillbody reads for quotation-onlyfrontmatterdiffs. Independentgeneration/budget/YAML/composition proof already169focusedpasses+build39Claude139Pi+type317lint318fmt737 at frozenhead before onlyhelper/docs laterchanges; sourceinspectionreviews are not required to run shellgates themselves. Return verifiedsource URLs/excerpts and exacttrace, not broadnewreview or codeedits."
   ],
@@ -113,7 +113,9 @@
     "agentId": "pi-workflow:wf_e00b88312b42/assignment-0mwdlgvkj-ewn8",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T13:39:55.513Z"
+    "startedAt": "2026-11-12T13:39:55.513Z",
+    "finishedAt": "2026-11-12T13:43:32.118Z"
   },
+  "result": "failure: result: Asking ambiguity reviewed; authoritative Stop Slop verification blocked because web tools could not access upstream.\nchanged: none\nchecks: Read `packages/runtime/src/instructions/gpt-6/root/asking.md` (lines 1–30); upstream web search/fetch all failed with: `exa provider requires EXA_API_KEY or apiKeys.exa in project or agent-directory pi-web-kit config.`\nblockers: Could not verify the pinned upstream `SKILL.md` source, MIT license, copyright year, or attribution from authoritative material.\nquestions: none\nnotes: The asking rule could be read to force investigation of workers before any escalation, including generic unrelated questions. Minimal qualifier: “Before escalating a question that depends on worker or repository state, delegate investigation of worker status, ownership, heartbeats and repository status.” Keep the existing unknown-is-not-inactive safeguard. This limits the trace to relevant questions without weakening the investigation requirement.\nevidence:\nProse evidence: `packages/runtime/src/instructions/gpt-6/root/asking.md:30` says to investigate worker/repository status “before escalation” without limiting that direction to questions depending on such status; upstream attribution/license verification blocked by web-tool error.\nchanged-paths: none\nchecks-run: Read `packages/runtime/src/instructions/gpt-6/root/asking.md:1-30`; upstream search/fetch failed as stated.\ndiff-file: none\nremaining-blockers: Need accessible authoritative source at pinned Stop Slop commit and its `LICENSE` to verify source/license/copyright/attribution.\n",
   "createdAt": "2026-11-12T13:39:24.499Z"
 }
