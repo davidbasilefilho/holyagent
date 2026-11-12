@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "validate-current-remote-branch-pr",
   "objective": "Validate current remote branch/PR metadata and exact safe push/PR target for reviewed0.3.3 with a read-only snapshot.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "ReviewedcleanHEADc6a9fd9 release/0.3.3/fix/npm-readiness; baseoriginallyorigin/release/0.3.3/integration c5b2ab2b. Primarymain271bfa02 preserved. Worknotpushed. Query gh repo/actor/defaultbranch, relevantopenownerPRheads/bases/drafts/reviews/checks, actualremoteheads(main/integration/currentworkbranch) usingls-remote (nofetch). ConventiononlyreleaseintegrationPRtomain, version0.3.3. DecidecorrectPRtarget and whether advance/divergence requiresmergeforward beforepush; rootwilljudge/perform Gitwrites.",
     "Readactualrulesets main/integration andenvironments(previously0); existing integrationPR/check status, requiredCIjobIDs and actualrepoPRtemplatepath. Currentworkbranchpush shouldvalidateonly becausepublicationguardsprotectedmain/integration; confirm smallworkflowread. GiveknownPRnumbers/URLs/remoteSHAs and concise nextpush/PRsequence; noCIrun/watch. Safe greenreviewedPRmerges historicallyauthorized, butchecksrequired.",
@@ -114,5 +114,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T14:23:30.780Z"
+  },
   "createdAt": "2026-11-12T14:23:16.779Z"
 }
