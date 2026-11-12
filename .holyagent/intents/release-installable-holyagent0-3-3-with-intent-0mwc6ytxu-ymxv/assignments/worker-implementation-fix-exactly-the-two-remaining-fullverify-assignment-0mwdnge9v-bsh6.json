@@ -125,5 +125,37 @@
     "finishedAt": "2026-11-12T14:44:56.029Z"
   },
   "result": "result: Both failures repaired; focused checks pass.\nchanged: packages/runtime/src/instructions/requirements/root/task-list.md, packages/runtime/src/instructions/claude-5.5/root/task-list.md, packages/runtime/tests/sessioncontext.test.ts, packages/integrations/claude/tests/hooks.test.ts\nchecks: Native PowerShell in release worktree: sessioncontext, requirements and instructions tests → exit 0, 58 pass; hooks test → exit 0, 370 pass, 2 skip; root-question-policy → exit 0, 20 pass; mise check/lint/fmt:check → exit 0, 317/318/737 files; git diff --check → exit 0.\nblockers: Root generation and independent instruction/artifact review remain required; build and fullverify not run per assignment.\nquestions: none\nnotes: Source prompt restores standalone worker-state asking guidance; CLI assertion updates stale “is” to “means” without changing the expected command. An initial combined mise invocation failed from incorrect task syntax; separate gates passed. An intermediate longer prompt failed two budget tests; final prompt passes them without changing budgets.\nevidence:\nTwo failure repair: Before, each exact focused test exited 1 with 0 pass: missing “trust boundaries” and stale CLI “is”; after, both pass in their complete files. Standalone guidance covers investigation, unknown state and safeguards; CLI assertion retains the exact path and command.\nFocused verification: Final native runs above passed; hook log and exit are in C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwd-hooks-final.log and C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwd-hooks-final.exit.\nchanged-paths: Four paths listed in changed; no other source or outward changes.\nchecks-run: Commands, exits and counts listed in checks; build/fullverify deliberately not run.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwdnge9v.diff\nremaining-blockers: Generate plugin from changed prompt, independently review instruction and test changes, then run the root-owned final release gates.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "Both exact originalfailures red0pass1fail→58runtime/370hooks2skip/20policy pass; check317lint318fmt737green, canonical39Claude139Pigeneration and56ee626committedrange4independentreviewsaccepted. Laterfullverify2DIFFERENTfailures donotinvalidate these repairedcontracts; releasegate remainsFailed.",
+    "criteria": [
+      {
+        "criterion": "Two failure repair: Both exact fullverify failures reproduce before and pass after minimal correct changes without weakening requiredcore/CLIpath semantics, budgets or tests.",
+        "support": "Before, each exact focused test exited 1 with 0 pass: missing “trust boundaries” and stale CLI “is”; after, both pass in their complete files. Standalone guidance covers investigation, unknown state and safeguards; CLI assertion retains the exact path and command."
+      },
+      {
+        "criterion": "Focused verification: Entire affectedtestfiles and changed-scope gates pass on the fixed tree with realnativecwd/exits/counts; no unrelatedsource or outwardchanges.",
+        "support": "Final native runs above passed; hook log and exit are in C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwd-hooks-final.log and C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwd-hooks-final.exit."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "Four paths listed in changed; no other source or outward changes."
+      },
+      {
+        "label": "checks-run",
+        "support": "Commands, exits and counts listed in checks; build/fullverify deliberately not run."
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwdnge9v.diff"
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Generate plugin from changed prompt, independently review instruction and test changes, then run the root-owned final release gates."
+      }
+    ]
+  },
   "createdAt": "2026-11-12T14:35:01.315Z"
 }
