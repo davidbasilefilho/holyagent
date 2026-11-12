@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-two-reproduced-test-coverage",
   "objective": "Repair the two reproduced test-coverage gaps and final small instruction/document nits for release0.3.3.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Reproduced: add issues:write to validation.yml branch-model job in Temp -> current25workflowtestsPASS; inversion of Claude dispatch polling prohibition while retaining R-WAKE phrase -> current3relevantprompttestsPASS. Evidence report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdlgqfw-tit3.md; Tempmirror %TEMP%/holyagent-testing-mutants-0mwdlgqfw. Restore generic all-writepermissionallowlist (only existingauthorized contents/id-token grants at scopedjobs; otherwritekeys fail). Restore explicit prohibition assertion in generatedroot/prompt, notmerepresence of scheduled check-ins phrase. Prove fixed normaltestsPASS and both unsafe mutantsFAIL. Never edit actualworkflow/pollingpolicy just to mutate.",
     "Optional actionable coverage finding: packages/integrations/pi/tests/extension.test.ts derives expected childprompt via fillPackageRoot (same helperunder test). Add an independentliteral deliveredprompt/path assertion protectingwiring ratherthan comparing helperagainstself; preserve existingtests. Add nofeatures.",
@@ -135,5 +135,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdlgqfw-tit3",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T13:49:10.057Z"
+  },
   "createdAt": "2026-11-12T13:48:29.857Z"
 }
