@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-publication-trust-boundary",
   "objective": "Re-review publication trust-boundary repairs and name actual account-protection prerequisites before0.3.3 publication.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Check caller/reusable protected-main/latest and protected-release-integration/dev guards, required npm environment, scopedOIDC, reject all existing versions without claims of verified provenance, known-tag preflight BEFORE immutable publication and retained postcheck. Actual repository had0environments; none configured by us. Assess source conditional on EFFECTIVE branch-restricted GitHubnpm environment plus environment-bound npm publisher. Actual account verification remains mandatory, never assume YAMLname creates protection.",
     "Bounded FFF trace C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdivg4s-1qlp.md: Windows default/false/junction probes did notreturn linkedcanary; same specialist exposure/settings existed onbase; explicit outsidepath reads separate. No validated introduced exploit. Otherplatform/Gitrepo followup0.3.4; reopen only with complete new introduced source-to-sink evidence."
@@ -130,7 +130,41 @@
     "agentId": "pi-workflow:wf_7666a5ca58d1/assignment-0mwdkjkek-erjf",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T13:14:23.782Z"
+    "startedAt": "2026-11-12T13:14:23.782Z",
+    "finishedAt": "2026-11-12T13:21:12.496Z"
+  },
+  "result": "result: Security repair passes conditionally; publication and account prerequisites remain open.\nchanged: none\nchecks: Security-review first pass and re-review of the complete repair diff and relevant source paths; static inspection only. No shell, tests, live account checks or publication.\nblockers: Before publication, obtain authorized configuration and verification of an effective branch-restricted GitHub `npm` environment and environment-bound npm trusted publisher; current-head gates and publication remain outstanding.\nquestions: none\nnotes:\n- Non-blocking, pre-existing release-integrity edge: a pre-existing nested annotated tag that ultimately points to the intended commit passes `scripts/npm-publishing.ts:90-115`, but `.github/actions/tag-release/action.yml:58-62` dereferences only one level and fails after npm publication. Automatic retry then rejects the existing version.\n- FFF disclosure remains unvalidated and deferred: the Windows probe did not reproduce it; other platforms and Git repositories remain untested.\nevidence:\nSecurity repair: Validated introduced publication flaws close under explicitly stated effective account-protection prerequisites; remaining findings have complete source-to-sink traces.: Caller and reusable workflows guard protected main/integration refs; `scripts/npm-publishing.ts:139-159` preflights tags and rejects all existing versions. The effective environment and branch rules are essential, not established by YAML alone.\nAuthority boundary: No token fallback, broad privileges, hidden account changes or unsupported provenance claims; account verification remains explicit.: OIDC is scoped to publication calls/jobs; npm publication uses `--provenance`, with no token fallback or claim that existing-version provenance was verified. `docs/npm-publishing.md` requires separate account verification.\nchanged-paths: none.\nchecks-run: Complete repair diff, prior security report, workflow permissions, tag preflight/postcheck, registry handling and documentation inspected; no commands run.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-5ef98be.patch, range 4ea9a3c..5ef98be.\nremaining-blockers: Verify protected branch rules and bypass permissions, configure and verify the `npm` environment and trusted publisher through authorized account actions, then complete required current-head gates and publication.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "Source trust-boundary repairs are supported by complete static traces. This accepts only conditional source security; effective account protection remains mandatory and unverified, and the nested-tag integrity issue is tracked for repair.",
+    "criteria": [
+      {
+        "criterion": "Security repair: Validated introduced publication flaws close under explicitly stated effective account-protection prerequisites; remaining findings have complete source-to-sink traces.",
+        "support": "Caller and reusable workflows guard protected main/integration refs; `scripts/npm-publishing.ts:139-159` preflights tags and rejects all existing versions. The effective environment and branch rules are essential, not established by YAML alone."
+      },
+      {
+        "criterion": "Authority boundary: No token fallback, broad privileges, hidden account changes or unsupported provenance claims; account verification remains explicit.",
+        "support": "OIDC is scoped to publication calls/jobs; npm publication uses `--provenance`, with no token fallback or claim that existing-version provenance was verified. `docs/npm-publishing.md` requires separate account verification."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "none."
+      },
+      {
+        "label": "checks-run",
+        "support": "Complete repair diff, prior security report, workflow permissions, tag preflight/postcheck, registry handling and documentation inspected; no commands run."
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-5ef98be.patch, range 4ea9a3c..5ef98be."
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Verify protected branch rules and bypass permissions, configure and verify the `npm` environment and trusted publisher through authorized account actions, then complete required current-head gates and publication."
+      }
+    ]
   },
   "createdAt": "2026-11-12T13:13:30.380Z"
 }
