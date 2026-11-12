@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-committed-cli-quoting-and",
   "objective": "Re-review committed CLI quoting and search repair for injection/approval-boundary regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907 only"
   ],
@@ -40,7 +40,37 @@
     "agentId": "/root/review_security",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:12:32.346Z"
+    "startedAt": "2026-11-12T19:12:32.346Z",
+    "finishedAt": "2026-11-12T19:13:53.771Z"
+  },
+  "result": "result: No security blocker found in the repair at 61a7adce3ba76878fe2f2342ab268908ce551907. The previously noted unquoted POSIX CLI command is now quoted.\nchanged: /workspace/work/rereview-security.md (report only)\nchecks: `mise exec -- bun test packages/integrations/pi/tests/extension.test.ts scripts/search-policy.test.ts` with assigned tool environment -> 0, 354 pass, 0 fail; `git diff --check 54f6647052b5ae7a184508b480ad88d808b428bf 61a7adce3ba76878fe2f2342ab268908ce551907` -> 0. Built-in `/security-review` unavailable: this host has no Claude Code Skill tool.\nblockers: none identified.\nquestions: none.\nnotes: POSIX shell single quotes and embedded-quote escaping protect the command path (extension.ts:194-206); the test executes a path containing spaces, an apostrophe and command-substitution syntax. Search fallback changes instructions rather than tool authorization; no approval gate changes in this range. This closes the unquoted CLI command concern noted in the prior report, which had not been classified as a blocker.\nevidence:\nRepairs close original blockers without new regressions: Prior report identified no blocker; quoted CLI path and search fallback show no validated security regression.\nReview independently covers committed repair range: Compared source, tests, instructions and generated changes in 54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907, without author participation; clean tree at head.\nreviewed-range: 54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907.\nfindings: No validated security blocker; prior CLI quoting concern closed for generated CLI commands.\nchecks-run: Targeted Bun tests -> 354 pass, 0 fail; git diff --check -> 0; built-in review unavailable as above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent committed-range review closes original blockers with passing targeted tests and no new merge blocker.",
+    "criteria": [
+      {
+        "criterion": "Repairs close original blockers without new regressions",
+        "support": "Prior report identified no blocker; quoted CLI path and search fallback show no validated security regression."
+      },
+      {
+        "criterion": "Review independently covers committed repair range",
+        "support": "Compared source, tests, instructions and generated changes in 54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907, without author participation; clean tree at head."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907."
+      },
+      {
+        "label": "findings",
+        "support": "No validated security blocker; prior CLI quoting concern closed for generated CLI commands."
+      },
+      {
+        "label": "checks-run",
+        "support": "Targeted Bun tests -> 354 pass, 0 fail; git diff --check -> 0; built-in review unavailable as above."
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:12:32.346Z"
 }
