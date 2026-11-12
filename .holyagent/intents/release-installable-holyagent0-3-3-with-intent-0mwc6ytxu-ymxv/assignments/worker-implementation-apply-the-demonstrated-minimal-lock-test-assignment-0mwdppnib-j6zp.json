@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "apply-the-demonstrated-minimal-lock-test",
   "objective": "Apply the demonstrated minimal lock-test harness correction in the correctly ownedfile and verify0.3.3affectedtests.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "OwnershipcorrectionONLY: priorwriterwaswronglygivenhooks.test.ts, truefilehook-locks.test.ts. Readcandidate C:/Users/david.basile/AppData/Local/Temp/holyagent-lock-proposed.patch andreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdpeb3d-2790.md. Rootreviewedactualwholefile250lines+patch andjudgedminimaltestcorrectionvalid: removeONLY`expect(result.ms).toBeLessThan(result.timeoutMs - 1500)` fromcontendedsuccessfulhooksloop, substitute2-linecomment explainingnativehosttimeoutboundsactualprocessandparentobservationincludesotherwork/scheduling;held-locktestsbelowcoveractualsharedwait. KeepnativeBun.spawn timeout10s, killedfalse,code0,Stdoutrecord-orStateLocked,all3createdintents/wholecommittedstate assertions,CLI30sbound,held-lock2tests4sminandtimeout-2000max. Noimplementationschanged. Parentelapsedclaimed8500boundNOTthe5slockwaitor10shosttimeoutcontract; deterministicdelayedparentobservationcounterexampleprovenred0pass1failvsfixed1pass+fullfile3passinTemp. Original48mshistoricaldelayremainsUnknown, don'tclaimprovedactualcause.",
     "Applyproposed2linecomment/1assertionchangeinactualrepo, thennativefull `bun test packages/integrations/claude/tests/hook-locks.test.ts` and `bun test packages/integrations/claude/tests/plugin.test.ts` (pendingpluginpolicyrepairfromotherterminalwriter) withadequate>=180stimeoutsandtrueLASTEXITCODE. Exactchangedfileformat/lint+typecheckrepo commands+diffcheck. Recordwhyremainingassertionsstillguaranteeboundedcompletion/hardkill/statewhole. ExistingTempcounterexamplerunner/logs maybereusedasevidence, no neednewtrace/research orfullverify. Includecompletecurrent2filepathdiffTemp (ownedfileyouwrite;pluginexistingeditincombineddiffonly). Rootwillcommit2testsandindependentreviewthissmallrange, thenfinalgate. NosourcegenerationbecauseONLYtests."
@@ -130,5 +130,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdpeb3d-2790",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T15:38:26.920Z"
+  },
   "createdAt": "2026-11-12T15:38:12.420Z"
 }
