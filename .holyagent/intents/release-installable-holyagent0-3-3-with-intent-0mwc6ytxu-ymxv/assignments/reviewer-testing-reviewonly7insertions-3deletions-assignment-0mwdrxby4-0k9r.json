@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "reviewonly7insertions-3deletions",
   "objective": "Reviewonly7insertions/3deletions fixing4actualmacOS0.3.3CItestfixtureerrors.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Committedrangeb00eab296a492ea28a9012b29c842cd3e78b0f09..54f6647052b5ae7a184508b480ad88d808b428bf,worktreeC:/Users/david.basile/dev/holyagent-0.3.3-npm,3testfilesONLY. Frozenpatch C:/Users/david.basile/AppData/Local/Temp/holyagent-033-macos-54f6647.patch. No production/generatedpayloadchange; priorreviews+Windowsfull3444pass52skipvalidelsewhere. Publicfinal/bootstrapTempbytesSTILLvalid; nopack/generationneeded. PR120oldb00hostedWindows+Linuxpass/macOS4fails; newnativeMacunknownuntilnewCI, separatefuturegate, notclaimtested.",
     "Changes: runtime/tests/setup-t3-settings.test.ts andsetup-tui-cli.test.tsenvfixtureDEVELOPER_DIR=join(home,'no-xcode') BEFORE ...extra. DarwinhostXcodehadwronglyoverriddenfakeAndroidSDK/no-deviceexpected; positiveexplicitXcodecaseoverridepreserved. tools.test.ts importsnodefsrealpath, comparesREALPATHrecordedcwdtoREALPATHproject insteadrawcwdcontainsresolvedproject; /varversus/private/varaliases SAMEdirectory. Arguments/resultassertionsunchanged, nowstrictpathidentitystronger. Mustnotweakenallowwrongdirectory. CheckactualdeviceHostpriorities/testoverridesandpositivecases.",
@@ -125,5 +125,10 @@
   "independentFrom": [
     "assignment-0mwdrkenp-sr3w"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T16:40:29.199Z"
+  },
   "createdAt": "2026-11-12T16:40:09.916Z"
 }
