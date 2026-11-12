@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-only-security-relevantc6a9fd9",
   "objective": "Re-review only security-relevantc6a9fd9 changes after the nested-tag and permission-coverage repair.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Use repairpatch+priorsecurityreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdkjkek-erjf.md. Newhelperrejectsnestedtagsbeforeimmutablepublication toalignexistingpostcheck; genericall-writegranttestonlyauthorizedcontents/id-token, noactualworkflowauthorityexpanded. Askingqualifier doesnotrelaxreservedapprovals/unknownconcurrency. Confirm all-existingversionfailclosed/protectedheads/environmentrequirementsremain. ActualnpmE401andGitHub0env pending are explicitunmetoutwardprerequisites, notsourcefalsification. Stateconditionalboundaryandanynewintroducedvulnerabilitywith exactsourcetosink. FFFhypothesisunvalidated/deferred0.3.4, no newprobe/globalreview."
   ],
@@ -121,7 +121,37 @@
     "agentId": "pi-workflow:wf_2917e1b02824/assignment-0mwdmhil1-xfyi",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T14:08:53.982Z"
+    "startedAt": "2026-11-12T14:08:53.982Z",
+    "finishedAt": "2026-11-12T14:14:44.862Z"
+  },
+  "result": "result: Security re-review passes conditionally; no introduced validated vulnerabilities found.\nchanged: none\nchecks: Security-review first pass covered the complete repair diff and relevant source-to-sink paths; static inspection only. No shell, tests, live account checks or publication.\nblockers: Before publication, configure and verify the branch-restricted GitHub `npm` environment and environment-bound npm trusted publisher with appropriate authorization; complete current-head gates.\nquestions: none\nnotes: The assignment reports npm `whoami` E401 and zero GitHub environments; these remain unmet publication prerequisites, not source-review failures. FFF disclosure remains unvalidated and deferred.\nevidence:\nSecurity repair review: No findings. `scripts/npm-publishing.ts:90-119,142-162` rejects nested tags before npm invocation and rejects existing versions; `scripts/npm-publishing.test.ts:100-110` asserts no publish call. Protected-head and `npm` environment guards remain in `.github/workflows/publish.yml:27-39`, `.github/workflows/stable.yml:11-17` and `.github/workflows/dev.yml:11-17`; their effectiveness depends on actual account configuration. Reserved approvals and Unknown concurrency safeguards remain in the asking instructions.\nchanged-paths: None by reviewer; inspected the 18-path repair.\nchecks-run: Read-only security first pass and source inspection; no executable checks run, so runtime behavior and account settings were not independently verified.\ndiff-file: `C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-c6a9fd9.patch`, range `5ef98be..c6a9fd9`.\nremaining-blockers: Authorized environment and trusted-publisher configuration and verification, required current-head gates, and actual publication remain pending.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "No new source vulnerability found in the complete18pathrepair; source protections remain. This acceptance is conditional on real branch-restricted environment and environment-bound npm publisher configuration, both explicitly outstanding.",
+    "criteria": [
+      {
+        "criterion": "Security repair review: No introduced validated vulnerability in the bounded repair; prior source protections remain, and real account/environment gaps are explicitly retained before publication.",
+        "support": "No findings. `scripts/npm-publishing.ts:90-119,142-162` rejects nested tags before npm invocation and rejects existing versions; `scripts/npm-publishing.test.ts:100-110` asserts no publish call. Protected-head and `npm` environment guards remain in `.github/workflows/publish.yml:27-39`, `.github/workflows/stable.yml:11-17` and `.github/workflows/dev.yml:11-17`; their effectiveness depends on actual account configuration. Reserved approvals and Unknown concurrency safeguards remain in the asking instructions."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "None by reviewer; inspected the 18-path repair."
+      },
+      {
+        "label": "checks-run",
+        "support": "Read-only security first pass and source inspection; no executable checks run, so runtime behavior and account settings were not independently verified."
+      },
+      {
+        "label": "diff-file",
+        "support": "`C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-c6a9fd9.patch`, range `5ef98be..c6a9fd9`."
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Authorized environment and trusted-publisher configuration and verification, required current-head gates, and actual publication remain pending."
+      }
+    ]
   },
   "createdAt": "2026-11-12T14:07:53.941Z"
 }
