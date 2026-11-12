@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "replace-the-one-accidental-literal",
   "objective": "Replace the one accidental literal newline escape in the publication document with actual paragraph spacing.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Only C:/Users/david.basile/dev/holyagent-0.3.3-npm/docs/npm-publishing.md. Root inspected currentgitdiff: final paragraphs accidentally contain literal backslash-n backslash-n between authorized manual process. and A rerun publishes. Replace those two literal escapes with an actual blankline. Preserve all other existing/sourceworker content. No research, prose redesign or otheredits.",
     "Check the literal sequence is absent and two paragraphs are actually separated; formatcheck the oneMarkdownfile withrepo formatter andgitdiffcheck. Write repair-onlydiff toTemp, report <=5bullets with exactlabels/actualcommand/exits. No fullverify/build/extra tests needed for this exacttextrepair."
@@ -112,7 +112,37 @@
     "agentId": "pi-workflow:wf_505007ae03c3/assignment-0mwdk18nm-45l5",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T12:59:44.906Z"
+    "startedAt": "2026-11-12T12:59:44.906Z",
+    "finishedAt": "2026-11-12T13:04:48.926Z"
+  },
+  "result": "result: Replaced the literal newline escapes with a blank line; prose unchanged\nchanged: docs/npm-publishing.md\nchecks: `git -C C:/Users/david.basile/dev/holyagent-0.3.3-npm diff --check -- docs/npm-publishing.md` -> exit 0; `bunx --no-install mise run fmt:check` -> exit 0, 729 files formatted\nblockers: none\nquestions: none\nnotes: none\nevidence:\nPublication paragraphs use real line breaks with unchanged prose and pass formatting and whitespace checks: literal escapes replaced by a blank line; formatter and diff check passed\nchanged-paths: docs/npm-publishing.md\nchecks-run: formatter and whitespace checks, exit 0\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/worker-mechanical-assignment-0mwdk18nm-45l5.diff\nremaining-blockers: none\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "The one-line paragraph repair preserves prose, has a real formatter and diff check, and the root inspected its final diff.",
+    "criteria": [
+      {
+        "criterion": "Publication paragraphs use real line breaks with unchanged prose and pass formatting and whitespace checks",
+        "support": "literal escapes replaced by a blank line; formatter and diff check passed"
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "docs/npm-publishing.md"
+      },
+      {
+        "label": "checks-run",
+        "support": "formatter and whitespace checks, exit 0"
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/worker-mechanical-assignment-0mwdk18nm-45l5.diff"
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "none"
+      }
+    ]
   },
   "createdAt": "2026-11-12T12:59:15.365Z"
 }
