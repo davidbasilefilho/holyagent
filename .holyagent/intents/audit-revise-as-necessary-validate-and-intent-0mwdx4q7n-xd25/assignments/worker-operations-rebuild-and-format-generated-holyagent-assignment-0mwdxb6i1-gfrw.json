@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mwdxb6i1-gfrw",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.operations",
+  "slug": "rebuild-and-format-generated-holyagent",
+  "objective": "Rebuild and format generated HolyAgent artifacts after accepted Pi CLI and search policy repairs.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/holyagent-pr120"
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and packages/integrations/claude/dist/agents/worker-operations.md. User authorizes PR120 revise/merge; GPT6.1 Terra specified, direct fallback. Source writers terminal. No VCS or .holyagent writes. Run bunx --no-install mise run build and formatter only for modified source/docs/new test where needed; no unrelated churn. Tool env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Root installed hooks with canary frozen install. Save report /workspace/work/build-repairs.md under150 words, changes plus diff-file /workspace/work/repairs.diff. Build must leave sources intact and consistent. Do not run full verify; it will run after committed independent review."
+  ],
+  "criteria": [
+    {
+      "text": "Generated artifacts reflect accepted source repairs and formatting is clean",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "docs/requirements.md",
+    "docs/pi/search.md",
+    "scripts/search-policy.test.ts"
+  ],
+  "dependencies": [
+    "assignment-0mwdx7yxg-3p8e",
+    "assignment-0mwdx7zi8-h8ol",
+    "assignment-0mwdx9hqq-7bev"
+  ],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T19:10:54.121Z"
+  },
+  "createdAt": "2026-11-12T19:10:54.121Z"
+}
