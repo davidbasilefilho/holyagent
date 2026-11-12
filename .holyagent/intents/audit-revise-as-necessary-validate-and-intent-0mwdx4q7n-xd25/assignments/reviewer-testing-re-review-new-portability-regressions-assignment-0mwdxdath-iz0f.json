@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "re-review-new-portability-regressions",
   "objective": "Re-review new portability regressions and meaningful before/after coverage.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907; extension.test.ts, scripts/search-policy.test.ts and supporting source/coverage"
   ],
@@ -40,7 +40,37 @@
     "agentId": "/root/review_testing",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-12T19:12:33.030Z"
+    "startedAt": "2026-11-12T19:12:33.030Z",
+    "finishedAt": "2026-11-12T19:13:54.552Z"
+  },
+  "result": "result: Repairs close the identified portability blockers at 61a7adce3ba76878fe2f2342ab268908ce551907; no new test blocker found.\nchanged: /workspace/work/rereview-testing.md (report only)\nchecks: mise exec -- bun test scripts/search-policy.test.ts packages/integrations/pi/tests/extension.test.ts -> exit 0; 354 passed, 0 failed, 1434 assertions (using assigned tool environment).\nblockers: none\nquestions: none\nnotes: The Unix command test executes both prompt forms with spaces, apostrophe and shell metacharacters and verifies arguments and no injected file. The old unquoted command fails that case by inspection; a pristine-base run was not performed. Windows is deliberately excluded from the Unix shell test; its existing separate prompt test remains. Full gates and hosted platform runs were not repeated here.\nevidence:\nRepairs close original blockers without new regressions: Both Pi families and roles assert the enabled, unavailable and failure-reporting search instructions; real Unix shell execution protects quoting and argument preservation. Targeted tests pass.\nReview independently covers committed repair range: Inspected test, source and instruction diffs from 54f6647052b5ae7a184508b480ad88d808b428bf through 61a7adce3ba76878fe2f2342ab268908ce551907; HEAD matched the latter.\nreviewed-range: 54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907.\nfindings: No remaining concrete test blocker.\nchecks-run: Targeted canary Bun tests exited 0, 354 pass, 1434 assertions; base and full gates not run.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent committed-range review closes original blockers with passing targeted tests and no new merge blocker.",
+    "criteria": [
+      {
+        "criterion": "Repairs close original blockers without new regressions",
+        "support": "Both Pi families and roles assert the enabled, unavailable and failure-reporting search instructions; real Unix shell execution protects quoting and argument preservation. Targeted tests pass."
+      },
+      {
+        "criterion": "Review independently covers committed repair range",
+        "support": "Inspected test, source and instruction diffs from 54f6647052b5ae7a184508b480ad88d808b428bf through 61a7adce3ba76878fe2f2342ab268908ce551907; HEAD matched the latter."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907."
+      },
+      {
+        "label": "findings",
+        "support": "No remaining concrete test blocker."
+      },
+      {
+        "label": "checks-run",
+        "support": "Targeted canary Bun tests exited 0, 354 pass, 1434 assertions; base and full gates not run."
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:12:33.030Z"
 }
