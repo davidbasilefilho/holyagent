@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "validate-or-dismiss-the-suspected",
   "objective": "Validate or dismiss the suspected introduced FFF repository-symlink disclosure with a bounded safe trace.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Read-only security investigation, not implementation. C:/Users/david.basile/dev/holyagent-0.3.3-npm HEAD4ea9a3c vs c5b2ab2b. Reviewer.security suspects packages/runtime/src/pi/tools.ts:181-195 exposes FFF following repository directory symlinks, potentially sending outside-repo secrets to model context. Determine introduced/current-versusbaseline and actual settings.",
     "Inspect installed FFF/pi-fff API/source and settings: C:/Users/david.basile/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts and C:/Users/david.basile/.pi/agent/npm/node_modules/@ff-labs/fff-node. Use FFF search integration, no shell searches. If feasible reproduce actual tool search with an isolated Temp repository and symlink to an outsideTemp dummycanary, NEVER actual secrets/home indexing. No external provider/model calls or installed-package edits.",
@@ -110,7 +110,9 @@
     "agentId": "pi-workflow:wf_6d56d223c369/assignment-0mwdivg4s-1qlp",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T12:27:12.732Z"
+    "startedAt": "2026-11-12T12:27:12.732Z",
+    "finishedAt": "2026-11-12T12:34:58.982Z"
   },
+  "result": "failure: result: Unknown; the suspected repository-symlink plaintext disclosure was not reproduced on Windows.\nchanged: none\nchecks: Temp probe, default, false and junction variants -> exit 0 each; workspace control matched, linked canary did not. Git comparison -> exit 0.\nblockers: Cross-platform and Git-repository reproduction remain untested.\nquestions: none\nnotes: Probe used only dummy Temp data, with no provider calls; script: C:/Users/david.basile/AppData/Local/Temp/fff-safe-probe.ts.\nevidence:\nFFF symlink claim is classified from introduced source-to-sink evidence or explicitly remains baseline or unknown: Unknown; Windows default-follow searches returned no linked filename or plaintext despite a working link; this does not establish behavior on Linux or macOS.\nchecks-run: The actual installed pi-fff tool returned the in-workspace control and, for an explicitly outside path, the dummy canary; default and disabled-follow workspace searches returned no linked match. Junction also returned no linked match.\nfindings: Installed pi-fff and fff-node are 0.11.0; C:/Users/david.basile/.pi/agent/pi-fff.json sets override mode but not followSymlinks. The extension defaults it to true; flags and environment override the file. The probe was a Temp directory, not a Git repository.\nremaining-blockers: A bounded Linux/macOS actual-tool search in an isolated Temp Git repository is needed to establish whether directory-link traversal reaches plaintext there.\nsource-to-sink: packages/runtime/src/pi/tools.ts enables registered FFF tools; pi-fff/src/index.ts passes followSymlinks to FilePickerFactory, invokes picker.grep and formats lineContent into tool-result text. Explicit outside-path routing is separate and worked even with following disabled.\nbaseline-comparison: c5b2ab2b already enabled FFF override grep/find for specialists with the same follow setting; 4ea9a3c additionally exposes FFF to the root and names all FFF tools for specialists. No change to the setting or package pin was found in the comparison.\n",
   "createdAt": "2026-11-12T12:26:45.484Z"
 }
