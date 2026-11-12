@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "generate-canonical0-3-3-artifacts-and",
   "objective": "Generate canonical0.3.3 artifacts and verify the final bounded source repairs before root commits.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Run canonical bunx --no-install mise run build; prior changes asking/task-list mean generatedartifacts stale. Then run full4relevant suites scripts/workflows.test.ts,scripts/root-question-policy.test.ts,packages/integrations/claude/tests/plugin.test.ts,packages/integrations/pi/tests/extension.test.ts from actualcwd with adequate timeout (notpriorfilteronly395+4). Include npmhelper/publishing tests and instruction/session-context/skills coverage as needed for changedgeneratedtext/budget/YAML. Use mise tasks properargumenthelp, don't guess. Run check/lint/fmt:check and diffcheck, report exactcwd/head/version/nativecmds trueexit. Lastwriter initialfull4file run469pass2fail includedexpectedstalesync; bothmustclearafterbuild.",
     "Produce Temp complete gitdiffpatch and bareJSONarray of EVERY authorizedchangedpath (14source plus canonicalgenerated), counts source/generated/newuntracked and5patternsecretscan. Source14paths rootalreadyauthorized, no unrelateddirtyfakes. No absolute temp diagnostics inside checkout. Confirm generationdeltaexpected onlyoutputs; don't call authorizedother-ownedsourcea blocker. Ifa realtestfailsreport exactcause without sourcefix."
@@ -121,5 +121,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdjtlo6-uly8",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T13:58:05.197Z"
+  },
   "createdAt": "2026-11-12T13:57:42.636Z"
 }
