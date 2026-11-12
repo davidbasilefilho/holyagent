@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "actually-execute-and-prove-the-fresh",
   "objective": "Actually execute and prove the fresh isolated installed-Pi loader smoke that prior validation failed to run.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Ownership only reserves installed dist validation; leave every repositoryfile unchanged. Prior worker only hashed tarball, checked WRONGmaincwd and quit without running requested smoke, no technicalblocker. Execute it now using existingSDK/package install/resources; no dependencies/networkinstall. Tarball C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwchl9q7-pswh.tgz/holyagent-0.3.3.tgz SHA2566723C4A782EF89995DF07AF3E668360DAF4D065E5671A596C76F38E2697D50EE; generatedruntime unchanged. Prior actualloader script/log clues C:/Users/david.basile/AppData/Local/Temp/holyagent-sdk-tools.mjs and C:/Users/david.basile/AppData/Local/Temp/pi-powershell-9ba4d2db2748c75a.log. DisposableTemp child, fresh home/auth/config and minimalallowlistedenv (no .env/autoload, no secrets); import existingSDK byabsoluteinstalledpath. Before realDefaultResourceLoader.reload/extension import, deny applicationfetch/http/https/net/dns APIs as appropriate and prove canaries reject without external request. Do not read actualauthstores, firewall/settings, dummykeys, pi--print or liveinference. Record actual1extension/11skills/zeroerrors/diagnostics, exits, isolation mechanisms, no network attempt. IfactualSDKexception occurs debug it withinTemp; quitonlygenuinetechnicalblocker."
   ],
@@ -120,7 +120,41 @@
     "agentId": "pi-workflow:wf_888fb5a9eb88/assignment-0mwdlgloh-jdwd",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T13:39:54.924Z"
+    "startedAt": "2026-11-12T13:39:54.924Z",
+    "finishedAt": "2026-11-12T13:46:39.628Z"
+  },
+  "result": "result: Fresh installed-Pi loader smoke passed.\nchanged: Temp scripts and results only; no repository files changed.\nchecks: PowerShell `ha-loader-run.ps1` -> exit 0; child exit 0; 11 denial canaries passed; 1 extension, 11 skills, 0 errors, diagnostics or warnings.\nblockers: none\nquestions: none\nnotes: The tarball was extracted into Pi’s managed npm layout, not installed by a package manager. Network denial was application-level API interception, not an OS firewall or sandbox.\nevidence:\nFresh smoke: Real installed DefaultResourceLoader.reload executes now with1extension11skills0errors0diagnostics, fresh absentcredentials and applicationnetworkdenial proven before load.: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\ha-loader-0de08653e5c24c3caf06739205c8044e\\smoke.log`; SDK reload and resource-origin assertions passed; no intercepted network or child-process calls during load.\nSafety: OnlyTemp scripts/results changed; realcredentials/accounts/settings/network/dependencies untouched, exact isolationboundary and childexit documented.: Fresh Temp home, config, project and auth absence; allowlisted child environment; fetch, HTTP(S), sockets, TLS, HTTP2, DNS, UDP and child-process APIs denied before SDK import; child exit 0. No OS-level network isolation claimed.\nchanged-paths: Temp only: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\ha-loader-offline-smoke.mjs`, `C:\\Users\\david.basile\\AppData\\Local\\Temp\\ha-loader-run.ps1`, and `C:\\Users\\david.basile\\AppData\\Local\\Temp\\ha-loader-0de08653e5c24c3caf06739205c8044e`.\nchecks-run: `ha-loader-run.ps1` -> exit 0; tarball SHA256 matched `6723C4A782EF89995DF07AF3E668360DAF4D065E5671A596C76F38E2697D50EE`.\ndiff-file: none; no repository edits.\nremaining-blockers: none for this assignment.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "A fresh real SDK reload passed with resource-origin assertions, exact tarball hash, 11 application-denial canaries,1extension11skills0diagnostics and childexit0. This proves the stated application-level boundary, not OS isolation or registry installation.",
+    "criteria": [
+      {
+        "criterion": "Fresh smoke: Real installed DefaultResourceLoader.reload executes now with1extension11skills0errors0diagnostics, fresh absentcredentials and applicationnetworkdenial proven before load.",
+        "support": "`C:\\Users\\david.basile\\AppData\\Local\\Temp\\ha-loader-0de08653e5c24c3caf06739205c8044e\\smoke.log`; SDK reload and resource-origin assertions passed; no intercepted network or child-process calls during load."
+      },
+      {
+        "criterion": "Safety: OnlyTemp scripts/results changed; realcredentials/accounts/settings/network/dependencies untouched, exact isolationboundary and childexit documented.",
+        "support": "Fresh Temp home, config, project and auth absence; allowlisted child environment; fetch, HTTP(S), sockets, TLS, HTTP2, DNS, UDP and child-process APIs denied before SDK import; child exit 0. No OS-level network isolation claimed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "Temp only: `C:\\Users\\david.basile\\AppData\\Local\\Temp\\ha-loader-offline-smoke.mjs`, `C:\\Users\\david.basile\\AppData\\Local\\Temp\\ha-loader-run.ps1`, and `C:\\Users\\david.basile\\AppData\\Local\\Temp\\ha-loader-0de08653e5c24c3caf06739205c8044e`."
+      },
+      {
+        "label": "checks-run",
+        "support": "`ha-loader-run.ps1` -> exit 0; tarball SHA256 matched `6723C4A782EF89995DF07AF3E668360DAF4D065E5671A596C76F38E2697D50EE`."
+      },
+      {
+        "label": "diff-file",
+        "support": "none; no repository edits."
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "none for this assignment."
+      }
+    ]
   },
   "createdAt": "2026-11-12T13:39:11.682Z"
 }
