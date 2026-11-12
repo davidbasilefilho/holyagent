@@ -121,6 +121,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwdivbjo-epaq",
   "specialist": {
+    "agentId": "pi-workflow:wf_486cfc65d7dc/assignment-0mwdj9a8d-ecua",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-12T12:37:57.910Z"
