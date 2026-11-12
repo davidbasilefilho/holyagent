@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "verify-0-3-3-committed-publication",
   "objective": "Verify 0.3.3 committed publication repairs close the validated code finding without regressions.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Prior blocker: existing npm version accepted without trusted provenance. Deliberate minimum-safe replacement rejects ALL existing versions, including matching integrity; no automatic rerun claimed. Check exact GitHub tag preflight BEFORE npm, annotated/lightweight/absent/conflict/error behavior, retained action postcheck, fresh OIDC and same-tarball workflow integration. Dev last-successful-publication semantics are explicit; feature branches validation-only. Review repaired paths and finish only previously incomplete code scope."
   ],
@@ -129,7 +129,9 @@
     "agentId": "pi-workflow:wf_29e1abfd68ba/assignment-0mwdkewcm-pw17",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T13:14:21.620Z"
+    "startedAt": "2026-11-12T13:14:21.620Z",
+    "finishedAt": "2026-11-12T13:20:57.594Z"
   },
+  "result": "failure: result: Fail — unsafe existing-version reruns are closed, but preflight and release handling disagree for nested annotated tags.\nchanged: none\nchecks: Focused publication/workflow tests → exit 0, 29 pass; Windows installation, long-path, skills and Pi tools tests → exit 0, 174 pass, 1 skip; full verify not run.\nblockers: behavior — `scripts/npm-publishing.ts:99-122`, `preflightTag`, accepts a nested annotated tag resolving to the intended commit, but `.github/actions/tag-release/action.yml:58-65` unwraps only one tag. npm can therefore publish an immutable version before the release action rejects the same tag; a rerun then rejects the existing npm version. Align both checks and test this handoff.\nquestions: none\nnotes: No material performance issue found. Actual GitHub/npm protection settings, live OIDC publication, macOS/Linux behavior and packaged startup were not run; the full earlier tooling range remains incompletely reviewed.\nevidence:\nCorrectness: Existing versions fail closed and ordinary absent, matching, conflicting and failed lookups are tested; nested annotated-tag handling remains a blocker.\nRegressions: Focused tests cover fresh `npm publish --provenance`, tarball handoff and workflow permissions; live OIDC remains unknown.\nchanged-paths: none; reviewed repair range `4ea9a3c...5ef98be`.\nchecks-run: `bun test scripts/npm-publishing.test.ts scripts/workflows.test.ts packages/integrations/pi/publishing.test.ts` → exit 0, 29 pass; `bun test packages/runtime/tests/state-long-path.test.ts packages/runtime/tests/skills.test.ts packages/runtime/tests/pi/tools.test.ts packages/runtime/tests/setup-pi.test.ts` → exit 0, 174 pass, 1 skip.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-5ef98be.patch.\nremaining-blockers: Nested annotated-tag preflight/postcheck mismatch; current-head full gate and actual trusted-publisher configuration remain unverified.\n",
   "createdAt": "2026-11-12T13:09:52.582Z"
 }
