@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwdx5dia-wycl",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "audit-pr-120-privileged-workflows-npm",
+  "objective": "Audit PR #120 privileged workflows, npm publication and integration approval boundaries for security blockers.",
+  "state": "Running",
+  "scope": [
+    "Committed range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; .github workflows/action, scripts/npm-publishing.ts, Pi auto-review/approval assessment, state file safety, package/tool execution and supporting code."
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and /workspace/work/holyagent-pr120/packages/integrations/claude/dist/agents/reviewer-security.md; apply role as HolyAgent specialist in this host. User explicitly selects gpt-6.1-terra and authorizes audit, revisions, merge PR120. Workflow unavailable; direct invocation fallback. This is the repository HolyAgent Reviewer.security audit, not a standalone Codex Security scan. Read only; no VCS/state writes, no publication or credentials/settings changes. Review exact committed range independently of authors. Ground blockers in source-to-sink file:line traces, threat preconditions and actual impact. Existing package bootstrap/environment setup limitations are release prerequisites unless unsafe merge behavior results. Report under 400 words, save full report /workspace/work/review-security.md."
+  ],
+  "criteria": [
+    {
+      "text": "No unaddressed merge blockers in assigned scope",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Review covers exact committed range and distinguishes baseline issues",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T19:06:23.266Z"
+  },
+  "createdAt": "2026-11-12T19:06:23.266Z"
+}
