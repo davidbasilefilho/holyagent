@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mwdxdaai-zz7y",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-committed-cli-quoting-and",
+  "objective": "Re-review committed CLI quoting and search repair for injection/approval-boundary regressions.",
+  "state": "Running",
+  "scope": [
+    "54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907 only"
+  ],
+  "constraints": [
+    "Use previous HolyAgent specialist role and relevant skills; this review follows same explicit user authorization (audit/revise/merge PR120) and Terra model instruction. Direct fallback, Workflow unavailable. Worktree /workspace/work/holyagent-pr120; writers/build terminal, committed head 61a7adc. No source/VCS/state writes. Prior original-head report available /workspace/work/review-security.md. Review only repair committed range and close original finding where applicable. Repaired source tests passed; root installed frozen dependencies/hooks and canary. Tool env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; use mise exec -- bun for direct targeted tests. Repair diff-file /workspace/work/repairs.diff. Report under250 words save /workspace/work/rereview-security.md. Name any remaining concrete blocker, otherwise explicit closure and exact head."
+  ],
+  "criteria": [
+    {
+      "text": "Repairs close original blockers without new regressions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Review independently covers committed repair range",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwdx7yxg-3p8e",
+    "assignment-0mwdx7zi8-h8ol"
+  ],
+  "followUpOf": "assignment-0mwdx5dia-wycl",
+  "specialist": {
+    "agentId": "/root/review_security",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T19:12:32.346Z"
+  },
+  "createdAt": "2026-11-12T19:12:32.346Z"
+}
