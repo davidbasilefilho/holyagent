@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.audit",
   "slug": "audit-source-and-existing-evidence-for",
   "objective": "Audit source and existing evidence for finalc6a9fd9 PR readiness while explicitly retaining external publication prerequisites.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Boundedread-onlyaudit, notnewglobalcode/artifact/testingreview. Previousaudit C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdkjwmx-ziwm.md reconciledlongpathtrace already; docsno-npm contradictions nowfixedandindependentartifactaccepted. Currentrepairpatch C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-c6a9fd9.patch, exact4reviewreports assignment-0mwdmh629-zkmf (code),assignment-0mwdmhdo3-8dhi (testing),assignment-0mwdmhil1-xfyi (security),assignment-0mwdmhqxb-1bfn (artifact), under C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/.",
     "Verify delegatedcurrentrequirements reflected source/evidence and minimal0.3.3, sourceprotectedpub/OIDC/sametarball/npmFIRST/failclosedexistingversions/tagpreflight, validpromptguardrails, real Windows regressions, no benchmark/newvisual0.3.4features. Do notinvent staticlongpathfailure alreadydisproved actualchildrecreatesworktree. Originalfullsource/reviews standexceptchangedpartscoveredcurrent4. No shellrequired; suppliedproof471tests/buildchecklintfmt, actualLuna medium strictschemaREADMErequest72tests, loader1extension11skills0errors11canaries.",
@@ -119,5 +119,10 @@
     "assignment-0mwdkxy14-3lcu"
   ],
   "followUpOf": "assignment-0mwdkjwmx-ziwm",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-12T14:15:41.457Z"
+  },
   "createdAt": "2026-11-12T14:15:12.730Z"
 }
