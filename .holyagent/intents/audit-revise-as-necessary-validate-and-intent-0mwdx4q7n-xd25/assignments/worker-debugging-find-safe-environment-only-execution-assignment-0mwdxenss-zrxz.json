@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwdxenss-zrxz",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.debugging",
+  "slug": "find-safe-environment-only-execution",
+  "objective": "Find safe environment-only execution remedy for pre-existing Pi cancellation timeout in this cloud container.",
+  "state": "Running",
+  "scope": [
+    "packages/integrations/pi/tests/bash.test.ts cancellation test; diagnostic scripts outside repository"
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and packages/integrations/claude/dist/agents/worker-debugging.md in /workspace/work/holyagent-pr120. User authorizes audit/revise/merge PR120, Terra low-xhigh, direct fallback. No source/VCS/.holyagent writes. Reproduced cancellation timeout waitFor line238 on pristine original head54f6647 and basec5b2ab2: /workspace/work/validation-logs/base-cancel.log and /workspace/work/review-validation.md. Suspect container PID1 does not reap orphan zombies, unproven. Need evidence cause and safe external execution remedy for full mise verify. Do not skip/relax tests, patch production for baseline issue, kill unrelated processes or change global settings. Try existing tini/dumb-init or external Python subreaper supervisor only if evidence warrants. Need passing focused command first. Tools via MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH mise exec -- bun. Report under250 words save /workspace/work/cancel-diagnosis.md; logs/scripts outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "Cancellation failure cause supported by reproduction and baseline evidence",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Any remedy preserves unmodified tests and normal runtime semantics",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "remedy"
+  ],
+  "ownershipPaths": [
+    "diagnostics"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T19:13:36.508Z"
+  },
+  "createdAt": "2026-11-12T19:13:36.508Z"
+}
