@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-committed-pi-search-fallback",
   "objective": "Re-review committed Pi search fallback repair, docs and generated prompts and close original blocker.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907; requirements, coverage, both Pi families, docs and generated artifacts"
   ],
@@ -41,7 +41,37 @@
     "agentId": "/root/review_artifact",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:12:31.689Z"
+    "startedAt": "2026-11-12T19:12:31.689Z",
+    "finishedAt": "2026-11-12T19:13:53.000Z"
+  },
+  "result": "result: Original search blocker closed at 61a7adce3ba76878fe2f2342ab268908ce551907; no new blocker found in the repair.\nchanged: /workspace/work/rereview-artifact.md (report only)\nchecks: git diff --check 54f6647052b5ae7a184508b480ad88d808b428bf 61a7adce3ba76878fe2f2342ab268908ce551907 -> 0; mise exec -- bun test scripts/search-policy.test.ts packages/runtime/tests/instructions.test.ts packages/integrations/pi/tests/extension.test.ts -> 0, 369 pass. Full build and verify not run in this read-only review.\nblockers: none\nquestions: none\nnotes: docs/pi/configuration.md:57 still describes FFF as “The specialists' `find` and `grep` on fff”; it omits the root, as noted in the first review.\nevidence:\nRepairs close original blockers without new regressions: met; requirements/root/search.md:1 and specialist/working.md:2 now permit role-available search when FFF is disabled or unsupported; both Pi families translate this to shell search for root and built-in search for specialists, and generated agents carry the repair. docs/pi/search.md:10 and docs/requirements.md:10 reflect the distinction.\nReview independently covers committed repair range: met; reviewed the committed source, documentation, coverage, representative generated prompts, wrapper quoting and tests at 61a7adce3ba76878fe2f2342ab268908ce551907.\nreviewed-range: 54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907; HEAD matched and tree clean.\nfindings: Original blocker closed; one nonblocking documentation omission above.\nchecks-run: git diff --check -> 0; targeted Bun tests -> 0, 369 pass; full build and verify not run.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent committed-range review closes original blockers with passing targeted tests and no new merge blocker.",
+    "criteria": [
+      {
+        "criterion": "Repairs close original blockers without new regressions",
+        "support": "met; requirements/root/search.md:1 and specialist/working.md:2 now permit role-available search when FFF is disabled or unsupported; both Pi families translate this to shell search for root and built-in search for specialists, and generated agents carry the repair. docs/pi/search.md:10 and docs/requirements.md:10 reflect the distinction."
+      },
+      {
+        "criterion": "Review independently covers committed repair range",
+        "support": "met; reviewed the committed source, documentation, coverage, representative generated prompts, wrapper quoting and tests at 61a7adce3ba76878fe2f2342ab268908ce551907."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907; HEAD matched and tree clean."
+      },
+      {
+        "label": "findings",
+        "support": "Original blocker closed; one nonblocking documentation omission above."
+      },
+      {
+        "label": "checks-run",
+        "support": "git diff --check -> 0; targeted Bun tests -> 0, 369 pass; full build and verify not run."
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:12:31.689Z"
 }
