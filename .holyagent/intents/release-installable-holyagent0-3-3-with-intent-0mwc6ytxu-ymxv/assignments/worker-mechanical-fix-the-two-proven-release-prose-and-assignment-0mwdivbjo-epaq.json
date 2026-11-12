@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "fix-the-two-proven-release-prose-and",
   "objective": "Fix the two proven release-prose and instruction-coverage inconsistencies and check the repairs.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Writer exception: edit ONLY these2ownedpaths in C:/Users/david.basile/dev/holyagent-0.3.3-npm. CurrentHEAD4ea9a3c; no other source/generated edits. Publication security design runs independently read-only.",
     "In packages/runtime/src/instructions/coverage.ts Claude R-ROLE phrase currently You own the user relationship but unchanged compact core now says Own the user relationship. Update only this Claude phrase to exactactualsource. Do not re-expand core or raise9400budget. Existing coverage/instruction tests should demonstrate regression now failing before and passing after.",
@@ -112,7 +112,9 @@
     "agentId": "pi-workflow:wf_aad70a10091d/assignment-0mwdivbjo-epaq",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T12:27:12.974Z"
+    "startedAt": "2026-11-12T12:27:12.974Z",
+    "finishedAt": "2026-11-12T12:34:57.940Z"
   },
+  "result": "failure: result: both requested inconsistencies corrected; relevant checks ran, with unrelated existing instruction-test failures\nchanged: docs/npm-publishing.md, packages/runtime/src/instructions/coverage.ts\nchecks: `bun test packages/runtime/tests/requirements.test.ts packages/integrations/claude/tests/plugin.test.ts scripts/npm-publishing.test.ts packages/integrations/pi/publishing.test.ts` -> exit 1, 84 pass, 12 fail; publication tests passed, instruction failures include unrelated stale coverage and prompt assertions. `git diff --check` -> exit 0.\nblockers: instruction suite is not green; failures extend beyond the changed Claude R-ROLE phrase.\nquestions: none\nnotes: No dedicated publishing-document test found.\nevidence:\n[blocking] Claude coverage matches the unchanged compact core and publication prose states actual npm-first ordering (regressions): `packages/runtime/src/instructions/coverage.ts` now uses “Own the user relationship”; `docs/npm-publishing.md` documents npm publication before the dependent GitHub release and the corrected failure consequence.\nchecks-run: Relevant four-file test command exited 1 (84 pass, 12 fail); `git diff --check` exited 0.\nfindings: Test failures include unrelated pre-existing instruction coverage/prompt inconsistencies; publication tests passed.\nremaining-blockers: Broader instruction tests remain failing; failures are not attributed to these two edits.\nchanged-paths: `docs/npm-publishing.md`, `packages/runtime/src/instructions/coverage.ts`\ndiff-file: `$env:TEMP\\assignment-0mwdivbjo-epaq.diff` (repair-only diff)\n",
   "createdAt": "2026-11-12T12:26:39.540Z"
 }
