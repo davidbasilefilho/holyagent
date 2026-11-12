@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "audit-pr-120-instruction-changes-and",
   "objective": "Audit PR #120 instruction changes and user documentation for semantic regressions and repository compliance.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Committed range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; AGENTS.md, README/docs, instruction requirements, every family translation, coverage and generated instruction artifacts."
   ],
@@ -36,7 +36,9 @@
     "agentId": "/root/review_artifact",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:06:23.945Z"
+    "startedAt": "2026-11-12T19:06:23.945Z",
+    "finishedAt": "2026-11-12T19:08:53.858Z"
   },
+  "result": "result: Gap: Pi search instructions break supported configurations without FFF.\nchanged: /workspace/work/review-artifact.md (report only)\nchecks: git diff --check c5b2ab2b3524063e408b2f0dbf6bf85a6237e168 54f6647052b5ae7a184508b480ad88d808b428bf -> 0; targeted bun tests -> 127, bun unavailable. Build and verify not run: bun unavailable.\nblockers: requirements/root/search.md:1 and specialist/working.md:2 require FFF in all Pi sessions. Both Pi families' root/search.md:3 and specialist/working.md:4/6 tell agents missing FFF is a setup failure and to use direct reads until repaired; generated agents repeat it. Yet docs/pi/search.md:11,15 documents supported hosts without an FFF build and the supported `fff off` setting. capabilities.ts:630-642,763-765 filters unsupported hosts; pi/tools.ts:167,187-199 adds FFF only when enabled. These sessions cannot follow the search instructions, and reinstalling cannot resolve an unsupported host. Amend requirements, translations, coverage and generated artifacts: use FFF when available and an accessible built-in or shell search when disabled or unsupported; report unexpected failures while preserving fallback.\nquestions: none\nnotes: docs/pi/configuration.md:57 describes “The specialists' `find` and `grep` on fff”, omitting the newly supported root. docs/requirements.md:10 calls ripgrep and fd “the root's and the specialists' search”, inconsistent with the new Pi policy. Update both when repairing search.\nevidence:\nNo unaddressed merge blockers in assigned scope: gap; FFF unavailable by design in documented configurations, as described above.\nReview covers exact committed range and distinguishes baseline issues: reviewed c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; search restriction is introduced in this range, supported off/unsupported behavior predates it.\nreviewed-range: c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; HEAD matched, clean tree at review.\nfindings: Blocking search regression and stale configuration description above; automated coverage checks cannot establish semantic equivalence.\nchecks-run: git diff --check -> 0; bun test scripts/root-question-policy.test.ts scripts/stop-slop-policy.test.ts packages/runtime/tests/instructions.test.ts -> 127 (bun not found); build and verify not run.\n",
   "createdAt": "2026-11-12T19:06:23.945Z"
 }
