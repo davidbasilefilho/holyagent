@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "finish-changed-test-coverage-review-and",
   "objective": "Finish changed-test coverage review and prove a freshly isolated installed-Pi offline loader smoke for0.3.3.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Prior648focused passes stand outside changed paths: don't repeat all. Finish original changed-test comparison, detecting removed/weakened assertions. New helper intentionally removes rerun/timestamp acceptance: ALL existing versions reject now. Check regressions for no publication/tag effects, and exact-tag absent/matching/annotated/conflict/lookup/network-error cases. Long-path tests passed; child realVCS recreates removed worktree before assertions.",
     "Run fresh Temp installed-tarball DefaultResourceLoader.reload with all provider credentials absent (env AND auth stores) and external network deterministically denied. Existing correct tarball C:/Users/david.basile/AppData/Local/Temp/holyagent-0mwchl9q7-pswh.tgz/holyagent-0.3.3.tgz SHA2566723C4A782EF89995DF07AF3E668360DAF4D065E5671A596C76F38E2697D50EE may be reused if applicability confirmed: no generatedPi runtime repair delta. Report observed extensions/errors/skills/diagnostics and isolation mechanism. Do not run pi--print, dummykeys, credential requests or dependency installs. If cannot run safely, report Unknown."
@@ -126,5 +126,10 @@
     "assignment-0mwdk18nm-45l5"
   ],
   "followUpOf": "assignment-0mwci3pli-k82q",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T13:14:21.216Z"
+  },
   "createdAt": "2026-11-12T13:13:23.557Z"
 }
