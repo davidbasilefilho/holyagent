@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mwdx7yxg-3p8e",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-pi-host-neutral-cli-prompt-commands",
+  "objective": "Fix Pi host-neutral CLI prompt commands when the package is installed under Unix paths with spaces or shell metacharacters.",
+  "state": "Running",
+  "scope": [
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests/extension.test.ts"
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and packages/integrations/claude/dist/agents/worker-implementation.md. Work in /workspace/work/holyagent-pr120. User authorizes revise and merge PR120; explicitly gpt-6.1-terra low-xhigh; Workflow unavailable so direct HolyAgent fallback. No VCS or .holyagent writes. Parallel writers have disjoint source scope; do not build generated outputs (root schedules single build after writers finish). Read relevant repo AGENTS. Run focused meaningful regression tests through available pinned Bun/mise. Use MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH for commands. Report under 300 words, save full report at specified /workspace/work path; logs outside repo.",
+    "Reviewer reproduced base `holyagent status` success and head unquoted `/tmp/My Apps/holyagent/scripts/holyagent status` exit127. extension.ts:201-205 substitutes absolute wrapper path without Unix quoting while Windows uses quoting. Quote Unix executable path safely, preserve actual args, Windows behavior and path with apostrophe/shell metacharacters. Add regression exercising emitted command path, including wrapper ownership behavior. Keep implementation minimal. Save report /workspace/work/repair-cli.md."
+  ],
+  "criteria": [
+    {
+      "text": "Pi CLI substitutions execute safely from paths with spaces and shell metacharacters",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regression test fails before repair and passes afterward",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests/extension.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T19:08:24.341Z"
+  },
+  "createdAt": "2026-11-12T19:08:24.341Z"
+}
