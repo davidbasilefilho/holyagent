@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwdx5e14-b7i6",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "audit-pr-120-instruction-changes-and",
+  "objective": "Audit PR #120 instruction changes and user documentation for semantic regressions and repository compliance.",
+  "state": "Running",
+  "scope": [
+    "Committed range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; AGENTS.md, README/docs, instruction requirements, every family translation, coverage and generated instruction artifacts."
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and /workspace/work/holyagent-pr120/packages/integrations/claude/dist/agents/reviewer-artifact.md; apply HolyAgent role. Read packages/runtime/AGENTS.md, .claude/skills/requirements/SKILL.md, and instruction-writing and evidence-judging skills. User explicitly requests Terra low-xhigh; authorizes audit/revise/merge PR120. Workflow unavailable; direct fallback. Read only; no source/VCS/state writes. Independently review exact committed range; flag concrete behavior drift, approval boundary erosion, unmet requirement ids or inaccurate user-facing documentation, avoiding stylistic churn. Report under 400 words and save /workspace/work/review-artifact.md."
+  ],
+  "criteria": [
+    {
+      "text": "No unaddressed merge blockers in assigned scope",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Review covers exact committed range and distinguishes baseline issues",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T19:06:23.945Z"
+  },
+  "createdAt": "2026-11-12T19:06:23.945Z"
+}
