@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "validate-or-dismiss-the-suspected",
   "objective": "Validate or dismiss the suspected introduced FFF repository-symlink disclosure with a bounded safe trace.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only security investigation, not implementation. C:/Users/david.basile/dev/holyagent-0.3.3-npm HEAD4ea9a3c vs c5b2ab2b. Reviewer.security suspects packages/runtime/src/pi/tools.ts:181-195 exposes FFF following repository directory symlinks, potentially sending outside-repo secrets to model context. Determine introduced/current-versusbaseline and actual settings.",
     "Inspect installed FFF/pi-fff API/source and settings: C:/Users/david.basile/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts and C:/Users/david.basile/.pi/agent/npm/node_modules/@ff-labs/fff-node. Use FFF search integration, no shell searches. If feasible reproduce actual tool search with an isolated Temp repository and symlink to an outsideTemp dummycanary, NEVER actual secrets/home indexing. No external provider/model calls or installed-package edits.",
@@ -106,5 +106,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwci3uoa-96jr",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T12:27:12.732Z"
+  },
   "createdAt": "2026-11-12T12:26:45.484Z"
 }
