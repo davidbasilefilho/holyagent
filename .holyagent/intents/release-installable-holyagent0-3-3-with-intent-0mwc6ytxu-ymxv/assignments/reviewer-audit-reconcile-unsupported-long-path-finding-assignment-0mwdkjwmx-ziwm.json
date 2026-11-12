@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.audit",
   "slug": "reconcile-unsupported-long-path-finding",
   "objective": "Reconcile unsupported long-path finding and audit latest0.3.3 source requirements versus pending release steps.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Prior guaranteed-failure claim from removed state worktree contradicts current passing code/testing evidence. Trace packages/runtime/tests/state-long-path.test.ts AND fixtures/legacy-long-path-write.ts through actualVCS recreation beforeassertions; close or substantiate with complete trace, never staticguess/testweakening.",
     "Audit fullsource for minimal0.3.3 plusapproved policy/StopSlop/Codex work. Benchmarks and visualiteration/responsiveness are explicitly0.3.4. Protectedheads and failclosedALL existingversions supersede older everybranch/idempotentrerun. No shutdownauthority. Distinguish actual source defects from pending later finalfullverify/remote3platformCI/accountconfiguration/bootstrap/OIDC/install, none claimedcomplete. Approvalinheritance unsupported unless authenticated runtime evidence establishes it."
@@ -126,5 +126,10 @@
     "assignment-0mwdk18nm-45l5"
   ],
   "followUpOf": "assignment-0mwci44xs-k1l8",
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-12T13:14:22.048Z"
+  },
   "createdAt": "2026-11-12T13:13:46.233Z"
 }
