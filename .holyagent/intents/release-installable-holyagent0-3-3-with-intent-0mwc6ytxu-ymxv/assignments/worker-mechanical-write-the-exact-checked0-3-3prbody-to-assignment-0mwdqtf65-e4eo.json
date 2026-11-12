@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "write-the-exact-checked0-3-3prbody-to",
   "objective": "Write the exact checked0.3.3PRbody to one unignored projectfile for root VCScommand.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "CreateONLYC:/Users/david.basile/dev/holyagent-0.3.3-npm/.pr-body-0.3.3.md withthisEXACTEnglishtextplusfinalnewline:\nRestore native Windows installation and state handling, Pi tooling, and cross-platform release validation. Update root question handling and GPT writing guidance while preserving approval boundaries.\n\nPublish the generated public `holyagent` package through npm OIDC before handing the same tarball to the GitHub release. Restrict publication to protected main/release integration branches and the `npm` environment; reject existing npm versions and conflicting GitHub tags before publication.\n\nValidation: `bunx --no-install mise run verify` passed (3,444 passed, 52 skipped, zero failures); independent code, testing, artifact and source-security reviews passed. The isolated packaged Pi loader loaded one extension and 11 skills without diagnostics.\n\nBefore publishing: bootstrap the npm package, configure and verify the branch-restricted GitHub `npm` environment and environment-bound npm trusted publisher, and complete hosted Windows/macOS/Linux checks. Existing-version reruns deliberately fail closed and require investigation.\n",
     "Nativecorrectcwd, readbackexactmatch and Git-C check-ignore ensureNOTignored. Reportpath+exactmatchtrue, no sourceedit/build/test/generation/Gitwrites. Leavefileuntrackedforrootvcspr; nevercommit. RootwillmovetoTempafterPR, notdelete. Noexternalmessages."
@@ -117,5 +117,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T16:09:21.027Z"
+  },
   "createdAt": "2026-11-12T16:09:07.854Z"
 }
