@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-committed-pi-cli-quoting",
   "objective": "Re-review committed Pi CLI quoting repair and close original blocker.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "54f6647052b5ae7a184508b480ad88d808b428bf..61a7adce3ba76878fe2f2342ab268908ce551907, focusing Pi extension, regression test, generated bundle"
   ],
@@ -39,7 +39,37 @@
     "agentId": "/root/review_code",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:12:30.828Z"
+    "startedAt": "2026-11-12T19:12:30.828Z",
+    "finishedAt": "2026-11-12T19:13:52.290Z"
+  },
+  "result": "result: Original Unix CLI quoting blocker closed at 61a7adce3ba76878fe2f2342ab268908ce551907; no remaining blockers in this repair.\nchanged: /workspace/work/rereview-code.md (report only)\nchecks: `mise exec -- bun test packages/integrations/pi/tests/extension.test.ts` with assignment tool environment -> 0, 350 pass, 0 fail, 1,418 assertions; `git diff --check 54f6647052b5ae7a184508b480ad88d808b428bf...61a7adce3ba76878fe2f2342ab268908ce551907` -> 0. Built-in `/code-review` unavailable: no Skill tool in host. Windows execution not run.\nblockers: none.\nquestions: none.\nnotes: Optional: the Kimi codemode example in `packages/runtime/src/instructions/kimi-k3.1/root/delegating.md:11` embeds the substituted command in a JavaScript double-quoted string. A package path containing an apostrophe produces shell escaping containing double quotes, invalidating this example as JavaScript. The standalone shell command works; the repair test exercises that path.\nevidence:\nRepairs close original blockers without new regressions: Unix executable now shell-quoted at packages/integrations/pi/src/extension.ts:201; test executes both substitution forms with spaces, apostrophe and shell metacharacters; generated bundle contains the same repair.\nReview independently covers committed repair range: inspected source, regression test, generated bundle and prior finding; exact committed head is 61a7adce3ba76878fe2f2342ab268908ce551907.\nreviewed-range: 54f6647052b5ae7a184508b480ad88d808b428bf...61a7adce3ba76878fe2f2342ab268908ce551907.\nfindings: original blocker closed; optional example limitation above.\nchecks-run: targeted extension tests 350 passed; diff check passed; built-in review and Windows execution unavailable as noted.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent committed-range review closes original blockers with passing targeted tests and no new merge blocker.",
+    "criteria": [
+      {
+        "criterion": "Repairs close original blockers without new regressions",
+        "support": "Unix executable now shell-quoted at packages/integrations/pi/src/extension.ts:201; test executes both substitution forms with spaces, apostrophe and shell metacharacters; generated bundle contains the same repair."
+      },
+      {
+        "criterion": "Review independently covers committed repair range",
+        "support": "inspected source, regression test, generated bundle and prior finding; exact committed head is 61a7adce3ba76878fe2f2342ab268908ce551907."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "54f6647052b5ae7a184508b480ad88d808b428bf...61a7adce3ba76878fe2f2342ab268908ce551907."
+      },
+      {
+        "label": "findings",
+        "support": "original blocker closed; optional example limitation above."
+      },
+      {
+        "label": "checks-run",
+        "support": "targeted extension tests 350 passed; diff check passed; built-in review and Windows execution unavailable as noted."
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:12:30.828Z"
 }
