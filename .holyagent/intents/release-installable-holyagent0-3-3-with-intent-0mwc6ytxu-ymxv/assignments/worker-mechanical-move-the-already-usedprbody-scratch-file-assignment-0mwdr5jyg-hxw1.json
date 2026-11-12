@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "move-the-already-usedprbody-scratch-file",
   "objective": "Move the already-usedPRbody scratch file to Temp and leave0.3.3worktreeclean.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "PR120https://github.com/davidbasilefilho/holyagent/pull/120wascreatedsuccessfullyusingC:/Users/david.basile/dev/holyagent-0.3.3-npm/.pr-body-0.3.3.md. ReversiblyMOVEONLYthisscratchtofreshTempdestination(notdelete). Read/hashbeforeandafter, requireidentical;nootherrepositoryedits. Git-CverifyfullstatuscleanandHEADb00eab296a492ea28a9012b29c842cd3e78b0f09. Recordnewabsolutepath. NativePSSetLocationLiteralPathrelease, notbareGitmain. No build/tests/pack/Gitwrites/accountsettings/login/APIwork."
   ],
@@ -117,5 +117,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdqtf65-e4eo",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T16:18:47.077Z"
+  },
   "createdAt": "2026-11-12T16:18:33.929Z"
 }
