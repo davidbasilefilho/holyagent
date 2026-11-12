@@ -82,7 +82,8 @@
     "Confirmed review repairs: align tag preflight with the existing release action's supported single annotated-tag layer so nested tags fail BEFORE immutable npm publication, with publish-not-called regression; preserve current supported tag behavior and the postcheck.",
     "Correct stale no-npm installation/distribution statements in docs/pi/installation.md and docs/pi/README.md and the overly broad dev-branch claim in AGENTS.md. No bootstrap/final publication has happened; document supported commands accurately without claiming publication.",
     "Finish the incomplete original artifact and assertion-comparison reviews in bounded path groups, and independently execute a fresh installed-Pi loader smoke with credentials absent and application networking denied. Unknown is not a passing result; pending account security configuration and final full gates remain required.",
-    "Latestuserrequest(m02172): cara eu não aguento mais só termina o 0.3.3. Finishonly0.3.3; minimize remaining work to actual final gate repairs, bounded requiredreview and release/account/install actions; open no newoptionalresearch/features/refactors."
+    "Latestuserrequest(m02172): cara eu não aguento mais só termina o 0.3.3. Finishonly0.3.3; minimize remaining work to actual final gate repairs, bounded requiredreview and release/account/install actions; open no newoptionalresearch/features/refactors.",
+    "User latest(m02203): atualize os todos, você não vai fazer nada do0.3.4, vai ser outro agente quando tiver instalado o holyagent. só deixe os intents atualizados. This session handles ONLY0.3.3 completion/install. Preserve0.3.4 requirements in its Intent for a different agent AFTERinstallation; no0.3.4 Assignments/research/implementation or active todos here."
   ],
   "revision": 29,
   "state": "Open",
