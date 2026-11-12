@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-only-security-relevantc6a9fd9",
   "objective": "Re-review only security-relevantc6a9fd9 changes after the nested-tag and permission-coverage repair.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Use repairpatch+priorsecurityreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdkjkek-erjf.md. Newhelperrejectsnestedtagsbeforeimmutablepublication toalignexistingpostcheck; genericall-writegranttestonlyauthorizedcontents/id-token, noactualworkflowauthorityexpanded. Askingqualifier doesnotrelaxreservedapprovals/unknownconcurrency. Confirm all-existingversionfailclosed/protectedheads/environmentrequirementsremain. ActualnpmE401andGitHub0env pending are explicitunmetoutwardprerequisites, notsourcefalsification. Stateconditionalboundaryandanynewintroducedvulnerabilitywith exactsourcetosink. FFFhypothesisunvalidated/deferred0.3.4, no newprobe/globalreview."
   ],
@@ -117,5 +117,10 @@
     "assignment-0mwdm4ewc-mgbs"
   ],
   "followUpOf": "assignment-0mwdkjkek-erjf",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T14:08:53.982Z"
+  },
   "createdAt": "2026-11-12T14:07:53.941Z"
 }
