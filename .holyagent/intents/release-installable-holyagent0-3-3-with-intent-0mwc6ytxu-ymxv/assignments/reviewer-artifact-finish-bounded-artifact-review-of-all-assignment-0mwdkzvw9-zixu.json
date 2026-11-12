@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "finish-bounded-artifact-review-of-all",
   "objective": "Finish bounded artifact review of all changed claude instruction sources.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Complete frozen scoped patch C:/Users/david.basile/AppData/Local/Temp/holyagent-033-artifact-claude.patch only, plus necessary source context. Covers only claude family changed instructions/skills; all paths in patch mustbe reviewed, no other docs/families responsibility. Check fidelity to requirements and familyguide, compactmeaning/corebudgets, denialvsautomaticrejection distinction, actionable questions/freeform, delegation/search/skillYAML. Preserve nonGPTstyle; no GPT-only StopSlop leakage. Existing bounded visual procedure remains; newvisualwork0.3.4. Currentcanonicalbuild no generateddelta supports generation; inspect mapping/composition/generatedsamples as needed. Return count/scopedverdict/excerpts, not unsupported globalallclear."
   ],
@@ -120,5 +120,10 @@
     "assignment-0mwdk18nm-45l5"
   ],
   "followUpOf": "assignment-0mwdkjqeg-3ph1",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T13:27:13.398Z"
+  },
   "createdAt": "2026-11-12T13:26:11.770Z"
 }
