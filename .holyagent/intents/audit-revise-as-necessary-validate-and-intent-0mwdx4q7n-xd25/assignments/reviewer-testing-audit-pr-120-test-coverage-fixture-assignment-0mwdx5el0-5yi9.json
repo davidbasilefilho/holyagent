@@ -33,6 +33,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/review_testing",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-12T19:06:24.661Z"
