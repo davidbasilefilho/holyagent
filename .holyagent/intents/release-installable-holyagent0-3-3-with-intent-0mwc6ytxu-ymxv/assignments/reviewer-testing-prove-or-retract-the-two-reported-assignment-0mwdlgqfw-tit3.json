@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "prove-or-retract-the-two-reported",
   "objective": "Prove or retract the two reported weakened assertions with isolated current-test mutants.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Your prior review identified scripts/workflows.test.ts generic writegrantcoverage replaced by contents/idtokenonly, and packages/integrations/claude/tests/plugin.test.ts positivephrase scheduled check-ins or wait loops no longerasserts prohibition. Rootdiff confirms weakertext but blocking finding needs executableproof from shellreviewer. In Temp mirror/copy or other reversible memory fixture WITHOUTeditingrealrepo, execute currentrelevanttests with unauthorized e.g. issues:write workflow job and with pollingpolicy inverted to require waits/checkins. Show currenttest incorrectlypasses and prerequisite normalbaselinepasses, or retract if otherassertioncatchesmutant. No actual token/workflowrun; onlyfakeYAML/prompt. Scope2findings, nofullverify/broadrepeats. Give exactfilelines/commands/exits and smallestrepairrecommendation. Optionaldeliveredpromptliteralassertion alreadyrequestaddtoreport, no implementation."
   ],
@@ -116,7 +116,37 @@
     "agentId": "pi-workflow:wf_6acbdb6d52ab/assignment-0mwdlgqfw-tit3",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-12T13:39:54.959Z"
+    "startedAt": "2026-11-12T13:39:54.959Z",
+    "finishedAt": "2026-11-12T13:48:21.945Z"
+  },
+  "result": "result: Both weakened assertions are reproduced by isolated mutants; repairs are needed.\nchanged: none; mutants exist only in the Temp mirror\nchecks:\n- Workflow baseline and mutant: `bun test scripts/workflows.test.ts` → each exit 0, 25 pass, 0 fail.\n- Prompt baseline and mutant: `bun test packages/integrations/claude/tests/plugin.test.ts --test-name-pattern 'root text states the rules|root keeps its context small|every requirement of requirements/'` → each exit 0, 3 pass, 0 fail.\n- Full prompt mutant suite → exit 1, 74 pass, 2 fail: generated-file mismatch and the original mutant’s missing R-WAKE phrase. The revised mutant preserves that phrase; the three relevant assertions pass.\nblockers: Restore generic job-level write-grant coverage in `scripts/workflows.test.ts:76-110`; assert the polling prohibition in generated root text in `packages/integrations/claude/tests/plugin.test.ts:403-415,862-879`.\nquestions: none\nnotes: Optional: assert the prohibition in the delivered prompt as well as the generated source.\nevidence:\nMutant evidence: Both alleged weakenings are reproduced with current relevant tests or explicitly disproved, with true commands/exits and no source edits.: In the Temp mirror, adding `issues: write` to `.github/workflows/validation.yml`’s `branch-model` job passed all 25 workflow tests. Replacing the prohibition in `packages/runtime/src/instructions/claude-5.5/root/dispatch.md:9` with a requirement to use polling, steering, scheduled check-ins or wait loops, while retaining the R-WAKE phrase, passed all three relevant prompt tests. No workflow was run and no repository source was edited.\nchanged-paths: none\nchecks-run: Baseline commands ran in `C:/Users/david.basile/dev/holyagent-0.3.3-npm`; mutant commands ran in `%TEMP%/holyagent-testing-mutants-0mwdlgqfw`. Exit codes and counts are listed above; no full verify was run.\ndiff-file: none; read-only review, with mutants confined to the Temp mirror\nremaining-blockers: Add assertions rejecting unauthorized write permissions of any scope and asserting the prohibition, then rerun the relevant tests against both mutants.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "Both previously unproven findings now have actual baseline/mutant command exits and counts in an isolated Temp mirror. This accepts the evidence of defects, not release readiness; source repair and re-review follow.",
+    "criteria": [
+      {
+        "criterion": "Mutant evidence: Both alleged weakenings are reproduced with current relevant tests or explicitly disproved, with true commands/exits and no source edits.",
+        "support": "In the Temp mirror, adding `issues: write` to `.github/workflows/validation.yml`’s `branch-model` job passed all 25 workflow tests. Replacing the prohibition in `packages/runtime/src/instructions/claude-5.5/root/dispatch.md:9` with a requirement to use polling, steering, scheduled check-ins or wait loops, while retaining the R-WAKE phrase, passed all three relevant prompt tests. No workflow was run and no repository source was edited."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "none"
+      },
+      {
+        "label": "checks-run",
+        "support": "Baseline commands ran in `C:/Users/david.basile/dev/holyagent-0.3.3-npm`; mutant commands ran in `%TEMP%/holyagent-testing-mutants-0mwdlgqfw`. Exit codes and counts are listed above; no full verify was run."
+      },
+      {
+        "label": "diff-file",
+        "support": "none; read-only review, with mutants confined to the Temp mirror"
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Add assertions rejecting unauthorized write permissions of any scope and asserting the prohibition, then rerun the relevant tests against both mutants."
+      }
+    ]
   },
   "createdAt": "2026-11-12T13:39:17.852Z"
 }
