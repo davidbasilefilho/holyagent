@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "fix-the-two-proven-release-prose-and",
   "objective": "Fix the two proven release-prose and instruction-coverage inconsistencies and check the repairs.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Writer exception: edit ONLY these2ownedpaths in C:/Users/david.basile/dev/holyagent-0.3.3-npm. CurrentHEAD4ea9a3c; no other source/generated edits. Publication security design runs independently read-only.",
     "In packages/runtime/src/instructions/coverage.ts Claude R-ROLE phrase currently You own the user relationship but unchanged compact core now says Own the user relationship. Update only this Claude phrase to exactactualsource. Do not re-expand core or raise9400budget. Existing coverage/instruction tests should demonstrate regression now failing before and passing after.",
@@ -108,5 +108,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwci3zcd-ill6",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T12:27:12.974Z"
+  },
   "createdAt": "2026-11-12T12:26:39.540Z"
 }
