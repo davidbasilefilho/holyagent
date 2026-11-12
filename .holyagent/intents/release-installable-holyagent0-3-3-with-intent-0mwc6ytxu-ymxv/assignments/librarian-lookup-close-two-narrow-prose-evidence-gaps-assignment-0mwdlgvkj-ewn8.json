@@ -5,7 +5,7 @@
   "roleTask": "Librarian.lookup",
   "slug": "close-two-narrow-prose-evidence-gaps",
   "objective": "Close two narrow prose evidence gaps using authoritative attribution and a precise GPT asking-context trace.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read only changed StopSlop composition/source plus official upstream https://github.com/hardikpandya/stop-slop at SKILL.md commit8da1f030185bdfe8471220585162991eaeb970e9 and LICENSE. Verify sourceMITcopyright2025HardikPandya and attribution in currentGPTguidance; no benchmarks. Current GPTasking C:/Users/david.basile/dev/holyagent-0.3.3-npm/packages/runtime/src/instructions/gpt-6/root/asking.md:30 standalone first Howtoask bullet says Delegate investigation of worker status, ownership, heartbeats and repository status before escalation. Determine with quotedcontext whether genericunrelatedquestionswouldbeforcedtoinvestigateworkers; propose minimal contextualqualifier if ambiguous and map requirement/otherfamilies' correspondingtext (read-only). Do not demand fullunchangedskillbody reads for quotation-onlyfrontmatterdiffs. Independentgeneration/budget/YAML/composition proof already169focusedpasses+build39Claude139Pi+type317lint318fmt737 at frozenhead before onlyhelper/docs laterchanges; sourceinspectionreviews are not required to run shellgates themselves. Return verifiedsource URLs/excerpts and exacttrace, not broadnewreview or codeedits."
   ],
@@ -109,5 +109,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdkzqw8-lggy",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T13:39:55.513Z"
+  },
   "createdAt": "2026-11-12T13:39:24.499Z"
 }
