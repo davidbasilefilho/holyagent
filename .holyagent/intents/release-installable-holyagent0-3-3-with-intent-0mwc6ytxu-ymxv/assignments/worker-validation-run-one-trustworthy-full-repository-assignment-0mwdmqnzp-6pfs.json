@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "run-one-trustworthy-full-repository",
   "objective": "Run one trustworthy full repository verification at the reviewed final commitc6a9fd9.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Run REQUIRED bunx --no-install mise run verify ONCE from actualnative releasecwd at clean c6a9fd9. Pre-record nativecwd/git-C HEAD/version0.3.3. NativePowerShell driver must capture true LASTEXITCODE, stdout/stderr longlogs+exitJSON inTemp, notwrapperexit0. Adequate nestedtimeouts for actualsuite (up to1200seconds; topcodemode timeout>=child+buffer ifused). Do notaddshort60s timeout thatmakesunknown. Repo dependencies alreadyinstalled; do notinstall/upgradeanything. DeveloperMode currentlyenabled forrealfile+directorysymlinks.",
     "Previoushistorical3431pass10fail/52skip wasBEFORErepairs andstale, do notreuse. Current471focusedtests/check317/lint318/fmt737+build39/139greensestablishchangedscopereadiness but areNOTfullverify. Actuallyexecuteallgates verifytaskrequires. Countpassed/failed/skipped; skip/unknownneverpass. Reportbaseline vsregression onlywith evidence, no repairs/waivers. Confirm generatedsync/statusunchangedafterrun, attach rawlogpath, native trueexit andgatesummary. Ifverifyfails returnexacttestnames/errorstext andcandidatecauses only; no fullsuite rerun on unchangedhead."
@@ -114,5 +114,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdm4ewc-mgbs",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T14:15:42.502Z"
+  },
   "createdAt": "2026-11-12T14:15:00.853Z"
 }
