@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "finish-gpt-document-wording-acceptance",
   "objective": "Finish GPT/document wording acceptance and review only the small committed final prose/instruction repair.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read instruction-writing C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/instruction-writing/SKILL.md. Repairpatchprose: AGENTS.md, docs/pi/README.md/installation.md; askingrequirement+GPT/Claude/Kimi qualifier; Claude task-listde-duplication; generatedsynccorrespondence. Usernpmplannedroute vsalreadypublishedtruthful, npm-firsthandoff unchangeddocs/npm-publishing.mdpriorfixaccepted. Verify preservedpendingdecisions/Askingreference andboundedstatequestions, reservedapprovals/concurrencyunchanged.",
     "Original24GPThunksalreadyinspected in C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdkzqw8-lggy.md; issueswereambiguousgenericinvestigation(nowqualifiedall4sources), budgets/generation(proven169/155priorand471current), attribution(nowauthoritative2HTTP200pinMIT2025HardikPandya in C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdlsq3g-809f.md). Close thoseevidencegaps usingprovidedchecks; no shell needed and no needfetchExa. InspectunchangedGPTscopeonlyifspecificconcreteconflictrequiresit. AllotherClaude/Kimioriginalscopesaccepted, thisrepairreviewupdateschangedtextonly. Return finalscopewordingverdictwithshortquotes, not globalpublicationreadiness."
@@ -118,5 +118,10 @@
     "assignment-0mwdm4ewc-mgbs"
   ],
   "followUpOf": "assignment-0mwdkzqw8-lggy",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T14:08:54.469Z"
+  },
   "createdAt": "2026-11-12T14:08:04.751Z"
 }
