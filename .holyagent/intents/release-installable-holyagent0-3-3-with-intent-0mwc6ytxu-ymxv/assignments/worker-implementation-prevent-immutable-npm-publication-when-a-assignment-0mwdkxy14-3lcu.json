@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "prevent-immutable-npm-publication-when-a",
   "objective": "Prevent immutable npm publication when a nested annotated tag would fail the existing release postcheck.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Confirmed trace: scripts/npm-publishing.ts preflightTag recursively peels16tag levels; .github/actions/tag-release/action.yml:58-65 peels exactly one. Minimum fix: preflight supports exactly existing action behavior (lightweight or one annotated tag resolving to intendedcommit), rejects a second annotation BEFORE npm. Do not broaden release-action features. Preserve absent/normalannotated/matching/conflict/lookupfailure cases, no-existing-version reruns, OIDC/sametarball. Add regression that fails on5ef98be for nested tag and explicitly asserts npm publish never called. Run focused publishing/workflow tests, type/lint/formatter relevant changed paths; don't build generated files. Return complete repair patch in Temp."
   ],
@@ -119,5 +119,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdjh5b1-szbc",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T13:27:14.348Z"
+  },
   "createdAt": "2026-11-12T13:24:41.225Z"
 }
