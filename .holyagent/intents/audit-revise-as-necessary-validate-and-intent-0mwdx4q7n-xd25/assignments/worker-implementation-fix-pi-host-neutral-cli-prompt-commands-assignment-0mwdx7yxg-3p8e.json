@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "fix-pi-host-neutral-cli-prompt-commands",
   "objective": "Fix Pi host-neutral CLI prompt commands when the package is installed under Unix paths with spaces or shell metacharacters.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "packages/integrations/pi/src/extension.ts",
     "packages/integrations/pi/tests/extension.test.ts"
@@ -41,7 +41,37 @@
     "agentId": "/root/repair_cli",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:08:24.341Z"
+    "startedAt": "2026-11-12T19:08:24.341Z",
+    "finishedAt": "2026-11-12T19:09:56.315Z"
+  },
+  "result": "result: Fixed Unix prompt command quoting while retaining the installed wrapper and its arguments.\nchanged: packages/integrations/pi/src/extension.ts; packages/integrations/pi/tests/extension.test.ts\nchecks: Focused regression before fix: exit 1, 1 fail; full `bun test packages/integrations/pi/tests/extension.test.ts`: exit 0, 350 pass, 0 fail; `bun fmt` on both changed files: exit 0. Logs: /workspace/work/repair-cli-before.log and /workspace/work/repair-cli-test.log.\nblockers: none\nquestions: none\nnotes: Full verify and generated build left to root as assigned.\nevidence:\nPi CLI substitutions execute safely from paths with spaces and shell metacharacters: Both prompt forms execute a fixture installed wrapper under a path with spaces, apostrophe, command substitution and semicolon, preserving arguments and creating no injected file; full test exit 0.\nRegression test fails before repair and passes afterward: /workspace/work/repair-cli-before.log records exit 1; /workspace/work/repair-cli-test.log records 350 passing tests including regression.\nchecks-run: Focused pre-fix test and full extension test; formatter; logs above.\nchanged-paths: packages/integrations/pi/src/extension.ts; packages/integrations/pi/tests/extension.test.ts\ndiff-file: /workspace/work/repair-cli.diff\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Executable-path regression fails before repair and passes for spaces, apostrophes and shell metacharacters; 350 extension tests passed.",
+    "criteria": [
+      {
+        "criterion": "Pi CLI substitutions execute safely from paths with spaces and shell metacharacters",
+        "support": "Both prompt forms execute a fixture installed wrapper under a path with spaces, apostrophe, command substitution and semicolon, preserving arguments and creating no injected file; full test exit 0."
+      },
+      {
+        "criterion": "Regression test fails before repair and passes afterward",
+        "support": "/workspace/work/repair-cli-before.log records exit 1; /workspace/work/repair-cli-test.log records 350 passing tests including regression."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Focused pre-fix test and full extension test; formatter; logs above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/pi/src/extension.ts; packages/integrations/pi/tests/extension.test.ts"
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/repair-cli.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:08:24.341Z"
 }
