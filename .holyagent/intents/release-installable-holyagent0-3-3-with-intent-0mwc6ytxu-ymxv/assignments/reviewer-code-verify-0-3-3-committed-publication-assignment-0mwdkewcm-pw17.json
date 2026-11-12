@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "verify-0-3-3-committed-publication",
   "objective": "Verify 0.3.3 committed publication repairs close the validated code finding without regressions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Prior blocker: existing npm version accepted without trusted provenance. Deliberate minimum-safe replacement rejects ALL existing versions, including matching integrity; no automatic rerun claimed. Check exact GitHub tag preflight BEFORE npm, annotated/lightweight/absent/conflict/error behavior, retained action postcheck, fresh OIDC and same-tarball workflow integration. Dev last-successful-publication semantics are explicit; feature branches validation-only. Review repaired paths and finish only previously incomplete code scope."
   ],
@@ -125,5 +125,10 @@
     "assignment-0mwdk18nm-45l5"
   ],
   "followUpOf": "assignment-0mwci3gdk-6j6q",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T13:14:21.620Z"
+  },
   "createdAt": "2026-11-12T13:09:52.582Z"
 }
