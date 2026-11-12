@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "run-one-real-complete-final-verify-on",
   "objective": "Run one real complete final verify on reviewed b00eab2 and report actual exit and counts for0.3.3release.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "C:/Users/david.basile/dev/holyagent-0.3.3-npm, branchrelease/0.3.3/fix/npm-readiness, HEADb00eab296a492ea28a9012b29c842cd3e78b0f09, version0.3.3. Allcode/testing/artifact/securitysourceacceptedatc6/56; latest2test-onlyrepairsindependentcode/testingacceptedwith79pass. No sourcewriteractive. Only1complete current-headverify remains priorpush.",
     "Using actualnativePowerShell Set-Location -LiteralPathrelease+Git-C, recordHEAD/version/Bun/cwd/clean. Run EXACTLYONCE `bunx --no-install mise run verify`, with sufficient>=1800s nativechild andoutertimeout; previousfullruns875s. CapturetruechildLASTEXITCODE reliably,stdout/stderrtoTemp, no wrapperfalsegreen/no terminal120s truncation. Codemode/toolnestedtimeoutsMUSTaccommodatecommand; foregroundnointeractive. Countsfromactualrun. Don'tpollbackgroundjob; waitcommandcompletionwithlongtooltimeout. No state/Gitwrites/source/buildbeyondnormalverifytasks/pack/install/networkprobe/account changes.",
@@ -123,5 +123,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdof370-11fw",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T15:50:52.975Z"
+  },
   "createdAt": "2026-11-12T15:50:38.143Z"
 }
