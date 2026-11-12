@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "verify-the-committed-assertion-repairs",
   "objective": "Verify the committed assertion repairs close both reproduced mutant gaps and preserve meaningful prompt wiring coverage.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Focusedcurrentrepairtests only; originalcomparisoncomplete14integrationscripts/17runtimepaths staysvalid. Yourprioractualmutantsrecord C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdlgqfw-tit3.md: unsafeissueswritepreviously25pass andpollinginversion3pass. Writer C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdlskdd-3nmh.md nowworkflowmutant25pass1fail/pollingmutant1pass2fail, normal395+4thenfull471pass. Review genericwriteallowlist-allkeys/negativepolling/literaldeliveredprompt and4familyqualifierregression. ReuseexistingTempmirror and revalidate2specificmutants atcurrentc6 ifneeded; no broadfullrepeat. Ifno furthergapfoundconfirmcoveragecomplete inthisscope, notasknewglobalcomparison."
   ],
@@ -117,5 +117,10 @@
     "assignment-0mwdm4ewc-mgbs"
   ],
   "followUpOf": "assignment-0mwdlgqfw-tit3",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T14:08:54.300Z"
+  },
   "createdAt": "2026-11-12T14:07:47.572Z"
 }
