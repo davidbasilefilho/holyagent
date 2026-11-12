@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "review-final-two-testing-repair",
   "objective": "Review final-two testing repair at56ee626 without reopening unchanged0.3.3 work.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Independently review ONLY7path repair testcoverage: whether replacingtrustboundariesliteral with meaningfulworkerstate/Unknown/safeguardassertions preserves requirement andcorebudget; negativeboundaryinAsking assertion guardsmissingchunk. CLIassertionis→meansstill exactcommand. Writerprovedbothredbeforegreenafter; actualfullaffectedtests58runtime+370hooks2skip+20policy, aftergeneration28sessioncontext370hooks2skipgreen. Independently run only focused2previousfailures+budgettests/currenthead nativetimeouts asneeded, notfull471orverify. Giveproofifweakening; otherwiseaccept. No speculativewholepolicyredesign.",
     "Exactcommittedpatch C:/Users/david.basile/AppData/Local/Temp/holyagent-033-final-two-committed.patch, ALL7pathsonly. Originalwriterreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdnge9v-bsh6.md, generationreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdntb5r-1ttg.md. Wholefullverifyoldc6had3442pass52skip2fail, exactly2repaired; currentfullverify willrunonceafterreviews. No publication/pushdone."
@@ -112,5 +112,10 @@
     "assignment-0mwdnge9v-bsh6",
     "assignment-0mwdntb5r-1ttg"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T14:54:25.280Z"
+  },
   "createdAt": "2026-11-12T14:54:01.023Z"
 }
