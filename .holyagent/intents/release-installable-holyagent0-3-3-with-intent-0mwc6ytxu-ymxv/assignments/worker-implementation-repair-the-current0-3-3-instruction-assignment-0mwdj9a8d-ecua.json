@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-current0-3-3-instruction",
   "objective": "Repair the current0.3.3 instruction coverage and contract failures without weakening semantics or budgets.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Knownrepro: bun test packages/runtime/tests/requirements.test.ts packages/integrations/claude/tests/plugin.test.ts scripts/npm-publishing.test.ts packages/integrations/pi/publishing.test.ts ->84pass12fail in latestmechanicalrepair. This agent owns instructions/contracts only; other worker owns npm scripts/docs/workflows/publishingtests, so runinstruction-side files and focusedpolicytests, don't touchpublisherfiles. Read C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdivbjo-epaq.md. Preserve pending Claude R-ROLE match Own the user relationship.",
     "Reproduce concretefailing assertions now. Compare relevant c5b2ab2b parent and4ea9a3c/current changes without checkout/statewrites; label baseline only when evidence establishes it. Repair release-introduced stalecoverage/prompt mismatches and incompleteapprovedbehavior requirements-first with applicablemodel-family translations/coverage. Keep explicituserdenial boundary, encouragedscopedreapproval afterautomaticrejection, settledfreeformauthorization, honestdelegationapprovalprovenance, all relevant GPT StopSlop guidance. No unrequestedbehavior. Tests can change literal assertions to same existingsemanticcontract when justified, never removecoverage/skip/fuzzaway failures.",
@@ -120,5 +120,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdivbjo-epaq",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T12:37:57.910Z"
+  },
   "createdAt": "2026-11-12T12:37:31.021Z"
 }
