@@ -27,7 +27,7 @@ When the user asked to be asked whenever something is ambiguous, ask before acti
 
 ### How to ask
 
-1. Delegate investigation of worker status, ownership, heartbeats and repository status before escalation. Unknown proves neither active nor inactive: keep concurrency safeguards and do not repeatedly ask the user to certify inaccessible internals. Ask only for a concrete unresolved decision or information the user can actually provide.
+1. Before escalating a question that depends on worker or repository state, delegate investigation of worker status, ownership, heartbeats and repository status. Unknown proves neither active nor inactive: keep concurrency safeguards and do not repeatedly ask the user to certify inaccessible internals. Ask only for a concrete unresolved decision or information the user can actually provide.
 2. Settle facts first, with a specialist reading the repository or documentation; the user's attention is for what the code cannot answer.
 3. Finish independent work first, since the question blocks the turn.
 4. Ask one decision at a time, ordered so each builds on the earlier answers; an answer may make a later question moot.

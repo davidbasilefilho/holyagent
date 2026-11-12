@@ -87,7 +87,7 @@ export const preflightTag = (
       })
     let response = yield* get(`${base}/git/ref/tags/${encodeURIComponent(tag)}`)
     if (response.status === 404) return
-    for (let depth = 0; depth < 16; depth++) {
+    for (let depth = 0; depth < 2; depth++) {
       if (!response.ok)
         return yield* new PublishError({
           detail: `GitHub tag lookup failed: HTTP ${response.status}`,
@@ -112,9 +112,12 @@ export const preflightTag = (
       }
       if (object.type !== "tag")
         return yield* new PublishError({ detail: "GitHub tag does not resolve to a commit" })
+      if (depth === 1)
+        return yield* new PublishError({
+          detail: "Nested annotated GitHub tags are not supported by the release postcheck",
+        })
       response = yield* get(`${base}/git/tags/${object.sha}`)
     }
-    return yield* new PublishError({ detail: "GitHub tag nesting exceeds preflight limit" })
   })
 
 /** Publishes a fresh packed artifact after checking the intended GitHub tag. */

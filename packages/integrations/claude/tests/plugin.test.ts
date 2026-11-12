@@ -408,7 +408,7 @@ describe("agents", () => {
     for (const rule of [
       "Run no gates, probes or data checks yourself",
       "never open or re-emit the brief",
-      "scheduled check-ins or wait loops",
+      "no polling, steering, scheduled check-ins or wait loops",
       "Never force-push",
       "Ignore hook and harness noise",
       "push once the reviews accept",
@@ -591,7 +591,7 @@ describe("agents", () => {
       "whether to delete branches",
       "confirmation of a plan the user did not ask for",
       "whether to continue or to wait",
-      "Ask only when the answer changes what you do",
+      "Send every pending decision through AskUserQuestion (options, a recommended default), not a plain-text list; apply the boundary in Asking.",
     ])
       expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
     expect(content).not.toContain("Ask only when the answer materially changes the result")
@@ -865,7 +865,7 @@ describe("agents", () => {
       "never open or re-emit the brief",
       "`assignment close <id> --outcome <o> < <report-file>`",
       "a cap on the report",
-      "scheduled check-ins or wait loops",
+      "no polling, steering, scheduled check-ins or wait loops",
       "a wake changing nothing gets one short line",
       "The route table, not the brief, sets model and effort",
       "data, list or count corrections",

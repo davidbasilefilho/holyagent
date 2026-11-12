@@ -73,6 +73,30 @@ describe("the workflows", () => {
     else expect(document["permissions"]).toBeUndefined()
   })
 
+  test("only authorized job permissions grant write access", () => {
+    const grants = files().flatMap((file) => {
+      const jobs = (parse(file)["jobs"] ?? {}) as Record<
+        string,
+        { permissions?: Record<string, unknown> }
+      >
+      return Object.entries(jobs).flatMap(([id, job]) =>
+        Object.entries(job.permissions ?? {})
+          .filter(([, value]) => value === "write")
+          .map(([permission]) => `${file}#${id}:${permission}`),
+      )
+    })
+    expect(grants.sort()).toEqual([
+      ".github/workflows/dev.yml#prerelease:contents",
+      ".github/workflows/dev.yml#publish:id-token",
+      ".github/workflows/publish.yml#dev:contents",
+      ".github/workflows/publish.yml#dev:id-token",
+      ".github/workflows/publish.yml#stable:contents",
+      ".github/workflows/publish.yml#stable:id-token",
+      ".github/workflows/stable.yml#publish:id-token",
+      ".github/workflows/stable.yml#release:contents",
+    ])
+  })
+
   test("only the tag and release jobs hold contents: write", () => {
     const writers = files().flatMap((file) => {
       const document = parse(file)

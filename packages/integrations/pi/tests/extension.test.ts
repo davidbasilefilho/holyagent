@@ -2016,6 +2016,9 @@ describe("telling a child from the root", () => {
       platformPath: win32,
     })
     expect(delivered?.systemPrompt).toBe(fillPackageRoot(prompt, "C:\\Users\\me\\pkg", win32))
+    expect(delivered?.systemPrompt).toBe(
+      "run bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent.js' status, then bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent.js' rg x .",
+    )
     // The wrapper of a Windows root is not the one the fake answers for, so the config is
     // unreadable and the provider's variables are the defaults'; the host and the worker cap are
     // the root's alone.

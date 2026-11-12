@@ -88,6 +88,7 @@ describe("packed npm publication", () => {
       for (const github of [
         [new Response("{}"), object("commit", other)],
         [new Response("{}"), object("tag", other), object("commit", other)],
+        [new Response("{}"), object("tag", other), new Response("", { status: 500 })],
         [new Response("{}"), new Response("", { status: 500 })],
         [new Response("", { status: 404 })],
         [new Response("{}"), new Response("invalid")],
@@ -96,6 +97,18 @@ describe("packed npm publication", () => {
         expect(Exit.isFailure(result.result)).toBe(true)
         expect(result.calls).toEqual([])
       }
+      const nested = await exercise(
+        [
+          new Response("{}"),
+          object("tag", other),
+          object("tag", "c".repeat(40)),
+          object("commit", commit),
+        ],
+        [missing, ok()],
+      )
+      expect(nested.calls.some(([command]) => command === "publish")).toBe(false)
+      expect(nested.calls).toEqual([])
+      expect(Exit.isFailure(nested.result)).toBe(true)
       for (const tag of ["dev", "latest", "custom"]) {
         const result = await exercise(absent(), [existing], tag)
         expect(Exit.isFailure(result.result)).toBe(true)

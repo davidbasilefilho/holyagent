@@ -21,7 +21,9 @@ describe.each(sets)("root question policy: %s", (set) => {
 
   test("delegates investigation and preserves unknown worker status", async () => {
     const text = await section("asking")
-    expect(text).toMatch(/ownership, heartbeats and repository status/i)
+    expect(text).toMatch(
+      /before escalating a question that depends on worker or repository state, delegate investigation of worker status, ownership, heartbeats and repository status/i,
+    )
     expect(text).toMatch(/Unknown proves neither active nor inactive/i)
     expect(text).toMatch(/information the user can actually provide/i)
   })
