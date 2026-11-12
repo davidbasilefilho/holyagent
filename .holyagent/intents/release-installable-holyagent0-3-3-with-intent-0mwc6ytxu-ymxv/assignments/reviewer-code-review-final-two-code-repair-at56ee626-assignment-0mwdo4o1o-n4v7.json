@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-final-two-code-repair-at56ee626",
   "objective": "Review final-two code repair at56ee626 without reopening unchanged0.3.3 work.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Independently review ONLY committed7path final-two repair c6a9fd9..56ee626 for correctness and no semantic/test weakening. Trustpriorc6reviews forunchangedcode. Inspect source/test/fullcanonicaldiff andactual core composition. Verify standalone workerstate/Unknown/concurrencysafeguards and genericdecisionapprovalguards remain; staleis→meansCLIassertion retainsEXACTCLIpath/command. AddSee R-NOASK/R-ASK requirementslinkvalid, otherfamilies stillcovered. Run boundedaffectedchecks asneeded, nofullsuite/build/networkcalls/newresearch; no speculativefindings withoutrepro/lineproof.",
     "Exactcommittedpatch C:/Users/david.basile/AppData/Local/Temp/holyagent-033-final-two-committed.patch, ALL7pathsonly. Originalwriterreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdnge9v-bsh6.md, generationreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdntb5r-1ttg.md. Wholefullverifyoldc6had3442pass52skip2fail, exactly2repaired; currentfullverify willrunonceafterreviews. No publication/pushdone."
@@ -112,5 +112,10 @@
     "assignment-0mwdnge9v-bsh6",
     "assignment-0mwdntb5r-1ttg"
   ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T14:54:25.610Z"
+  },
   "createdAt": "2026-11-12T14:53:53.725Z"
 }
