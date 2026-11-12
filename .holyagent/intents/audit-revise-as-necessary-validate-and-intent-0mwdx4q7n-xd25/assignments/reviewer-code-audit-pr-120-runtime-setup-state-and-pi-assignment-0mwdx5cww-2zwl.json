@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "audit-pr-120-runtime-setup-state-and-pi",
   "objective": "Audit PR #120 runtime, setup, state and Pi code for merge-blocking bugs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Committed range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; all changed runtime/setup/state/Pi source and supporting tests, excluding instruction prose and npm workflow surfaces handled by other reviewers."
   ],
@@ -36,7 +36,9 @@
     "agentId": "/root/review_code",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:06:22.497Z"
+    "startedAt": "2026-11-12T19:06:22.497Z",
+    "finishedAt": "2026-11-12T19:08:53.165Z"
   },
+  "result": "result: Blocked: Pi prompts generate broken CLI commands for Unix installation paths containing spaces.\nchanged: /workspace/work/review-code.md (report only)\nchecks: `git diff --check c5b2ab2b3524063e408b2f0dbf6bf85a6237e168...54f6647052b5ae7a184508b480ad88d808b428bf -- packages/runtime/src packages/integrations/pi/src` -> 0. Shell reproduction with an executable under `My Apps/holyagent`: base `holyagent status` via PATH returned 0; the unquoted absolute command produced by the new concatenation exited 127 (`.../My: not found`). Tests and verify not run: bun, bunx and mise are absent from PATH. Windows behavior inspected only. Built-in `/code-review` could not run: Skill tool unavailable in this host.\nblockers: `packages/integrations/pi/src/extension.ts:201-205` substitutes an unquoted Unix package root into every inline `holyagent` command, including root dispatch and commit instructions. For package root `/home/me/My Apps/holyagent`, `holyagent status` becomes `/home/me/My Apps/holyagent/scripts/holyagent status`, which the shell splits at the space and cannot execute. This is new for host-neutral commands: the base left them as `holyagent status`. Quote the Unix executable path and cover spaces and shell metacharacters.\nquestions: none\nnotes: Scope excludes instruction prose and npm workflows per assignment. Existing placeholder-based commands also lacked Unix quoting on the base; the new host-neutral substitution expands the failure to commands that formerly resolved through PATH. HolyAgent search CLI unavailable without bun; used system rg.\nevidence:\nNo unaddressed merge blockers in assigned scope: unmet; unquoted substitution at packages/integrations/pi/src/extension.ts:201-205.\nReview covers exact committed range and distinguishes baseline issues: inspected committed source diff c5b2ab2b3524063e408b2f0dbf6bf85a6237e168...54f6647052b5ae7a184508b480ad88d808b428bf and surrounding callers; baseline distinction above.\nreviewed-range: c5b2ab2b3524063e408b2f0dbf6bf85a6237e168...54f6647052b5ae7a184508b480ad88d808b428bf; merge base equals start.\nfindings: one blocker above; runtime, setup, state and Pi source changes reviewed independently.\nchecks-run: diff check exited 0; tests, verify and built-in code review unavailable as described above.\n",
   "createdAt": "2026-11-12T19:06:22.497Z"
 }
