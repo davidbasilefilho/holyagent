@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "prepare-exact-updatedpr120body",
   "objective": "Prepare exact updatedPR120body reflecting3test-onlymacOSrepairs and precisevalidationprovenance.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "CreateONLYC:/Users/david.basile/dev/holyagent-0.3.3-npm/.pr-body-0.3.3.md exactUTF8textwithfinalnewline:\nFix native Windows setup and state handling, restore Pi tooling, and validate installation across Windows, macOS and Linux. Isolate device fixtures from host Xcode and compare resolved temporary paths. Update root question handling and GPT prose guidance while preserving approval boundaries.\n\nPublish the generated public `holyagent` package through npm OIDC before handing the same tarball to the GitHub release. Restrict publication to protected main/release integration branches and the `npm` environment; reject existing npm versions and conflicting GitHub tags before publication.\n\nLocal validation: complete Windows `bunx --no-install mise run verify` passed on production-identical b00eab2 (3,444 passed, 52 skipped, zero failures). The subsequent three macOS-fixture-only test files passed on Windows (78 passed, five platform skips), with controlled before/after reproductions. Native macOS and hosted Linux/Windows results remain governed by this PR's current-head CI. Independent reviews and the isolated packaged Pi loader check passed; the loader found one extension and 11 skills without diagnostics.\n\nBefore publishing: complete hosted checks, bootstrap the npm package, and configure and verify the branch-restricted GitHub `npm` environment and environment-bound npm trusted publisher. Existing-version reruns deliberately fail closed and require investigation.\n",
     "Exactreadbackmatch/checkGit-Cignore(unignored)andonlyscratchuntracked. HEAD54f6647052b5ae7a184508b480ad88d808b428bf. Nothingelse. Rootwillvcspr--update120afterreview+push; noPRorGitwritesfromyou. RootlaterrelocatescratchTemp, donotdelete."
@@ -118,5 +118,10 @@
   ],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T16:42:31.089Z"
+  },
   "createdAt": "2026-11-12T16:42:16.563Z"
 }
