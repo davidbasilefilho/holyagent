@@ -141,5 +141,45 @@
     "finishedAt": "2026-11-12T16:38:36.450Z"
   },
   "result": "result: Four macOS failures traced and test fixtures repaired; native macOS verification remains pending CI.\nchanged: packages/runtime/tests/setup-t3-settings.test.ts, packages/runtime/tests/setup-tui-cli.test.ts, packages/runtime/tests/tools.test.ts\nchecks: Three affected files: 78 pass, 5 Windows skips, 0 fail; `mise run check`, `lint`, `fmt:check`, and `git diff --check`: exit 0. Full verify not run as instructed.\nblockers: Native macOS result unknown until CI.\nquestions: none\nnotes: Tests only; production payloads do not need regeneration or repacking. No instrumentation remains.\nevidence:\nFour macOS failure causes established: Hosted errors and ranked hypotheses in C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-evidence.txt; three fixtures detected host Xcode, while the fourth compared unresolved and resolved paths.\nMinimal crossplatform fixes covered: Controlled Darwin simulations for all three device tests and a junction-path comparison each failed before and passed after the fixture corrections; existing assertions retained.\nAffected checks pass: Windows affected-file tests and gates passed; Linux hosted `check` on Ubuntu 26.04 passed 3493 tests, 2 skipped, 0 failed; macOS pending.\nRelease only scope: Three test files changed; no production or generated files.\nchanged-paths: C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-fixes-files.txt\nchecks-run: C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-evidence.txt\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-fixes.patch\nremaining-blockers: Current-head native macOS CI has not run.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "4hostederrorsactualexpectedtraced, controlledDarwinandjunctionredgreen,3affectedfiles78pass5skip0fail/checklintformatgreen; independentcode/testingaccepted54f6647. Onlytests, prod/distbytesunchanged; currentnativeMacresultremainsCIpendingnotclaimed.",
+    "criteria": [
+      {
+        "criterion": "Four macOS failure causes established",
+        "support": "Hosted errors and ranked hypotheses in C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-evidence.txt; three fixtures detected host Xcode, while the fourth compared unresolved and resolved paths."
+      },
+      {
+        "criterion": "Minimal crossplatform fixes covered",
+        "support": "Controlled Darwin simulations for all three device tests and a junction-path comparison each failed before and passed after the fixture corrections; existing assertions retained."
+      },
+      {
+        "criterion": "Affected checks pass",
+        "support": "Windows affected-file tests and gates passed; Linux hosted `check` on Ubuntu 26.04 passed 3493 tests, 2 skipped, 0 failed; macOS pending."
+      },
+      {
+        "criterion": "Release only scope",
+        "support": "Three test files changed; no production or generated files."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-fixes-files.txt"
+      },
+      {
+        "label": "checks-run",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-evidence.txt"
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-fixes.patch"
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Current-head native macOS CI has not run."
+      }
+    ]
+  },
   "createdAt": "2026-11-12T16:30:06.901Z"
 }
