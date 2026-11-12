@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "run-final-full0-3-3-verification-once-at",
   "objective": "Run final full0.3.3 verification once at reviewed56ee626 and reconcile canonical-repair evidence without new scope.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "All4independent56ee626repairsreviewsaccepted code/testing/artifact/security(sourceconditional). Final7pathrepairgeneratedandcommitted, checkoutclean. Previouslyc6fullverify3442pass52skip2fail; BOTHexactfailuresfixedred/green, now28sessioncontext+370hooks2skip andindependent58runtime+1targethook+6budgets pass; budgetsnotchanged. Execute REQUIRED `bunx --no-install mise run verify` exactlyonce inactualnativecwd withadequatetimeout. Capturetrueexit/counts/allgateoutcomes. Ifnotgreen listliteralerrors/testnamesanddoNOTfix/retry. ConfirmHEAD+gitstatusunchangedafter. Record52skips as skips, neverpassed.",
     "LifecyclefollowUpOfgenerationreport wasunacceptedONLYbecause itnested evidence bullets, actualbuild39Claude139Pi/28core370hooks2skipgreen and7path root-reviewedcommittedpatch. Originalwriter report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdnge9v-bsh6.md andgenreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdntb5r-1ttg.md; patch C:/Users/david.basile/AppData/Local/Temp/holyagent-033-final-two-committed.patch. InyourONEfinalreport includeflatcorrected/evidencefororiginal2criteria+gen2criteria fromrecordedred/green+actualcurrentfullrun, notrawretypeclaimchecksnotrun. EvidencekeysEXACT: Final full verification; Clean head; Two failure repair; Focused verification; Canonical final repair; Commit inventory; changed-paths; checks-run; diff-file; remaining-blockers. Eachevidenceentry supportplaincommandexitcounts/path/reviewedsha; nevernestbullets or omitcanonical/parentproof. Thisclosesformat/evidencegap alongside finalgate, no newchecks apartverify. No needredoartifact/review/credential/modelsmoke/accountfacts."
@@ -128,5 +128,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdntb5r-1ttg",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T15:02:14.995Z"
+  },
   "createdAt": "2026-11-12T15:01:59.916Z"
 }
