@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwdx5cww-2zwl",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "audit-pr-120-runtime-setup-state-and-pi",
+  "objective": "Audit PR #120 runtime, setup, state and Pi code for merge-blocking bugs.",
+  "state": "Running",
+  "scope": [
+    "Committed range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; all changed runtime/setup/state/Pi source and supporting tests, excluding instruction prose and npm workflow surfaces handled by other reviewers."
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and /workspace/work/holyagent-pr120/packages/integrations/claude/dist/agents/reviewer-code.md; apply role as HolyAgent specialist in this host. User explicitly selects gpt-6.1-terra; user authorized audit, revisions, and merge of PR120. Workflow unavailable; direct specialist invocation is the fallback. Read only; no VCS or state writes. Use HolyAgent search CLI when available, system rg fallback if tools absent. Review existing committed changes independently of their authors. Need concrete file:line traces or reproductions for blockers; distinguish baseline issues. Report under 400 words, save full report /workspace/work/review-code.md; logs outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "No unaddressed merge blockers in assigned scope",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Review covers exact committed range and distinguishes baseline issues",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T19:06:22.497Z"
+  },
+  "createdAt": "2026-11-12T19:06:22.497Z"
+}
