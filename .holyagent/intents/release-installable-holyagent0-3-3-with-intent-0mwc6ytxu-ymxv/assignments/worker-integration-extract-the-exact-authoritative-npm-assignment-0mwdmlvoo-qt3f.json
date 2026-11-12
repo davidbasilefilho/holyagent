@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "extract-the-exact-authoritative-npm",
   "objective": "Extract the exact authoritative npm trusted-publisher runtime, reusable-workflow identity and environment requirements from two literal official pages.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "ONLY read public documentation; ownership is reservation, do noteditfiles. Fetch via nativePowerShell Invoke-WebRequest literal https://docs.npmjs.com/trusted-publishers/ and https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments intoTemp, parse meaningfulhtmltext/excerpts or follow official linkedrawsourceonlyifneeded. No Exa/browser/config/APIkey/search required. Ordinary publicHTTP alreadyworked for priorlicenseworker and initialdesign4pagesHTTP200. Earliermechanicalworker ranCLIbutdidNOTfinishtheseexcerpts, no exactHTTPerrorwasreported.",
     "Return exactcurrentminimum npm/Node versions, requiredOIDCpermissions/platform/provenance conditions, whether configured npmworkflowfilename shouldbe callerpublish.yml or calledstable.yml/dev.yml for THISrepository reusableflow, and how exactnpm environmentname isbound/authenticated. Include authoritativequote/URL for each, distinguish inference. Do notrepeatnpmwhoami/login/packagecheck: alreadyknownnpm11.20.0/nodev26.13.1, npmwhoamiE401, entireholyagentE404, davidbasilefilho/holyagent,0GitHubenvironments. ProposedGitHubenvironment npm with selecteddeploymentbranches main and release/*/integration; npmtrustedpublisherrepo davidbasilefilho/holyagent + exactdoc-supportedfilename+environmentnpm. Report anyadditional prerequisite thatchangesactualsetup.",
@@ -112,5 +112,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdm7w7z-hne3",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T14:11:31.247Z"
+  },
   "createdAt": "2026-11-12T14:11:17.544Z"
 }
