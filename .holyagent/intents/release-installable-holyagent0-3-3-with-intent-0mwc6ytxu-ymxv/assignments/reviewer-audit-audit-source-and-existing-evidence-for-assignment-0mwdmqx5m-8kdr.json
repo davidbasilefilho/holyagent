@@ -120,6 +120,7 @@
   ],
   "followUpOf": "assignment-0mwdkjwmx-ziwm",
   "specialist": {
+    "agentId": "pi-workflow:wf_32fa6f937424/assignment-0mwdmqx5m-8kdr",
     "model": "haiku",
     "effort": "high",
     "startedAt": "2026-11-12T14:15:41.457Z"
