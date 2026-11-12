@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "audit-pr-120-privileged-workflows-npm",
   "objective": "Audit PR #120 privileged workflows, npm publication and integration approval boundaries for security blockers.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Committed range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; .github workflows/action, scripts/npm-publishing.ts, Pi auto-review/approval assessment, state file safety, package/tool execution and supporting code."
   ],
@@ -36,7 +36,37 @@
     "agentId": "/root/review_security",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T19:06:23.266Z"
+    "startedAt": "2026-11-12T19:06:23.266Z",
+    "finishedAt": "2026-11-12T19:07:50.195Z"
+  },
+  "result": "result: No security merge blocker found in the assigned committed range; external npm and GitHub configuration remains a release prerequisite.\nchanged: /workspace/work/review-security.md (report only)\nchecks: `git diff --check c5b2ab2b3524063e408b2f0dbf6bf85a6237e168 54f6647052b5ae7a184508b480ad88d808b428bf` -> 0; source and baseline comparison. Runtime tests not run: Bun and mise are unavailable. Claude Code's built-in `/security-review` could not run: its Skill tool is unavailable in this host.\nblockers: none identified.\nquestions: none.\nnotes: Reviewed protected-ref and environment gates, OIDC permissions, action pins, artifact handoff, npm registry and tag preflight, Pi auto-review model change and fail-closed path, Windows state writes and FFF activation. Publication depends on the documented environment and trusted publisher configuration; this review did not inspect those external settings. The POSIX prompt path is unquoted, but placeholder substitution already had that property at the base; no new attacker-controlled source or demonstrated security regression was established.\nevidence:\nNo unaddressed merge blockers in assigned scope: No validated new or worsened vulnerability found; tag lookup fails closed and npm refuses existing versions (scripts/npm-publishing.ts:82, :142-163); approval failures deny (packages/runtime/src/pi/codex/auto-review/assessment.ts:119); state copy retains containment and atomic rename (packages/runtime/src/state/tree.ts:759-775).\nReview covers exact committed range and distinguishes baseline issues: Compared c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; unquoted POSIX placeholder existed at base packages/integrations/pi/src/extension.ts:191.\nreviewed-range: c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; clean tree at head during review.\nfindings: No validated security blockers; external publishing controls require verification before publication (docs/npm-publishing.md).\nchecks-run: git diff --check -> 0; static source-to-sink and base comparison; runtime checks and built-in security review unavailable as noted above.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Static trace found no exploitable change; publication environment prerequisites remain explicitly separated from code security.",
+    "criteria": [
+      {
+        "criterion": "No unaddressed merge blockers in assigned scope",
+        "support": "No validated new or worsened vulnerability found; tag lookup fails closed and npm refuses existing versions (scripts/npm-publishing.ts:82, :142-163); approval failures deny (packages/runtime/src/pi/codex/auto-review/assessment.ts:119); state copy retains containment and atomic rename (packages/runtime/src/state/tree.ts:759-775)."
+      },
+      {
+        "criterion": "Review covers exact committed range and distinguishes baseline issues",
+        "support": "Compared c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; unquoted POSIX placeholder existed at base packages/integrations/pi/src/extension.ts:191."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; clean tree at head during review."
+      },
+      {
+        "label": "findings",
+        "support": "No validated security blockers; external publishing controls require verification before publication (docs/npm-publishing.md)."
+      },
+      {
+        "label": "checks-run",
+        "support": "git diff --check -> 0; static source-to-sink and base comparison; runtime checks and built-in security review unavailable as noted above."
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:06:23.266Z"
 }
