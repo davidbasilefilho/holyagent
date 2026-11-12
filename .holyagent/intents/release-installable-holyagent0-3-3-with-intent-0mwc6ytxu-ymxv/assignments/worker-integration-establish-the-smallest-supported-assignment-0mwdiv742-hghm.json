@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "establish-the-smallest-supported",
   "objective": "Establish the smallest supported publication-security repair design before implementing it.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Read-only design in C:/Users/david.basile/dev/holyagent-0.3.3-npm, cleanHEAD4ea9a3c. Review scripts/npm-publishing.ts, .github/workflows/publish.yml, stable.yml, dev.yml, tag-release action, docs/npm-publishing.md, and independent reports C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwci3gdk-6j6q.md and C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwci3uoa-96jr.md. Do not edit.",
     "Validated issue: proposed npm identity publish.yml/noenvironment lets an unprotectedbranchwriter modify their workflow and publish latest once trustedpublisher configured. Give2 safe minimal options/tradeoffs and recommendation, preferably protected release heads plus an effectively protected npm environment. Merely naming an unprotected environment is insufficient. User requires publish.yml calling stable/dev, stable GitHub/npm latest and dev GitHub/npm dev; allfeaturebranchpublication is NOT an explicit user requirement. Preserve featurebranchvalidation. Read actual existing GitHub environment/protection metadata with gh if helpful; do not change it. Account-security changes still need a concrete user decision.",
@@ -109,5 +109,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwci3uoa-96jr",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T12:27:11.616Z"
+  },
   "createdAt": "2026-11-12T12:26:33.794Z"
 }
