@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "verify-the-committedc6a9fd9-repairs",
   "objective": "Verify the committedc6a9fd9 repairs close tag-preflight and policy-coverage findings without new code regressions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Codehunks onlyinrepairpatch: scripts/npm-publishing.ts/test, scripts/workflows.test.ts, root-question-policy.test.ts, Claudeplugin/Piextensiontests andcanonicalgeneratedcounterparts asnecessary. Nestedannotation preflight nowexactlyone matchesactionpostcheck; matchinglightweight/singleabsentpass, nested/conflict/readfailaborts BEFOREnpm. Validate current29focusedpublicationcases plus smallestotherchecks ifneeded, no471repeat/fullverify. Existingversionalwaysreject no tokenfallback. Genericjobwritepermissions restored, pollingassertionnegative, childpromptliteralexpectedindependent. Existing originalcode reports reviewedc5..4ea+4ea..5ef; no newglobalcomparison owed."
   ],
@@ -117,5 +117,10 @@
     "assignment-0mwdm4ewc-mgbs"
   ],
   "followUpOf": "assignment-0mwdkewcm-pw17",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T14:08:53.653Z"
+  },
   "createdAt": "2026-11-12T14:07:37.713Z"
 }
