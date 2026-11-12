@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mwdr05vq-xz1d",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "number": 120,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/120",
+  "branch": "release/0.3.3/fix/npm-readiness",
+  "base": "release/0.3.3/integration",
+  "created": true,
+  "recordedAt": "2026-11-12T16:14:22.406Z"
+}
