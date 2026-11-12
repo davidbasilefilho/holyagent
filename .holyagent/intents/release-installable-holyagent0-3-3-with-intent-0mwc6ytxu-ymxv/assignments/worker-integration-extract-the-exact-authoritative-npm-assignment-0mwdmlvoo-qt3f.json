@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "extract-the-exact-authoritative-npm",
   "objective": "Extract the exact authoritative npm trusted-publisher runtime, reusable-workflow identity and environment requirements from two literal official pages.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "ONLY read public documentation; ownership is reservation, do noteditfiles. Fetch via nativePowerShell Invoke-WebRequest literal https://docs.npmjs.com/trusted-publishers/ and https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments intoTemp, parse meaningfulhtmltext/excerpts or follow official linkedrawsourceonlyifneeded. No Exa/browser/config/APIkey/search required. Ordinary publicHTTP alreadyworked for priorlicenseworker and initialdesign4pagesHTTP200. Earliermechanicalworker ranCLIbutdidNOTfinishtheseexcerpts, no exactHTTPerrorwasreported.",
     "Return exactcurrentminimum npm/Node versions, requiredOIDCpermissions/platform/provenance conditions, whether configured npmworkflowfilename shouldbe callerpublish.yml or calledstable.yml/dev.yml for THISrepository reusableflow, and how exactnpm environmentname isbound/authenticated. Include authoritativequote/URL for each, distinguish inference. Do notrepeatnpmwhoami/login/packagecheck: alreadyknownnpm11.20.0/nodev26.13.1, npmwhoamiE401, entireholyagentE404, davidbasilefilho/holyagent,0GitHubenvironments. ProposedGitHubenvironment npm with selecteddeploymentbranches main and release/*/integration; npmtrustedpublisherrepo davidbasilefilho/holyagent + exactdoc-supportedfilename+environmentnpm. Report anyadditional prerequisite thatchangesactualsetup.",
@@ -116,7 +116,37 @@
     "agentId": "pi-workflow:wf_c245a6d53c6f/assignment-0mwdmlvoo-qt3f",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-12T14:11:31.247Z"
+    "startedAt": "2026-11-12T14:11:31.247Z",
+    "finishedAt": "2026-11-12T14:17:32.652Z"
+  },
+  "result": "result: Official requirements extracted; account configuration and end-to-end publication remain pending.\nchanged: none\nchecks: npm trusted-publishers page HTTP 200; GitHub environments page HTTP 200; npm-linked GitHub OIDC page HTTP 200; read local publish.yml, stable.yml and dev.yml.\nblockers: None for documentation research; see remaining-blockers.\nquestions: none\nnotes:\n- Configure direct `npm publish` as an allowed action: new trusted-publisher configurations default to staged publishing. First successful publish must occur within two days or the configuration expires.\n- npm says OIDC `npm dist-tag` commands require npm 11.21.0 or later and 12.2.0 or later, plus separate “Allow npm dist-tag” permission. This is distinct from selecting a tag during `npm publish`.\n- npm CLI can fall back to traditional tokens; the release must independently enforce the requested no-token-fallback policy.\n- Environment restrictions and npm trusted-publisher configuration are separate account-security actions; neither was changed.\n\nevidence:\nOfficial publisher facts: npm says “version 11.5.1 or later and Node version 22.14.0 or higher,” GitHub-hosted runners, and “id-token: write”; “validation checks the calling workflow's name” and permission must be given to “both parent and child workflows.” Thus this repository’s caller is `publish.yml`, not `stable.yml` or `dev.yml`. npm requires exact case-sensitive fields and matching package `repository.url`; trusted publishing automatically generates provenance for a public repository and public package unless disabled: https://docs.npmjs.com/trusted-publishers/ . GitHub shows an OIDC subject `repo:octo-org/octo-repo:environment:prod` and an `environment` claim; by inference the corresponding job environment here is `npm`, configured identically in npm and both publishing jobs: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect . GitHub states environment protection rules gate jobs referencing the environment, selected branch patterns match `GITHUB_REF`, and wildcards do not match `/`; therefore `main` and `release/*/integration` are the intended separate selected branch patterns: https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments .\nchanged-paths: none\nchecks-run: Three public documentation requests, HTTP 200 each; three workflow files read; no build, tests, installation or publication run.\ndiff-file: none; read-only assignment.\nremaining-blockers: Effective GitHub `npm` environment restrictions and matching npm publisher settings need separate concrete approval and configuration; actual OIDC publication and provenance verification remain unproven. GitHub notes administrators can bypass environment rules by default.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "Three officialpagesHTTP200 establish minimums11.5.1/Node22.14, callerpublish.yml identity, parentchildOIDCpermissions and exact environmentbinding/branchpatterns. Directpublishpermission and2dayfirstpublish expiry are concretependingaccountprerequisites, not alreadyconfigured.",
+    "criteria": [
+      {
+        "criterion": "Official publisher facts: Runtime, caller-versus-reusable workflow identity and environment binding are supported by authoritative quoted sources, with any genuinely unresolved point explicitly isolated.",
+        "support": "npm says “version 11.5.1 or later and Node version 22.14.0 or higher,” GitHub-hosted runners, and “id-token: write”; “validation checks the calling workflow's name” and permission must be given to “both parent and child workflows.” Thus this repository’s caller is `publish.yml`, not `stable.yml` or `dev.yml`. npm requires exact case-sensitive fields and matching package `repository.url`; trusted publishing automatically generates provenance for a public repository and public package unless disabled: https://docs.npmjs.com/trusted-publishers/ . GitHub shows an OIDC subject `repo:octo-org/octo-repo:environment:prod` and an `environment` claim; by inference the corresponding job environment here is `npm`, configured identically in npm and both publishing jobs: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect . GitHub states environment protection rules gate jobs referencing the environment, selected branch patterns match `GITHUB_REF`, and wildcards do not match `/`; therefore `main` and `release/*/integration` are the intended separate selected branch patterns: https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments ."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "none"
+      },
+      {
+        "label": "checks-run",
+        "support": "Three public documentation requests, HTTP 200 each; three workflow files read; no build, tests, installation or publication run."
+      },
+      {
+        "label": "diff-file",
+        "support": "none; read-only assignment."
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Effective GitHub `npm` environment restrictions and matching npm publisher settings need separate concrete approval and configuration; actual OIDC publication and provenance verification remain unproven. GitHub notes administrators can bypass environment rules by default."
+      }
+    ]
   },
   "createdAt": "2026-11-12T14:11:17.544Z"
 }
