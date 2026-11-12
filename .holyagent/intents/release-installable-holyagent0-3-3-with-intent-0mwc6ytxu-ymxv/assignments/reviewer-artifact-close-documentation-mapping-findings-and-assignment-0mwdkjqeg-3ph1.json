@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "close-documentation-mapping-findings-and",
   "objective": "Close documentation/mapping findings and finish previously truncated0.3.3 artifact and instruction review.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Prior blockers: docs reversed npm-first order and ClaudeR-ROLE mapping stale. Repair aligns coverage/tests with unchanged compact prompts and preserves semantic assertions/corebudget9400. docs now describe npm-first same-tarball, protectedheads/realenvironment prerequisite, preflight/race limitations, reject every existing-version rerun and manual recovery. Verify matches implementation.",
     "Finish remaining original prose/prompt/style scope from full diff in bounded chunks. Load instruction-writing. Approved distinction userdenial vs automaticrejection, meaningful freeform answers, GPT-only human-facing StopSlop source/MIT2025HardikPandya attribution, preserve code/protocol/exactevidence/nonGPTstyle/familysemantics. No fictitious runtime approval inheritance. Frontend/visual work is deferred0.3.4."
@@ -130,7 +130,9 @@
     "agentId": "pi-workflow:wf_fd1a65674891/assignment-0mwdkjqeg-3ph1",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T13:14:22.713Z"
+    "startedAt": "2026-11-12T13:14:22.713Z",
+    "finishedAt": "2026-11-12T13:20:50.720Z"
   },
+  "result": "failure: result: Gaps found; artifact review incomplete.\nchanged: none\nchecks: Read-only inspection; no commands or tests run. Full verification was outside this assignment.\nblockers: Correct release documentation and complete the original artifact review before acceptance.\nquestions: none\nnotes: Account configuration, current-head gates, bootstrap and trusted publication remain unverified.\nevidence:\nArtifact correctness: gap — `docs/pi/installation.md:23,30` says “HolyAgent publishes no npm package” and “There is no npm publishing for the Pi package,” which will be false for the intended release and omits its npm installation route. `AGENTS.md:23` says “`dev.yml` elsewhere,” but `.github/workflows/publish.yml` limits dev publication to protected release integration branches. The prior npm-ordering repair matches the inspected implementation; `packages/runtime/src/instructions/coverage.ts:28` now matches Claude’s root identity.\nArtifact completeness: unverified — reviewed the repair patch and portions of the original patch, but not the entire original prose, prompt and style scope; attribution and all generated family variants remain unverified.\nchanged-paths: none\nchecks-run: File reads and searches only; no shell was available, so runtime behavior and test results were not independently executed.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-5ef98be.patch; C:/Users/david.basile/AppData/Local/Temp/holyagent-033-full-5ef98be.patch\nremaining-blockers: Documentation discrepancies, incomplete artifact review, current-head gates, effectively restricted npm environment, trusted-publisher setup, bootstrap and final publication.\n",
   "createdAt": "2026-11-12T13:13:38.152Z"
 }
