@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "reviewonly7insertions-3deletions",
   "objective": "Reviewonly7insertions/3deletions fixing4actualmacOS0.3.3CItestfixtureerrors.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Committedrangeb00eab296a492ea28a9012b29c842cd3e78b0f09..54f6647052b5ae7a184508b480ad88d808b428bf,worktreeC:/Users/david.basile/dev/holyagent-0.3.3-npm,3testfilesONLY. Frozenpatch C:/Users/david.basile/AppData/Local/Temp/holyagent-033-macos-54f6647.patch. No production/generatedpayloadchange; priorreviews+Windowsfull3444pass52skipvalidelsewhere. Publicfinal/bootstrapTempbytesSTILLvalid; nopack/generationneeded. PR120oldb00hostedWindows+Linuxpass/macOS4fails; newnativeMacunknownuntilnewCI, separatefuturegate, notclaimtested.",
     "Changes: runtime/tests/setup-t3-settings.test.ts andsetup-tui-cli.test.tsenvfixtureDEVELOPER_DIR=join(home,'no-xcode') BEFORE ...extra. DarwinhostXcodehadwronglyoverriddenfakeAndroidSDK/no-deviceexpected; positiveexplicitXcodecaseoverridepreserved. tools.test.ts importsnodefsrealpath, comparesREALPATHrecordedcwdtoREALPATHproject insteadrawcwdcontainsresolvedproject; /varversus/private/varaliases SAMEdirectory. Arguments/resultassertionsunchanged, nowstrictpathidentitystronger. Mustnotweakenallowwrongdirectory. CheckactualdeviceHostpriorities/testoverridesandpositivecases.",
@@ -129,7 +129,41 @@
     "agentId": "pi-workflow:wf_9bffe3229e20/assignment-0mwdrxby4-0k9r",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-12T16:40:29.199Z"
+    "startedAt": "2026-11-12T16:40:29.199Z",
+    "finishedAt": "2026-11-12T16:44:36.514Z"
+  },
+  "result": "result: Testing review passed; native macOS CI remains pending.\nchanged: none\nchecks: `bun test packages/runtime/tests/setup-t3-settings.test.ts packages/runtime/tests/setup-tui-cli.test.ts packages/runtime/tests/tools.test.ts` -> exit 0, 78 pass, 5 Windows skips, 0 fail; base tests not independently run; full verify not run per scope.\nblockers: none for this review; current-head native macOS CI is a separate pending gate.\nquestions: none\nnotes: Windows skips the POSIX CLI passthrough test; native macOS outcome is not claimed.\nevidence:\nFour regressions covered: `setup-t3-settings.test.ts:333` checks absent device settings; `setup-tui-cli.test.ts:212` and `:299` check Android and absent-device offers; `tools.test.ts:112` checks unchanged arguments and exact canonical working-directory identity. `t3-settings.ts:183-194` confirms Xcode priority; `setup-t3-settings.test.ts:343-351` retains explicit Xcode override. Writer’s controlled red/green simulations and junction comparison are recorded in `C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-evidence.txt`; not independently repeated.\nAffected tests pass: Windows run exited 0 with 78 pass, 5 skip, 0 fail; macOS pending.\nOnly three test files: `git diff --stat b00eab296a492ea28a9012b29c842cd3e78b0f09 54f6647052b5ae7a184508b480ad88d808b428bf` -> exit 0, three test files, 7 insertions, 3 deletions.\nchecks-run: Windows affected-file command above; no independent base run.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-033-macos-54f6647.patch\nremaining-blockers: Current-head native macOS CI and release/account gates remain pending.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "Exact3testonlyrange7insert3delete independentlyreadand78pass5platformskip0fail; Xcodepositiveoverride/arguments/strictrealpathidentityretained, controlledredgreenprovesfixturefault. NativeMacpendingseparateCIgate. Optional2linefixtureduplicationisnotvalidateddefect; sharedhelperrefactorisunrequestedandbarredbyexplicitfinishonly0.3.3scope.",
+    "criteria": [
+      {
+        "criterion": "Four regressions covered",
+        "support": "`setup-t3-settings.test.ts:333` checks absent device settings; `setup-tui-cli.test.ts:212` and `:299` check Android and absent-device offers; `tools.test.ts:112` checks unchanged arguments and exact canonical working-directory identity. `t3-settings.ts:183-194` confirms Xcode priority; `setup-t3-settings.test.ts:343-351` retains explicit Xcode override. Writer’s controlled red/green simulations and junction comparison are recorded in `C:/Users/david.basile/AppData/Local/Temp/holyagent-0.3.3-macos-evidence.txt`; not independently repeated."
+      },
+      {
+        "criterion": "Affected tests pass",
+        "support": "Windows run exited 0 with 78 pass, 5 skip, 0 fail; macOS pending."
+      },
+      {
+        "criterion": "Only three test files",
+        "support": "`git diff --stat b00eab296a492ea28a9012b29c842cd3e78b0f09 54f6647052b5ae7a184508b480ad88d808b428bf` -> exit 0, three test files, 7 insertions, 3 deletions."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Windows affected-file command above; no independent base run."
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/holyagent-033-macos-54f6647.patch"
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Current-head native macOS CI and release/account gates remain pending."
+      }
+    ]
   },
   "createdAt": "2026-11-12T16:40:09.916Z"
 }
