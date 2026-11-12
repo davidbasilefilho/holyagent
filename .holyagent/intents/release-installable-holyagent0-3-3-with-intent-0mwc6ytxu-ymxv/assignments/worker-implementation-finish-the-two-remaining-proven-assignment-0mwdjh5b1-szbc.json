@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "finish-the-two-remaining-proven",
   "objective": "Finish the two remaining proven publication-helper security blockers with minimal fail-closed behavior and regression tests.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Worktree C:/Users/david.basile/dev/holyagent-0.3.3-npm HEAD4ea9a3c plus deliberate uncommitted repairs. Prior publication worker finished partially: guards in publish/stable/dev.yml and named npm environment/docs,30focusedpasses; NEVER treat helper or preflight as repaired. Read report C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdj95js-o4wv.md. Instruction writer runs independently on instructions/Claude tests; leave those alone.",
     "Implement precise minimal0.3.3 behavior: helper MUST NOT accept an existing immutable npm version based solely on integrity/identity. Current supported provenance verification is unestablished. For this bounded repair do NOT research or build a new verifier: reject all pre-existing versions with explicit safe diagnostic that trusted provenance cannot currently be established, even if bytes match. Preserve fresh-version trusted OIDC publication, safe handling of known newerchannels, wrongchannel/malformedregistry errors, no fallback token/dist-tag. Replace any tests that currently authorize unsafe integrity-only reuse with security rejection assertions; retain all other cases. Document deliberate rerun limitation and npm-first failure consequence. This safe restriction is the root's minimum chosen implementation until verified-provenance support exists; do not leave unsafeacceptance behind.",
@@ -128,5 +128,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdj95js-o4wv",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T12:44:00.657Z"
+  },
   "createdAt": "2026-11-12T12:43:37.886Z"
 }
