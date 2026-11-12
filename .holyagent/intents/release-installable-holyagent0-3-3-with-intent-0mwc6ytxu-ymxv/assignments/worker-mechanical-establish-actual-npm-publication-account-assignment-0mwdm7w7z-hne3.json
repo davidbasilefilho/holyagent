@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "establish-actual-npm-publication-account",
   "objective": "Establish actual npm publication/account/runtime prerequisites and the exact pending protected-environment configuration using read-only native commands and literal official HTTP.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Previous Librarianattempt had NO CLI and ExaAPIkeymissing, so no accountfacts established; this is configurationunavailability notdenial. You have shell: execute readonly npm--version, node--version, npmwhoami, npmviewholyagent (wholepackage metadata AND0.3.3 separately) against actualnpmjsregistry, record exits/E404distinction/owner without exposingcredentialconfig. Inspect current generateddistmanifestversion0.3.3/publicname/private/root distinction and report minimum publication set (one holyagent ifsufficient). Don't publish/reserve anything.",
     "Fetch literalofficialdocs via PowerShell Invoke-WebRequest publicHTTP (lastliteralGitHubHTTPworks): https://docs.npmjs.com/trusted-publishers/ ; https://docs.npmjs.com/generating-provenance-statements/ ; https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments . Record actualminimum Node/npm/OIDC requirements and reusable-workflow identity (callerpublish.yml vs stable/dev calledfile) with exactquote. Never treat unknown as assumption. SourceYAML requires environment npm, protectedmain stable and protectedrelease/*/integration dev, callerpublish.yml invokesstable/dev. Actualenvironment-boundpublisher is critical, fileYAMLalone insufficient.",
@@ -121,7 +121,9 @@
     "agentId": "pi-workflow:wf_949ba0090900/assignment-0mwdm7w7z-hne3",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T14:00:51.009Z"
+    "startedAt": "2026-11-12T14:00:51.009Z",
+    "finishedAt": "2026-11-12T14:05:35.332Z"
   },
+  "result": "failure: result: npm prerequisites established; official documentation/configuration details remain unresolved\nchanged: none; docs/npm-publishing.md was not created because official-document excerpts could not be verified\nchecks: npm --version -> exit 0, 11.20.0; node --version -> exit 0, v26.13.1; npm whoami -> exit 1, E401; npm view holyagent and holyagent@0.3.3 -> exit 1 each, registry E404; gh repo view -> exit 0, davidbasilefilho/holyagent; gh api environments -> exit 0, no environments; npm view @earendil-works/pi-coding-agent version -> exit 0, 1.5.2\nblockers: Public package absent; npm login not authenticated; official trusted-publisher/runtime requirements and reusable workflow identity were not verified\nquestions: none\nnotes: root package is private; generated Pi distribution is public `holyagent@0.3.3`, with host dependencies as peers and no runtime dependency indicated. Likely minimum package set is the Pi distribution alone, but publication closure was not confirmed. Worktree already had unrelated dirty files; none modified.\nevidence:\nNpm facts: Actual npmjs package availability, existing login/runtime and minimum public package set established with command exits.: npm E404 for package and version; npm E401 whoami; generated manifest at packages/integrations/pi/dist/package.json.\nPublisher boundary: Official trustedpublisher/runtime/reusableidentity requirements and actual GitHub environment gap yield concrete proposed configuration without any settings/credential changes.: GitHub environment query returned none; documentation excerpts unavailable.\nchanged-paths: none\nchecks-run: npm/node/gh commands above; official docs fetch and content verification not completed.\ndiff-file: none\nremaining-blockers: npm publication and trusted-publisher documentation/runtime verification remain outstanding.\n",
   "createdAt": "2026-11-12T14:00:25.055Z"
 }
