@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-three-release-documentation",
   "objective": "Correct three release documentation contradictions about npm distribution and allowed publication branches.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Reviewers found docs/pi/installation.md:23,30 says publishes no npm/no npm Pi publishing; docs/pi/README.md:59 says git-only/no npm; AGENTS.md:23 dev.yml elsewhere is nowfalse. Replace only these contradictory statements/closely required installation text with the actual planned public holyagent npm package, supported Pi npm installation route and protected release-integration dev publication. Check command syntax against project package/host conventions, preserve supported git routes. Publication hasn't occurred, so distinguish release-intended route from already published claim. Load instruction-writing for AGENTS.md. No new generic instructions/features/restructure. Verify formatter/diff and any existing applicable doc contract check; produce Temp diff."
   ],
@@ -123,7 +123,9 @@
     "agentId": "pi-workflow:wf_74ee3a8129bd/assignment-0mwdky3nc-u7xk",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T13:27:14.152Z"
+    "startedAt": "2026-11-12T13:27:14.152Z",
+    "finishedAt": "2026-11-12T13:36:56.474Z"
   },
+  "result": "failure: result: Unable to verify or report the documentation changes: the requested worktree returned empty results for `git diff` and `git status`.\nchanged: docs/pi/installation.md, docs/pi/README.md, AGENTS.md (edits reported successful, but absent from git status)\nchecks: `git diff --check -- AGENTS.md docs/pi/installation.md docs/pi/README.md` -> exit 0, no output; diff and status were empty\nblockers: Worktree contents could not be confirmed; no applicable documentation contract check was identified or run.\nquestions: none\nnotes: none\nevidence:\nDocumentation repair: Edits were attempted, but the worktree reported no changes; confirmation is blocked.\nScope and checks: `git status --short` was empty, so changed-path scope and resulting content cannot be verified.\nchanged-paths: Unverified; requested paths have no changes in `git status --short`.\nchecks-run: `git diff --check -- AGENTS.md docs/pi/installation.md docs/pi/README.md` -> exit 0, no output.\ndiff-file: None; `git diff -- AGENTS.md docs/pi/installation.md docs/pi/README.md` was empty.\nremaining-blockers: Verify the correct worktree and reapply/check the documentation edits there.\n",
   "createdAt": "2026-11-12T13:24:48.504Z"
 }
