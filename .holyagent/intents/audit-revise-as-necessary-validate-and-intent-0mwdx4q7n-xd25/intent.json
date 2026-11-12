@@ -1,0 +1,16 @@
+{
+  "id": "intent-0mwdx4q7n-xd25",
+  "slug": "audit-revise-as-necessary-validate-and",
+  "objective": "Audit, revise as necessary, validate and merge HolyAgent PR #120 into release/0.3.3/integration.",
+  "requirements": [
+    "if the open pr in davidbasilefilho/holyagent is merge-ready, merge it. audit it, revise it and continue until you merge it and tell me what you changed",
+    "use the holyagent directives, skills, agents",
+    "use gpt 6.1 terra agents from low-xhigh",
+    "Review immutable PR range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf with independent code, testing, artifact and security specialists; fix validated blockers, review repairs and run current-head verify before merge.",
+    "Merge only PR #120 by squash per repository settings; no branch deletion, force push, credential or security-setting changes, or manual package publication. Repository workflows triggered by the authorized merge may run.",
+    "Task sequence: bootstrap tools; parallel independent audits and verification; repair and re-review blockers; verify CI and merge; report actual changes."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-12T19:05:53.075Z"
+}
