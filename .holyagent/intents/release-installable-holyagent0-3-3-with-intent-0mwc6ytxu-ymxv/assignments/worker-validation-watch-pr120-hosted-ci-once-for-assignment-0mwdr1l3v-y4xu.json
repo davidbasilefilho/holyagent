@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "watch-pr120-hosted-ci-once-for",
   "objective": "Watch PR120 hosted CI once for exactb00eab2 and report3platform validation plus merge state withoutmerging.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "PRhttps://github.com/davidbasilefilho/holyagent/pull/120, branchrelease/0.3.3/fix/npm-readiness->release/0.3.3/integration, HEADb00eab296a492ea28a9012b29c842cd3e78b0f09. Rootpushedreviewedbranch+holyagent/stateandopenedPR. FullnativeWindowslocalverify3444pass52skip0fail, allindependentreviewsaccepted. NeedactualhostedCIWindows/macOS/LinuxcurrentSHA. No sourcewriters, packagedartifactsopsTemp-onlyparallel.",
     "ReadC:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/ci-watch/SKILL.md and followwatchone-shotprotocol. Run`gh pr checks 120 --repo davidbasilefilho/holyagent --watch` ONCE viahostprocessmonitorifavailablewithcompletionwake; doNOTpoll/sleep/loop/blockshell>60swhenbackgroundwakeavailable. IfnosuitablehostprocessavailablefallbackONCEforegroundwithtimeoutpastlongestCI(>=1800s); necessarynestedtimeoutsaccommodate. Oncompletion ONEbounded `gh pr view120--jsonheadRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,mergeable,url,baseRefName` snapshot and optional`ghrunlist--commitb00`/runmetadataforplatformactualproof ifnamesinsufficient. Noactionchanges, no cancels/re-runs/merges/branchdeletes/commentreplies.",
@@ -132,7 +132,9 @@
     "agentId": "pi-workflow:wf_901e298be690/assignment-0mwdr1l3v-y4xu",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T16:15:44.928Z"
+    "startedAt": "2026-11-12T16:15:44.928Z",
+    "finishedAt": "2026-11-12T16:29:53.518Z"
   },
+  "result": "failure: 📦 [ACP] Compressed m00003–m00004, m00006–m00013 → 2 block(s), ~23371 tokens saved.\nresult: PR #120 validation is not merge-ready; macOS CI is failing.\nchanged: none\nchecks: `gh pr checks 120 --repo davidbasilefilho/holyagent --watch` -> exit 1; macOS failed, Windows passed, Linux result absent.\nblockers: macOS failures: T3 device-access test, two setup device-row tests, and CLI argument passthrough test; publish jobs skipped.\nquestions: none\nnotes: No outward writes. Review comments API returned `[]`; `reviewDecision` is empty.\nevidence:\nchecks-run: PR #120 on head `b00eab296a492ea28a9012b29c842cd3e78b0f09`; latest snapshot shows validation macOS FAILURE, Windows SUCCESS, branch-model/check/installers SUCCESS, version SKIPPED; publish macOS FAILURE and Windows SUCCESS.\nci-links: macOS validation https://github.com/davidbasilefilho/holyagent/actions/runs/43256495387/job/131316138721; macOS publish https://github.com/davidbasilefilho/holyagent/actions/runs/43256467503/job/131315926683\nremaining-blockers: Both macOS runs: 3,488 pass, 3 skip, 4 fail of 3,495 tests/118 files. PR merge state UNSTABLE (MERGEABLE); review comments `[]`.\n",
   "createdAt": "2026-11-12T16:15:28.796Z"
 }
