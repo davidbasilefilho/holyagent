@@ -38,6 +38,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/repair_cli",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-12T19:08:24.341Z"
