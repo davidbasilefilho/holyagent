@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "prevent-immutable-npm-publication-when-a",
   "objective": "Prevent immutable npm publication when a nested annotated tag would fail the existing release postcheck.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Confirmed trace: scripts/npm-publishing.ts preflightTag recursively peels16tag levels; .github/actions/tag-release/action.yml:58-65 peels exactly one. Minimum fix: preflight supports exactly existing action behavior (lightweight or one annotated tag resolving to intendedcommit), rejects a second annotation BEFORE npm. Do not broaden release-action features. Preserve absent/normalannotated/matching/conflict/lookupfailure cases, no-existing-version reruns, OIDC/sametarball. Add regression that fails on5ef98be for nested tag and explicitly asserts npm publish never called. Run focused publishing/workflow tests, type/lint/formatter relevant changed paths; don't build generated files. Return complete repair patch in Temp."
   ],
@@ -123,7 +123,41 @@
     "agentId": "pi-workflow:wf_9a2da26c3540/assignment-0mwdkxy14-3lcu",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T13:27:14.348Z"
+    "startedAt": "2026-11-12T13:27:14.348Z",
+    "finishedAt": "2026-11-12T13:36:50.589Z"
+  },
+  "result": "result: Nested annotated tags are rejected before npm publication; supported tag behavior and the postcheck remain unchanged.\nchanged: scripts/npm-publishing.ts, scripts/npm-publishing.test.ts\nchecks: Focused publishing and workflow tests exit 0, 29 pass; mise check exit 0, 317 files; mise lint exit 0, 318 files; changed-file format check exit 0, 2 files. Full format check exit 1 on docs/pi/README.md, outside ownership.\nblockers: Full format check requires the docs owner to resolve or recheck docs/pi/README.md.\nquestions: none\nnotes: No full verify or build run, as assigned. docs/pi/README.md may have been changing concurrently.\nevidence:\nTag repair: Nested annotated tags fail before npm; supported existing tags and postcheck remain consistent.: scripts/npm-publishing.ts limits peeling to one annotation; focused publishing and workflow tests exit 0.\nRegression proof: New nested-tag publish-not-called regression fails on5ef98be and passes fixed source without weakening existing coverage.: Baseline test exit 1, 0 pass, because npm publish was called; fixed test exit 0 within the 29-test focused run.\nchanged-paths: scripts/npm-publishing.ts, scripts/npm-publishing.test.ts; packages/integrations/pi/publishing.test.ts unchanged.\nchecks-run: Focused tests 29 pass; check, lint and changed-file format pass; full format check fails on docs/pi/README.md.\ndiff-file: C:/Users/david.basile/AppData/Local/Temp/holyagent-npm-tag-repair.patch\nremaining-blockers: Full format check failure outside ownership; full verify not run by assignment constraint.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "The real nested-tag regression failed on the prior head and passes now, with 29 focused tests plus type/lint/changed-format green. Other-owned document formatting is handled separately; it does not invalidate this bounded fix.",
+    "criteria": [
+      {
+        "criterion": "Tag repair: Nested annotated tags fail before npm; supported existing tags and postcheck remain consistent.",
+        "support": "scripts/npm-publishing.ts limits peeling to one annotation; focused publishing and workflow tests exit 0."
+      },
+      {
+        "criterion": "Regression proof: New nested-tag publish-not-called regression fails on5ef98be and passes fixed source without weakening existing coverage.",
+        "support": "Baseline test exit 1, 0 pass, because npm publish was called; fixed test exit 0 within the 29-test focused run."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "scripts/npm-publishing.ts, scripts/npm-publishing.test.ts; packages/integrations/pi/publishing.test.ts unchanged."
+      },
+      {
+        "label": "checks-run",
+        "support": "Focused tests 29 pass; check, lint and changed-file format pass; full format check fails on docs/pi/README.md."
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/AppData/Local/Temp/holyagent-npm-tag-repair.patch"
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "Full format check failure outside ownership; full verify not run by assignment constraint."
+      }
+    ]
   },
   "createdAt": "2026-11-12T13:24:41.225Z"
 }
