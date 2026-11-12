@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "establish-actual-npm-publication-account",
   "objective": "Establish actual npm publication/account/runtime prerequisites and the exact pending protected-environment configuration using read-only native commands and literal official HTTP.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Previous Librarianattempt had NO CLI and ExaAPIkeymissing, so no accountfacts established; this is configurationunavailability notdenial. You have shell: execute readonly npm--version, node--version, npmwhoami, npmviewholyagent (wholepackage metadata AND0.3.3 separately) against actualnpmjsregistry, record exits/E404distinction/owner without exposingcredentialconfig. Inspect current generateddistmanifestversion0.3.3/publicname/private/root distinction and report minimum publication set (one holyagent ifsufficient). Don't publish/reserve anything.",
     "Fetch literalofficialdocs via PowerShell Invoke-WebRequest publicHTTP (lastliteralGitHubHTTPworks): https://docs.npmjs.com/trusted-publishers/ ; https://docs.npmjs.com/generating-provenance-statements/ ; https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments . Record actualminimum Node/npm/OIDC requirements and reusable-workflow identity (callerpublish.yml vs stable/dev calledfile) with exactquote. Never treat unknown as assumption. SourceYAML requires environment npm, protectedmain stable and protectedrelease/*/integration dev, callerpublish.yml invokesstable/dev. Actualenvironment-boundpublisher is critical, fileYAMLalone insufficient.",
@@ -117,5 +117,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwce4lpf-4hm3",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T14:00:51.009Z"
+  },
   "createdAt": "2026-11-12T14:00:25.055Z"
 }
