@@ -408,7 +408,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
     "R-SEARCH": {
       section: "root/search.md",
-      phrase: "Search files and contents with the FFF integration",
+      phrase: "search through the available shell with `rg` and `fd`",
     },
     "R-DEVSERVER": {
       section: "root/skills.md",
@@ -517,7 +517,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-S-SEARCH": {
       section: "specialist/working.md",
-      phrase: "Search files and contents with the FFF integration",
+      phrase: "use the role's built-in `find` and `grep` through codemode",
     },
     "R-MATERIAL": {
       section: "shared/materiality.md",
@@ -720,7 +720,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
     "R-SEARCH": {
       section: "root/search.md",
-      phrase: "Search files and contents with the FFF integration",
+      phrase: "search through the available shell with `rg` and `fd`",
     },
     "R-DEVSERVER": {
       section: "root/skills.md",
@@ -829,7 +829,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-S-SEARCH": {
       section: "specialist/working.md",
-      phrase: "Search files and contents with the FFF integration",
+      phrase: "use the role's built-in `find` and `grep` through codemode",
     },
     "R-MATERIAL": {
       section: "shared/materiality.md",

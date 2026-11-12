@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -2036,6 +2036,37 @@ describe("telling a child from the root", () => {
       "Run \u0060bun --no-env-file --config='C:/pkg/scripts/empty-bunfig.toml' 'C:/pkg/scripts/holyagent.js' status\u0060.",
     )
   })
+
+  test.skipIf(process.platform === "win32")(
+    "Unix prompt commands execute the installed wrapper with their arguments",
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), "holyagent-prompt-"))
+      try {
+        const root = join(directory, "My Apps' $(touch injected); package")
+        const scripts = join(root, "scripts")
+        await mkdir(scripts, { recursive: true })
+        const wrapper = join(scripts, "holyagent")
+        await Bun.write(wrapper, '#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        await chmod(wrapper, 0o755)
+        for (const prompt of [
+          "`holyagent status --project 'my project'`",
+          `${PI_ROOT_PLACEHOLDER}/scripts/holyagent status --project 'my project'`,
+        ]) {
+          const command = fillPackageRoot(prompt, root).replaceAll("`", "")
+          const child = Bun.spawn(["sh", "-c", command], {
+            cwd: directory,
+            stdout: "pipe",
+            stderr: "pipe",
+          })
+          expect(await child.exited).toBe(0)
+          expect(await new Response(child.stdout).text()).toBe("status\n--project\nmy project\n")
+        }
+        expect(await Bun.file(join(directory, "injected")).exists()).toBe(false)
+      } finally {
+        await removeTemporary(directory)
+      }
+    },
+  )
 
   test("Windows CLI prompts use isolated Bun rather than a non-executable shell wrapper", () => {
     const prompt = fillPackageRoot(

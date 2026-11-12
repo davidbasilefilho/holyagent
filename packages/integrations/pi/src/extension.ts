@@ -198,7 +198,7 @@ export const fillPackageRoot = (
         quote(root + "/scripts/empty-bunfig.toml") +
         " " +
         quote(root + "/scripts/holyagent.js")
-      : root + "/scripts/holyagent"
+      : quote(root + "/scripts/holyagent")
   return (
     prompt
       // Host-neutral families name the CLI in inline code rather than carrying a package placeholder.
