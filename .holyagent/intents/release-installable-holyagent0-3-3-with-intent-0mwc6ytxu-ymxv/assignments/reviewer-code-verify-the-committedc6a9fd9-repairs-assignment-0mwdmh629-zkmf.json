@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "verify-the-committedc6a9fd9-repairs",
   "objective": "Verify the committedc6a9fd9 repairs close tag-preflight and policy-coverage findings without new code regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Codehunks onlyinrepairpatch: scripts/npm-publishing.ts/test, scripts/workflows.test.ts, root-question-policy.test.ts, Claudeplugin/Piextensiontests andcanonicalgeneratedcounterparts asnecessary. Nestedannotation preflight nowexactlyone matchesactionpostcheck; matchinglightweight/singleabsentpass, nested/conflict/readfailaborts BEFOREnpm. Validate current29focusedpublicationcases plus smallestotherchecks ifneeded, no471repeat/fullverify. Existingversionalwaysreject no tokenfallback. Genericjobwritepermissions restored, pollingassertionnegative, childpromptliteralexpectedindependent. Existing originalcode reports reviewedc5..4ea+4ea..5ef; no newglobalcomparison owed."
   ],
@@ -121,7 +121,37 @@
     "agentId": "pi-workflow:wf_39539c7f14ef/assignment-0mwdmh629-zkmf",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-12T14:08:53.653Z"
+    "startedAt": "2026-11-12T14:08:53.653Z",
+    "finishedAt": "2026-11-12T14:14:29.479Z"
+  },
+  "result": "result: Repair review passed; no new code blockers found.\nchanged: none\nchecks: Focused npm-publication and workflow tests -> exit 0, 27 pass; root-question-policy tests -> exit 0, 20 pass; Claude agent tests -> exit 0, 51 pass; Pi child-prompt test -> exit 0, 1 pass.\nblockers: none in the reviewed repair.\nquestions: none\nnotes: First-pass review found no defects. Actual publication, account configuration, final packaging and current-head gates remain later release actions; they were not run or assessed as passed here.\nevidence:\nCode repair review: Reviewed `5ef98be...c6a9fd9`; nested tags and read failures stop before npm, matching lightweight and singly annotated tags pass, and existing versions fail closed. Focused tests passed; live GitHub/npm publication was read, not run.\nchanged-paths: none; read-only review.\nchecks-run: `bun test scripts/npm-publishing.test.ts scripts/workflows.test.ts` -> 27 pass; `bun test scripts/root-question-policy.test.ts` -> 20 pass; filtered Claude and Pi tests -> 51 and 1 pass respectively, all exit 0.\ndiff-file: `C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-c6a9fd9.patch`; reviewed committed range directly with `git diff`.\nremaining-blockers: No blocker found in this repair; publication configuration and final release gates remain pending outside this review.\n",
+  "acceptance": {
+    "revision": 29,
+    "rationale": "Fresh focused27publication/workflow+20policy+51Claude+1Pichild tests pass; boundedcommittedreview closespriorcodeblockers with no introduceddefects.",
+    "criteria": [
+      {
+        "criterion": "Code repair review: Committed repair closes prior validated code findings with focused executable evidence and no introduced behavior/scope/regression defect.",
+        "support": "Reviewed `5ef98be...c6a9fd9`; nested tags and read failures stop before npm, matching lightweight and singly annotated tags pass, and existing versions fail closed. Focused tests passed; live GitHub/npm publication was read, not run."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "none; read-only review."
+      },
+      {
+        "label": "checks-run",
+        "support": "`bun test scripts/npm-publishing.test.ts scripts/workflows.test.ts` -> 27 pass; `bun test scripts/root-question-policy.test.ts` -> 20 pass; filtered Claude and Pi tests -> 51 and 1 pass respectively, all exit 0."
+      },
+      {
+        "label": "diff-file",
+        "support": "`C:/Users/david.basile/AppData/Local/Temp/holyagent-033-repair-c6a9fd9.patch`; reviewed committed range directly with `git diff`."
+      },
+      {
+        "label": "remaining-blockers",
+        "support": "No blocker found in this repair; publication configuration and final release gates remain pending outside this review."
+      }
+    ]
   },
   "createdAt": "2026-11-12T14:07:37.713Z"
 }
