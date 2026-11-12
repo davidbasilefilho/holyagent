@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-publication-trust-boundary",
   "objective": "Re-review publication trust-boundary repairs and name actual account-protection prerequisites before0.3.3 publication.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Check caller/reusable protected-main/latest and protected-release-integration/dev guards, required npm environment, scopedOIDC, reject all existing versions without claims of verified provenance, known-tag preflight BEFORE immutable publication and retained postcheck. Actual repository had0environments; none configured by us. Assess source conditional on EFFECTIVE branch-restricted GitHubnpm environment plus environment-bound npm publisher. Actual account verification remains mandatory, never assume YAMLname creates protection.",
     "Bounded FFF trace C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdivg4s-1qlp.md: Windows default/false/junction probes did notreturn linkedcanary; same specialist exposure/settings existed onbase; explicit outsidepath reads separate. No validated introduced exploit. Otherplatform/Gitrepo followup0.3.4; reopen only with complete new introduced source-to-sink evidence."
@@ -126,5 +126,10 @@
     "assignment-0mwdk18nm-45l5"
   ],
   "followUpOf": "assignment-0mwci3uoa-96jr",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T13:14:23.782Z"
+  },
   "createdAt": "2026-11-12T13:13:30.380Z"
 }
