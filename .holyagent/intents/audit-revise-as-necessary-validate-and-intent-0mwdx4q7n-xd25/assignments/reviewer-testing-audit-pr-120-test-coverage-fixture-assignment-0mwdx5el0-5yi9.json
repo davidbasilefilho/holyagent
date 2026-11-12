@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwdx5el0-5yi9",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.testing",
+  "slug": "audit-pr-120-test-coverage-fixture",
+  "objective": "Audit PR #120 test coverage, fixture isolation and cross-platform validation for merge blockers.",
+  "state": "Running",
+  "scope": [
+    "Committed range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..54f6647052b5ae7a184508b480ad88d808b428bf; all changed test files and their relevant production paths, CI validation and installation matrices."
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and /workspace/work/holyagent-pr120/packages/integrations/claude/dist/agents/reviewer-testing.md; apply HolyAgent role. User explicitly requests Terra low-xhigh; authorizes audit/revise/merge PR120. Workflow unavailable; direct fallback. No source/VCS/state writes. Exact range independent of authors. Focus on tests weakened or missing meaningful failure-path coverage; platform fixes must not silently skip behavior. Hosted current-head CI passed Linux/Windows/macOS/installers. Toolchain setup running separately; /workspace/work/tools/bun/bin/bun available, frozen install may still run. Run bounded targeted reproductions if helpful, full gates owned by validation worker. Report under 400 words and save /workspace/work/review-testing.md."
+  ],
+  "criteria": [
+    {
+      "text": "No unaddressed merge blockers in assigned scope",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Review covers exact committed range and distinguishes baseline issues",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T19:06:24.661Z"
+  },
+  "createdAt": "2026-11-12T19:06:24.661Z"
+}
