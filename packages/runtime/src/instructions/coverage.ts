@@ -25,11 +25,14 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "other families remain unchanged",
     },
     "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
-    "R-ROLE": { section: "root/identity.md", phrase: "You own the user relationship" },
+    "R-ROLE": { section: "root/identity.md", phrase: "Own the user relationship" },
     "R-PRECEDENCE": { section: "shared/precedence.md", phrase: "When rules conflict" },
     "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
     "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
-    "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
+    "R-TURN": {
+      section: "root/task-list.md",
+      phrase: "End your turn only when done or nothing can move",
+    },
     "R-ACK": { section: "root/user-messages.md", phrase: "Acknowledge every user message" },
     "R-NUDGE": { section: "root/user-messages.md", phrase: "one short line at most" },
     "R-MERGEREVIEW": {
@@ -44,7 +47,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-DECIDE": {
       section: "root/task-list.md",
-      phrase: "Every pending decision goes through AskUserQuestion",
+      phrase: "Send every pending decision through AskUserQuestion",
     },
     "R-REASK": {
       section: "root/asking.md",
@@ -64,10 +67,13 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-NOFILLER": {
       section: "root/identity.md",
-      phrase: "free of filler sections, redundant summaries and boilerplate",
+      phrase: "free of filler, redundant summaries and boilerplate",
     },
-    "R-OUTWARD": { section: "root/identity.md", phrase: "need the user's approval" },
-    "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
+    "R-OUTWARD": { section: "root/identity.md", phrase: "need user approval" },
+    "R-DELEGATE": {
+      section: "root/delegating.md",
+      phrase: "Delegate edits, runs, checks, reviews, research and investigation to specialists",
+    },
     "R-LEAN": {
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",
@@ -75,13 +81,13 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
-    "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
+    "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch --input '<json>'`" },
     "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
     "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
-    "R-WAKE": { section: "root/dispatch.md", phrase: "Completion notices are the only wake-ups" },
+    "R-WAKE": { section: "root/dispatch.md", phrase: "Only completion notices wake you" },
     "R-STOP": {
       section: "root/dispatch.md",
-      phrase: "only when a new requirement or new information conflicts with that running work",
+      phrase: "only for conflicting new requirements or information",
     },
     "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
     "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
@@ -110,7 +116,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-GIT": {
       section: "root/identity.md",
-      phrase: "Never force-push, and never push to the base, default or a protected branch",
+      phrase: "Never force-push or push to the base, default or a protected branch",
     },
     "R-BRANCH": {
       section: "root/identity.md",
@@ -270,7 +276,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       carriedBy: "packages/runtime/tests/instructions.test.ts",
       phrase: "hold no dates, times or other time-varying text",
     },
-    "R-CACHE-REUSE": { section: "root/dispatch.md", phrase: "a warm agent to continue" },
+    "R-CACHE-REUSE": { section: "root/dispatch.md", phrase: "or warm agent" },
     "R-CACHE-WINDOW": {
       carriedBy: "packages/runtime/src/setup/settings.ts",
       phrase: "subagentPromptCacheTtl",

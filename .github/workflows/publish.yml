@@ -24,7 +24,7 @@ jobs:
   # Only the jobs that call the tagging workflows may write contents.
   stable:
     needs: validation
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.ref_protected
     uses: ./.github/workflows/stable.yml
     permissions:
       contents: write
@@ -32,7 +32,7 @@ jobs:
 
   dev:
     needs: validation
-    if: github.ref != 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected
     uses: ./.github/workflows/dev.yml
     permissions:
       contents: write

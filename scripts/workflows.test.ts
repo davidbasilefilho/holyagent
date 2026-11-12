@@ -112,6 +112,25 @@ describe("the workflows", () => {
   })
 })
 
+describe("publication authority", () => {
+  test.each(["stable", "dev"])(
+    "%s npm job requires the npm environment and a protected ref",
+    (name) => {
+      const jobs = parse(`.github/workflows/${name}.yml`)["jobs"] as Record<
+        string,
+        { environment?: string; if?: string }
+      >
+      expect(jobs["publish"]?.environment).toBe("npm")
+      expect(jobs["publish"]?.if).toContain("github.ref_protected")
+      expect(jobs["publish"]?.if).toBe(
+        name === "stable"
+          ? "github.ref == 'refs/heads/main' && github.ref_protected"
+          : "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
+      )
+    },
+  )
+})
+
 describe("release lookup", () => {
   test.each(["404", "500"])(
     "handles HTTP %s without treating operational failures as absent",
@@ -182,16 +201,16 @@ describe("publish.yml", () => {
     expect(publish.on.push["branches-ignore"]).toEqual(["holyagent/state"])
   })
 
-  test("calls stable on main and dev elsewhere, only after validation", () => {
+  test("calls stable on protected main and dev on protected integration branches, only after validation", () => {
     expect(publish.jobs["validation"]?.uses).toBe("./.github/workflows/validation.yml")
     expect(publish.jobs["stable"]).toMatchObject({
       needs: "validation",
-      if: "github.ref == 'refs/heads/main'",
+      if: "github.ref == 'refs/heads/main' && github.ref_protected",
       uses: "./.github/workflows/stable.yml",
     })
     expect(publish.jobs["dev"]).toMatchObject({
       needs: "validation",
-      if: "github.ref != 'refs/heads/main'",
+      if: "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
       uses: "./.github/workflows/dev.yml",
     })
   })

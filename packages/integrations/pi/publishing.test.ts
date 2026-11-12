@@ -4,7 +4,13 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const root = join(import.meta.dir, "../../..")
-type Step = { name?: string; run?: string; uses?: string; with?: Record<string, string> }
+type Step = {
+  name?: string
+  run?: string
+  uses?: string
+  with?: Record<string, string>
+  env?: Record<string, string>
+}
 type Job = { needs?: string; steps: Step[] }
 const workflow = (name: string) =>
   Bun.YAML.parse(readFileSync(join(root, `.github/workflows/${name}.yml`), "utf8")) as {
@@ -102,6 +108,8 @@ ${attach.run}
       expect(readFileSync(join(dir, "runner/npm-args"), "utf8")).toContain(
         `holyagent-${version}.tgz\n${name === "dev" ? "dev" : "latest"}\n`,
       )
+      expect(readFileSync(join(dir, "runner/npm-args"), "utf8")).toContain(`holyagent-${version}\n`)
+      expect(npm.env?.["GH_TOKEN"]).toBe("${{ github.token }}")
       expect(readFileSync(join(dir, "runner/gh-args"), "utf8")).toContain(`holyagent-${version}\n`)
       const manifest = Bun.spawnSync(["tar", "-xOzf", archive, "package/package.json"])
       expect(manifest.exitCode).toBe(0)

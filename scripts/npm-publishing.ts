@@ -12,18 +12,7 @@ const RegistryVersion = open({
   dist: open({ integrity: Schema.String }),
 })
 const RegistryError = open({ error: open({ code: Schema.Literal("E404") }) })
-const Tags = Schema.Record(Schema.String, Schema.String)
-const stableVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
-const devVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-dev-[a-f0-9]{7}$/
-
-const timestamp = (value: string | undefined) => {
-  if (!value || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(value)) return NaN
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) &&
-    new Date(parsed).toISOString() === value.replace(/Z$/, value.includes(".") ? "Z" : ".000Z")
-    ? parsed
-    : NaN
-}
+const GitObject = open({ object: open({ type: Schema.String, sha: Schema.String }) })
 
 /** A publication cannot safely proceed. */
 export class PublishError extends Data.TaggedError("PublishError")<{ readonly detail: string }> {}
@@ -54,8 +43,88 @@ const npm: NpmRunner = (args) =>
 const decode = <A, I>(schema: Schema.Codec<A, I>, input: unknown) =>
   Schema.decodeUnknownEffect(schema, strict)(input)
 
-/** Publishes a packed artifact or verifies an identical existing version without changing tags. */
-export const publishArtifact = (path: string, tag: string, run: NpmRunner = npm) =>
+/** GitHub context for the tag that the subsequent release job will create. */
+export interface TagContext {
+  readonly repository: string
+  readonly tag: string
+  readonly commit: string
+  readonly token: string
+}
+
+/** Check the exact release tag using authenticated read-only GitHub API requests. */
+export const preflightTag = (
+  context: TagContext,
+  request: (url: string, init: RequestInit) => Promise<Response> = fetch,
+) =>
+  Effect.gen(function* () {
+    const { repository, tag, commit, token } = context
+    if (
+      !/^[\w.-]+\/[\w.-]+$/.test(repository) ||
+      !/^holyagent-[\w.-]+$/.test(tag) ||
+      !/^[a-f0-9]{40}$/.test(commit) ||
+      !token
+    )
+      return yield* new PublishError({ detail: "Invalid GitHub tag preflight context" })
+    const base = `https://api.github.com/repos/${repository}`
+    const get = (url: string) =>
+      Effect.tryPromise({
+        try: () =>
+          request(url, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
+          }),
+        catch: (cause) =>
+          new PublishError({ detail: `GitHub tag lookup failed: ${String(cause)}` }),
+      })
+    // A ref 404 is meaningful only after confirming the repository is accessible.
+    const repo = yield* get(base)
+    if (!repo.ok)
+      return yield* new PublishError({
+        detail: `GitHub repository lookup failed: HTTP ${repo.status}`,
+      })
+    let response = yield* get(`${base}/git/ref/tags/${encodeURIComponent(tag)}`)
+    if (response.status === 404) return
+    for (let depth = 0; depth < 16; depth++) {
+      if (!response.ok)
+        return yield* new PublishError({
+          detail: `GitHub tag lookup failed: HTTP ${response.status}`,
+        })
+      const body = yield* Effect.tryPromise({
+        try: (): Promise<unknown> => response.json(),
+        catch: (cause) =>
+          new PublishError({ detail: `Invalid GitHub tag response: ${String(cause)}` }),
+      })
+      const parsed = yield* decode(GitObject, body).pipe(
+        Effect.mapError(() => new PublishError({ detail: "Invalid GitHub tag response" })),
+      )
+      const object = parsed.object
+      if (!/^[a-f0-9]{40}$/.test(object.sha))
+        return yield* new PublishError({ detail: "Invalid GitHub tag object SHA" })
+      if (object.type === "commit") {
+        if (object.sha !== commit)
+          return yield* new PublishError({
+            detail: `GitHub tag ${tag} conflicts with expected commit ${commit}`,
+          })
+        return
+      }
+      if (object.type !== "tag")
+        return yield* new PublishError({ detail: "GitHub tag does not resolve to a commit" })
+      response = yield* get(`${base}/git/tags/${object.sha}`)
+    }
+    return yield* new PublishError({ detail: "GitHub tag nesting exceeds preflight limit" })
+  })
+
+/** Publishes a fresh packed artifact after checking the intended GitHub tag. */
+export const publishArtifact = (
+  path: string,
+  tag: string,
+  context: TagContext,
+  run: NpmRunner = npm,
+  request: (url: string, init: RequestInit) => Promise<Response> = fetch,
+) =>
   Effect.gen(function* () {
     if (!path || !/^[a-z][a-z0-9-]*$/.test(tag))
       return yield* new PublishError({ detail: "Expected a tarball path and a dist-tag" })
@@ -67,11 +136,7 @@ export const publishArtifact = (path: string, tag: string, run: NpmRunner = npm)
     const manifest = yield* decode(Schema.fromJsonString(Manifest), tar.stdout.toString())
     if (!manifest.name || !manifest.version)
       return yield* new PublishError({ detail: "Empty package identity" })
-    const bytes = yield* Effect.tryPromise({
-      try: () => Bun.file(path).arrayBuffer(),
-      catch: (cause) => new PublishError({ detail: `Cannot read tarball: ${String(cause)}` }),
-    })
-    const integrity = `sha512-${new Bun.CryptoHasher("sha512").update(bytes).digest("base64")}`
+    yield* preflightTag(context, request)
     const spec = `${manifest.name}@${manifest.version}`
     const lookup = yield* run(["view", spec, "--json"])
     if (lookup.exitCode !== 0) {
@@ -89,69 +154,26 @@ export const publishArtifact = (path: string, tag: string, run: NpmRunner = npm)
         })
       return
     }
-    const existing = yield* decode(Schema.fromJsonString(RegistryVersion), lookup.stdout)
-    if (
-      existing.name !== manifest.name ||
-      existing.version !== manifest.version ||
-      existing.dist.integrity !== integrity
-    )
-      return yield* new PublishError({ detail: `Registry content conflicts with ${spec}` })
-    const tags = yield* run(["dist-tag", "ls", manifest.name, "--json"])
-    if (tags.exitCode !== 0)
-      return yield* new PublishError({
-        detail: `Dist-tag lookup failed: ${tags.stderr || tags.stdout}`,
-      })
-    const current = yield* decode(Schema.fromJsonString(Tags), tags.stdout).pipe(
-      Effect.mapError(
-        () =>
-          new PublishError({
-            detail:
-              "Invalid dist-tag data; investigate registry state before retrying. OIDC cannot repair tags.",
-          }),
-      ),
-    )
-    if (current[tag] !== manifest.version) {
-      const tagged = current[tag]
-      const sameChannel =
-        tag === "dev"
-          ? devVersion.test(manifest.version) && devVersion.test(tagged ?? "")
-          : tag === "latest" &&
-            stableVersion.test(manifest.version) &&
-            stableVersion.test(tagged ?? "") &&
-            Bun.semver.order(tagged ?? "", manifest.version) > 0
-      if (!sameChannel)
-        return yield* new PublishError({
-          detail: `Dist-tag ${tag} is missing or points outside the expected channel for ${spec}; OIDC cannot repair this tag. Investigate registry state before retrying.`,
-        })
-      const times = yield* run(["view", manifest.name, "time", "--json"])
-      if (times.exitCode !== 0)
-        return yield* new PublishError({
-          detail: `Publication time lookup failed: ${times.stderr || times.stdout}`,
-        })
-      const dates = yield* decode(Schema.fromJsonString(Tags), times.stdout).pipe(
-        Effect.mapError(
-          () =>
-            new PublishError({
-              detail:
-                "Invalid publication time data; investigate registry state before retrying. OIDC cannot repair tags.",
-            }),
-        ),
-      )
-      const ours = timestamp(dates[manifest.version])
-      const theirs = timestamp(dates[tagged ?? ""])
-      if (!Number.isFinite(ours) || !Number.isFinite(theirs) || theirs <= ours)
-        return yield* new PublishError({
-          detail: `Dist-tag ${tag} does not point to ${spec} or a newer published version; OIDC cannot repair this tag. Investigate registry state before retrying.`,
-        })
-    }
+    yield* decode(Schema.fromJsonString(RegistryVersion), lookup.stdout)
+    return yield* new PublishError({
+      detail: `Cannot reuse existing ${spec}: trusted provenance cannot currently be established. Investigate the registry and release state before proceeding; no tag changes were made.`,
+    })
   })
 
 if (import.meta.main) {
-  const [path = "", tag = ""] = Bun.argv.slice(2)
+  const [path = "", tag = "", releaseTag = ""] = Bun.argv.slice(2)
+  const context = {
+    repository: process.env["GITHUB_REPOSITORY"] ?? "",
+    commit: process.env["GITHUB_SHA"] ?? "",
+    token: process.env["GH_TOKEN"] ?? "",
+    tag: releaseTag,
+  }
   await Effect.runPromise(
-    publishArtifact(path, tag).pipe(
+    publishArtifact(path, tag, context).pipe(
       Effect.catch((error) =>
-        Console.error(`npm publication failed: ${String(error)}`).pipe(
+        Console.error(
+          `npm publication failed: ${error instanceof PublishError ? error.detail : String(error)}`,
+        ).pipe(
           Effect.andThen(
             Effect.sync(() => {
               process.exitCode = 1
