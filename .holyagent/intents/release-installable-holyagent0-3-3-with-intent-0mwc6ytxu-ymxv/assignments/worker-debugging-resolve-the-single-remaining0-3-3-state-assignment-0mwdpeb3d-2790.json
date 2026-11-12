@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "resolve-the-single-remaining0-3-3-state",
   "objective": "Resolve the single remaining0.3.3 state-lock test timing failure with concrete stage evidence and minimal justified regression-safe fix.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Priorreport C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdp2rnq-s1nn.md. Fullgate56ee626actualerrorat C:/Users/david.basile/AppData/Local/Temp/holyagent-final-verify-56ee626.stderr.log /stdout.log: failed `agent-launch hook and CLI processes contending for the state lock > each finishes or fails with StateLocked inside its wait, and the state stays whole`. Parentmeasured8548ms vs8500ms,childexit0,nohostkill. Entirefocusedhook-lockfile3pass+3parallelfocusedpass, sojustanotherfocussedpass isNOTdiagnosis. Hypothesesranked scheduling/load;post-lockGit/I/O;actualexcesswait;parentmeasurementdelay. Readactualtestcontractandlocklifecycle BEFOREdiagnosing. AddTempchild/parentstageinstrumentationasneeded viaTempmirroror reversibletest-onlyinstrumentation; demonstratedcontrolledlateparentmeasurement/postlockdelaycanbevaliddeterministiccounterexampleifthebugistestharness, without full3496suite. Ensureinstrumentationdoesnotescape finaldiff. Distinguish timeinsideguardedwait from totalprocesselapsed/starthostoverhead. DoNOTchangeuser-visiblelocksemanticsjustfor48msoverrun. CurrentbehaviorallowscompleteorStateLockedwithinboundedwait, nooutputcorruption.",
     "Prove minimalfix with red/green scenario that fails original measurablefault andpassescorrected; fullaffectedfile+boundedstresstrueexitcounts. Ifrealimplementationbug, regressionfirstthenfix. Ifwallclocktestclaimsstrongerthanimplementationcontract, compareliteralcontract/calltrace and correcttest with equivalentactualwait/hostbound+whole-statechecks, ratherthanweaken/deliberatelyignoreload. Allexisting52skipsunchanged. Sourcepolicytestrepairalreadygreen76pass and rootwillreviewafterthiswriterterminal. Runchanged-scopegates/check/diffcheck, nofullverifyorgeneration. List exactchangedfiles+completeTempdiff. No unrequestedfeatures/refactors; doallasked."
@@ -131,5 +131,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdp2rnq-s1nn",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-12T15:29:36.871Z"
+  },
   "createdAt": "2026-11-12T15:29:23.113Z"
 }
