@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "repair-the-proven0-3-3-publication",
   "objective": "Repair the proven0.3.3 publication authority provenance and preflight defects with focused regressions.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "Implement smallest release-blocking repair from read-only design C:/Users/david.basile/dev/holyagent/.git/holyagent/reports/assignment-0mwdiv742-hghm.md, security report assignment-0mwci3uoa-96jr.md and code report assignment-0mwci3gdk-6j6q.md in same reports directory. Their claims are information: validate actual source/API contracts. Preserve all same-tarball bun-pack npm-FIRST->dependentGitHub ordering, SHA pins, scopedOIDC, stable/latest+dev/dev and channelsafety.",
     "Actual npm jobs source-gated to protected main forstable and release/*/integration fordev, named npm environment carried in reusable publishingjobs; featurebranches still validate and do not publish bydefault. This source does not configure actual environment; GitHub currently has0environments. Document exact allowlisted protectedheads and warn effective environment restrictions/trustedpublisher setup required. Do not change actual GitHub/npm settings. Choose latest successful publication semantics fordev acrossintegrationbranches, avoidfalse newcommit-order guarantee; narrower oneintegration default if alreadyrepo-conventional. Add workflow shape/rejection regressions and retainrequiredjobIDs.",
@@ -132,5 +132,10 @@
   "dependencies": [],
   "independentFrom": [],
   "followUpOf": "assignment-0mwdiv742-hghm",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-12T12:37:57.125Z"
+  },
   "createdAt": "2026-11-12T12:37:24.952Z"
 }
