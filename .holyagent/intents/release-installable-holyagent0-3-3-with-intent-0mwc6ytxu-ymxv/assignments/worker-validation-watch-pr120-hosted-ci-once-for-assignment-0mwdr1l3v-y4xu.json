@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "watch-pr120-hosted-ci-once-for",
   "objective": "Watch PR120 hosted CI once for exactb00eab2 and report3platform validation plus merge state withoutmerging.",
-  "state": "Ready",
+  "state": "Running",
   "scope": [
     "PRhttps://github.com/davidbasilefilho/holyagent/pull/120, branchrelease/0.3.3/fix/npm-readiness->release/0.3.3/integration, HEADb00eab296a492ea28a9012b29c842cd3e78b0f09. Rootpushedreviewedbranch+holyagent/stateandopenedPR. FullnativeWindowslocalverify3444pass52skip0fail, allindependentreviewsaccepted. NeedactualhostedCIWindows/macOS/LinuxcurrentSHA. No sourcewriters, packagedartifactsopsTemp-onlyparallel.",
     "ReadC:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent/packages/integrations/pi/dist/families/gpt-6/skills/ci-watch/SKILL.md and followwatchone-shotprotocol. Run`gh pr checks 120 --repo davidbasilefilho/holyagent --watch` ONCE viahostprocessmonitorifavailablewithcompletionwake; doNOTpoll/sleep/loop/blockshell>60swhenbackgroundwakeavailable. IfnosuitablehostprocessavailablefallbackONCEforegroundwithtimeoutpastlongestCI(>=1800s); necessarynestedtimeoutsaccommodate. Oncompletion ONEbounded `gh pr view120--jsonheadRefOid,statusCheckRollup,mergeStateStatus,reviewDecision,mergeable,url,baseRefName` snapshot and optional`ghrunlist--commitb00`/runmetadataforplatformactualproof ifnamesinsufficient. Noactionchanges, no cancels/re-runs/merges/branchdeletes/commentreplies.",
@@ -128,5 +128,10 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-12T16:15:44.928Z"
+  },
   "createdAt": "2026-11-12T16:15:28.796Z"
 }
