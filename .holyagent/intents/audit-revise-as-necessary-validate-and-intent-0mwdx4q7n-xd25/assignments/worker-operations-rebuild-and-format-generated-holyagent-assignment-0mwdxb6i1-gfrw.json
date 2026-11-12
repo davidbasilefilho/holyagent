@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "rebuild-and-format-generated-holyagent",
   "objective": "Rebuild and format generated HolyAgent artifacts after accepted Pi CLI and search policy repairs.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "/workspace/work/holyagent-pr120"
   ],
@@ -41,7 +41,33 @@
     "agentId": "/root/build_repairs",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T19:10:54.121Z"
+    "startedAt": "2026-11-12T19:10:54.121Z",
+    "finishedAt": "2026-11-12T19:11:50.558Z"
+  },
+  "result": "result: Rebuilt generated integrations and formatted assigned files.\nchanged: packages/integrations/pi/dist; docs/requirements.md (other assigned docs/test already modified by source writers).\nchecks: `bunx --no-install mise run build` -> 0; built 39 Claude and 139 Pi files. `bun fmt --no-script --check` on 12 modified source, docs and test files -> 0; all formatted. Full verify deferred as assigned.\nblockers: none\nquestions: none\nnotes: Claude build produced no tracked changes.\nevidence:\nGenerated artifacts reflect accepted source repairs and formatting is clean: build succeeded; formatting check passed on all 12 modified source, docs and test files.\nchecks-run: build and targeted format check, both exit 0; full verify not run as instructed.\nchanged-paths: packages/integrations/pi/dist and docs/requirements.md; full assigned-path diff at /workspace/work/repairs.diff.\ndiff-file: /workspace/work/repairs.diff\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Build generated both distributions successfully and all 12 edited source/docs/test files passed formatting.",
+    "criteria": [
+      {
+        "criterion": "Generated artifacts reflect accepted source repairs and formatting is clean",
+        "support": "build succeeded; formatting check passed on all 12 modified source, docs and test files."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "build and targeted format check, both exit 0; full verify not run as instructed."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/pi/dist and docs/requirements.md; full assigned-path diff at /workspace/work/repairs.diff."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/repairs.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:10:54.121Z"
 }
