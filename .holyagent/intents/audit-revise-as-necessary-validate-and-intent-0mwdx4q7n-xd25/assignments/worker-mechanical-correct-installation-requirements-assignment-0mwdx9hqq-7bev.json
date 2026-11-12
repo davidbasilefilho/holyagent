@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-installation-requirements",
   "objective": "Correct installation requirements documentation to distinguish Pi FFF search from Claude shell search.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "docs/requirements.md",
     "docs/pi/search.md"
@@ -35,7 +35,33 @@
     "agentId": "/root/repair_docs",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-12T19:09:35.379Z"
+    "startedAt": "2026-11-12T19:09:35.379Z",
+    "finishedAt": "2026-11-12T19:10:31.784Z"
+  },
+  "result": "result: Corrected integration-specific search and fallback documentation.\nchanged: docs/requirements.md, docs/pi/search.md\nchecks: git diff --check -- docs/requirements.md docs/pi/search.md -> 0; reviewed both changed lines against family instructions. bunx --no-install mise run verify -> 127, bunx unavailable.\nblockers: Verify gate could not start because bunx is unavailable.\nquestions: none\nnotes: Family instructions may have been changing concurrently; documentation follows their observed fallback behavior.\nevidence:\nDocumentation accurately describes integration-specific search and fallback: docs/requirements.md:10 and docs/pi/search.md:10 distinguish Claude and Pi, disabled or unsupported FFF, and unexpected failures.\nchanged-paths: docs/requirements.md, docs/pi/search.md\nchecks-run: git diff --check -> 0; verify -> 127 (bunx unavailable).\ndiff-file: /workspace/work/repair-docs.diff\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Documentation now distinguishes preferred Pi FFF from role-appropriate fallbacks and Claude shell tools; whitespace check passed.",
+    "criteria": [
+      {
+        "criterion": "Documentation accurately describes integration-specific search and fallback",
+        "support": "docs/requirements.md:10 and docs/pi/search.md:10 distinguish Claude and Pi, disabled or unsupported FFF, and unexpected failures."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "docs/requirements.md, docs/pi/search.md"
+      },
+      {
+        "label": "checks-run",
+        "support": "git diff --check -> 0; verify -> 127 (bunx unavailable)."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/repair-docs.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-12T19:09:35.379Z"
 }
