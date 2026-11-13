@@ -33,6 +33,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/owned_duplicate_artifact_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T21:04:25.931Z"
