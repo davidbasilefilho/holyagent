@@ -13349,10 +13349,10 @@ var init_specialists = __esm(() => {
 });
 
 import { createHash } from "crypto";
-var ActiveIntentFile, SpecialistsFile, WorkTreesFile, WorkTree, workTreeKey = (workTree) => createHash("sha1").update(workTree).digest("hex").slice(0, 16), activeIntentFile = (directory, workTree) => localFile(directory, `active-intent/${workTreeKey(workTree)}.json`), LEGACY_ACTIVE_INTENT = "active-intent.json", ensureLocalDirectory = (directory) => {
+var ActiveIntentFile, SpecialistsFile, WorkTreesFile, WorkTree, workTreeKey = (workTree) => createHash("sha1").update(workTree).digest("hex").slice(0, 16), activeIntentFile = (directory, workTree) => localFile(directory, `active-intent/${workTreeKey(workTree)}.json`), LEGACY_ACTIVE_INTENT = "active-intent.json", ensureLocalDirectory = (directory, authorize = void_3) => {
   const ignore = localFile(directory, ".gitignore");
-  return readText(ignore).pipe(flatMap2((text) => text !== undefined ? void_3 : commitFile(ignore, `*
-`)));
+  return readText(ignore).pipe(flatMap2((text) => text !== undefined ? void_3 : authorize.pipe(andThen2(commitFile(ignore, `*
+`)))));
 }, readLocal = (directory) => gen2(function* () {
   const workTree = yield* WorkTree;
   const own = workTree === undefined ? undefined : yield* readJson(ActiveIntentFile, activeIntentFile(directory, workTree));
@@ -13547,11 +13547,12 @@ import { link as link2, lstat, mkdir as mkdir2, open, rename as rename2, rm as r
 import { dirname as dirname2 } from "path";
 var LockOwner, UNREADABLE_STALE_MS = 30000, readOwner = (file) => readJson(LockOwner, file).pipe(orElseSucceed2(() => {
   return;
-})), processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ESRCH")))), inTheWay = (file) => tryPromise2({ try: () => lstat(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT")))), putBack = (taken, file) => io(file, () => link2(taken, file)).pipe(catch_2((error) => hasCode(error.cause, "EEXIST") ? void_3 : inTheWay(file).pipe(flatMap2((present) => present ? void_3 : io(file, () => rename2(taken, file))))), ignore2), breakIfStale = (file) => gen2(function* () {
+})), processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ESRCH")))), inTheWay = (file) => tryPromise2({ try: () => lstat(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT")))), putBack = (taken, file) => io(file, () => link2(taken, file)).pipe(catch_2((error) => hasCode(error.cause, "EEXIST") ? void_3 : inTheWay(file).pipe(flatMap2((present) => present ? void_3 : io(file, () => rename2(taken, file))))), ignore2), breakIfStale = (file, authorize) => gen2(function* () {
   const owner = yield* readOwner(file);
   const stale = owner ? !(yield* processAlive(owner.pid)) : (yield* currentTimeMillis2) - (yield* io(file, () => stat(file)).pipe(map5((item) => item.mtimeMs), orElseSucceed2(() => 0))) > UNREADABLE_STALE_MS;
   if (!stale)
     return;
+  yield* authorize;
   const taken = `${file}.stale-${crypto.randomUUID()}`;
   const moved = yield* io(file, () => rename2(file, taken)).pipe(as2(true), catch_2(() => succeed6(false)));
   if (!moved)
@@ -13560,40 +13561,41 @@ var LockOwner, UNREADABLE_STALE_MS = 30000, readOwner = (file) => readJson(LockO
   if (claimedMeanwhile)
     yield* putBack(taken, file);
   yield* io(taken, () => rm2(taken, { force: true }));
-}).pipe(ignore2), BLOCKED_CODES, create = (file, retry = true) => tryPromise2({ try: () => open(file, "wx"), catch: (cause) => cause }).pipe(catch_2((cause) => {
+}).pipe(catchTag2("StateIo", () => void_3)), BLOCKED_CODES, create = (file, retry = true) => tryPromise2({ try: () => open(file, "wx"), catch: (cause) => cause }).pipe(catch_2((cause) => {
   if (hasCode(cause, "EEXIST"))
     return fail5(new StateLocked({ lockFile: file }));
   if (!BLOCKED_CODES.some((code) => hasCode(cause, code)))
     return fail5(new StateIo({ path: file, cause }));
   return inTheWay(file).pipe(flatMap2((present) => present ? fail5(new StateLocked({ lockFile: file })) : retry ? create(file, false) : fail5(new StateIo({ path: file, cause }))));
-})), claim = (file) => gen2(function* () {
+})), claim = (file, authorize) => gen2(function* () {
   const owner = {
     pid: process.pid,
     token: crypto.randomUUID(),
     acquiredAt: yield* currentTimeMillis2
   };
   const content = yield* encodeJson(LockOwner, owner).pipe(orDie2);
+  yield* authorize;
   const handle = yield* create(file);
   yield* io(file, () => handle.writeFile(content)).pipe(tapError2(() => io(file, () => rm2(file, { force: true })).pipe(ignore2)), ensuring2(io(file, () => handle.close()).pipe(ignore2)));
   return owner.token;
 }), HOOK_WAIT_MS = 5000, deadlineIn = (ms) => map5(currentTimeMillis2, (now) => ({ until: now + ms })), STATE_PATIENCE = "short", WORKTREE_PATIENCE = "long", WAITS, DEADLINE_WAIT, holderBusy = (file, limit) => gen2(function* () {
   const owner = yield* readOwner(file);
   return owner === undefined || (yield* currentTimeMillis2) - owner.acquiredAt < limit;
-}), acquire = (file, patience) => {
+}), acquire = (file, patience, authorize) => {
   const named = typeof patience === "string";
   const { delay, limit, stuck } = named ? WAITS[patience] : DEADLINE_WAIT;
-  return claim(file).pipe(catchTag2("StateLocked", (locked) => breakIfStale(file).pipe(andThen2(fail5(locked)))), retry2({
+  return authorize.pipe(andThen2(claim(file, authorize)), catchTag2("StateLocked", (locked) => authorize.pipe(andThen2(breakIfStale(file, authorize)), andThen2(fail5(locked)))), retry2({
     schedule: spaced(delay),
     ...named ? { times: limit / delay } : {},
     while: (error) => gen2(function* () {
-      if (error._tag !== "StateLocked")
+      if (!(error instanceof StateLocked))
         return false;
       if (!named && (yield* currentTimeMillis2) >= patience.until)
         return false;
       return stuck ? yield* holderBusy(file, limit) : true;
     })
   }));
-}, release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2), withFileLock = (file, use, patience = STATE_PATIENCE) => acquireUseRelease2(io(file, () => mkdir2(dirname2(file), { recursive: true })).pipe(andThen2(acquire(file, patience))), () => use, (token) => release(file, token)), withStateLock = (directory, use, patience = STATE_PATIENCE) => acquireUseRelease2(ensureLocalDirectory(directory).pipe(andThen2(acquire(localFile(directory, "lock"), patience))), () => use, (token) => release(localFile(directory, "lock"), token));
+}, release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm2(file, { force: true })) : void_3), ignore2), withFileLock = (file, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(authorize.pipe(andThen2(io(file, () => mkdir2(dirname2(file), { recursive: true }))), andThen2(acquire(file, patience, authorize))), () => use, (token) => release(file, token)), withStateLock = (directory, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(ensureLocalDirectory(directory, authorize).pipe(andThen2(acquire(localFile(directory, "lock"), patience, authorize))), () => use, (token) => release(localFile(directory, "lock"), token));
 var init_lock = __esm(() => {
   init_dist();
   init_errors4();
@@ -13767,7 +13769,7 @@ ${ran.stdout}`.trim().split(`
     return false;
   return !(isEntry(line) && isMark(lines[index - 1] ?? ""));
 }), excludePath = (top, env) => gitText(top, env, ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"]).pipe(map5((path) => fromGitPath(path))), linesOf = (text) => text === undefined || text === "" ? [] : text.replace(/\n$/, "").split(`
-`), editExclude = (top, common, env, edit, done, patience = WORKTREE_PATIENCE) => gen2(function* () {
+`), editExclude = (top, common, env, edit, done, patience = WORKTREE_PATIENCE, authorize = void_3) => gen2(function* () {
   const path = yield* excludePath(top, env);
   if (done?.(linesOf(yield* readText(path))) === true)
     return;
@@ -13781,9 +13783,10 @@ ${ran.stdout}`.trim().split(`
     const body = lines.length === 0 ? "" : `${lines.join(`
 `)}
 `;
+    yield* authorize;
     yield* commitFile(path, body);
-  }), patience);
-}), ensureExcluded = (top, common, env, patience, authorize) => editExclude(top, common, env, (lines) => authorize.pipe(andThen2(stateModeOf(top, env)), map5((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry, patience), excludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withEntry(lines))), unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withoutMarked(lines))), isDirectory = (path) => io(path, () => stat2(path)).pipe(map5((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), stateBranch = (top, env) => gen2(function* () {
+  }), patience, authorize);
+}), ensureExcluded = (top, common, env, patience, authorize) => editExclude(top, common, env, (lines) => authorize.pipe(andThen2(stateModeOf(top, env)), map5((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry, patience, authorize), excludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withEntry(lines))), unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withoutMarked(lines))), isDirectory = (path) => io(path, () => stat2(path)).pipe(map5((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), stateBranch = (top, env) => gen2(function* () {
   const configured = yield* git(top, env, ["config", "--get", BRANCH_KEY]);
   const fromGit = configured.code === 0 ? configured.stdout.trim() : "";
   const branch = fromGit !== "" ? fromGit : DEFAULT_STATE_BRANCH;
@@ -13879,7 +13882,7 @@ ${ran.stdout}`.trim().split(`
     if (real)
       process.kill(-child.pid, "SIGKILL");
   }).pipe(ignore2);
-}, gitBounded = (cwd, env, args, timeout) => spawn("git", args, { cwd, env, discard: true }).pipe(map5((result) => result.code), catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause }))), timeoutOption2(timeout), map5((code) => code._tag === "Some" ? code.value : -1)), fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => git(top, env, ["config", "--get", "core.sshCommand"]).pipe(map5((ran) => ran.code === 0 ? ran.stdout.trim() : ""), flatMap2((configured) => gitBounded(top, fetchEnvironment(env, configured === "" ? undefined : configured), [
+}, gitBounded = (cwd, env, args, timeout) => spawn("git", args, { cwd, env, discard: true }).pipe(map5((result) => result.code), catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause }))), timeoutOption2(timeout), map5((code) => code._tag === "Some" ? code.value : -1)), fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS, authorize = void_3) => git(top, env, ["config", "--get", "core.sshCommand"]).pipe(map5((ran) => ran.code === 0 ? ran.stdout.trim() : ""), flatMap2((configured) => authorize.pipe(andThen2(gitBounded(top, fetchEnvironment(env, configured === "" ? undefined : configured), [
   "-c",
   "core.askPass=",
   "fetch",
@@ -13887,37 +13890,44 @@ ${ran.stdout}`.trim().split(`
   "--no-tags",
   "origin",
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
-], timeout)), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false))), readyMarker = (path) => `${path}.ready`, ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join4(common, "holyagent", "worktree.lock"), gen2(function* () {
+], timeout)))), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false))), readyMarker = (path) => `${path}.ready`, ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join4(common, "holyagent", "worktree.lock"), gen2(function* () {
   yield* authorize;
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
   if (again !== undefined) {
-    if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready)))
+    if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready))) {
+      yield* authorize;
       yield* io(ready, () => mkdir3(dirname3(ready), { recursive: true }).then(() => writeFile2(ready, "")));
+    }
     return { kind: "ready", path: again, created: false };
   }
   if (!options.make)
     return { kind: "absent" };
   if ((yield* stateModeOf(top, env)) !== "branch")
     return { kind: "deferred" };
+  yield* authorize;
   yield* git(top, env, ["worktree", "prune"]);
   yield* requireFree(yield* listWorktrees(top, env), path, branch);
   const add = [...BOOKKEEPING, "worktree", "add", "-q"];
   const local = yield* refExists(top, env, `refs/heads/${branch}`);
-  const remote = (yield* refExists(top, env, `refs/remotes/origin/${branch}`)) || !local && options.online && (yield* fetchRemoteBranch(top, env, branch));
+  const remote = (yield* refExists(top, env, `refs/remotes/origin/${branch}`)) || !local && options.online && (yield* authorize.pipe(andThen2(fetchRemoteBranch(top, env, branch, undefined, authorize))));
   if (!local && !remote && !options.online)
     return { kind: "absent" };
   const start = local || remote ? undefined : yield* baseStart(top, env);
   const target = local ? [path, branch] : remote ? ["--track", "-b", branch, path, `origin/${branch}`] : start === undefined ? undefined : ["--no-track", "-b", branch, path, start];
   if (target === undefined)
     return { kind: "deferred" };
+  yield* authorize;
   yield* io(ready, () => rm3(ready, { force: true }));
+  yield* authorize;
   yield* io(path, () => rm3(path, { recursive: true, force: true }));
+  yield* authorize;
   yield* io(path, () => mkdir3(dirname3(path), { recursive: true }));
+  yield* authorize;
   yield* gitText(top, env, [...add, ...target]);
-  yield* io(ready, () => mkdir3(dirname3(ready), { recursive: true }).then(() => writeFile2(ready, "")));
+  yield* uninterruptible2(io(ready, () => mkdir3(dirname3(ready), { recursive: true }).then(() => writeFile2(ready, ""))));
   return { kind: "ready", path, created: true };
-}), patience), LOCAL_FILES, sameBytes = (a, b) => all2([io(a, () => readFile2(a)), io(b, () => readFile2(b))]).pipe(map5(([left, right]) => Buffer.from(left).equals(Buffer.from(right)))), fileExists = (path) => io(path, () => stat2(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), kindAt = (path) => io(path, () => lstat2(path)).pipe(map5((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined))), realStateFolder = (root) => canonical(dirname3(root)).pipe(map5((parent) => join4(parent, basename(root)))), requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
+}), patience, authorize), LOCAL_FILES, sameBytes = (a, b) => all2([io(a, () => readFile2(a)), io(b, () => readFile2(b))]).pipe(map5(([left, right]) => Buffer.from(left).equals(Buffer.from(right)))), fileExists = (path) => io(path, () => stat2(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), kindAt = (path) => io(path, () => lstat2(path)).pipe(map5((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined))), realStateFolder = (root) => canonical(dirname3(root)).pipe(map5((parent) => join4(parent, basename(root)))), requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
   path: root,
   cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`
 })))), isPlainFile = (root, relative) => gen2(function* () {
@@ -13941,9 +13951,10 @@ ${ran.stdout}`.trim().split(`
         cause: `a ${kind} stands where state is to be written; the state worktree must hold only plain files and folders, so remove it`
       });
   }
-}), copyInto = (root, relative, from) => gen2(function* () {
+}), copyInto = (root, relative, from, begin) => gen2(function* () {
   yield* requirePlainTarget(root, relative);
   const to = join4(root, relative);
+  yield* begin;
   yield* io(to, () => mkdir3(dirname3(to), { recursive: true }));
   const [folder, base] = yield* all2([canonical(dirname3(to)), realStateFolder(root)]);
   if (folder !== base && !folder.startsWith(`${base}${sep2}`))
@@ -13993,6 +14004,7 @@ ${ran.stdout}`.trim().split(`
       return;
     const entries = yield* workTreeEntries(top, env);
     const moved = [];
+    const copies = [];
     for (const entry of entries) {
       if (!(yield* isPlainFile(source, entry.path)))
         continue;
@@ -14002,45 +14014,57 @@ ${ran.stdout}`.trim().split(`
       const there = (yield* kindAt(to)) !== undefined;
       const wanted = !there || dirty && !(yield* sameBytes(join4(source, entry.path), to));
       if (wanted)
-        yield* copyInto(target, entry.path, join4(source, entry.path));
+        copies.push(entry);
       if (dirty && !entry.path.startsWith("local/"))
         moved.push(entry);
     }
-    yield* commit("chore(state): migrate the state found in a work tree");
-    for (const entry of moved) {
-      const from = join4(source, entry.path);
-      if (!(yield* sameBytes(from, join4(target, entry.path))))
-        continue;
-      const status = entry.status ?? "";
-      if (status === "??")
-        yield* io(from, () => rm3(from, { force: true }));
-      else if (status.startsWith("A"))
-        yield* gitText(top, env, [
-          "rm",
-          "-f",
-          "-q",
-          "--",
-          `${STATE_DIRECTORY}/${entry.path}`
-        ]);
-      else
-        yield* gitText(top, env, [
-          "--literal-pathspecs",
-          "restore",
-          "--source=HEAD",
-          "--staged",
-          "--worktree",
-          "--",
-          `${STATE_DIRECTORY}/${entry.path}`
-        ]);
-      yield* pruneEmpty(source, dirname3(from));
-    }
-    yield* io(source, () => rmdir(source)).pipe(ignore2);
-    yield* io(marker, () => mkdir3(dirname3(marker), { recursive: true }).then(() => writeFile2(marker, "")));
-  }), patience)))))));
-}, STATE_FILE, stageState = (worktree, env, copied) => gen2(function* () {
+    let started = false;
+    const begin = suspend2(() => started ? void_3 : authorize.pipe(tap2(() => sync2(() => {
+      started = true;
+    }))));
+    yield* uninterruptible2(gen2(function* () {
+      for (const entry of copies)
+        yield* copyInto(target, entry.path, join4(source, entry.path), begin);
+      yield* commit("chore(state): migrate the state found in a work tree", begin);
+      for (const entry of moved) {
+        const from = join4(source, entry.path);
+        if (!(yield* sameBytes(from, join4(target, entry.path))))
+          continue;
+        const status = entry.status ?? "";
+        yield* begin;
+        if (status === "??")
+          yield* io(from, () => rm3(from, { force: true }));
+        else if (status.startsWith("A"))
+          yield* gitText(top, env, [
+            "rm",
+            "-f",
+            "-q",
+            "--",
+            `${STATE_DIRECTORY}/${entry.path}`
+          ]);
+        else
+          yield* gitText(top, env, [
+            "--literal-pathspecs",
+            "restore",
+            "--source=HEAD",
+            "--staged",
+            "--worktree",
+            "--",
+            `${STATE_DIRECTORY}/${entry.path}`
+          ]);
+        yield* pruneEmpty(source, dirname3(from));
+      }
+      yield* begin;
+      yield* io(source, () => rmdir(source)).pipe(ignore2);
+      yield* io(marker, () => mkdir3(dirname3(marker), { recursive: true }).then(() => writeFile2(marker, "")));
+    }));
+  }), patience, authorize)))))));
+}, STATE_FILE, stageState = (worktree, env, copied, begin) => gen2(function* () {
   const tracked = [STATE_DIRECTORY, `:(exclude)${STATE_DIRECTORY}/local`];
-  if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "")
+  if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "") {
+    yield* begin;
     yield* gitText(worktree, env, ["add", "-u", "--", ...tracked]);
+  }
   const folder = stateDirectory(worktree);
   const files = yield* io(folder, () => scanFiles(folder));
   const named = copied.map((path) => toPosix(relative(folder, path))).filter((path) => path !== "" && !path.startsWith("../") && !/^local(?:\/|$)/.test(path));
@@ -14050,9 +14074,11 @@ ${ran.stdout}`.trim().split(`
       ...named
     ])
   ].map((path) => `${STATE_DIRECTORY}/${path}`);
-  if (wanted.length > 0)
+  if (wanted.length > 0) {
+    yield* begin;
     yield* gitText(worktree, env, ["--literal-pathspecs", "add", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"], wanted.map((path) => `${path}\x00`).join(""));
-}), commitState = (directory, env, message, copied = [], resolved) => gen2(function* () {
+  }
+}), commitState = (directory, env, message, copied = [], resolved, begin = void_3) => gen2(function* () {
   const worktree = dirname3(directory);
   if (!(yield* isDirectory(worktree)))
     return false;
@@ -14074,10 +14100,12 @@ ${ran.stdout}`.trim().split(`
   const branch = "branch" in known ? known.branch : yield* stateBranch(worktree, env);
   if (current.code !== 0 || current.stdout.trim() !== branch)
     return false;
-  yield* stageState(worktree, env, copied);
+  yield* stageState(worktree, env, copied, begin);
   if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
     return false;
-  yield* gitText(worktree, yield* committing(worktree, env), [
+  const identity = yield* committing(worktree, env);
+  yield* begin;
+  yield* gitText(worktree, identity, [
     ...BOOKKEEPING,
     "commit",
     "-q",
@@ -14151,7 +14179,7 @@ ${ran.stdout}`.trim().split(`
     for (const source of new Set(sources))
       if (source !== worktree && (yield* isDirectory(source))) {
         yield* authorize;
-        yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message, [], resolved), patience, authorize);
+        yield* migrateWorkTree(source, common, worktree, env, (message, begin) => commitState(directory, env, message, [], resolved, begin), patience, authorize);
       }
   }
   return { root: top, directory, resolved };
@@ -14438,7 +14466,7 @@ var globBelow = (folder, pattern, separator = sep3) => `${toPosix(folder, separa
   const shown = records.slice(0, MAX_LISTED).join(", ");
   const more = records.length - MAX_LISTED;
   return `chore(state): record ${records.length === 0 ? "state" : shown}${more > 0 ? ` and ${more} more` : ""}`;
-}, updateState = (directory, transition, env = {}, patience = STATE_PATIENCE, resolved, after) => withStateLock(directory, gen2(function* () {
+}, updateState = (directory, transition, env = {}, patience = STATE_PATIENCE, resolved, after, authorize = void_3) => withStateLock(directory, gen2(function* () {
   const snapshot = yield* readSnapshot(directory);
   const result = yield* transition(snapshot);
   yield* uninterruptible2(gen2(function* () {
@@ -14449,7 +14477,7 @@ var globBelow = (folder, pattern, separator = sep3) => `${toPosix(folder, separa
       yield* after(result);
   }));
   return result;
-}), patience);
+}), patience, authorize);
 var init_store = __esm(() => {
   init_dist();
   init_assignment();
@@ -15453,7 +15481,7 @@ var Unauthorized, requireCapability = (context, capability) => suspend2(() => co
       const result = yield* transition(snapshot);
       yield* requireCapability(context, capability);
       return result;
-    }), context.env, undefined, state.resolved, after)
+    }), context.env, undefined, state.resolved, after, authorizeInitialization)
   }).pipe(provideService2(WorkTree, state.root));
 }), resolveIntent = (snapshot) => {
   const open = snapshot.project.intents.filter((item) => item.state === "Open").toSorted((a, b) => a.id.localeCompare(b.id));

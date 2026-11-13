@@ -136,6 +136,7 @@ export const withState = <A, E, R>(
           undefined,
           state.resolved,
           after,
+          authorizeInitialization,
         ),
     }).pipe(Effect.provideService(WorkTree, state.root))
   })

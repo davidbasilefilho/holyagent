@@ -61,10 +61,15 @@ export interface Local {
  * Makes the `local/` folder and, on first use, its `.gitignore` holding `*`, so nothing in it is
  * ever committed (the ignore file ignores itself too).
  */
-export const ensureLocalDirectory = (directory: string) => {
+export const ensureLocalDirectory = <E = never>(
+  directory: string,
+  authorize: Effect.Effect<void, E> = Effect.void,
+) => {
   const ignore = localFile(directory, ".gitignore")
   return readText(ignore).pipe(
-    Effect.flatMap((text) => (text !== undefined ? Effect.void : commitFile(ignore, "*\n"))),
+    Effect.flatMap((text) =>
+      text !== undefined ? Effect.void : authorize.pipe(Effect.andThen(commitFile(ignore, "*\n"))),
+    ),
   )
 }
 

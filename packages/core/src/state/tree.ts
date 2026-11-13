@@ -214,6 +214,7 @@ const editExclude = <E, R>(
   edit: (lines: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<string>, E, R>,
   done?: (lines: ReadonlyArray<string>) => boolean,
   patience: Patience = WORKTREE_PATIENCE,
+  authorize: Effect.Effect<void, E, R> = Effect.void,
 ) =>
   Effect.gen(function* () {
     const path = yield* excludePath(top, env)
@@ -225,9 +226,11 @@ const editExclude = <E, R>(
         const lines = yield* edit(before)
         if (lines.join("\n") === before.join("\n")) return
         const body = lines.length === 0 ? "" : `${lines.join("\n")}\n`
+        yield* authorize
         yield* commitFile(path, body)
       }),
       patience,
+      authorize,
     )
   })
 
@@ -254,6 +257,7 @@ const ensureExcluded = <E>(
       ),
     hasEntry,
     patience,
+    authorize,
   )
 
 /**
@@ -572,28 +576,33 @@ const gitBounded = (
  * `timeout` milliseconds; an offline, slow, missing or empty remote only means the branch starts
  * from the base.
  */
-export const fetchRemoteBranch = (
+export const fetchRemoteBranch = <E = never>(
   top: string,
   env: Environment,
   branch: string,
   timeout: number = FETCH_TIMEOUT_MS,
+  authorize: Effect.Effect<void, E> = Effect.void,
 ) =>
   git(top, env, ["config", "--get", "core.sshCommand"]).pipe(
     Effect.map((ran) => (ran.code === 0 ? ran.stdout.trim() : "")),
     Effect.flatMap((configured) =>
-      gitBounded(
-        top,
-        fetchEnvironment(env, configured === "" ? undefined : configured),
-        [
-          "-c",
-          "core.askPass=",
-          "fetch",
-          "-q",
-          "--no-tags",
-          "origin",
-          `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
-        ],
-        timeout,
+      authorize.pipe(
+        Effect.andThen(
+          gitBounded(
+            top,
+            fetchEnvironment(env, configured === "" ? undefined : configured),
+            [
+              "-c",
+              "core.askPass=",
+              "fetch",
+              "-q",
+              "--no-tags",
+              "origin",
+              `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
+            ],
+            timeout,
+          ),
+        ),
       ),
     ),
     Effect.flatMap((code) =>
@@ -636,22 +645,29 @@ const ensureWorktree = <E>(
       const ready = readyMarker(path)
       const again = yield* checkedOut(yield* listWorktrees(top, env), branch)
       if (again !== undefined) {
-        if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready)))
+        if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready))) {
+          yield* authorize
           yield* io(ready, () =>
             mkdir(dirname(ready), { recursive: true }).then(() => writeFile(ready, "")),
           )
+        }
         return { kind: "ready", path: again, created: false } satisfies Ensured
       }
       if (!options.make) return { kind: "absent" } satisfies Ensured
       // A mode change made while this command waited for the lock leaves no state branch to make.
       if ((yield* stateModeOf(top, env)) !== "branch") return { kind: "deferred" } satisfies Ensured
+      yield* authorize
       yield* git(top, env, ["worktree", "prune"])
       yield* requireFree(yield* listWorktrees(top, env), path, branch)
       const add = [...BOOKKEEPING, "worktree", "add", "-q"]
       const local = yield* refExists(top, env, `refs/heads/${branch}`)
       const remote =
         (yield* refExists(top, env, `refs/remotes/origin/${branch}`)) ||
-        (!local && options.online && (yield* fetchRemoteBranch(top, env, branch)))
+        (!local &&
+          options.online &&
+          (yield* authorize.pipe(
+            Effect.andThen(fetchRemoteBranch(top, env, branch, undefined, authorize)),
+          )))
       // Without the network the remote copy is unknown, so the branch is left for a command that
       // may fetch it; starting it from the base here would shadow the remote one for good.
       if (!local && !remote && !options.online) return { kind: "absent" } satisfies Ensured
@@ -666,16 +682,24 @@ const ensureWorktree = <E>(
       if (target === undefined) return { kind: "deferred" } satisfies Ensured
       // The folder is ours (under the git directory) and no work tree is registered at it, so what
       // is there is a leftover.
+      yield* authorize
       yield* io(ready, () => rm(ready, { force: true }))
+      yield* authorize
       yield* io(path, () => rm(path, { recursive: true, force: true }))
+      yield* authorize
       yield* io(path, () => mkdir(dirname(path), { recursive: true }))
+      yield* authorize
       yield* gitText(top, env, [...add, ...target])
-      yield* io(ready, () =>
-        mkdir(dirname(ready), { recursive: true }).then(() => writeFile(ready, "")),
+      // Finish marking a completed checkout; an interrupted checkout is recovered on the next run.
+      yield* Effect.uninterruptible(
+        io(ready, () =>
+          mkdir(dirname(ready), { recursive: true }).then(() => writeFile(ready, "")),
+        ),
       )
       return { kind: "ready", path, created: true } satisfies Ensured
     }),
     patience,
+    authorize,
   )
 
 interface Entry {
@@ -785,10 +809,11 @@ const requirePlainTarget = (root: string, relative: string) =>
  * checking that the folders it lands in are plain folders inside the worktree. The rename never
  * follows a link at the destination.
  */
-const copyInto = (root: string, relative: string, from: string) =>
+const copyInto = <E>(root: string, relative: string, from: string, begin: Effect.Effect<void, E>) =>
   Effect.gen(function* () {
     yield* requirePlainTarget(root, relative)
     const to = join(root, relative)
+    yield* begin
     yield* io(to, () => mkdir(dirname(to), { recursive: true }))
     const [folder, base] = yield* Effect.all([canonical(dirname(to)), realStateFolder(root)])
     if (folder !== base && !folder.startsWith(`${base}${sep}`))
@@ -875,7 +900,7 @@ const migrateWorkTree = <E>(
   common: string,
   worktree: string,
   env: Environment,
-  commit: (message: string) => Effect.Effect<boolean, StateIo>,
+  commit: (message: string, begin: Effect.Effect<void, E>) => Effect.Effect<boolean, StateIo | E>,
   patience: Patience = STATE_PATIENCE,
   authorize: Effect.Effect<void, E> = Effect.void,
 ) => {
@@ -902,6 +927,7 @@ const migrateWorkTree = <E>(
                           if (yield* fileExists(marker)) return
                           const entries = yield* workTreeEntries(top, env)
                           const moved: Array<Entry> = []
+                          const copies: Array<Entry> = []
                           for (const entry of entries) {
                             // A link, device or socket in the work tree is not state.
                             if (!(yield* isPlainFile(source, entry.path))) continue
@@ -911,46 +937,70 @@ const migrateWorkTree = <E>(
                             const there = (yield* kindAt(to)) !== undefined
                             const wanted =
                               !there || (dirty && !(yield* sameBytes(join(source, entry.path), to)))
-                            if (wanted)
-                              yield* copyInto(target, entry.path, join(source, entry.path))
+                            if (wanted) copies.push(entry)
                             if (dirty && !entry.path.startsWith("local/")) moved.push(entry)
                           }
-                          yield* commit("chore(state): migrate the state found in a work tree")
-                          // Only what the state worktree now holds byte for byte leaves the work tree.
-                          for (const entry of moved) {
-                            const from = join(source, entry.path)
-                            if (!(yield* sameBytes(from, join(target, entry.path)))) continue
-                            const status = entry.status ?? ""
-                            if (status === "??") yield* io(from, () => rm(from, { force: true }))
-                            else if (status.startsWith("A"))
-                              yield* gitText(top, env, [
-                                "rm",
-                                "-f",
-                                "-q",
-                                "--",
-                                `${STATE_DIRECTORY}/${entry.path}`,
-                              ])
-                            else
-                              yield* gitText(top, env, [
-                                "--literal-pathspecs",
-                                "restore",
-                                "--source=HEAD",
-                                "--staged",
-                                "--worktree",
-                                "--",
-                                `${STATE_DIRECTORY}/${entry.path}`,
-                              ])
-                            yield* pruneEmpty(source, dirname(from))
-                          }
-                          // The folder goes too when only its emptied husk is left; one with `local/` stays.
-                          yield* io(source, () => rmdir(source)).pipe(Effect.ignore)
-                          yield* io(marker, () =>
-                            mkdir(dirname(marker), { recursive: true }).then(() =>
-                              writeFile(marker, ""),
-                            ),
+                          let started = false
+                          const begin = Effect.suspend(() =>
+                            started
+                              ? Effect.void
+                              : authorize.pipe(
+                                  Effect.tap(() =>
+                                    Effect.sync(() => {
+                                      started = true
+                                    }),
+                                  ),
+                                ),
+                          )
+                          yield* Effect.uninterruptible(
+                            Effect.gen(function* () {
+                              for (const entry of copies)
+                                yield* copyInto(target, entry.path, join(source, entry.path), begin)
+                              yield* commit(
+                                "chore(state): migrate the state found in a work tree",
+                                begin,
+                              )
+                              // Only what the state worktree now holds byte for byte leaves the work tree.
+                              for (const entry of moved) {
+                                const from = join(source, entry.path)
+                                if (!(yield* sameBytes(from, join(target, entry.path)))) continue
+                                const status = entry.status ?? ""
+                                yield* begin
+                                if (status === "??")
+                                  yield* io(from, () => rm(from, { force: true }))
+                                else if (status.startsWith("A"))
+                                  yield* gitText(top, env, [
+                                    "rm",
+                                    "-f",
+                                    "-q",
+                                    "--",
+                                    `${STATE_DIRECTORY}/${entry.path}`,
+                                  ])
+                                else
+                                  yield* gitText(top, env, [
+                                    "--literal-pathspecs",
+                                    "restore",
+                                    "--source=HEAD",
+                                    "--staged",
+                                    "--worktree",
+                                    "--",
+                                    `${STATE_DIRECTORY}/${entry.path}`,
+                                  ])
+                                yield* pruneEmpty(source, dirname(from))
+                              }
+                              // The folder goes too when only its emptied husk is left; one with `local/` stays.
+                              yield* begin
+                              yield* io(source, () => rmdir(source)).pipe(Effect.ignore)
+                              yield* io(marker, () =>
+                                mkdir(dirname(marker), { recursive: true }).then(() =>
+                                  writeFile(marker, ""),
+                                ),
+                              )
+                            }),
                           )
                         }),
                         patience,
+                        authorize,
                       ),
                 ),
               ),
@@ -977,13 +1027,20 @@ const STATE_FILE =
  * `copied` files a command wrote itself (absolute paths; one outside the state folder or in
  * `local/` is ignored).
  */
-const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<string>) =>
+const stageState = <E>(
+  worktree: string,
+  env: Environment,
+  copied: ReadonlyArray<string>,
+  begin: Effect.Effect<void, E>,
+) =>
   Effect.gen(function* () {
     // Newer git rejects `add -u` for a pathspec that matches nothing git tracks, as on the first
     // state commit, so only update what is tracked.
     const tracked = [STATE_DIRECTORY, `:(exclude)${STATE_DIRECTORY}/local`]
-    if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "")
+    if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "") {
+      yield* begin
       yield* gitText(worktree, env, ["add", "-u", "--", ...tracked])
+    }
     const folder = stateDirectory(worktree)
     const files = yield* io(folder, () => scanFiles(folder))
     const named = copied
@@ -997,13 +1054,15 @@ const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<st
     ].map((path) => `${STATE_DIRECTORY}/${path}`)
     // The names go to git on its standard input, NUL-separated: on the command line they would
     // outgrow the operating system's limit as the history grows (about 200 files on Windows).
-    if (wanted.length > 0)
+    if (wanted.length > 0) {
+      yield* begin
       yield* gitText(
         worktree,
         env,
         ["--literal-pathspecs", "add", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"],
         wanted.map((path) => `${path}\0`).join(""),
       )
+    }
   })
 
 /**
@@ -1016,12 +1075,13 @@ const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<st
  * branch that {@link resolveState} found, which save reading them from git config again; without it
  * they are read. Call it under the state lock.
  */
-export const commitState = (
+export const commitState = <E = never>(
   directory: string,
   env: Environment,
   message: string,
   copied: ReadonlyArray<string> = [],
   resolved?: Resolved,
+  begin: Effect.Effect<void, E> = Effect.void,
 ) =>
   Effect.gen(function* () {
     const worktree = dirname(directory)
@@ -1042,10 +1102,12 @@ export const commitState = (
     const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"])
     const branch = "branch" in known ? known.branch : yield* stateBranch(worktree, env)
     if (current.code !== 0 || current.stdout.trim() !== branch) return false
-    yield* stageState(worktree, env, copied)
+    yield* stageState(worktree, env, copied, begin)
     if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
       return false
-    yield* gitText(worktree, yield* committing(worktree, env), [
+    const identity = yield* committing(worktree, env)
+    yield* begin
+    yield* gitText(worktree, identity, [
       ...BOOKKEEPING,
       "commit",
       "-q",
@@ -1189,7 +1251,7 @@ export const resolveState = <E = never>(
             common,
             worktree,
             env,
-            (message) => commitState(directory, env, message, [], resolved),
+            (message, begin) => commitState(directory, env, message, [], resolved, begin),
             patience,
             authorize,
           )
