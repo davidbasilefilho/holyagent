@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwfh9npp-1roo",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-review-authorization-and",
+  "objective": "Independently review authorization and state integrity of direct Node native consumers and shared Core APIs.",
+  "state": "Running",
+  "scope": [
+    "Immutable edce18fee6579d591d59a629765225e2e0e955cd...5b1b6e2 in /workspace/work/holyagent-034-core, full diff /workspace/work/034/core-resume-repair.diff and report core-resume-repair-report.json/APIinventory core-resume-api-inventory.md. Review strictschema/decodeextrafields, capabilityauthorityrootversuschild, flag/version/configreload/revocation, criticalstatetransitionlock/cancellation/migration/paths, authorizerecheckunderlock, no CLI/Bun/argv/parser fallback, realNodeSDKsubprocessproof, commandtextreports/controlencoding, updaterworkspacegraphpinpreservation. No privilegednative VCS/setup/state-modewrites exposed without equivalentauthority, do not infer useraccountentitlement.",
+    "User explicitinternalCLIANYoutputplainincludingTTYforcedcolors: internal entry deliberately noTUI, publicnpmseparateentryretainssetupUI. Ordinarysecurityreview notexternalCodexSecurityscan. No livepaidmodel/Pi oractualstate/account operations; fixturesisolatedoutsideGit. Full3562pass2skip andfocusedNodeSDKcurrentpass. Independently boundedproofifneeded; no unsupportedpermissionboundaryclaims. Save /workspace/work/034/core-checkpoint-security-review-report.json."
+  ],
+  "constraints": [
+    "\nFirst pass: security-review.\n\nYou are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from `git diff` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff, then list the trust boundaries it touches: where data enters (requests, files, environment, arguments, stored data, output of tools and models) and what privilege the code runs with.\n2. For each source, follow the data to every sink it reaches: a shell or process call, a query, a file path, a deserializer, rendered output, an outgoing request, an authentication or authorization decision, a secret store or log, a cryptographic call.\n3. Read each check on the path. A check counts only if it covers this source and this sink.\n4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.\n5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.\n6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the source, the sink and the path between them, with files and lines;\n- the precondition;\n- the impact rating;\n- validated or suspected, with what is missing for a suspicion;\n- the label.\n\nExample entry:\n\n- Source `GET /files?name=` in `src/routes/files.ts:18`; sink `readFile` in `src/files.ts:31`; `name` is joined to the upload root with no check for `..`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers `name`. blocker.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "No introduced or worsened security finding remains in shared Core state and native tool authority boundaries",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "first-pass",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfgluop-h1ed",
+    "assignment-0mwf8phge-0pau",
+    "assignment-0mwf7j400-7whk"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T21:17:21.613Z"
+  },
+  "createdAt": "2026-11-13T21:17:21.613Z"
+}
