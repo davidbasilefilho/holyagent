@@ -74,6 +74,10 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 - Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content.
 - The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render; under reduced motion, movement becomes a fade or nothing.
 
+### Iteration quality
+
+Assess the design system, composition, alignment, contrast, distribution, placement and sizing, and responsiveness. Exercise fluid component and route animation and transitions, including reduced motion. For each interactive element check hover where applicable, press or tap, keyboard focus and disabled appearance where relevant. Follow platform conventions while preserving creative latitude.
+
 ## Web rules
 
 - Name the mode in the plan. An expressive page (marketing, editorial) is judged on point of view and composition; a task-oriented product UI is judged on familiarity and speed of use. (preference)

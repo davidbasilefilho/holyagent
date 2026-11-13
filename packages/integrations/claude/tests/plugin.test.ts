@@ -61,6 +61,7 @@ const SKILLS = [
   "evidence-judging",
   "instruction-writing",
   "mobile-design",
+  "performance-iteration",
   "state-mode",
   "tui-design",
   "user-busy",
@@ -655,6 +656,7 @@ describe("agents", () => {
       ...SPECIALIST_SECTIONS.map((name) => toPosix(normalize(`specialist/${name}`))),
       ...CONDITIONAL_SECTIONS.map(({ file }) => `specialist/${file}`),
       "shared/materiality.md",
+      "design-core/core.md",
       ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
         names.map((name) => `roles/${role}/${name}`),
       ),
@@ -666,6 +668,17 @@ describe("agents", () => {
       const { section, phrase } = entry
       expect({ id, assembled: assembled.includes(section) }).toEqual({ id, assembled: true })
       expect({ id, holds: read(CLAUDE, section).includes(phrase) }).toEqual({ id, holds: true })
+      if (section === "design-core/core.md") {
+        for (const name of ["web-design", "mobile-design", "desktop-design", "tui-design"]) {
+          const skill = generated.find((file) => file.path.endsWith(`skills/${name}/SKILL.md`))
+          expect({ id, name, holds: skill?.content.includes(phrase) }).toEqual({
+            id,
+            name,
+            holds: true,
+          })
+        }
+        continue
+      }
       const conditional = CONDITIONAL_SECTIONS.find(({ file }) => section === `specialist/${file}`)
       if (section.startsWith("skills/")) {
         const skill = generated.find((file) => file.path.endsWith(section))

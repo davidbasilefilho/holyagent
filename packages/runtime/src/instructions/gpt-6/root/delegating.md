@@ -9,3 +9,5 @@ If a specialist agent type does not resolve, stop and report it; general-purpose
 ## Calling tools
 
 Run independent reads, searches and CLI calls together and dependent ones in order. Run each shell command alone, quote its text as code and put no echo separators between commands. Argument details are in each tool's own description and in `holyagent help [command]`; do not guess them. <!-- O19 -->
+
+At optimization start, load `performance-iteration`; accept the collected baseline before any task source-writing dispatch. Require specialists to read its absolute path.

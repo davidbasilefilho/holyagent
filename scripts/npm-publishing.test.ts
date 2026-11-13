@@ -20,12 +20,49 @@ const context = {
 const object = (type: string, sha: string) => Response.json({ object: { type, sha } })
 
 describe("packed npm publication", () => {
+  test("rejects missing repository metadata before any network or npm operation", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "npm-metadata-"))
+    try {
+      writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "x", version: "1.0.0" }))
+      expect(
+        Bun.spawnSync(["bun", "pm", "pack", "--destination", dir], { cwd: dir }).exitCode,
+      ).toBe(0)
+      let called = false
+      const result = await Effect.runPromiseExit(
+        publishArtifact(
+          join(dir, "x-1.0.0.tgz"),
+          "dev",
+          context,
+          () => {
+            called = true
+            return Effect.succeed(ok())
+          },
+          () => {
+            called = true
+            return Promise.resolve(new Response("{}"))
+          },
+        ),
+      )
+      expect(Exit.isFailure(result)).toBe(true)
+      expect(called).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
   test("preflights the exact tag and rejects unsafe registry states without publishing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "npm-publish-test-"))
     try {
       writeFileSync(
         join(dir, "package.json"),
-        JSON.stringify({ name: "test-publish-artifact", version: "1.2.3-dev-0123456" }),
+        JSON.stringify({
+          name: "test-publish-artifact",
+          version: "1.2.3-dev-0123456",
+          repository: {
+            type: "git",
+            url: "https://github.com/owner/repo",
+            directory: "packages/integrations/pi/dist",
+          },
+        }),
       )
       expect(
         Bun.spawnSync(["bun", "pm", "pack", "--destination", dir], { cwd: dir }).exitCode,
