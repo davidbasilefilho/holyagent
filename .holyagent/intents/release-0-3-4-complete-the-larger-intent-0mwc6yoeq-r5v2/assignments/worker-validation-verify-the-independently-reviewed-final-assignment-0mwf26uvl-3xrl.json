@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwf26uvl-3xrl",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 13,
+  "roleTask": "Worker.validation",
+  "slug": "verify-the-independently-reviewed-final",
+  "objective": "Verify the independently reviewed final state commit.",
+  "state": "Running",
+  "scope": [
+    "Final supervised full verify only on exact edce18fee6579d591d59a629765225e2e0e955cd; reviews code/security/testing green. Do not build/edit source."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-state. Read relevant /workspace/work/034/state-final-review-security.json. No actualVCS/.git/.holyagentwrites, extraagents, sourcefixes, externalcalls, dependencychanges. Sourcehashesmustremainstable; reportfailurebeforefix. RepoAGENTS/.claude rules apply.",
+    "Toolchain env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates throughmise; state fullverify uses python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify for descendent reaping. Guidancebuild with bunx --no-install mise run build and focusedtests via miseexecbun. No budget/testweakening.",
+    "JSON /workspace/work/034/state-reviewed-gates-report.json correctCLIshape/exactkeys; generateddiff ifguidance /workspace/work/034/guidance-final-generated.diff. <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested final gates pass with source unchanged",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/handoff.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf1vvvm-7wmt",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:15:16.689Z"
+  },
+  "createdAt": "2026-11-13T14:15:16.689Z"
+}
