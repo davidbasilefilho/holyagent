@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mwfhppqt-xxe7",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.operations",
+  "slug": "install-the-unchanged-frozen-dependency",
+  "objective": "Install the unchanged frozen dependency graph and build the prepared Core-host worktree for its pending normal merge commit.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core-host branchrelease/0.3.4/feat/core-host-operations currently5b1b6e2 with root's automatic no-conflict main-policy merge7b69947 pending. RootCLIcommit failedONLYbecause thisfreshworktree lackednode_modules/eslint-plugin-jsdoc. No commit made; MERGE_HEAD/stagedcontentintact. Do notchangeGitindex/commit/branch/state.",
+    "Read cloudruntimepackageinstallation skill reference beforeinstallation; run bun install --frozen-lockfile for thisworktree (notbunupdate, preserveexternalpins) then bunx --no-install mise run build and focused releasepolicy/metadata tests pluscheck/lint/fmt. Report actualgates; root willretry sameCLIcommit afterward. Maywrite expectednode_modules+buildgeneratedartifacts only; no sourcefixunless reportblocker androotauthorizes. buninstallprepare's repositoryconfigured sharedhookinstallation isexpectedandpermitted perAGENTS; no manual.git/config/hookchanges.",
+    "Save /workspace/work/034/core-host-frozen-build-report.json with currentchangedpathsfrombuild ifany andlogsoutside, under150words."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "Prepared Core host worktree has unchanged frozen dependencies and current build static release policy checks pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "dependency-graph-unchanged"
+  ],
+  "ownershipPaths": [
+    "node_modules",
+    "packages/core/node_modules",
+    "packages/runtime/node_modules",
+    "packages/integrations/pi/node_modules",
+    "packages/integrations/claude/node_modules",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T21:29:50.741Z"
+  },
+  "createdAt": "2026-11-13T21:29:50.741Z"
+}
