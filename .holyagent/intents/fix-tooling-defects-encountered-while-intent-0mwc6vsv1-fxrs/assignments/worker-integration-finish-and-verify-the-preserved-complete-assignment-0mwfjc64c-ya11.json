@@ -1,0 +1,92 @@
+{
+  "id": "assignment-0mwfjc64c-ya11",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.integration",
+  "slug": "finish-and-verify-the-preserved-complete",
+  "objective": "Finish and verify the preserved complete Core host-application extraction after the environment restart.",
+  "state": "Running",
+  "scope": [
+    "WORKTREE /workspace/work/holyagent-034-core-host, branchrelease/0.3.4/feat/core-host-operations HEAD0e784284a33a55a6519cb3e298ee39b2cdad5e38, pendingmergeofG228c6b8. Priorworkerconfirmedgone (onlyrootlisted afterrestart); rootclosedassignment0mwfi7tqfinterrupted, notpassed. Allitsauthoredsource preserved. ONLYtwoindexUUgeneratedCLIfilesremain; generatedfileCONTENTS rebuiltclean already, rootalonewillstage/commit. Do notloseanyprior source/untrackedCoremodules/fsports/tests. Firstinspectrelevantownsurvivingtestprocesses/logs beforeedits; parentexit/oldsessionalone notproofnoownprocessruns. Noactualaccount/envdump.",
+    "Read /workspace/work/034/core-completion-map.md; chosenOption1 isactualNode-safe@holyagent/core reusablebusinessAPI withthinCLI andruntimecompatibilityreexports, notforwarding/parser/CLIproxy. Approximately6000lines setup/doctor/VCS alreadyextractedintoCore+typedstrictapplicationcompositions. Nativeprivilegedhostopsremainexplicitlydenied; typedNodeSDKdirectsupportsallowedhostcontexts. RuntimeTUI/hooks/rawrgfd/browserstdioareintentionalhostadapters. Noextra package/newexternalpins/Core→runtimecycle.",
+    "Latestpriorworkerobservations: injectableFileSystemwithNodedefault implementedacrossCore setup/config/PR, trustedVCSstateadaptercaninjectstatereader; FDno-followPRbodyvalidation/atomicsettingsreplacement/undoownershipretained. RealNodefixturewithBunabsentprovesdoctor/setupdryrun, actualisolatedGitidentity/commit, fakeGithubPR,denied/invalid, injectedreads/no writesdryrun andPRnofollowopen; subprocessspynovoluntaryHolyAgentCLIcalls. Latest193focused/build/check/lint/fmtpass; earlier829focusedacross32files. FinalsupervisedfullverifySTARTEDbutoutcomeUnknownafterrestart, finalreport/diffABSENT.",
+    "PriorrootauthorizedcanonicalUsageclassmoveinCorewithruntime/src/cli/errors.tsreexport, Node-safePisettingsleaves Core/pi +runtimecompat and source-locationonlyR-CACHE-WINDOW pointer inruntime/src/instructions/coverage.ts tocore/src/setup/settings.ts. Preserveallerrorclassidentities/allrequirementsemantics. Inspectactualmodifiedsource; finishanybugs/incompletions honestly. FSport mustnotdropdescriptor/no-followsecurityorrollback. AGENTS dependencytablecanbeupdatedonlyifnecessarytoaccuratelypointnewCorepins; useralreadyauthorizedAGENTS changes, no newpolicies.",
+    "CorehostContextaddssetup,doctor.read,doctor.fix,vcs.commit,vcs.identity,vcs.pr capabilityliterals. Preservethese. SeparateCorestatebranch6ebdf1e haspostwaitauthority/checkout improvements andanunfinishedmigrationcancellation/recoveryfix; parentwillmergefinalstatefixlater. Don'tedit state/process/tree inthisworktree. Keepintegrationseams explicit; actualfullaggregateverificationlaterrequired.",
+    "CompletefocusedSDK/setup/VCS/Pi/CLI checks asaffected, build/staticandonefinalsupervisedverifyoncandidate (inspectoldlogsifcompletedbutdon'tclaimunknownpass). No mutationsduringgates. No actualinstall/account/PC/mutableGitHuboperations: fixtureportsisolatedoutsideGitancestry withindependenthostmoduleresolution. Don't weakenassertions/deadlines.",
+    "Save final /workspace/work/034/core-host-application-report.json, complete /workspace/work/034/core-host-application.diff includingalluntrackedandpendingmergedfiles, updated /workspace/work/034/core-host-api-inventory.md. Reportunder400words+completepathinventory; actualnumericchecks, preciseanyremaininggap, currentSHA/pendingGmerge; no releasecompletionclaim."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Complete setup doctor and VCS business operations use reusable Node safe typed Core APIs with thin CLI adapters and preserved host authority",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Real Node and Pi direct consumers preserve file safety error identity undo and no HolyAgent CLI or Bun process proxy behavior",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Final current candidate build static meaningful SDK compatibility tests and supervised full verification pass",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "CLI family ownership native limitations and remaining integration seams are documented accurately",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "api-inventory",
+    "integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/setup",
+    "packages/core/src/vcs",
+    "packages/core/src/index.ts",
+    "packages/core/src/config",
+    "packages/core/src/platform",
+    "packages/core/src/ports",
+    "packages/core/src/pi",
+    "packages/core/tests",
+    "packages/runtime/src/cli/errors.ts",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/native/catalog.ts",
+    "packages/runtime/src/index.ts",
+    "packages/runtime/src/pi",
+    "packages/runtime/src/instructions/coverage.ts",
+    "packages/runtime/tests",
+    "packages/integrations/pi/src/native-tools.ts",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "docs/core-api.md",
+    "docs/native-tools.md",
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfi7tqf-w53a",
+  "specialist": {
+    "agentId": "/root/core_resume_repair",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T22:15:18.012Z"
+  },
+  "createdAt": "2026-11-13T22:15:18.012Z"
+}
