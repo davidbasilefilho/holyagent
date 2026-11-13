@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "regenerate-and-validate-guidance-trigger",
   "objective": "Regenerate and validate guidance-trigger-build for committed independent review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Latesttask-start trigger/sourcewriterterminal. Buildthenfocusedinstruction/context/approvalpolicy+generatorfreshnesstests from guidance-trigger-report.json andprior558suite. No fullverify untilcommitted re-review."
   ],
@@ -37,7 +37,33 @@
     "agentId": "/root/r034_state_final_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T15:27:58.513Z"
+    "startedAt": "2026-11-13T15:27:58.513Z",
+    "finishedAt": "2026-11-13T15:30:49.292Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/claude/dist/agents/holyagent.md\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent.js\nchecks:\n- bunx --no-install mise run build -> exit 0\n- mise exec -- bun test scripts/root-question-policy.test.ts packages/runtime/tests/sessioncontext.test.ts packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts packages/integrations/pi/tests/session-context.test.ts packages/integrations/pi/tests/extension.test.ts packages/integrations/claude/tests/plugin.test.ts packages/integrations/pi/tests/pi.test.ts -> exit 0\n- cmp guidance-trigger-build-before-hashes.txt guidance-trigger-build-after-hashes.txt -> exit 0\nnotes:\n- Focused suite: 558 pass, 0 fail across 8 files. Full verification deferred as instructed.\n- Tracked and untracked non-generated source hashes stable.\n- Logs: /workspace/work/034/guidance-trigger-build.log and /workspace/work/034/guidance-trigger-build-focused.log.\nevidence:\n- Requested generated and validation gates pass with source unchanged: Build and focused tests exited 0; 558 tests passed. Non-generated source hashes matched.\n- checks-run: Build exit 0; focused tests exit 0; hash comparison exit 0.\n- changed-paths: Generated paths enumerated in changed_paths.\n- diff-file: /workspace/work/034/guidance-trigger-build.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Current source regenerated cleanly; relevant focused checks pass and tracked/untracked source hashes stay stable.",
+    "criteria": [
+      {
+        "criterion": "Requested generated and validation gates pass with source unchanged",
+        "support": "Build and focused tests exited 0; 558 tests passed. Non-generated source hashes matched."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Build exit 0; focused tests exit 0; hash comparison exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Generated paths enumerated in changed_paths."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/guidance-trigger-build.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T15:27:58.513Z"
 }
