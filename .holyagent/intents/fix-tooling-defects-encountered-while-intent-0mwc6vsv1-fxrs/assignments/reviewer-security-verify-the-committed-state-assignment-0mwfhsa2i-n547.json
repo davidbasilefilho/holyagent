@@ -39,6 +39,7 @@
   ],
   "followUpOf": "assignment-0mwfh9npp-1roo",
   "specialist": {
+    "agentId": "/root/core_state_authority_security_rereview",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T21:31:50.394Z"
