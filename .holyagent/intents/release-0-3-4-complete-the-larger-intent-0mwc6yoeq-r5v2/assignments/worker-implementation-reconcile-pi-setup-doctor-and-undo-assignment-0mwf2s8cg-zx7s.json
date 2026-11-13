@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "reconcile-pi-setup-doctor-and-undo",
   "objective": "Reconcile Pi setup doctor and undo regression coverage with native-search permission preservation.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Recorded16setup-pi-settings failures, truthful documentation and necessary narrowly proven lifecycle fixes."
   ],
@@ -45,7 +45,9 @@
     "agentId": "/root/r034_routing_setup_repair",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T14:31:53.920Z"
+    "startedAt": "2026-11-13T14:31:53.920Z",
+    "finishedAt": "2026-11-13T14:58:21.520Z"
   },
+  "result": "status: done\nchanged:\n- packages/runtime/tests/setup-pi-settings.test.ts\n- docs/routing.md\nchecks:\n- bun test packages/runtime/tests/setup-pi-settings.test.ts packages/runtime/tests/pi/tools.test.ts packages/runtime/tests/pi/provider.test.ts packages/runtime/tests/routing.test.ts -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- 170 focused tests pass. Setup no longer creates provider permissions; explicit on/off values survive setup and undo. A simulated legacy record verifies undo removes only unchanged recorded keys. Doctor's setup checks do not claim native search readiness; routing documentation gives the opt-in and distinguishes exposure from entitlement.\n- The diff includes the previously untracked routing documentation and prior routing changes in owned paths. Full verify and build were deferred as assigned. Logs are /workspace/work/034/routing-setup-*.log.\nevidence:\n- Setup doctor and undo preserve explicit native-search permissions and recorded ownership: Focused lifecycle tests pass, including mixed user permissions and a legacy ownership record.\n- All16recorded failures are resolved with meaningful current and historical lifecycle coverage: 170 focused tests pass, including all setup-pi-settings tests and legacy undo.\n- checks-run: Focused tests: 170 pass, 0 fail; check, lint, fmt:check exit 0.\n- changed-paths: packages/runtime/tests/setup-pi-settings.test.ts and docs/routing.md.\n- diff-file: /workspace/work/034/routing-setup-repair.diff",
   "createdAt": "2026-11-13T14:31:53.920Z"
 }
