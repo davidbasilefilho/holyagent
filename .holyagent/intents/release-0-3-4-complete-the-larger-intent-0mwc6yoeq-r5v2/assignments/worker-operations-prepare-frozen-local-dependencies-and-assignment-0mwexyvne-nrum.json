@@ -43,8 +43,9 @@
   },
   "result": "result: Frozen dependencies and pinned toolchain are available.\nchanged: `node_modules`; task-local mise trust state.\nchecks: Frozen install exited 0 with 397 packages; toolchain check exited 0; tracked status clean. Full verify intentionally not run.\nblockers: none\nquestions: none\nnotes: Five postinstalls were blocked by `--ignore-scripts`. Details: `/workspace/work/034/bootstrap.md`.\nevidence:\nPinned toolchain and frozen dependencies are available without tracked changes: frozen install and toolchain check exited 0; tracked status empty.\nchecks-run: `mise exec -- bun install --frozen-lockfile --ignore-scripts`; `bunx --no-install mise run toolchain`; both exited 0.\ntool-paths: `/workspace/work/tools/mise/bin/mise` 2026.11.6; mise-installed Bun 1.4.4-canary.1, Node v26.13.1, ripgrep 15.2.0, fd 10.5.2.\nchanged-paths: `node_modules` and task-local mise trust state; no tracked changes.\n",
   "acceptance": {
-    "revision": 10,
-    "rationale": "Frozen installation and pinned toolchain passed without tracked changes.",
+    "revision": 11,
+    "carriedFrom": 10,
+    "rationale": "The inspected source tree is unchanged. New budget/profile and shared-harness requirements do not invalidate this bounded architecture/evidence/bootstrap result; implementation remains separately required at revision11.",
     "criteria": [
       {
         "criterion": "Pinned toolchain and frozen dependencies are available without tracked changes",
