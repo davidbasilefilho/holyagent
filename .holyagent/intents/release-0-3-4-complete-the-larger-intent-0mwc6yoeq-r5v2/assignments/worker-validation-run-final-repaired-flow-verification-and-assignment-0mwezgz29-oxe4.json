@@ -39,6 +39,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_final_flow_validation",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T12:59:09.825Z"
