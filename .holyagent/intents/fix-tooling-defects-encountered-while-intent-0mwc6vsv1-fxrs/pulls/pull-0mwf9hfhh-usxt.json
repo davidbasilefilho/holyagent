@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mwf9hfhh-usxt",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "number": 125,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/125",
+  "branch": "release/0.3.4/feat/plain-agent-cli",
+  "base": "dev",
+  "created": true,
+  "recordedAt": "2026-11-13T17:39:27.270Z"
+}
