@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "diagnose-and-repair-the-windows-release",
   "objective": "Diagnose and repair the Windows release-lookup fixture failure without weakening publication checks.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only /workspace/work/holyagent-033-repair on current PR129 head0b30619. Validation Windows job132114797916 run43491854458 failed scripts/workflows.test.ts:193 release lookup HTTP404: expected exit0 got4. Log /tmp/033-windows-validation.log; 3455pass53skip1fail. Exact same head Publish Windows passed. All other gates incl required version/branch-model passed.",
     "Inspect actual .github/actions/tag-release/action.yml and test fixture. scripts/workflows.test.ts release-lookup fixture was unchanged from main except unrelated version wiring checks; do not call it environmental without baseline evidence. Diagnose shell/fake gh/jq command isolation on Windows, possible accidental real CLI invocation/auth exit4, and ensure fixture actually executes intended stub and never touches live GitHub. Portable shell function stubs may be appropriate only if evidence supports equivalent coverage. Preserve real production action, distinct404vs500 exit/create assertions; no skipped Windows cases, longer deadlines, blanket reruns or assertion weakening.",
@@ -44,7 +44,41 @@
     "agentId": "/root/r033_windows_release_lookup_repair",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T19:38:41.653Z"
+    "startedAt": "2026-11-13T19:38:41.653Z",
+    "finishedAt": "2026-11-13T19:42:01.441Z"
+  },
+  "result": "status: done\nchanged:\n- scripts/workflows.test.ts\nchecks:\n- mise exec -- bun test scripts/workflows.test.ts -t release lookup (before) -> exit 0\n- mise exec -- bun test scripts/workflows.test.ts -> exit 0\n- isolated action mutations: 500 treated as absent; command gh bypass -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\n- git diff --check -> exit 0\nnotes:\n- Hosted Windows rerun required; log does not capture stdout or stderr, so exact exit 4 cause is unconfirmed. Local Linux baseline passes 2/2; main currently lacks this fixture. Full verify deferred to root as instructed.\nevidence:\n- Windows fixture repair preserves real publication script behavior and distinct absence versus operational-failure assertions: Unmodified action executes with Bash functions for jq and gh and isolated PATH; 404 creates release with exit 0, 500 does not with exit 1; calls logged and asserted.\n- Meaningful regression evidence supports the fix and platform verification limits are explicit: 27 tests pass locally. Mutation making 500 absent fails 500 case; bypassing gh stub fails both with command not found, without CLI access. Windows hosted rerun still required.\n- cause: Windows exit 4 confirmed, but stdout/stderr absent: cannot distinguish gh authentication, jq, shell resolution or another cause. Extensionless PATH stubs were not proven to run; functions avoid executable lookup and isolated PATH prevents fallback.\n- checks-run: Baseline 2 pass; changed suite 27 pass; two independent mutations detected; check 318 files, lint 319 files, fmt 736 files, diff check all pass.\n- changed-paths: scripts/workflows.test.ts only.\n- diff-file: /workspace/work/034/033-windows-release-lookup-repair.diff",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "Focused27 tests, baseline2, negative mutations and static gates prove isolated fixture still runs unchanged action with distinct404/500 behavior. Exact old Windows exit cause remains unknown and hosted rerun pending.",
+    "criteria": [
+      {
+        "criterion": "Windows fixture repair preserves real publication script behavior and distinct absence versus operational-failure assertions",
+        "support": "Unmodified action executes with Bash functions for jq and gh and isolated PATH; 404 creates release with exit 0, 500 does not with exit 1; calls logged and asserted."
+      },
+      {
+        "criterion": "Meaningful regression evidence supports the fix and platform verification limits are explicit",
+        "support": "27 tests pass locally. Mutation making 500 absent fails 500 case; bypassing gh stub fails both with command not found, without CLI access. Windows hosted rerun still required."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "cause",
+        "support": "Windows exit 4 confirmed, but stdout/stderr absent: cannot distinguish gh authentication, jq, shell resolution or another cause. Extensionless PATH stubs were not proven to run; functions avoid executable lookup and isolated PATH prevents fallback."
+      },
+      {
+        "label": "checks-run",
+        "support": "Baseline 2 pass; changed suite 27 pass; two independent mutations detected; check 318 files, lint 319 files, fmt 736 files, diff check all pass."
+      },
+      {
+        "label": "changed-paths",
+        "support": "scripts/workflows.test.ts only."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/033-windows-release-lookup-repair.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T19:38:41.653Z"
 }
