@@ -44,6 +44,7 @@
   ],
   "followUpOf": "assignment-0mwfh6acf-6jbu",
   "specialist": {
+    "agentId": "/root/core_state_authority_code_rereview",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T21:31:49.636Z"
