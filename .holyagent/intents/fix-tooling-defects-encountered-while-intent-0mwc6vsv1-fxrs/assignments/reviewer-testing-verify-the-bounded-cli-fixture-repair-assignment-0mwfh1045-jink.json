@@ -35,6 +35,7 @@
     "assignment-0mwfgmwr3-1ul6"
   ],
   "specialist": {
+    "agentId": "/root/plain_hosted_testing_review",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T21:10:37.782Z"
