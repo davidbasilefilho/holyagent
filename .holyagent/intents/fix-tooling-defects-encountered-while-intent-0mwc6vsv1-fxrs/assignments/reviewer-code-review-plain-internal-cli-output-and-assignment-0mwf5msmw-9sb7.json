@@ -33,6 +33,7 @@
     "assignment-0mwf40ynd-1jfb"
   ],
   "specialist": {
+    "agentId": "/root/r034_plain_cli_review_code",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T15:51:39.128Z"
