@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "verify-the-reported-bunx-executable",
   "objective": "Verify the reported Bunx executable error only now that stable0.3.3 is confirmed published.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read public exact holyagent@0.3.3 manifest bin/entry metadata; execute harmless `bunx holyagent@0.3.3 -h` in a fresh /tmp directory outside all Git repos, with BUN_INSTALL_CACHE_DIR and npm cache set to scratch. Record exact Bun version, output/exit. Bound command60s. Main460f and latest0.3.3/publication already verified. If error persists, record for existing0.3.4 scope; no0.3.3fix/republish.",
     "Do not run Pi CLI/models, setup, userPC operations, global installs or credentials changes. Root user explicitly handles local npm installation. This cloud smoke is scratch-only."
@@ -35,7 +35,37 @@
     "agentId": "/root/r033_post_publication_executable",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T20:46:39.228Z"
+    "startedAt": "2026-11-13T20:46:39.228Z",
+    "finishedAt": "2026-11-13T20:50:20.634Z"
+  },
+  "result": "status: done\nchecks:\n- curl -fsSL https://registry.npmjs.org/holyagent/0.3.3 | bun -e '<select name, version, bin, main, module, exports>' -> exit 0\n- bun --version -> exit 0\n- timeout 60s bunx holyagent@0.3.3 -h -> exit 1\nnotes:\n- Bun 1.4.4; fresh /tmp/holyagent-033-smoke.3rPIlP with isolated Bun and npm caches.\n- Output: Resolving dependencies; Resolved, downloaded and extracted [482]; Saved lockfile; error: could not determine executable to run for package holyagent.\n- Defer executable repair to 0.3.4; do not republish 0.3.3.\n- Manifest pipeline exit reflects the final Bun process; registry response was successfully parsed as holyagent 0.3.3.\nevidence:\n- Exact post-publication executable behavior is verified in isolation and any persistent issue is deferred accurately: Fresh scratch bunx exited 1 with executable error; defer to 0.3.4.\n- package: Public registry manifest identifies holyagent 0.3.3; bin, main, module, and exports are absent.\n- command-result: Bun 1.4.4; timeout 60s bunx holyagent@0.3.3 -h exited 1: error: could not determine executable to run for package holyagent.\n- follow-up: Address in 0.3.4; no 0.3.3 republish.\n- checks-run: Public manifest read, Bun version, and isolated timed bunx help smoke.",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "After actual publication, exact0.3.3 fresh isolated Bunx help reproduced exit1/no executable and registry manifest lacks bin. This fulfills requested check; fix belongs to0.3.4, not republishing immutable0.3.3.",
+    "criteria": [
+      {
+        "criterion": "Exact post-publication executable behavior is verified in isolation and any persistent issue is deferred accurately",
+        "support": "Fresh scratch bunx exited 1 with executable error; defer to 0.3.4."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "package",
+        "support": "Public registry manifest identifies holyagent 0.3.3; bin, main, module, and exports are absent."
+      },
+      {
+        "label": "command-result",
+        "support": "Bun 1.4.4; timeout 60s bunx holyagent@0.3.3 -h exited 1: error: could not determine executable to run for package holyagent."
+      },
+      {
+        "label": "follow-up",
+        "support": "Address in 0.3.4; no 0.3.3 republish."
+      },
+      {
+        "label": "checks-run",
+        "support": "Public manifest read, Bun version, and isolated timed bunx help smoke."
+      }
+    ]
   },
   "createdAt": "2026-11-13T20:46:39.228Z"
 }
