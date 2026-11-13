@@ -32,6 +32,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_state_macos_fixture_repair",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T15:51:38.499Z"
