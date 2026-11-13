@@ -74,7 +74,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
-    "agentId": "/root/core_host_application_resume",
+    "agentId": "/root/core_routing_integration",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T23:33:55.634Z"
