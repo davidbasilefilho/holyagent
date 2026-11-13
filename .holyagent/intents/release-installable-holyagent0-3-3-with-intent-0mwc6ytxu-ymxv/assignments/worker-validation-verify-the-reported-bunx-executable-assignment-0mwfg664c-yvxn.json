@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwfg664c-yvxn",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.validation",
+  "slug": "verify-the-reported-bunx-executable",
+  "objective": "Verify the reported Bunx executable error only now that stable0.3.3 is confirmed published.",
+  "state": "Running",
+  "scope": [
+    "Read public exact holyagent@0.3.3 manifest bin/entry metadata; execute harmless `bunx holyagent@0.3.3 -h` in a fresh /tmp directory outside all Git repos, with BUN_INSTALL_CACHE_DIR and npm cache set to scratch. Record exact Bun version, output/exit. Bound command60s. Main460f and latest0.3.3/publication already verified. If error persists, record for existing0.3.4 scope; no0.3.3fix/republish.",
+    "Do not run Pi CLI/models, setup, userPC operations, global installs or credentials changes. Root user explicitly handles local npm installation. This cloud smoke is scratch-only."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT validation role. No actual source/VCS/state/config/remote writes or subagents/paidcalls. Only public registry reads and scratchcache/logs. Never set HOME or CODEX_HOME. Preserve failures/unknowns honestly.",
+    "PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; MISE_* directories /workspace/work/tools/mise/{data,cache,state,config}. Avoid bootstrapcache via exactversion/freshcache. No bugfix beyond report.",
+    "Save /workspace/work/034/033-post-publication-executable-report.json exact JSON {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}, validate fields, <=200words."
+  ],
+  "criteria": [
+    {
+      "text": "Exact post-publication executable behavior is verified in isolation and any persistent issue is deferred accurately",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "package",
+    "command-result",
+    "follow-up",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T20:46:39.228Z"
+  },
+  "createdAt": "2026-11-13T20:46:39.228Z"
+}
