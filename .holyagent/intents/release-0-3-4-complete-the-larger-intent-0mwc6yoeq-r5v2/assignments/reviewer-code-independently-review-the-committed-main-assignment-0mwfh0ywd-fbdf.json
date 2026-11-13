@@ -42,6 +42,7 @@
     "assignment-0mwfgp42p-zdz1"
   ],
   "specialist": {
+    "agentId": "/root/development_main_code_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T21:10:36.205Z"
