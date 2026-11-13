@@ -39,6 +39,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwf0ddmb-uwah",
   "specialist": {
+    "agentId": "/root/r034_state_final_build",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T13:56:22.070Z"
