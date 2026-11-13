@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwf520wn-jh9q",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Worker.integration",
+  "slug": "repair-global-workflow-instruction-and",
+  "objective": "Repair global workflow instruction and registration regressions from the events slice.",
+  "state": "Running",
+  "scope": [
+    "Read /workspace/work/034/events-build-report.json/verifylog:7fail. AlignR-WAITcoveragephrases inGPT/Kimifamily sectionswithoutweakeningrequirement. Restore required no-polling rule and Assignmentreportsmissing-row->noresult/error handling lost inrewrittenworkflowprompt. Keepnewuser/timeout/eventwakeandliteralagentTypes. ExistingcontextbudgetlostRequirement5: shortennew/staticprose withoutchangingthresholds/status/whole-requirement tests orapprovalsemantics. Pi factoryregistrationtestneedsnewnative-rootflag/handlersbutmuststillprovenostartupeffects. RequirementsFIRSTallfamiliesrelevantsections, contextualguides. Don'tmerelydeletefailingassertions; legitimateoldwordings mayupdate withsemanticcoverage. FbaseCcompactnotpresent, mustpassthisheadalone; recordmergeCdispatchseam."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-events. Builder/writerterminal. NoactualVCS/statewrites/deps/pinschanges/extraagents/livecalls/generatededits/build/fullverify. RootownsVCS/state; existingAGENTS/.claude andfamilyinstructionwritingstandardsapply. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Runallpreviouslyfailingfocusedfiles+affectedpolicy/context/assemblytests,type/lint/fmt. Generatedfreshnessexpectedstaleifsourcechanges/rootbuildlater.",
+    "JSON /workspace/work/034/events-global-repair-report.json status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]; diff /workspace/work/034/events-global-repair.diff. Exactkeys<=250wordfinal/logsexternal. Keepworkingthroughfixes, don'tstopatpartialfoundation."
+  ],
+  "criteria": [
+    {
+      "text": "Global validation failures are resolved while preserving the requested behavior and existing invariants",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/integrations/pi/tests/pi.test.ts",
+    "packages/integrations/claude/tests/plugin.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf2nlwa-qcxy",
+  "specialist": {
+    "agentId": "/root/r034_subscription_routing",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:35:30.071Z"
+  },
+  "createdAt": "2026-11-13T15:35:30.071Z"
+}
