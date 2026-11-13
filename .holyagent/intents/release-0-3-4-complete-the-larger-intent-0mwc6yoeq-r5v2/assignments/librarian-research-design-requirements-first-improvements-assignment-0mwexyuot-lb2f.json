@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "design-requirements-first-improvements",
   "objective": "Design requirements-first improvements for scoped skills and iterative responsive visual review across HolyAgent model families.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Current requirements/model-family skill and specialist texts, coverage/assembly",
     "Authoritative frontend-design from anthropics/claude-code and Leonxlnx/taste-skill",
@@ -43,7 +43,37 @@
     "agentId": "/root/r034_instruction_research",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T12:17:04.733Z"
+    "startedAt": "2026-11-13T12:17:04.733Z",
+    "finishedAt": "2026-11-13T12:29:10.646Z"
+  },
+  "result": "result: Completed the requirements-first instruction plan at [instruction-plan.md](/workspace/work/034/instruction-plan.md).\n\nchanged: Research artifact only; no repository or HolyAgent state changes.\n\nchecks: Read the binding Intents, instruction sources and integration generators; inspected authoritative upstream sources and licenses. No build, tests or visual inspection ran because this was a research-only assignment.\n\nblockers: None for the proposed plan. Role-specific skill filtering in the Pi host remains unverified and needs implementation-time investigation.\n\nquestions: None.\n\nnotes: The original Claude Code frontend-design path was removed when its plugin moved to the official plugin repository. The plan pins the replacement source and identifies the conflicting fixed prescriptions in taste-skill.\n\nevidence:\nProposed visual cycle covers responsiveness and real comparison evidence within existing repair semantics: The plan specifies product-relevant sizes and states, real usage and capture comparisons against both the preceding iteration and last PR, honest Unknowns, and the existing three-round limit per material finding.\nInstruction plan respects source requirements model translations and upstream provenance: The plan identifies requirements-first changes, all three families, coverage and generation, and pinned Anthropic Apache-2.0 and taste-skill MIT sources.\nsources: [instruction-plan.md](/workspace/work/034/instruction-plan.md) lists pinned upstream links, licenses, WCAG and both Intent revisions.\ninstruction-map: The plan maps R-VISUAL, R-WVI, R-RV, design roles, evidence judging, family coverage and both integration generators.\nrecommended-paths: The plan recommends extending existing visual roles, design-core, platform design and visual-judging skills; it maps Context7 setup and role-scoped loading separately.\n",
+  "acceptance": {
+    "revision": 10,
+    "rationale": "Plan covers all model families, responsive visual comparisons, interaction states and licensed upstream principles without rigid styles.",
+    "criteria": [
+      {
+        "criterion": "Proposed visual cycle covers responsiveness and real comparison evidence within existing repair semantics",
+        "support": "The plan specifies product-relevant sizes and states, real usage and capture comparisons against both the preceding iteration and last PR, honest Unknowns, and the existing three-round limit per material finding."
+      },
+      {
+        "criterion": "Instruction plan respects source requirements model translations and upstream provenance",
+        "support": "The plan identifies requirements-first changes, all three families, coverage and generation, and pinned Anthropic Apache-2.0 and taste-skill MIT sources."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "[instruction-plan.md](/workspace/work/034/instruction-plan.md) lists pinned upstream links, licenses, WCAG and both Intent revisions."
+      },
+      {
+        "label": "instruction-map",
+        "support": "The plan maps R-VISUAL, R-WVI, R-RV, design roles, evidence judging, family coverage and both integration generators."
+      },
+      {
+        "label": "recommended-paths",
+        "support": "The plan recommends extending existing visual roles, design-core, platform design and visual-judging skills; it maps Context7 setup and role-scoped loading separately."
+      }
+    ]
   },
   "createdAt": "2026-11-13T12:17:04.733Z"
 }
