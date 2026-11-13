@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "plan0-4-0-minimal-harness-installation",
   "objective": "Plan0.4.0 minimal harness installation and native Codex/cloud support with task-proportional orchestration and fast profiles.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Existing0.4.0 planning Intent intent-0mwey29b2-wyyn",
     "Pi/Claude current adapters and official Codex local/cloud interfaces"
@@ -42,7 +42,41 @@
     "agentId": "/root/r040_architecture_plan",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T12:33:26.648Z"
+    "startedAt": "2026-11-13T12:33:26.648Z",
+    "finishedAt": "2026-11-13T12:45:10.025Z"
+  },
+  "result": "result: 0.4.0 architecture plan prepared; implementation remains unauthorized.\nchanged: /workspace/work/034/040-plan.md, /workspace/work/034/040-plan-report.md\nchecks: Read revision 2 Intent and generated explorer-map role; inspected README, Pi generator and Codex provider source/config; searched official OpenAI documentation and Codex GitHub source. No code tests or paid model calls: planning-only assignment. Worktree is moving during 0.3.4 delivery.\nblockers: None for planning. Full Codex Cloud support claim requires actual host loading and authorized smoke test; exact noninteractive native plugin activation and account/model eligibility remain unverified.\nquestions: None.\nnotes: The initial `ls packages/cli/src` probe exited 2 because this worktree has no such directory; the subsequent `ls packages` succeeded and showed integrations and runtime. No source, dependency, installation, VCS, account, security or state writes performed.\nevidence:\nPlan covers all explicit 0.4.0 requirements with task-proportional architecture: /workspace/work/034/040-plan.md covers installer, shared contracts, profiles, cloud, optimizations, orchestration, optional PR skill, conformance and phased acceptance.\nCodex and cloud capability claims are sourced or explicitly unknown: plan's supported surfaces and optimization inventory cite official OpenAI documentation and GitHub source, and distinguish Codex Cloud from Agents API with unverified cloud loading called out.\nsources: Intent revision 2 at /workspace/work/holyagent/.git/holyagent/holyagent-state-c9bdc9d6fc/.holyagent/intents/plan-holyagent-0-4-0-minimal-harness-intent-0mwey29b2-wyyn/intent.json; local README, packages/integrations/pi/src/generate.ts, packages/integrations/pi/src/codex.ts, packages/runtime/src/pi/codex/context-management.ts; linked official sources in plan.\narchitecture-options: plan Material decisions gives two options and recommended defaults for adapter, Codex distribution and proportional coordination.\nphased-plan: plan Conformance and delivery gives five ordered implementation phases and release acceptance tests.\nunknowns: cloud plugin/skill activation and persistence, CLI activation, host-version and account eligibility, profile availability and measured gains remain explicit; cloud claim requires a real smoke test.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Planning covers native/local/cloud capability boundaries, minimal installers, optional PR skill, proportional coordination, shared contracts and user-selected fast roots without implementation claims.",
+    "criteria": [
+      {
+        "criterion": "Plan covers all explicit 0.4.0 requirements with task-proportional architecture",
+        "support": "/workspace/work/034/040-plan.md covers installer, shared contracts, profiles, cloud, optimizations, orchestration, optional PR skill, conformance and phased acceptance."
+      },
+      {
+        "criterion": "Codex and cloud capability claims are sourced or explicitly unknown",
+        "support": "plan's supported surfaces and optimization inventory cite official OpenAI documentation and GitHub source, and distinguish Codex Cloud from Agents API with unverified cloud loading called out."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "Intent revision 2 at /workspace/work/holyagent/.git/holyagent/holyagent-state-c9bdc9d6fc/.holyagent/intents/plan-holyagent-0-4-0-minimal-harness-intent-0mwey29b2-wyyn/intent.json; local README, packages/integrations/pi/src/generate.ts, packages/integrations/pi/src/codex.ts, packages/runtime/src/pi/codex/context-management.ts; linked official sources in plan."
+      },
+      {
+        "label": "architecture-options",
+        "support": "plan Material decisions gives two options and recommended defaults for adapter, Codex distribution and proportional coordination."
+      },
+      {
+        "label": "phased-plan",
+        "support": "plan Conformance and delivery gives five ordered implementation phases and release acceptance tests."
+      },
+      {
+        "label": "unknowns",
+        "support": "cloud plugin/skill activation and persistence, CLI activation, host-version and account eligibility, profile availability and measured gains remain explicit; cloud claim requires a real smoke test."
+      }
+    ]
   },
   "createdAt": "2026-11-13T12:33:26.648Z"
 }
