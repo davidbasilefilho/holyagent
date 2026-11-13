@@ -1,0 +1,86 @@
+{
+  "id": "assignment-0mwfi7tqf-w53a",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.integration",
+  "slug": "complete-the-reusable-node-safe-core",
+  "objective": "Complete the reusable Node-safe Core application boundary for setup doctor and VCS without CLI subprocess proxies.",
+  "state": "Running",
+  "scope": [
+    "Work ONLY /workspace/work/holyagent-034-core-host branch release/0.3.4/feat/core-host-operations. RootpreparedfromCore5b1b6e2, mergedreviewedmain/devpolicy7b69947 as85a4676 theninitialauthorityrepair870c86e as0e78428. Currentmergeof owned-role-guidance228c6b8 pending: sourcesauto-merged, ONLYgeneratedCLI bundles conflicted (Claude/Pi dist/scripts/holyagent.js). Resolvegeneratedcontent by normal build ONLY (no Git/index commands); preserveactualGsource (no globalownedskillpreload, ctx7CLIkeptbut--claude/globalinstructioninstallationretired). Rootwillrecordthefinalmerge/featurecommit. Everywriteisthisworktreeonly.",
+    "Read /workspace/work/034/core-completion-map.md and core-completion-map-report.json. RootselectsOption1: extendexistingprivate@holyagent/core withNode-safe typedapplicationoperations, noextra package. ActualVCScommitsettings/messagepreparation/commit/state-recordingcompositioncurrentlyCLI-only; setupdoctorinternalEffectsexist butpublicNode-safeapplicationcompositionmissing. Extractcompletebusinessoperations with strictEffectSchemas/taggederrors andinjectedprocess/filesystem/GitHubhostservices; CLIparses/rendersandcallsCore. Preserveallbehavior/errorcontracts,currentGsetupmigration,fileownership/undo preservation, updater/versionpolicies, user/thirdpartyskills/credentials andnormalCLI permissions.",
+    "Move/adaptactualsetup/doctor+VCSlogic andneededportsintoCore, make runtimecompatibilityreexports whereusefultopreserveexistingconsumers; no duplicatedcanonicalbusinesslogic. UseactualtypedAPIs,input/resultsnotCLIargv/parser/freeformcommandproxy. NativeNodecanexecute directSDK Core withoutBun global/import requirement; noHolyAgent CLIspawn. CLIhostmayinject BunShell-backedports; portableNode servicesmustpreservecancellation/processkill/timeouts. KeepinteractiveTUI,hookpayloadtransport,rawrg/fd passthroughandlong-livedbrowserstdiohostasruntimeadapters. Do notextractunrelatedharnesspresentation justtoinflateCore.",
+    "Nativecatalog mustconsumeCore directoperationswhereenabled. InspectactualexistingCLIhostguardcontract, don'tinventblanketnewapprovalflows. Keep unsupported mutatingnativehostoperations denied unlessequivalentrealhostconstraintsaredemonstrated; do nottreatrootcapabilityasuserapprovalreceipt. Expose read-only doctor directonlyifitsoperationsareactuallyreadonlyandhostauthorizationisretained, otherwisehonesttypedSDKsupportwithoutfalsenativeclaims. Per-actionpermissionsnevertrustedfrommodelinput. Native state-modewrite remainsunsupported. Useralreadyauthorizesrepo development/release, not genericusersecuritysettingweakenings.",
+    "Corestateauthoritycurrentlybeingrepairedfurtherin separate /workspace/work/holyagent-034-core by anotherworker (residualpostwaitrevocationfinding). Do noteditCorestatefiles orstateinitializationlogic inthisworktree; useexistingContext API and addnewhostoperationCapability namesonlyasneeded. Parentwillmergefinalstatefix. Youmaycommunicatewith /root/events_wildcard_repair aboutContextsignatures; keepreportedbasehonest. No cross-worktreewrites. Capture preciseintegrationseams.",
+    "Prove actualNodeSDK importandtyped/codemodecallswithBunabsent andsubprocessspyshowingnoHolyAgentCLI fordoctordiagnosticfakeports+actualisolatedGitcommit/identity/PRfixtureappropriate(no liveGHwrites). MatchCLIcompositionresults/errorsandroot/child/config/unsupportedauthoritydenials. Setupinstallation testsuseisolatedfakehostports/nofilesoutsidefixtures; noactual account/PCsettings/installs/publishactions. ExistingGit hook behavior mustnotbedisabledtofakeVCSsuccess; testfixturescanownemptyhooksoutsideactualrepo.",
+    "Buildgeneratedassetsfromsource, preserveGownedguidancepaths andallfamilies, adddocsaccuratebusinessAPI vsprotocoladapterinventory, internalCLIplainnaturalshortoutputincludingTTY/forcedcolorsandpublicseparateUIentry. Runfrozeninstallonlyifneeded(already397installed), focusedSDK/setup/VCS/Pi/CLI/staticandonesupervisedfullverifyonfinalcandidate. No mutationduringgates; lastcombinedsourcewillgethostedMac/Winlater. NewoutsideGitfixturesmustindependentlyresolvehostmodules.",
+    "Save /workspace/work/034/core-host-application-report.json withcompletechangedpaths, currentheadandpendingmergenote, actualchecks+remaininggaps, /workspace/work/034/core-host-application.diff includinguntrackedfiles, andconciseupdatedfullfamilyAPIinventory. Keepreportunder400words (pathinventoryseparateifneeded). Returnblockers/integrationseams, donotdeclarebroaderreleasecomplete."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "Actual setup doctor and VCS business compositions live in reusable Node safe typed Core APIs used directly by CLI consumers",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Native and SDK consumers execute supported operations without HolyAgent CLI argv parser or Bun process proxies and preserve real authority boundaries",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Current candidate generated build meaningful Node and host compatibility tests static gates and supervised full verify pass",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "All CLI family ownership and any native host limitations are documented accurately with no duplicated business implementations",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "api-inventory",
+    "integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/setup",
+    "packages/core/src/vcs",
+    "packages/core/src/index.ts",
+    "packages/core/src/config",
+    "packages/core/src/platform",
+    "packages/core/src/ports",
+    "packages/core/tests",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/vcs",
+    "packages/runtime/src/native/catalog.ts",
+    "packages/runtime/src/index.ts",
+    "packages/runtime/tests",
+    "packages/integrations/pi/src/native-tools.ts",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "docs/core-api.md",
+    "docs/native-tools.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/core_resume_repair",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T21:43:55.719Z"
+  },
+  "createdAt": "2026-11-13T21:43:55.719Z"
+}
