@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mwf8z90u-ubyy",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "owned-guidance-final-gates",
+  "objective": "owned-guidance-final-gates",
+  "state": "Running",
+  "scope": [
+    "Validate completed owned-role guidance and layout tests. Build generated assets and run full verify, plus existing offline packaging checks if not part verify. Prior production writers terminal; no source repairs yourself."
+  ],
+  "constraints": [
+    "Work only /workspace/work/holyagent-034-skills; read AGENTS.md and GPT validation directives. No VCS, Git config or .holyagent writes. Only generated files from repository build may change; no source edits or dependencies changes.",
+    "Set MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Run bunx --no-install mise run build; full verify through python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1 does not reap children; this makes cancellation checks truthful). No live Pi/paid model calls.",
+    "Keep working through requested gates; report failures with source assertion and log path rather than weakening tests. JSON /workspace/work/034/owned-guidance-final-gates-report.json: status done|partial|blocked, notes array, checks numeric exit, exact criterion/evidence keys; <=200 words, long logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Generated assets are rebuilt and current full verification results are accurately reported",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "failures"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/extensions",
+    "packages/integrations/pi/skills",
+    "packages/integrations/pi/agents",
+    "packages/integrations/pi/scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T17:25:19.086Z"
+  },
+  "createdAt": "2026-11-13T17:25:19.086Z"
+}
