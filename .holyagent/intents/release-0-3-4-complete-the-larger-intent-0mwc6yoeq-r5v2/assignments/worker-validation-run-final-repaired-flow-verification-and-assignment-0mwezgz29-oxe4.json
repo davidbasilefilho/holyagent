@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwezgz29-oxe4",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 12,
+  "roleTask": "Worker.validation",
+  "slug": "run-final-repaired-flow-verification-and",
+  "objective": "Run final repaired-flow verification and prepare frozen runtime-state dependencies.",
+  "state": "Running",
+  "scope": [
+    "Read-only gates /workspace/work/holyagent-034 atc3c935108a3bd3958f6dbcb7bc2d96f11eba212b",
+    "Install node_modules only /workspace/work/holyagent-034-state"
+  ],
+  "constraints": [
+    "Read HolyAgent worker-validation role and umbrella Intent. User authorized0.3.4 release/Terra low-xhigh, direct fallback. No source, lockfile, VCS, shared hooks, .holyagent, security/account writes or publication.",
+    "Use task env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. First trust config if required and run mise exec -- bun install --frozen-lockfile --ignore-scripts in STATE worktree; tell parent as soon as dependencies ready so disjoint writers can start there.",
+    "Then in FLOW worktree only, run python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify with same env. Two-file repair justified this final repeat. Expected start/end headc3c9351, clean tracked tree. No skipped/relaxed tests or repeated broad runs without a new cause. State writers in another worktree must not contaminate flow gates.",
+    "Save /workspace/work/034/flow-final-validation.md with final plain evidence: block and logs outside repo. Report under160words, exact commands/exits/counts; distinguish native CI still pending."
+  ],
+  "criteria": [
+    {
+      "text": "Repaired flow exact head passes full verify without source changes",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Runtime-state worktree frozen dependencies are ready",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "head-sha",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T12:59:09.825Z"
+  },
+  "createdAt": "2026-11-13T12:59:09.825Z"
+}
