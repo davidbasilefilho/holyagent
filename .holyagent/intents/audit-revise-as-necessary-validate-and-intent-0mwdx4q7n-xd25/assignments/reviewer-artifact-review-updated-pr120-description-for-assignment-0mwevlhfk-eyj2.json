@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwevlhfk-eyj2",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-updated-pr120-description-for",
+  "objective": "Review updated PR120 description for accuracy and concise repository voice.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/pr120-body.txt; committed PR range c5b2ab2..61a7adc"
+  ],
+  "constraints": [
+    "Apply previously loaded HolyAgent Reviewer.artifact and evidence-judging rules. User resumed authorized PR120 audit/revise/merge with Terra low-xhigh; direct fallback. No source/VCS/.holyagent writes or outward messages. Draft authored by pr_description worker (assignment-0mwevkfpi-y1ne), independent review required. Full verify running so FINAL_VERIFY_RESULT token is intentional; root replaces with exact evidence only after completion. Hosted CI pending; verify draft labels it pending and doesn't claim npm publication. Review technical accuracy against existing accepted context, avoid broad code audit. Save /workspace/work/pr120-body-review.md; report under150 words with required evidence. Worktree /workspace/work/holyagent-pr120."
+  ],
+  "criteria": [
+    {
+      "text": "PR description is accurate concise and makes no unsupported claims",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-artifact",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [
+    "assignment-0mwevkfpi-y1ne"
+  ],
+  "independentFrom": [
+    "assignment-0mwevkfpi-y1ne"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T11:10:41.792Z"
+  },
+  "createdAt": "2026-11-13T11:10:41.792Z"
+}
