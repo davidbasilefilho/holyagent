@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mwfgmwr3-1ul6",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.debugging",
+  "slug": "repair-the-real-hosted-macos-and-windows",
+  "objective": "Repair the real hosted macOS and Windows plain-CLI test failures while preserving internal CLI plain output and public package entry behavior.",
+  "state": "Running",
+  "scope": [
+    "Worktree holyagent-034-cli branch release/0.3.4/feat/plain-agent-cli at eaf9981d845693c448c37b29898b9877dcc8153a, ready PR125. Current-head hosted macOS internalPiTTY cli-output.test.ts:76 expected stdin or stdout is not a terminal but stdout empty; Windows public/internal parity spawnexit null/0or2,5second fixture deadlines, forcedcolorsearch timeout. Investigate actual logs/source with read-only gh and repair the minimum behavior/fixture defects with meaningful assertions. Independent generated build/static/focused verify; full verify if changes justify. Do not claim hosted result from Linux.",
+    "Root separately integrates copied H source into Core in another worktree; your report/diff must clearly identify incremental repair from eaf9981 so it can be carried without losing Core consumers. User requires all internal CLI errors/help/version short natural plain text even forcedcolors/TTY, structuredfacts and identifiers preserved; public setupUI entry remains intentionally distinct.",
+    "Check public bin source metadata includes a viable generated public entry but do not expand into0.4setupcommand. Final integrated package/archive proof happens after Core integration."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs.",
+    "Write report /workspace/work/034/plain-hosted-repair-report.json and incremental diff ending .diff in same directory."
+  ],
+  "criteria": [
+    {
+      "text": "Hosted plain CLI failures have evidence based fixes preserving plain output and meaningful cross platform assertions",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Current candidate focused gates and generated build pass and hosted unknowns are explicit",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "hosted-failure-cause"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/hooks",
+    "packages/runtime/tests/cli-output.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "packages/runtime/tests/pi/tools.test.ts",
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/package.json",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T20:59:40.239Z"
+  },
+  "createdAt": "2026-11-13T20:59:40.239Z"
+}
