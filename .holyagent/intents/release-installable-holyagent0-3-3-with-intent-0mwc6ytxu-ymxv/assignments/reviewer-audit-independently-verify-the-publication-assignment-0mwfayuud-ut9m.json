@@ -37,6 +37,7 @@
     "assignment-0mwfavba9-bm8e"
   ],
   "specialist": {
+    "agentId": "/root/r033_ancestry_audit",
     "model": "haiku",
     "effort": "high",
     "startedAt": "2026-11-13T18:20:59.942Z"
