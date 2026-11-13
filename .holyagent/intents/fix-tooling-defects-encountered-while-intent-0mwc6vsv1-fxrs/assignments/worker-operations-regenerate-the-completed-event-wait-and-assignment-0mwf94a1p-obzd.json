@@ -32,6 +32,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_events_regenerated_check",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T17:29:13.693Z"
