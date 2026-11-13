@@ -31,6 +31,7 @@
     "assignment-0mwewgyav-p1ls"
   ],
   "specialist": {
+    "agentId": "/root/release_body_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T11:36:22.030Z"
