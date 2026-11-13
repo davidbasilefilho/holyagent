@@ -36,6 +36,7 @@
     "assignment-0mwfidci0-cj9b"
   ],
   "specialist": {
+    "agentId": "/root/routing_current_artifact_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T22:24:07.487Z"
