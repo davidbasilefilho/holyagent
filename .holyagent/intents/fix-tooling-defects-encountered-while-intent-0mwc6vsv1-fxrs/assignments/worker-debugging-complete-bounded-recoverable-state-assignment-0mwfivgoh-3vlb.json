@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mwfivgoh-3vlb",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.debugging",
+  "slug": "complete-bounded-recoverable-state",
+  "objective": "Complete bounded recoverable state migration while preserving live authorization and safe cancellation.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core branchrelease/0.3.4/feat/shared-core cleanat6ebdf1e. Priorworkerpaused/terminal, you are solewriterhere. Read reports core-checkpoint-security-review-report.json, core-state-authority-security-rereview-report.json, latest core-state-revocation-repair-report.json and incremental.diff under /workspace/work/034. Currentcandidatecompiled/full3568pass2skip butNOTmerge-ready: migration persistence staysuninterruptibleoverGitcommit/files/sourcecleanup/marker withnoprovenindependentdeadline orsafeabort/rollback. Checkoutwasrestoredinterruptible andabort/retrytestpasses. Preserveallthatwork.",
+    "Trace actualmigrationcommit/recovery semantics andCorestate/process.ts. Develop smallest completefix, choosing between a bounded independently-enforced Git/process operation with correctcommit/recovery handling or an interruptible staged/recoverablemigration transaction; useactualsource/experiments ratherthanlabelingunboundedworksafe. ExistingGitcommitatomicref semantics mayhelp, butmustverify. Youhaveauthorizationtoimplement/testthenfinish, notstopatoptionsorrelabelpartialasdone. No newexternaldeps, globalpermissionweakening ormodel/CLIproxy.",
+    "Allnewinitialization/migration/locksetupmutationsafterpreparatoryasyncwaits requirefreshappropriateoperation+state.initializecapability. Read-onlyhosts use non-mutatingpeek; revocationduringremote/preparatorywaitcannotstartnewwrites. Do not promiseinstantrollbackofalready-startedatomicOSactions. A boundedconsistencyunitmaycompleteafteritsfreshgrant onlywhenits realbounds/recoveryareproved. Do nothide Effect.timeoutinsideuninterruptibility; noindefiniteGit/hooks/descendantprocess writesaftercallerreturns. Avoidpartialcopiedstateorlossofsource/index/useredits; demonstrate recovery/retryorrollbackoninterruption/timeout/ambiguouscommit.",
+    "PreserveEffect/taggederrors/strictschemaboundaries, existingCLINodeSDKandstatecancellation/contracts. TheprocesshelperisalsousedbynewNode-safe setup/VCS applicationextraction in separate /workspace/work/holyagent-034-core-host (anotherwriter); makebackward-compatibleoptionalextensions ifneeded, no editsinthatworktree. Keepordinarylegitimateinstallationdurationunaffectedbyanymigration-onlytimeoutpolicy. Core-hostcontextaddssetup,doctor.read,doctor.fix,vcs.commit,vcs.identity,vcs.pr capabilityliterals; parentwillpreservethoseonmerge.",
+    "Add meaningfuldeterministic regression(s): stall/abort orboundedtimeoutinsideMIGRATIONGitcommit (checkoutaborttestisnot enough), verify callerreturnswithprovenbound, no continueddescendantwrites, originalsource/index/data preserved, nextauthorizedretryrecovers; includerevocationbeforefirstmutationandread-only/no-native-CLIexistingtests. FixturesoutsideactualGit ancestry, independentlyresolvehostmodules; noliveaccounts/network/paidmodels/PCoperations. Keepoldpartial/failureevidence, no deadline/assertionrelaxation.",
+    "RunfocusedCore/state/migration/cancellation/NodeSDK tests, build/staticgates andonefullsupervisedverifyonfinalcandidate only; no mutationswhilegatesongoing. Youmayreadimmutablehistory/tempfixturesandcreateownoutside-reporeport artifacts, noVCS/.git/.holyagent/configwritesotherthanfixtureGit. No needsubagents; rootownsallstate/VCS.",
+    "Save /workspace/work/034/core-migration-bounds-repair-report.json and incremental.diff from6ebdf1e plusconcise transaction/recovery/boundexplanation. Reportunder400words +pathlist/logsoutside; includeeveryfailedprobeandnumericexits, actualplatformlimitsandmaterialintegrationseams. Do notclaimcompletewhileboundedcancellationorstateintegrityremainunproved."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "State migration has proven bounded cancellation or timeout and recoverable consistent source index and shared state",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Read only and revoked authority cannot start new initialization or migration writes after preparatory waits",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Meaningful stalled migration real Git recovery tests and current focused build static full verification pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "red-green-proof",
+    "transaction-and-bound",
+    "integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/state",
+    "packages/core/tests",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/state-hook-locks.test.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "docs/core-api.md",
+    "docs/native-tools.md",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfi1lgo-86h4",
+  "specialist": {
+    "agentId": "/root/plain_hosted_repair",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T22:02:18.545Z"
+  },
+  "createdAt": "2026-11-13T22:02:18.545Z"
+}
