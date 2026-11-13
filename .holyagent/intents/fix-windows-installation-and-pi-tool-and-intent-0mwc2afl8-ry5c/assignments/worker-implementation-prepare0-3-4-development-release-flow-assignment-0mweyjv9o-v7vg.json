@@ -71,6 +71,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_development_flow",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T12:33:25.260Z"
