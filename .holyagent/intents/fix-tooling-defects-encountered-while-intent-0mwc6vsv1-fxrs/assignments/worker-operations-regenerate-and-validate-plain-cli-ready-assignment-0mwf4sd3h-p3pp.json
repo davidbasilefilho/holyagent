@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "regenerate-and-validate-plain-cli-ready",
   "objective": "Regenerate and validate plain-cli-ready-build for committed independent review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Latestquotedhelp/hintrepairterminal. Buildthenfocusedinput/host/cli-output/tools/generatorfreshnesstests. No fullverify untilcommittedreview."
   ],
@@ -36,7 +36,33 @@
     "agentId": "/root/r034_state_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T15:27:59.309Z"
+    "startedAt": "2026-11-13T15:27:59.309Z",
+    "finishedAt": "2026-11-13T15:30:49.925Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent.js\nchecks:\n- bunx --no-install mise run build -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run test -- packages/runtime/tests/input.test.ts packages/runtime/tests/host.test.ts packages/integrations/claude/tests/host.test.ts packages/runtime/tests/cli-output.test.ts packages/runtime/tests/tools.test.ts packages/runtime/tests/generated.test.ts packages/integrations/claude/tests/plugin.test.ts -> exit 0\nnotes:\n- Focused tests: 165 pass, 1 conditional Windows skip, 0 fail, 15896 assertions across 7 files. Full verify deferred by assignment. Logs /workspace/work/034/plain-cli-ready-build.log and plain-cli-ready-tests.log.\nevidence:\n- Requested generated and validation gates pass with source unchanged: Build and focused tests exit 0; 0 nongenerated tracked or untracked source hash changes.\n- checks-run: Build and seven focused input, host, CLI output, tools and generator/plugin test files; exit 0. Full verify not run per brief.\n- changed-paths: 2 generated paths listed in changed_paths; before/after manifests in /workspace/work/034.\n- diff-file: /workspace/work/034/plain-cli-ready-build.diff includes tracked and new generated files.",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Current source regenerated cleanly; relevant focused checks pass and tracked/untracked source hashes stay stable.",
+    "criteria": [
+      {
+        "criterion": "Requested generated and validation gates pass with source unchanged",
+        "support": "Build and focused tests exit 0; 0 nongenerated tracked or untracked source hash changes."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Build and seven focused input, host, CLI output, tools and generator/plugin test files; exit 0. Full verify not run per brief."
+      },
+      {
+        "label": "changed-paths",
+        "support": "2 generated paths listed in changed_paths; before/after manifests in /workspace/work/034."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/plain-cli-ready-build.diff includes tracked and new generated files."
+      }
+    ]
   },
   "createdAt": "2026-11-13T15:27:59.309Z"
 }
