@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwewgxsu-u0sf",
+  "intentId": "intent-0mwewgx8e-sh5o",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.audit",
+  "slug": "independently-audit-release0-3-3",
+  "objective": "Independently audit release0.3.3 composition and whether prior accepted evidence carries to main release PR.",
+  "state": "Running",
+  "scope": [
+    "main074bc72a5370d9b1db6802d4ae823a8deec68195..integration9c8edee7bf9a82e062121e89c507f4b76cc09ae9",
+    "New delta outside previously reviewed c5b2ab2..61a7adc is version-bump commitc5b2ab2b3524063e408b2f0dbf6bf85a6237e168"
+  ],
+  "constraints": [
+    "Read AGENTS.md,.claude/CLAUDE.md and packages/integrations/claude/dist/agents/reviewer-audit.md. Work /workspace/work/holyagent-release033. User 'go until it is on main' explicitlyauthorizes releasePR/mainmerge, prior Terra low-xhigh persists; Workflow unavailable directfallback. Readonly no VCS/state/source edits. Prior full review/test evidence at /workspace/work/rereview-*.md,/workspace/work/final-validation.md,/workspace/work/current-head-ci.md. Confirm exact git tree equality9c8edee7 vs61a7adc and main ancestry. Review versionbump10files and copies/generatedversion synchronization,releasebranchconventions,scope. Avoid duplicate broad source review or tests unless new delta invalidates prior evidence. Need concrete blockers/trace if any. Read release workflow contexts relevant main safeguards. Save report /workspace/work/release033-audit.md under250words."
+  ],
+  "criteria": [
+    {
+      "text": "Release composition and version bump comply with main merge rules",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Prior accepted source reviews and verification remain valid for release tree",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "tree-equivalence",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-13T11:35:09.342Z"
+  },
+  "createdAt": "2026-11-13T11:35:09.342Z"
+}
