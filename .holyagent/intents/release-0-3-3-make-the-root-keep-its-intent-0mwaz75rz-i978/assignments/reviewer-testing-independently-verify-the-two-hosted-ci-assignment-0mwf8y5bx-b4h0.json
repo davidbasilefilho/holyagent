@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mwf8y5bx-b4h0",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.testing",
+  "slug": "independently-verify-the-two-hosted-ci",
+  "objective": "Independently verify the two hosted-CI fixture repairs preserve the read-only handoff and operational reservation assertions.",
+  "state": "Running",
+  "scope": [
+    "Read committed range edce18fee6579d591d59a629765225e2e0e955cd..78366e7459c144c2f6c77a6075964ced06c433a9 in /workspace/work/holyagent-034-state",
+    "Review /workspace/work/034/state-macos-fixture-repair-report.json and its diff; run meaningful focused tests through mise"
+  ],
+  "constraints": [
+    "Read repository AGENTS.md and GPT reviewer.testing directives; do not edit source, generated files, Git or .holyagent state",
+    "Confirm fixture-local maintenance controls do not weaken the no-write invariant and decoded Windows resource comparison retains exact kind/path equality",
+    "No live Pi or model calls, no source commits or CI mutations",
+    "Report JSON status done|partial|blocked, notes array, checks numeric exit; under 250 words at /workspace/work/034/state-fixture-testing-review-report.json",
+    "Environment MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; use mise gates. Root will push and observe actual hosted platforms."
+  ],
+  "criteria": [
+    {
+      "text": "Both committed CI fixture repairs preserve the asserted production invariants without weakening coverage",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Focused checks pass and remaining hosted platform verification is stated accurately",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf5ms5e-5wsj"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T17:24:27.645Z"
+  },
+  "createdAt": "2026-11-13T17:24:27.645Z"
+}
