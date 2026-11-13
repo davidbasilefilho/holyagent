@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "build-and-verify-the-current-native",
   "objective": "Build and verify the current native source for immutable independent review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Generated build and fullverifyonly, sourceunchanged."
   ],
@@ -37,7 +37,9 @@
     "agentId": "/root/r034_state_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T14:58:26.085Z"
+    "startedAt": "2026-11-13T14:58:26.085Z",
+    "finishedAt": "2026-11-13T15:06:35.391Z"
   },
+  "result": "status: blocked\nchanged:\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent.js\nchecks:\n- bunx --no-install mise run build -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 1\nblockers:\n- the extension > is a default-exported factory that registers the role flag and handlers and starts nothing: packages/integrations/pi/tests/pi.test.ts:620 expected registered handlers/flags list; actual includes additional on session_shutdown and registerFlag holyagent-native-root.\nnotes:\n- Verify: 3499 pass, 2 conditional skips, 1 fail, 25225 assertions across 121 files. Logs /workspace/work/034/native-final-build.log and native-final-verify.log.\nevidence:\n- Generated artifacts and full verification pass with source unchanged: Build exit 0; verify exit 1 on one extension registration assertion. Source hashes stable.\n- checks-run: Build exit 0 and supervised verify exit 1; detailed logs in /workspace/work/034.\n- changed-paths: 3 generated paths listed; 0 changes outside generated ownership. Before/after source manifests in /workspace/work/034.\n- diff-file: /workspace/work/034/native-final-generated.diff includes tracked and new generated files.",
   "createdAt": "2026-11-13T14:58:26.085Z"
 }
