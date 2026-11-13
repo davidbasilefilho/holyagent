@@ -38,6 +38,7 @@
     "assignment-0mwfdqrud-wlze"
   ],
   "specialist": {
+    "agentId": "/root/r033_windows_lookup_testing_review",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T19:43:25.310Z"
