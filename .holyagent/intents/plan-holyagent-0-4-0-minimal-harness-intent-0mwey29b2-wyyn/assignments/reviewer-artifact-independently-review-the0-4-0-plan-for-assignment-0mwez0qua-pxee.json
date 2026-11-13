@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwez0qua-pxee",
+  "intentId": "intent-0mwey29b2-wyyn",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.artifact",
+  "slug": "independently-review-the0-4-0-plan-for",
+  "objective": "Independently review the0.4.0 plan for coverage, proportionality and sourced native Codex/cloud claims.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/034/040-plan.md and0.4.0 planning Intent"
+  ],
+  "constraints": [
+    "Read HolyAgent reviewer-artifact and evidence-judging rules. User asked planning only, not0.4.0 implementation. Terra medium, direct fallback. No source/state/VCS or account writes. Independent of assignment-0mweyjwc8-79qs. Verify plan covers minimal setup pi|claude|codex, context_management and measured caching optimization, true Codex Cloud compatibility boundary, optional gh-pr-stack and fewer PRs, task-proportional direct root work, cross-harness shared contracts and100/20-dollar fast profiles (Sonnet Claude ROOT; Terra Codex fast-root preference).",
+    "Check official-source claims carefully: general OpenAI/Agents API/ChatGPT plugin documentation does not by itself prove native Codex or Codex Cloud loading. Flag misattributed sources or guarantees, but explicit honest unknowns in a planning document are not implementation blockers. No new broad research; use authoritative sources cited if concrete doubt. Return exact proposed corrections if needed.",
+    "Save /workspace/work/034/040-plan-review.md with final plain evidence: block/exact labels. Report under200words; no other agents."
+  ],
+  "criteria": [
+    {
+      "text": "Plan faithfully covers user requirements without unsupported capability promises",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-artifact",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mweyjwc8-79qs"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T12:46:32.674Z"
+  },
+  "createdAt": "2026-11-13T12:46:32.674Z"
+}
