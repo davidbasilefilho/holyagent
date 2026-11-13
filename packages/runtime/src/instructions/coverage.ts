@@ -29,8 +29,8 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "load the state-mode skill for handoff durability",
     },
     "R-VISUAL-ITERATION": {
-      section: "roles/worker-visual/purpose.md",
-      phrase: "immutable original task baseline",
+      section: "skills/visual-judging/SKILL.md",
+      phrase: "After the root creates each source commit",
     },
     "R-DESIGN-QUALITY": {
       section: "design-core/core.md",
@@ -39,6 +39,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",
       phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ORDER": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "After the root creates each source commit",
     },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
@@ -345,8 +349,8 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "load the state-mode skill for handoff durability",
     },
     "R-VISUAL-ITERATION": {
-      section: "roles/worker-visual/purpose.md",
-      phrase: "immutable original task baseline",
+      section: "skills/visual-judging/SKILL.md",
+      phrase: "After the root creates each source commit",
     },
     "R-DESIGN-QUALITY": {
       section: "design-core/core.md",
@@ -355,6 +359,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",
       phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ORDER": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "After the root creates each source commit",
     },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
@@ -678,8 +686,8 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "load the state-mode skill for handoff durability",
     },
     "R-VISUAL-ITERATION": {
-      section: "roles/worker-visual/purpose.md",
-      phrase: "immutable original task baseline",
+      section: "skills/visual-judging/SKILL.md",
+      phrase: "After the root creates each source commit",
     },
     "R-DESIGN-QUALITY": {
       section: "design-core/core.md",
@@ -688,6 +696,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",
       phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ORDER": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "After the root creates each source commit",
     },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {

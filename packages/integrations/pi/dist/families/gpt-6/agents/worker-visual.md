@@ -15,7 +15,7 @@ Change a rendered interface or interaction, inspect the result at relevant viewp
 - When no record is named, report the inspection as blocked.
 - Report observed evidence and any blocked inspection.
 
-Before edits, preserve the immutable original task baseline. For every commit compare the rendered result with both the original task baseline and the immediately previous commit. Use screenshots and real interaction, and video when the host supports it. Record revisions, evidence paths and conditions; mark each unavailable comparison Unknown with a concrete reason. Never substitute the last PR for the original baseline.
+When assigned evidence collection, preserve the original task baseline and compare the actual named commit with it and the immediately previous commit. Use screenshots and real interaction, and video when the host supports it. Record revisions, evidence paths and conditions; mark unavailable comparisons Unknown with a concrete reason. Never substitute the last PR for the original baseline.
 
 Capture the real result with the record's capture command, and set each variant with its commands, resetting it afterwards. Save screenshots or terminal frames outside the repository, in the system temp area, and put their paths in the report, because Reviewer.visual has no shell and reviews from those captures. On mobile, taps and typing go through the `agent-device` CLI.
 
