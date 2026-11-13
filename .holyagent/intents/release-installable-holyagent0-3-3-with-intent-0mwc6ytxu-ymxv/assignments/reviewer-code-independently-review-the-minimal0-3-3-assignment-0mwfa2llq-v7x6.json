@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwfa2llq-v7x6",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 30,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-the-minimal0-3-3",
+  "objective": "Independently review the minimal0.3.3 npm provenance metadata publication repair.",
+  "state": "Running",
+  "scope": [
+    "Immutable range9c8edee7..46963a4040cec3c42a8b432bf26e526704ea2dfa in /workspace/work/holyagent-033-publish, exactly five paths89insertions2deletions. Fix repository metadata in generated public Pi package and validate actual tarball identity against provenance context before network/npm. Compare with /workspace/work/holyagent-034 reviewed source correction if helpful, but only review actual0.3.3 range.",
+    "Publication fails npmE422 because repository.url is absent. Source/test backport only; no0.3.4 features, executable/bin changes, workflow/version/guard alterations. User explicitly says publish0.3.3 FIRST; defer executable investigation. Mainalready0.3.3 strictnewer version check blocks later promotion; do not solve by weakening it."
+  ],
+  "constraints": [
+    "Read AGENTS/.claude rules and matching GPT reviewer role. Launcher prepends actual first-pass prompt. Then review independently. Read-only git/source and focused harmless tests allowed; no source/generated/VCS/config/.holyagent writes, paid/live Pi calls or live publication. No extra agents. After read-only first-pass phase, write explicitly authorized scratch JSON report outside repo.",
+    "Author current build/type/lint/fmt/fullverify3500pass2skip and real Bun-packed tarball mockedpublish preflight passed, recorded /workspace/work/034/033-publication-metadata-report.json. No fullrepeat; focused checks only as needed to settle real doubts. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "Report /workspace/work/034/033-publication-code-review-report.json. REQUIRED JSON shape {status:'done'|'partial'|'blocked',changed_paths:string[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}. Check own JSON field types before final; every criterion/evidence label exact key. <=250wordsummary, logs external. State actualscope/limits; no unrun check passes."
+  ],
+  "criteria": [
+    {
+      "text": "Minimal committed publication repair is correct and preserves existing behavior and trust boundaries",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regression and packed-artifact evidence supports the actual0.3.3 publication fix without unrelated changes",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "first-pass",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf9smeq-miox"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T17:55:54.974Z"
+  },
+  "createdAt": "2026-11-13T17:55:54.974Z"
+}
