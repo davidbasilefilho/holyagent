@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "map-current-runtime-architecture-and-an",
   "objective": "Map current runtime architecture and an implementation-ready plan for 0.3.4 native tools, waiting, tool naming, operational ownership and handoff.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "packages/runtime/src domain/cli/state/pi, packages/integrations/pi/src, route/instruction assembly, workflow validator",
     "Existing related Intents intent-0mwc6vsv1-fxrs and intent-0mwaz75rz-i978"
@@ -42,7 +42,37 @@
     "agentId": "/root/r034_runtime_map",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T12:17:02.807Z"
+    "startedAt": "2026-11-13T12:17:02.807Z",
+    "finishedAt": "2026-11-13T12:29:09.345Z"
+  },
+  "result": "result: Runtime architecture mapped and implementation slices proposed in /workspace/work/034/runtime-map.md.\nchanged: /workspace/work/034/runtime-map.md only.\nchecks: Source, existing tests, related Intents, local reports and Git history inspected; tests were not run for this read-only assignment.\nblockers: Pi host support for worker-completion and user-input wakeups, and safe forwarding of external tool aliases, remains unverified.\nquestions: None.\nnotes: The map identifies shared files that require writer sequencing. No matching handoff commit or local report was found; inaccessible historical artifacts remain unknown.\nevidence:\nCurrent behavior and missing release contracts are traced to source: The map traces CLI dispatch, Pi tool selection and gates, workflow validation, ownership, skills, wait and handoff to source and existing tests.\nImplementation plan preserves authority boundaries and supports independent slices: The map specifies role-gated command adapters, preserved repository locks, and disjoint ownership groups with shared-file sequencing.\nsource-map: /workspace/work/034/runtime-map.md, “Contracts and current evidence.”\noptions: /workspace/work/034/runtime-map.md, “Design options and sequencing.”\nrecommended-paths: /workspace/work/034/runtime-map.md, suggested implementation slices A–E.\n",
+  "acceptance": {
+    "revision": 10,
+    "rationale": "Source-traced options and scoped path sequencing preserve CLI authority and repository locks; host wait and alias contracts still need proof.",
+    "criteria": [
+      {
+        "criterion": "Current behavior and missing release contracts are traced to source",
+        "support": "The map traces CLI dispatch, Pi tool selection and gates, workflow validation, ownership, skills, wait and handoff to source and existing tests."
+      },
+      {
+        "criterion": "Implementation plan preserves authority boundaries and supports independent slices",
+        "support": "The map specifies role-gated command adapters, preserved repository locks, and disjoint ownership groups with shared-file sequencing."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "source-map",
+        "support": "/workspace/work/034/runtime-map.md, “Contracts and current evidence.”"
+      },
+      {
+        "label": "options",
+        "support": "/workspace/work/034/runtime-map.md, “Design options and sequencing.”"
+      },
+      {
+        "label": "recommended-paths",
+        "support": "/workspace/work/034/runtime-map.md, suggested implementation slices A–E."
+      }
+    ]
   },
   "createdAt": "2026-11-13T12:17:02.807Z"
 }
