@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mwf9enmt-njvf",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Worker.mechanical",
+  "slug": "remove-the-single-repeated-on-demand",
+  "objective": "Remove the single repeated on-demand guidance instruction while preserving all role-map coverage.",
+  "state": "Running",
+  "scope": [
+    "Work /workspace/work/holyagent-034-skills at d9f21e91; optional duplication documented in /workspace/work/034/owned-artifact-current-review-report.json. Remove one duplicate sentence from all three root sources while keeping canonical generated owned-guidance routing. Regenerate distributions and run affected instruction/scoped-guidance/packaging freshness tests and fmt."
+  ],
+  "constraints": [
+    "Read AGENTS.md/GPT mechanical role. Own only three root/skills.md source files and generated distributions through build. Do not alter role map, instruction requirement contracts, setup behavior or other source. Read-only git allowed; no VCS writes, config, .holyagent or deps changes. No live Pi/model calls.",
+    "Environment MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; use mise. Full verify already3493pass2skip on code; no fullrepeat for this wording-only fix.",
+    "Report /workspace/work/034/owned-guidance-duplicate-repair-report.json exact schema {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; <=200words. Include diff file containing all changes."
+  ],
+  "criteria": [
+    {
+      "text": "Repeated guidance instruction is removed consistently without losing role coverage or changing functionality",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/root/skills.md",
+    "packages/runtime/src/instructions/gpt-6/root/skills.md",
+    "packages/runtime/src/instructions/kimi-k3.1/root/skills.md",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf3onqq-igcn",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T17:37:17.861Z"
+  },
+  "createdAt": "2026-11-13T17:37:17.861Z"
+}
