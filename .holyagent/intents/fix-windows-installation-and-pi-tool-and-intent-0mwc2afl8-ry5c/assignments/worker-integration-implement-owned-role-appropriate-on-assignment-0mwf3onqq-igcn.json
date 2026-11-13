@@ -1,0 +1,75 @@
+{
+  "id": "assignment-0mwf3onqq-igcn",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Worker.integration",
+  "slug": "implement-owned-role-appropriate-on",
+  "objective": "Implement owned role-appropriate on-demand guidance and retire external Context7 instruction installation.",
+  "state": "Running",
+  "scope": [
+    "Shared role-skill map/assembly, both integration generators and role routers, owned documentationlookupskill, setup/doctor/undo/docs/tests."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-skills acceptedc3base. Read repoAGENTS/.claude, .claude/skills/requirements/SKILL.md, instruction-writing+familyguides. Research /workspace/work/034/scoped-skills-design.md/reportjson and SDKprobe are acceptedwithlimits; distributionIntent4 recordsrootchoice. SourceC addsvisual/perfskills androotidentity/delegating/coverage; F workflow/search/dispatch/coverage; E roleprofiles; D nativeflag/CLIIPC. Yourtreeindependent; reportmergeseams, do noteditotherworktrees.0.4redesignplanningonly.",
+    "Selecteddesign: keepone shared role->ownedskill routing map withsituationaltriggers, packageownedbodies under NONdiscoveredpaths, giveeachrole minimalon-demandpathrouter. RemoveONLYHolyAgent-owned globaladvertisements/defaultskillfolders afteractualgenerator+hostfixtureproof; don'tadvertiseprivatefolderagainviamanifest. Preserveuser/thirdparty skilldiscovery andalltoolpermissions. No frontmatter skills blanketpreload,noSdk skillOverride injectionunsupported,noinstalledpackagepatch. Thisisroleappropriateguidance, NOTfilesystemauthorization/hostnativeper-rolefiltering. Existing skill publicinvocationcompatifchanged mustdocumentmigrationandreview; don'tsilentlybreakinternalpathrefs. Rootmustbeableloadviaexistingpermittedreader/CLIrg; nonewCLIcommandunlessevidenceaskedroot.",
+    "RequirementsFIRST/allclaude-5.5/gpt-6/kimi-k3.1translations/coverage, selectedfamilyroutescorrectPi+Claude. Addowned documentation-lookup skill forlibrarydocswork, verifiedContext7CLIcommands/provenance; scopesresearch/lookup/implementationwhenrelevant, rootdelegateslookup. Nofixedvisualstylepresets. Progressive loading noallbodiesinroot/roleprompts, existingcontextbudgetsthresholdspreserved. Exactknownskillrolecrossproducttests deterministicownedpaths/absenceunrelatedownedrouters/userresourcepreservation. Cperformance skillnotinbase; flagrequiredmappinguponintegrationandtestfailsunknownownedskilluntilmapped ratherthanignore.",
+    "Retire ctx7 setup --cli --claude thatinstallsexternalskills/rules; retainexistingversionedCLIinstallationandhonestauth/readiness. Do notinventnewdependencies/pins orreadsecrets. Don'task/echo/forwardkeysforretiredsetupcall. Keepoldflagscompatiblewithclearaccuratemigrationifneeded; nocredentialdeletion/globalsettingschanges. Existingglobaluser~/.agents/skills/context7-cli orClauderulesownershipUNPROVED: neverinspect/delete/claimcleanup. Setup/doctor/dryrun/undo/cloud tests useisolatedhomes; legacyownedrecordsettingsrestoreonlyactualownership, modified/preexistinguserfilesuntouched.",
+    "Newprivateownedassetsmustactuallyusedbyroot/roles/generators, notunreachablefileonly. MeaningfulSDKresourceLoaderfixtureprovesprivateHolyAgentfoldernotgloballycataloguedandunrelateduserskillstillavailable; Claudeofficialdefaultfolderrules/sourcegenproofplusdeclaredhostfixturelimits, no liveClaude/modelcallsrequired. Ifsupportedhostcannotwireownedpaths, sendcompactoptionsbefore unsafehack. FrontmatterSkilldisallowisnotper-skillfilter.",
+    "No actualVCS/.git/.holyagentwrites, sourcecommits, livePiCLI/modelcalls, globaluserPCoperations, dependencies/pinchanges, generateddistedits orsubagents. TemporaryGit/SDK/homefixturesallowed. Frozeninstall --ignore-scripts asneeded. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Focusedredgreen/type/lint/fmtvia mise, rootbuild/fullverifylater.",
+    "Checkactualtestfilenames; requestnecessaryownershipcorrectionsbeforeeditingunlistedtests. Keepworkingthroughrequestedsource/checks; realhostlimitsnotfakeisolation. JSON /workspace/work/034/owned-skills-report.json correctCLIshape/exactkeys; diff /workspace/work/034/owned-skills.diff. <=350wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Owned guidance is progressively routed by role across families and both harnesses without global body preload",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "User and third-party resources remain available while owned private paths and internal references are coherent",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Context7 migration stops external instruction installation and preserves credentials user files and undo ownership",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Focused role-mapping generator and setup lifecycle checks pass at unchanged context budgets",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "host-limits"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/runtime/tests/instructions.test.ts",
+    "packages/runtime/tests/setup.test.ts",
+    "packages/runtime/tests/doctor.test.ts",
+    "packages/runtime/tests/scoped-skills.test.ts",
+    "packages/integrations/pi/src/agents.ts",
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/tests/scoped-skills.test.ts",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/integrations/claude/src/setup-command.md",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "docs/owned-guidance.md",
+    "docs/components.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:57:06.866Z"
+  },
+  "createdAt": "2026-11-13T14:57:06.866Z"
+}
