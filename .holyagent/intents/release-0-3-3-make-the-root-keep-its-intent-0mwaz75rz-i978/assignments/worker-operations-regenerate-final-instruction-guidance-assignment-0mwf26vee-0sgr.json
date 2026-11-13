@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf26vee-0sgr",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-final-instruction-guidance",
+  "objective": "Regenerate final instruction guidance after the policy wording repair.",
+  "state": "Running",
+  "scope": [
+    "Build only then focused scripts/root-question-policy.test.ts, session context and generated freshness tests. No fullverify yet: final after committed review. Sourcewordingwriter terminal."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-guidance. Read relevant /workspace/work/034/guidance-wording-report.json. No actualVCS/.git/.holyagentwrites, extraagents, sourcefixes, externalcalls, dependencychanges. Sourcehashesmustremainstable; reportfailurebeforefix. RepoAGENTS/.claude rules apply.",
+    "Toolchain env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates throughmise; state fullverify uses python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify for descendent reaping. Guidancebuild with bunx --no-install mise run build and focusedtests via miseexecbun. No budget/testweakening.",
+    "JSON /workspace/work/034/guidance-reviewed-gates-report.json correctCLIshape/exactkeys; generateddiff ifguidance /workspace/work/034/guidance-final-generated.diff. <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested final gates pass with source unchanged",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_state_final_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:15:17.366Z"
+  },
+  "createdAt": "2026-11-13T14:15:17.366Z"
+}
