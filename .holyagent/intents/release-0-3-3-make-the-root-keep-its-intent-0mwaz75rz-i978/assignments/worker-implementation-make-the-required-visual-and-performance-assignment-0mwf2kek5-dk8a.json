@@ -50,5 +50,33 @@
     "finishedAt": "2026-11-13T14:31:54.623Z"
   },
   "result": "status: partial\nchanged:\n- docs/iteration-evidence.md\n- packages/runtime/src/instructions/claude-5.5/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/claude-5.5/root/delegating.md\n- packages/runtime/src/instructions/claude-5.5/skills/performance-iteration/SKILL.md\n- packages/runtime/src/instructions/claude-5.5/skills/visual-judging/SKILL.md\n- packages/runtime/src/instructions/coverage.ts\n- packages/runtime/src/instructions/gpt-6/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/gpt-6/root/delegating.md\n- packages/runtime/src/instructions/gpt-6/skills/performance-iteration/SKILL.md\n- packages/runtime/src/instructions/gpt-6/skills/visual-judging/SKILL.md\n- packages/runtime/src/instructions/kimi-k3.1/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/kimi-k3.1/root/delegating.md\n- packages/runtime/src/instructions/kimi-k3.1/skills/performance-iteration/SKILL.md\n- packages/runtime/src/instructions/kimi-k3.1/skills/visual-judging/SKILL.md\n- packages/runtime/src/instructions/requirements/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/requirements/root/delegating.md\n- packages/runtime/src/instructions/requirements/skills/performance-iteration/SKILL.md\n- packages/runtime/src/instructions/requirements/skills/visual-judging/SKILL.md\n- packages/runtime/tests/instructions.test.ts\nchecks:\n- bunx --no-install mise run test -- scripts/root-question-policy.test.ts packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts packages/runtime/tests/sessioncontext.test.ts packages/integrations/pi/tests/session-context.test.ts -> exit 0\n- bunx --no-install mise run test -- scripts/root-question-policy.test.ts packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts packages/runtime/tests/sessioncontext.test.ts packages/integrations/pi/tests/session-context.test.ts packages/integrations/pi/tests/extension.test.ts packages/integrations/claude/tests/plugin.test.ts -> exit 1\n- mise exec -- bun in-memory Claude and Pi generator skill checks -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nblockers:\n- Two Claude plugin checks compare stale generated assets to changed sources; root must rebuild and rerun them.\nnotes:\n- 520 of 522 extended focused tests pass; both failures are generated asset freshness. Generated files were not edited.\n- No full build or verify per assignment.\nevidence:\n- Original baseline is collected before edits and actual per-commit evidence is dispatched after root commits: Requirements and both on-demand skills require baseline collection before source edits and read-only specialist collection on each actual root commit before review, acceptance or push, preserving original and advancing previous.\n- Cross-family and harness guidance preserves budgets approval boundaries and truthful evidence: All-family 96 focused source/policy/context checks pass; in-memory Claude and Pi generators include both skills, type/lint/format pass. Two stale generated-file assertions await rebuild.\n- checks-run: Commands and exit codes in checks; detailed logs /workspace/work/034/guidance-evidence-order-*.log.\n- changed-paths: See changed_paths.\n- diff-file: /workspace/work/034/guidance-evidence-order.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Recorded source proof plus subsequent regenerated558focusedchecks close stale-assets gap, preserves source budgets and actual per-commit collection order.",
+    "criteria": [
+      {
+        "criterion": "Original baseline is collected before edits and actual per-commit evidence is dispatched after root commits",
+        "support": "Requirements and both on-demand skills require baseline collection before source edits and read-only specialist collection on each actual root commit before review, acceptance or push, preserving original and advancing previous."
+      },
+      {
+        "criterion": "Cross-family and harness guidance preserves budgets approval boundaries and truthful evidence",
+        "support": "All-family 96 focused source/policy/context checks pass; in-memory Claude and Pi generators include both skills, type/lint/format pass. Two stale generated-file assertions await rebuild."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Commands and exit codes in checks; detailed logs /workspace/work/034/guidance-evidence-order-*.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "See changed_paths."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/guidance-evidence-order.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-13T14:25:48.725Z"
 }
