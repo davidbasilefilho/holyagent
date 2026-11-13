@@ -32,7 +32,7 @@ jobs:
 
   dev:
     needs: validation
-    if: startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected
+    if: github.ref == 'refs/heads/dev' && github.ref_protected
     uses: ./.github/workflows/dev.yml
     permissions:
       contents: write

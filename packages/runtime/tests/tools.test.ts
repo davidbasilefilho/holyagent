@@ -109,7 +109,7 @@ describe.skipIf(!posix)("the command line passes through to the program on PATH"
     await chmod(path, 0o755)
   }
 
-  test("hands every argument over untouched, --help and -h included, from the working directory", async () => {
+  test("passes arguments unchanged, from the working directory", async () => {
     await fake("rg", 0)
     const argv = ["-n", "--help", "-h", "two words", "a*b", "$HOME", "--", "-x"]
     const result = await cli(["rg", ...argv])

@@ -26,10 +26,7 @@ const passes = (pr: PullRequest) =>
 
 describe("checkBranchModel", () => {
   test.each([
-    ["release/0.2.1/integration", "main", "0.2.1"],
-    ["release/0.2.1/ci/release-flow", "release/0.2.1/integration", "0.2.1"],
-    ["release/0.2.1/fix/a", "release/0.2.1/feat/b", "0.2.1"],
-    ["release/0.2.1/integration", "release/0.2.1/ci/x", "0.2.1"],
+    ["dev", "main", "0.2.1"],
     ["feature/x", "dev", "0.2.1"],
     ["feature/x", "feature/y", "0.2.1"],
   ])("accepts %s into %s at version %s", (head, base, version) => {
@@ -43,47 +40,6 @@ describe("checkBranchModel", () => {
     ["release/0.2.1/integration-2", "a look-alike of the integration branch"],
   ])("rejects a pull request into main from %s (%s)", (head) => {
     expect(rule({ base: "main", head, version: "0.2.1" })).toBe("main-base")
-  })
-
-  test("rejects a release branch whose version differs from the head's version", () => {
-    expect(
-      rule({ base: "release/0.2.1/integration", head: "release/0.2.1/fix/a", version: "0.2.0" }),
-    ).toBe("branch-version")
-    expect(rule({ base: "main", head: "release/0.2.0/integration", version: "0.2.1" })).toBe(
-      "branch-version",
-    )
-    expect(rule({ base: "dev", head: "release/0.3.0/fix/a", version: "0.2.0" })).toBe(
-      "branch-version",
-    )
-  })
-
-  test.each([
-    ["feature/x", "a branch outside any release"],
-    ["release/0.2.0/fix/a", "a branch of another release"],
-    ["main", "main"],
-  ])("rejects a pull request into a release branch from %s (%s)", (head) => {
-    expect(rule({ base: "release/0.2.1/integration", head, version: "0.2.0" })).toBe("release-base")
-  })
-
-  test.each([
-    ["release/0.2.1/integration", "0.2.1-1"],
-    ["release/0.2.1-1/integration", "0.2.1"],
-  ])("compares versions, not spellings: %s at %s", (head, version) => {
-    expect(passes({ base: "main", head, version })).toBe(true)
-  })
-
-  test.each([
-    ["release/0.2.01/integration", "0.2.1"],
-    ["release/next/integration", "0.2.1"],
-    ["release/0.2.10/integration", "0.2.1"],
-  ])("rejects the release segment of %s against version %s", (head, version) => {
-    expect(rule({ base: "main", head, version })).toBe("branch-version")
-  })
-
-  test("a malformed head version fails a release branch with InvalidVersion", () => {
-    expect(rule({ base: "main", head: "release/0.2.1/integration", version: "1.0.0" })).toBe(
-      "InvalidVersion",
-    )
   })
 
   test("a failure names the rule, the branches and the reason", () => {
@@ -150,7 +106,7 @@ describe("the command line", () => {
   })
 
   test("branch-model exits 0 for a valid release pull request and 1 otherwise", async () => {
-    expect(await run("branch-model", "main", "release/0.2.1/integration", "head")).toBe(0)
+    expect(await run("branch-model", "main", "dev", "head")).toBe(0)
     expect(await run("branch-model", "main", "feature/x", "head")).toBe(1)
   })
 

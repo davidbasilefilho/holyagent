@@ -16,11 +16,10 @@ Rules for working in this repository, each with the reason it exists. The contri
 
 This repository's own convention, enforced by CI and rulesets; HolyAgent's instructions do not carry it.
 
-- Each release has an integration branch, `release/0.X.Y/integration`, cut from `main`. Work branches are `release/0.X.Y/<type>/<change>`. The first work PR targets the integration branch; later work PRs may stack within the release. One integration branch per release lets `main` move only by a whole, validated release.
-- The first PR of a release carries the version bump as its own commit, made with `mise run bump:patch` (or `bump:minor`). Every later branch of the release is cut after it, so the version in a branch's head equals the `<v>` in its name, which the `branch-model` check compares.
-- Only `release/0.X.Y/integration` opens a PR into `main`. The `branch-model` check fails any other head into `main`, a `release/<v>/...` head whose `<v>` differs from the version in the head, and a PR into a `release/<v>/...` base from a branch of another release. The `version` check fails a PR into `main` unless the head's root `package.json` version is strictly greater than `main`'s, so a release cannot merge without its bump.
-- Rulesets protect `main` and `release/*/integration` (PRs only, no force push, no deletion) and the `holyagent-*` tags (no update, no deletion). The required checks are the job ids in `.github/workflows/validation.yml`: `check`, `windows`, `installers` and `branch-model`, plus `version` on `main`. Renaming a job drops its check from protection until the ruleset names the new one; `docs/development.md` lists them.
-- A push to a branch runs `publish.yml`: validation first, then `stable.yml` on `main` (tag `holyagent-<version>` and a Release) or `dev.yml` on release integration branches (tag `holyagent-<version>-dev-<short-hash>` and a pre-release). Only protected release contexts publish npm packages. Tags are never a trigger, so a tag cannot start a release.
+- Work PRs target `dev`; release PRs promote `dev` to `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
+- Only `dev` opens a PR into `main`. The `branch-model` check enforces that rule and `version` requires the head's version to advance over `main`, so a release cannot merge without its bump.
+- Protect `main` and `dev` (PRs only, no force push, no deletion) and `holyagent-*` tags (no update, no deletion). Required checks are the job ids `check`, `windows`, `installers` and `branch-model`, plus `version` on `main`. Renaming a job drops its check from protection until the ruleset names the new one.
+- Branch pushes run validation, then publish stable on protected `main` or a development release on protected `dev`. Development versions use the commit UTC time and short SHA. Tags never trigger publication.
 - Pin every external action to a full commit SHA with a `# vX.Y.Z` comment, and give `contents: write` only to the jobs that tag and release. A moving tag can change what runs with the repository's token; `scripts/workflows.test.ts` checks both rules.
 
 ## The version
