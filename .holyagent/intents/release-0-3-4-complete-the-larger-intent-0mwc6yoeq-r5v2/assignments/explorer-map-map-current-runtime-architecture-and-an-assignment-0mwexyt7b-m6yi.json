@@ -39,6 +39,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_runtime_map",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T12:17:02.807Z"
