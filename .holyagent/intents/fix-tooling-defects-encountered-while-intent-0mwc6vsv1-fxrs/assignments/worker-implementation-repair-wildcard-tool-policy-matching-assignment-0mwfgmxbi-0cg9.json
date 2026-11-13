@@ -53,5 +53,37 @@
     "finishedAt": "2026-11-13T21:03:35.006Z"
   },
   "result": "status: done\nchanged:\n- packages/runtime/src/pi/tools.ts\n- packages/runtime/tests/pi/tools.test.ts\n- packages/integrations/pi/dist/extensions/holyagent.js\nchecks:\n- bunx --no-install mise run test -- packages/runtime/tests/pi/tools.test.ts packages/integrations/pi/tests/tool-aliases.test.ts packages/integrations/pi/tests/wait-for-agents.test.ts -> exit 0\n- bunx --no-install mise run test -- packages/integrations/pi/tests/extension.test.ts -> exit 0\n- bunx --no-install mise run build -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\n- git diff --check -> exit 0\nnotes:\n- Reproduced two failing focused regression tests before repair. Generated Pi bundle rebuilt from source.\n- evidence: Wildcard and literal policies match canonical tool names and aliases without widening host authority: Known pairs are matched in either spelling; unrelated names stay exact and negative wildcard cases pass. Current alias regression tests and build static gates pass while prior wait semantics remain preserved: 98 focused and 351 extension tests pass; build, check, lint and fmt:check pass. Wait implementation is unchanged. checks-run: Commands and exit codes in checks; logs at /workspace/work/034/events-wildcard-*.log. changed-paths: packages/runtime/src/pi/tools.ts, packages/runtime/tests/pi/tools.test.ts, packages/integrations/pi/dist/extensions/holyagent.js diff-file: /workspace/work/034/events-wildcard-repair.diff authority-preservation: Alias invocation and original nested tool invocation retain independent SDK host checks; no host authorization code changed.\nevidence:\n- Wildcard and literal policies match canonical tool names and aliases without widening host authority: Known pairs are matched in either spelling; unrelated names stay exact and negative wildcard cases pass.\n- Current alias regression tests and build static gates pass while prior wait semantics remain preserved: 98 focused and 351 extension tests pass; build, check, lint and fmt:check pass. Wait implementation is unchanged.\n- checks-run: Commands and exit codes in checks; logs at /workspace/work/034/events-wildcard-*.log.\n- changed-paths: packages/runtime/src/pi/tools.ts, packages/runtime/tests/pi/tools.test.ts, packages/integrations/pi/dist/extensions/holyagent.js\n- diff-file: /workspace/work/034/events-wildcard-repair.diff\n- authority-preservation: Alias invocation and original nested tool invocation retain independent SDK host checks; no host authorization code changed.",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Verified original reproduction,449focused and extension tests plusbuild/staticpass; committed b2ac10b independently reviewed forcode andauthority with no blockers.",
+    "criteria": [
+      {
+        "criterion": "Wildcard and literal policies match canonical tool names and aliases without widening host authority",
+        "support": "Known pairs are matched in either spelling; unrelated names stay exact and negative wildcard cases pass."
+      },
+      {
+        "criterion": "Current alias regression tests and build static gates pass while prior wait semantics remain preserved",
+        "support": "98 focused and 351 extension tests pass; build, check, lint and fmt:check pass. Wait implementation is unchanged."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Commands and exit codes in checks; logs at /workspace/work/034/events-wildcard-*.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/src/pi/tools.ts, packages/runtime/tests/pi/tools.test.ts, packages/integrations/pi/dist/extensions/holyagent.js"
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/events-wildcard-repair.diff"
+      },
+      {
+        "label": "authority-preservation",
+        "support": "Alias invocation and original nested tool invocation retain independent SDK host checks; no host authorization code changed."
+      }
+    ]
+  },
   "createdAt": "2026-11-13T20:59:40.974Z"
 }
