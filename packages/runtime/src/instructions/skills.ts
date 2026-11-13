@@ -308,6 +308,7 @@ export const guidanceRouter = (role: string, family: Family, root: string): stri
   )
   return [
     "User and third-party skills remain available.",
+    ...(role === "root" ? [] : ["Read the relevant guidance when its situation applies."]),
     ...lines,
     ...(role === "root"
       ? ["Delegate library documentation lookup to a librarian or implementation specialist."]

@@ -16680,6 +16680,7 @@ var guidanceRouter = (role, family, root) => {
   const lines = entries.map(({ name, when }) => `- ${when}: \`${root}/${GUIDANCE_FOLDER}/${family}/${name}/SKILL.md\``);
   return [
     "User and third-party skills remain available.",
+    ...role === "root" ? [] : ["Read the relevant guidance when its situation applies."],
     ...lines,
     ...role === "root" ? ["Delegate library documentation lookup to a librarian or implementation specialist."] : []
   ].join(`

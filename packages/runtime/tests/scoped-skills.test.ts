@@ -17,6 +17,10 @@ describe("owned guidance routing", () => {
     expect(() => validateOwnedGuidance(files)).not.toThrow()
     for (const role of ["root", ...ROUTES.map((route) => route.roleTask)]) {
       const router = guidanceRouter(role, family, "/package")
+      if (role !== "root" && OWNED_GUIDANCE.some((entry) => entry.roles.includes(role)))
+        expect(router).toContain("Read the relevant guidance when its situation applies.")
+      if (role === "root")
+        expect(router).not.toContain("Read the relevant guidance when its situation applies.")
       for (const entry of OWNED_GUIDANCE) {
         const path = `/package/guidance/${family}/${entry.name}/SKILL.md`
         expect(router.includes(path)).toBe(entry.roles.includes(role))

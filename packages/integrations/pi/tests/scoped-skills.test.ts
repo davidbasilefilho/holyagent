@@ -60,6 +60,8 @@ test("Pi role prompts route only mapped family guidance and keep bodies out", as
     const agents = await agentFiles(family)
     for (const route of ROUTES) {
       const prompt = agents.find((file) => file.path.endsWith(`/${route.agent}.md`))?.content ?? ""
+      if (OWNED_GUIDANCE.some((entry) => entry.roles.includes(route.roleTask)))
+        expect(prompt).toContain("Read the relevant guidance when its situation applies.")
       for (const entry of OWNED_GUIDANCE)
         expect(prompt.includes(`/guidance/${family}/${entry.name}/SKILL.md`)).toBe(
           entry.roles.includes(route.roleTask),

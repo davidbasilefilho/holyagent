@@ -111,4 +111,5 @@ Failed fetches retry up to three times: tests/fetch.test.ts "retries three times
 - On a follow-up, report only what is new.
 
 User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
 - library documentation is needed: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/documentation-lookup/SKILL.md`

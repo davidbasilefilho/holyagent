@@ -1103,6 +1103,17 @@ describe("agents", () => {
       })
   })
 
+  test("specialists read routed guidance when relevant without repeating it for the root", () => {
+    const directive = "Read the relevant guidance when its situation applies."
+    for (const route of ROUTES) {
+      const prompt = agent(route.agent)?.content ?? ""
+      expect(prompt.includes(directive)).toBe(
+        OWNED_GUIDANCE.some((entry) => entry.roles.includes(route.roleTask)),
+      )
+    }
+    expect(agent("holyagent")?.content).not.toContain(directive)
+  })
+
   test("each agent description stands alone, without pointing at text below it", () => {
     for (const route of ROUTES)
       expect({

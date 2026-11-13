@@ -187,6 +187,7 @@ This text owns the severity of those findings. A finding blocks only when the ch
 Every other finding is optional, as is anything already on the base.
 
 User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
 - library documentation is needed: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/documentation-lookup/SKILL.md`
 - writing or reviewing model-facing instructions: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/instruction-writing/SKILL.md`
 

@@ -149,6 +149,7 @@ Where to look. Use the browser, preview, screenshot and device tools the host pr
 Stay on the page under test: navigate only to the pages the Assignment names, evaluate script only to inspect that page, and upload only files it names. Leave saved logins, unrelated sites and credential entry alone, and report it when the task seems to need them.
 
 User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
 - the selected platform is web: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/web-design/SKILL.md`
 - the selected platform is mobile: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/mobile-design/SKILL.md`
 - the selected platform is desktop: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/desktop-design/SKILL.md`
