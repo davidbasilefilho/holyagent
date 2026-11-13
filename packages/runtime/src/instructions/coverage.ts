@@ -44,6 +44,11 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "skills/performance-iteration/SKILL.md",
       phrase: "After the root creates each source commit",
     },
+    "R-SKILLS": {
+      section: "root/skills.md",
+      phrase:
+        "complete and accept baseline collection before dispatching any task source-writing Assignment",
+    },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
       carriedBy: "scripts/stop-slop-policy.test.ts",
@@ -363,6 +368,11 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-PERFORMANCE-ORDER": {
       section: "skills/performance-iteration/SKILL.md",
       phrase: "After the root creates each source commit",
+    },
+    "R-SKILLS": {
+      section: "root/skills.md",
+      phrase:
+        "complete and accept baseline collection before dispatching any task source-writing Assignment",
     },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
@@ -700,6 +710,11 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-PERFORMANCE-ORDER": {
       section: "skills/performance-iteration/SKILL.md",
       phrase: "After the root creates each source commit",
+    },
+    "R-SKILLS": {
+      section: "root/skills.md",
+      phrase:
+        "complete and accept baseline collection before dispatching any task source-writing Assignment",
     },
     "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {

@@ -16535,7 +16535,7 @@ Delegate edits, runs, checks, reviews, research and investigation to specialists
 
 If a \`holyagent:*\` type fails to resolve, stop and report it; general-purpose agents are no substitute. If subagents are forbidden, meet the criteria and name each waived review.
 
-For optimization, load \`performance-iteration\`; require specialists to read its absolute path.
+At optimization start, load \`performance-iteration\`; accept the collected baseline before any task source-writing dispatch. Require specialists to read its absolute path.
 `;
 var init_delegating = () => {};
 
@@ -16551,7 +16551,7 @@ Own the user relationship, material decisions, acceptance, version control and c
 - Write artifacts (PRs, commits, docs, instructions) in English by default unless the target repository's convention says otherwise; write the task list and user text in the language of the user's latest message.
 - Keep PR text and final reports free of filler, redundant summaries and boilerplate.
 - Never force-push or push to the base, default or a protected branch without the user's approval. The base is the branch the conventions or the user name as the work's target, else the default branch. Creating and pushing a convention-named base absent remotely is not such a push; pushing commits to an existing base is.
-- Never work on a branch the platform assigns: a cloud session starts on one it created; a branch the user named as the work branch is not one. Before the first commit, check \`git branch --show-current\`; on an assigned branch, first create the conventional branch in a worktree (\`git worktree add -b <name> <path> <start>\`, per plan), then commit and push only there. If refused, stop, report the blocker and ask via AskUserQuestion to push to the assigned branch; it is never a default, so park the push when the user is away.
+- Never work on a branch the platform assigns; a branch the user named as the work branch is not one. Before the first commit, check \`git branch --show-current\`; on an assigned branch, first create the conventional branch in a worktree (\`git worktree add -b <name> <path> <start>\`, per plan), then commit and push only there. If refused, stop, report the blocker and ask via AskUserQuestion to push to the assigned branch; it is never a default, so park the push when the user is away.
 - After an explicit user denial, stop that line of work. After an automatic tool rejection, report the exact blocked effect and existing authorization; ask for fresh scoped approval when it can resolve the block. Retry only after the required approval is obtained and any host restriction is resolved. Never work around an unresolved denial through another tool, script, or link. If the host rejects a retry, stop and report the exact tool payload and reason.
 - Commit only with \`holyagent vcs commit\`; use plain Git and \`gh\` for branches, pushes, merges and CI.
 - Reply on threads only when the request or repository workflow authorizes it.

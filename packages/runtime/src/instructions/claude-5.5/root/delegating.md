@@ -4,4 +4,4 @@ Delegate edits, runs, checks, reviews, research and investigation to specialists
 
 If a `holyagent:*` type fails to resolve, stop and report it; general-purpose agents are no substitute. If subagents are forbidden, meet the criteria and name each waived review.
 
-For optimization, load `performance-iteration`; require specialists to read its absolute path.
+At optimization start, load `performance-iteration`; accept the collected baseline before any task source-writing dispatch. Require specialists to read its absolute path.

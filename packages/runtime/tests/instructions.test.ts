@@ -165,6 +165,15 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
   test("assembles iteration guidance for the shared harness skill pipeline", async () => {
     const skills = await Effect.runPromise(skillFiles(family, () => "test source"))
     expect(read(join(FAMILY, "root/delegating.md"))).toContain("load `performance-iteration`")
+    expect(read(join(FAMILY, "root/delegating.md"))).toContain(
+      "accept the collected baseline before any task source-writing dispatch",
+    )
+    const routing = read(join(FAMILY, "root/skills.md"))
+    expect(routing).toContain("load it at visual task start")
+    expect(routing).toContain(
+      "complete and accept baseline collection before dispatching any task source-writing Assignment",
+    )
+    expect(routing).toContain("the baseline collector may be dispatched first")
     const performance = skills.find((skill) => skill.path === "performance-iteration/SKILL.md")
     expect(performance?.content).toContain("immediately previous commit")
     expect(performance?.content).toContain("Before any task source edits")
