@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mwf5mrmq-4xp5",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Worker.integration",
+  "slug": "remove-free-form-native-command-payloads",
+  "objective": "Remove free-form native command payloads from OS process arguments.",
+  "state": "Running",
+  "scope": [
+    "Read native-review-security.json validatedmediumfinding: assignmentcloseaccept,assignmentacceptrationale,intentclosereason/drop reachspawnargv. FixALLfree-formpayloads viaPRIVATEstrictstdin request envelope containing internally preparedfixedCLIargs+originalcommandstdin, notOSargv. Private cancellationIPCremainsCANCELONLY. ChilddecodeenvelopeandinvokesexistingCLIinmemory; modeltoolstilltypedpercommand,nogenericargvtool. ExistingpublicCLIargs/stdinsemanticsunchanged. Rootselectsenvelopetoavoidper-commandnewflags; protocolversion/schema strict, fixedprocessargv/script/projectonly, no tempfiles/payloadlogging. Preserveuser/mergedconfigrootcap, missingIPCfailclosed, stdout/error/exit/limits, cooperativecancel+uninterruptiblepersist+30sindeterminatefallback. TestactualproductionNode->Bunbridgeandargvcanariesforallfourleaks+intentcreatereporttext. Rootauthorizesnarrowentry/main/control changesneeded; no broadrewrite. SyntheticorphanonnormalcompletionunvalidatedsupportedCLIpath, reportlimitnotunrelatedprocess-supervisorrewrite."
+  ],
+  "constraints": [
+    "WorkONLY /workspace/work/holyagent-034-tools. Readreporules/roleinstructions and /workspace/work/034 relatedreports. Allpreviouswriters/buildterminal, sourcesfixedexceptassignedrepair. No actualVCS/.git/.holyagentwrites, depschanges, extraagents, livePi/modelcalls oruserPCoperations. TempGit/SDKfixturesallowed. Rootownscommits/push/state. Keepworkingthroughrequestedfix+checks; no generatededits/build/fullverifyunlessspecificallyverificationtask. ",
+    "Read native-review-security.json validatedmediumfinding: assignmentcloseaccept,assignmentacceptrationale,intentclosereason/drop reachspawnargv. FixALLfree-formpayloads viaPRIVATEstrictstdin request envelope containing internally preparedfixedCLIargs+originalcommandstdin, notOSargv. Private cancellationIPCremainsCANCELONLY. ChilddecodeenvelopeandinvokesexistingCLIinmemory; modeltoolstilltypedpercommand,nogenericargvtool. ExistingpublicCLIargs/stdinsemanticsunchanged. Rootselectsenvelopetoavoidper-commandnewflags; protocolversion/schema strict, fixedprocessargv/script/projectonly, no tempfiles/payloadlogging. Preserveuser/mergedconfigrootcap, missingIPCfailclosed, stdout/error/exit/limits, cooperativecancel+uninterruptiblepersist+30sindeterminatefallback. TestactualproductionNode->Bunbridgeandargvcanariesforallfourleaks+intentcreatereporttext. Rootauthorizesnarrowentry/main/control changesneeded; no broadrewrite. SyntheticorphanonnormalcompletionunvalidatedsupportedCLIpath, reportlimitnotunrelatedprocess-supervisorrewrite.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; focusedchecksthroughmise. JSON /workspace/work/034/native-private-input-repair-report.json status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}], exactkeys. Repairdiff /workspace/work/034/native-private-input-repair.diff. <=300wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested repair or verification meets its stated contract without weakening safeguards",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/native",
+    "packages/runtime/src/hooks/pi-entry.ts",
+    "packages/runtime/src/cli/main.ts",
+    "packages/runtime/tests/native-tools.test.ts",
+    "packages/integrations/pi/src/native-process.ts",
+    "packages/integrations/pi/src/native-tools.ts",
+    "packages/integrations/pi/tests/native-tools.test.ts",
+    "docs/native-tools.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf2e0k3-vq4n",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:51:37.826Z"
+  },
+  "createdAt": "2026-11-13T15:51:37.826Z"
+}
