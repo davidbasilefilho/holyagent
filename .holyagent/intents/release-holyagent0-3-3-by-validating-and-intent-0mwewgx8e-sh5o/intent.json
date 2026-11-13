@@ -17,6 +17,7 @@
     "Any later request to complete npm publication should start from /workspace/work/npm-oidc-diagnosis.md and failed dev job131861265745 logs via the purpose-built GitHub connector. Check actual npm/Node versions, sanitized OIDC diagnostics and trusted publisher identity before choosing a fix; no guessed code changes, token fallback or external security-setting writes were performed."
   ],
   "revision": 1,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "Completed: release PR #121 merged into main at44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a; required main PR checks passed, reviewed source tree preserved, remote main verified.",
   "createdAt": "2026-11-13T11:35:08.606Z"
 }
