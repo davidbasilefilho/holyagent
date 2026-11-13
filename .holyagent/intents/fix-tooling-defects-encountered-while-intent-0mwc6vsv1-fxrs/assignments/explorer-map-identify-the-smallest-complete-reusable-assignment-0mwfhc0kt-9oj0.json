@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwfhc0kt-9oj0",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Explorer.map",
+  "slug": "identify-the-smallest-complete-reusable",
+  "objective": "Identify the smallest complete reusable library boundary for the actual HolyAgent CLI functionality and native Pi consumers.",
+  "state": "Running",
+  "scope": [
+    "Read immutable5b1b6e2 in /workspace/work/holyagent-034-core plus /workspace/work/034/core-resume-api-inventory.md, docs/core-api.md and native-tools.md. User exact architecturalinstruction: 'a cli interna deve ter sua funcionalidade real em outro pacote que ela usa, para ferramentas nativasPi executarem funcionalidadesnativamente sem chamarCLI'. Current@holyagent/core actualtypedstate/orchestration effectsusedCLI andnativeNode pass; inventorylabels runtimeownedsetupdoctor,VCS,hooks,passthrough,browser asremaining. Evaluate that label against actualsource: are these alreadyreusablelibrary modules withthinCLIadapters, or actualbusinesslogicstrandedbehindCLI? Provide preciseexportpaths/callgraphs not assumedgap.",
+    "Give2small concrete architectureoptions ifneeded tofullysatisfy user'sactualreusegoal, withtradeoffs NodeSDKcompatibility/effecttypedAPI/authority/packaging/cost. Prefer minimalcomplete design; hostprotocol/presentation adapters canstayharnessspecific, don't inventrequirement toexposeeveryrawprocess/stdio serverasmodeltool. Mustnotclaimfullgoalcomplete ifactualbusinesslogiconlyreachablethroughCLIparser remains.",
+    "Analyze existingactualCLIpermission/approvalcontracts vsnativehostchecks beforeclaimingunsupportedprivilegedfunctionsrequire anewapprovalgate. Distinguish instructionlevelapprovals vsactualOS/tool enforcement; never proposebypass. Useralreadyauthorizesrelease andrequiredimplementation; no new blanketapprovalflows, extraneouspackages, externalpinchanges or newuserquestionunless truly necessary.",
+    "ReadGPTexplorermaproles/guide; no source/VCS/state/configwrites,noactualaccount orPCoperations, no gatesneeded exceptboundedreadproof. Save concise architectureoptions /workspace/work/034/core-completion-map.md and JSON /workspace/work/034/core-completion-map-report.json. Recommendationsunder500words; detailedmappingseparateappendix."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "Remaining reusable functionality gaps and minimum complete architecture options are traced to actual source and host contracts",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "source-map",
+    "options-and-tradeoffs",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T21:19:11.598Z"
+  },
+  "createdAt": "2026-11-13T21:19:11.598Z"
+}
