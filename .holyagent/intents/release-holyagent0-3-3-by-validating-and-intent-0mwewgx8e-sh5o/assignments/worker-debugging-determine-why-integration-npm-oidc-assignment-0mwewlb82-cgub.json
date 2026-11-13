@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "determine-why-integration-npm-oidc",
   "objective": "Determine why integration npm OIDC publication fails with ENEEDAUTH before deciding release readiness.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "scripts/npm-publishing.ts",
     ".github/workflows/{publish,dev,stable}.yml",
@@ -41,7 +41,9 @@
     "agentId": "/root/npm_oidc_diagnosis",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T11:38:33.363Z"
+    "startedAt": "2026-11-13T11:38:33.363Z",
+    "finishedAt": "2026-11-13T11:42:12.286Z"
   },
+  "result": "result: Dev publication failed; its precise OIDC cause is unresolved. No code defect or required main PR check failure is established by ENEEDAUTH alone. Assess source promotion separately from publication readiness.\nchanged: /workspace/work/npm-oidc-diagnosis.md\nchecks: Retrieved job 131861265745 logs; inspected workflow and publishing source and local npm 11.9.0 OIDC source; consulted npm docs. Canary Bun shell passed exact-value inheritance of both harmless OIDC sentinel variables (exit 0). An initial probe exited 1 due to test-command quoting; corrected and individual presence probes passed. No workflow rerun or publication attempted.\nblockers: Job logs do not show npm/Node versions, OIDC environment presence, token exchange response, or npm trusted-publisher configuration. Exact cause and release readiness remain unproven.\nquestions: none\nnotes: npm requires Node >=22.14.0 and npm >=11.5.1. The job resolves node@lts but does not log versions. npm docs require exact repository, workflow filename, optional environment and direct-publish permission; config is not publicly visible. Confirm caller workflow identity against GitHub claims, including reusable workflow details, before assuming its filename.\nevidence:\nFailure cause is supported by logs and code or client behavior evidence: Job log shows successful tarball inspection followed by ENEEDAUTH. Local npm 11.9.0 publish.js:141-161 calls oidc then throws when no credentials; oidc.js:27-142 silently returns for CI detection, missing request variables, GitHub token request or registry exchange failure. This traces the failure class, not its unresolved underlying cause; job npm version is unknown.\nProposed next step preserves trusted publishing and approval boundaries: Inspect npm trusted-publisher binding and workflow identity read-only; collect exact versions and sanitized verbose OIDC diagnostics in a separately authorized run. Do not introduce tokens, modify trusted publisher settings, publish, or rerun without authorization.\nchecks-run: Job logs fetched via GitHub connector; source and https://docs.npmjs.com/trusted-publishers/ examined; canary Bun sentinel inheritance probe exit 0. No project tests run for this read-only investigation.\nsource-trace: publish.yml:33-39 grants id-token: write to dev caller; dev.yml:10-17 grants it to npm environment job; scripts/npm-publishing.ts:30-34,142-156 invokes npm publish with --provenance after preflight and missing-version lookup. stable.yml:10-17 has equivalent permissions. Bun shell inherits both sentinel variables locally; actual job environment remains unknown.\nrecommendation: Verify exact tool versions and sanitized OIDC diagnostics, and compare npm binding with actual GitHub claims. Fix only an evidenced cause. Evaluate main promotion against actual required checks and release requirements separately; stable npm publication remains unproven.\n",
   "createdAt": "2026-11-13T11:38:33.363Z"
 }
