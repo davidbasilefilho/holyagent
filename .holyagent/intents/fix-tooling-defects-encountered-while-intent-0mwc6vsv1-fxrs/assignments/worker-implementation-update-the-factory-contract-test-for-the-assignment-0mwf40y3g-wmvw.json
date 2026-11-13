@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwf40y3g-wmvw",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Worker.implementation",
+  "slug": "update-the-factory-contract-test-for-the",
+  "objective": "Update the factory contract test for the gated native flag and shutdown lifecycle.",
+  "state": "Running",
+  "scope": [
+    "Read native-final-build-report.json: pi.test620 exactregistrationlistlacksnewregisterFlagholyagent-native-root andonsession_shutdown. UpdatelegitimateexpectedinterfaceswhilePRESERVING startsnothingassertion: noexec/process/statewritesuntilauthorizedcall, configfalse/unknownnoneactive. Don'tweakenfactorytest/privacy/roleguards. Testonlysourcebundleunchanged. Run pi.test+nativefocused+type/lint/fmt; nobuild/fullverify."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-tools. Allpreviousbuilders/reviewers terminal. No actualVCS/.git/.holyagentwrites/depschanges/extraagents/livecalls/generatededits. RootownsVCS/state. RepoAGENTS/.claude/role rulesapply. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; checksthroughmise.",
+    "JSON /workspace/work/034/native-factory-repair-report.json correctCLIshape/exactkeys; diff /workspace/work/034/native-factory-repair.diff. Final<=200words/logsexternal. Keepworkingthroughfixchecks."
+  ],
+  "criteria": [
+    {
+      "text": "Factory contract covers native lifecycle registrations while still proving startup has no effects",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/tests/pi.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf2e0k3-vq4n",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T15:06:40.156Z"
+  },
+  "createdAt": "2026-11-13T15:06:40.156Z"
+}
