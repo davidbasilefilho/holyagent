@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mwf2nlwa-qcxy",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 5,
+  "roleTask": "Worker.integration",
+  "slug": "implement-pi-event-based-root-waiting",
+  "objective": "Implement Pi event-based root waiting, safe snake_case external-tool aliases and coherent all-family workflow guidance.",
+  "state": "Running",
+  "scope": [
+    "Pi wait/alias modules and integration hooks, shared canonical-name policy/allowlists, focused host-contract tests and model instructions."
+  ],
+  "constraints": [
+    "Work only /workspace/work/holyagent-034-events acceptedc3base. Read repoAGENTS/.claude, integrationrole, /workspace/work/034/host-contracts.md, runtime-map.md. SourceSDKcontracts lockedPi1.5.0/pi-subagents0.23.2 from /workspace/work/034/host-contract-probes/subagents/package and installedPi. Userauthorized0.3.4 Terra low-xhigh. Root0.4proportionalorchestrationredesign planningonly; do notremoveexistingworkflowdefault. SharedsemanticsadaptPi/Claude, honestlydeclarenotavailableAPI.",
+    "Coreuserrequiresroot waitforagentsORuserORcache-awaretimeout. Rootresponsibilities planning/decisions/acceptance/VCS, specialistsdoexecution/research/checks. Toolsnake_case everywherepossible withouteditinginstalledpackages. Implement root-only wait_for_agents with actual lifecycle/input signals, reasons agent/input/timeout/cancelled/unavailable, retainedcompletionledger+subscribe-beforelaunch,racehandling, cleanuptimers/listeners onabort/reload/shutdown. NO pollingfilesystem or timer-onlystub presentedasfullwait. top-levelpublicsubagents completed/failed events work; workflowchildren have NOpubliccompletionevent andoutboxblockeduntilturn_end, so neverblockwaitworkflowjobs. Explicitunavailable/unsupportedworkflow result andordinaryhostnotifications; nofakeworkflowwait.",
+    "Cachetimeout derivedonlyfromactualknown effectiveproviderretention/TTL, includesbound+safetymargin; configuredassumption/unknownfallbackexplicitlylabelled, no guaranteed cachehit/keepwarmclaim withoutactual evidence. Timeout deliberatelyreturnsso rootcanresumeandcachemayrefresh, don'tinventTTL. Document exactunknownhostlimits. Submittedinput hook wakeswithoutconsumingusertext, sourcefilteredinteractive/rpc, actualdeliverynextturn, ESCabort=cancellation. Model-free realSDK mockprovider/RPC methods proof forinputduringblockedtool, actualeventbus andtop-levelAgentcompletion fixture ifpossible. Test completion-beforewait,races,input/abort,timeout,unavailable,dispose,reload,pendinghistory withoutnotificationconsumption.",
+    "Rootrole MUSTNOT usemutablePi sessiondisplayname/defaultmissingflagasauthority: nativewriterprovedinvalid. Use sameexplicit no-default --holyagent-native-root launchcapability fromnative-toolsbranch, absent=>deny. ThatbranchisNOTyours andnotmerged; independentlyregisterflaghere onceandreportmergeseam root will reconcile toonecentralregistration. Actualchildloaderdoesnotinheritflag inlockedPi/subagents, model-freeSDKproofneeded. Aliasaccesspreservesunderlyingexistingauthority andpermissions; doesnotclaimnativegating securesspecialistshellCLI.",
+    "Alias onlyknownexternaltools Agent->agent, SubagentWorkflow->subagent_workflow, fff-multi-grep->fff_multi_grep whenavailable/collisionfree/callable. Forward via official ctx.executeTool(original,args,{signal,onUpdate}), never definition.execute direct. Preserve schemas/results/errorsthrown+isError/updates/cancel, targetoriginalhooks+permissions andcanonicalentry gates,workflowliteralvalidation andauto-review onBOTHnames. Directtargetmustremainactive; codemode/deferred canbecallableinactive; model-onlyunsupported. prepareLoadout.hiddendeclarations onlypresentation, originalsremaincallablediscoverable—no false securityhidingclaim. Failclosedcollision/targetdisappearance/deniedhooks. No broadgenericrenameunproven. TestrealnestedSDKpipeline inclallow/deny, source/aliaspermissiondifferences, schemas, errors, signal, model-only/inactive/discovery/reload.",
+    "Crossfamilyguidance requirementsFIRST/familyguides+instruction-writing, literalstaticagentType examplesreplacecomputed e.agentType becausevalidatorrejects. RootuseswaittoolONLYavailabletop-levelwaitablework/nootherrootresponsibilityready; workflowsordinarynotificationreturn, fallbackhonestcurrentClaudeavailablehostwaitnotificationAPI noPiAPIpromises. Canonicalaliasesroleallowlistsautopolicyconsistentbothnames, maintainoldcompat. Keep rootcontextbudgetsunchanged, on-demanddetailswheresensible. Cguidancebranchchangesrootidentity/delegating/state-mode andcoverage; youmodifyonlylistedworkflow/searchsections, mergecoverageadditive. Native/routingwritersmodifyseparatetreesextension localizedseams; reportprecisely.",
+    "No actualVCS/.git/.holyagentwrites, userPC/globalinstalls, livePiCLI/modelrequests, deps/pinchanges oradditionalagents. TemporarySDKmock/Gitfixturesallowed. RootownsVCS/state. Frozeninstall --ignore-scripts perworktree. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Focusedred/green+type/lint/fmt throughmise; no generatededits/fullbuild/verify untilrootcoordinates.",
+    "Keepworkingthroughcode+focusedchecks. Genuineunavailablehostcontract getcompactoptionsroot, notfakefunctionality. JSON /workspace/work/034/events-report.json correctCLIshape/exactkeys, full /workspace/work/034/events.diff. Final<=350words/logsexternal. Noteunrequestedfeaturesratherthanadding."
+  ],
+  "criteria": [
+    {
+      "text": "Root waiting uses proven agent and user events with truthful cache timeout cancellation and workflow limitations",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "External snake_case aliases preserve schema results nested permissions cancellation and original gates",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Both-name inventories and all-family workflow examples are coherent without weakening protections",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Real host-contract and focused regression checks pass with honest supported-harness limits",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "host-limitations"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/src/wait-for-agents.ts",
+    "packages/integrations/pi/src/tool-aliases.ts",
+    "packages/integrations/pi/src/auto-review.ts",
+    "packages/integrations/pi/src/agents.ts",
+    "packages/integrations/pi/tests/wait-for-agents.test.ts",
+    "packages/integrations/pi/tests/tool-aliases.test.ts",
+    "packages/integrations/pi/tests/extension.test.ts",
+    "packages/runtime/src/domain/host.ts",
+    "packages/runtime/src/pi/tools.ts",
+    "packages/runtime/src/cli/workflow-check.ts",
+    "packages/runtime/tests/workflow-check.test.ts",
+    "packages/runtime/src/instructions/requirements/root/workflows.md",
+    "packages/runtime/src/instructions/requirements/root/search.md",
+    "packages/runtime/src/instructions/gpt-6/root/workflows.md",
+    "packages/runtime/src/instructions/gpt-6/root/search.md",
+    "packages/runtime/src/instructions/claude-5.5/root/workflows.md",
+    "packages/runtime/src/instructions/claude-5.5/root/search.md",
+    "packages/runtime/src/instructions/kimi-k3.1/root/workflows.md",
+    "packages/runtime/src/instructions/kimi-k3.1/root/search.md",
+    "packages/runtime/src/instructions/coverage.ts",
+    "docs/event-wait.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_subscription_routing",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:28:18.202Z"
+  },
+  "createdAt": "2026-11-13T14:28:18.202Z"
+}
