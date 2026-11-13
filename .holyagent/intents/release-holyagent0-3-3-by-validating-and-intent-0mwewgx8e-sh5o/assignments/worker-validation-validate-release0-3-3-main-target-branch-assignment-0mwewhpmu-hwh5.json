@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "validate-release0-3-3-main-target-branch",
   "objective": "Validate release0.3.3 main-target branch/version gates and prepare to monitor release PR CI.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "/workspace/work/holyagent-release033 at9c8edee7bf9a82e062121e89c507f4b76cc09ae9; targetmain074bc72a"
   ],
@@ -38,7 +38,37 @@
     "agentId": "/root/release_gates",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T11:35:45.414Z"
+    "startedAt": "2026-11-13T11:35:45.414Z",
+    "finishedAt": "2026-11-13T11:52:40.453Z"
+  },
+  "result": "result: PR Validation passed; GitHub reports MERGEABLE / UNSTABLE on the release head.\nchanged: none tracked\nchecks: Frozen install, branch-model and version exit 0; tree diff versus 61a7adc exit 0. origin/main 074bc72a matches remote, versions 0.3.2 → 0.3.3. Full verify not repeated because trees match. PR #121 Validation run https://github.com/davidbasilefilho/holyagent/actions/runs/43418762267 succeeded: check, windows, installers, branch-model, version and macos passed; GitGuardian passed. Watch exit 1 reflects prior dev publish failure. Zero reviews and review threads.\nblockers: GitHub merge state UNSTABLE, not CLEAN; earlier dev publish failed ENEEDAUTH, publication cause unknown. Rules API lists required check, windows, installers, branch-model, version; legacy protection API returned HTTP 403.\nquestions: none\nnotes: Integration Publish job https://github.com/davidbasilefilho/holyagent/actions/runs/43416856899/job/131861265745 failed at Publish package; separate from PR Validation. Prerelease skipped.\nevidence:\nRelease branch and version gates pass against actual main: both local PR commands exit 0; main 074bc72a matches remote; hosted branch-model and version pass.\nRelease tracked tree remains unchanged and prior verification is applicable: clean status; git diff --quiet 61a7adc HEAD exit 0.\nchecks-run: frozen install, local branch-model, version, tree comparison, remote-main comparison, PR watch, rules and review inspection.\nhead-sha: 9c8edee7bf9a82e062121e89c507f4b76cc09ae9\nchanged-paths: none tracked.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "All required main PR checks and local version/branch gates passed on exact reviewed head. Known earlier optional dev publication failure explains UNSTABLE and watcher exit1; normal GitHub merge API enforced protections and successfully merged without bypass.",
+    "criteria": [
+      {
+        "criterion": "Release branch and version gates pass against actual main",
+        "support": "both local PR commands exit 0; main 074bc72a matches remote; hosted branch-model and version pass."
+      },
+      {
+        "criterion": "Release tracked tree remains unchanged and prior verification is applicable",
+        "support": "clean status; git diff --quiet 61a7adc HEAD exit 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "frozen install, local branch-model, version, tree comparison, remote-main comparison, PR watch, rules and review inspection."
+      },
+      {
+        "label": "head-sha",
+        "support": "9c8edee7bf9a82e062121e89c507f4b76cc09ae9"
+      },
+      {
+        "label": "changed-paths",
+        "support": "none tracked."
+      }
+    ]
   },
   "createdAt": "2026-11-13T11:35:45.414Z"
 }
