@@ -51,5 +51,33 @@
     "finishedAt": "2026-11-13T19:07:22.422Z"
   },
   "result": "status: done\nchanged:\n- AGENTS.md\n- .claude/CLAUDE.md\n- packages/runtime/CLAUDE.md\n- README.md\n- docs/development.md\n- docs/pi/claude-parity.md\nchecks:\n- git diff --check -- AGENTS.md .claude/CLAUDE.md packages/runtime/CLAUDE.md README.md docs/development.md docs/pi/claude-parity.md -> exit 0\n- rg -n removed repository instruction paths in AGENTS.md README.md docs (no matches) -> exit 0\n- rg README headings and review scoped diff -> exit 0\n- bunx --no-install mise exec -- bun fmt --check --no-script docs/development.md docs/pi/claude-parity.md (configured mise environment) -> exit 0\nnotes:\n- Existing packages/runtime/AGENTS.md already preserves scoped rules; CLAUDE.md was only its pointer. Other CLAUDE.md references include product and user instructions and were preserved. Product tests and build delegated to integration owner.\nevidence:\n- Assigned repair satisfies the authorized contract while preserving safeguards and unrelated scope: Migrated contributing rules, removed pointers, preserved scoped runtime rules, added no-draft and release repair safeguards.\n- Meaningful current checks and remaining limits are recorded accurately: Scoped diff, reference and formatting checks passed; product tests/build delegated.\n- checks-run: Scoped diff whitespace, removed-path references, README headings and two-file Bun formatting checked.\n- changed-paths: Six paths listed in changed_paths; runtime AGENTS.md unchanged.\n- diff-file: /workspace/work/034/033-instructions-consolidation.diff",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "Scoped diff preserves contributing/runtime rules, removes only repository CLAUDE duplicates, records stated reason and guarded same-version policy, retains README sections and passes scoped formatting/reference checks; independent artifact review remains pending.",
+    "criteria": [
+      {
+        "criterion": "Assigned repair satisfies the authorized contract while preserving safeguards and unrelated scope",
+        "support": "Migrated contributing rules, removed pointers, preserved scoped runtime rules, added no-draft and release repair safeguards."
+      },
+      {
+        "criterion": "Meaningful current checks and remaining limits are recorded accurately",
+        "support": "Scoped diff, reference and formatting checks passed; product tests/build delegated."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Scoped diff whitespace, removed-path references, README headings and two-file Bun formatting checked."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Six paths listed in changed_paths; runtime AGENTS.md unchanged."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/033-instructions-consolidation.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-13T19:02:30.048Z"
 }
