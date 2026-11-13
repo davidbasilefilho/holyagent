@@ -33,6 +33,7 @@
   ],
   "followUpOf": "assignment-0mwf1oomm-uh7o",
   "specialist": {
+    "agentId": "/root/r034_state_review_code",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T14:10:39.056Z"
