@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwf2dzjn-xq1n",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-committed-iteration",
+  "objective": "Independently review committed iteration and durable handoff guidance for code correctness.",
+  "state": "Running",
+  "scope": [
+    "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..d1cd4a0ef0758efe16cd49f09a32265971094ddc in guidanceworktree."
+  ],
+  "constraints": [
+    "Read-only /workspace/work/holyagent-034-guidance exactd1cd4a0ef0758efe16cd49f09a32265971094ddc. Read repoAGENTS/.claude, yourrole and instruction-writing skill/modelguides; report /workspace/work/034/guidance-{report,repair-report,wording-report,reviewed-gates-report}.json hold source+checkevidence. Writers/buildterminal, build+208focusedchecks pass; fullfinalverify afterreview. No actualVCS/statewrites/extraagents/remote/modelcalls. Tempfixturesallowed. Currentuser0.3.4 authorized,0.4architectureplanningonly.",
+    "Assess requirements-first/allthreefamilycoverage, skill/role reachability in Pi+Claude, tests/in-memory andgeneratedassetconformance, unchanged contextbudget/status/objective visibility. Review assembly coverage/tests and rootcompaction forsemanticregressions. No fakebaseline/performanceproof. Check new rootrouteractuallyloads state-modeperformance beforebehaviorneeded.",
+    "Reviewerindependent fromallguidancewriters. Findingsrequirefile:line trace/repro; no unrelatedfeatures. Use relevantfocusedchecksviastandardmiseenv only; nofullverifyrepeat. JSON /workspace/work/034/guidance-review-code.json correctCLIshape/exactkeys, <=250wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Iteration and handoff requirements are preserved across families and current harnesses without blockers",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Context budgets approval boundaries and evidence honesty remain intact",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf1cfkg-rcz5",
+    "assignment-0mwf1my7e-pmzo",
+    "assignment-0mwf20yvo-13go"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T14:20:49.332Z"
+  },
+  "createdAt": "2026-11-13T14:20:49.332Z"
+}
