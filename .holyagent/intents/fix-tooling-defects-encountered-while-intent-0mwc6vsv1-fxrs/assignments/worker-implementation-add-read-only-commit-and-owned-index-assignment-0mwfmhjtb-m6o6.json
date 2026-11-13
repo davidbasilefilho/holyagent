@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mwfmhjtb-m6o6",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "add-read-only-commit-and-owned-index",
+  "objective": "Add read only commit and owned index verification for migration recovery adapters.",
+  "state": "Running",
+  "scope": [
+    "Own only migration-index.ts and migration-index.test.ts in /workspace/work/holyagent-034-core. Your private prepare/publication helpers are complete. Runner and files modules now also exist. Add two small read-only helpers: verifyMigrationIndex confirms every owned path has expected postimage blob/mode/stage without changing index or unrelated entries; verifyMigrationCommit confirms recorded commit has exactly the expected single parent and tree and only the planned owned delta.",
+    "Read the actual runner contract /workspace/work/034/migration-runner-module-api.md. Expose documented typed Effects/errors using your existing parsers and Git runner; preserve existing signatures. Verify branch roots are caller-trusted, do not use unchecked journal roots. Unexpected data fails actionably, no writes/reset. Git read commands only, no publication.",
+    "Add focused real Git tests for correct verification, wrong commit parent/tree, wrong owned index entry, and preservation of foreign staged/unstaged entries. Other integration writers may begin after your completion, so signal once edits stop; isolated checks allowed and honest repository gate status. Save /workspace/work/034/migration-index-verification-report.json and incremental.diff plus updated API notes. Finish actual functions, not only state that caller must do it."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Read only recovery verification proves expected commit ancestry tree and owned index postimages without mutating unrelated data",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file",
+    "module-api",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/state/migration-index.ts",
+    "packages/core/tests/migration-index.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfklua4-yv6b",
+  "specialist": {
+    "agentId": "/root/migration_index_module",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T23:43:27.887Z"
+  },
+  "createdAt": "2026-11-13T23:43:27.887Z"
+}
