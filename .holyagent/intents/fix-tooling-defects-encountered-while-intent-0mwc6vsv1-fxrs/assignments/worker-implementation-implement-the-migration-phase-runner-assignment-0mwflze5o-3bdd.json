@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mwflze5o-3bdd",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-the-migration-phase-runner",
+  "objective": "Implement the migration phase runner using the completed journal and private-index helpers.",
+  "state": "Running",
+  "scope": [
+    "Work only in /workspace/work/holyagent-034-core. Own new files packages/core/src/state/migration-runner.ts and packages/core/tests/migration-runner.test.ts. Do not edit tree.ts or the completed journal/index modules. The broad integration attempt made no edits; your task is this smaller executable engine, not a design report.",
+    "Read actual migration-journal.ts, migration-index.ts and their API reports under /workspace/work/034. Implement runMigrationTransaction with typed trusted IO callbacks for readRef, CAS ref update, file publication, index publication and safe source cleanup, plus prepareMigrationCommit/journal helpers. Callback adapters into tree.ts are a later task; keep the engine independent of legacy layout.",
+    "Algorithm: read and validate an existing journal against trusted roots/branch or prepare a private commit and atomically begin one. In prepared phase, read actual ref: expected parent permits CAS; expected commit means CAS already succeeded; anything else is a conflict without reset. Re-read after CAS before advancing. In ref-published phase, idempotently publish expected file and index postimages, then advance. In target-published phase, run safe idempotent cleanup, then advance. In source-cleaned phase, finish the journal. Interrupted callbacks leave the last durable phase intact. Recheck live authorization before each new mutation and after preparation waits. Never use uninterruptible Git or infer commit success/failure from exit code alone.",
+    "Use strict typed inputs and tagged errors, pure Effect composition and trusted services rather than argv/parser/CLI proxies. The caller holds initialization/domain locks. If callbacks disagree with expected data, fail actionably and preserve the journal. A callback that has already completed can be repeated only under the stated idempotence contract. Do not log payload contents.",
+    "Add meaningful tests with controlled Effect callbacks and temporary real journal files: normal order, interruption before CAS, ref updated then callback interrupted, target publication interrupted midway and retried, unexpected ref conflict, authority revoked after a read, cleanup failure/retry, successful finish. Demonstrate Fiber.interrupt returns promptly when a publication callback stalls. Tests need not implement real Git here; real Git helpers already have tests and final tree wiring will run end-to-end regressions.",
+    "Coordinate contracts with /root/migration_file_module when it exists, but do not edit its files. No whole-worktree gates while peer source changes; run tests in an isolated copy if necessary and report real commands. Save /workspace/work/034/migration-runner-module-report.json, .diff and a concise API contract. Actual module code is required; do not stop at listing caller boundaries."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Effect migration runner implements durable idempotent phase recovery and prompt interruption with trusted root ref and authority checks",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file",
+    "module-api",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/state/migration-runner.ts",
+    "packages/core/tests/migration-runner.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/core_migration_journal_implementation",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T23:29:20.748Z"
+  },
+  "createdAt": "2026-11-13T23:29:20.748Z"
+}
