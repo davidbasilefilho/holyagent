@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "review-test-contract-changes-especially",
   "objective": "Review test contract changes, especially removed legacy branch tests and deterministic/provenance regression strength.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Committed range44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a..e28990817cb5a0e233c7673a98594320afb973ef in /workspace/work/holyagent-034"
   ],
@@ -42,7 +42,9 @@
     "agentId": "/root/r034_flow_review_testing",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T12:46:31.311Z"
+    "startedAt": "2026-11-13T12:46:31.311Z",
+    "finishedAt": "2026-11-13T12:48:55.566Z"
   },
+  "result": "result: Blocked: the new development-version tests break macOS validation.\nchanged: /workspace/work/034/flow-review-testing.md\nchecks: Linux `bun test scripts/pr-checks.test.ts scripts/npm-publishing.test.ts scripts/workflows.test.ts packages/integrations/pi/publishing.test.ts` -> 0, 52 pass, 0 fail. `mise exec` attempt -> 1: sandbox denied ~/.local/state/mise/trusted-configs. Writer's supervised full verify: 3487 pass, 2 skips, 0 fail. Base run and actual Windows/macOS runs not done.\nblockers: `.github/actions/tag-release/dev-version.sh:11` uses GNU `date -d`, absent from macOS BSD date. `packages/integrations/pi/publishing.test.ts:30-43` runs it and expects a timestamp; its dev handoff at lines 46-135 also expects one. `.github/workflows/validation.yml:177-193` runs the suite on macOS. Make the helper or test seam portable and verify the macOS gate. Linux success cannot establish platform success.\nquestions: none\nnotes: Retired release-branch tests cover intentionally removed rules; replacement asserts dev-only main and rejects lookalikes. Workflow tests preserve protected refs, required job IDs and token permissions. Handoff compares packed bytes; npm tests cover tag preflight, conflict, rerun refusal, and missing metadata before network. Generator test asserts canonical URL; actual E422 repair/publication and remote dev protections/npm policy remain unverified. UTC test compares zones and handoff checks a fixed timestamp/hash; no base run performed.\nevidence:\nCommitted release-flow slice has no unaddressed merge blockers: blocked by macOS date incompatibility, traced above.\nReview covers exact committed scope without treating prerequisites as completed: reviewed immutable range and Intent revisions 3 and 11; remote settings and npm publication unverified.\nreviewed-range: 44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a..e28990817cb5a0e233c7673a98594320afb973ef.\nfindings: macOS validation blocker; retired branch cases match the authorized model change.\nchecks-run: focused Linux test command and prior supervised verify above; no base or native Windows/macOS run.\n",
   "createdAt": "2026-11-13T12:46:31.311Z"
 }
