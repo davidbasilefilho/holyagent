@@ -1,6 +1,6 @@
 {
   "name": "@holyagent/pi",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "The holyagent integration for Pi: generates the Pi package from the runtime.",
   "license": "Apache-2.0",
   "type": "module",

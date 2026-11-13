@@ -101,6 +101,11 @@ export const manifest = (): GeneratedFile => ({
     description: DESCRIPTION,
     license: "Apache-2.0",
     author: "davidbasilefilho",
+    repository: {
+      type: "git",
+      url: "https://github.com/davidbasilefilho/holyagent",
+      directory: "packages/integrations/pi/dist",
+    },
     type: "module",
     keywords: ["pi-package"],
     files: PACKAGE_FILES,

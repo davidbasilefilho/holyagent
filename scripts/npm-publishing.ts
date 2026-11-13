@@ -5,7 +5,13 @@ const RecordOfUnknown = Schema.Record(Schema.String, Schema.Unknown)
 const open = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
   Schema.StructWithRest(Schema.Struct(fields), [RecordOfUnknown])
 const strict = { onExcessProperty: "error" } as const
-const Manifest = open({ name: Schema.String, version: Schema.String })
+const Manifest = open({
+  name: Schema.String,
+  version: Schema.String,
+  repository: Schema.optional(
+    open({ type: Schema.String, url: Schema.String, directory: Schema.String }),
+  ),
+})
 const RegistryVersion = open({
   name: Schema.String,
   version: Schema.String,
@@ -139,6 +145,15 @@ export const publishArtifact = (
     const manifest = yield* decode(Schema.fromJsonString(Manifest), tar.stdout.toString())
     if (!manifest.name || !manifest.version)
       return yield* new PublishError({ detail: "Empty package identity" })
+    if (
+      manifest.repository?.type !== "git" ||
+      manifest.repository.url !== `https://github.com/${context.repository}` ||
+      manifest.repository.directory !== "packages/integrations/pi/dist"
+    )
+      return yield* new PublishError({
+        detail:
+          "Package repository metadata does not match the provenance repository and package directory",
+      })
     yield* preflightTag(context, request)
     const spec = `${manifest.name}@${manifest.version}`
     const lookup = yield* run(["view", spec, "--json"])

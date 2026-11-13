@@ -17,11 +17,11 @@
     },
     "packages/integrations/claude": {
       "name": "@holyagent/claude",
-      "version": "0.3.3",
+      "version": "0.3.4",
     },
     "packages/integrations/pi": {
       "name": "@holyagent/pi",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "devDependencies": {
         "@earendil-works/pi-coding-agent": "^1.0.0",
       },
@@ -35,7 +35,7 @@
     },
     "packages/runtime": {
       "name": "@holyagent/runtime",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "dependencies": {
         "@toon-format/toon": "^4.0.0",
         "acorn": "^8.0.0",

@@ -10302,7 +10302,7 @@ function resolveOptions(options) {
     replacer: options?.replacer
   };
 }
-var version = "0.3.3";
+var version = "0.3.4";
 
 import { join } from "path";
 var STATE_DIRECTORY = ".holyagent";

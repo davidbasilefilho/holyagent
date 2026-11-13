@@ -1,7 +1,21 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync as createTemp, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
+
+// Refuse fixtures under an existing repository, even when the system temp directory is overridden.
+const mkdtempSync = (prefix: string) => {
+  const dir = createTemp(prefix)
+  const probe = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--show-toplevel"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  if (probe.exitCode !== 128) {
+    rmSync(dir, { recursive: true, force: true })
+    throw new Error("Fixture temp directory is inside a Git repository or Git is unavailable")
+  }
+  return dir
+}
 
 const repoRoot = join(import.meta.dir, "..")
 const githubDir = join(repoRoot, ".github")
@@ -149,7 +163,7 @@ describe("publication authority", () => {
       expect(jobs["publish"]?.if).toBe(
         name === "stable"
           ? "github.ref == 'refs/heads/main' && github.ref_protected"
-          : "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
+          : "github.ref == 'refs/heads/dev' && github.ref_protected",
       )
     },
   )
@@ -162,23 +176,28 @@ describe("release lookup", () => {
       const dir = mkdtempSync(join(tmpdir(), "release-lookup-"))
       try {
         mkdirSync(join(dir, "bin"))
-        writeFileSync(join(dir, "bin", "jq"), "#!/bin/sh\nprintf '0.3.3\\n'\n", { mode: 0o755 })
-        writeFileSync(
-          join(dir, "bin", "gh"),
-          `#!/bin/sh
+        // Functions take precedence over Windows executables; an isolated PATH prevents a
+        // future command from accidentally reaching the installed GitHub CLI.
+        const stubs = `
+grep_path="$(type -P grep)"
+export PATH="$PWD/bin"
+grep() { "$grep_path" "$@"; }
+jq() { printf 'jq\\n' >> calls; printf '0.3.3\\n'; }
+gh() {
+printf '%s\\n' "$*" >> calls
 case "$*" in
-  *git/ref/tags*) echo "commit abc"; exit 0 ;;
-  *release*create*) touch created; exit 0 ;;
-  *) echo "HTTP ${status}" >&2; exit 1 ;;
+  "api repos/owner/repo/git/ref/tags/"*) echo "commit abc" ;;
+  "api repos/owner/repo/releases/tags/"*) echo "HTTP ${status}" >&2; return 1 ;;
+  "release create "*) : > created ;;
+  *) echo "Unexpected gh call: $*" >&2; return 2 ;;
 esac
-`,
-          { mode: 0o755 },
-        )
+}
+`
         const action = parse(".github/actions/tag-release/action.yml") as {
           runs: { steps: Array<{ run: string }> }
         }
         const script = action.runs.steps[0]?.run ?? ""
-        const result = Bun.spawnSync(["bash", "-c", `export PATH="$PWD/bin:$PATH"\n${script}`], {
+        const result = Bun.spawnSync(["bash", "-c", `${stubs}\n${script}`], {
           cwd: dir,
           env: {
             ...process.env,
@@ -190,8 +209,14 @@ esac
           stdout: "pipe",
           stderr: "pipe",
         })
-        expect(result.exitCode).toBe(status === "404" ? 0 : 1)
+        const diagnostic = `stdout: ${result.stdout.toString()}\nstderr: ${result.stderr.toString()}`
+        expect(result.exitCode, diagnostic).toBe(status === "404" ? 0 : 1)
         expect(readdirSync(dir).includes("created")).toBe(status === "404")
+        const calls = readFileSync(join(dir, "calls"), "utf8")
+        expect(calls).toContain("jq\n")
+        expect(calls).toContain("api repos/owner/repo/git/ref/tags/holyagent-0.3.3")
+        expect(calls).toContain("api repos/owner/repo/releases/tags/holyagent-0.3.3")
+        expect(calls.includes("release create holyagent-0.3.3")).toBe(status === "404")
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }
@@ -234,7 +259,7 @@ describe("publish.yml", () => {
     })
     expect(publish.jobs["dev"]).toMatchObject({
       needs: "validation",
-      if: "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
+      if: "github.ref == 'refs/heads/dev' && github.ref_protected",
       uses: "./.github/workflows/dev.yml",
     })
   })
@@ -284,6 +309,14 @@ describe("validation.yml", () => {
       })
       expect(steps[guard]?.run).toContain('"${HEAD_REPOSITORY,,}" != "${GITHUB_REPOSITORY,,}"')
     }
+  })
+
+  test("version passes the event head ref as a quoted environment variable", () => {
+    const step = validation.jobs["version"]?.steps?.find(
+      (item) => item.name === "Check the version",
+    )
+    expect(step?.env).toEqual({ HEAD_REF: "${{ github.head_ref }}" })
+    expect(step?.run).toBe('bun scripts/pr-checks.ts version main . "$HEAD_REF"')
   })
 
   test("only a pull request run is cancelled by a newer run", () => {
