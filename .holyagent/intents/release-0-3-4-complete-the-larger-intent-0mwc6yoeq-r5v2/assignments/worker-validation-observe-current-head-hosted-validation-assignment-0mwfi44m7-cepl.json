@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwfi44m7-cepl",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Worker.validation",
+  "slug": "observe-current-head-hosted-validation",
+  "objective": "Observe current-head hosted validation of the reviewed 0.3.4 development-flow integration.",
+  "state": "Running",
+  "scope": [
+    "ReadyPR122 https://github.com/davidbasilefilho/holyagent/pull/122 branchrelease/0.3.4/chore/development-flow expected7b699478 (resolvefullimmutableSHA). Rootpushedreviewedmain-forwardA+AGENTSclaimrepair; locateactualPRValidation/pushPublishrunsmatchingSHAonly. Readci-watchskill /workspace/work/holyagent-033-repair/packages/integrations/claude/dist/skills/ci-watch/SKILL.md and GPTvalidationrole. Useghread/watchcurrentCI, no rerun/editPR/cancel/settings/merge orsourcewrites.",
+    "Sourceheadincludesmain460f metadata/publicationrepairpolicyplusnormaldevflow, allcode/security/artifactreviewsaccepted andfull3494pass2skip/focused59; finaldoc-onlyclaimfixfmt/rereviewpass. CurrentMac/Windows/Linux/installers/branchmodelactualCIrequired; skipsnotpasses. Ifsignedlogblob403explainunknownpreciselyuseannotations. No expectedstable/devpublicationonfeaturebranch. Save /workspace/work/034/development-main-current-ci-report.json under200words+detailedlogsoutside."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "Actual current head hosted development flow validation results and remaining blockers are reported accurately",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "head-and-runs",
+    "hosted-results",
+    "remaining-blockers"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T21:41:03.200Z"
+  },
+  "createdAt": "2026-11-13T21:41:03.200Z"
+}
