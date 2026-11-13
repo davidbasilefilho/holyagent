@@ -54,6 +54,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_iteration_guidance",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T13:51:37.168Z"
