@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "determine-the-smallest-supported-role",
   "objective": "Determine the smallest supported role-scoped owned-skill and Context7 migration design for Pi and Claude.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Current source generators/roles/setup, lockedPi1.5.0/pi-subagents0.23.2 APIs and authoritativeClaude skills/agentdocs."
   ],
@@ -41,7 +41,41 @@
     "agentId": "/root/r034_scoped_skills_research",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T14:35:26.910Z"
+    "startedAt": "2026-11-13T14:35:26.910Z",
+    "finishedAt": "2026-11-13T14:57:03.091Z"
+  },
+  "result": "status: done\nchanged:\n- /workspace/work/034/scoped-skills-design.md\n- /workspace/work/034/scoped-skills-research-report.json\n- /workspace/work/034/scoped-skills-probe.mjs\nchecks:\n- /workspace/work/tools/bun/bin/bun /workspace/work/034/scoped-skills-probe.mjs -> exit 0\n- Read official Claude Code subagents, skills and plugin manifest documentation via web tool, 2026-11-13 -> exit 0\nnotes:\n- The recommendation provides role-appropriate progressive file routing, not a discovery or security boundary. No implementation or user files changed.\n- Actual role-scoped host skill discovery for both integrations is not established: Pi subagent does not expose SDK skillsOverride to extensions; Claude documented preload and tool controls do not provide per-role discovery filtering.\nevidence:\n- Role-scoping recommendation is grounded in actual Pi and Claude discovery and loading capabilities (behavior): Pi 1.5.0 SDK probe passed and 0.23.2 runner has no extension override seam. Official Claude docs confirm full-body preload and continued project/user/plugin discovery; no per-role filtering hook identified. Actual filtering remains blocked.\n- Owned Context7 migration preserves user files and progressive loading across families (scope): Design replaces external setup instruction with owned on-demand role routes, avoids touching user files or credentials, and requires all-family and setup fixture tests; implementation remains future work.\n- sources: See design for versioned Pi and HolyAgent source paths and official Claude Code subagents, skills and plugin manifest docs accessed 2026-11-13; Claude docs are not pinned to an installed version.\n- checks-run: Pi 1.5.0 DefaultResourceLoader scratch fixture passed; Claude official docs reviewed; no live host or model.\n- file-map: See Ownership and sequence in scoped-skills-design.md, including C/F/E collision coordination.\n- open-questions: Installed Claude version behavior requires fixture verification; upstream Pi child loader filtering seam is unavailable; actual user-owned legacy Context7 files are unknown and outside scope.",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Completed bounded research with versionedPi probe and officialClaude documentation, actual discovery limitations explicit.",
+    "criteria": [
+      {
+        "criterion": "Role-scoping recommendation is grounded in actual Pi and Claude discovery and loading capabilities",
+        "support": "Pi 1.5.0 SDK probe passed and 0.23.2 runner has no extension override seam. Official Claude docs confirm full-body preload and continued project/user/plugin discovery; no per-role filtering hook identified. Actual filtering remains blocked."
+      },
+      {
+        "criterion": "Owned Context7 migration preserves user files and progressive loading across families",
+        "support": "Design replaces external setup instruction with owned on-demand role routes, avoids touching user files or credentials, and requires all-family and setup fixture tests; implementation remains future work."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "See design for versioned Pi and HolyAgent source paths and official Claude Code subagents, skills and plugin manifest docs accessed 2026-11-13; Claude docs are not pinned to an installed version."
+      },
+      {
+        "label": "checks-run",
+        "support": "Pi 1.5.0 DefaultResourceLoader scratch fixture passed; Claude official docs reviewed; no live host or model."
+      },
+      {
+        "label": "file-map",
+        "support": "See Ownership and sequence in scoped-skills-design.md, including C/F/E collision coordination."
+      },
+      {
+        "label": "open-questions",
+        "support": "Installed Claude version behavior requires fixture verification; upstream Pi child loader filtering seam is unavailable; actual user-owned legacy Context7 files are unknown and outside scope."
+      }
+    ]
   },
   "createdAt": "2026-11-13T14:35:26.910Z"
 }
