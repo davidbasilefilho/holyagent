@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwfguhh8-ysxs",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-review-setup-migration-and",
+  "objective": "Independently review setup migration and private owned guidance discovery boundaries on the committed 0.3.4 branch.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-skills immutable c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..e4e9cd5a, final ownedrole feature plus duplicate wording correction. Originalfeature code/artifact accepted, security review outstanding. Read source/generatedsetupmigration and role scoped loader. User authorized retiring ctx7 setup --claude/globalexternalinstruction install and replacing it with HolyAgent-owned documentation-lookup guidance across all3families; keep CLI/auth readiness. Must preserve unrecordeduser/thirdpartyfiles/credentials, undo ownership tracking, native hostauth. No filesystem/securityisolation claim; private non-discovered packageowned routingonly.",
+    "Read relevant GPT reviewer-security directives. Ordinary independent security review, not an externally requested CodexSecurityscan. Scope setup filewrites/pathownership/resourcecatalog/migration/loader trustboundaries, installedprivateguidancepath handling and docsclaims. Produce source-to-sink trace for any materialfinding; current type/lint/fmt/build+full3493pass2skip oldfeature and140focused repair evidence exists, but perform boundedactualproof forfindings. No changes to source, no actual usersettings/account operations.",
+    "Save /workspace/work/034/owned-guidance-security-review-report.json. Actual main460f policy consolidation willmergeforwardlater; do not flag intentionallypendingbranchintegration as introducedsecurityissue."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "No introduced or worsened security finding remains in owned guidance discovery and setup migration boundaries",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T21:05:33.692Z"
+  },
+  "createdAt": "2026-11-13T21:05:33.692Z"
+}
