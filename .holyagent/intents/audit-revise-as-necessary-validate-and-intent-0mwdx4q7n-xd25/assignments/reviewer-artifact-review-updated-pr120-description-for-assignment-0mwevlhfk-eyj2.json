@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-updated-pr120-description-for",
   "objective": "Review updated PR120 description for accuracy and concise repository voice.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "/workspace/work/pr120-body.txt; committed PR range c5b2ab2..61a7adc"
   ],
@@ -34,7 +34,9 @@
     "agentId": "/root/pr_description_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T11:10:41.792Z"
+    "startedAt": "2026-11-13T11:10:41.792Z",
+    "finishedAt": "2026-11-13T11:11:59.191Z"
   },
+  "result": "result: Changes required: one unsupported artifact-flow claim.\nfindings: The body says the same tarball is handed from validation to publication and release. Validation checks the generated package but does not pack or transfer a tarball; stable.yml:27-33 and dev.yml:27-36 pack it after validation, and those workflows transfer the published tarball to the release. Say “publish and attach the same packed tarball after validation.” The placeholder and pending hosted CI statement are appropriate given the brief; replace the placeholder with actual results before posting. Existing independent reviews and targeted tests support the other validation statement. The Kimi JavaScript example has an optional quoting limitation documented in rereview-code.md.\nevidence:\nPR description is accurate concise and makes no unsupported claims: FAIL; validation-to-publication artifact transfer is unsupported by validation.yml and publish.yml.\nreviewed-artifact: /workspace/work/pr120-body.txt against c5b2ab2..61a7adc, release-prerequisites.md and independent rereviews.\nfindings: One blocking artifact-flow claim; suggested correction above. No claim of successful npm publication; hosted CI is marked pending.\n",
   "createdAt": "2026-11-13T11:10:41.792Z"
 }
