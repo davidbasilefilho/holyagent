@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwf23uzf-taw7",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "build-and-verify-the-typed-native-tools",
+  "objective": "Build and verify the typed native-tools slice for committed independent review.",
+  "state": "Running",
+  "scope": [
+    "Generated artifacts and full verification of current native-tools source."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-tools at c3baseplusnativewriterterminalchanges. Read native-tools-report.json. Sourcehashesstableacrossbuild/verify; onlygeneratededits. No actualVCS/statewrites/sourcefixes/depschanges/externalcalls/extraagents. Existingrepo/toolchainrulesapply.",
+    "Buildthenfullverify with standard MISE_* /workspace/work/tools/mise dirs and PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH, via bunx --no-install mise run build then python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify. Don'tweaken tests or repeat ifgreen; compactfailures inreport ifred.",
+    "JSON /workspace/work/034/native-build-report.json correctCLIshape/exactkeys; generateddiff /workspace/work/034/native-generated.diff. <=150wordfinal, logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Native tool generated assets and full verification pass without source edits",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_state_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:12:56.859Z"
+  },
+  "createdAt": "2026-11-13T14:12:56.859Z"
+}
