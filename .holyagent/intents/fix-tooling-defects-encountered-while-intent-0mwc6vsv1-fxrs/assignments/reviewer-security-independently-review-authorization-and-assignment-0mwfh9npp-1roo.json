@@ -39,6 +39,7 @@
     "assignment-0mwf7j400-7whk"
   ],
   "specialist": {
+    "agentId": "/root/core_checkpoint_security_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T21:17:21.613Z"
