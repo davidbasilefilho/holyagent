@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwfd2hmg-2oeo",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-the-one-stale-npm-publication",
+  "objective": "Correct the one stale npm-publication statement in the already changed parity document.",
+  "state": "Running",
+  "scope": [
+    "Work only /workspace/work/holyagent-033-repair docs/pi/claude-parity.md near line146, noted in /workspace/work/034/033-final-artifact-review-report.json. Replace the pre-existing 'There is no npm publishing' statement with accurate current protected CI/Bun-pack/npm trusted publishing guidance, preferably link existing docs/npm-publishing.md. Preserve surrounding comparison and do not claim stable0.3.3 already published."
+  ],
+  "constraints": [
+    "No other edits or feature/executable investigation. No VCS/Git/config/state writes; read-only git allowed. Read AGENTS/GPT mechanical and instruction-writing. Format this file with configured mise/Bun and diff/reference check. Product code unchanged, do not rerun full tests/build.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Save /workspace/work/034/033-parity-publication-repair-report.json exact schema status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]; <=150words."
+  ],
+  "criteria": [
+    {
+      "text": "The stale publication statement is corrected without unrelated changes or unsupported release claims",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "docs/pi/claude-parity.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfcg880-vh45",
+  "specialist": {
+    "agentId": "/root/r033_no_draft_carry",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T19:19:48.665Z"
+  },
+  "createdAt": "2026-11-13T19:19:48.665Z"
+}
