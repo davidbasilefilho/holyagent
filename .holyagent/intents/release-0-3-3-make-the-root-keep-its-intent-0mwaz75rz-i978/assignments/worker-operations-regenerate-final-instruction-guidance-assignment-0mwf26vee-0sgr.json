@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "regenerate-final-instruction-guidance",
   "objective": "Regenerate final instruction guidance after the policy wording repair.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Build only then focused scripts/root-question-policy.test.ts, session context and generated freshness tests. No fullverify yet: final after committed review. Sourcewordingwriter terminal."
   ],
@@ -35,7 +35,29 @@
     "agentId": "/root/r034_state_final_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T14:15:17.366Z"
+    "startedAt": "2026-11-13T14:15:17.366Z",
+    "finishedAt": "2026-11-13T14:18:00.229Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/claude/dist/agents/holyagent.md\n- packages/integrations/claude/dist/agents/reviewer-visual.md\n- packages/integrations/claude/dist/agents/worker-visual.md\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/claude/dist/skills/desktop-design/SKILL.md\n- packages/integrations/claude/dist/skills/mobile-design/SKILL.md\n- packages/integrations/claude/dist/skills/state-mode/SKILL.md\n- packages/integrations/claude/dist/skills/tui-design/SKILL.md\n- packages/integrations/claude/dist/skills/visual-judging/SKILL.md\n- packages/integrations/claude/dist/skills/web-design/SKILL.md\n- packages/integrations/pi/dist/agents/reviewer-visual-headless-screen.md\n- packages/integrations/pi/dist/agents/reviewer-visual-screen.md\n- packages/integrations/pi/dist/agents/reviewer-visual.md\n- packages/integrations/pi/dist/agents/worker-visual-headless-screen.md\n- packages/integrations/pi/dist/agents/worker-visual-screen.md\n- packages/integrations/pi/dist/agents/worker-visual.md\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/families/gpt-6/agents/reviewer-visual-headless-screen.md\n- packages/integrations/pi/dist/families/gpt-6/agents/reviewer-visual-screen.md\n- packages/integrations/pi/dist/families/gpt-6/agents/reviewer-visual.md\n- packages/integrations/pi/dist/families/gpt-6/agents/worker-visual-headless-screen.md\n- packages/integrations/pi/dist/families/gpt-6/agents/worker-visual-screen.md\n- packages/integrations/pi/dist/families/gpt-6/agents/worker-visual.md\n- packages/integrations/pi/dist/families/gpt-6/skills/desktop-design/SKILL.md\n- packages/integrations/pi/dist/families/gpt-6/skills/mobile-design/SKILL.md\n- packages/integrations/pi/dist/families/gpt-6/skills/state-mode/SKILL.md\n- packages/integrations/pi/dist/families/gpt-6/skills/tui-design/SKILL.md\n- packages/integrations/pi/dist/families/gpt-6/skills/visual-judging/SKILL.md\n- packages/integrations/pi/dist/families/gpt-6/skills/web-design/SKILL.md\n- packages/integrations/pi/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/skills/desktop-design/SKILL.md\n- packages/integrations/pi/dist/skills/mobile-design/SKILL.md\n- packages/integrations/pi/dist/skills/state-mode/SKILL.md\n- packages/integrations/pi/dist/skills/tui-design/SKILL.md\n- packages/integrations/pi/dist/skills/visual-judging/SKILL.md\n- packages/integrations/pi/dist/skills/web-design/SKILL.md\n- packages/integrations/claude/dist/skills/performance-iteration/SKILL.md\n- packages/integrations/pi/dist/families/gpt-6/skills/performance-iteration/SKILL.md\n- packages/integrations/pi/dist/skills/performance-iteration/SKILL.md\nchecks:\n- bunx --no-install mise run build -> exit 0\n- mise exec -- bun test scripts/root-question-policy.test.ts packages/runtime/tests/sessioncontext.test.ts packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts packages/integrations/pi/tests/session-context.test.ts packages/integrations/claude/tests/plugin.test.ts packages/integrations/pi/tests/pi.test.ts -> exit 0\n- cmp guidance-reviewed-before-hashes.txt guidance-reviewed-after-hashes.txt -> exit 0\nnotes:\n- Focused tests: 208 pass, 0 fail; seven files. Full verify deferred as instructed.\n- Tracked and untracked non-generated source hashes stable. Changed paths list includes generated modifications already present before build.\n- Logs: /workspace/work/034/guidance-reviewed-build.log and /workspace/work/034/guidance-reviewed-focused.log.\nevidence:\n- Requested final gates pass with source unchanged: Build and focused tests exited 0; 208 tests passed. Non-generated tracked and untracked source hashes matched.\n- checks-run: Build exit 0; focused tests exit 0; hash comparison exit 0.\n- changed-paths: Generated paths enumerated in changed_paths; complete diff /workspace/work/034/guidance-final-generated.diff.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Regenerated final source and208focused checks pass with source hashes stable.",
+    "criteria": [
+      {
+        "criterion": "Requested final gates pass with source unchanged",
+        "support": "Build and focused tests exited 0; 208 tests passed. Non-generated tracked and untracked source hashes matched."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Build exit 0; focused tests exit 0; hash comparison exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Generated paths enumerated in changed_paths; complete diff /workspace/work/034/guidance-final-generated.diff."
+      }
+    ]
   },
   "createdAt": "2026-11-13T14:15:17.366Z"
 }
