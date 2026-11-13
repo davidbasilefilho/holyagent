@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwf9eo85-dyqi",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Reviewer.artifact",
+  "slug": "close-the-prior-cli-output-wording-and",
+  "objective": "Close the prior CLI output wording and recovery instruction findings on the committed repair.",
+  "state": "Running",
+  "scope": [
+    "Work /workspace/work/holyagent-034-cli; bounded e778f69439a30b9f639f87a7f77c40c3bfc06df6..eaf9981d. Prior artifact report /workspace/work/034/plain-cli-review-artifact-report.json. Check concise natural plain internal output, actual executable command with assignment ID/report stdin, structured facts preserved, public setup distinction accurate. Code/security independent accepted and full3494pass2skip; do not repeat full gates."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT artifact role. Read-only git/source and focused tests permitted; no source/generated/VCS/config/.holyagent writes or live model calls.",
+    "Report /workspace/work/034/plain-artifact-current-review-report.json exact schema status done|partial|blocked, changed_paths:[],checks array numeric exit,blockers:[],notes array,evidence key/support with exact criteria/labels; <=200words."
+  ],
+  "criteria": [
+    {
+      "text": "The prior CLI artifact findings are resolved and current guidance matches actual behavior",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf7j4ip-hpmw"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T17:37:18.630Z"
+  },
+  "createdAt": "2026-11-13T17:37:18.630Z"
+}
