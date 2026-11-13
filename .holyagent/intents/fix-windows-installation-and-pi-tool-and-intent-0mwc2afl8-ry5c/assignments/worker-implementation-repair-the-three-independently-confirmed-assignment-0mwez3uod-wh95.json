@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mwez3uod-wh95",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-three-independently-confirmed",
+  "objective": "Repair the three independently confirmed portability and version-evolution blockers in the0.3.4 release slice.",
+  "state": "Running",
+  "scope": [
+    ".github/actions/tag-release/dev-version.sh",
+    "packages/integrations/pi/publishing.test.ts"
+  ],
+  "constraints": [
+    "Same HolyAgent implementation role and prior authorization. Work /workspace/work/holyagent-034, sourcehead e289908; user requested0.3.4 release. Root owns VCS/state; no .git/.holyagent/security-setting/remote changes. Read independent reports flow-review-{code,security,testing,artifact}.md outside repo. Repair only the evidenced findings.",
+    "1) dev-version.sh uses GNU date -d but tests run under macOS BSD date. Use portable UTC timestamp derivation available in both production action and native test hosts. Prefer Git's own UTC formatting over adding a new runtime dependency; release tagging job does not install Bun, so don't silently require it. Preserve deterministic commit-time+SHA SemVer and existing protected tag prefix.",
+    "2) Date conversion failure masked in printf command substitution produces0.3.4-dev..gHASH with exit0. Assign/validate intermediate values and fail closed for missing/invalid commit metadata/conversion; add a controlled red/green regression reproducing the masked failure, without relying on a live macOS machine. Test portability through a non-GNU-date environment/fixture, not by skipping macOS tests.",
+    "3) publishing.test.ts hardcodes0.3.4. Derive root version or use an isolated version fixture and demonstrate next bump's expected behavior, preserving the only-root-version convention. Do not mutate root version manually or weaken branch/version contracts.",
+    "Tools env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Run focused changed-scope tests plus type/lint/format via mise. Full verify already passed before these two files changed; root schedules final broad gate after independent re-review. No generated build needed unless source requires it. Save /workspace/work/034/flow-repair-report.md with final plain evidence: block and /workspace/work/034/flow-repair.diff. Report under250words."
+  ],
+  "criteria": [
+    {
+      "text": "Development version generation is portable and fails closed on metadata errors",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regression coverage survives future version bumps and fails before repair",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    ".github/actions/tag-release/dev-version.sh",
+    "packages/integrations/pi/publishing.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mweyjv9o-v7vg",
+  "specialist": {
+    "agentId": "/root/r034_development_flow",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T12:48:57.613Z"
+  },
+  "createdAt": "2026-11-13T12:48:57.613Z"
+}
