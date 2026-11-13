@@ -31,6 +31,7 @@
     "assignment-0mwevkfpi-y1ne"
   ],
   "specialist": {
+    "agentId": "/root/pr_description_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T11:10:41.792Z"
