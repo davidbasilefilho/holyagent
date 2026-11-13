@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-plain-internal-cli-output-and",
   "objective": "Review plain internal CLI output and search-stream behavior.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..e778f69439a30b9f639f87a7f77c40c3bfc06df6"
   ],
@@ -36,7 +36,9 @@
     "agentId": "/root/r034_plain_cli_review_code",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T15:51:39.128Z"
+    "startedAt": "2026-11-13T15:51:39.128Z",
+    "finishedAt": "2026-11-13T16:42:58.528Z"
   },
+  "result": "status: partial\nchecks:\n- bunx --no-install mise run test -- packages/runtime/tests/cli-output.test.ts packages/runtime/tests/tools.test.ts -> exit 0\n- git diff --check c3c935108a3bd3958f6dbcb7bc2d96f11eba212b...e778f69439a30b9f639f87a7f77c40c3bfc06df6 -> exit 0\n- temporary intent create with U+009B objective, inspect stdout with od -> exit 0\nblockers:\n- behavior: packages/runtime/src/cli/program.ts:170-173 emits encoded TOON without sanitization. Creating an intent with objective a\\u009bb produces raw bytes c2 9b in stdout; C1 control output violates the plain-output requirement. WithTrailer fields use the same path. Preserve the decoded data and add a raw-output and round-trip regression test.\nnotes:\n- Focused tests: 18 pass, 1 skip, 0 fail. Code-review first-pass prompt was absent from the assignment, so that prescribed first pass could not run. Reviewed the committed diff and surrounding code independently. Full verify deferred to root; cancellation was read but not exercised. No changed source paths or repair diff; review is read-only.\nevidence:\n- Assigned committed scope has no unaddressed concrete blockers: Not met: raw U+009B in TOON stdout, program.ts:170-173; reproduced with intent create and od.\n- reviewed-range: c3c935108a3bd3958f6dbcb7bc2d96f11eba212b...e778f69439a30b9f639f87a7f77c40c3bfc06df6; HEAD matched e778f69 and working tree was clean.\n- findings: One blocking behavior finding above; no substantiated duplication or performance finding.\n- checks-run: Focused suite exit 0 (18 pass, 1 skip); diff --check exit 0; U+009B reproduction exit 0 and exposed c2 9b.",
   "createdAt": "2026-11-13T15:51:39.128Z"
 }
