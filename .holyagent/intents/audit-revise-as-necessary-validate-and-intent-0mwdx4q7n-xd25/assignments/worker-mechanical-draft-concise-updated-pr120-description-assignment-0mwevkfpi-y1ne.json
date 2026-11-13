@@ -30,6 +30,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/pr_description",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T11:09:52.902Z"
