@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "prepare0-3-4-development-release-flow",
   "objective": "Prepare0.3.4 development release flow and fix the confirmed npm provenance metadata blocker.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Version bump first, then main/dev CI rules, deterministic development artifacts and public package repository metadata"
   ],
@@ -74,7 +74,41 @@
     "agentId": "/root/r034_development_flow",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T12:33:25.260Z"
+    "startedAt": "2026-11-13T12:33:25.260Z",
+    "finishedAt": "2026-11-13T12:45:08.709Z"
+  },
+  "result": "result: 0.3.4 development flow and provenance metadata implemented; generated package rebuilt.\nchanged: .github/actions/tag-release/action.yml, .github/actions/tag-release/dev-version.sh, .github/workflows/dev.yml, .github/workflows/publish.yml, AGENTS.md, docs/development.md, docs/npm-publishing.md, packages/integrations/pi/dist/package.json, packages/integrations/pi/publishing.test.ts, packages/integrations/pi/src/generate.ts, scripts/npm-publishing.ts, scripts/npm-publishing.test.ts, scripts/pr-checks.ts, scripts/pr-checks.test.ts, scripts/workflows.test.ts.\nchecks: Stage 1 bump and sync: /workspace/work/034/flow-bump.md. Red regression: mise exec -- bun test packages/integrations/pi/publishing.test.ts scripts/npm-publishing.test.ts -> exit 1, 2 expected failures, 4 pass (missing generated repository; preflight contacted network). Focused green: mise exec -- bun test scripts/pr-checks.test.ts scripts/npm-publishing.test.ts scripts/workflows.test.ts packages/integrations/pi/publishing.test.ts -> exit 0, 52 pass, 0 fail. bunx --no-install mise run build -> exit 0, Claude 39 and Pi 139 files. python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 0, 3487 pass, 2 platform/environment skips, 0 fail, 25100 assertions; check 318 files, lint 319, format 738. Log: /workspace/work/034/flow-verify-supervised.log. An earlier unsupervised verify was interrupted (130).\nblockers: Remote branch protection and npm environment must be configured and verified by root; actual publication not attempted.\nquestions: none\nnotes: Development versions use commit UTC and SHA; stable handoff remains covered. Existing required job IDs preserved.\nevidence:\nVersion bump is staged separately through the prescribed task: bump:patch and 56 sync tests in /workspace/work/034/flow-bump.md; root committed 07eaaf9181a2160d1f695e2c7394fa1ac99646f2.\nMain/dev and deterministic dev publication preserve protection contracts and stable behavior: protected-ref workflow tests and artifact handoff, ref rejection, timestamp and timezone tests passed; full verify above.\nGenerated public package satisfies repository provenance metadata with red-green regression: generator and preflight tests failed before fix and passed after; rebuilt dist manifest includes canonical repository URL and directory.\nchecks-run: full commands, exits and counts above; /workspace/work/034/flow-verify-supervised.log.\nchanged-paths: listed above.\ndiff-file: /workspace/work/034/flow.diff.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Version bump separately committed, new flow and provenance red/green tests passed, full3487pass2skip0fail; independent review still required before push.",
+    "criteria": [
+      {
+        "criterion": "Version bump is staged separately through the prescribed task",
+        "support": "bump:patch and 56 sync tests in /workspace/work/034/flow-bump.md; root committed 07eaaf9181a2160d1f695e2c7394fa1ac99646f2."
+      },
+      {
+        "criterion": "Main/dev and deterministic dev publication preserve protection contracts and stable behavior",
+        "support": "protected-ref workflow tests and artifact handoff, ref rejection, timestamp and timezone tests passed; full verify above."
+      },
+      {
+        "criterion": "Generated public package satisfies repository provenance metadata with red-green regression",
+        "support": "generator and preflight tests failed before fix and passed after; rebuilt dist manifest includes canonical repository URL and directory."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "full commands, exits and counts above; /workspace/work/034/flow-verify-supervised.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "listed above."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/flow.diff."
+      }
+    ]
   },
   "createdAt": "2026-11-13T12:33:25.260Z"
 }
