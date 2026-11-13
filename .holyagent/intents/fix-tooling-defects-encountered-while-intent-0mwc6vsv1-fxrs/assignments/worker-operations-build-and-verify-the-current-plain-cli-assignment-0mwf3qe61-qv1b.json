@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "build-and-verify-the-current-plain-cli",
   "objective": "Build and verify the current plain-cli source for immutable independent review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Generated build and fullverifyonly, sourceunchanged."
   ],
@@ -36,7 +36,9 @@
     "agentId": "/root/r034_state_final_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T14:58:27.769Z"
+    "startedAt": "2026-11-13T14:58:27.769Z",
+    "finishedAt": "2026-11-13T15:06:37.766Z"
   },
+  "result": "status: partial\nchanged:\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent.js\nchecks:\n- bunx --no-install mise run build -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 1\n- cmp plain-cli-final-before-hashes.txt plain-cli-final-after-hashes.txt -> exit 0\nblockers:\n- packages/runtime/tests/input.test.ts:156 expects top help to contain --input '<json>'; actual help says --input <json>.\n- packages/runtime/tests/host.test.ts:340 expects Pi hint \"Resume the subagent with the Agent tool for the missing support\"; actual hint says \"missing evidence\".\nnotes:\n- Full verification: 3489 pass, 2 skip, 2 fail across 120 files.\n- Tracked and untracked non-generated hashes stable. Logs: /workspace/work/034/plain-cli-final-build.log and /workspace/work/034/plain-cli-final-verify.log.\nevidence:\n- Generated artifacts and full verification pass with source unchanged: Build passed and source hashes matched; full verification failed on the two wording assertions listed in blockers.\n- checks-run: Build exit 0; supervised verify exit 1; hash comparison exit 0.\n- changed-paths: packages/integrations/claude/dist/scripts/holyagent.js; packages/integrations/pi/dist/scripts/holyagent.js.\n- diff-file: /workspace/work/034/plain-cli-final-generated.diff",
   "createdAt": "2026-11-13T14:58:27.769Z"
 }
