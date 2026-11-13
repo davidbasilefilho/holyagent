@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwf40xeh-8rii",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "route-visual-and-performance-baseline",
+  "objective": "Route visual and performance baseline instructions before any task source-writing dispatch.",
+  "state": "Running",
+  "scope": [
+    "Read guidance-final-review-artifact.json and code.json in /workspace/work/034. Root/skills.md loadsvisual-judging onlybeforefirstvisualspecialist, afterordinaryimplementationmayalreadyeditsource. RequirementsFIRSTfixR-SKILLS+all3familyroot/skills.md toloadatvisual-taskstart BEFORE anytasksource-writingAssignment. Baselinecollectoroperationitselfallowed; complete/acceptbaselinebefore sourcewriterdispatch. Makeperformance rootrouter explicitpre-edit/predispatchtoo, preservetargetquery+original/previous+postcommitordering. Minimalwording/unchangedbudgets. Gprivate-guidancebranchrootroutersmustmergethis timingcontract. Sourceonlyinstruction/context/approvalpolicy/in-memoryassemblytests+type/lint/fmt. No generatedbuild/fullverify."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-guidance. Allpreviousbuilders/reviewers terminal. No actualVCS/.git/.holyagentwrites/depschanges/extraagents/livecalls/generatededits. RootownsVCS/state. RepoAGENTS/.claude/role rulesapply. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; checksthroughmise.",
+    "JSON /workspace/work/034/guidance-trigger-report.json correctCLIshape/exactkeys; diff /workspace/work/034/guidance-trigger.diff. Final<=200words/logsexternal. Keepworkingthroughfixchecks."
+  ],
+  "criteria": [
+    {
+      "text": "Baseline guidance loads and baseline evidence completes before visual or performance source edits can begin",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "All-family triggers and unchanged budget policy checks pass",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/tests/instructions.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf2kek5-dk8a",
+  "specialist": {
+    "agentId": "/root/r034_iteration_guidance",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T15:06:39.257Z"
+  },
+  "createdAt": "2026-11-13T15:06:39.257Z"
+}
