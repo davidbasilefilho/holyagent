@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "draft-concise-updated-pr120-description",
   "objective": "Draft concise updated PR120 description covering final change and validation for publication by root.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Full committed PR range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..61a7adce3ba76878fe2f2342ab268908ce551907, original PR body metadata"
   ],
@@ -33,7 +33,33 @@
     "agentId": "/root/pr_description",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T11:09:52.902Z"
+    "startedAt": "2026-11-13T11:09:52.902Z",
+    "finishedAt": "2026-11-13T11:10:41.114Z"
+  },
+  "result": "result: Draft ready for root publication; title unchanged.\nchanged: /workspace/work/pr120-body.txt, /workspace/work/pr120-body-report.md\nchecks: Read original PR metadata and committed range; reviewed draft against assignment. Full verify and hosted CI not run by this specialist.\nblockers: none\nquestions: none\nnotes: Replace FINAL_VERIFY_RESULT with final verification evidence before publication.\nevidence:\nPR description accurately reflects full final scope without unsupported validation claims: Draft covers the requested scope and distinguishes pending validation.\nchanged-paths: /workspace/work/pr120-body.txt and /workspace/work/pr120-body-report.md\nchecks-run: gh pr view 120 --json body,title and git diff --stat and git log for the specified range, exit 0.\ndraft-path: /workspace/work/pr120-body.txt\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Draft identifies full final scope and explicitly marks pending final verification rather than claiming success.",
+    "criteria": [
+      {
+        "criterion": "PR description accurately reflects full final scope without unsupported validation claims",
+        "support": "Draft covers the requested scope and distinguishes pending validation."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "/workspace/work/pr120-body.txt and /workspace/work/pr120-body-report.md"
+      },
+      {
+        "label": "checks-run",
+        "support": "gh pr view 120 --json body,title and git diff --stat and git log for the specified range, exit 0."
+      },
+      {
+        "label": "draft-path",
+        "support": "/workspace/work/pr120-body.txt"
+      }
+    ]
   },
   "createdAt": "2026-11-13T11:09:52.902Z"
 }
