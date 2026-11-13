@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 
@@ -162,23 +162,28 @@ describe("release lookup", () => {
       const dir = mkdtempSync(join(tmpdir(), "release-lookup-"))
       try {
         mkdirSync(join(dir, "bin"))
-        writeFileSync(join(dir, "bin", "jq"), "#!/bin/sh\nprintf '0.3.3\\n'\n", { mode: 0o755 })
-        writeFileSync(
-          join(dir, "bin", "gh"),
-          `#!/bin/sh
+        // Functions take precedence over Windows executables; an isolated PATH prevents a
+        // future command from accidentally reaching the installed GitHub CLI.
+        const stubs = `
+grep_path="$(type -P grep)"
+export PATH="$PWD/bin"
+grep() { "$grep_path" "$@"; }
+jq() { printf 'jq\\n' >> calls; printf '0.3.3\\n'; }
+gh() {
+printf '%s\\n' "$*" >> calls
 case "$*" in
-  *git/ref/tags*) echo "commit abc"; exit 0 ;;
-  *release*create*) touch created; exit 0 ;;
-  *) echo "HTTP ${status}" >&2; exit 1 ;;
+  "api repos/owner/repo/git/ref/tags/"*) echo "commit abc" ;;
+  "api repos/owner/repo/releases/tags/"*) echo "HTTP ${status}" >&2; return 1 ;;
+  "release create "*) : > created ;;
+  *) echo "Unexpected gh call: $*" >&2; return 2 ;;
 esac
-`,
-          { mode: 0o755 },
-        )
+}
+`
         const action = parse(".github/actions/tag-release/action.yml") as {
           runs: { steps: Array<{ run: string }> }
         }
         const script = action.runs.steps[0]?.run ?? ""
-        const result = Bun.spawnSync(["bash", "-c", `export PATH="$PWD/bin:$PATH"\n${script}`], {
+        const result = Bun.spawnSync(["bash", "-c", `${stubs}\n${script}`], {
           cwd: dir,
           env: {
             ...process.env,
@@ -190,8 +195,14 @@ esac
           stdout: "pipe",
           stderr: "pipe",
         })
-        expect(result.exitCode).toBe(status === "404" ? 0 : 1)
+        const diagnostic = `stdout: ${result.stdout.toString()}\nstderr: ${result.stderr.toString()}`
+        expect(result.exitCode, diagnostic).toBe(status === "404" ? 0 : 1)
         expect(readdirSync(dir).includes("created")).toBe(status === "404")
+        const calls = readFileSync(join(dir, "calls"), "utf8")
+        expect(calls).toContain("jq\n")
+        expect(calls).toContain("api repos/owner/repo/git/ref/tags/holyagent-0.3.3")
+        expect(calls).toContain("api repos/owner/repo/releases/tags/holyagent-0.3.3")
+        expect(calls.includes("release create holyagent-0.3.3")).toBe(status === "404")
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }
