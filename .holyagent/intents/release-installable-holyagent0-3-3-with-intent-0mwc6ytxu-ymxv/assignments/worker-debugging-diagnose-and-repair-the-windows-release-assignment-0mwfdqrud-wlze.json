@@ -41,6 +41,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwfcg7pi-hk7z",
   "specialist": {
+    "agentId": "/root/r033_windows_release_lookup_repair",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T19:38:41.653Z"
