@@ -1,0 +1,77 @@
+{
+  "id": "assignment-0mwfgluop-h1ed",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.integration",
+  "slug": "stabilize-the-preserved-shared-core",
+  "objective": "Stabilize the preserved shared-Core consumer checkpoint without CLI proxying and produce a buildable verified commit candidate.",
+  "state": "Running",
+  "scope": [
+    "Work only in /workspace/work/holyagent-034-core, branch release/0.3.4/feat/shared-core at edce18fee6579d591d59a629765225e2e0e955cd. This worktree already contains the prior authored dirty Core extraction/consumers; preserve that checkpoint. Prior verbatim report /workspace/work/034/core-consumers-report.json and diff core-consumers.diff explain remaining failures.",
+    "Repair the two CLI host-error message compatibility regressions in runtime host tests and format the19 outstanding files, preserving behavior and meaningful assertions. Re-run the prior focused Core/native SDK/legacy Pi/policy/host/CLI suites, type/lint/fmt, then generated build and full verify under the subreaper supervisor.",
+    "Produce a concise every-CLI-command-family inventory mapping shared Core operation, host adapter and any unsupported native operation; identify actual architectural gaps against the user's request that actual CLI functionality live in another package and native Pi tools invoke it directly. Do not introduce unrelated family extraction in this repair; root will decide identified remaining scope."
+  ],
+  "constraints": [
+    "User authorized completing/releasing0.3.4 then0.4after publication.0.3.3 is actually published now; this resumes paused0.3.4. Actual public bunx0.3.3 error belongs0.3.4, no immutable0.3.3 republish.",
+    "Use repository AGENTS and GPT directives: read applicable AGENTS, packages/runtime/src/instructions/gpt-6/roles/worker-integration and guide as appropriate. Root is user-facing parent; you are delegated specialist. Model override user requests GPT6.1Terra high. No VCS writes, no edits under .git/.holyagent, no commits/merge/stateCLI mutation. Read-only Git allowed. Do not merge any source branches or restore deleted CLAUDE directives. Main460f policy integration is root's later step.",
+    "CLI and Pi native consumers must call strict typed Effect application APIs directly. No HolyAgent CLI process, argv, parser proxy, Bun-global fallback in native Node. Preserve operation authorization under lock, cancellation/critical-section semantics, disabled/stale/root/child/config checks. Legacy semantic test port must never enable native registration. Document unsupported native authority honestly; never bypass approval.",
+    "All fixture projects must be outside repository ancestry with independent host module resolution; prior fixture accidentally created actual state Intents, already closed by root. Fail fast if enclosing Git repository exists. No actual shared state or real account/PC operations, no live paid model/Pi runs.",
+    "Toolchain env: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Commands through bunx --no-install mise run. Full Linux verify MUST run python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail does not reap orphans; don't hide genuine failures by deadline/assertion relaxation.",
+    "Preserve external dependency pins; internal workspace extraction/updater lock-only changes are authorized. Build generated output from source. Keep all existing dirty authored changes. No fixtures weakening. Full verify might take time; save detailed logs outside repo in /workspace/work/034.",
+    "Save verbatim JSON report to /workspace/work/034/core-resume-repair-report.json with schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}. Include complete diff for current worktree including untracked files /workspace/work/034/core-resume-repair.diff and concise API inventory file; no secrets. Keep report under400words (changed_paths inventory may be separate evidence path if necessary)."
+  ],
+  "criteria": [
+    {
+      "text": "Shared Core consumers preserve typed direct Node execution without HolyAgent CLI subprocesses or argv proxies",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Existing host error contracts legacy Pi authorization and cancellation remain compatible without weakening tests",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Current candidate builds and appropriate focused tests plus supervised full verify type lint and format pass",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Every CLI family and native support gap is inventoried accurately within the preserved authorized scope",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "api-inventory"
+  ],
+  "ownershipPaths": [
+    "packages/core",
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "packages/integrations/pi",
+    "scripts/bump-version.ts",
+    "scripts/bump-version.test.ts",
+    "scripts/update-dependencies.ts",
+    "scripts/update-dependencies.test.ts",
+    "docs/core-api.md",
+    "docs/native-tools.md",
+    "package.json",
+    "bun.lock",
+    "packages/integrations/claude/dist",
+    ".claude-plugin",
+    "marketplace.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf8phge-0pau",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T20:58:50.905Z"
+  },
+  "createdAt": "2026-11-13T20:58:50.905Z"
+}
