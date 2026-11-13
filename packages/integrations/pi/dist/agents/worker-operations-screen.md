@@ -124,3 +124,7 @@ Failed fetches retry up to three times: tests/fetch.test.ts "retries three times
 - Name each check you did not run.
 - Put long logs in a file outside the repository and list its path; quote CLI output (TOON) only by the lines that support a claim.
 - On a follow-up, report only what is new.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- a web app or served static build, a terminal UI, a desktop or mobile app needs a shared render target: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/dev-server/SKILL.md`

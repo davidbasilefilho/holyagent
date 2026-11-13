@@ -2,7 +2,8 @@ import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
-import { readText } from "../state/files.ts"
+import { fileSystem } from "../ports/filesystem.ts"
+import { hasCode, io } from "../state/files.ts"
 import { CONFIG_FILE, STATE_DIRECTORY } from "../state/layout.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import { ConfigInvalid } from "./errors.ts"
@@ -23,6 +24,15 @@ export const userConfigFile = (env: Env): string =>
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
+
+const readText = (path: string) =>
+  fileSystem.pipe(
+    Effect.flatMap((fs) => io(path, () => fs.readFile(path, "utf8"))),
+    Effect.catchIf(
+      (error) => hasCode(error.cause, "ENOENT"),
+      () => Effect.succeed(undefined),
+    ),
+  )
 
 /**
  * Merges two decoded config values key by key: objects merge recursively and the override wins

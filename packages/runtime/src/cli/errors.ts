@@ -1,13 +1,11 @@
+import { Usage } from "@holyagent/core/api/usage.ts"
 import { Data } from "effect"
 
 import { CLAUDE_WORDS, type HostWords } from "../domain/host.ts"
 import { VCS_HINTS, VCS_REFUSED_ERRORS } from "../vcs/errors.ts"
 
 /** The command line does not match the command's usage. */
-export class Usage extends Data.TaggedError("Usage")<{
-  readonly message: string
-  readonly hint: string
-}> {}
+export { Usage }
 
 /** A command that reads stdin found a terminal or nothing. */
 export class StdinMissing extends Data.TaggedError("StdinMissing")<{

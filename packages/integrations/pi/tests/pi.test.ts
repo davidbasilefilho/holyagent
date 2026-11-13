@@ -137,17 +137,16 @@ describe("the package manifest", () => {
     expect(packageJson.version).toBe(readJson("package.json")["version"] as string)
   })
 
-  test("lists the extension, prompt and skill folders under the pi key, and they exist", () => {
+  test("advertises extensions and prompts and keeps guidance private", () => {
     expect(manifest["pi"]).toEqual({
       extensions: ["./extensions"],
       prompts: ["./prompts"],
-      skills: ["./skills"],
       subagents: { agents: ["./agents"] },
     })
     const built = generated.map((file) => file.path.slice(`${DIST_DIRECTORY}/`.length))
     expect(built).toContain(EXTENSION_OUTPUT)
     expect(built.some((path) => path.startsWith("prompts/"))).toBe(true)
-    expect(built.some((path) => path.startsWith("skills/"))).toBe(true)
+    expect(built.some((path) => path.startsWith("guidance/"))).toBe(true)
   })
 
   test("declares the host modules as peers with the range * and bundles none", () => {
@@ -289,12 +288,14 @@ describe("the runtime scripts", () => {
 })
 
 describe("the skills", () => {
-  const skills = generated.filter((file) => file.path.startsWith(`${DIST_DIRECTORY}/skills/`))
+  const skills = generated.filter((file) =>
+    file.path.startsWith(`${DIST_DIRECTORY}/guidance/${PI_FAMILY}/`),
+  )
 
   test("are the files of the family's skills, one for one", () => {
-    expect(skills.map((file) => file.path.slice(`${DIST_DIRECTORY}/skills/`.length))).toEqual(
-      sourceSkills,
-    )
+    expect(
+      skills.map((file) => file.path.slice(`${DIST_DIRECTORY}/guidance/${PI_FAMILY}/`.length)),
+    ).toEqual(sourceSkills)
     expect(FAMILIES).toContain(PI_FAMILY)
   })
 
@@ -325,7 +326,7 @@ describe("the other families the package carries", () => {
     files.map((file) => file.path.split("/").at(-1) ?? "").toSorted()
   const expectedAgents = AGENT_TYPES.map((name) => `${name}.md`).toSorted()
 
-  test("the package's own agents and skills stay the default family's; the others sit below families/", () => {
+  test("the package's own agents stay the default family's; others sit below families/", () => {
     expect(EXTRA_PI_FAMILIES).toEqual(["gpt-6"])
     expect(PI_FAMILY).toBe(DEFAULT_PI_FAMILY)
     expect(PACKAGE_FILES).toContain(FAMILIES_FOLDER)

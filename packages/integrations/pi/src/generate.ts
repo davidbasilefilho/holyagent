@@ -6,7 +6,7 @@ import { bundleModule } from "../../../runtime/src/bundle.ts"
 import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { jsonText } from "../../../runtime/src/instructions/generated.ts"
-import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
+import { skillFiles, validateOwnedGuidance } from "../../../runtime/src/instructions/skills.ts"
 import { SHELL_EXTERNAL, withoutSqlite } from "../../../runtime/src/pi/bash/bundle.ts"
 import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
 import { PROMPT_TEMPLATES } from "../../../runtime/src/prompts/index.ts"
@@ -16,7 +16,7 @@ import { frontmatter } from "../../claude/src/agents.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles } from "./agents.ts"
 import { bunFlags } from "./bun-flags.ts"
-import { EXTRA_PI_FAMILIES, FAMILIES_FOLDER, familyAgents, familySkills } from "./families.ts"
+import { EXTRA_PI_FAMILIES, FAMILIES_FOLDER, familyAgents } from "./families.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -68,7 +68,7 @@ export const PACKAGE_FILES: ReadonlyArray<string> = [
   FAMILIES_FOLDER,
   "prompts",
   "scripts",
-  "skills",
+  "guidance",
 ]
 
 // The wrapper and its empty Bun config are the Claude plugin's, shared so the two cannot differ.
@@ -117,7 +117,6 @@ export const manifest = (): GeneratedFile => ({
       extensions: ["./extensions"],
       // The first-pass review templates, which a person runs as `/code-review` and `/security-review`.
       prompts: ["./prompts"],
-      skills: ["./skills"],
       // `@tintinweb/pi-subagents` loads the specialists from the folder this key names.
       subagents: { agents: ["./agents"] },
     },
@@ -240,11 +239,14 @@ const promptFiles = (): ReadonlyArray<GeneratedFile> =>
     content: `${frontmatter(generatedNote(`${PROMPTS_SOURCE}/${name}.md`), head)}\n${body}\n`,
   }))
 
-const skills = async (family: Family, folder = "skills"): Promise<ReadonlyArray<GeneratedFile>> =>
-  (await Effect.runPromise(skillFiles(family, generatedNote))).map(({ path, content }) => ({
-    path: inPackage(`${folder}/${path}`),
-    content,
-  }))
+const skills = async (
+  family: Family,
+  folder = `guidance/${family}`,
+): Promise<ReadonlyArray<GeneratedFile>> =>
+  Effect.runPromise(skillFiles(family, generatedNote)).then((files) => {
+    validateOwnedGuidance(files)
+    return files.map(({ path, content }) => ({ path: inPackage(`${folder}/${path}`), content }))
+  })
 
 /**
  * The specialist prompts and skills of the families a provider can run besides the package's own,
@@ -256,7 +258,7 @@ const otherFamilies = async (family: Family): Promise<ReadonlyArray<GeneratedFil
     await Promise.all(
       EXTRA_PI_FAMILIES.filter((extra) => extra !== family).map(async (extra) => [
         ...(await agentFiles(extra, undefined, familyAgents(extra))),
-        ...(await skills(extra, familySkills(extra))),
+        ...(await skills(extra)),
       ]),
     )
   ).flat()

@@ -128,3 +128,10 @@ Where to look:
 - Tool names differ across T3 versions; confirm a name exists before relying on it.
 
 Stay on the page under test: navigate only to the pages the Assignment names, use `preview_evaluate` only to inspect that page, and upload only files it names. Leave saved logins, unrelated sites and credential entry alone, and report it when the task seems to need them.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- the selected platform is web: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/web-design/SKILL.md`
+- the selected platform is mobile: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/mobile-design/SKILL.md`
+- the selected platform is desktop: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/desktop-design/SKILL.md`
+- the selected platform is terminal UI: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/tui-design/SKILL.md`

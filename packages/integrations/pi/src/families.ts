@@ -7,23 +7,22 @@ import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import type { PiFamily } from "../../../runtime/src/instructions/families.ts"
 
 /**
- * The family the package's own `agents/` and `skills/` folders hold, which every provider but Codex
- * runs on. A provider that runs another family finds that family's copies under
- * {@link FAMILIES_FOLDER}.
+ * The family the package's own `agents/` folder holds, which every provider but Codex runs on. A
+ * provider that runs another family finds that family's copies under {@link FAMILIES_FOLDER}.
  */
 export const DEFAULT_PI_FAMILY: PiFamily = "kimi-k3.1"
 
 /** The families the package carries besides {@link DEFAULT_PI_FAMILY}, built next to it. */
 export const EXTRA_PI_FAMILIES: ReadonlyArray<PiFamily> = ["gpt-6"]
 
-/** The folder of the package, beside `agents/` and `skills/`, that holds the other families' copies. */
+/** The folder of the package that holds other families' agent copies. */
 export const FAMILIES_FOLDER = "families"
 
 /** The folder of a family's specialist prompts, relative to the package root. */
 export const familyAgents = (family: PiFamily): string => `${FAMILIES_FOLDER}/${family}/agents`
 
 /** The folder of a family's skills, relative to the package root. */
-export const familySkills = (family: PiFamily): string => `${FAMILIES_FOLDER}/${family}/skills`
+export const familySkills = (family: PiFamily): string => `guidance/${family}`
 
 /** The text of an agent file below its frontmatter, trimmed: the prompt the specialist runs on. */
 export const promptBody = (file: string): string =>
@@ -57,10 +56,8 @@ export const familyAgentPrompt = (
       )
 
 /**
- * A system prompt with the package's skills pointed at the family's copies: Pi lists each skill by
- * the path of its `SKILL.md`, which the model reads, so the paths below the package's `skills/`
- * folder (written with the platform's separator or with `/`) become the family's folder. Returns
- * the prompt unchanged for the default family.
+ * Rewrite legacy package skill paths to the selected family's private guidance paths. Paths outside
+ * the package are untouched. Returns the prompt unchanged for the default family.
  */
 export const familySkillPaths = (
   prompt: string,

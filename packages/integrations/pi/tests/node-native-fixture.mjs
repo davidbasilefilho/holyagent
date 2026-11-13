@@ -18,6 +18,9 @@ const {
   SessionManager,
 } = await import("@earendil-works/pi-coding-agent")
 const { registerNativeTools, NATIVE_ROOT_FLAG } = await import(pathToFileURL(process.argv[2]).href)
+const { setup, Shell } = await import("@holyagent/core")
+const { Effect, Layer, Option } = await import("effect")
+const { Type } = await import("typebox")
 const cwd = process.argv[3]
 const repository = childProcess.spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
   encoding: "utf8",
@@ -38,6 +41,34 @@ const services = await createAgentSessionServices({
     noContextFiles: true,
     extensionFactories: [
       { name: "codemode", factory: createCodemodeExtension({ models: false }) },
+      {
+        name: "host-diagnostic-fixture",
+        factory: (pi) =>
+          pi.registerTool({
+            name: "fixture_core_doctor",
+            label: "Fixture Core doctor",
+            description: "Exercise the direct Core diagnostic with a fake host.",
+            parameters: Type.Object({}),
+            exposure: "codemode",
+            execute: async () => {
+              const context = {
+                cwd,
+                env: { HOME: cwd, HOLYAGENT_HOME: cwd },
+                host: "pi",
+                execution: { host: "pi", ttlMinutes: 55, workflowsAvailable: false },
+                authorize: (capability) => capability === "doctor.read",
+              }
+              const shell = Layer.succeed(Shell, {
+                which: () => Effect.succeed(Option.none()),
+                run: () => Effect.die("unexpected command"),
+              })
+              const report = await Effect.runPromise(
+                setup.doctor(context, { fix: false }).pipe(Effect.provide(shell)),
+              )
+              return { content: [{ type: "text", text: JSON.stringify(report) }] }
+            },
+          }),
+      },
       {
         name: "native",
         factory: (pi) => {
@@ -95,6 +126,11 @@ try {
     code: "text(await tools.holyagent_intent_list({}))",
   })
   assert.match(JSON.stringify(nested), /Node direct fixture/)
+  const diagnostic = await codemode.execute("diagnostic", {
+    code: "text(await tools.fixture_core_doctor({}))",
+  })
+  assert.match(JSON.stringify(diagnostic), /settings/)
+  assert.equal(session.getToolDefinition("holyagent_doctor"), undefined)
   assert.ok(spawned.length > 0)
   assert.ok(
     spawned.every(([program]) => program === "git"),

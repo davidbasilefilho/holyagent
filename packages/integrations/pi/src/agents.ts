@@ -114,6 +114,8 @@ export const agentFiles = async (
   const variant = (screen: boolean, form: CapabilityForm = "normal") =>
     specialistFiles({
       instructions: instructionsDirectory(family),
+      guidanceFamily: family,
+      guidanceRoot: "${HOLYAGENT_PI_ROOT}",
       path: (route) => `${DIST_DIRECTORY}/${folder}/${agentFor(route, screen, form)}.md`,
       // No `model:` or `thinking:`: the package ranks an agent file above the call's parameters on
       // its `Agent` path, and the route values are per user, so the root passes them on each call.

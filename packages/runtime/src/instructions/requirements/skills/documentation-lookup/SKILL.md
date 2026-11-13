@@ -1,0 +1,1 @@
+- R-DOCLOOKUP: When library documentation is needed, resolve the relevant library and version, retrieve focused documentation, check it against primary sources and the task, and report sources and gaps. Respect a user-selected provider; Context7 CLI is one option.

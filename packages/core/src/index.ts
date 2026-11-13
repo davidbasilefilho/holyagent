@@ -2,6 +2,14 @@
 export * as assignment from "./api/assignment.ts"
 /** Typed Intent application operations. */
 export * as intent from "./api/intent.ts"
+/** Typed version-control application operations. */
+export * as vcs from "./api/vcs.ts"
+/** Typed installation and diagnostics operations. */
+export * as setup from "./api/setup.ts"
+export { Shell, type ShellResult, type WhichOptions } from "./setup/shell.ts"
+export { FileSystem, nodeFileSystem } from "./ports/filesystem.ts"
+export { Git, gitLive, type GitResult } from "./vcs/git.ts"
+export { GitHub, githubLive, type RestRequest } from "./vcs/github.ts"
 export { type Capability, type Context, NoActiveIntent, Unauthorized } from "./api/context.ts"
 
 export { handoff, plan, reconcile, stateMode, status } from "./api/overview.ts"

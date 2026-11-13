@@ -42,9 +42,6 @@
     "prompts": [
       "./packages/integrations/pi/dist/prompts"
     ],
-    "skills": [
-      "./packages/integrations/pi/dist/skills"
-    ],
     "subagents": {
       "agents": [
         "./packages/integrations/pi/dist/agents"

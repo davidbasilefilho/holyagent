@@ -3910,19 +3910,29 @@ describe("under the Codex provider", () => {
     }
   })
 
-  test("the skills Pi lists are the family's copies", async () => {
-    const listed = (folder: string) =>
-      `<skill><location>${join(PACKAGE_ROOT, folder, "ci-watch", "SKILL.md")}</location></skill>`
-    const { delivered } = await run(codexConfig(), {
-      systemPrompt: `${PI_PROMPT}\n${listed("skills")}`,
-      pi: codexPi,
-    })
-    expect(delivered?.systemPrompt).toContain(listed("families/gpt-6/skills"))
-    expect(delivered?.systemPrompt).not.toContain(listed("skills"))
-    const kimi = await run(healthy("/missing"), {
-      systemPrompt: `${PI_PROMPT}\n${listed("skills")}`,
-    })
-    expect(kimi.delivered?.systemPrompt).toContain(listed("skills"))
+  test("the root routes to the chosen family's private guidance and preserves unrelated skills", async () => {
+    const unrelated = "<skill><location>/user/skills/unrelated/SKILL.md</location></skill>"
+    const input = `${PI_PROMPT}\n${unrelated}`
+    const gpt = await run(codexConfig(), { systemPrompt: input, pi: codexPi })
+    expect(gpt.delivered?.systemPrompt).toBe(
+      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6"], PACKAGE_ROOT)}\n\n${input}`,
+    )
+    expect(gpt.delivered?.systemPrompt).toContain(
+      join(PACKAGE_ROOT, "guidance/gpt-6/ci-watch/SKILL.md"),
+    )
+    expect(gpt.delivered?.systemPrompt).not.toContain(
+      join(PACKAGE_ROOT, "guidance/kimi-k3.1/ci-watch/SKILL.md"),
+    )
+    const kimi = await run(healthy("/missing"), { systemPrompt: input })
+    expect(kimi.delivered?.systemPrompt).toBe(
+      `${fillPackageRoot(PI_ROOT_PROMPT, PACKAGE_ROOT)}\n\n${input}`,
+    )
+    expect(kimi.delivered?.systemPrompt).toContain(
+      join(PACKAGE_ROOT, "guidance/kimi-k3.1/ci-watch/SKILL.md"),
+    )
+    expect(kimi.delivered?.systemPrompt).not.toContain(
+      join(PACKAGE_ROOT, "guidance/gpt-6/ci-watch/SKILL.md"),
+    )
   })
 
   test("a specialist that writes gets apply_patch beside the tools it has; the others and the root do not", async () => {

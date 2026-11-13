@@ -102,6 +102,14 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "skills/visual-judging/SKILL.md",
       phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
     },
+    "R-OWNEDROUTES": {
+      section: "root/skills.md",
+      phrase: "Read the relevant HolyAgent guidance file on demand",
+    },
+    "R-DOCLOOKUP": {
+      section: "skills/documentation-lookup/SKILL.md",
+      phrase: "Verify the result against the primary source",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
       phrase: "start the one target per platform that the visual specialists share",
@@ -278,7 +286,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-CACHE-REUSE": { section: "root/dispatch.md", phrase: "or warm agent" },
     "R-CACHE-WINDOW": {
-      carriedBy: "packages/runtime/src/setup/settings.ts",
+      carriedBy: "packages/core/src/setup/settings.ts",
       phrase: "subagentPromptCacheTtl",
     },
     "R-CACHE-COMPACT": { section: "specialist/report.md", phrase: "End with one compact report" },
@@ -410,9 +418,17 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/search.md",
       phrase: "search through the available shell with `rg` and `fd`",
     },
+    "R-OWNEDROUTES": {
+      section: "root/skills.md",
+      phrase: "Read the relevant HolyAgent guidance file on demand",
+    },
+    "R-DOCLOOKUP": {
+      section: "skills/documentation-lookup/SKILL.md",
+      phrase: "Verify the result against the primary source",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
-      phrase: "start the one target per platform that the visual specialists share",
+      phrase: "start one render target for visual work",
     },
     "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
     "R-MERGEREVIEW": {
@@ -722,9 +738,17 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/search.md",
       phrase: "search through the available shell with `rg` and `fd`",
     },
+    "R-OWNEDROUTES": {
+      section: "root/skills.md",
+      phrase: "Read the relevant HolyAgent guidance file on demand",
+    },
+    "R-DOCLOOKUP": {
+      section: "skills/documentation-lookup/SKILL.md",
+      phrase: "Verify the result against the primary source",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
-      phrase: "start the one target per platform that the visual specialists share",
+      phrase: "start one render target for visual work",
     },
     "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
     "R-MERGEREVIEW": {

@@ -1,7 +1,8 @@
+import { type Context, setup as coreSetup } from "@holyagent/core"
 import { Effect, Schema } from "effect"
 
 import { CAPABILITIES } from "../config/capabilities.ts"
-import { doctor } from "../setup/doctor.ts"
+import { DEFAULT_CONFIG } from "../domain/directive.ts"
 import { SetupFailure } from "../setup/errors.ts"
 import { chooseForm, FORM_CHOICES } from "../setup/form.ts"
 import type { CapabilityChoices } from "../setup/pi-check.ts"
@@ -14,8 +15,7 @@ import {
   SCOPES,
 } from "../setup/scope.ts"
 import { CACHE_TTLS } from "../setup/settings.ts"
-import { Shell } from "../setup/shell.ts"
-import { setup } from "../setup/steps.ts"
+import { type Shell, shellLive } from "../setup/shell.ts"
 import { runInteractive } from "../setup/tui/session.ts"
 import { booleanFlag, choiceFlag, stringFlag } from "./args.ts"
 import { Usage } from "./errors.ts"
@@ -25,6 +25,13 @@ const CacheTtlFlag = Schema.Literals(CACHE_TTLS)
 const SwitchFlag = Schema.Literals(["on", "off"])
 const ScopeFlag = Schema.Literals(SCOPES)
 const FormFlag = Schema.Literals(FORM_CHOICES)
+const coreContext = (cwd: string, env: Context["env"]): Context => ({
+  cwd,
+  env,
+  host: "claude",
+  execution: DEFAULT_CONFIG,
+  authorize: () => true,
+})
 
 /** The flags that switch one capability each, `--<name> on|off`, from the registry. */
 const CAPABILITY_FLAGS = Object.fromEntries(
@@ -109,7 +116,7 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
     output:
       "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
-      "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
+      "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
       "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
       "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
       "--scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
@@ -174,10 +181,9 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
           notes: ReadonlyArray<string> = [],
         ) =>
           Effect.gen(function* () {
-            const report = yield* setup(env, {
+            const report = yield* coreSetup.setup(coreContext(cwd, env), {
               scope: resolved.scope,
               undo: booleanFlag(args, "undo"),
-              cwd,
               subagentCacheTtl,
               dryRun: booleanFlag(args, "dry-run"),
               skipCtx7: booleanFlag(args, "skip-ctx7"),
@@ -195,7 +201,12 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
                 ...report.lines,
               ],
             } satisfies Report
-          }).pipe(Effect.provide(Shell.live(env)))
+          }).pipe(
+            Effect.provide(shellLive(env)),
+            Effect.catch((error) =>
+              Effect.succeed({ lines: [`! setup: ${error.message}`], ok: false }),
+            ),
+          )
         const interactive = yield* runInteractive({
           env,
           cwd,
@@ -215,7 +226,7 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
         })
         if (interactive.kind === "done") return printed(interactive.report)
         return printed(yield* apply(flagged, capabilities, interactive.notes))
-      }).pipe(Effect.provide(Shell.live(env))),
+      }).pipe(Effect.provide(shellLive(env))),
   },
   {
     path: ["doctor"],
@@ -228,7 +239,7 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
       "--scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
       "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
       "the Pi checks include `ok   pi form:` (headless or normal, detected from the machine as setup does, or named by --form) and one `pi capability <name>` line for each capability the config turns on: `ok` with its form and what applies, `FAIL` naming an unmet system need or a package not listed at its pin, or a `~` line when the form does not offer it (computer-use on a headless machine), which fails nothing; the provider and web kit packages are the `pi base packages` line",
-      "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages",
+      "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages. The ctx7 check verifies CLI availability, not authentication",
     ],
     flags: { scope: "string", fix: "boolean", form: "string" },
     stateless: true,
@@ -242,10 +253,9 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
           return printed({ lines: [fail("scope", resolved.message)], ok: false })
         }
         const form = yield* formOf(args, env, DOCTOR_USAGE)
-        const report = yield* doctor(env, {
+        const report = yield* coreSetup.doctor(coreContext(cwd, env), {
           fix: booleanFlag(args, "fix"),
           scope: resolved.scope,
-          cwd,
           form,
         })
         return printed({
@@ -256,6 +266,6 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
             ...report.lines,
           ],
         })
-      }).pipe(Effect.provide(Shell.live(env))),
+      }).pipe(Effect.provide(shellLive(env))),
   },
 ]

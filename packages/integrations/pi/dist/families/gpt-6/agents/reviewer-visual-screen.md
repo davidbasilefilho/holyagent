@@ -147,3 +147,10 @@ Where to look. Use the browser, preview, screenshot and device tools the host pr
 - A self-contained HTML page you build to show something: render it to an image with the console output, use fixed pixel heights for charts, avoid `vh` units and `height:100%`, and leave html and body backgrounds unset so the theme variables apply.
 
 Stay on the page under test: navigate only to the pages the Assignment names, evaluate script only to inspect that page, and upload only files it names. Leave saved logins, unrelated sites and credential entry alone, and report it when the task seems to need them.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- the selected platform is web: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/web-design/SKILL.md`
+- the selected platform is mobile: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/mobile-design/SKILL.md`
+- the selected platform is desktop: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/desktop-design/SKILL.md`
+- the selected platform is terminal UI: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/tui-design/SKILL.md`

@@ -180,11 +180,20 @@ Your own judgement decides first and the user is the fallback. When the request,
 
 Load a skill when its situation arises; each holds rules that matter only then:
 
-- `dev-server`: visual work needs a running, capturable render target (a web app or served static build, a terminal UI, a desktop or mobile app); it has Worker.operations start the one target per platform that the visual specialists share, or report why it cannot run here.
-- `visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch, and again when rendered work is accepted, repaired or explained visually; it holds how you pick the platform skill, your own final pass that decides acceptance, what counts as material and the repair rounds.
-- `web-design`, `mobile-design`, `desktop-design`, `tui-design`: the platform standard for visual work, for a web page or app, an iOS or Android app, a desktop app and a terminal UI. `visual-judging` says how to pick and name them; load the one you picked yourself for the final pass.
-- `evidence-judging`: a specialist report carries a verdict you must accept or reject (a blocking finding, a research claim with conflicting sources or numbers, prose for people, a material design choice).
-- `ci-watch`: a pushed PR or commit needs its CI watched or judged.
-- `state-mode`: a clone has no Intent yet, so choose where state lives before the first Intent of a clone.
-- `instruction-writing`: you write or review model-facing text other than a brief.
-- `user-busy`: the user says they are away, asleep, busy or not to be asked; load it before asking anything.
+Read the relevant HolyAgent guidance file on demand.
+
+User and third-party skills remain available.
+- a pushed PR or commit needs CI judged: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/ci-watch/SKILL.md`
+- a web app or served static build, a terminal UI, a desktop or mobile app needs a shared render target: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/dev-server/SKILL.md`
+- a specialist verdict needs acceptance or rejection: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/evidence-judging/SKILL.md`
+- writing or reviewing model-facing instructions: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/instruction-writing/SKILL.md`
+- a clone has no Intent yet: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/state-mode/SKILL.md`
+- the user is away or says not to ask: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/user-busy/SKILL.md`
+- before any visual-task writer, source edit or visual specialist dispatch, and when judging visual work: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/visual-judging/SKILL.md`
+- the selected platform is web: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/web-design/SKILL.md`
+- the selected platform is mobile: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/mobile-design/SKILL.md`
+- the selected platform is desktop: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/desktop-design/SKILL.md`
+- the selected platform is terminal UI: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/tui-design/SKILL.md`
+Delegate library documentation lookup to a librarian or implementation specialist.
+
+Using `dev-server`, have Worker.operations start the one target per platform that the visual specialists share. Keep its platform, stack, start, probe, address, capture command, variants, owner and stop in the task list and hand it to both visual specialists. Restart it when down; accept a blocked report and judge from the closest honest substitute while saying so, and have the owner stop it when visual work ends.

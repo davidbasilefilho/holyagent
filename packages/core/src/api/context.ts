@@ -34,6 +34,12 @@ export type Capability =
   | "state.initialize"
   | "stateMode.read"
   | "stateMode.write"
+  | "vcs.commit"
+  | "vcs.identity"
+  | "vcs.pr"
+  | "setup"
+  | "doctor.read"
+  | "doctor.fix"
 
 /** Authority and host settings constructed by the host adapter, never from model input. */
 export interface Context {

@@ -22,7 +22,7 @@
     "families",
     "prompts",
     "scripts",
-    "skills"
+    "guidance"
   ],
   "pi": {
     "extensions": [
@@ -30,9 +30,6 @@
     ],
     "prompts": [
       "./prompts"
-    ],
-    "skills": [
-      "./skills"
     ],
     "subagents": {
       "agents": [

@@ -196,6 +196,13 @@ Where to look. Use the browser, preview, screenshot and device tools the host pr
 
 Stay on the page under test: navigate only to the pages the Assignment names, evaluate script only to inspect that page, and upload only files it names. Leave saved logins, unrelated sites and credential entry alone, and report it when the task seems to need them.
 
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- the selected platform is web: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/web-design/SKILL.md`
+- the selected platform is mobile: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/mobile-design/SKILL.md`
+- the selected platform is desktop: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/desktop-design/SKILL.md`
+- the selected platform is terminal UI: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/tui-design/SKILL.md`
+
 ## Headless screen
 
 This machine has no graphical session. You have a headless browser. Outside T3 it is the browser-use MCP tools: `mcp__browser_use__browser_exec`, which runs Python on the browser, and `mcp__browser_use__browser_screenshot`, with a temporary profile that is removed when the session ends. Where T3 hosts the session, the browser is T3's preview tools and browser-use is not available: T3 exposes no endpoint browser-use could attach to, so HolyAgent does not start it. You have no desktop: computer use and the user's real browser are not available. Report a missing tool instead of working around it.
