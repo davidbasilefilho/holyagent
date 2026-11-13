@@ -1,0 +1,17 @@
+{
+  "id": "intent-0mwewgx8e-sh5o",
+  "slug": "release-holyagent0-3-3-by-validating-and",
+  "objective": "Release HolyAgent0.3.3 by validating and merging release/0.3.3/integration into main.",
+  "requirements": [
+    "go until it is on main",
+    "Use the holyagent directives, skills, agents and GPT6.1 Terra agents low-xhigh as already requested.",
+    "Carry release0.3.3 integration9c8edee7bf9a82e062121e89c507f4b76cc09ae9 through a release PR into main074bc72a5370d9b1db6802d4ae823a8deec68195. User explicitly authorizes main merge and necessary normal release PR actions; no direct protected-branch pushes, force pushes, deletions, settings/credential changes or manual publication.",
+    "Prior PR120 merged after independent code/artifact/security/testing reviews, full verify3498pass2conditional skips0fail and hostedLinuxWindowsmacOS/installers green. Integration tree equals reviewed/tested61a7adc exactly; preserve valid accepted evidence. New target adds version/branch-model review of bumped0.3.3 versus main0.3.2.",
+    "Task plan: independently audit release composition and tree equivalence/version bump; draft/review release PR description; open release PR; validate new-target branch/version and all current-head hosted required checks; fix/review any genuine blocker; squash merge into main with expected head; verifymain remote and record/close state.",
+    "Do not expand to0.3.4 or other open historical Intents. Existing normal merge-triggered dev/stable publication may run; report publication only with evidence, do not change external security settings.",
+    "Primary clone /workspace/work/holyagent remainsmain, new integration worktree /workspace/work/holyagent-release033 tracks existingremote release/0.3.3/integration. State branch remains shared. Prior full task Intentintent-0mwdx4q7n-xd25 closed,pushed. Integration push Publish43416856899 currentlyrunning. No release PR open at task start."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-13T11:35:08.606Z"
+}
