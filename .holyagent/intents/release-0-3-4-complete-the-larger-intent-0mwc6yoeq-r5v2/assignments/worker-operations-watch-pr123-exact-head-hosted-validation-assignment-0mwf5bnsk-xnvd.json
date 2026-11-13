@@ -33,6 +33,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_state_pr123_ci",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T15:42:59.636Z"
