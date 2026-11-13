@@ -1,0 +1,80 @@
+{
+  "id": "assignment-0mwf1kijn-fn5o",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 13,
+  "roleTask": "Worker.integration",
+  "slug": "implement-auditable-mixed-provider-role",
+  "objective": "Implement auditable mixed-provider role routing, explicit normal/fast subscription profiles and installed-native-search preference for HolyAgent 0.3.4.",
+  "state": "Running",
+  "scope": [
+    "Routing/scoring/capability config, Pi per-role provider and native search resolution, Claude profile activation, tests and docs."
+  ],
+  "constraints": [
+    "Work only /workspace/work/holyagent-034-routing from accepted c3c93510. Read AGENTS.md/.claude/CLAUDE.md and integration role instructions. Accepted research: /workspace/work/034/routing-profiles.md and routing-research.md; use exact sourced limits. Scratch /workspace/work/034. User authorized release0.3.4, Terra low–xhigh. 0.4nativeCodex/setupCLI/orchestration redesign planning only. No VCS/actual .git/.holyagent writes, usermachine installs, live model requests/pi launch, account/admin/publication actions or extraagents. Local deterministic SDK/mock tests allowed. No pins/deps changes; install frozen --ignore-scripts as needed.",
+    "Root-selected narrow design per research: typed per-role provider with capability validation, versioned auditable evidence import/scorer, separate explicit policy fallback. Share semantics in Pi/Claude adapted to native harness, no generic host redesign. Preserve user root/model/permission defaults when no profile explicitly activated, explicit overrides outrank chosen profile. Do not override credentials/account entitlements or grant permissions.",
+    "Primary target100USD PER-PROVIDER plans, explicit fast20USD for every supportedprovider/harness (PiCodex,PiKimi,Claude). Codex fastROOT Terra userpreference, Claude fastROOT Sonnet; specialists independent. Current normaldefaults retained unless explicit profile chosen. Fast names plan tier, not guaranteed latency. Actual host activation must be supported+tested (not unused config); Claude generated profile/root variant or documented launch alias may be suitable. NativeCodexharness0.4only. Kimi aliases mutable: configured eligibleaccount model only, no invented fastwinner.",
+    "Every considered eligible ranked model gets finite [0,1] using comparable role benchmark subscription quality/cost, normalized value/max among eligible. Exact model/provider/effort/harness/plan and dated provenance required, importeddata versioned/freshness policy. Missing/stale/noncomparable/APIpricefallback/unknownrequiredcapability =>excluded/unknown withreason and NO invented zero; policyfallback unscored-policy distinct fromrankedwinner. Publicmypriors data lacks several exact100/20plan/model/effort rows. Implement correct import/rank engine+honest diagnostics and declare optimization pending for absent evidence; neverfill missing with API cost or best-model claims. Don't claim userrequirement fulfilled if real rankings lack sourced data.",
+    "Routes may mix Codex/Kimi perrole when configuredavailable/capable, screen routing must use actualproviderrow. Searchinventory consults ALL installed actually enabled/exposed/authorized nativeprovider tools independent of selectedroot. Use known officialcallable adapter (Kimi opt-inOAuth, Codexnative unknown); no inference API docs==exposedtool. Native disabled/unknown/error not silently absent; transientfail doesn'tsilentlyactivateExa. Webkit/Exa only if none offers supported callable native search and explicitfallback config; do notchange userkeys/permissions. Need harmless host/providermocks proving Codexroot+Kimisearch ifactualcrossmodelcallcontractsupports, else truthfulunsupported.",
+    "Native-tools writer concurrently edits OTHERworktree holyagent-034-tools, including separate extension.ts native registration. You own routing-only extension edits here; keep changes localized and report precise merge seams. Instruction writer separate branch owns modelinstructions; don'tedit instructions in this slice. Claude sourceprofilechanges independentnativeadapterunsupported. Do not edit generated dist; rootcoordinatedbuildlater.",
+    "Meaningful focused red/green tests for ranking/eligibility, mixedroutes, profileoverride precedence+real adapteractivation, native-search selection/error/denial. Type/lint/fmt via mise, no fullbuild/verify yet. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Report newtoolingbugs reproduction/impact.",
+    "Keep working throughrequested implementation/checks, report unresolvedmissingexternaldata honestly. Full diff /workspace/work/034/routing.diff; JSON /workspace/work/034/routing-report.json {status:done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]}, exactkeys. Final<=350words/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Per-role mixed-provider routing and eligibility preserve user overrides and permission boundaries",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Comparable subscription evidence is scored within zero and one while missing evidence remains explicit",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Normal and fast profiles activate through supported Pi and Claude adapters with requested root preferences",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Installed callable native search is preferred across providers with truthful fallback and failure semantics",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Focused routing profile and search regression checks pass without unrelated changes",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "missing-evidence"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/config",
+    "packages/runtime/src/pi",
+    "packages/runtime/src/domain/route.ts",
+    "packages/runtime/src/routing",
+    "packages/runtime/tests/routing.test.ts",
+    "packages/runtime/tests/provider.test.ts",
+    "packages/runtime/tests/config.test.ts",
+    "packages/integrations/pi/src/provider.ts",
+    "packages/integrations/pi/src/agents.ts",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests/routing.test.ts",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/integrations/claude/tests/profiles.test.ts",
+    "docs/routing.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T13:57:54.275Z"
+  },
+  "createdAt": "2026-11-13T13:57:54.275Z"
+}
