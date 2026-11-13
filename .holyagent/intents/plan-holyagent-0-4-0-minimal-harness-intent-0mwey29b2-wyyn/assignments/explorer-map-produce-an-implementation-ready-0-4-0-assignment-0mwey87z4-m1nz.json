@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "produce-an-implementation-ready-0-4-0",
   "objective": "Produce an implementation-ready 0.4.0 plan for minimal harness setup, native Codex/cloud support and proportional orchestration.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Existing 0.4.0 Intent intent-0mwey29b2-wyyn",
     "Current HolyAgent Pi/Claude packaging/architecture; official Codex local/cloud docs"
@@ -42,7 +42,9 @@
   "specialist": {
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T12:24:21.856Z"
+    "startedAt": "2026-11-13T12:24:21.856Z",
+    "finishedAt": "2026-11-13T12:32:05.149Z"
   },
+  "result": "stopped: Never launched. Replanned after the user added explicit100-dollar/default and20-dollar fast-tier root preferences to the0.4.0 planning Intent. No research or source work was lost.\n",
   "createdAt": "2026-11-13T12:24:21.856Z"
 }
