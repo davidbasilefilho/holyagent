@@ -44,6 +44,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_host_contracts",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T12:33:25.966Z"
