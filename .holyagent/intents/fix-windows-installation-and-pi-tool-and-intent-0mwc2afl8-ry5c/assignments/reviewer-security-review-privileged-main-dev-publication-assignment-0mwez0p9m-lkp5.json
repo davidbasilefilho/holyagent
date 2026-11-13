@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwez0p9m-lkp5",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.security",
+  "slug": "review-privileged-main-dev-publication",
+  "objective": "Review privileged main/dev publication and metadata preflight changes for authority, provenance and irreversible-publication safety.",
+  "state": "Running",
+  "scope": [
+    "Committed range44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a..e28990817cb5a0e233c7673a98594320afb973ef in /workspace/work/holyagent-034"
+  ],
+  "constraints": [
+    "Read AGENTS.md,.claude/CLAUDE.md and your exact HolyAgent role. User authorized0.3.4 develop/release, main/dev and deterministic UTC versions; GPT6.1Terra selected, direct fallback. Independent of writer assignment-0mweyjv9o-v7vg. Read existing component Intent intent-0mwc2afl8-ry5c revision3 and umbrella revision11. No source/VCS/state/security-setting writes or publishing; review actual immutable range.",
+    "Two commits: prescribed0.3.4 bump07eaaf9 and sourcee289908. Full supervised verify on final source passed3487pass2skips0fail. Previous unchanged main had3498pass2skips; tests for retired release-branch model were removed/replaced. Judge whether coverage aligns with main/dev request or any useful guard was weakened. No automatic approval just from green tests.",
+    "Look for branch/ref/version authorization regressions, exact protected context and required job IDs, timestamp/hash determinism and npm SemVer, portability of dev-version.sh tests onWindows/macOS, tag/preflight ordering, canonical repository metadata proof of E422 repair, rerun immutability, same published tarball handoff and least privilege. Source does NOT configure actual dev protection or npm deployment branch policy; don't confuse intended docs with verified remote configuration.",
+    "For artifact scope, /workspace/work/034/flow-report.md and /workspace/work/034/flow.diff support the review. Native MCP/scoring/other0.3.4 features are not in this slice. Concrete blocker needs file:line trace or executed reproduction; distinguish baseline. Tool env paths as prior bootstrap under /workspace/work/tools/mise, use explicit env/paths if tests needed, never claim Bun absent from ambient PATH alone.",
+    "Save final concise report /workspace/work/034/flow-review-security.md with a final plain evidence: block and exact labels, not just detailed notes. Report under300words; logs outside repo. No further agents."
+  ],
+  "criteria": [
+    {
+      "text": "Committed release-flow slice has no unaddressed merge blockers",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Review covers exact committed scope without treating prerequisites as completed",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mweyjv9o-v7vg"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T12:46:30.634Z"
+  },
+  "createdAt": "2026-11-13T12:46:30.634Z"
+}
