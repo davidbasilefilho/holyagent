@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwf0zkll-k5on",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "independently-review-the-committed",
+  "objective": "Independently review the committed shared runtime-state feature slice.",
+  "state": "Running",
+  "scope": [
+    "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..11f756589ece8907912a11e43187fbb4407e5ccb in /workspace/work/holyagent-034-state"
+  ],
+  "constraints": [
+    "User authorized0.3.4 develop/release/HolyAgent/Terra low-xhigh; direct fallback. Read exact role, AGENTS.md,.claude/CLAUDE.md, umbrella intent-0mwc6yoeq-r5v2 r13 and current component. Read-only; no source/VCS/state or account/security writes. Review exact new range, not already accepted main/dev source.",
+    "Independent of BOTH writers: ownership assignment-0mwezkhag-z0nw and handoff assignment-0mwezkhrb-0ml6. CLI only supports independentFrom references within one Intent; formal field links your component writer, this constraint preserves actual independence from peer too. No reviewer authored either change.",
+    "Operational claims are deliberately local scheduling reservations, not permissions or authenticated cross-host locks. Canonicalize local absolute targets/reject known repo/worktree aliases, serialize any operational writer against all Running writers in either order and plan, preserve repo-only behavior/default old records. Test/trace real bypasses of that contract, strict boundary decoding, creation/dispatch revalidation and lifecycle transitions; don't demand a new distributed filesystem-lock system. Native adapters later must use shared CLI validation.",
+    "Handoff is portable read-only recorded summary with --intent filter, complete requirements/Assignment outcomes/recorded PRs, explicit unknown live freshness. Check no mutations, corrupt omission, misleading live/operational claims. CLI shared Pi/Claude. For artifact focus docs and help/brief text; code/security/testing focus actual implementation and failure/alias/portability coverage. Source full3502pass2conditional skips0fail already verified.",
+    "Concrete blocker requires source trace or bounded reproduction. Use explicit task tools under /workspace/work/tools/mise, don't claim Bun missing from ambientPATH alone. Run only meaningful targeted checks, no broadrepeat. Save /workspace/work/034/state-review-artifact.json in --report-json shape {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command,exit}],blockers:[],notes:[],evidence:[{key:'EXACT criterion/label',support:'...'}]}; valid double-quotedJSON, no Markdown. Report under300words; no more agents."
+  ],
+  "criteria": [
+    {
+      "text": "State feature slice has no unaddressed blockers in assigned review scope",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Review assesses the stated local scheduling and read-only handoff contracts accurately",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwezkhrb-0ml6"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T13:41:37.161Z"
+  },
+  "createdAt": "2026-11-13T13:41:37.161Z"
+}
