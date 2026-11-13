@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwfidci0-cj9b",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-and-verify-the-preserved",
+  "objective": "Regenerate and verify the preserved subscription routing checkpoint for a reviewable source commit.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-routing branch release/0.3.4/feat/subscription-routing at c3c93510 pluspreserveduncommittedEsource. Prior /workspace/work/034/routing-wiring-report.json +diff reports803focusedand5SDK, type/lint/fmtpass; build/full/reviewsnotyetdone. Preserveexistingauthoredchanges. Actualusergoalnormal100dollarprofilesandfast20dollaroptioneveryprovider/harness, CodexfastTerra andClaudefastROOTSonnet, independent specialists, exactregistry/auth/model gating, comparablesubscription-scopedscoringifrealdataexists; unknown/missingexactdatasetremainsunscoredfallback/noinventedwinner.",
+    "Run current build and appropriate focusedrouting/exactSDK/sourcefreshness suites plusstatic/fullsupervisedverify once. Do not changepins/deps/source/benchmarks/modelroutinglogic; ifreal failure reportexactsource/test/integrationcause forrootrepair. Maywrite generatedbuildoutputs only. No livepaidmodel/Pi/account operations; no claimfixtureprovesrealplanentitlementorbenchmarkscore. Rootwillcommitthenreview; integratecanonicalsourceintoCore later, don'tcopytootherworktrees.",
+    "Save /workspace/work/034/routing-final-gates-report.json completechangedpathsincludingallprioruntrackedsource inventory+generated andfullcandidate.diff fromc3c93510. Reportcommands/counts/unknownsunder200words, detailedlogsoutside."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "Preserved routing source regenerates and passes current focused SDK static and supervised full checks without fabricated subscription evidence",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "remaining-integration"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/core_host_frozen_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T21:48:13.320Z"
+  },
+  "createdAt": "2026-11-13T21:48:13.320Z"
+}
