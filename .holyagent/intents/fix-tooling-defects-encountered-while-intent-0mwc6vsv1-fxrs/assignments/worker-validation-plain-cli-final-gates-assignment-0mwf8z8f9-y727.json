@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "plain-cli-final-gates",
   "objective": "plain-cli-final-gates",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Regenerate Pi and Claude assets for the completed plain CLI control repair, then run full verify. Source e778f694 plus completed /workspace/work/034/plain-cli-control-repair-report.json. Prior production writers terminal; no source repairs yourself."
   ],
@@ -39,7 +39,33 @@
     "agentId": "/root/r034_plain_cli_final_gates",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T17:25:18.309Z"
+    "startedAt": "2026-11-13T17:25:18.309Z",
+    "finishedAt": "2026-11-13T17:30:08.480Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/claude/dist\n- packages/integrations/pi/dist\nchecks:\n- bunx --no-install mise run build -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 0\nnotes:\n- Baseline unknown; no pristine base check was run. Build writes Pi assets under packages/integrations/pi/dist, not the Pi ownership paths listed in the assignment. Content-level changed paths were not established because VCS use was prohibited.\nevidence:\n- Generated assets are rebuilt and current full verification results are accurately reported: Build generated 39 Claude and 140 Pi files; verify passed 3494 tests, skipped 2, failed 0. Logs: /workspace/work/034/plain-cli-final-build.log and /workspace/work/034/plain-cli-final-verify.log.\n- checks-run: Build and supervised full verify both exited 0; verify ran 3496 tests across 120 files.\n- changed-paths: Build regenerated packages/integrations/claude/dist and packages/integrations/pi/dist; content-level changes unknown.\n- failures: None; two platform-dependent tests skipped in full verify.",
+  "acceptance": {
+    "revision": 8,
+    "rationale": "Current source was regenerated and full verify passed3494 tests with two skips; root reviewed generated paths and no source edits were introduced by the gate runner.",
+    "criteria": [
+      {
+        "criterion": "Generated assets are rebuilt and current full verification results are accurately reported",
+        "support": "Build generated 39 Claude and 140 Pi files; verify passed 3494 tests, skipped 2, failed 0. Logs: /workspace/work/034/plain-cli-final-build.log and /workspace/work/034/plain-cli-final-verify.log."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Build and supervised full verify both exited 0; verify ran 3496 tests across 120 files."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Build regenerated packages/integrations/claude/dist and packages/integrations/pi/dist; content-level changes unknown."
+      },
+      {
+        "label": "failures",
+        "support": "None; two platform-dependent tests skipped in full verify."
+      }
+    ]
   },
   "createdAt": "2026-11-13T17:25:18.309Z"
 }
