@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwf1vvvm-7wmt",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 13,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-the-narrow-ignored-state",
+  "objective": "Regenerate the narrow ignored-state handoff repair before commit.",
+  "state": "Running",
+  "scope": [
+    "Build only; source stable. Final fullverify after independent re-review."
+  ],
+  "constraints": [
+    "Work only /workspace/work/holyagent-034-state. Writers terminal. Read /workspace/work/034/handoff-ignored-repair-report.json, sourcehashsnapshot before/after. Build via mise standardenv MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Read repo rules. No sourcefixes/actualVCS/.git/.holyagent writes/externalcalls/subagents/dependencychanges.",
+    "Run only bunx --no-install mise run build, notfullverify yet. Report unexpected sourcechange/failure, nofix. JSON /workspace/work/034/state-ignored-build-report.json correctCLIshape/exactkeys; generateddiff /workspace/work/034/state-ignored-generated.diff. Final<=150words/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Generated artifacts match the ignored-state repair without source edits",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf1ijee-t8xb",
+  "specialist": {
+    "agentId": "/root/r034_state_final_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:06:44.770Z"
+  },
+  "createdAt": "2026-11-13T14:06:44.770Z"
+}
