@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-genuine-linked-worktree",
   "objective": "Close the genuine linked-worktree integration coverage gap in operational reservations.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "packages/runtime/tests/operational-ownership.test.ts and isolated related test fixtures"
   ],
@@ -45,7 +45,37 @@
     "agentId": "/root/r034_operational_ownership",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T13:46:50.884Z"
+    "startedAt": "2026-11-13T13:46:50.884Z",
+    "finishedAt": "2026-11-13T13:54:18.776Z"
+  },
+  "result": "status: done\nchanged:\n- packages/runtime/tests/operational-ownership.test.ts\nchecks:\n- bun test packages/runtime/tests/operational-ownership.test.ts -> exit 0\n- HOLYAGENT_TEST_CWD_ONLY=1 bun test packages/runtime/tests/operational-ownership.test.ts -t 'registered linked worktree' -> exit 1\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- The exit 1 is the intended mutation result: both new rejection assertions fail when a Git shim reports only the current worktree. Normal test run: 11 passed, 0 failed.\n- All tests used isolated temporary Git repositories. Linux symlink aliases were exercised; Windows symlink creation and non-Linux runs were not exercised here. Full verify/build deferred to root. Repository-wide checks ran in a shared tree with a peer writer.\nevidence:\n- Actual linked-worktree CLI discovery and dispatch revalidation are tested: Real temporary Git worktree registration: creation rejects linked targets and a symlink alias without changing assignments; a previously valid saved draft is rejected after registration and remains Ready.\n- Regression fails if discovery silently uses current worktree only: The test-only Git shim returns cwd alone for worktree discovery; both new creation and dispatch rejection tests fail with exit 1, while normal discovery passes.\n- checks-run: Focused tests: 11 pass; mutation: 2 expected failures; type: 322 files; lint: 323 files; format: 744 files. Assigned tool environment used.\n- changed-paths: packages/runtime/tests/operational-ownership.test.ts\n- diff-file: /workspace/work/034/ownership-repair.diff",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Real Git regression and mutation evidence closes the review finding; focused type/lint/format pass, combined final validation follows.",
+    "criteria": [
+      {
+        "criterion": "Actual linked-worktree CLI discovery and dispatch revalidation are tested",
+        "support": "Real temporary Git worktree registration: creation rejects linked targets and a symlink alias without changing assignments; a previously valid saved draft is rejected after registration and remains Ready."
+      },
+      {
+        "criterion": "Regression fails if discovery silently uses current worktree only",
+        "support": "The test-only Git shim returns cwd alone for worktree discovery; both new creation and dispatch rejection tests fail with exit 1, while normal discovery passes."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Focused tests: 11 pass; mutation: 2 expected failures; type: 322 files; lint: 323 files; format: 744 files. Assigned tool environment used."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/tests/operational-ownership.test.ts"
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/ownership-repair.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T13:46:50.884Z"
 }
