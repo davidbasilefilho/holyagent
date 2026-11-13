@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "watch-the-final-squash-compatible-0-3-3",
   "objective": "Watch the final squash-compatible 0.3.3 publication repair PR and report exact current-head checks.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "PR129 head0b30619faa4d73ddbdfc666358804ee84962f92a targets main from release/0.3.3/fix/publication-repair. All independent code/security/artifact reviews accepted; author full supervised3506pass2skip. Use gh pr checks129 --watch and current snapshots. Observe actual branch-model AND required version pass for bounded same-version registry absence; all Linux/macOS/Windows/installers terminal outcomes in both workflows.",
     "Fetch actionable logs on failure (GitHub connector if gh redirects403). Do not rerun jobs or write. Old127/128 closed as superseded, no merge/admin exceptions needed; merge commits remain disabled, version required."
@@ -35,7 +35,9 @@
     "agentId": "/root/r033_final_pr_ci_watch",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T19:27:05.296Z"
+    "startedAt": "2026-11-13T19:27:05.296Z",
+    "finishedAt": "2026-11-13T19:38:40.886Z"
   },
+  "result": "status: blocked\nchecks:\n- gh pr checks 129 --watch --interval 20 -> exit 1\n- gh run view 43491854458 --job 132114797916 --log-failed -> exit 0\n- gh pr view 129 --json headRefOid,state,mergeable,mergeStateStatus -> exit 0\nblockers:\n- Validation windows failed: HTTP 404 release lookup test expected exit 0, received 4 at scripts/workflows.test.ts:193.\nnotes:\n- Validation branch-model, version, check, macos and installers passed; windows failed. Publish validation check, windows, macos and installers passed; branch-model and version skipped. GitGuardian passed; stable and dev skipped.\n- Failure log: /tmp/033-windows-validation.log\nevidence:\n- Final repair head checks and merge prerequisites are accurately reported: Watch exited 1; PR is OPEN, MERGEABLE, merge state BLOCKED.\n- head: 0b30619faa4d73ddbdfc666358804ee84962f92a\n- checks-run: Validation run 43491854458; Publish run 43491790979; all platform jobs terminal.\n- failures: Validation windows: 3455 pass, 53 skip, 1 fail; expected 0, received 4 at scripts/workflows.test.ts:193.\n- merge-state: BLOCKED; required Windows failed.",
   "createdAt": "2026-11-13T19:27:05.296Z"
 }
