@@ -57,7 +57,7 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
         run: bun scripts/pr-checks.ts branch-model "$BASE_REF" "$HEAD_REF"
 
-  # The version of a pull request into main must be strictly greater than the one on main.
+  # A same-version publication repair requires confirmation from the public npm registry.
   version:
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
@@ -94,7 +94,9 @@ jobs:
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Check the version
-        run: bun scripts/pr-checks.ts version main .
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: bun scripts/pr-checks.ts version main . "$HEAD_REF"
 
   check:
     runs-on: ubuntu-latest

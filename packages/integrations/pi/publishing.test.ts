@@ -1,9 +1,30 @@
 import { describe, expect, test } from "bun:test"
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync as createTemp,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { manifest } from "./src/generate.ts"
+
+// Refuse fixtures under an existing repository, even when the system temp directory is overridden.
+const mkdtempSync = (prefix: string) => {
+  const dir = createTemp(prefix)
+  const probe = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--show-toplevel"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  if (probe.exitCode !== 128) {
+    rmSync(dir, { recursive: true, force: true })
+    throw new Error("Fixture temp directory is inside a Git repository or Git is unavailable")
+  }
+  return dir
+}
 
 const root = join(import.meta.dir, "../../..")
 type Step = {
@@ -43,6 +64,7 @@ describe("npm publication", () => {
     ).version
     expect(version.startsWith(`${rootVersion}-dev.`)).toBe(true)
     expect(version).toMatch(/-dev\.\d{4}-\d\d-\d\d\.\d\d-\d\d-\d\d\.g[0-9a-f]{7}$/)
+
     expect(Bun.semver.satisfies(version, version)).toBe(true)
     expect(run("UTC", "refs/heads/main").exitCode).not.toBe(0)
   })
