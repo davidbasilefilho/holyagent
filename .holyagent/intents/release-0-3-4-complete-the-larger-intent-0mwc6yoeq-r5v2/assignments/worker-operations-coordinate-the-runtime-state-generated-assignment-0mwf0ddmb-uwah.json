@@ -41,6 +41,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_state_build",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T13:24:21.683Z"
