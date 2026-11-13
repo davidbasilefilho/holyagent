@@ -42,6 +42,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_routing_setup_repair",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T14:31:53.920Z"
