@@ -32,6 +32,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r033_final_pr_ci_watch",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T19:27:05.296Z"
