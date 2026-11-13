@@ -12,7 +12,7 @@ import { INPUT_FLAG, parseArgs, stringFlag } from "./args.ts"
 import { COMMANDS } from "./commands.ts"
 import { agentHostOf, loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport } from "./context.ts"
-import { describeFailure, Usage } from "./errors.ts"
+import { describeFailure, plainText, Usage } from "./errors.ts"
 import { type Call, type Command, type Host, Streamed, Verbatim, WithTrailer } from "./types.ts"
 
 /** What one run prints and the exit code it ends with. */
@@ -44,13 +44,13 @@ const listed = (host: AgentHost): ReadonlyArray<Command> =>
 
 const topHelp = (host: AgentHost, words: HostWords): string =>
   [
-    "holyagent <command> [args]; JSON inline as `--input '<json>'` or on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
-    "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
+    "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
+    "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure.",
     ...listed(host).map((command) => {
       const { usage, summary } = forWords(command, words)
       return `${usage}  ${summary}`
     }),
-    "help [command] or <command> --help shows a command's input shape, stdout and rules",
+    "Run holyagent help [command] for details.",
   ].join("\n")
 
 const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Command) =>
@@ -154,16 +154,22 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
         hint: `Usage: holyagent ${command.usage}`,
       })
     const emitted: Array<string> = []
-    const emit = host.emit ?? ((text: string) => Effect.sync(() => void emitted.push(text)))
+    const write = host.emit ?? ((text: string) => Effect.sync(() => void emitted.push(text)))
+    const emit = (text: string) => write(plainText(text))
     const call = yield* callFor(args, host, emit, command)
     // The Intent in use is kept per work tree: every read and write of the run resolves it from here.
     const output = yield* command.run(call).pipe(Effect.provideService(WorkTree, call.root))
-    if (output instanceof Verbatim) return output
+    if (output instanceof Verbatim)
+      return {
+        stdout: plainText(output.stdout),
+        stderr: plainText(output.stderr),
+        code: output.code,
+      }
     if (output instanceof Streamed)
       return { stdout: emitted.join(""), stderr: "", code: output.code }
     const stdout =
       output instanceof WithTrailer
-        ? `${encode(output.fields)}\n${output.label}:\n${output.text}\n`
+        ? `${encode(output.fields)}\n${output.label}:\n${plainText(output.text)}\n`
         : `${encode(output)}\n`
     return { stdout, stderr: "", code: 0 }
   })

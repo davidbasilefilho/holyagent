@@ -4578,6 +4578,7 @@ var succeed6 = succeed3;
 var suspend2 = suspend;
 var sync2 = sync;
 var void_3 = void_;
+var callback2 = callback;
 var gen2 = gen;
 var fail5 = fail3;
 var failCauseSync2 = failCauseSync;
@@ -8540,7 +8541,7 @@ var REFUSED_ERRORS = new Set([
   "StateModeRefused",
   ...VCS_REFUSED_ERRORS
 ]);
-var insufficientAcceptanceHint = (words) => `Nothing was recorded. ${words.askForSupport} for the missing support the message names, then run \`holyagent assignment close <id> --outcome success --accept <rationale>\` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or \`holyagent assignment accept <id> --rationale <text> --report\` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.`;
+var insufficientAcceptanceHint = (words) => `Nothing was recorded. ${words.askForSupport} for the missing support, then run assignment close <id> --outcome success --accept <rationale> with the corrected report, or assignment accept <id> --rationale <text> --report. For a workflow agent, draft a follow-up with followUpOf.`;
 var HINTS = {
   StdinMissing: "Give the input as --input '<json>' or pipe it in, for example: echo '...' | holyagent <command>; see --help.",
   NoActiveIntent: "Pick one with `holyagent intent use <id>`, or start one with `holyagent intent create`.",
@@ -8564,18 +8565,26 @@ var HINTS = {
   BrowserLaunchFailed: "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
   StateModeRefused: "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
-  StateIo: "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
+  StateIo: "Check the path, permissions and Git state named in the error. Resolve any branch name conflict and retry.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
   ConfigInvalid: "Fix the field the message names in that config.json (the keys and values are listed in docs/pi/configuration.md), or delete the file to use the defaults.",
   ...VCS_HINTS
+};
+var plainText = (text) => {
+  let result = "";
+  for (const character of text) {
+    const code = character.charCodeAt(0);
+    result += code < 32 && code !== 9 && code !== 10 || code >= 127 && code <= 159 ? `\\u${code.toString(16).padStart(4, "0")}` : character;
+  }
+  return result;
 };
 var describeFailure = (error, words = CLAUDE_WORDS) => {
   const tag = typeof error === "object" && error !== null && "_tag" in error ? String(error._tag) : "Defect";
   const message = (typeof error === "object" && error !== null && "message" in error ? String(error.message) : String(error)).replace(/\s+/g, " ").trim();
   return {
     tag,
-    message,
-    hint: error instanceof Usage ? error.hint : tag === "InsufficientAcceptance" ? insufficientAcceptanceHint(words) : HINTS[tag] ?? "Run `holyagent --help` for the commands.",
+    message: plainText(message),
+    hint: plainText(error instanceof Usage ? error.hint : tag === "InsufficientAcceptance" ? insufficientAcceptanceHint(words) : HINTS[tag] ?? "Run `holyagent --help` for the commands."),
     code: USAGE_ERRORS.has(tag) ? EXIT.usage : REFUSED_ERRORS.has(tag) ? EXIT.refused : EXIT.state
   };
 };
@@ -26636,27 +26645,94 @@ var STATE_COMMANDS = [
   }
 ];
 
-var {$: $5 } = globalThis.Bun;
 class ToolMissing extends TaggedError2("ToolMissing") {
   get message() {
     const { title, commands } = SEARCH_TOOLS[this.tool];
     return `${title} (${commands.join(" or ")}) is not on PATH; ${installAdvice}`;
   }
 }
+var visibleBytes = (bytes, previous, final) => {
+  const result = [];
+  const escape = (code) => {
+    for (const character of `\\u${code.toString(16).padStart(4, "0")}`)
+      result.push(character.charCodeAt(0));
+  };
+  let pending = previous;
+  for (const byte of bytes) {
+    if (pending === -1) {
+      pending = 0;
+      if (byte >= 128 && byte <= 159) {
+        escape(byte);
+        continue;
+      }
+      result.push(194);
+      if (byte >= 160 && byte <= 191) {
+        result.push(byte);
+        continue;
+      }
+    }
+    if (pending > 0 && byte >= 128 && byte <= 191) {
+      result.push(byte);
+      pending--;
+      continue;
+    }
+    pending = 0;
+    if (byte === 194)
+      pending = -1;
+    else if (byte >= 195 && byte <= 223) {
+      result.push(byte);
+      pending = 1;
+    } else if (byte >= 224 && byte <= 239) {
+      result.push(byte);
+      pending = 2;
+    } else if (byte >= 240 && byte <= 244) {
+      result.push(byte);
+      pending = 3;
+    } else if (byte < 32 && byte !== 9 && byte !== 10 || byte >= 127 && byte <= 159)
+      escape(byte);
+    else
+      result.push(byte);
+  }
+  if (final && pending === -1)
+    result.push(194);
+  return { bytes: Uint8Array.from(result), pending: final ? 0 : pending };
+};
+var forward = (stream, target) => {
+  const reader = stream.getReader();
+  const read = (pending) => tryPromise2(() => reader.read()).pipe(flatMap2(({ done, value }) => {
+    const output = visibleBytes(value ?? new Uint8Array, pending, done);
+    return callback2((resume) => {
+      target.write(output.bytes, (error) => resume(error ? fail5(error) : void_3));
+    }).pipe(andThen2(done ? void_3 : suspend2(() => read(output.pending))));
+  }));
+  return read(0);
+};
 var runTool = (options) => gen2(function* () {
   const found = yield* locateTool(options.tool, options.cwd, (command, whichOptions) => sync2(() => findCommand(options.env, command, whichOptions)));
   if (isNone2(found))
     return yield* new ToolMissing({ tool: options.tool });
   const path = found.value;
-  const output = yield* promise2(() => $5`${path} ${options.args}`.cwd(options.cwd).env(definedEnv(options.env)).nothrow());
-  return output.exitCode;
+  const env = { ...definedEnv(options.env), NO_COLOR: "1", FORCE_COLOR: "0", CLICOLOR_FORCE: "0" };
+  const child = yield* try_2(() => Bun.spawn([path, ...options.args], {
+    cwd: options.cwd,
+    env,
+    stdin: "inherit",
+    stdout: "pipe",
+    stderr: "pipe"
+  }));
+  const [code] = yield* all2([
+    promise2(() => child.exited),
+    forward(child.stdout, process.stdout),
+    forward(child.stderr, process.stderr)
+  ], { concurrency: "unbounded" }).pipe(ensuring2(sync2(() => child.kill())));
+  return code;
 });
 var toolCommand = (tool, summary) => ({
   path: [tool],
   usage: `${tool} <${SEARCH_TOOLS[tool].title} arguments\u2026>`,
   summary,
   notes: [
-    `the arguments, stdin, stdout, stderr and exit code are the program's own, so \`holyagent ${tool} --help\` prints its help and its exit codes keep their meaning`,
+    `arguments and exit codes follow ${tool}; terminal control bytes in output are displayed as escapes`,
     "the program is the one on PATH (fd also as fdfind, its name on Debian and Ubuntu); when it is not installed, holyagent itself fails with ToolMissing, exits 4 and prints an `error:` line on stderr with the install commands"
   ],
   flags: {},
@@ -26697,13 +26773,13 @@ var help = (command, words) => {
 };
 var listed = (host) => COMMANDS.filter((command) => command.hosts === undefined || command.hosts.includes(host));
 var topHelp = (host, words) => [
-  "holyagent <command> [args]; JSON inline as `--input '<json>'` or on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
-  "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
+  "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
+  "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure.",
   ...listed(host).map((command) => {
     const { usage, summary } = forWords(command, words);
     return `${usage}  ${summary}`;
   }),
-  "help [command] or <command> --help shows a command's input shape, stdout and rules"
+  "Run holyagent help [command] for details."
 ].join(`
 `);
 var callFor = (args, host, emit, command) => gen2(function* () {
@@ -26773,16 +26849,21 @@ var execute = (given, host) => gen2(function* () {
       hint: `Usage: holyagent ${command.usage}`
     });
   const emitted = [];
-  const emit = host.emit ?? ((text) => sync2(() => void emitted.push(text)));
+  const write = host.emit ?? ((text) => sync2(() => void emitted.push(text)));
+  const emit = (text) => write(plainText(text));
   const call = yield* callFor(args, host, emit, command);
   const output = yield* command.run(call).pipe(provideService2(WorkTree, call.root));
   if (output instanceof Verbatim)
-    return output;
+    return {
+      stdout: plainText(output.stdout),
+      stderr: plainText(output.stderr),
+      code: output.code
+    };
   if (output instanceof Streamed)
     return { stdout: emitted.join(""), stderr: "", code: output.code };
   const stdout = output instanceof WithTrailer ? `${encode2(output.fields)}
 ${output.label}:
-${output.text}
+${plainText(output.text)}
 ` : `${encode2(output)}
 `;
   return { stdout, stderr: "", code: 0 };
