@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mwfcg7pi-hk7z",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.integration",
+  "slug": "implement-a-squash-compatible-repair",
+  "objective": "Implement a squash-compatible repair path for a failed, unpublished release without an artificial version bump.",
+  "state": "Running",
+  "scope": [
+    "Work only /workspace/work/holyagent-033-repair, branch release/0.3.3/fix/publication-repair based on main44c79ab2. Carry exact reviewed five-file provenance fix from bea61f99 (generator/dist manifest, publishing test, npm-publishing script/test), without old squash history or any 0.3.4 feature.",
+    "Extend branch-model for exact release/<version>/fix/publication-repair heads into main. Normal integration/newer-version behavior stays. Extend required version job: same-version repair allowed only on this named path when main/head exactly equal, branch version matches, and exact holyagent version is verified unpublished in actual public npm registry. Registry error/offline/auth/malformed/identity mismatch must fail closed; published exact versions, lookalikes, downgrades and normal same-version releases reject. No hardcoded version/PR/one-time status bypass. Use strict Effect Schema at external data boundary, Effect/tagged errors, injectable lookup; prevent shell interpolation of refs. No new dependencies/actions/token/provenance fallback.",
+    "Wire .github/workflows/validation.yml to pass trusted event head ref through quoted env, preserving job IDs/fork rejection/permissions and main protection. Add meaningful red/green regressions plus CLI/workflow wiring evidence. Coordinate with policy writer; do not edit its documentation paths."
+  ],
+  "constraints": [
+    "Read repo AGENTS/CLAUDE rules and matching GPT role. User explicitly authorizes repository instruction removal and failed-publication version exception. Root owns VCS/state; no actual .git/.holyagent writes, commits, pushes, settings changes or subagents. Read-only Git allowed. No live Pi/paid model/publication, no bin/executable investigation before stable publication. No dependencies/pins/version/workflow permission changes. Keep work bounded until done.",
+    "Environment MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Integration owner initializes new worktree with frozen install --ignore-scripts, runs focused meaningful checks and type/lint/fmt; final full verify/build after both writers terminal, root will delegate it. Documentation-only writer needs diff/reference checks; no product tests or build.",
+    "Save /workspace/work/034/033-squash-repair-report.json and .diff including untracked/deleted files. Exact JSON {status:'done'|'partial'|'blocked',changed_paths:string[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}; exact criterion/label keys, validate schema fields, <=300wordsummary, logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned repair satisfies the authorized contract while preserving safeguards and unrelated scope",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Meaningful current checks and remaining limits are recorded accurately",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "scripts/pr-checks.ts",
+    "scripts/pr-checks.test.ts",
+    "scripts/workflows.test.ts",
+    ".github/workflows/validation.yml",
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/dist/package.json",
+    "packages/integrations/pi/publishing.test.ts",
+    "scripts/npm-publishing.ts",
+    "scripts/npm-publishing.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T19:02:29.382Z"
+  },
+  "createdAt": "2026-11-13T19:02:29.382Z"
+}
