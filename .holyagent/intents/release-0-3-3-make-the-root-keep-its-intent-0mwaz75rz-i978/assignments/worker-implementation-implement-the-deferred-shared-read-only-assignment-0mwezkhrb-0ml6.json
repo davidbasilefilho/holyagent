@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mwezkhrb-0ml6",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-the-deferred-shared-read-only",
+  "objective": "Implement the deferred shared read-only handoff command and truthful portable state summary.",
+  "state": "Running",
+  "scope": [
+    "packages/runtime/src/cli/overview.ts and commands.ts",
+    "Runtime command tests and handoff documentation"
+  ],
+  "constraints": [
+    "User authorizes developing/releasing0.3.4 using existing HolyAgent Intents and GPT6.1Terra low-xhigh. Read AGENTS.md,.claude/CLAUDE.md and worker-implementation role, plus umbrella intent-0mwc6yoeq-r5v2 revision12 and your component Intent. Direct fallback because Workflow tool unavailable. Historical0.3.3 deferral is superseded.",
+    "Work /workspace/work/holyagent-034-state, branch release/0.3.4/feat/runtime-state at independently reviewed c3c9351. Frozen397packages already installed. Another writer has disjoint paths; coordinate any shared interfaces through parent before touching another ownership path. No VCS, .git, actual .holyagent, account/security writes or user-machine installation. Isolated temporary state fixtures in tests are allowed. Root owns version control and real state.",
+    "Shared behavior must work for both current harnesses Pi/Claude; implement shared runtime behavior once and don't add Pi-only assumptions to shared commands. No0.4.0 implementation. Preserve Effect/error/strict Schema/JSDoc conventions. Tool env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "Run meaningful focused changed-scope tests plus type/lint/format; no generated build or full verify until both writers terminal and root coordinates. Save detailed notes/diff outside repository and a final plain report ending evidence: with exact labels. Do not silently relax tests/budgets. No further agents.",
+    "Read existing handoff component Intent and surviving writer report assignment-0mwazi6k1-me7p through CLI if helpful. Lost commit0167e289 is unavailable; reimplement against current source, not claim recovery/merge. Root-instruction and visual/performance changes are assigned later; this writer owns COMMAND only, no instruction files or generators.",
+    "Add local read-only holyagent handoff summary from recorded state: open Intents/objectives/requirements/status-and-open-items, Assignments with state/objective/outcome and recorded branches/PRs. Include scoped filtering to keep large histories usable while supporting complete self-contained handoff. Clearly distinguish recorded CI/PR facts from live checks; no network calls or fake freshness. Preserve state rather than mutate through a read command; include failures/unknowns, don't silently drop pending work or arbitrary-truncate requirements.",
+    "Add CLI dispatch/help coverage and meaningful fixtures demonstrating command fails before addition and preserves source state; ensure portable output across hosts/model families and no credentials/model/network tests. Coordinate with the operational ownership writer on any new fields; never touch their domain/state/program/assignments files. Root will wire instructions and native command catalog later.",
+    "Owned tests new handoff test and existing cli overview/help tests only; if shared file needed notify parent first. Save docs/handoff.md and /workspace/work/034/handoff-report.md plus handoff.diff. Report under300words with final evidence block."
+  ],
+  "criteria": [
+    {
+      "text": "Handoff summary is self-contained truthful portable and read-only",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Command dispatch filtering and unchanged recorded state have meaningful regression coverage",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "public-interface",
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/overview.ts",
+    "packages/runtime/src/cli/commands.ts",
+    "packages/runtime/tests/handoff.test.ts",
+    "packages/runtime/tests/overview.test.ts",
+    "packages/runtime/tests/cli-overview.test.ts",
+    "packages/runtime/tests/cli-help.test.ts",
+    "docs/handoff.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T13:01:54.024Z"
+  },
+  "createdAt": "2026-11-13T13:01:54.024Z"
+}
