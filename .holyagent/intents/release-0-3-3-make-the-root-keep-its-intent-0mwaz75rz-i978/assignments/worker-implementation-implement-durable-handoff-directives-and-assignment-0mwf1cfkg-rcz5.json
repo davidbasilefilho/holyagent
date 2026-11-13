@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mwf1cfkg-rcz5",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-durable-handoff-directives-and",
+  "objective": "Implement durable handoff directives and cross-platform visual/performance iteration guidance for HolyAgent 0.3.4.",
+  "state": "Running",
+  "scope": [
+    "Model-facing requirements, all three family translations, skill assembly and coverage, focused instruction tests and human docs."
+  ],
+  "constraints": [
+    "Work only in /workspace/work/holyagent-034-guidance from accepted baseline c3c935108a3bd3958f6dbcb7bc2d96f11eba212b; scratch /workspace/work/034. Read repo AGENTS.md and .claude/CLAUDE.md, .claude/skills/requirements/SKILL.md, relevant family guides and instruction-writing skill before edits. Read /workspace/work/034/instruction-plan.md as research; latest requirements below override older wording.",
+    "User authorized develop/release0.3.4 using existing Intents and Terra agents. 0.4.0 orchestration redesign is planning only; do not implement it. No source VCS or actual .git/.holyagent writes, remote actions, paid calls, pi launches or extra subagents. Root owns commits/state. Temporary Git/state fixtures allowed. Install frozen dependencies --ignore-scripts if needed with configured toolchain. Dependencies only updater: do not change pins/lock.",
+    "Requirements first, then adapt claude-5.5, gpt-6 and kimi-k3.1 to family guide, coverage, assembled Pi/Claude assets. Do not hand-edit generated dist. Scope source under instructions; coordinate root before changing other shared tests/path. Leave Context7 role loader redesign to a separate slice.",
+    "Handoff: in branch mode root pushes holyagent/state after each Assignment close and merge and before turn end, not only with source pushes; status/open-items requirement replaced in place on merge/new blocker/before final, includes merged/open PR+CI, next concrete action, residuals, untried real-service checks. A different harness must resume from it. Shared command handoff was added on sibling branch; reference its intended read-only recorded-state contract without requiring it exist on this branch's baseline.",
+    "Visual: immutable ORIGINAL TASK baseline before edits, every commit compared to BOTH original and immediately previous commit, screenshots plus real interaction and video WHEN host supports. Record revisions/evidence/conditions, do not substitute last PR for original. Account for design system, composition, alignment, contrast, distribution, placement/sizing, responsiveness, fluid component/route animation/transitions and reduced motion; per-element hover where applicable, pressed/tap, keyboard focus, disabled where relevant. Use existing visual/platform skills, preserve three-round bounded repair semantics and creative latitude; mark missing comparisons Unknown with concrete reason rather than inventing captures.",
+    "Performance: add coherent on-demand skill/role guidance across all families and actually include in source assembly/coverage. At optimization task start ask user objective + measurable target unless already supplied clearly; do not repeatedly ask settled goal. Baseline BEFORE edits, comprehensive RELEVANT measurements for affected workload; per-commit compare original+previous, repeatable environment/workload, cold/warm/cache/noise, correctness/UX/security regressions. Choose sensible metrics with project context, don't force irrelevant universal benchmark list. Failures/unavailable runtime honest; no fabricated speedup/caching claim. Root routes only performance task to this skill; avoid global extra burden for unrelated work.",
+    "Meaningful focused coverage/assembly checks, type/lint/fmt through mise; no full build/verify yet, root coordinates generated artifacts later. Use /workspace/work/cancel-supervisor.py if relevant to process tests. Toolchain env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "Keep working through implementation and focused checks, then stop. Write full diff to /workspace/work/034/guidance.diff and JSON report /workspace/work/034/guidance-report.json with shape {status,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]}; exact criterion/evidence keys. Final <=300words, logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Shared handoff durability directives are implemented requirements-first for all current families",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Visual iteration compares immutable task baseline and previous commit with truthful interaction evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Optimization guidance establishes user target and controlled original-and-previous per-commit measurements",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Both supported harnesses assemble the guidance and focused checks pass without changing unrelated behavior",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/tests/instructions.test.ts",
+    "docs/iteration-evidence.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T13:51:37.168Z"
+  },
+  "createdAt": "2026-11-13T13:51:37.168Z"
+}
