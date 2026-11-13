@@ -38,6 +38,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/npm_oidc_diagnosis",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T11:38:33.363Z"
