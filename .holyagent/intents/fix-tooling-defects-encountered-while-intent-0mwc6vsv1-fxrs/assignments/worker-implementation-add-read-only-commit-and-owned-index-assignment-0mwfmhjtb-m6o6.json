@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-read-only-commit-and-owned-index",
   "objective": "Add read only commit and owned index verification for migration recovery adapters.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Own only migration-index.ts and migration-index.test.ts in /workspace/work/holyagent-034-core. Your private prepare/publication helpers are complete. Runner and files modules now also exist. Add two small read-only helpers: verifyMigrationIndex confirms every owned path has expected postimage blob/mode/stage without changing index or unrelated entries; verifyMigrationCommit confirms recorded commit has exactly the expected single parent and tree and only the planned owned delta.",
     "Read the actual runner contract /workspace/work/034/migration-runner-module-api.md. Expose documented typed Effects/errors using your existing parsers and Git runner; preserve existing signatures. Verify branch roots are caller-trusted, do not use unchecked journal roots. Unexpected data fails actionably, no writes/reset. Git read commands only, no publication.",
@@ -43,7 +43,9 @@
     "agentId": "/root/migration_index_module",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T23:43:27.887Z"
+    "startedAt": "2026-11-13T23:43:27.887Z",
+    "finishedAt": "2026-11-13T23:54:32.687Z"
   },
+  "result": "status: done\nchanged:\n- packages/core/src/state/migration-index.ts\n- packages/core/tests/migration-index.test.ts\nchecks:\n- bun fmt --no-script on owned files -> exit 0\n- bun check --no-script on isolated /tmp copy -> exit 0\n- bun test on isolated /tmp copy, initial chmod fixture -> exit 1\n- bun check --no-script on final isolated /tmp copy -> exit 0\n- bun test on final isolated /tmp copy -> exit 0\nnotes:\n- The intermediate test failure was a fixture error: Git chmod expected a worktree file for an index-only entry. The fixture now uses cacheinfo. Final run: six tests, 41 assertions. Repository-wide gates remain for integration.\nevidence:\n- Read only recovery verification proves expected commit ancestry tree and owned index postimages without mutating unrelated data: Focused tests verify valid commit and index, wrong parent, wrong tree, unrelated tree change, wrong index blob and mode, and unchanged staged/unstaged foreign data.\n- changed-paths: Two owned paths are listed above.\n- diff-file: /workspace/work/034/migration-index-verification-incremental.diff\n- module-api: /workspace/work/034/migration-index-module-api.md\n- checks-run: The checks array records isolated type check, six final passing Git tests, and the earlier fixture failure.",
   "createdAt": "2026-11-13T23:43:27.887Z"
 }
