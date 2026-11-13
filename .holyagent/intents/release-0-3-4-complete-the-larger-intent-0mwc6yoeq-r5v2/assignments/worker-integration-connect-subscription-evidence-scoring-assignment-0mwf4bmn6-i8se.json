@@ -1,0 +1,76 @@
+{
+  "id": "assignment-0mwf4bmn6-i8se",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 15,
+  "roleTask": "Worker.integration",
+  "slug": "connect-subscription-evidence-scoring",
+  "objective": "Connect subscription evidence scoring and normal/fast profiles to actual launch routing across Pi and Claude.",
+  "state": "Running",
+  "scope": [
+    "Existing partialrouting source: actual selection beforeCLI/hostlaunch, explicitoverrides/profileactivation, meaningfultests/docs."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-routing existinguncommittedpartialsourcefromacceptedA c3, no otherwriter here. Originalwriter nowEvents elsewhere, do noteditotherworktree. Read routing-report.json/diff, routing-setup-repair-report.json (170lifecycletestsresolved16fullfailures), /workspace/work/034/routing-profiles.md/research.md. UmbrellaCURRENT15recordsrootclarification. Preserveprevioussource, don'treset/overwrite. Userauthorizedfull0.3.4/Terra low-xhigh;0.4nativeCodex/setup/orchestrationplanningonly.",
+    "CurrentpureselectRoute/scorer isDISCONNECTED fromactualmodelchoice. Finishit. Rootchooses simplestsharedconfigured-evidence pre-launch selection: explicitlyoptedin versioned/strictschema comparabledata anddeclaredrequiredcapabilities, highesteligible0..1modelperrole entersACTUAL CLIassignmentdispatch model/provider/effort orsupportedadapterlaunch. Purehelperunitpassaloneisnotcompletion. Wire into existing shared route resolution beforeCLI printslaunchchoices so no forcedpost-launch setModel isneeded. Preserveexplicit perrole/root model/effort/provider overrides; no preset =>existingrootselection. Bothharnesses effectiveper-rolelaunchbehavior, rootfastCodexTerra/ClaudeSonnet onlyonexplicitactivation. Existingnormalmodelsretained; fastnamed20tiernotlatencyguarantee.",
+    "Do notover-scopeproof: registry/authpresence isn'tliveentitlement andmustbelabelleddeclared/configured/unknown. Actualprovider auth andtool/screenpermissions stayenforced independently; ranking data cannotgrantthem. UnknownREQUIREDrolecapabilityexcludesrank; sourceddeclaredcapabilityvalidiftruthfullydeclarednotmeasuredruntimeproof. Userconfiguredallowlistedproviders/modelsandexplicitoptin governselection, don't silently addpaidprovider/credentials. Runtimeauth/backendfailuresvisible,noautomaticweakerfallback. Nonew cross-processattestation or handshake merelytochoosemodels. Importvalidatedevidenceinconfigorread-onlyexplicitdataset ifneeded; nosynthetic benchmarkdata shippedasreal.",
+    "Subscriptionrequirements: exactharness/rolebenchmark/model/effort/100or20plan/date/provenance, samecomparablequalityscale andpositivecost, freshness; missing/stale/APIpricefallbackrows excludedNOscore, notfakezero. Explicitunscoredpolicyfallbackdistinctfromrankedwinner withreason. Existingpublicdata lacks severalexactrows: keepitunresolved, nofabrication. Codecanfullywire withdeterministicvalidfixtureswithoutclaimingrealrankingsavailable. Allconsideredeligiblecandidatesfinite[0,1],pickhighest role-suitable. Show auditable reason/assumptions/incomplete coveragewithoutbloatingrootcontext.",
+    "Actualprofiles: supportedroot launch flags suchas claude --agent holyagent:holyagent --model sonnet/PicodexTerra mayactivateexplicitrootpreference perofficialcontract, retainhookidentity. Effectiveprofileperrolesmustbeconsumed bydispatch/generation, notonlydocs/unconsumedfields. Ifrootprovenancecannotbedistinguished, useexplicitlaunchactivationanddon'tsilentlysetModel. Newrootagentvariantnotneeded. Specialistsindependentfromrootmodel. Allproviders/harnesses have explicitnormal/fast20semantics evenifdata gaps/policyfallback remains. NativeCodexharness0.4only.",
+    "Preservealreadyfixednative-searchdiscoveryrolepermissionsandsetupoff/on/legacyundo. Don'trenameallrolepermissionsbasedmutablePisimplesessionnameasstrongauthority; toolhostgatesoriginalpipeline preserved. CurrentKimi toolsactualexecute ctx.model-independent withOAuth opt-in, knownregistered/active notentitlement; Exaexplicitfallback no autherror-as-absence. Sourceshaveexactcodepaths. Additionalinstructionchanges ifneededaskrootcoordinateC/F/Gsamefamilies; do noteditinstructionsnow.",
+    "No actualVCS/.git/.holyagentwrites, generatededits, extraagents, paidmodels/livePiCLI/userPCinstalls, deps/pinchanges. TempSDK/Git/configfixturesallowed. RepoAGENTS/.claude/role/Effectstrictschema rulesapply. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Focusedmeaningfulintegrationtests assertactualdispatchchoices+overrideprecedence+permissionfailures+missingdata, type/lint/fmt; no build/fullverifyuntilroot.",
+    "Keepworkinguntilrequestedwireandcheckscomplete; amount/complexityisnotterminalblocker. Genuineunsupportedhostcontractreportexactsourceand2optionswithoutfakingfeature. JSON /workspace/work/034/routing-wiring-report.json correctCLIshape/exactkeys; fullupdated /workspace/work/034/routing.diff, wiringdiff /workspace/work/034/routing-wiring.diff. Final<=350words/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Evidence ranking selects the highest eligible role model through actual Pi and Claude launch resolution",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Normal and fast activation preserves explicit overrides and requested root preferences without granting permissions",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Missing subscription evidence and unverified account capabilities remain explicit without fabricated scores",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Actual dispatch profile eligibility and preserved search setup tests pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "remaining-data"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/config",
+    "packages/runtime/src/routing",
+    "packages/runtime/src/pi",
+    "packages/runtime/src/domain/route.ts",
+    "packages/runtime/src/cli/config.ts",
+    "packages/runtime/tests",
+    "packages/integrations/pi/src/agents.ts",
+    "packages/integrations/pi/src/codex.ts",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests",
+    "packages/integrations/claude/src/agents.ts",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/integrations/claude/tests",
+    "docs/routing.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf1kijn-fn5o",
+  "specialist": {
+    "agentId": "/root/r034_native_tools",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:14:58.530Z"
+  },
+  "createdAt": "2026-11-13T15:14:58.530Z"
+}
