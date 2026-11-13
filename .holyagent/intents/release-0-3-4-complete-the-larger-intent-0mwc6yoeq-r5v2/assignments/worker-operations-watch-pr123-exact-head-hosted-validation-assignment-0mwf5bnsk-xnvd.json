@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf5bnsk-xnvd",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 15,
+  "roleTask": "Worker.operations",
+  "slug": "watch-pr123-exact-head-hosted-validation",
+  "objective": "Watch PR123 exact-head hosted validation to terminal and report actionable failures.",
+  "state": "Running",
+  "scope": [
+    "GitHubPR123 edce18fee6579d591d59a629765225e2e0e955cd checks/pushruns/threads/merge-state only."
+  ],
+  "constraints": [
+    "Read-only source/worktree /workspace/work/holyagent-034-state. No source/actualVCS/statewrites, merges/admin/npm/publication/depschanges orsubagents. Userauthorizedsourceworkandmergerelease, but devconfigurationblockedGitHub403; doNOTmergeunprotecteddev or change settings. PR123draftdependsonPR122, bothbase dev44c. Baseinheritedflowalreadyreviewed; watchexactheadCIacrossLinux/macOS/Windows/installers/branch-model,versionexpectedskipdev. No outputclaimskip==pass.",
+    "Read ci-watchskill at packages/runtime/src/instructions/gpt-6/skills/ci-watch/SKILL.md. PurposebuiltGitHubconnectorpreferredforlogs (gh/curlredirectlog403known); toolsmetadataALL_TOOLS. GHCLIreadallowedcommandswithauthavailable; don'tprinttokens. ActualGitHubsettings403notautomaticapprovaldenial; no adminretry. Checkthreadsandrealmerge_state_status notnormalizedsnapshotfalseassumption. Don'tsendmessagesorcomments. Backgroundwatch/pollwithboundedtoolwaits<=60seach andcompactupdates, notrootpolling.",
+    "Onfailedjob getactualstep/logrepro paths andrequiredrepair; stopafterterminalfailed/green ratherthannetworktimeoutpretend. Preserveunknown. NeedlocaltemporarylogsoutsideGit, no paidmodelcalls. JSON /workspace/work/034/state-pr123-ci-report.json status EXACTLY done|partial|blocked,changed_paths:[],checks:[{command,exit}],blockers,notes,evidence:[{key,support}]. <=200wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Exact-head hosted checks and outstanding threads are reported truthfully with actionable failure evidence",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "ci-state",
+    "threads",
+    "merge-state"
+  ],
+  "ownershipPaths": [
+    ".github/workflows"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:42:59.636Z"
+  },
+  "createdAt": "2026-11-13T15:42:59.636Z"
+}
