@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwf5ms5e-5wsj",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.debugging",
+  "slug": "diagnose-and-repair-the-macos-no-write",
+  "objective": "Diagnose and repair the macOS no-write fixture race in PR123 without weakening the contract.",
+  "state": "Running",
+  "scope": [
+    "RemotePR123draft edce18fee6579d591d59a629765225e2e0e955cd failedbothmacOS runs43454567912/43454483542. Read state-pr123-ci-report.json/logevidence:handoff.test141 snapshotexpected.git/objects/maintenance.lock thenmissing;3505pass3skip1fail. Reproduce/source-tracecause: likelyautomaticdetachedGitmaintenanceoutlivingfixture setup, notconfirmed. MakeisolatedtempGitreposdeterministic (repo-localgc/maintenanceconfigBEFOREsnapshots ifproven) ratherthanexcludeGitobjects/lockpaths orweakenno-write assertion. Preservefullstatebytes+Git/worktree/no-writechecks. No actualrepoGitconfig changes! Onlytempfixtures. No productioncode unlessevidencedbugthenaskroot. Linuxlocal/controlledprobeallowed; actualmacOSverificationafterpush. Testred/greenfault/trace+handoff/statebranchfocused+type/lint/fmt, don'tclaimmacOSpassedwithoutCI. Fixpublicationmustre-reviewbeforepush."
+  ],
+  "constraints": [
+    "WorkONLY /workspace/work/holyagent-034-state. Readreporules/roleinstructions and /workspace/work/034 relatedreports. Allpreviouswriters/buildterminal, sourcesfixedexceptassignedrepair. No actualVCS/.git/.holyagentwrites, depschanges, extraagents, livePi/modelcalls oruserPCoperations. TempGit/SDKfixturesallowed. Rootownscommits/push/state. Keepworkingthroughrequestedfix+checks; no generatededits/build/fullverifyunlessspecificallyverificationtask. ",
+    "RemotePR123draft edce18fee6579d591d59a629765225e2e0e955cd failedbothmacOS runs43454567912/43454483542. Read state-pr123-ci-report.json/logevidence:handoff.test141 snapshotexpected.git/objects/maintenance.lock thenmissing;3505pass3skip1fail. Reproduce/source-tracecause: likelyautomaticdetachedGitmaintenanceoutlivingfixture setup, notconfirmed. MakeisolatedtempGitreposdeterministic (repo-localgc/maintenanceconfigBEFOREsnapshots ifproven) ratherthanexcludeGitobjects/lockpaths orweakenno-write assertion. Preservefullstatebytes+Git/worktree/no-writechecks. No actualrepoGitconfig changes! Onlytempfixtures. No productioncode unlessevidencedbugthenaskroot. Linuxlocal/controlledprobeallowed; actualmacOSverificationafterpush. Testred/greenfault/trace+handoff/statebranchfocused+type/lint/fmt, don'tclaimmacOSpassedwithoutCI. Fixpublicationmustre-reviewbeforepush.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; focusedchecksthroughmise. JSON /workspace/work/034/state-macos-fixture-repair-report.json status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}], exactkeys. Repairdiff /workspace/work/034/state-macos-fixture-repair.diff. <=300wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested repair or verification meets its stated contract without weakening safeguards",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/handoff.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T15:51:38.499Z"
+  },
+  "createdAt": "2026-11-13T15:51:38.499Z"
+}
