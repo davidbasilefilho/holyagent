@@ -32,6 +32,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r033_ancestry_ci_watch",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T18:27:36.014Z"
