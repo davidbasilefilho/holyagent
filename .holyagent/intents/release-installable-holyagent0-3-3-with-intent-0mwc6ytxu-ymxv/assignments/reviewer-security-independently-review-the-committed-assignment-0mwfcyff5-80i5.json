@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwfcyff5-80i5",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-review-the-committed",
+  "objective": "Independently review the committed squash-compatible publication repair and instruction consolidation.",
+  "state": "Running",
+  "scope": [
+    "Work only /workspace/work/holyagent-033-repair. Review immutable origin/main..HEAD once root supplies exact committed head in launcher; base44c79ab2. Trace registry response and branch/version input through guard decisions, public-registry authenticity/schema/failure handling, immutable published versions, shell/ref injection, fork rejection and workflow token/OIDC boundaries. No source permission expansion; npm preflight metadata binding preserved.",
+    "Author current full supervised verify3506pass2skip0fail; focused71 and real public npm exact0.3.3absence observed. Initial unsupervised cancellation timeout preserved, exact supervised focused+full passed, no test weakening. No executable offering investigation before publication. Five provenance metadata paths match reviewedbea61f99."
+  ],
+  "constraints": [
+    "Read current AGENTS and matching GPT reviewer role; code/security actual first-pass prompt supplied by launcher, then own independent review. Read-only Git/source and harmless focused checks allowed; no source/generated/VCS/config/state writes or subagents/live Pi/paid model/publication. After first-pass phase, write explicitly authorized scratch JSON report outside repo.",
+    "No full gate repeat; focused tests only to settle real review doubt. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "Save /workspace/work/034/033-final-security-review-report.json exact schema {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}; validate own fields and exact evidence keys. <=300words with actionable file/line/trace; long logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Committed repair meets the authorized contract without unresolved material review findings",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Evidence and limitations preserve release safeguards and repository scope accurately",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfcg7pi-hk7z",
+    "assignment-0mwfcg880-vh45"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T19:16:39.185Z"
+  },
+  "createdAt": "2026-11-13T19:16:39.185Z"
+}
