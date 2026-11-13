@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mwf6i588-ayo7",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 7,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-verify-the-prepared-dev",
+  "objective": "Independently verify the prepared dev ruleset import for the user's manual GitHub configuration.",
+  "state": "Running",
+  "scope": [
+    "Readonly /workspace/outputs/holyagent-dev-ruleset.json root-authoredsecurityartifact. CompareactualGETmainruleset26614767/currentdevrulesandPR123checknames viaGHreadAPI; userapproveddevprotectionandmanualimport, no adminwrites. Activeonlyrefs/heads/dev, no bypass, PRrequiredsameparamsasmain, strictrequiredcheck/macOS/windows/installers/branchmodel exactcontexts(check,macos,windows,installers,branch-model), no versiondevskip, blockforcepushanddeletion. ArtifactincludesmacosbecauseactualcheckLinuxdoesn'tgateMac. VerifyGitHubimportJSONexportshape fields withofficialdocs/APIcurrent, readonlyIDsremoved. Don'tpost/import/delete/changeaccount. Existingmain/tagunaffected. Flagbadmissingcontext/extraunapprovedscope/dangerousbypass. RootcreatedJSONfromactualGETandsemanticassertions; independentchecknotrubberstamp. Output /workspace/work/034/dev-ruleset-review-report.json statusdone|partial|blocked/CLIshape; <=200wordfinal. Thisisurgentuserwaitingfile."
+  ],
+  "constraints": [
+    "RepoAGENTS/.claude/roleinstructionsapply. RootownsVCS/state/usersecuritysettings; no externalwrites orsourcechangesexceptexplicitAGENTS.mdwriter. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. ReportJSONstatus EXACTLY done|partial|blocked,checks exitsNUMBERSnotstrings/null,exactcriterion/evidencelabelkeys."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned artifact or architecture scope is completed accurately with stated limits",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T16:16:01.784Z"
+  },
+  "createdAt": "2026-11-13T16:16:01.784Z"
+}
