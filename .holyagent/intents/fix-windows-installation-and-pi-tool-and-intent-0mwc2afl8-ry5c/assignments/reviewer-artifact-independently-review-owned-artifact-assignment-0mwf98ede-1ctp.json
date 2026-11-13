@@ -37,6 +37,7 @@
     "assignment-0mwf3onqq-igcn"
   ],
   "specialist": {
+    "agentId": "/root/r034_owned_current_artifact_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T17:32:25.922Z"
