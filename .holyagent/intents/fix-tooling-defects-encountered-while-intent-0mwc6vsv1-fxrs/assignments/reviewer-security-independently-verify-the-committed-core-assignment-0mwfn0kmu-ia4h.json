@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mwfn0kmu-ia4h",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-verify-the-committed-core",
+  "objective": "Independently verify the committed Core host services and setup VCS safety boundaries.",
+  "state": "Running",
+  "scope": [
+    "Review immutable0e784284a33a55a6519cb3e298ee39b2cdad5e38...31a9702 in /workspace/work/holyagent-034-core-host. A later routing merge is being edited; use git show/archive31a9702 for source, never current working files. Complete diff /workspace/work/034/core-host-application.diff and report core-host-application-report.json describe new setup/doctor/VCS APIs and Node service ports.",
+    "Trace strict schemas and trusted context/service boundaries through config/installation writes, undo ownership, user/third-party file preservation, PR body descriptor no-follow checks, Git argv/message/identity/staging scope, GitHub body handling and state recording under provided locks. Native privileged functions remain denied; a root flag is not a generic user approval receipt. Check actual effects and errors rather than assuming injected ports prove safety. No Core→runtime cycle or Bun/CLI process fallback should exist.",
+    "Review all materially changed security-sensitive source; generated bundles may be assessed through source/build equivalence, not by dumping huge minified output and declaring an incomplete scan. Original G migration security was accepted; inspect new port integration. Core state initialization/migration and later routing have separate known blockers under active repair, so label these as known baseline/context rather than pretending they are fixed or introduced by this business port.",
+    "Ordinary repository review, no external Codex Security scan or live exploit. Source-to-sink evidence for findings; bounded isolated fixture probes allowed, no real account/credential/PC operations. Save /workspace/work/034/core-host-current-security-review-report.json; record material coverage and actual limitations without fake passes."
+  ],
+  "constraints": [
+    "\nFirst pass: security-review.\n\nYou are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from `git diff` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff, then list the trust boundaries it touches: where data enters (requests, files, environment, arguments, stored data, output of tools and models) and what privilege the code runs with.\n2. For each source, follow the data to every sink it reaches: a shell or process call, a query, a file path, a deserializer, rendered output, an outgoing request, an authentication or authorization decision, a secret store or log, a cryptographic call.\n3. Read each check on the path. A check counts only if it covers this source and this sink.\n4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.\n5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.\n6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the source, the sink and the path between them, with files and lines;\n- the precondition;\n- the impact rating;\n- validated or suspected, with what is missing for a suspicion;\n- the label.\n\nExample entry:\n\n- Source `GET /files?name=` in `src/routes/files.ts:18`; sink `readFile` in `src/files.ts:31`; `name` is joined to the upload root with no check for `..`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers `name`. blocker.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "No introduced or worsened security finding remains in Core setup filesystem VCS and host service authority boundaries",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "first-pass",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfjc64c-ya11",
+    "assignment-0mwfi7tqf-w53a"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T23:58:15.414Z"
+  },
+  "createdAt": "2026-11-13T23:58:15.414Z"
+}
