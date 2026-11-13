@@ -103,7 +103,8 @@ const HINTS: Readonly<Record<string, string>> = {
   InvalidDraft:
     "Send JSON in the shape `holyagent <command> --help` shows; unknown fields are refused.",
   InvalidPath: "Use relative portable paths such as packages/runtime/src.",
-  MissingOwnership: "Give a writing role task at least one ownershipPaths entry.",
+  MissingOwnership:
+    "Give a writing role task an ownershipPaths entry or operationalResources entry.",
   UnknownRecord: "List ids with `holyagent intent list` or `holyagent assignment list --all`.",
   DuplicateRecord: "Retry the command; ids are generated.",
   StaleRevision:

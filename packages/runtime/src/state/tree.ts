@@ -316,6 +316,24 @@ const listWorktrees = (cwd: string, env: Environment) =>
     ),
   )
 
+/** Lists local worktrees for operational resource validation, or the root outside git. */
+export const operationalWorktrees = (cwd: string, env: Environment) =>
+  git(cwd, env, ["worktree", "list", "--porcelain", "-z"]).pipe(
+    Effect.flatMap((result) => {
+      if (result.code !== 0)
+        return /not a git repository/i.test(result.stderr)
+          ? Effect.succeed([cwd])
+          : Effect.fail(failed(cwd, ["worktree", "list", "--porcelain", "-z"], result))
+      const roots = result.stdout
+        .split("\0")
+        .filter((field) => field.startsWith("worktree "))
+        .map((field) => fromGitPath(field.slice(9)))
+      return roots.length
+        ? Effect.succeed(roots)
+        : Effect.fail(new StateIo({ path: cwd, cause: "git listed no worktrees" }))
+    }),
+  )
+
 /** The listed worktree that has the branch checked out, when its folder is still there. */
 const checkedOut = (listed: ReadonlyArray<Listed>, branch: string) =>
   Effect.gen(function* () {
