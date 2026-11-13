@@ -32,6 +32,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_guidance_reviewed_verify",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T15:51:41.232Z"
