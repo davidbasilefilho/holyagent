@@ -181,7 +181,10 @@ describe.each(["claude", "pi"])("%s host", (host) => {
     expect(started.code).toBe(0)
     const id = String((decode(started.stdout.split("\nprompt:\n")[0] ?? "") as { id: string }).id)
     const show = await cli(["assignment", "show", id, "--full"], undefined)
-    expect(show.stdout).toContain(target)
+    expect(show.code).toBe(0)
+    expect((decode(show.stdout) as { operationalResources: unknown }).operationalResources).toEqual(
+      resource(target),
+    )
     const briefPath = /at (.+?\.md) with/.exec(started.stdout)?.[1]
     expect(briefPath).toBeDefined()
     expect(await Bun.file(briefPath ?? "").text()).toContain(target)

@@ -115,6 +115,10 @@ test("branch-mode handoff refuses pending state and an unavailable state branch 
     return result.stdout.toString()
   }
   git("init", "-b", "main")
+  // A detached automatic maintenance process can outlive the fixture commit and
+  // remove its lock after the no-write snapshot is taken.
+  git("config", "--local", "gc.auto", "0")
+  git("config", "--local", "maintenance.auto", "false")
   git(
     "-c",
     "user.name=Fixture",
