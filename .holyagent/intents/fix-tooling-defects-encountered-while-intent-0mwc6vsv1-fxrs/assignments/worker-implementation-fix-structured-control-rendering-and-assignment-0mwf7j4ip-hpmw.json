@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mwf7j4ip-hpmw",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Worker.implementation",
+  "slug": "fix-structured-control-rendering-and",
+  "objective": "Fix structured control rendering and actionable recovery while keeping the internal agent CLI plain.",
+  "state": "Running",
+  "scope": [
+    "H e778f69, reviewers terminal. Read three plain-cli-review-*-report.json files. encode(output) and WithTrailer fields emit raw U+009B. Preserve TOON decoded record data exactly while escaping all terminal controls in serialization. Inspect encoder APIs first; no silent deletion/replacement, malformed quoting, protocol change or lossy postprocessing. Test raw bytes AND round-trip equality for nested/table data, literal backslash-u text, keys if supported, trailers and adaptation collisions."
+  ],
+  "constraints": [
+    "Read repo AGENTS.md, .claude/CLAUDE.md and the applicable GPT role. Root owns VCS, state and external actions; never draft PRs. No actual .git/.holyagent writes, commits/checkouts, live Pi/model calls, user-machine installs or extra agents. Temporary Git/SDK/home fixtures are allowed. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; checks through mise.",
+    "Report JSON status EXACTLY done|partial|blocked, changed_paths, checks:[{command,exit:number}], blockers, notes, evidence:[{key,support}]. Final <=350 words; long logs outside repo. Keep working through the requested implementation/checks.",
+    "Restore valid InsufficientAcceptance recovery: holyagent executable and corrected report on stdin, proper close or accept --report forms with relevant ID; concise natural language. Keep raw search argv/exits/stream controls correct.",
+    "Internal agent CLI must remain plain even under TTY. Its setup route must not open a styled interface; public user installer UI may stay unchanged. Inspect actual public/internal wiring and make the smallest origin/guard separation; if genuinely inseparable, return source/options before broad UI changes. Do not introduce0.4 setup pi|claude syntax. Ask root for necessary public entry scope if beyond your paths, while continuing independent fixes.",
+    "Core extraction is separate; keep presentation changes localized and report merge seams. Preserve data, schemas, stdout/stderr, exits, cancellation and public authentication/UI behavior. Focused control/host/input/setup tests plus type/lint/fmt; no generated edits/build/full verify. Save /workspace/work/034/plain-cli-control-repair-report.json and plain-cli-control-repair.diff."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned functional package or CLI repair is implemented with accurate behavior and preserved safeguards",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Meaningful direct-runtime and regression checks pass within the assigned scope",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "remaining-integration"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/setup",
+    "packages/runtime/src/hooks/pi-entry.ts",
+    "packages/runtime/tests",
+    "docs/agent-cli-output.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf40ynd-1jfb",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T16:44:47.138Z"
+  },
+  "createdAt": "2026-11-13T16:44:47.138Z"
+}
