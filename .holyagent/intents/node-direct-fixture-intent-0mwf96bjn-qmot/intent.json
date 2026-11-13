@@ -4,6 +4,7 @@
   "objective": "Node direct fixture",
   "requirements": [],
   "revision": 1,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "Accidental Node SDK test fixture discovered enclosing real worktree. No assignments. Preserve this closed record for audit; fixture moved outside repository ancestry.",
   "createdAt": "2026-11-13T17:30:48.947Z"
 }
