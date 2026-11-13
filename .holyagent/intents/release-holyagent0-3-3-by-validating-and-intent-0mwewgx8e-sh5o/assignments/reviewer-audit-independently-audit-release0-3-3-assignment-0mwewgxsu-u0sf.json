@@ -34,6 +34,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/release_audit",
     "model": "haiku",
     "effort": "high",
     "startedAt": "2026-11-13T11:35:09.342Z"
