@@ -38,6 +38,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_scoped_skills_research",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T14:35:26.910Z"
