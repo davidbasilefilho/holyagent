@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "update-the-factory-contract-test-for-the",
   "objective": "Update the factory contract test for the gated native flag and shutdown lifecycle.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read native-final-build-report.json: pi.test620 exactregistrationlistlacksnewregisterFlagholyagent-native-root andonsession_shutdown. UpdatelegitimateexpectedinterfaceswhilePRESERVING startsnothingassertion: noexec/process/statewritesuntilauthorizedcall, configfalse/unknownnoneactive. Don'tweakenfactorytest/privacy/roleguards. Testonlysourcebundleunchanged. Run pi.test+nativefocused+type/lint/fmt; nobuild/fullverify."
   ],
@@ -35,7 +35,33 @@
     "agentId": "/root/r034_native_factory_repair",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T15:06:40.156Z"
+    "startedAt": "2026-11-13T15:06:40.156Z",
+    "finishedAt": "2026-11-13T15:27:57.712Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/pi/tests/pi.test.ts\nchecks:\n- bunx --no-install mise run test -- packages/integrations/pi/tests/pi.test.ts packages/integrations/pi/tests/native-tools.test.ts -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- 44 focused tests passed; logs in /workspace/work/034/native-factory-*.log. No build or full verify run as instructed.\nevidence:\n- Factory contract covers native lifecycle registrations while still proving startup has no effects (regressions): Exact registration assertion includes the native-root flag and second shutdown handler; existing factory startup and native-gating assertions remain intact. Focused tests pass.\n- checks-run: Focused tests, check, lint and fmt:check passed; logs in /workspace/work/034/native-factory-*.log.\n- changed-paths: packages/integrations/pi/tests/pi.test.ts only.\n- diff-file: /workspace/work/034/native-factory-repair.diff",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Registration-only contract updated,44focusedtests and check/lint/format pass; startup/no-privilege assertions retained.",
+    "criteria": [
+      {
+        "criterion": "Factory contract covers native lifecycle registrations while still proving startup has no effects",
+        "support": "Exact registration assertion includes the native-root flag and second shutdown handler; existing factory startup and native-gating assertions remain intact. Focused tests pass."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Focused tests, check, lint and fmt:check passed; logs in /workspace/work/034/native-factory-*.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/pi/tests/pi.test.ts only."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/native-factory-repair.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T15:06:40.156Z"
 }
