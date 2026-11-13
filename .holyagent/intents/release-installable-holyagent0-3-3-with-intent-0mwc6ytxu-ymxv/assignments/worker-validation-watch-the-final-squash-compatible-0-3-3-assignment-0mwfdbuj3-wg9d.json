@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwfdbuj3-wg9d",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.validation",
+  "slug": "watch-the-final-squash-compatible-0-3-3",
+  "objective": "Watch the final squash-compatible 0.3.3 publication repair PR and report exact current-head checks.",
+  "state": "Running",
+  "scope": [
+    "PR129 head0b30619faa4d73ddbdfc666358804ee84962f92a targets main from release/0.3.3/fix/publication-repair. All independent code/security/artifact reviews accepted; author full supervised3506pass2skip. Use gh pr checks129 --watch and current snapshots. Observe actual branch-model AND required version pass for bounded same-version registry absence; all Linux/macOS/Windows/installers terminal outcomes in both workflows.",
+    "Fetch actionable logs on failure (GitHub connector if gh redirects403). Do not rerun jobs or write. Old127/128 closed as superseded, no merge/admin exceptions needed; merge commits remain disabled, version required."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT validation and ci-watch. Read-only gh/Git/API/logs; no source/VCS/state/config/remote writes or subagents/live Pi/model/publication. User says publish0.3.3 before executable investigation, so do not inspect/run bin availability or0.3.4 failures.",
+    "Return only current head results; skip/unknown never passed validation. Main source44c79ab2 baseline until root merges; root handles final exact-head merge and subsequent stable publication. Do not wait forever on a head changed by root; report new head.",
+    "Save /workspace/work/034/033-final-pr-ci-report.json EXACT schema {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}. Validate JSON fields and exact keys. <=250words, logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Final repair head checks and merge prerequisites are accurately reported",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "head",
+    "checks-run",
+    "failures",
+    "merge-state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T19:27:05.296Z"
+  },
+  "createdAt": "2026-11-13T19:27:05.296Z"
+}
