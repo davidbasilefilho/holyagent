@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwfgt16z-pint",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "independently-verify-the-bounded-removal",
+  "objective": "Independently verify the bounded removal of repeated owned guidance instructions preserves every family and role contract.",
+  "state": "Running",
+  "scope": [
+    "Immutable narrow repair d9f21e91b6861e4ff5261b00b81fd33f7f22690f..e4e9cd5a in /workspace/work/holyagent-034-skills. Originald9feature code/artifactreviews accepted; inspect only sharedguidanceRouter prefix sentence removal and generated66files, plus familyrole text to verify no instruction lost. Originalreport /workspace/work/034/owned-guidance-duplicate-repair-report.json has140focusedpass/build/fmt. Familyrootphrases preserve loadondemandtrigger while sharedprefixnow only userthirdpartyavailability. Do not broaden intonewpolicy.",
+    "Read instruction-writing skill and GPT reviewerartifact role. Save /workspace/work/034/owned-guidance-duplicate-artifact-review-report.json. No source writes, no fullreverify; bounded fresh artifactcoverage test ifuseful."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "Committed duplicate removal preserves on demand role guidance and all family requirement coverage without contradictory instructions",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T21:04:25.931Z"
+  },
+  "createdAt": "2026-11-13T21:04:25.931Z"
+}
