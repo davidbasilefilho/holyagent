@@ -10,6 +10,7 @@ import type { Capability, Context } from "../src/api/context.ts"
 import { createIntent } from "../src/domain/intent.ts"
 import { assignment, handoff, intent, makeContext, migrate, plan } from "../src/index.ts"
 import { WorkTree } from "../src/state/local.ts"
+import { withFileLock } from "../src/state/lock.ts"
 import { spawn } from "../src/state/process.ts"
 import { readState, updateState } from "../src/state/store.ts"
 import { resolveState } from "../src/state/tree.ts"
@@ -95,6 +96,74 @@ describe("direct shared application operations", () => {
       const result = await Effect.runPromiseExit(intent.create(context, { objective: "revoked" }))
       expect(result._tag).toBe("Failure")
       expect((await Effect.runPromise(intent.list(f.context, {}))).intents).toHaveLength(0)
+    } finally {
+      await f.close()
+    }
+  })
+  test("read authority does not initialize or migrate staged worktree state", async () => {
+    const f = await fixture()
+    try {
+      const git = (...args: string[]) => {
+        const result = spawnSync("git", args, { cwd: f.cwd, encoding: "utf8" })
+        if (result.status !== 0) throw new Error(result.stderr)
+        return result.stdout
+      }
+      expect(spawnSync("git", ["-C", f.cwd, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      git("init", "-b", "main")
+      git("config", "user.name", "Fixture")
+      git("config", "user.email", "fixture@example.test")
+      git("commit", "--allow-empty", "-m", "fixture")
+      await mkdir(join(f.cwd, ".holyagent"), { recursive: true })
+      await writeFile(join(f.cwd, ".holyagent", "fixture"), "state")
+      git("add", ".holyagent/fixture")
+      const before = git("status", "--porcelain")
+      const readOnly: Context = {
+        ...f.context,
+        authorize: (capability) => capability === "intent.list",
+      }
+      await Effect.runPromiseExit(intent.list(readOnly, {}))
+      expect(git("status", "--porcelain")).toBe(before)
+      expect(await readFile(join(f.cwd, ".holyagent", "fixture"), "utf8")).toBe("state")
+      expect(git("worktree", "list", "--porcelain")).not.toContain("holyagent/state")
+      expect(git("branch", "--list", "holyagent/state").trim()).toBe("")
+    } finally {
+      await f.close()
+    }
+  })
+
+  test("initialization rechecks authority after waiting for the worktree lock", async () => {
+    const f = await fixture()
+    try {
+      const git = (...args: string[]) => {
+        const result = spawnSync("git", args, { cwd: f.cwd, encoding: "utf8" })
+        if (result.status !== 0) throw new Error(result.stderr)
+        return result.stdout
+      }
+      expect(spawnSync("git", ["-C", f.cwd, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      git("init", "-b", "main")
+      git("config", "user.name", "Fixture")
+      git("config", "user.email", "fixture@example.test")
+      git("commit", "--allow-empty", "-m", "fixture")
+      const started = await Effect.runPromise(Deferred.make<void>())
+      const finish = await Effect.runPromise(Deferred.make<void>())
+      const holder = Effect.runFork(
+        withFileLock(
+          join(f.cwd, ".git", "holyagent", "worktree.lock"),
+          Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(finish))),
+        ),
+      )
+      await Effect.runPromise(Deferred.await(started))
+      let allowed = true
+      const context: Context = { ...f.context, authorize: () => allowed }
+      const operation = Effect.runFork(intent.create(context, { objective: "revoked" }))
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      allowed = false
+      await Effect.runPromise(Deferred.succeed(finish, undefined))
+      await Effect.runPromise(Fiber.join(holder))
+      expect((await Effect.runPromise(Fiber.await(operation)))._tag).toBe("Failure")
+      expect(git("worktree", "list", "--porcelain")).not.toContain("holyagent/state")
+      expect(git("branch", "--list", "holyagent/state").trim()).toBe("")
+      expect(git("status", "--porcelain")).toBe("")
     } finally {
       await f.close()
     }

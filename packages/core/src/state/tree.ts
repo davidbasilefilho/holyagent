@@ -236,13 +236,20 @@ const editExclude = <E, R>(
  * unless the clone has left `local` since the command read its mode: the mode is read again under
  * the lock, so a command that waited cannot bring the entry back after a mode change removed it.
  */
-const ensureExcluded = (top: string, common: string, env: Environment, patience?: Patience) =>
+const ensureExcluded = <E>(
+  top: string,
+  common: string,
+  env: Environment,
+  patience: Patience | undefined,
+  authorize: Effect.Effect<void, E>,
+) =>
   editExclude(
     top,
     common,
     env,
     (lines) =>
-      stateModeOf(top, env).pipe(
+      authorize.pipe(
+        Effect.andThen(stateModeOf(top, env)),
         Effect.map((mode) => (mode === "local" ? withEntry(lines) : lines)),
       ),
     hasEntry,
@@ -612,7 +619,7 @@ type Ensured =
  * worktree is `absent`. A finished worktree gets a marker next to it, so that later commands pass
  * without the lock. `patience` is how long the lock is waited for (see {@link withFileLock}).
  */
-const ensureWorktree = (
+const ensureWorktree = <E>(
   top: string,
   common: string,
   env: Environment,
@@ -620,10 +627,12 @@ const ensureWorktree = (
   path: string,
   options: { readonly make: boolean; readonly peek: boolean; readonly online: boolean },
   patience: Patience = WORKTREE_PATIENCE,
+  authorize: Effect.Effect<void, E> = Effect.void,
 ) =>
   withFileLock(
     join(common, "holyagent", "worktree.lock"),
     Effect.gen(function* () {
+      yield* authorize
       const ready = readyMarker(path)
       const again = yield* checkedOut(yield* listWorktrees(top, env), branch)
       if (again !== undefined) {
@@ -861,13 +870,14 @@ const migrationMarker = (common: string, top: string) =>
  * restored), so the work tree is left without uncommitted state. The per-clone files are copied
  * only when the state worktree has none. `patience` is how long the state lock is waited for.
  */
-const migrateWorkTree = (
+const migrateWorkTree = <E>(
   top: string,
   common: string,
   worktree: string,
   env: Environment,
   commit: (message: string) => Effect.Effect<boolean, StateIo>,
   patience: Patience = STATE_PATIENCE,
+  authorize: Effect.Effect<void, E> = Effect.void,
 ) => {
   const source = stateDirectory(top)
   const target = stateDirectory(worktree)
@@ -888,6 +898,7 @@ const migrateWorkTree = (
                     : withStateLock(
                         target,
                         Effect.gen(function* () {
+                          yield* authorize
                           if (yield* fileExists(marker)) return
                           const entries = yield* workTreeEntries(top, env)
                           const moved: Array<Entry> = []
@@ -1087,12 +1098,13 @@ const locate = (cwd: string, env: Environment) =>
  * for that long at most, so a plugin hook passes one deadline (see {@link deadlineIn}) to give up
  * inside the host's hook timeout; without it each lock keeps the wait its holder needs.
  */
-export const resolveState = (
+export const resolveState = <E = never>(
   cwd: string,
   env: Environment,
   ensure: Ensure,
   online: boolean = true,
   patience?: Patience,
+  authorize: Effect.Effect<void, E> = Effect.void,
 ) =>
   Effect.gen(function* () {
     const repository = yield* locate(cwd, env)
@@ -1101,7 +1113,10 @@ export const resolveState = (
     const { top, common } = repository
     const mode = yield* stateModeOf(top, env)
     if (mode !== "branch") {
-      if (mode === "local" && ensure !== "peek") yield* ensureExcluded(top, common, env, patience)
+      if (mode === "local" && ensure !== "peek") {
+        yield* authorize
+        yield* ensureExcluded(top, common, env, patience, authorize)
+      }
       return { root: top, directory: stateDirectory(top), resolved: { mode } } satisfies StateTree
     }
     const branch = yield* stateBranch(top, env)
@@ -1128,18 +1143,23 @@ export const resolveState = (
         ? { kind: "ready", path: found, created: false }
         : found === undefined && !make
           ? { kind: "absent" }
-          : yield* ensureWorktree(
-              top,
-              common,
-              env,
-              branch,
-              standard,
-              {
-                make,
-                peek: ensure === "peek",
-                online,
-              },
-              patience,
+          : yield* authorize.pipe(
+              Effect.andThen(
+                ensureWorktree(
+                  top,
+                  common,
+                  env,
+                  branch,
+                  standard,
+                  {
+                    make,
+                    peek: ensure === "peek",
+                    online,
+                  },
+                  patience,
+                  authorize,
+                ),
+              ),
             )
     if (ensured.kind === "deferred")
       return { root: top, directory: stateDirectory(top), resolved } satisfies StateTree
@@ -1162,7 +1182,8 @@ export const resolveState = (
           ]
         : [top]
       for (const source of new Set(sources))
-        if (source !== worktree && (yield* isDirectory(source)))
+        if (source !== worktree && (yield* isDirectory(source))) {
+          yield* authorize
           yield* migrateWorkTree(
             source,
             common,
@@ -1170,7 +1191,9 @@ export const resolveState = (
             env,
             (message) => commitState(directory, env, message, [], resolved),
             patience,
+            authorize,
           )
+        }
     }
     return { root: top, directory, resolved } satisfies StateTree
   })
