@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mwevkfpi-y1ne",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "draft-concise-updated-pr120-description",
+  "objective": "Draft concise updated PR120 description covering final change and validation for publication by root.",
+  "state": "Running",
+  "scope": [
+    "Full committed PR range c5b2ab2b3524063e408b2f0dbf6bf85a6237e168..61a7adce3ba76878fe2f2342ab268908ce551907, original PR body metadata"
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and packages/integrations/claude/dist/agents/worker-mechanical.md in /workspace/work/holyagent-pr120. User explicitly authorizes continue audit/revise/merge PR120 and Terra low-xhigh; direct fallback. No source/VCS/.holyagent writes; do not publish or message GitHub. Draft plain PR body /workspace/work/pr120-body.txt outside repo; report /workspace/work/pr120-body-report.md under150 words. Root will publish via structured connector (available, higher-level tool preference). Read original body with gh pr view120 --json body and committed diff source as needed. Keep title unchanged unless required. Describe native Windows setup/state, Pi tooling/CLI quoting and FFF fallbacks, isolated platform fixtures, instructions/approval guidance, protected-branch npm OIDC publishing and same-tarball release handoff/preflights. Two/three concise paragraphs or minimal sections only if useful; follow repository prose conventions. Validation: independent reviews and targeted executed quoting/search tests passed. Final full Linux verify on61a7adc is RUNNING, so use explicit token FINAL_VERIFY_RESULT pending replacement by root when evidence arrives. New-head hosted CI also pending, don't claim passed. npm environment and bootstrap package already verified read-only; trusted publisher config not publicly verifiable, workflow must establish publication. No internal process words, agent attribution, stale Windows numbers or claims of npm publish. This is PR artifact technical writing with repo voice, not user chat style matching."
+  ],
+  "criteria": [
+    {
+      "text": "PR description accurately reflects full final scope without unsupported validation claims",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run",
+    "draft-path"
+  ],
+  "ownershipPaths": [
+    "pr-description"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T11:09:52.902Z"
+  },
+  "createdAt": "2026-11-13T11:09:52.902Z"
+}
