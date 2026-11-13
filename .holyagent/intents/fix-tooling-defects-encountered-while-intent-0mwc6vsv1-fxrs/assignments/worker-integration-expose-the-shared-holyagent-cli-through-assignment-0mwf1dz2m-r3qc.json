@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mwf1dz2m-r3qc",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 3,
+  "roleTask": "Worker.integration",
+  "slug": "expose-the-shared-holyagent-cli-through",
+  "objective": "Expose the shared HolyAgent CLI through typed, role-authorized native tool adapters in Pi codemode and the supported Claude integration.",
+  "state": "Running",
+  "scope": [
+    "Shared typed command catalog/Effect dispatch and trusted-role authorization; Pi native registration and Claude host adapter, conformance tests and focused docs."
+  ],
+  "constraints": [
+    "Work only /workspace/work/holyagent-034-tools from accepted c3c93510; scratch /workspace/work/034. Read AGENTS.md, .claude/CLAUDE.md, integration role sections as needed; /workspace/work/034/runtime-map.md, host-contracts.md, mcp-capabilities.md are accepted research, their limits matter. User authorized0.3.4 using Intents/Terra agents. Root selected explicit schema-decoded command adapters reusing existing Effect dispatch rather than generic unrestricted shell/argv. No new dependencies; updater only. No real pi launches/live model calls/user-PC writes/account/admin/publish/VCS/statewrites or extra subagents. Temporary fixtures and deterministic SDK/mock sessions allowed.",
+    "Native adapters must use same strict schemas/domain/errors/observable results as CLI, preserve CLI compatibility, and support explicit cancellation through Effect interruption. Derive role from trusted host/session context, never arguments/default root. Enforce root/specialist policy BOTH inventory/registration AND execution including codemode/nested calls. Default deny unknown commands/roles. Explicit allowed read/search specialist capabilities only with role-compatible tool policy. Mutating state/VCS/setup/hook interfaces cannot be reached by specialists through aliases or indirect calls. A local scheduling reservation is not authorization.",
+    "Inventory ALL current COMMANDS (research baseline35): every identity has native supported schema+adapter OR explicit unsupported reason/capability. rg/fd raw passthrough, stdio browser-server, hooks, setup/VCS interactive bits must be deliberately classified. Do not hide unsupported functionality or call a generic argv tool a full typed solution. Add contract tests comparing inventory to COMMANDS to catch future handoff command. Sibling branch adds handoff/operational flags; do not cherry-pick or edit sibling, root merges later and assigned final coverage will require it.",
+    "Use a narrow shared Effect dispatch seam if extraction needed; no rewrite of CLI or broad architecture. Claude has different native tool APIs than Pi; establish actual supported adapter/capabilities (likely MCP if repo already supports protocol) and test sourced host-specific authority, no forged identity parameter/env trust claim. If any required authorization cannot be enforced by available Claude host adapter, stop with compact evidence/options before unsafe implementation, implement unaffected shared/Pi work. Shared behavior adapted to both harnesses, not Pi-only silent omission.",
+    "Pi uses built-in MCP/codemode locked1.5.0; no pi-mcp-to-tool dependency. Real SDK harmless mock tests preferred to fake-only assumptions for permission and role-filter execution. Tools must be discoverable/callable in codemode and respond accurately to cancellation/error. Do not implement wait/aliases/routing/search/scoped-skills in this slice: separate work. Own extension.ts final native wiring here. Avoid generated dist edits; final build root-coordinated.",
+    "Run meaningful focused regression/conformance tests and changed-scope type/lint/fmt via mise; install frozen --ignore-scripts perworktree. No full build/verify yet. Toolchain env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use /workspace/work/cancel-supervisor.py for orphan-reaping process fixtures as needed.",
+    "Report tooling failures with reproduction/impact and acceptance. Keep working until requested code/checks done or genuine host contract blocks safe progress, then stop. Diff /workspace/work/034/native-tools.diff and JSON /workspace/work/034/native-tools-report.json shape {status,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]}; exact keys. Final under350words, detailed logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Every CLI command has an explicit typed native capability or justified unsupported classification",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Trusted root and specialist authorization is enforced at inventory and indirect execution without weakening CLI validation",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Supported Pi and Claude adapters expose accurate results errors and cancellation with host-specific conformance evidence",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Focused regression checks pass and changes stay within native tooling scope",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/native",
+    "packages/runtime/src/pi/tools.ts",
+    "packages/runtime/tests/native-tools.test.ts",
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests/native-tools.test.ts",
+    "packages/integrations/claude/src",
+    "packages/integrations/claude/tests/native-tools.test.ts",
+    "docs/native-tools.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T13:52:49.102Z"
+  },
+  "createdAt": "2026-11-13T13:52:49.102Z"
+}
