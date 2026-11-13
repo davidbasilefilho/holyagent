@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "regenerate-the-post-commit-evidence",
   "objective": "Regenerate the post-commit evidence-order guidance for immutable review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Build and focusedinstruction/assembly/policy/contextchecks only."
   ],
@@ -37,7 +37,33 @@
     "agentId": "/root/r034_state_final_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T14:35:25.605Z"
+    "startedAt": "2026-11-13T14:35:25.605Z",
+    "finishedAt": "2026-11-13T14:52:23.882Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/claude/dist/agents/holyagent.md\n- packages/integrations/claude/dist/agents/worker-visual.md\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/claude/dist/skills/performance-iteration/SKILL.md\n- packages/integrations/claude/dist/skills/visual-judging/SKILL.md\n- packages/integrations/pi/dist/agents/worker-visual-headless-screen.md\n- packages/integrations/pi/dist/agents/worker-visual-screen.md\n- packages/integrations/pi/dist/agents/worker-visual.md\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/families/gpt-6/agents/worker-visual-headless-screen.md\n- packages/integrations/pi/dist/families/gpt-6/agents/worker-visual-screen.md\n- packages/integrations/pi/dist/families/gpt-6/agents/worker-visual.md\n- packages/integrations/pi/dist/families/gpt-6/skills/performance-iteration/SKILL.md\n- packages/integrations/pi/dist/families/gpt-6/skills/visual-judging/SKILL.md\n- packages/integrations/pi/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/skills/performance-iteration/SKILL.md\n- packages/integrations/pi/dist/skills/visual-judging/SKILL.md\nchecks:\n- bunx --no-install mise run build -> exit 0\n- mise exec -- bun test scripts/root-question-policy.test.ts packages/runtime/tests/sessioncontext.test.ts packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts packages/integrations/pi/tests/session-context.test.ts packages/integrations/pi/tests/extension.test.ts packages/integrations/claude/tests/plugin.test.ts packages/integrations/pi/tests/pi.test.ts -> exit 0\n- cmp guidance-order-before-hashes.txt guidance-order-after-hashes.txt -> exit 0\nnotes:\n- Focused tests: 558 pass, 0 fail across 8 files. Full verification deferred as instructed.\n- Tracked and untracked non-generated source hashes stable.\n- Logs: /workspace/work/034/guidance-order-build.log and /workspace/work/034/guidance-order-focused.log.\nevidence:\n- Repaired guidance builds and focused parity budget and policy checks pass without source changes: Build and focused tests exited 0; 558 tests passed. Non-generated source hashes matched.\n- checks-run: Build exit 0; focused tests exit 0; hash comparison exit 0.\n- changed-paths: Generated paths enumerated in changed_paths.\n- diff-file: /workspace/work/034/guidance-order-generated.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Build/focused558tests pass after evidence-order repair, source hashes unchanged.",
+    "criteria": [
+      {
+        "criterion": "Repaired guidance builds and focused parity budget and policy checks pass without source changes",
+        "support": "Build and focused tests exited 0; 558 tests passed. Non-generated source hashes matched."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Build exit 0; focused tests exit 0; hash comparison exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Generated paths enumerated in changed_paths."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/guidance-order-generated.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T14:35:25.605Z"
 }
