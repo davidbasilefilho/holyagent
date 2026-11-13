@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "verify-the-committed-specialist-guidance",
   "objective": "Verify the committed specialist guidance repair closes the prior missing reading directive finding.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Immutable e4e9cd5a...228c6b8 in /workspace/work/holyagent-034-skills. Previous blockingreport /workspace/work/034/owned-guidance-duplicate-artifact-review-report.json; repairreport /workspace/work/034/owned-guidance-specialist-repair-report.json, incremental.diff. The sharedrouter now adds explicit relevantguidancereaddirective for mapped specialists, excludesroot because rootfamilytextalreadydoes. Check all3families/PiClaudeincludingheadless/screenagents, no bodypreload/catalog/privateguidanceisolationclaim, no requirementcoverage lost.",
     "Read instruction-writing guidance and GPTartifact role. Bounded rereviewonly previousfinding+repair, no unrelatedstyle churn. Save /workspace/work/034/owned-guidance-specialist-artifact-rereview-report.json."
@@ -39,7 +39,33 @@
     "agentId": "/root/owned_duplicate_artifact_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T21:14:42.827Z"
+    "startedAt": "2026-11-13T21:14:42.827Z",
+    "finishedAt": "2026-11-13T21:24:56.161Z"
+  },
+  "result": "status: done\nchecks:\n- git diff e4e9cd5a 228c6b8 and scripted committed artifact and family root inspection -> exit 0\nnotes:\n- evidence: Committed specialist repair closes missing guidance reading directive across all families while root avoids duplicate wording: Met: skills.ts adds a situational read directive to mapped non-root roles; root retains its own directive. All 63 changed generated specialist prompts contain exactly one new directive and guidance path, including Pi screen and headless variants across GPT-6 and Kimi and Claude agents. checks-run: Read-only committed diff and scripted inspection of 63 generated prompts and three family root files passed. Repair report records 85 focused tests, build, check, lint and fmt passing; no fresh test run. reviewed-range: e4e9cd5a..228c6b8; 68 changed files, including router, three tests, 63 agent prompts and Pi bundle. findings: No findings in bounded rereview. Diff adds no guidance bodies, catalog, private-isolation claims or requirement changes.\nevidence:\n- Committed specialist repair closes missing guidance reading directive across all families while root avoids duplicate wording: Met: skills.ts adds a situational read directive to mapped non-root roles; root retains its own directive. All 63 changed generated specialist prompts contain exactly one new directive and guidance path, including Pi screen and headless variants across GPT-6 and Kimi and Claude agents.\n- checks-run: Read-only committed diff and scripted inspection of 63 generated prompts and three family root files passed. Repair report records 85 focused tests, build, check, lint and fmt passing; no fresh test run.\n- reviewed-range: e4e9cd5a..228c6b8; 68 changed files, including router, three tests, 63 agent prompts and Pi bundle.\n- findings: No findings in bounded rereview. Diff adds no guidance bodies, catalog, private-isolation claims or requirement changes.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Exact repair228c6b8 inspected across63generatedspecialists andall3familyroots; prior explicitreadingdirectivegap closed, no newfindings, scoped85tests/build/staticevidenceholds.",
+    "criteria": [
+      {
+        "criterion": "Committed specialist repair closes missing guidance reading directive across all families while root avoids duplicate wording",
+        "support": "Met: skills.ts adds a situational read directive to mapped non-root roles; root retains its own directive. All 63 changed generated specialist prompts contain exactly one new directive and guidance path, including Pi screen and headless variants across GPT-6 and Kimi and Claude agents."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Read-only committed diff and scripted inspection of 63 generated prompts and three family root files passed. Repair report records 85 focused tests, build, check, lint and fmt passing; no fresh test run."
+      },
+      {
+        "label": "reviewed-range",
+        "support": "e4e9cd5a..228c6b8; 68 changed files, including router, three tests, 63 agent prompts and Pi bundle."
+      },
+      {
+        "label": "findings",
+        "support": "No findings in bounded rereview. Diff adds no guidance bodies, catalog, private-isolation claims or requirement changes."
+      }
+    ]
   },
   "createdAt": "2026-11-13T21:14:42.827Z"
 }
