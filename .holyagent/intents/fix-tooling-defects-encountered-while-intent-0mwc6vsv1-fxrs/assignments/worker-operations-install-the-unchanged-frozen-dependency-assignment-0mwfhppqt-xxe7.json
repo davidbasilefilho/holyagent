@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "install-the-unchanged-frozen-dependency",
   "objective": "Install the unchanged frozen dependency graph and build the prepared Core-host worktree for its pending normal merge commit.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-core-host branchrelease/0.3.4/feat/core-host-operations currently5b1b6e2 with root's automatic no-conflict main-policy merge7b69947 pending. RootCLIcommit failedONLYbecause thisfreshworktree lackednode_modules/eslint-plugin-jsdoc. No commit made; MERGE_HEAD/stagedcontentintact. Do notchangeGitindex/commit/branch/state.",
     "Read cloudruntimepackageinstallation skill reference beforeinstallation; run bun install --frozen-lockfile for thisworktree (notbunupdate, preserveexternalpins) then bunx --no-install mise run build and focused releasepolicy/metadata tests pluscheck/lint/fmt. Report actualgates; root willretry sameCLIcommit afterward. Maywrite expectednode_modules+buildgeneratedartifacts only; no sourcefixunless reportblocker androotauthorizes. buninstallprepare's repositoryconfigured sharedhookinstallation isexpectedandpermitted perAGENTS; no manual.git/config/hookchanges.",
@@ -45,7 +45,33 @@
     "agentId": "/root/core_host_frozen_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T21:29:50.741Z"
+    "startedAt": "2026-11-13T21:29:50.741Z",
+    "finishedAt": "2026-11-13T21:39:31.394Z"
+  },
+  "result": "status: done\nchanged:\n- node_modules/\n- packages/core/node_modules/\n- packages/runtime/node_modules/\n- packages/integrations/pi/node_modules/\nchecks:\n- bun install --frozen-lockfile -> exit 0\n- bunx --no-install mise run build -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\n- bunx --no-install mise run test -- scripts/npm-publishing.test.ts scripts/pr-checks.test.ts scripts/workflows.test.ts scripts/bump-version.test.ts packages/integrations/pi/publishing.test.ts -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 0\nnotes:\n- Build generated 39 Claude and 140 Pi files; no unstaged tracked changes. Focused tests: 115 pass; full verify: 3568 pass, 2 skipped. Logs: /workspace/work/034/core-host-*.log.\n- evidence: Prepared Core host worktree has unchanged frozen dependencies and current build static release policy checks pass (tests): frozen install, build, 115 focused tests and full verify passed. checks-run: seven commands passed; full verify 3568 pass, 2 skip. changed-paths: installed dependency directories; build produced no tracked diff. dependency-graph-unchanged: SHA-256 checks of lockfile and all package manifests match before installation.\nevidence:\n- Prepared Core host worktree has unchanged frozen dependencies and current build static release policy checks pass (tests): Frozen install, build, 115 focused tests and full verify passed.\n- checks-run: Seven commands passed; full verify 3568 pass, 2 skipped.\n- changed-paths: Installed dependency directories; build produced no unstaged tracked diff.\n- dependency-graph-unchanged: Lockfile and all package manifests match pre-install SHA-256 hashes.",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Per-worktreefrozeninstall unchangedmanifest+lockhashes;build/static115releasefocused/full3568pass2skipcurrentpreparedmain-policymerge. No sourcechanges androotwillretryordinaryCLIcommit, nohookbypass.",
+    "criteria": [
+      {
+        "criterion": "Prepared Core host worktree has unchanged frozen dependencies and current build static release policy checks pass",
+        "support": "Frozen install, build, 115 focused tests and full verify passed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Seven commands passed; full verify 3568 pass, 2 skipped."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Installed dependency directories; build produced no unstaged tracked diff."
+      },
+      {
+        "label": "dependency-graph-unchanged",
+        "support": "Lockfile and all package manifests match pre-install SHA-256 hashes."
+      }
+    ]
   },
   "createdAt": "2026-11-13T21:29:50.741Z"
 }
