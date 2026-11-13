@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mwf9smeq-miox",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 30,
+  "roleTask": "Worker.integration",
+  "slug": "backport-only-the-proven-npm-provenance",
+  "objective": "Backport only the proven npm provenance metadata fix needed to publish stable0.3.3.",
+  "state": "Running",
+  "scope": [
+    "Work only /workspace/work/holyagent-033-publish, branch release/0.3.3/fix/npm-provenance-metadata at9c8edee7 whose tree equals main44c79ab2. The stable npm publish currently fails E422 missing repository.url; proven fix exists in /workspace/work/holyagent-034 commit e2899081 and focused scripts/npm-publishing and Pi manifest tests. Backport only generator repository metadata and strict tarball manifest repository preflight plus minimal meaningful tests. Preserve0.3.3 version and existing old release/integration workflows.",
+    "No executable/bin/setup investigation or fix: user explicitly says publish0.3.3 FIRST, then if bunx error persists handle in0.3.4. Do not copy0.3.4 routing/core/output/guidance/branch-model changes. Source only four relevant Pi generation/test and npm-publishing script/test files, generated dist manifest through build."
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md and GPT Worker.integration directives. Root owns commits/push/PR/state. No VCS writes, actual .git/.holyagent writes, Git config, workflow/guard/version/dependency changes or live Pi/model calls. Read-only git allowed. Do not weaken provenance/OIDC/checks or add token fallback. Do not run actual publication; root will run approved workflow.",
+    "Initialize this new worktree with bun install --frozen-lockfile, then mise build and focused red/green metadata/preflight tests, meaningful offline package manifest validation, type/lint/fmt and one full supervised verify. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Full via python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify.",
+    "Keep working through required fix+checks. Save /workspace/work/034/033-publication-metadata-report.json and /workspace/work/034/033-publication-metadata.diff including untracked source. Exact JSON schema {status:'done'|'partial'|'blocked',changed_paths:string[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}; <=250words. Record unchanged-version promotion constraint but do not solve it by changing checks."
+  ],
+  "criteria": [
+    {
+      "text": "Minimal metadata and provenance preflight repair is backported without0.3.4 changes or guard weakening",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Meaningful regression packaging and current full verification checks pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "publication-limitations"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/tests/pi.test.ts",
+    "packages/integrations/pi/publishing.test.ts",
+    "scripts/npm-publishing.ts",
+    "scripts/npm-publishing.test.ts",
+    "packages/integrations/pi/dist/package.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_native_tools",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T17:48:09.458Z"
+  },
+  "createdAt": "2026-11-13T17:48:09.458Z"
+}
