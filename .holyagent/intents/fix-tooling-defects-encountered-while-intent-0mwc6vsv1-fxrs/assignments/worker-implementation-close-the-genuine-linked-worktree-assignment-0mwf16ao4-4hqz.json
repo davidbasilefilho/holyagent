@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mwf16ao4-4hqz",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-genuine-linked-worktree",
+  "objective": "Close the genuine linked-worktree integration coverage gap in operational reservations.",
+  "state": "Running",
+  "scope": [
+    "packages/runtime/tests/operational-ownership.test.ts and isolated related test fixtures"
+  ],
+  "constraints": [
+    "User authorizes0.3.4 develop/release/HolyAgent/Terra low-xhigh. Read worker-implementation role and relevant Intents; direct fallback. Work /workspace/work/holyagent-034-state at11f756589ece8907912a11e43187fbb4407e5ccb. Two disjoint repair writers run in parallel; no shared source writes without coordination. No actual VCS/.git/.holyagent/admin/account/security writes or publication. Tests may create isolated temporary Git repositories/worktrees/state as fixtures.",
+    "Tool env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Run meaningful red/green changed-scope tests and type/lint/format, no build/fullverify until both terminal/rootcoordinates. Don't repair peer's in-progress files.",
+    "Save concise reportJSON in CLI --report-json shape {status,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key:'EXACT brief criterion/label',support:'...'}]}, actual doublequotedJSON. Detailed notes/diff outside repo; report under250words, no more agents.",
+    "Read /workspace/work/034/state-review-testing.json. Current tests supply fabricated root lists and non-Git CLI fixtures; replacing real operationalWorktrees discovery with[cwd] would still pass. Add an actual isolated Git repository with a registered linked worktree and exercise normal CLI assignment creation AND dispatch revalidation against that real worktree/alias. Assert rejection and no accidental Running/state mutation.",
+    "Demonstrate regression strength against a controlled cwd-only discovery mutation in isolated archived/copy fixture or equivalent injected seam, restoring no real source mutation. Source at11f7565 should pass desired integration test if correct; a mutated helper must fail. Do not count pre-feature unknown-input rejection as this red proof.",
+    "Do not modify src/state/tree.ts (peer owns read-only handoff repair there) or broaden scope into distributed locking. If integration test proves a source bug, report precise location and coordinate with root before source edits. Preserve scheduling-only contract and repo-only behavior. Saved report /workspace/work/034/ownership-repair-report.json, diff ownership-repair.diff."
+  ],
+  "criteria": [
+    {
+      "text": "Actual linked-worktree CLI discovery and dispatch revalidation are tested",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Regression fails if discovery silently uses current worktree only",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/operational-ownership.test.ts",
+    "packages/runtime/tests/fixtures/operational-discovery.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwezkhag-z0nw",
+  "specialist": {
+    "agentId": "/root/r034_operational_ownership",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T13:46:50.884Z"
+  },
+  "createdAt": "2026-11-13T13:46:50.884Z"
+}
