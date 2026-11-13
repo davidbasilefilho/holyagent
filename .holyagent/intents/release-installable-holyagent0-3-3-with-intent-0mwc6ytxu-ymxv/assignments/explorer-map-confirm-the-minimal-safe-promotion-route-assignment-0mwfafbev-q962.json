@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "confirm-the-minimal-safe-promotion-route",
   "objective": "Confirm the minimal safe promotion route for the already-on-main but unpublished0.3.3 metadata repair.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only repository/GitHub policy mapping for PR126 head46963a4 target release/0.3.3/integration. main44c79ab2 root0.3.3 tree equals integration9c8edee7 before five-path fix. Repository allows squash only. Main ruleset26614767 strict required check/windows/installers/branch-model/version, no bypass. Integration ruleset26614707 PR/no force/no delete. npm environment already allows main and release/*/integration.",
     "Determine exact unavoidable promotion blocks after126normal squash merge: same-version requiredversion check, and whether strict up-to-date main ancestry also blocks reused integration after previous main squash. Use actual compare/graph/docs as necessary, clearly distinguish proven vs hypothetical. Return minimal concrete user-admin exception/action if normal protected PR flow cannot publish same0.3.3. Do not suggest false statuses, token/provenance fallback, unprotected publishing, or silently weakening guards."
@@ -35,7 +35,37 @@
     "agentId": "/root/r033_promotion_route",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T18:05:48.295Z"
+    "startedAt": "2026-11-13T18:05:48.295Z",
+    "finishedAt": "2026-11-13T18:08:51.349Z"
+  },
+  "result": "status: done\nchecks:\n- gh api rulesets, repository and compare -> exit 0\n- git merge-base --is-ancestor main integration -> exit 1\n- git diff --stat and git show manifests/check -> exit 0\nnotes:\n- After normal squash of 126, request an admin-approved narrowly scoped one-time exception for main promotion: bypass the version requirement and strict up-to-date requirement for the reviewed integration PR, retaining all other checks; restore protection immediately. Confirm the platform permits this exact scoped exception before acting. Alternatively, merge main ancestry into integration via a reviewed PR using a temporarily enabled merge-commit method, then separately except version. No publication or setting changes performed.\n- Strict ancestry issue is proven for current head and follows for a normal squash of 126; actual GitHub mergeability and available bypass mechanisms remain untested. Main movement would require reassessment.\nevidence:\n- Promotion obstacles and smallest necessary user action are supported by current repository facts without a protection workaround: Admin authorization for a narrowly scoped exception is necessary; no bypass actor currently exists.\n- facts: Main 44c79ab2 and head 46963a4 both 0.3.3; checkVersionNewer rejects equality. Ruleset 26614767 requires version and strict checks. Compare: diverged, behind 1; ancestor exit 1. Repository permits squash only; integration protection requires PR.\n- recommended-route: Merge reviewed 126 normally, then obtain explicit admin exception for the promotion PR covering both failures; preserve remaining checks and restore settings.\n- uncertainties: Exact admin UI/API exception and promotion mergeability not tested; no bypass currently configured.\n- checks-run: Read-only Git and GitHub API commands above; no CI or executable investigation.",
+  "acceptance": {
+    "revision": 30,
+    "rationale": "Current graph, squash-only setting and main rules prove same-version and ancestry blocks. No exception has been executed; root will prepare scoped settings proposal and verify actual mergeability.",
+    "criteria": [
+      {
+        "criterion": "Promotion obstacles and smallest necessary user action are supported by current repository facts without a protection workaround",
+        "support": "Admin authorization for a narrowly scoped exception is necessary; no bypass actor currently exists."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "facts",
+        "support": "Main 44c79ab2 and head 46963a4 both 0.3.3; checkVersionNewer rejects equality. Ruleset 26614767 requires version and strict checks. Compare: diverged, behind 1; ancestor exit 1. Repository permits squash only; integration protection requires PR."
+      },
+      {
+        "label": "recommended-route",
+        "support": "Merge reviewed 126 normally, then obtain explicit admin exception for the promotion PR covering both failures; preserve remaining checks and restore settings."
+      },
+      {
+        "label": "uncertainties",
+        "support": "Exact admin UI/API exception and promotion mergeability not tested; no bypass currently configured."
+      },
+      {
+        "label": "checks-run",
+        "support": "Read-only Git and GitHub API commands above; no CI or executable investigation."
+      }
+    ]
   },
   "createdAt": "2026-11-13T18:05:48.295Z"
 }
