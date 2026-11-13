@@ -51,6 +51,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/plain_hosted_repair",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T20:59:40.239Z"
