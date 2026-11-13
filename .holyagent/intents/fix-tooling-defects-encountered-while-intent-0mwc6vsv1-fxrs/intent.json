@@ -1,7 +1,7 @@
 {
   "id": "intent-0mwc6vsv1-fxrs",
   "slug": "fix-tooling-defects-encountered-while",
-  "objective": "Fix tooling defects encountered while restoring Pi capabilities and expose HolyAgent CLI functionality as actual codemode tools, with CI validation on macOS Linux and Windows.",
+  "objective": "Implement HolyAgent 0.3.4 native codemode tools, safe operational ownership and coherent workflow interfaces.",
   "requirements": [
     "the holyagent cli functionality must be actual tools in codemode in the pi integration",
     "the ci validates on darwin, linux and windows right? if not do so",
@@ -9,9 +9,11 @@
     "Observed: assignment creation rejects ownershipPaths:[] as MissingOwnership, and user-level operational ownership paths ../../.pi/agent as InvalidPath due '..' segments; the only accepted reservation packages/integrations/pi conflicts with a prior cloud Running assignment despite operational work being user installation only. Provide safe explicit operational/external ownership semantics without weakening repository locks.",
     "Observed: root workflow example permits e.agentType but live workflow validator refuses computed agent types. Static literals launch successfully. Align documented workflow shape and validator, preserving specialist-only launch protections.",
     "Codemode tools must retain runtime validation, root/specialist authority boundaries and CLI compatibility. Installation setup under intent-0mwc6p2im-6one and review under intent-0mwc2nbqi-g05p remain open. Preserve original npm release/main-dev/scoped-skills delivery in intent-0mwc2afl8-ry5c.",
-    "Record further tooling failures with reproduction, impact and fix acceptance; separate environmental/OS blockers from product bugs. No remote publication, protected pushes, account/credential or security-setting changes without existing user authority."
+    "Record further tooling failures with reproduction, impact and fix acceptance; separate environmental/OS blockers from product bugs. No remote publication, protected pushes, account/credential or security-setting changes without existing user authority.",
+    "Active under release umbrella intent-0mwc6yoeq-r5v2 after explicit current user authorization to develop/release0.3.4. Preserve prior issue reproductions. Native CLI tool adapters must enforce role authorization at registration and execution; wait uses proven host lifecycle/input signals; external snake_case aliases retain permissions/cancellation without installed-package edits; operational ownership is typed separately from repository paths and never permits '..' to bypass locks. Shared non-harness-specific behavior is adapted/tested across Pi and Claude. Existing old cloud workers were closed on recorded confirmation; no new unknown active worker may be cleared.",
+    "Status and open items (2026-11-13): source maps ready in umbrella Assignments; no0.3.4 implementation exists yet. Native Pi MCP/codemode is the evidence-backed carrier, no separate bridge justified. Next: prove host wait/forwarding contracts, then implement owned source slices with current-head tests and independent reviews. Global user installation/credentials are not changed by this cloud task."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-11T14:03:20.413Z"
 }
