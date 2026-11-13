@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "resolve-mcp-adapter-adoption-and-cua",
   "objective": "Resolve MCP adapter adoption and Cua package mismatch evidence for 0.3.4 using maintained public sources and actual pinned Pi behavior.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Existing failed MCP Assignments assignment-0mwc7eskz-7hm7 and assignment-0mwc7kcf3-nt3d",
     "Pi 1.5.0 native MCP/codemode versus current maintained release",
@@ -44,7 +44,41 @@
     "agentId": "/root/r034_mcp_capabilities",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T12:17:04.138Z"
+    "startedAt": "2026-11-13T12:17:04.138Z",
+    "finishedAt": "2026-11-13T12:29:10.039Z"
+  },
+  "result": "result: Recommend Pi’s built-in MCP and codemode, subject to HolyAgent permission and role-filter integration tests. No separate adapter or computer-use package replacement is justified by the evidence.\n\nchanged: [mcp-capabilities.md](/workspace/work/034/mcp-capabilities.md), outside the repository.\n\nchecks: Inspected the published Pi 1.5.0 and computer-use 0.1.38 tarballs, repository lockfile, and upstream sources. No runtime or Windows tests were run.\n\nblockers: Windows execution and actual HolyAgent permission enforcement remain unverified.\n\nquestions: None.\n\nnotes: The prior FFF junction result does not establish cross-platform Git-repository traversal. The artifact recommends bounded benign tests.\n\nevidence:\nMCP context and tool behavior supports evidence-based adoption or separate-package decision: Pi 1.5.0 documentation and executable nested-call source establish discovery, exposure, transports, and hook routing; the artifact identifies integration tests still needed.\nCapability package claims and OS limitations are sourced without speculative replacement: The pinned extension identifies its bundled upstream as official Cua Driver Rust 0.37.0; platform and optional perception limits are recorded in the artifact.\nsources: Version-specific npm tarballs, repository lockfile, and linked Pi and Cua upstream sources in the artifact.\nadapter-decision: Native Pi is the recommended maintained solution; the established alternative replaces native session MCP and has no demonstrated advantage for these requirements.\ncapability-findings: Deferred discovery limits inline schemas but server summaries enter context; Windows and Linux driver startup depend on the live host.\nrecommended-paths: Test filters, hook denial, discovery, transports and cancellation on supported hosts; preserve the existing computer-use choice and test FFF using isolated benign fixtures.\n",
+  "acceptance": {
+    "revision": 10,
+    "rationale": "Version-specific sources justify native Pi MCP/codemode with integration tests and preserve the evidenced official Cua package.",
+    "criteria": [
+      {
+        "criterion": "MCP context and tool behavior supports evidence-based adoption or separate-package decision",
+        "support": "Pi 1.5.0 documentation and executable nested-call source establish discovery, exposure, transports, and hook routing; the artifact identifies integration tests still needed."
+      },
+      {
+        "criterion": "Capability package claims and OS limitations are sourced without speculative replacement",
+        "support": "The pinned extension identifies its bundled upstream as official Cua Driver Rust 0.37.0; platform and optional perception limits are recorded in the artifact."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "Version-specific npm tarballs, repository lockfile, and linked Pi and Cua upstream sources in the artifact."
+      },
+      {
+        "label": "adapter-decision",
+        "support": "Native Pi is the recommended maintained solution; the established alternative replaces native session MCP and has no demonstrated advantage for these requirements."
+      },
+      {
+        "label": "capability-findings",
+        "support": "Deferred discovery limits inline schemas but server summaries enter context; Windows and Linux driver startup depend on the live host."
+      },
+      {
+        "label": "recommended-paths",
+        "support": "Test filters, hook denial, discovery, transports and cancellation on supported hosts; preserve the existing computer-use choice and test FFF using isolated benign fixtures."
+      }
+    ]
   },
   "createdAt": "2026-11-13T12:17:04.138Z"
 }
