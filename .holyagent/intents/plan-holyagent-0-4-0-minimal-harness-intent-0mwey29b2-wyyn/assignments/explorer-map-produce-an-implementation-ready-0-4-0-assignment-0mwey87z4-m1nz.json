@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mwey87z4-m1nz",
+  "intentId": "intent-0mwey29b2-wyyn",
+  "intentRevision": 1,
+  "roleTask": "Explorer.map",
+  "slug": "produce-an-implementation-ready-0-4-0",
+  "objective": "Produce an implementation-ready 0.4.0 plan for minimal harness setup, native Codex/cloud support and proportional orchestration.",
+  "state": "Running",
+  "scope": [
+    "Existing 0.4.0 Intent intent-0mwey29b2-wyyn",
+    "Current HolyAgent Pi/Claude packaging/architecture; official Codex local/cloud docs"
+  ],
+  "constraints": [
+    "User explicitly asks to plan0.4.0 now while0.3.4 remains active, including bunx holyagent setup pi|claude|codex, Codex context_management/caching/optimization/cloud compatibility, simplified agents, optional gh-pr-stack skill with fewer PRs, and shared changes adapted across every supported harness. Latest clarification: simple tasks need no orchestration; orchestration depth/count must match task complexity. Read full planning Intent via CLI.",
+    "Act as HolyAgent explorer-map in /workspace/work/holyagent-034; read AGENTS.md,.claude/CLAUDE.md,role and relevant instruction-writing/evidence-judging guidance. User-selected GPT6.1Terra high; Workflow unavailable direct fallback. Planning only: no source/dependency/installation/VCS/state/security/account writes or paid model calls. No additional agents.",
+    "Use available public web search mcp__codex_apps__search_service_web_run and official OpenAI/Codex/GitHub docs/source for supported interfaces; distinguish native Codex harness from Codex inside Pi. Verify cloud differences before promising plugins/config/context-management knobs. No auth-file access.",
+    "Recommend current-to-target architecture and 2-3 options where material, then concrete command contract, idempotent minimal installer effects, local/cloud support matrix, optimization inventory with benefit/measurement/rollback and known unknowns, task proportionality decision rules, optional gh-pr-stack skill boundaries/PR grouping, cross-harness conformance tests and phased acceptance. Shared contracts should be common while adapter behavior respects actual APIs; don't fake uniform runtime features.",
+    "Propose direct root handling for straightforward low-risk work, one bounded specialist when useful, parallel work only for independent complex slices, and required independent review proportional to risk/repo rules. Keep planning/acceptance/VCS ownership and actual approval boundaries. Don't make universal Intent/workflow creation or delegation the new default for every chat question.",
+    "Save /workspace/work/034/040-plan.md outside repo. Return under500words with key contracts, verified source links and unknowns; detailed proposal in artifact. Do not implement0.4.0 or distract current0.3.4 writers."
+  ],
+  "criteria": [
+    {
+      "text": "Plan covers all explicit 0.4.0 requirements with task-proportional architecture",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Codex and cloud capability claims are sourced or explicitly unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "architecture-options",
+    "phased-plan",
+    "unknowns"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T12:24:21.856Z"
+  },
+  "createdAt": "2026-11-13T12:24:21.856Z"
+}
