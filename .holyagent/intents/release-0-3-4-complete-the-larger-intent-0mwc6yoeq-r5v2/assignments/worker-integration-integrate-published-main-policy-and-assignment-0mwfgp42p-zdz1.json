@@ -68,5 +68,41 @@
     "finishedAt": "2026-11-13T21:07:51.990Z"
   },
   "result": "status: done\nchanged:\n- .claude/CLAUDE.md\n- .github/workflows/validation.yml\n- AGENTS.md\n- README.md\n- docs/development.md\n- docs/pi/claude-parity.md\n- packages/integrations/pi/publishing.test.ts\n- packages/runtime/CLAUDE.md\n- scripts/npm-publishing.test.ts\n- scripts/pr-checks.test.ts\n- scripts/pr-checks.ts\n- scripts/workflows.test.ts\nchecks:\n- bunx --no-install mise run build -> exit 0\n- bunx --no-install mise run fmt -- <changed source files> -> exit 0\n- bunx --no-install mise run test -- scripts/pr-checks.test.ts scripts/npm-publishing.test.ts scripts/workflows.test.ts packages/integrations/pi/publishing.test.ts -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 0\n- bash -n install/wsl-install.sh -> exit 0\nnotes:\n- Full verify: 3494 passed, 2 skipped. PowerShell unavailable; Windows installer parsing remains for CI. First verify failed JSDoc lint, fixed before the passing run. Index remains unmerged for root to stage.\n- evidence:\nevidence:\n- Main dev release flow preserves the bounded unpublished repair exception and fails closed on published or unknown registry state: dev promotion requires advancement; exact repair ref and matching versions require exact npm version 404; published, malformed, auth and network states fail.\n- Consolidated AGENTS no draft policy publication nuance and main metadata survive integration without CLAUDE resurrection: AGENTS retains no-draft and immutable artifact rules; metadata preflight regressions pass; both CLAUDE files remain deleted.\n- Resolved source generated build static gates and focused release tests pass without weakening requirements: Build and focused 59 tests pass; supervised verify passes check, lint, format and 3494 tests (2 skipped).\n- checks-run: See checks array and /workspace/work/034/development-verify2.log and development-focused2.log.\n- changed-paths: See changed_paths array; 12 paths including two merge deletions.\n- diff-file: /workspace/work/034/development-main-forward.diff\n- conflicts-resolved: All six conflict files contain resolved source with no conflict markers; index deliberately untouched.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Integrateda26d8ce/full3494pass2skip+59focused/code/securityindependentpass; AGENTS-only7b69947 fixesartifactclaim andrereviewpasses. Main/devflow and boundedrepair retained, hostednewheadpending.",
+    "criteria": [
+      {
+        "criterion": "Main dev release flow preserves the bounded unpublished repair exception and fails closed on published or unknown registry state",
+        "support": "dev promotion requires advancement; exact repair ref and matching versions require exact npm version 404; published, malformed, auth and network states fail."
+      },
+      {
+        "criterion": "Consolidated AGENTS no draft policy publication nuance and main metadata survive integration without CLAUDE resurrection",
+        "support": "AGENTS retains no-draft and immutable artifact rules; metadata preflight regressions pass; both CLAUDE files remain deleted."
+      },
+      {
+        "criterion": "Resolved source generated build static gates and focused release tests pass without weakening requirements",
+        "support": "Build and focused 59 tests pass; supervised verify passes check, lint, format and 3494 tests (2 skipped)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "See checks array and /workspace/work/034/development-verify2.log and development-focused2.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "See changed_paths array; 12 paths including two merge deletions."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/development-main-forward.diff"
+      },
+      {
+        "label": "conflicts-resolved",
+        "support": "All six conflict files contain resolved source with no conflict markers; index deliberately untouched."
+      }
+    ]
+  },
   "createdAt": "2026-11-13T21:01:23.041Z"
 }
