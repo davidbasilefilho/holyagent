@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mwfklua4-yv6b",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-private-git-migration-commit",
+  "objective": "Implement private Git migration commit and conflict checked live index publication helpers with real Git tests.",
+  "state": "Running",
+  "scope": [
+    "Only /workspace/work/holyagent-034-core newfiles packages/core/src/state/migration-index.ts and packages/core/tests/migration-index.test.ts. NOtree.ts/process.ts/revocationtestchanges. Previouswhole-taskattemptspartial, actualdiagnosiscomplete. Actualmodulecode required, notanotherdesign-onlyhandoff. Source/targetcleanhelpers mustpreserveunrelatedstaged/unstagededits.",
+    "Shared contract for two helper authors: Core migration will use a private index seeded from HEAD to create an exact migration-only tree/commit, durable journal BEFORE CAS ref update, then per-owned-path/index publication and source cleanup with recovery. Journal is canonical schema/type owner. Fields: version:1, transaction:string, sourceRoot:string,targetRoot:string,branch:string,parent:string,commit:string,tree:string,indexBefore:string,indexAfter:string,files:Array<{path:string,before:string|null,after:string,content:string,mode:number}>,source:Array<{path:string,digest:string,tracked:boolean}>,phase:'prepared'|'ref-published'|'target-published'|'source-cleaned'. Hex SHA fields accept repository's supported SHA1/SHA256; indexBefore/indexAfter are semantic index fingerprints or encoded snapshots as agreed by authors; before=null means absent; content base64; modes canonical file permissions; path canonical relative. Root fields must match caller-trusted canonical roots before use. Low-level helper Effects receive trusted authorization Effect before writes and caller holds initialization/domain locks. Authors may refine this contract jointly using direct messages, but no conflicting parallel edits. No API parser/CLI proxy, all mutations newcapability guarded. Existing partial source tree/tests are owned by neither helper author; leave untouched. No gates while peer source mutations happen; write meaningful tests and return module ready for integration (root will run combined meaningful gates before acceptance).",
+    "Prepareexactmigration-onlycommit usingtemp/privateindex seededHEAD, knowntrustedownedpaths/sourcecontent, hash-object/read-tree/update-index/commit-tree plumbing via effectfultrustedGit runner; noactualliveindex/worktreebeforepublication. Captureparent/tree/commit +semanticpre/postindexfactsforjournal. Allargvstructured, noGitCLI parserorHolyAgentprocessproxy. Newownedpathconflictsrefuse. Existingidenticaltargetpaths/preexistingeditsmustnotbeaccidentallycommitted.",
+    "PublishindexunderrealGitindex.lock: acquireexclusivelynofollow, inspectfreshactualindexentries/preimages, preserveunrelatedcurrententries (includingstaged/unstagedforeigncontent), updateonlyownedexpectedpre/postentriesusingprivatecopyandatomicindexpublication; conflictsfailwithoutdestructivereset. Idempotentrecoveryhandlespreorpostownedstate, unknownexternallychangedownedentriesreject. Callerhandlesjournal/refCAS/tree/source publication; no fulltree integrationinyourmodule.",
+    "UseexistingCoreEffect/process/FS/errorpatterns; optionalGitRunnerfunctionsignaturefornodeContextenvironmentprovidedcaller, no runtimeimports. Coordinatecontractwith /root/migration_journal_module onceavailable; canonicaljournaltypeslivenewmigration-journal.ts. Helpersboundedcallerinterruptible, no uninterruptibleexternalGit; no globalprocesspolicychanges.",
+    "AddactualisolatedGittempfixturetests: prepareprivatecommitdoesnotconsumeunrelatedstaged/unstagedchanges; liveindexpublishpreservesforeignentries; staleownedentry/indexlockcontentionfailpreservingdata; idempotentpostpublicationaccepted. Peerwritesotherfiles so no build/fullgateswhilepeerwrites; canreturnreadyforcombinedvalidation, honestchecks. Save /workspace/work/034/migration-index-module-report.json and .diff/APIcontract. Keepmodulefocusedandfinishactualcode."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Private commit and owned index publication helpers preserve unrelated edits and reject concurrent owned conflicts with safe retry semantics",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file",
+    "module-api",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/state/migration-index.ts",
+    "packages/core/tests/migration-index.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T22:50:48.844Z"
+  },
+  "createdAt": "2026-11-13T22:50:48.844Z"
+}
