@@ -72,6 +72,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_subscription_routing",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T13:57:54.275Z"
