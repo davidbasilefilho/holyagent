@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwf81md5-qd2f",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Reviewer.artifact",
+  "slug": "verify-the-maintainer-s-no-draft-pr",
+  "objective": "Verify the maintainer's no-draft-PR policy commit.",
+  "state": "Running",
+  "scope": [
+    "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..b95759de59c1cc0fcb129c1d57909cddf3b945bd in AGENTS.md only."
+  ],
+  "constraints": [
+    "Read-only /workspace/work/holyagent-034. The user explicitly instructed adding a rule never to create draft PRs, authorizing this AGENTS.md edit. Verify one clear rule, ready-for-review PRs may remain unmerged pending checks/prerequisites, no new merge authority or unrelated policy changes. Existing PR123 is verified ready, not draft. Inspect immutable diff and repository wording. No product tests needed for this one-line documentation change; no source/VCS/state writes or extra agents.",
+    "Save /workspace/work/034/no-draft-policy-review-report.json with status done|partial|blocked, changed_paths:[], checks:[{command,exit:number}], blockers,notes,evidence:[{key,support}]. Exact keys, <=150 words. Root owns push and PR metadata."
+  ],
+  "criteria": [
+    {
+      "text": "The committed policy accurately implements the user's no-draft instruction without unrelated changes",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf6i5q1-rjlc"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T16:59:10.073Z"
+  },
+  "createdAt": "2026-11-13T16:59:10.073Z"
+}
