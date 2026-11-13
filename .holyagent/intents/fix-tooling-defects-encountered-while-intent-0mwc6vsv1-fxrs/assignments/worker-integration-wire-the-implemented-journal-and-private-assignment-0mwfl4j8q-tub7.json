@@ -1,0 +1,76 @@
+{
+  "id": "assignment-0mwfl4j8q-tub7",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.integration",
+  "slug": "wire-the-implemented-journal-and-private",
+  "objective": "Wire the implemented journal and private-index helpers into a working cancellable state migration and prove recovery end to end.",
+  "state": "Running",
+  "scope": [
+    "Work only in /workspace/work/holyagent-034-core, branch release/0.3.4/feat/shared-core at 6ebdf1e plus preserved partial changes and four new helper/test files. Both module writers are terminal; you are sole writer here. Read /workspace/work/034/migration-journal-module-report.json, migration-index-module-api.md, migration-index-module-report.json, and the two actual new modules. They exist and have isolated tests; no need to repeat architecture research or return another design-only handoff.",
+    "Journal exports beginMigrationJournal, readMigrationJournal, advanceMigrationJournal, finishMigrationJournal and strict types/errors. Index helper exports prepareMigrationCommit and publishMigrationIndex; returns known parent/tree/commit, semantic owned-index fingerprints and per-path blob pre/postimages. Index publication holds index.lock and preserves unrelated current entries. Four real Git index tests and four journal tests passed in isolated copies; combined repository validation is still required.",
+    "Replace the uninterruptible live-copy/live-index migration in tree.ts with these helpers. Under existing initialization/domain locks and live operation + state.initialize grant: preflight and plan exact owned paths; prepare private migration-only commit; begin durable journal before CAS ref update; reconcile actual ref if abort occurs after update; publish only expected owned file/index postimages with conflict checks; clean source only after target is verified. Advance phases idempotently and finish only when source cleanup is safe. Do not overwrite unexpected user edits or infer commit failure from an exit code. Pending journals must prevent peek/readers from seeing partial state and support the next authorized recovery attempt.",
+    "Preserve actual staged/unstaged source and unrelated target edits. The current partial tree refuses every dirty target; narrow that to true owned conflicts so the unrelated staged-edit regression can succeed. Existing identical target records must not accidentally commit their manual edits. Clean source paths can be migrated normally; conflicting tracked source edits must remain or fail actionably without destructive reset. Existing source-retention safeguards and stronger tests must not be discarded to fake success.",
+    "Keep checkout interruptible and all post-preparation authorization checks. External Git cannot run inside unbounded uninterruptibility. Use optional compatible process bounds/termination support if necessary; preserve legitimate setup/VCS calls in the other worktree. A previously authorized small atomic filesystem update can finish consistently. Prove cancellation at the actual new commit/ref publication point, including the case where the ref changed before the child reports success.",
+    "Journal parent must be canonical/private and created safely under authority. Validate journal roots/branch against trusted current context; never execute its unchecked paths. Consider Windows path/permission behavior: POSIX uid/mode assumptions cannot falsely claim Windows ownership or disable all legitimate Windows migrations. Reuse existing portable state/path helpers. No arbitrary scope limits or new approval flow; metadata safety errors should be short and actionable.",
+    "Keep all three red real-Git regressions from /workspace/work/034/core-migration-recovery-red.log: stalled commit, committed-before-abort ambiguity, unrelated staged target edit. Adapt fixture interception to the real new CAS/commit point rather than silently skipping it. Add end-to-end recovery before/after CAS and partial target publication, reader protection, concurrent owned-conflict preservation, and existing read-only/revocation/Node SDK checks.",
+    "Run module tests and the complete revocation suite first, fix production code until they pass, then focused state/migration/CLI/Node tests, build/static and one supervised full verify on final candidate. No source/build mutations during gates. No live account/network/paid session or actual shared-state writes; all fixtures outside repository ancestry.",
+    "All implementation files needed for this migration are owned below, including helper revisions now that their authors finished. Other /workspace/work/holyagent-034-core-host has independently completed business API extraction at31a9702 and will merge this final repair later; do not edit it. Preserve existing function signatures with optional additions and describe integration seams.",
+    "Save /workspace/work/034/core-migration-integrated-report.json, complete incremental.diff from6ebdf1e including all untracked files, and concise transaction/recovery notes. Actual end-to-end passing code is required; a report that the already-implemented helpers still need wiring does not complete this assignment. Report under400words plus paths/logs, keep prior failed/partial reports."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Integrated journaled migration cancels within a proven bound and recovers correctly before and after ref publication without partial reader visibility",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Source target staged and unstaged edits read only and revoked authority remain safe with precise conflict handling",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "All real Git migration regressions helper tests Node compatibility build static and supervised full verification pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "red-green-proof",
+    "transaction-and-recovery",
+    "integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/state",
+    "packages/core/tests",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/state-hook-locks.test.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "docs/core-api.md",
+    "docs/native-tools.md",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/core_host_application_resume",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T23:05:21.002Z"
+  },
+  "createdAt": "2026-11-13T23:05:21.002Z"
+}
