@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf20x86-x624",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.security",
+  "slug": "close-the-ignored-state-handoff-finding",
+  "objective": "Close the ignored-state handoff finding with a bounded independent security re-review.",
+  "state": "Running",
+  "scope": [
+    "f2110f1fd9b855a28217d299f46731eba4f5632d..edce18fee6579d591d59a629765225e2e0e955cd only, plus prior finding context."
+  ],
+  "constraints": [
+    "Read-only /workspace/work/holyagent-034-state at exactedce18fee6579d591d59a629765225e2e0e955cd. Review /workspace/work/034/handoff-ignored-repair-report.json, handoff-ignored-repair.diff and state-rereview-security.json. Writers terminal, generatedbuildpassedsourcehashstable. No actualVCS/statewrites/extraagents/remote/modelcalls. TempGitfixtures allowed. Must be actually independent frombothwriters, formalcrossIntentindependentFromlinksrestricted. Root owns VCS, repo rules andstandardtoolchainenvapply.",
+    "Re-run exact isolated ignored-file reproduction and confirm truthful no-write refusal, check resulting source trace.",
+    "Run meaningful focusedchecks ifshellavailable, don'trepeatfullverify. No securityvulnerabilityclaim withoutboundedsource-to-output/repro. Localreservations scheduling only; handoffreadonly canrefuseambiguouspendingstate actionably, cleantrackedhistorical copies accepted bydocumentedmigrationcontract. LiveCI/PRunknown unchanged. Diffimmutablecommittedhead. JSON /workspace/work/034/state-final-review-security.json CLIshape/exactkeys, <=200wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Ignored-state omission is closed without new blockers in the repair",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf16ao4-4hqz"
+  ],
+  "followUpOf": "assignment-0mwf1op4r-n1z1",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T14:10:39.798Z"
+  },
+  "createdAt": "2026-11-13T14:10:39.798Z"
+}
