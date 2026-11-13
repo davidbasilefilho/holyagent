@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mwfjniny-jmrq",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.artifact",
+  "slug": "verify-routing-documentation-and-user",
+  "objective": "Verify routing documentation and user visible claims accurately describe profiles and real scoring limitations.",
+  "state": "Running",
+  "scope": [
+    "Read immutable c3c935108a3bd3958f6dbcb7bc2d96f11eba212b...f70c650c /workspace/work/holyagent-034-routing, especiallydocs/routing.md (21lines) andpublichelp/configerrorsfornewprofiles. Priorfinalgates915focused/full3518pass2skip; actualbenchmarkdatasetmissing. Mustnotclaimmeasuredoptimalranking/realaccountplanentitlementorobservedlaunchidentityfromdeclaredmetadata. UserfastCodexrootTerra andClaudefastROOTSonnet (notjustspecialists), explicitoverrides/harnessrootselectionlimitsaccurate.",
+    "Readactualsourceenough tocheckdocs claim; docs-implementation mismatchrequiresprecisetrace, no testsneededformereprose. Preserve user/thirdpartyproviders and no inventedaccountsetupclaims. Save /workspace/work/034/routing-current-artifact-review-report.json; no writesoutsideownreport."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Routing documentation and visible claims match actual provider harness profile and missing data behavior without unsupported optimization claims",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfidci0-cj9b"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T22:24:07.487Z"
+  },
+  "createdAt": "2026-11-13T22:24:07.487Z"
+}
