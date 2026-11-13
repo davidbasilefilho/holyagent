@@ -37,6 +37,7 @@
     "assignment-0mwfgp42p-zdz1"
   ],
   "specialist": {
+    "agentId": "/root/development_main_security_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T21:10:36.975Z"
