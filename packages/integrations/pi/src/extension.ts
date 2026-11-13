@@ -677,7 +677,13 @@ export const refuseProfileLaunch = (
       block: true,
       reason: `Exact model ${model} is not available with configured authentication. Check the provider, model and login; entitlement remains unverified.`,
     }
-  return undefined
+  // Authentication proves availability, not that this model is authorized for the assignment.
+  // Until the host supplies trusted current dispatch and configuration state, fail closed.
+  return {
+    block: true,
+    reason:
+      "Profile routing cannot verify this launch against trusted assignment routing state. No Agent was launched.",
+  }
 }
 
 /**

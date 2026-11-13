@@ -19182,7 +19182,7 @@ var codexSettings = (config) => {
     family: profile.family,
     contextManagement: contextManagementOn(config),
     lunaReserve: config.pi.features.lunaReserve,
-    applyPatchAgents: RoleTask.literals.flatMap((roleTask) => (config.pi.routes[roleTask].provider ?? config.pi.provider) === "openai-codex" && toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL) ? [
+    applyPatchAgents: RoleTask.literals.flatMap((roleTask) => toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL) ? [
       agentFor(routeFor(roleTask), false),
       agentFor(routeFor(roleTask), true, "normal"),
       agentFor(routeFor(roleTask), true, "headless")
@@ -19584,7 +19584,10 @@ var refuseProfileLaunch = (event, active, registry) => {
       block: true,
       reason: `Exact model ${model} is not available with configured authentication. Check the provider, model and login; entitlement remains unverified.`
     };
-  return;
+  return {
+    block: true,
+    reason: "Profile routing cannot verify this launch against trusted assignment routing state. No Agent was launched."
+  };
 };
 var refuseExcludedTool = (event, excluded) => excluded.some((pattern) => toolMatches(pattern, event.toolName)) ? {
   block: true,

@@ -20,7 +20,7 @@ import {
   refuseUnassignedWebTool,
 } from "../src/extension.ts"
 
-test("a Codex writing role under a Kimi root gets Codex tools without giving them to Kimi roles", async () => {
+test("a Codex-enabled config identifies eligible writing roles", async () => {
   const config = await Effect.runPromise(
     Schema.decodeUnknownEffect(Config, { onExcessProperty: "error" })({
       pi: { routes: { "Worker.integration": { provider: "openai-codex" } } },
@@ -28,7 +28,18 @@ test("a Codex writing role under a Kimi root gets Codex tools without giving the
   )
   const settings = codexSettings(config)
   expect(settings?.applyPatchAgents).toContain("worker-integration")
-  expect(settings?.applyPatchAgents).not.toContain("worker-implementation")
+  expect(settings?.applyPatchAgents).toContain("worker-implementation")
+})
+
+test("ranked Codex writers receive patch access, but read-only roles do not", async () => {
+  const config = await Effect.runPromise(
+    Schema.decodeUnknownEffect(Config)({
+      pi: { profile: "fast", routes: { "Worker.integration": { provider: "openai-codex" } } },
+    }),
+  )
+  const settings = codexSettings(config)
+  expect(settings?.applyPatchAgents).toContain("worker-implementation")
+  expect(settings?.applyPatchAgents).not.toContain("reviewer-code")
 })
 
 test("explicit fallback and enabled native search remain callable independently of the model", () => {
@@ -81,8 +92,8 @@ test("profile launch gates require exact available provider/model and refuse bot
         { toolName, input: { model: "openai-codex/gpt-6.1-sol" } },
         true,
         registry,
-      ),
-    ).toBeUndefined()
+      )?.block,
+    ).toBe(true)
     expect(
       refuseProfileLaunch({ toolName, input: { model: "kimi-coding/gpt-6.1-sol" } }, true, registry)
         ?.block,
@@ -174,7 +185,7 @@ test("real Pi codemode nested calls cannot use wrong-provider fallback", async (
         JSON.stringify(
           await runCode('text(await tools.Agent({ model: "openai-codex/gpt-6.1-sol" }))'),
         ),
-      ).toContain("fixture ran")
+      ).toContain("cannot verify this launch")
       expect(
         JSON.stringify(
           await runCode(

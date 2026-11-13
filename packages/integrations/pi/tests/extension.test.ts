@@ -4324,7 +4324,13 @@ describe("profile routing host gate", () => {
       members: { modelRegistry: registry },
     })
     for (const tool of ["Agent", "agent"]) {
-      expect(await api.emit("tool_call", call(tool))).toEqual([undefined])
+      expect(await api.emit("tool_call", call(tool))).toEqual([
+        expect.objectContaining({
+          block: true,
+          reason:
+            "Profile routing cannot verify this launch against trusted assignment routing state. No Agent was launched.",
+        }),
+      ])
       expect(await api.emit("tool_call", call(tool, "kimi-coding/gpt-6.1-sol"))).toEqual([
         expect.objectContaining({ block: true }),
       ])
