@@ -1,0 +1,72 @@
+{
+  "id": "assignment-0mwfksyxo-hfti",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "bind-profiled-agent-launches-to-their",
+  "objective": "Bind profiled Agent launches to their trusted routing selection and repair related Codex tool and documentation gaps.",
+  "state": "Running",
+  "scope": [
+    "Work only in /workspace/work/holyagent-034-routing, clean commit f70c650c. Read /workspace/work/034/routing-current-security-review-report.json, routing-current-code-review-report.json, and routing-current-artifact-review-report.json. The author candidate passed 915 focused and 3518 full tests; independent code review passed 378 tests, but security found a medium blocker.",
+    "The profile gate currently accepts any authenticated registry provider/model in model-controlled Agent input. It must also enforce the actual trusted role/assignment routing selection, configured providers/candidates and explicit configured overrides. Registry authentication alone is not route authorization. Derive or load the expected selection from trusted current configuration and dispatch state; do not treat model-supplied expected-model/approval fields as proof. Cover direct, chain and parallel Agent payloads and both canonical/alias tool names. If a selection cannot be verified under an active profile/ranking policy, fail clearly rather than silently choosing another provider. Keep legacy behavior when profiles are inactive.",
+    "Preserve intentional unscored policy fallback when the exact comparable subscription dataset is missing. Candidate lists constrain ranked evidence, while fallback is separately governed by the configured policy; document the precise contract instead of calling candidates a universal allowlist. Explicit trusted overrides win. No invented benchmark or account entitlement. Claude fast root is Sonnet; Codex fast root is Terra. Preserve current harness limitations honestly.",
+    "Fix the optional Codex apply_patch gap: a writer ranked from a Kimi policy route onto an enabled Codex provider must receive the correct Codex tool settings based on actual selected provider, while retaining role write restrictions. Do not activate writable tools for read-only roles. Correct docs/routing.md so it states Pi setup root defaults can derive from pi.profile.",
+    "Add meaningful red-to-green tests for an authenticated but out-of-policy Agent model, assignment/role binding, configured override, missing-data fallback, direct/chain/parallel payloads, and cross-provider Codex writer/read-only settings. Use isolated fixture ports, no live provider or paid session. Avoid a new CLI proxy: the final Core consumer will need typed semantic state/config access. Clearly identify any adapter seam for parent integration.",
+    "Run focused routing/SDK/extension and relevant policy tests, build/static and one supervised full verify on the final candidate. Do not mutate during gates. Save /workspace/work/034/routing-policy-repair-report.json and incremental.diff from f70c650c; preserve previous reports and state exact limits. Implement the repair rather than returning an options-only report."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Profiled Agent launches match trusted role or assignment routing policy and reject authenticated out of policy models",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Actual selected Codex writers get apply patch while read only roles overrides fallback and legacy behavior remain correct",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Meaningful policy SDK tests current build static full verification and accurate routing documentation pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "red-green-proof",
+    "core-integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/runtime/src/cli",
+    "packages/runtime/src/config",
+    "packages/runtime/src/domain",
+    "packages/runtime/src/pi",
+    "packages/runtime/src/routing",
+    "packages/runtime/tests/routing.test.ts",
+    "packages/runtime/tests/routing-dispatch.test.ts",
+    "packages/runtime/tests/pi",
+    "docs/routing.md",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T22:56:21.469Z"
+  },
+  "createdAt": "2026-11-13T22:56:21.469Z"
+}
