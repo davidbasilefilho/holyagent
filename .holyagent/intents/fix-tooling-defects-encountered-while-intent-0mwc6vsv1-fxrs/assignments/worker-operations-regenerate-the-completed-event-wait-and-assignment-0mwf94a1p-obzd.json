@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "regenerate-the-completed-event-wait-and",
   "objective": "Regenerate the completed event-wait and safe tool aliases source and verify focused runtime/instruction freshness.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work /workspace/work/holyagent-034-events; source complete per /workspace/work/034/events-global-repair-report.json. Rebuild assets and run affected event wait/aliases, integration/instruction freshness and workflow policy tests, type/lint/fmt. No source repair or full verify yet."
   ],
@@ -35,7 +35,33 @@
     "agentId": "/root/r034_events_regenerated_check",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T17:29:13.693Z"
+    "startedAt": "2026-11-13T17:29:13.693Z",
+    "finishedAt": "2026-11-13T17:33:23.891Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/claude/dist/agents/holyagent.md\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent.js\nchecks:\n- Claude and Pi exported build functions into /tmp staging; copy distribution outputs to owned paths -> exit 0\n- diff -qr staged and worktree Claude and Pi dist directories -> exit 0\n- bun test focused event-wait, aliases, runtime instruction/workflow, Pi and Claude integration, workflow policy suites (12 files) -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- 843 tests passed, including both committed generated-file freshness comparisons; 0 failed. Type check: 322 files; lint: 323 files; formatting: 743 files.\n- Build functions were run in staging to avoid version synchronization and marketplace writes outside ownership; staged distributions match worktree distributions exactly. Logs: /workspace/work/034/events-regenerated-{build,focused,check,lint,fmt}.log. Full verify was outside scope.\nevidence:\n- Generated event-wait and alias assets are current and meaningful affected checks pass or are accurately diagnosed: Both staged distributions match the worktree exactly; 843 focused tests passed including generated-file freshness comparisons.\n- checks-run: Build, distribution comparison, 12 focused test files, type check, lint and format check exited 0; logs at /workspace/work/034/events-regenerated-*.log.\n- changed-paths: Four modified distribution paths listed in changed_paths.\n- failures: None.",
+  "acceptance": {
+    "revision": 8,
+    "rationale": "Generated distributions exactly match exported build functions; 843 affected tests and type/lint/fmt pass. Full integrated verification remains pending.",
+    "criteria": [
+      {
+        "criterion": "Generated event-wait and alias assets are current and meaningful affected checks pass or are accurately diagnosed",
+        "support": "Both staged distributions match the worktree exactly; 843 focused tests passed including generated-file freshness comparisons."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Build, distribution comparison, 12 focused test files, type check, lint and format check exited 0; logs at /workspace/work/034/events-regenerated-*.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Four modified distribution paths listed in changed_paths."
+      },
+      {
+        "label": "failures",
+        "support": "None."
+      }
+    ]
   },
   "createdAt": "2026-11-13T17:29:13.693Z"
 }
