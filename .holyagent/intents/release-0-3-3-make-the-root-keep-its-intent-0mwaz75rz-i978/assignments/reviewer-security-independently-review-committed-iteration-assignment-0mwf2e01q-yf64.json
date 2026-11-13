@@ -39,6 +39,7 @@
     "assignment-0mwf20yvo-13go"
   ],
   "specialist": {
+    "agentId": "/root/r034_guidance_review_security",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T14:20:49.982Z"
