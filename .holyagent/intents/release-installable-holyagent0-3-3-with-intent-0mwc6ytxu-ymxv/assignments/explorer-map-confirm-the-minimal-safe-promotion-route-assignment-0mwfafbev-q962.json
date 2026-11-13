@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwfafbev-q962",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 30,
+  "roleTask": "Explorer.map",
+  "slug": "confirm-the-minimal-safe-promotion-route",
+  "objective": "Confirm the minimal safe promotion route for the already-on-main but unpublished0.3.3 metadata repair.",
+  "state": "Running",
+  "scope": [
+    "Read-only repository/GitHub policy mapping for PR126 head46963a4 target release/0.3.3/integration. main44c79ab2 root0.3.3 tree equals integration9c8edee7 before five-path fix. Repository allows squash only. Main ruleset26614767 strict required check/windows/installers/branch-model/version, no bypass. Integration ruleset26614707 PR/no force/no delete. npm environment already allows main and release/*/integration.",
+    "Determine exact unavoidable promotion blocks after126normal squash merge: same-version requiredversion check, and whether strict up-to-date main ancestry also blocks reused integration after previous main squash. Use actual compare/graph/docs as necessary, clearly distinguish proven vs hypothetical. Return minimal concrete user-admin exception/action if normal protected PR flow cannot publish same0.3.3. Do not suggest false statuses, token/provenance fallback, unprotected publishing, or silently weakening guards."
+  ],
+  "constraints": [
+    "Work /workspace/work/holyagent-033-publish. Read AGENTS/GPT Explorer.map. Read-only Git/gh/API/official docs only; no source/generated/VCS/config/state/remote writes, no subagents or live model/publication. Do not investigate executable/bin issue: user explicitly defers that until after0.3.3publication.",
+    "Keep bounded to actual release-route uncertainty, no speculative alternative architecture. Source repair is already locally3500pass2skip and independently code/securityaccepted. CIwatch owns126 observations; do not duplicate monitoring. Root handles all action/permission decisions.",
+    "Save /workspace/work/034/033-promotion-route-report.json exact schema status done|partial|blocked,changed_paths:[],checks array numeric exit,blockers:[],notes:[],evidence:[{key,support}]. <=250words with exact actionable conclusion and limits."
+  ],
+  "criteria": [
+    {
+      "text": "Promotion obstacles and smallest necessary user action are supported by current repository facts without a protection workaround",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "facts",
+    "recommended-route",
+    "uncertainties",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T18:05:48.295Z"
+  },
+  "createdAt": "2026-11-13T18:05:48.295Z"
+}
