@@ -39,6 +39,7 @@
     "assignment-0mwezkhrb-0ml6"
   ],
   "specialist": {
+    "agentId": "/root/r034_state_review_artifact",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T13:41:37.161Z"
