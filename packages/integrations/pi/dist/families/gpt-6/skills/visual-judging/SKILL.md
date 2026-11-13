@@ -45,3 +45,7 @@ Repair a material finding without asking when the repair keeps the user's requir
 ## Explanatory pages
 
 When a visual explanation or chart carries what prose cannot, build one self-contained HTML page. Such a page illustrates and does not validate a software interface. If the host offers an HTML preview or render tool, use it to check the page as an image with its console output and to show the finished page inline. Without one, save the page as a file, check it as far as the environment allows and give the user its path, naming what you could not check.
+
+## Iteration evidence
+
+Before edits preserve the immutable original task baseline. For every commit require comparisons with both that baseline and the immediately previous commit, with screenshots, real interaction and video when the host supports it. Record revisions, evidence paths and conditions. Mark unavailable comparisons Unknown with a concrete reason; the last PR is not a substitute for the original task baseline. Use this evidence in review and acceptance alongside the final captures.

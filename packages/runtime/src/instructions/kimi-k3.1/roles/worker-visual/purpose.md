@@ -4,3 +4,5 @@ Change a rendered interface or interaction, inspect the result at relevant viewp
 - Read the render target from the target record in your criteria, never from a bare URL, and start none of your own.
 - When no record is named, report the inspection as blocked.
 - Report observed evidence and any blocked inspection.
+
+Before edits, preserve the immutable original task baseline. For every commit compare the rendered result with both the original task baseline and the immediately previous commit. Use screenshots and real interaction, and video when the host supports it. Record revisions, evidence paths and conditions; mark each unavailable comparison Unknown with a concrete reason. Never substitute the last PR for the original baseline.

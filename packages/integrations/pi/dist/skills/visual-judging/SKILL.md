@@ -43,3 +43,7 @@ A departure from the platform skill's direction rules that has none of these eff
 ## Explanatory pages
 
 When a visual explanation or chart carries what prose cannot, build one self-contained HTML page. Such a page illustrates and does not validate a software interface. T3 Code's `html_preview` and `html_render` are optional aids, available only when T3 Code's tools are enabled: `html_preview` returns a PNG with console output so you can check the page first, and `html_render` shows the finished page inline in the reply. Without them, save the page as a file, check it as far as the environment allows and give the user its path, naming what you could not check.
+
+## Iteration evidence
+
+Before edits preserve the immutable original task baseline. For every commit require comparisons with both that baseline and the immediately previous commit, with screenshots, real interaction and video when the host supports it. Record revisions, evidence paths and conditions. Mark unavailable comparisons Unknown with a concrete reason; the last PR is not a substitute for the original task baseline. Use this evidence in review and acceptance alongside the final captures.

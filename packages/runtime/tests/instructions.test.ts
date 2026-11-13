@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { Effect } from "effect"
+
 import { ROUTES } from "../src/domain/route.ts"
 import { FAMILIES, type Family } from "../src/instructions/families.ts"
+import { skillFiles } from "../src/instructions/skills.ts"
 
 const INSTRUCTIONS = join(import.meta.dir, "../src/instructions")
 
@@ -141,6 +144,7 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
       "evidence-judging",
       "instruction-writing",
       "mobile-design",
+      "performance-iteration",
       "state-mode",
       "tui-design",
       "user-busy",
@@ -156,6 +160,15 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
       expect(keys).toContain("description")
       expect(text).toContain(`name: ${skill}\n`)
     }
+  })
+
+  test("assembles iteration guidance for the shared harness skill pipeline", async () => {
+    const skills = await Effect.runPromise(skillFiles(family, () => "test source"))
+    const performance = skills.find((skill) => skill.path === "performance-iteration/SKILL.md")
+    expect(performance?.content).toContain("immediately previous commit")
+    expect(performance?.content).toContain("Before edits")
+    const design = skills.find((skill) => skill.path === "web-design/SKILL.md")
+    expect(design?.content).toContain("fluid component and route animation")
   })
 
   test("start the bundled CLI only in the form the family documents", () => {

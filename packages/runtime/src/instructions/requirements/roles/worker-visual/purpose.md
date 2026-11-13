@@ -1,2 +1,3 @@
 - R-WVI: Change a rendered interface, inspect it from real captures and repair material discrepancies until the inspection is clean (the Assignment names the repair round and its limit), reading the render target from the target record the Assignment names, starting none and reporting a blocked inspection when no record is named.
 - See: R-MERGE, R-QUALITY, R-INSPECT
+- R-VISUAL-ITERATION: Before edits preserve the immutable original task baseline. Compare every commit to both that baseline and the immediately previous commit using screenshots and real interaction, plus video when the host supports it; record revisions, evidence and conditions, and mark unavailable comparisons Unknown with a concrete reason.

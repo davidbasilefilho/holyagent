@@ -35,3 +35,7 @@ A departure from the platform skill's direction rules that has none of these eff
 ## Explanatory pages
 
 When a visual explanation or chart carries what prose cannot, build one self-contained HTML page. `html_preview` returns a PNG with console output so you can check it first; `html_render` shows the finished page inline in the reply. Such a page illustrates and does not validate a software interface.
+
+## Iteration evidence
+
+Before edits preserve the immutable original task baseline. For every commit require comparisons with both that baseline and the immediately previous commit, with screenshots, real interaction and video when the host supports it. Record revisions, evidence paths and conditions. Mark unavailable comparisons Unknown with a concrete reason; the last PR is not a substitute for the original task baseline. Use this evidence in review and acceptance alongside the final captures.

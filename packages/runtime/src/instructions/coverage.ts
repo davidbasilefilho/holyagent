@@ -20,6 +20,27 @@ export type Coverage =
  */
 export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<string, Coverage>>>> = {
   "claude-5.5": {
+    "R-HANDOFF": {
+      section: "skills/state-mode/SKILL.md",
+      phrase: "after each Assignment close and merge",
+    },
+    "R-HANDOFF-ROUTE": {
+      section: "root/identity.md",
+      phrase: "load the state-mode skill for handoff durability",
+    },
+    "R-VISUAL-ITERATION": {
+      section: "roles/worker-visual/purpose.md",
+      phrase: "immutable original task baseline",
+    },
+    "R-DESIGN-QUALITY": {
+      section: "design-core/core.md",
+      phrase: "fluid component and route animation",
+    },
+    "R-PERFORMANCE": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
       carriedBy: "scripts/stop-slop-policy.test.ts",
       phrase: "other families remain unchanged",
@@ -315,6 +336,27 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
   },
   "kimi-k3.1": {
+    "R-HANDOFF": {
+      section: "skills/state-mode/SKILL.md",
+      phrase: "after each Assignment close and merge",
+    },
+    "R-HANDOFF-ROUTE": {
+      section: "root/identity.md",
+      phrase: "load the state-mode skill for handoff durability",
+    },
+    "R-VISUAL-ITERATION": {
+      section: "roles/worker-visual/purpose.md",
+      phrase: "immutable original task baseline",
+    },
+    "R-DESIGN-QUALITY": {
+      section: "design-core/core.md",
+      phrase: "fluid component and route animation",
+    },
+    "R-PERFORMANCE": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
       carriedBy: "scripts/stop-slop-policy.test.ts",
       phrase: "other families remain unchanged",
@@ -399,7 +441,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
     "R-CACHE-REUSE": {
       section: "root/dispatch.md",
-      phrase: "continues an idle specialist of the same role, model and effort",
+      phrase: "selects an idle specialist of the same role, model and effort",
     },
     "R-COMMIT-PR": {
       section: "root/pr-text.md",
@@ -627,6 +669,27 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
   },
   "gpt-6": {
+    "R-HANDOFF": {
+      section: "skills/state-mode/SKILL.md",
+      phrase: "after each Assignment close and merge",
+    },
+    "R-HANDOFF-ROUTE": {
+      section: "root/identity.md",
+      phrase: "load the state-mode skill for handoff durability",
+    },
+    "R-VISUAL-ITERATION": {
+      section: "roles/worker-visual/purpose.md",
+      phrase: "immutable original task baseline",
+    },
+    "R-DESIGN-QUALITY": {
+      section: "design-core/core.md",
+      phrase: "fluid component and route animation",
+    },
+    "R-PERFORMANCE": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
       section: "specialist/conduct.md",
       phrase: "For human-facing prose, write directly and specifically",
