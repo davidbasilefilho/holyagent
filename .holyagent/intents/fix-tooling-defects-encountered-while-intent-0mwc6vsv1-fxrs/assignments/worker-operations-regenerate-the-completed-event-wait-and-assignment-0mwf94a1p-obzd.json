@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwf94a1p-obzd",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-the-completed-event-wait-and",
+  "objective": "Regenerate the completed event-wait and safe tool aliases source and verify focused runtime/instruction freshness.",
+  "state": "Running",
+  "scope": [
+    "Work /workspace/work/holyagent-034-events; source complete per /workspace/work/034/events-global-repair-report.json. Rebuild assets and run affected event wait/aliases, integration/instruction freshness and workflow policy tests, type/lint/fmt. No source repair or full verify yet."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT operations directives. No VCS/Git config/state writes, no paid/live Pi calls, no source edits; generated files only through build. Report current failures precisely, do not weaken tests. Set MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "JSON /workspace/work/034/events-regenerated-check-report.json status done|partial|blocked, changed_paths, checks numeric exit, blockers, notes array, evidence key/support exact. <=200wordsummary, logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Generated event-wait and alias assets are current and meaningful affected checks pass or are accurately diagnosed",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "failures"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T17:29:13.693Z"
+  },
+  "createdAt": "2026-11-13T17:29:13.693Z"
+}
