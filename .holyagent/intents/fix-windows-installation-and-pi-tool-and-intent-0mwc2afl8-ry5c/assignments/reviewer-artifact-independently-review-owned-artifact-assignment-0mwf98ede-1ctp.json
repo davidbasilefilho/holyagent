@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "independently-review-owned-artifact",
   "objective": "Independently review owned-artifact current committed change.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..d9f21e91b6861e4ff5261b00b81fd33f7f22690f: requirements-first all three instruction families, owned role guidance map correctness, private on-demand routing/no global body preload, docs on host limitations/third-party preservation, documentation-lookup/Context7 provenance. No actual security isolation or host per-role filter claim. Existing performance-iteration from separate C not merged here yet: integration owner will add exact map entry; do not call absent independent branch feature a regression."
   ],
@@ -40,7 +40,37 @@
     "agentId": "/root/r034_owned_current_artifact_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T17:32:25.922Z"
+    "startedAt": "2026-11-13T17:32:25.922Z",
+    "finishedAt": "2026-11-13T17:36:28.341Z"
+  },
+  "result": "status: done\nchecks:\n- bunx --no-install mise run test -- packages/runtime/tests/scoped-skills.test.ts packages/integrations/pi/tests/scoped-skills.test.ts packages/integrations/claude/tests/plugin.test.ts -> exit 0\n- bunx --no-install mise run test -- packages/runtime/tests/instructions.test.ts packages/runtime/tests/setup.test.ts packages/integrations/pi/tests/pi.test.ts packages/integrations/pi/tests/extension.test.ts -> exit 0\nnotes:\n- Optional instruction duplication: packages/integrations/claude/dist/agents/holyagent.md:183 and :185 repeat ‘Read the relevant HolyAgent guidance file on demand’; the three root source files and skills.ts:310 produce it. Remove one copy while preserving coverage. No disagreement or material regression found.\nevidence:\n- The committed change satisfies its stated contract with no unresolved material review findings: Met: skills.ts:239-322 maps roles and validates bodies; family generators and generated prompts route on demand. Optional duplicate noted above.\n- Relevant regression evidence and actual host limitations are preserved accurately: Met: 510 focused tests pass; docs/owned-guidance.md:7-11 describes existing Context7 preservation, CLI provenance, SDK fixture limits and no live host or per-role filter claim.\n- reviewed-range: c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..d9f21e91b6861e4ff5261b00b81fd33f7f22690f; HEAD matched and tree clean.\n- findings: No blocking findings; one optional repeated instruction described in notes.\n- checks-run: Two mise test invocations exited 0: 84 and 426 tests respectively. Pi SDK fixture is not a live child session; no live model or host session was run.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Instruction maps/generated outputs reviewed with510 focused tests; optional duplicate retained as repair item before push.",
+    "criteria": [
+      {
+        "criterion": "The committed change satisfies its stated contract with no unresolved material review findings",
+        "support": "Met: skills.ts:239-322 maps roles and validates bodies; family generators and generated prompts route on demand. Optional duplicate noted above."
+      },
+      {
+        "criterion": "Relevant regression evidence and actual host limitations are preserved accurately",
+        "support": "Met: 510 focused tests pass; docs/owned-guidance.md:7-11 describes existing Context7 preservation, CLI provenance, SDK fixture limits and no live host or per-role filter claim."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..d9f21e91b6861e4ff5261b00b81fd33f7f22690f; HEAD matched and tree clean."
+      },
+      {
+        "label": "findings",
+        "support": "No blocking findings; one optional repeated instruction described in notes."
+      },
+      {
+        "label": "checks-run",
+        "support": "Two mise test invocations exited 0: 84 and 426 tests respectively. Pi SDK fixture is not a live child session; no live model or host session was run."
+      }
+    ]
   },
   "createdAt": "2026-11-13T17:32:25.922Z"
 }
