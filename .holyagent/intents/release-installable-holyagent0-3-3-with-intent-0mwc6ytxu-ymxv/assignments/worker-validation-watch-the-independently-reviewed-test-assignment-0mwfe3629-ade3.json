@@ -33,7 +33,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwfdbuj3-wg9d",
   "specialist": {
-    "agentId": "/root/r033_final_pr_ci_watch",
+    "agentId": "/root/r033_resumed_ci_watch",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T19:48:19.953Z"
