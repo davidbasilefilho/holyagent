@@ -36,6 +36,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_plain_cli_final_gates",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T17:25:18.309Z"
