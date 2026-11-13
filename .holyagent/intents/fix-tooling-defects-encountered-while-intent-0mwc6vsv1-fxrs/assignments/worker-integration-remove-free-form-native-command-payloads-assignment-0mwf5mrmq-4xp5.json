@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "remove-free-form-native-command-payloads",
   "objective": "Remove free-form native command payloads from OS process arguments.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read native-review-security.json validatedmediumfinding: assignmentcloseaccept,assignmentacceptrationale,intentclosereason/drop reachspawnargv. FixALLfree-formpayloads viaPRIVATEstrictstdin request envelope containing internally preparedfixedCLIargs+originalcommandstdin, notOSargv. Private cancellationIPCremainsCANCELONLY. ChilddecodeenvelopeandinvokesexistingCLIinmemory; modeltoolstilltypedpercommand,nogenericargvtool. ExistingpublicCLIargs/stdinsemanticsunchanged. Rootselectsenvelopetoavoidper-commandnewflags; protocolversion/schema strict, fixedprocessargv/script/projectonly, no tempfiles/payloadlogging. Preserveuser/mergedconfigrootcap, missingIPCfailclosed, stdout/error/exit/limits, cooperativecancel+uninterruptiblepersist+30sindeterminatefallback. TestactualproductionNode->Bunbridgeandargvcanariesforallfourleaks+intentcreatereporttext. Rootauthorizesnarrowentry/main/control changesneeded; no broadrewrite. SyntheticorphanonnormalcompletionunvalidatedsupportedCLIpath, reportlimitnotunrelatedprocess-supervisorrewrite."
   ],
@@ -43,7 +43,9 @@
     "agentId": "/root/r034_native_private_input_repair",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T15:51:37.826Z"
+    "startedAt": "2026-11-13T15:51:37.826Z",
+    "finishedAt": "2026-11-13T16:42:55.900Z"
   },
+  "result": "status: done\nchanged:\n- docs/native-tools.md\n- packages/integrations/pi/src/native-tools.ts\n- packages/integrations/pi/tests/native-tools.test.ts\n- packages/runtime/src/cli/main.ts\n- packages/runtime/src/hooks/pi-entry.ts\n- packages/runtime/src/native/control.ts\n- packages/runtime/tests/native-tools.test.ts\nchecks:\n- mise exec -- bun test packages/runtime/tests/native-tools.test.ts packages/integrations/pi/tests/native-tools.test.ts -> exit 0\n- mise run check -> exit 0\n- mise run lint -> exit 0\n- mise exec -- bun fmt --no-script <changed files> -> exit 0\nnotes:\n- Node-to-Bun production bridge tests capture spawned argv for close accept, accept rationale, close reason/drop, intent objective and report canaries; CLI comparison covers stdin semantics. IPC cancellation, disconnect, persistence, limits and capability tests pass. Synthetic normal-exit orphan remains an unvalidated supervisor limitation; no broader rewrite. No Windows hosted verification or full verify.\n- An initial unavailable prettier attempt and interim failing checks were corrected; final checks above pass.\nevidence:\n- Requested repair or verification meets its stated contract without weakening safeguards (tests): Versioned strict stdin envelope transports prepared args and original stdin; launch receives no command arguments; tests exercise actual Node-to-Bun bridge, argv canaries, cancellation and fail-closed behavior.\n- checks-run: Focused tests, type check, lint and targeted formatting exit 0; logs /workspace/work/034/native-private-input-{tests,check,lint,fmt}.log.\n- changed-paths: docs/native-tools.md, packages/integrations/pi/src/native-tools.ts, packages/integrations/pi/tests/native-tools.test.ts, packages/runtime/src/cli/main.ts, packages/runtime/src/hooks/pi-entry.ts, packages/runtime/src/native/control.ts, packages/runtime/tests/native-tools.test.ts\n- diff-file: /workspace/work/034/native-private-input-repair.diff",
   "createdAt": "2026-11-13T15:51:37.826Z"
 }
