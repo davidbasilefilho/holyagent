@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwf4schc-fnje",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-and-validate-guidance-trigger",
+  "objective": "Regenerate and validate guidance-trigger-build for committed independent review.",
+  "state": "Running",
+  "scope": [
+    "Latesttask-start trigger/sourcewriterterminal. Buildthenfocusedinstruction/context/approvalpolicy+generatorfreshnesstests from guidance-trigger-report.json andprior558suite. No fullverify untilcommitted re-review."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-guidance. No sourceedits, actualVCS/statewrites, extraagents, livecalls, dependency/versionchanges. RootownsVCS/state; onlygeneratedchanges. Hash trackedANDuntrackednongeneratedsource before/after. RepoAGENTS/.claude apply.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. bunx --no-install mise run build thenrelevantfocusedtestsviamiseexec. No fullverifyyet. Onfailure compactexactnames/assertions notfixorweaken.",
+    "JSON /workspace/work/034/guidance-trigger-build-report.json with status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]. Diff /workspace/work/034/guidance-trigger-build.diff. Exactcriterion/evidencelabelkeys; <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested generated and validation gates pass with source unchanged",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf2wrol-0dph",
+  "specialist": {
+    "agentId": "/root/r034_state_final_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:27:58.513Z"
+  },
+  "createdAt": "2026-11-13T15:27:58.513Z"
+}
