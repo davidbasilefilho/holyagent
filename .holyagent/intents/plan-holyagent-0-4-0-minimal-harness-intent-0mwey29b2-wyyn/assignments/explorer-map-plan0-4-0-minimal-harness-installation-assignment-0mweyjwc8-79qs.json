@@ -39,6 +39,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r040_architecture_plan",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T12:33:26.648Z"
