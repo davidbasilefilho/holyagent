@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf4sdlm-7l4z",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-and-validate-events-build-for",
+  "objective": "Regenerate and validate events-build for committed independent review.",
+  "state": "Running",
+  "scope": [
+    "Eventswriterterminal; actualpinnedhostprobes+733focusedtests pass; initial build/fullverify tocatchglobalsurfacefailures."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-events. No sourceedits, actualVCS/statewrites, extraagents, livecalls, dependency/versionchanges. RootownsVCS/state; onlygeneratedchanges. Hash trackedANDuntrackednongeneratedsource before/after. RepoAGENTS/.claude apply.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. bunx --no-install mise run build then python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify. Onfailure compactexactnames/assertions notfixorweaken.",
+    "JSON /workspace/work/034/events-build-report.json with status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]. Diff /workspace/work/034/events-build.diff. Exactcriterion/evidencelabelkeys; <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested generated and validation gates pass with source unchanged",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:27:59.962Z"
+  },
+  "createdAt": "2026-11-13T15:27:59.962Z"
+}
