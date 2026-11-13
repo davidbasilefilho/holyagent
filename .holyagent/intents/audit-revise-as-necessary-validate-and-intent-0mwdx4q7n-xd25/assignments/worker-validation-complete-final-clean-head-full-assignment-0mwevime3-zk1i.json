@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwevime3-zk1i",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "complete-final-clean-head-full",
+  "objective": "Complete final clean-head full verification of reviewed PR120 repair commit61a7adc.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/holyagent-pr120 at61a7adce3ba76878fe2f2342ab268908ce551907"
+  ],
+  "constraints": [
+    "Read AGENTS.md, .claude/CLAUDE.md, packages/integrations/claude/dist/agents/worker-validation.md. User resumed authorized audit/revise/merge PR120 and explicitly GPT6.1 Terra low-xhigh; Workflow tool unavailable, direct fallback. No source/VCS/.holyagent edits. Prior four independent committed-range reviews accepted; source tree clean, no writers. Inspect /workspace/work/cancel-supervisor.py and accepted /workspace/work/cancel-diagnosis.md: container PID1 does not reap orphan zombies, causing baseline cancellation test kill(pid,0) timeout; supervisor only reaps its adopted descendants and preserves exit. If sound, run exact full command MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify. No skips/test weakening. Save full logs /workspace/work/validation-logs/final-verify.log, report /workspace/work/final-validation.md. Report command, exit, test counts, clean starting/ending head and diff status. If real failure investigate narrowly and report; do not repeat broad runs without cause. Under200 words."
+  ],
+  "criteria": [
+    {
+      "text": "Final clean-head full verify passes without weakened tests",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Head and tracked tree remain unchanged",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "head-sha",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "validation"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T11:08:28.251Z"
+  },
+  "createdAt": "2026-11-13T11:08:28.251Z"
+}
