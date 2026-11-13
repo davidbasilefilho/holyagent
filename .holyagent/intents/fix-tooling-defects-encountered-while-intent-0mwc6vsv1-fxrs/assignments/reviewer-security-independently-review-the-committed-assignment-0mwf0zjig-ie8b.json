@@ -39,6 +39,7 @@
     "assignment-0mwezkhag-z0nw"
   ],
   "specialist": {
+    "agentId": "/root/r034_state_review_security",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T13:41:35.752Z"
