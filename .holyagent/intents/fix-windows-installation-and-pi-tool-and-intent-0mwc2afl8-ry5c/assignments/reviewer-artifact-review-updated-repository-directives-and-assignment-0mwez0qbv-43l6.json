@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-updated-repository-directives-and",
   "objective": "Review updated repository directives and publishing/development docs for accurate main/dev behavior and operational prerequisites.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Committed range44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a..e28990817cb5a0e233c7673a98594320afb973ef in /workspace/work/holyagent-034"
   ],
@@ -42,7 +42,9 @@
     "agentId": "/root/r034_flow_review_artifact",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T12:46:32.011Z"
+    "startedAt": "2026-11-13T12:46:32.011Z",
+    "finishedAt": "2026-11-13T12:48:56.226Z"
   },
+  "result": "result: Gaps; two test regressions block the committed slice.\nchanged: /workspace/work/034/flow-review-artifact.md\nchecks: Read committed diff, release workflows, action, documentation, both Intents and writer's supervised verification report. No tests or remote settings changed; macOS and Windows execution not available in this review.\nblockers:\n- `.github/actions/tag-release/dev-version.sh:11` calls GNU `date -d`. The new test invokes it on macOS (`packages/integrations/pi/publishing.test.ts:35`), and `.github/workflows/validation.yml` runs verify on macos-latest. BSD date lacks `-d`, so that test receives a malformed version and fails. Use portable UTC conversion.\n- `packages/integrations/pi/publishing.test.ts:41` hardcodes `0.3.4`. The prescribed next version bump makes this test reject the correct new version. Derive the prefix from the manifest or use a controlled fixture.\nnotes: Removed tests enforce the retired release-branch naming model; replacement covers the new main restriction. Docs accurately present branch protection and npm environment as administrator prerequisites, not verified configuration. Metadata validation and generated canonical repository match the recorded E422 expectation, but publication remains unverified. Stable/dev jobs preflight before publishing and hand off the published tarball; reruns reject existing npm versions. Protected refs, job IDs and permission boundaries were inspected.\nevidence:\nCommitted release-flow slice has no unaddressed merge blockers: gap; macOS date portability and hardcoded version at the locations above.\nReview covers exact committed scope without treating prerequisites as completed: met; range and docs/workflows inspected; remote protection, deployment policy and actual publication unverified.\nreviewed-range: 44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a..e28990817cb5a0e233c7673a98594320afb973ef; /workspace/work/034/flow.diff and git diff --stat.\nfindings: two blockers above; no other artifact blocker found.\nchecks-run: read-only inspection; writer reports supervised verify exit 0, 3487 pass, 2 skips, 0 fail on Linux; cross-platform CI not run here.\n",
   "createdAt": "2026-11-13T12:46:32.011Z"
 }
