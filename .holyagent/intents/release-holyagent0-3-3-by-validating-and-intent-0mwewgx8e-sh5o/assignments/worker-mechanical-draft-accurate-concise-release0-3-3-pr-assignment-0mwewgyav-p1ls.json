@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mwewgyav-p1ls",
+  "intentId": "intent-0mwewgx8e-sh5o",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "draft-accurate-concise-release0-3-3-pr",
+  "objective": "Draft accurate concise release0.3.3 PR description targetingmain.",
+  "state": "Running",
+  "scope": [
+    "release0.3.3 main..integration range and prior reviewedPR120 body"
+  ],
+  "constraints": [
+    "Read AGENTS.md,.claude/CLAUDE.md,holyagent worker-mechanical role. Work /workspace/work/holyagent-release033. User authorizes go untilmain and Terra low-xhigh; directfallback. No source/VCS/state edits or external publication. Save draft /workspace/work/release033-body.txt and report /workspace/work/release033-body-report.md outside repo. Title convention release:0.3.3 (use actual spacing 'release: 0.3.3'). Scope versionbump0.3.2->0.3.3 and PR120 cross-platform/npm fixes; reuse accurate prior body /workspace/work/pr120-body.txt but omit stale placeholders. Mention bundled CLI paths/FFFfallback/docs, Windowslongpath/platformfixtures, protectedbranch npmOIDC,same tarball from publicationtoGitHubrelease, preflightfailclosed. Tests fullverify3498pass2skip0fail on identicallocal61a7adc; new releasetarget CI authoritative don't claim passed yet. No agent/processattribution or npm publicationsuccess. Prefer2-3 conciseparagraphs; no placeholder that requires lateredit, neutral 'Current-head checks validate the release PR' clause. Reportunder100words."
+  ],
+  "criteria": [
+    {
+      "text": "Release description accurately summarizes final scope and existing validation",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "draft-path",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "pr-description"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/pr_description",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T11:35:09.992Z"
+  },
+  "createdAt": "2026-11-13T11:35:09.992Z"
+}
