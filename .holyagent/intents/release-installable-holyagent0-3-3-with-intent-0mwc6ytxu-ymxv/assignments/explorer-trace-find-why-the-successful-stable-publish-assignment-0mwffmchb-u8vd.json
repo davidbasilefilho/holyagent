@@ -5,7 +5,7 @@
   "roleTask": "Explorer.trace",
   "slug": "find-why-the-successful-stable-publish",
   "objective": "Find why the successful stable publish step did not make holyagent0.3.3 visible in public npm.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only bounded diagnosis of main460f9453, Publish43499104894 success and GH stabletag/asset0.3.3 exist, but fresh no-cache public npm exactversion/tarball404 andpackumentMISS omits0.3.3/latestbootstrap. Read /workspace/work/034/033-main-publication-report.json and actualstablejoblogs, scripts/npm-publishing.ts/mainentry, bunfig/mise/env/publishconfig and effective invocation. No assumptions cachedabsenceispropagation afterfreshMISS. No npm binary-offering investigation; this is actual publication correctness.",
     "Trace real command/Effect execution and expected side effect; check dryrun/staging/registry or suppressed response/entry no-op using source and controlled offline subprocess probe if needed. All probe projects/tempfiles outside actualrepo ancestry, fake npm and intercepted GitHub fetch only, never run real npm publish. Source read-only; no credentials printed. Identify exact supported facts vs hypothesis. Propose smallest safe recovery preserving existing immutabletagholyagent0.3.3 at460f and existingcorrectartifact; do not update/delete tags, republishblindly, bumpversion, weakenprovenance or bypassguards."
@@ -36,7 +36,41 @@
     "agentId": "/root/r033_publication_discrepancy_trace",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T20:31:14.352Z"
+    "startedAt": "2026-11-13T20:31:14.352Z",
+    "finishedAt": "2026-11-13T20:42:25.135Z"
+  },
+  "result": "status: done\nchecks:\n- git show 460f9453:scripts/npm-publishing.ts and stable.yml -> exit 0\n- offline Bun main-entry probe with fake npm and GitHub fetch -> exit 0\n- public registry exact version and packument no-cache requests -> exit 0\n- download release asset and npm tarball; cmp and SHA-512 -> exit 0\n- read npm attestations payload -> exit 0\n- gh run view --job 132146617436 --log -> exit 0\nnotes:\n- Previous fresh registry miss occurred before npm's recorded publication at 20:28:39.258Z; exact version returned 200 at 20:33:24Z. The precise cause of the delay between successful job and registry visibility is unverified.\n- The job log endpoint returned no log content on this reread; its signed redirect was forbidden. Prior report records the successful step. Attestation payload was inspected, not cryptographically verified.\nevidence:\n- Publication discrepancy is traced to evidence-backed cause or a precise remaining uncertainty with safe recovery options: Earlier absence preceded npm's recorded publish time; exact delay mechanism unknown. The version is now published and matches the existing release asset; no recovery is needed.\n- source-path: At commit 460f9453, stable.yml packs, invokes bun scripts/npm-publishing.ts with latest, then releases. publishArtifact validates manifest and GitHub tag, requires npm view E404, then runs npm publish with provenance; quiet hides npm output. No tracked npmrc or manifest publishConfig sets a registry or dry run.\n- runtime-evidence: Offline real main-entry probe with intercepted fetch and fake npm invoked view holyagent@0.3.3 --json then publish tarball --tag latest --provenance, exit 0. npm attestation payload names main commit 460f9453 and run 43499104894 attempt 1; payload subject digest matches asset.\n- registry-state: Fresh public version returns 200; packument latest 0.3.3, timestamp 2026-11-13T20:28:39.258Z. Registry and GitHub release tarballs are byte-identical and SHA-512 agrees with npm integrity.\n- recovery: None required; preserve existing tag and artifact, avoid republishing. If a future retry is needed, independently confirm current registry identity, integrity, provenance and exact tag before acting.\n- checks-run: Exact commit inspection, controlled fake-network CLI probe, public metadata and attestation inspection, and artifact byte comparison all exited 0; full gates not applicable to read-only diagnosis.",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "Fresh public registry now confirms latest0.3.3; npm tarball and GH release asset are byte-identical and match integrity, attestation payload identifies main460f/run43499104894. Original misses are preserved and no recovery write or signature-verification claim made.",
+    "criteria": [
+      {
+        "criterion": "Publication discrepancy is traced to evidence-backed cause or a precise remaining uncertainty with safe recovery options",
+        "support": "Earlier absence preceded npm's recorded publish time; exact delay mechanism unknown. The version is now published and matches the existing release asset; no recovery is needed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "source-path",
+        "support": "At commit 460f9453, stable.yml packs, invokes bun scripts/npm-publishing.ts with latest, then releases. publishArtifact validates manifest and GitHub tag, requires npm view E404, then runs npm publish with provenance; quiet hides npm output. No tracked npmrc or manifest publishConfig sets a registry or dry run."
+      },
+      {
+        "label": "runtime-evidence",
+        "support": "Offline real main-entry probe with intercepted fetch and fake npm invoked view holyagent@0.3.3 --json then publish tarball --tag latest --provenance, exit 0. npm attestation payload names main commit 460f9453 and run 43499104894 attempt 1; payload subject digest matches asset."
+      },
+      {
+        "label": "registry-state",
+        "support": "Fresh public version returns 200; packument latest 0.3.3, timestamp 2026-11-13T20:28:39.258Z. Registry and GitHub release tarballs are byte-identical and SHA-512 agrees with npm integrity."
+      },
+      {
+        "label": "recovery",
+        "support": "None required; preserve existing tag and artifact, avoid republishing. If a future retry is needed, independently confirm current registry identity, integrity, provenance and exact tag before acting."
+      },
+      {
+        "label": "checks-run",
+        "support": "Exact commit inspection, controlled fake-network CLI probe, public metadata and attestation inspection, and artifact byte comparison all exited 0; full gates not applicable to read-only diagnosis."
+      }
+    ]
   },
   "createdAt": "2026-11-13T20:31:14.352Z"
 }
