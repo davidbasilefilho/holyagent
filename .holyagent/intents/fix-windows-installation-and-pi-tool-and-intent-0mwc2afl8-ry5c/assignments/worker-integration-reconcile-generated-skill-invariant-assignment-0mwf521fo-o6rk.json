@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mwf521fo-o6rk",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Worker.integration",
+  "slug": "reconcile-generated-skill-invariant",
+  "objective": "Reconcile generated-skill invariant tests with the private owned-guidance layout.",
+  "state": "Running",
+  "scope": [
+    "Read /workspace/work/034/owned-skills-build-report.json/verifylog:6fail inplatformskills/materiality/Pifamilycopies. Tests likelyreadoldglobalpaths; update toactualprivateownedpathswhilePRESERVINGallinvariants: selfcontainedplatformcore,80–140existinglinebudgetunlessactualreasonrootapproves, materialitydefinedonce/copiedwhole/noduplication, chosenfamilycorrect. Don'tweakenassertionsorassumeallfailpath-only; reportactualsourcebugbeforeeditingunownedproduction. Provepublishednpm filewhitelistINCLUDESnewguidancefolders andomitsglobalownedadvertisement, notonlysourcegeneratesfiles. Ifpackagingbugneedsprodpathfixreturntraceandminscope. Preserveunrelateduserskill/resources andbudget tests."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-skills. Builder/writerterminal. NoactualVCS/statewrites/deps/pinschanges/extraagents/livecalls/generatededits/build/fullverify. RootownsVCS/state; existingAGENTS/.claude andfamilyinstructionwritingstandardsapply. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Runallpreviouslyfailingfocusedfiles+affectedpolicy/context/assemblytests,type/lint/fmt. Generatedfreshnessexpectedstaleifsourcechanges/rootbuildlater.",
+    "JSON /workspace/work/034/owned-skills-layout-repair-report.json status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]; diff /workspace/work/034/owned-skills-layout-repair.diff. Exactkeys<=250wordfinal/logsexternal. Keepworkingthroughfixes, don'tstopatpartialfoundation."
+  ],
+  "criteria": [
+    {
+      "text": "Global validation failures are resolved while preserving the requested behavior and existing invariants",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests",
+    "packages/integrations/pi/tests",
+    "packages/integrations/claude/tests",
+    "scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf3onqq-igcn",
+  "specialist": {
+    "agentId": "/root/r034_owned_role_guidance",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:35:30.756Z"
+  },
+  "createdAt": "2026-11-13T15:35:30.756Z"
+}
