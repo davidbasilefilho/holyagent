@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "verify-consolidated-instructions",
   "objective": "Verify consolidated instructions accurately describe normal dev releases and bounded failed-publication repair after integration.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Immutable b95759de59c1cc0fcb129c1d57909cddf3b945bd...a26d8ce88cfeca5115f0b1b0af9bb199bcbfc74d in /workspace/work/holyagent-034. Review onlymergedAGENTS/docsdevelopment/README/parity policytext versus currentCI. Preserve noDraft, ClaudereadsAGENTSreason and bothCLAUDEduplicatesdeleted, normalworkPRsdev/normalreleasepromotiondev→main newer, bounded equalversion404unpublishedrepair directmain squash, immutabilityandno gratuitousdeployment-onlybumpnuance. No conflictingintegrationbranch-only rules in finaldocs. Actualsettingsstillpendingdevprotection/npmdevenv, don'tclaim configured.",
     "Read instruction-writing skill and GPTartifactrole. Userauthorizededits/consolidation/noDraft; sourceoriginalvariousbranchchangesalreadyreviewed. Authorreport /workspace/work/034/development-main-forward-report.json; full3494pass2skip. Save /workspace/work/034/development-main-artifact-review-report.json."
@@ -38,7 +38,9 @@
     "agentId": "/root/development_main_artifact_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T21:14:43.638Z"
+    "startedAt": "2026-11-13T21:14:43.638Z",
+    "finishedAt": "2026-11-13T21:24:54.758Z"
   },
+  "result": "status: done\nchecks:\n- git diff b95759de59c1cc0fcb129c1d57909cddf3b945bd a26d8ce88cfeca5115f0b1b0af9bb199bcbfc74d -- AGENTS.md README.md docs/development.md docs/pi/claude-parity.md .claude/CLAUDE.md packages/runtime/CLAUDE.md; inspect scripts/pr-checks.ts and workflows -> exit 0\n- git diff --exit-code a26d8ce88cfeca5115f0b1b0af9bb199bcbfc74d -- reviewed paths -> exit 0\nblockers:\n- AGENTS.md:38 claims the release convention is enforced by CI and rulesets, although dev protection is pending; distinguish implemented CI checks from required rulesets.\nnotes:\n- Review only; no independent test run. The author reports full verification passed (3494 passed, 2 skipped).\n- evidence: Consolidated instructions and release documentation match current CI policies without contradictions or unsupported setup claims: Not met; AGENTS.md:38 claims ruleset enforcement while dev protection remains pending. checks-run: Read-only diff, workflow, and policy inspection; author verification report reviewed. reviewed-range: b95759de59c1cc0fcb129c1d57909cddf3b945bd...a26d8ce88cfeca5115f0b1b0af9bb199bcbfc74d. findings: One blocking unsupported enforcement claim; release and repair descriptions otherwise match the examined checks.\nevidence:\n- Consolidated instructions and release documentation match current CI policies without contradictions or unsupported setup claims: Not met: AGENTS.md:38 asserts ruleset enforcement while dev protection remains pending.\n- checks-run: Read-only diff, workflow and policy inspection; author verification report reviewed.\n- reviewed-range: b95759de59c1cc0fcb129c1d57909cddf3b945bd...a26d8ce88cfeca5115f0b1b0af9bb199bcbfc74d.\n- findings: One blocking unsupported enforcement claim; normal dev promotion, bounded equal-version npm-404 repair, no-draft and deleted CLAUDE files otherwise preserved.",
   "createdAt": "2026-11-13T21:14:43.638Z"
 }
