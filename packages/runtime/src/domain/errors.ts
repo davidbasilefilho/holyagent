@@ -44,7 +44,7 @@ export class MissingOwnership extends Data.TaggedError("MissingOwnership")<{
 }> {
   /** The description shown to the user. */
   override get message() {
-    return `${this.roleTask} writes, so it needs at least one ownership path`
+    return `${this.roleTask} writes, so it needs an ownership path or operational resource`
   }
 }
 

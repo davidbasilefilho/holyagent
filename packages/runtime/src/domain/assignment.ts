@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path"
+
 import { Effect, Schema } from "effect"
 
 import {
@@ -77,6 +79,14 @@ export const AssignmentState = Schema.Literals([
 /** One Assignment state. */
 export type AssignmentState = typeof AssignmentState.Type
 
+/** An explicitly requested local filesystem resource outside the repository worktrees. */
+export const OperationalResource = Schema.Struct({
+  kind: Schema.Literal("local-path"),
+  target: Text,
+})
+/** An operational resource claim supplied by the caller, without host identity. */
+export type OperationalResource = typeof OperationalResource.Type
+
 /** What the root provides to plan an Assignment. */
 export const AssignmentDraft = Schema.Struct({
   intentId: IntentId,
@@ -89,6 +99,7 @@ export const AssignmentDraft = Schema.Struct({
   evidence: TextList.pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   // Checked by createAssignment, which names the offending path.
   ownershipPaths: TextList.pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  operationalResources: Schema.optionalKey(Schema.Array(OperationalResource)),
   dependencies: Schema.Array(AssignmentId).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
   independentFrom: Schema.Array(AssignmentId).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed([])),
@@ -117,6 +128,7 @@ const fields = {
   criteria: Schema.NonEmptyArray(Criterion),
   evidence: TextList,
   ownershipPaths: Schema.Array(PortablePath),
+  operationalResources: Schema.optionalKey(Schema.Array(OperationalResource)),
   dependencies: Schema.Array(AssignmentId),
   independentFrom: Schema.Array(AssignmentId),
   followUpOf: Schema.optionalKey(AssignmentId),
@@ -163,8 +175,8 @@ export type Creation = typeof Creation.Type
 /**
  * Plans an Assignment as Ready. The inputs must match their schemas and the id must not be in use.
  * The Intent must be open and the draft written against its live revision; a writing route needs at
- * least one ownership path; paths must be portable; criteria and evidence labels must be unique;
- * and every Assignment it names must belong to the Intent.
+ * least one ownership path or operational resource; paths must be portable; criteria and evidence
+ * labels must be unique; and every Assignment it names must belong to the Intent.
  */
 export const createAssignment = (
   project: Project,
@@ -179,11 +191,22 @@ export const createAssignment = (
     const intent = yield* findIntent(project, draft.intentId)
     yield* requireOpen(intent)
     yield* requireLive(intent, draft.intentRevision)
-    if (isWriter(draft.roleTask) && draft.ownershipPaths.length === 0)
+    if (
+      isWriter(draft.roleTask) &&
+      draft.ownershipPaths.length === 0 &&
+      !draft.operationalResources?.length
+    )
       return yield* new MissingOwnership({ roleTask: draft.roleTask })
     for (const path of draft.ownershipPaths) {
       const reason = pathProblem(path)
       if (reason !== undefined) return yield* new InvalidPath({ path, reason })
+    }
+    for (const resource of draft.operationalResources ?? []) {
+      if (!isAbsolute(resource.target))
+        return yield* new InvalidPath({
+          path: resource.target,
+          reason: "operational target must be absolute",
+        })
     }
     for (const [what, labels] of [
       ["criterion", draft.criteria.map((criterion) => criterion.text)],
@@ -211,6 +234,9 @@ export const createAssignment = (
       criteria: draft.criteria,
       evidence: draft.evidence,
       ownershipPaths: draft.ownershipPaths,
+      ...(draft.operationalResources?.length
+        ? { operationalResources: draft.operationalResources }
+        : {}),
       dependencies: draft.dependencies,
       independentFrom: draft.independentFrom,
       ...(draft.followUpOf === undefined ? {} : { followUpOf: draft.followUpOf }),

@@ -149,7 +149,7 @@ describe("publication authority", () => {
       expect(jobs["publish"]?.if).toBe(
         name === "stable"
           ? "github.ref == 'refs/heads/main' && github.ref_protected"
-          : "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
+          : "github.ref == 'refs/heads/dev' && github.ref_protected",
       )
     },
   )
@@ -234,7 +234,7 @@ describe("publish.yml", () => {
     })
     expect(publish.jobs["dev"]).toMatchObject({
       needs: "validation",
-      if: "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
+      if: "github.ref == 'refs/heads/dev' && github.ref_protected",
       uses: "./.github/workflows/dev.yml",
     })
   })

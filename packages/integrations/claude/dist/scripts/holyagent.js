@@ -7893,6 +7893,8 @@ var commitFile = (path, content) => {
   return write.pipe(andThen2(io(path, () => rename(temporary, path))), tapError2(() => io(temporary, () => rm(temporary, { force: true })).pipe(ignore2)));
 };
 
+import { isAbsolute } from "path";
+
 class UnknownRecord extends TaggedError2("UnknownRecord") {
   get message() {
     return `Unknown ${this.kind} ${this.id}`;
@@ -7916,7 +7918,7 @@ class InvalidDraft extends TaggedError2("InvalidDraft") {
 
 class MissingOwnership extends TaggedError2("MissingOwnership") {
   get message() {
-    return `${this.roleTask} writes, so it needs at least one ownership path`;
+    return `${this.roleTask} writes, so it needs an ownership path or operational resource`;
   }
 }
 
@@ -8181,6 +8183,10 @@ var AssignmentState = Literals([
   "Failed",
   "Cancelled"
 ]);
+var OperationalResource = Struct({
+  kind: Literal2("local-path"),
+  target: Text
+});
 var AssignmentDraft = Struct({
   intentId: IntentId,
   intentRevision: Revision,
@@ -8191,6 +8197,7 @@ var AssignmentDraft = Struct({
   criteria: NonEmptyArray(Criterion),
   evidence: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
   ownershipPaths: TextList.pipe(withDecodingDefaultKey(succeed6([]))),
+  operationalResources: optionalKey2(ArraySchema(OperationalResource)),
   dependencies: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
   independentFrom: ArraySchema(AssignmentId).pipe(withDecodingDefaultKey(succeed6([]))),
   followUpOf: optionalKey2(AssignmentId),
@@ -8209,6 +8216,7 @@ var fields = {
   criteria: NonEmptyArray(Criterion),
   evidence: TextList,
   ownershipPaths: ArraySchema(PortablePath),
+  operationalResources: optionalKey2(ArraySchema(OperationalResource)),
   dependencies: ArraySchema(AssignmentId),
   independentFrom: ArraySchema(AssignmentId),
   followUpOf: optionalKey2(AssignmentId),
@@ -8245,12 +8253,19 @@ var createAssignment = (project, rawDraft, rawCreation) => gen2(function* () {
   const intent = yield* findIntent(project, draft.intentId);
   yield* requireOpen(intent);
   yield* requireLive(intent, draft.intentRevision);
-  if (isWriter(draft.roleTask) && draft.ownershipPaths.length === 0)
+  if (isWriter(draft.roleTask) && draft.ownershipPaths.length === 0 && !draft.operationalResources?.length)
     return yield* new MissingOwnership({ roleTask: draft.roleTask });
   for (const path of draft.ownershipPaths) {
     const reason = pathProblem(path);
     if (reason !== undefined)
       return yield* new InvalidPath({ path, reason });
+  }
+  for (const resource of draft.operationalResources ?? []) {
+    if (!isAbsolute(resource.target))
+      return yield* new InvalidPath({
+        path: resource.target,
+        reason: "operational target must be absolute"
+      });
   }
   for (const [what, labels] of [
     ["criterion", draft.criteria.map((criterion) => criterion.text)],
@@ -8277,6 +8292,7 @@ var createAssignment = (project, rawDraft, rawCreation) => gen2(function* () {
     criteria: draft.criteria,
     evidence: draft.evidence,
     ownershipPaths: draft.ownershipPaths,
+    ...draft.operationalResources?.length ? { operationalResources: draft.operationalResources } : {},
     dependencies: draft.dependencies,
     independentFrom: draft.independentFrom,
     ...draft.followUpOf === undefined ? {} : { followUpOf: draft.followUpOf },
@@ -8546,7 +8562,7 @@ var HINTS = {
   NoActiveIntent: "Pick one with `holyagent intent use <id>`, or start one with `holyagent intent create`.",
   InvalidDraft: "Send JSON in the shape `holyagent <command> --help` shows; unknown fields are refused.",
   InvalidPath: "Use relative portable paths such as packages/runtime/src.",
-  MissingOwnership: "Give a writing role task at least one ownershipPaths entry.",
+  MissingOwnership: "Give a writing role task an ownershipPaths entry or operationalResources entry.",
   UnknownRecord: "List ids with `holyagent intent list` or `holyagent assignment list --all`.",
   DuplicateRecord: "Retry the command; ids are generated.",
   StaleRevision: "Reread with `holyagent intent show`, reassess the work at the live revision, then retry.",
@@ -10302,7 +10318,7 @@ function resolveOptions(options) {
     replacer: options?.replacer
   };
 }
-var version = "0.3.3";
+var version = "0.3.4";
 
 import { join } from "path";
 var STATE_DIRECTORY = ".holyagent";
@@ -10794,6 +10810,12 @@ var listWorktrees = (cwd, env) => gitText(cwd, env, ["worktree", "list", "--porc
     prunable: lines.some((line) => line === "prunable" || line.startsWith("prunable "))
   };
 }).filter((entry) => entry.path !== "")));
+var operationalWorktrees = (cwd, env) => git(cwd, env, ["worktree", "list", "--porcelain", "-z"]).pipe(flatMap2((result) => {
+  if (result.code !== 0)
+    return /not a git repository/i.test(result.stderr) ? succeed6([cwd]) : fail5(failed(cwd, ["worktree", "list", "--porcelain", "-z"], result));
+  const roots = result.stdout.split("\x00").filter((field) => field.startsWith("worktree ")).map((field) => fromGitPath(field.slice(9)));
+  return roots.length ? succeed6(roots) : fail5(new StateIo({ path: cwd, cause: "git listed no worktrees" }));
+}));
 var checkedOut = (listed, branch) => gen2(function* () {
   for (const entry of listed)
     if (entry.branch === `refs/heads/${branch}` && !entry.prunable && (yield* isDirectory(entry.path)))
@@ -11157,6 +11179,11 @@ var resolveState = (cwd, env, ensure, online = true, patience) => gen2(function*
   const found = yield* checkedOut(listed, branch);
   const standard = join3(common, "holyagent", worktreeFolder(branch));
   const settled = found !== undefined && (!(yield* samePath(found, standard)) || (yield* fileExists(readyMarker(standard))));
+  if (ensure === "peek" && found !== undefined && !settled)
+    return yield* new StateIo({
+      path: found,
+      cause: "the state worktree is not ready; wait for its checkout to finish and retry"
+    });
   const make = ensure === "create" || ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed));
   const ensured = found !== undefined && settled ? { kind: "ready", path: found, created: false } : found === undefined && !make ? { kind: "absent" } : yield* ensureWorktree(top, common, env, branch, standard, {
     make,
@@ -11182,6 +11209,61 @@ var resolveState = (cwd, env, ensure, online = true, patience) => gen2(function*
         yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message, [], resolved), patience);
   }
   return { root: top, directory, resolved };
+});
+var requireHandoffState = (cwd, env, directory) => gen2(function* () {
+  const repository = yield* locate(cwd, env);
+  if (repository === undefined || (yield* stateModeOf(repository.top, env)) !== "branch")
+    return;
+  const { top, common } = repository;
+  const branch = yield* stateBranch(top, env);
+  const listed = yield* listWorktrees(top, env);
+  const stateWorktree = yield* checkedOut(listed, branch);
+  if (stateWorktree === undefined && ((yield* refExists(top, env, `refs/heads/${branch}`)) || (yield* refExists(top, env, `refs/remotes/origin/${branch}`))))
+    return yield* new StateIo({
+      path: directory,
+      cause: `the recorded state branch ${branch} is not checked out; run a state command to make it available, then retry handoff`
+    });
+  const own = join3(common, "holyagent");
+  for (const entry of listed) {
+    if (entry.prunable || stateWorktree !== undefined && (yield* samePath(entry.path, stateWorktree)) || entry.path.startsWith(`${own}${sep2}`))
+      continue;
+    const source = stateDirectory(entry.path);
+    yield* requireStateFolder(source);
+    const records = join3(source, "intents");
+    const kind = yield* kindAt(records);
+    if (kind === undefined)
+      continue;
+    if (kind !== "directory")
+      return yield* new StateIo({
+        path: records,
+        cause: "recorded state is not a directory; inspect it before retrying handoff"
+      });
+    const marker = yield* migrationMarker(common, entry.path);
+    if (!(yield* fileExists(marker)))
+      return yield* new StateIo({
+        path: source,
+        cause: "recorded state awaits migration; run a state command from this worktree, then retry handoff"
+      });
+    const entries = yield* workTreeEntries(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" });
+    const trackedResult = yield* git(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
+      "ls-files",
+      "--cached",
+      "-z",
+      "--",
+      `${STATE_DIRECTORY}/intents`
+    ]);
+    if (trackedResult.code !== 0)
+      return yield* failed(entry.path, ["ls-files", "--cached", "-z", "--", `${STATE_DIRECTORY}/intents`], trackedResult);
+    const tracked = new Set(trackedResult.stdout.split("\x00").map((path) => path.slice(STATE_DIRECTORY.length + 1)));
+    for (const file of entries.filter((item) => item.path.startsWith("intents/"))) {
+      const target = join3(directory, file.path);
+      if (!(yield* isPlainFile(source, file.path)) || !(yield* isPlainFile(directory, file.path)) || (file.status !== undefined || !tracked.has(file.path)) && !(yield* sameBytes(join3(source, file.path), target)))
+        return yield* new StateIo({
+          path: source,
+          cause: "recorded state differs from the shared state; inspect and reconcile this worktree before retrying handoff"
+        });
+    }
+  }
 });
 var requireRepository = (cwd, env) => locate(cwd, env).pipe(flatMap2((repository) => repository === undefined ? fail5(new StateIo({
   path: cwd,
@@ -11579,6 +11661,7 @@ var assignmentView = (assignment) => present({
   criteria: assignment.criteria,
   evidence: assignment.evidence,
   paths: assignment.ownershipPaths,
+  operationalResources: assignment.operationalResources,
   dependsOn: assignment.dependencies,
   independentFrom: assignment.independentFrom,
   followUpOf: assignment.followUpOf,
@@ -11850,7 +11933,7 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
 var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline);
 
 import { rm as rm4 } from "fs/promises";
-import { isAbsolute, join as join5, resolve as resolve3 } from "path";
+import { isAbsolute as isAbsolute2, join as join5, resolve as resolve3 } from "path";
 
 var code_review_default = `---
 description: First-pass code review of a committed range, each finding traced to a realistic failure and labeled
@@ -12350,7 +12433,7 @@ var piRecordReports = (session, source, agents) => gen2(function* () {
   return { reports, notAssignmentIds };
 }).pipe(mapError2(refused("Pass the root session file of the Pi session, unedited.")));
 
-var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute(common) ? join5(resolve3(common), "holyagent", name) : localFile(call.directory, name)));
+var folderFor = (call, name) => gitMaybe(["rev-parse", "--path-format=absolute", "--git-common-dir"]).pipe(provide3(call.vcs), map4((common) => common !== undefined && isAbsolute2(common) ? join5(resolve3(common), "holyagent", name) : localFile(call.directory, name)));
 var pathIn = (call, name, assignmentId) => folderFor(call, name).pipe(map4((folder) => join5(folder, `${assignmentId}.md`)));
 var writeNamed = (call, name, assignmentId, text) => gen2(function* () {
   const path = yield* pathIn(call, name, assignmentId);
@@ -12359,7 +12442,11 @@ var writeNamed = (call, name, assignmentId, text) => gen2(function* () {
   return path;
 });
 var briefText = (assignment, agent, host) => {
-  const assignmentText = renderPrompt(assignment, agent);
+  const resources = assignment.operationalResources?.map(({ target }) => `- ${target}`).join(`
+`);
+  const assignmentText = `${renderPrompt(assignment, agent)}${resources ? `
+Operational resources (write only here):
+${resources}` : ""}`;
   const firstPass = host === "pi" ? firstPassPrompt(assignment.roleTask) : undefined;
   return firstPass === undefined ? assignmentText : `${firstPass}
 
@@ -13325,7 +13412,7 @@ var VCS_COMMANDS = [
   }
 ];
 
-import { basename as basename3, resolve as resolve4 } from "path";
+import { basename as basename4, resolve as resolve5 } from "path";
 
 var AcceptanceInput = Struct({
   rationale: Text,
@@ -13407,7 +13494,7 @@ var dispatchBlock = (project, assignment, assumeAccepted = new Set, workTree) =>
   if (intent.revision !== assignment.intentRevision)
     return new StaleRevision({ given: assignment.intentRevision, live: intent.revision });
   const writes = isWriter(assignment.roleTask);
-  if (writes && assignment.ownershipPaths.length === 0)
+  if (writes && assignment.ownershipPaths.length === 0 && !assignment.operationalResources?.length)
     return new MissingOwnership({ roleTask: assignment.roleTask });
   for (const id of assignment.dependencies) {
     if (assumeAccepted.has(id))
@@ -13423,6 +13510,12 @@ var dispatchBlock = (project, assignment, assumeAccepted = new Set, workTree) =>
     for (const running of project.assignments) {
       if (running.state !== "Running" || !isWriter(running.roleTask))
         continue;
+      if (assignment.operationalResources?.length || running.operationalResources?.length)
+        return new OwnershipConflict({
+          id: assignment.id,
+          runningId: running.id,
+          path: assignment.operationalResources?.[0]?.target ?? running.operationalResources?.[0]?.target ?? "operational resource"
+        });
       const elsewhere = running.specialist?.workTree;
       if (workTree !== undefined && elsewhere !== undefined && elsewhere !== workTree)
         continue;
@@ -13566,7 +13659,47 @@ var detectForm = (env, platform = process.platform) => {
 var chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` };
 var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
 
-import { join as join8 } from "path";
+import { lstat as lstat3, realpath as realpath3 } from "fs/promises";
+import { basename as basename3, dirname as dirname4, isAbsolute as isAbsolute3, join as join8, resolve as resolve4, sep as sep6 } from "path";
+var canonical2 = (path) => io(path, () => realpath3(path)).pipe(catch_2((error) => {
+  if (!hasCode(error.cause, "ENOENT"))
+    return fail5(new InvalidDraft({
+      message: `Cannot resolve operational target ${path}: ${error.message}`
+    }));
+  return io(path, () => lstat3(path)).pipe(flatMap2(() => fail5(new InvalidDraft({
+    message: `Cannot resolve operational target ${path}: dangling symlink or inaccessible path`
+  }))), catch_2((problem) => {
+    if (problem instanceof InvalidDraft)
+      return fail5(problem);
+    if (!hasCode(problem.cause, "ENOENT") || dirname4(path) === path)
+      return fail5(new InvalidDraft({
+        message: `Cannot inspect operational target ${path}: ${problem.message}`
+      }));
+    return canonical2(dirname4(path)).pipe(map4((parent) => join8(parent, basename3(path))));
+  }));
+}));
+var comparable = (path) => resolve4(path).split(sep6).join("/").toLowerCase();
+var contains = (parent, child) => child === parent || child.startsWith(parent.endsWith("/") ? parent : `${parent}/`);
+var overlaps = (a, b) => contains(a, b) || contains(b, a);
+var validateOperationalResources = (resources, worktrees) => gen2(function* () {
+  if (resources.length === 0)
+    return;
+  const roots = yield* forEach2(worktrees, (root) => canonical2(root));
+  for (const resource of resources) {
+    const { target } = resource;
+    if (!isAbsolute3(target) || target.split(/[\\/]/).some((part) => part === "." || part === ".."))
+      return yield* new InvalidDraft({
+        message: `Operational target must be an absolute path without . or .. segments: ${target}`
+      });
+    const resolved = yield* canonical2(target);
+    if (worktrees.some((root, index) => overlaps(comparable(root), comparable(target)) || overlaps(comparable(roots[index] ?? root), comparable(resolved))))
+      return yield* new InvalidDraft({
+        message: `Operational target overlaps a repository worktree: ${target}`
+      });
+  }
+});
+
+import { join as join9 } from "path";
 
 var APPLY_PATCH_TOOL = "apply_patch";
 class PatchSyntaxError extends TaggedError2("PatchSyntaxError") {
@@ -13665,9 +13798,9 @@ var claudeWorkflowsAvailable = (env, root) => {
   if (env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return succeed6(false);
   const files = [
-    join8(claudeConfigDirectory(env), "settings.json"),
-    join8(root, ".claude", "settings.json"),
-    join8(root, ".claude", "settings.local.json")
+    join9(claudeConfigDirectory(env), "settings.json"),
+    join9(root, ".claude", "settings.json"),
+    join9(root, ".claude", "settings.local.json")
   ];
   return forEach2(files, disablesWorkflows).pipe(map4((disabled) => !disabled.includes(true)));
 };
@@ -13731,13 +13864,15 @@ var AssignmentInput = Struct({
   intentId: optionalKey2(IntentId),
   intentRevision: optionalKey2(Revision)
 });
-var DRAFT_SHAPE = `{roleTask: ${RoleTask.literals.join("|")}, objective, scope?: [text], constraints?: [text], criteria: [{text, blocking, dimension: behavior|regressions|tests|scope|style|repo-standards}], evidence?: [label], ownershipPaths?: [path] (required for writers), dependencies?: [assignmentId], independentFrom?: [assignmentId], followUpOf?: assignmentId, screen?: boolean, intentId?, intentRevision?}`;
+var DRAFT_SHAPE = `{roleTask: ${RoleTask.literals.join("|")}, objective, scope?: [text], constraints?: [text], criteria: [{text, blocking, dimension: behavior|regressions|tests|scope|style|repo-standards}], evidence?: [label], ownershipPaths?: [path], operationalResources?: [{kind: local-path, target: absolutePath}], dependencies?: [assignmentId], independentFrom?: [assignmentId], followUpOf?: assignmentId, screen?: boolean, intentId?, intentRevision?}`;
 var DRAFT_NOTES = [
   "required: roleTask, objective and criteria; unknown fields are refused",
   "evidence labels are answered by the specialist by name; keep them few and observable (checks-run, changed-paths, diff-file)",
   "screen: true when the Assignment needs to see or drive a screen (a desktop app, a real browser, the page shown in T3); its specialist then gets the computer-use, browser-use and T3 preview tools, and under the Codex provider runs on GPT-6.1 Terra at medium or higher effort. Pi host only; the dispatch prints the agent to launch, whose name ends in -screen",
-  "ownershipPaths: relative portable paths that must not overlap a Running writer's in the same work tree; dependencies must be accepted at the live revision; a review names the work it must be independent from in independentFrom; a repair or follow-up sets followUpOf"
+  "ownershipPaths: relative portable paths that must not overlap a Running writer's in the same work tree; dependencies must be accepted at the live revision; a review names the work it must be independent from in independentFrom; a repair or follow-up sets followUpOf",
+  "a writer needs ownershipPaths or operationalResources; an operational target is an absolute local path outside known worktrees, and an operational writer waits for every Running writer in the shared state"
 ];
+var validateResources = (call, resources) => resources?.length ? operationalWorktrees(call.root, call.env).pipe(flatMap2((roots) => validateOperationalResources(resources, roots))) : void_3;
 var completeDraft = (snapshot, input) => gen2(function* () {
   const { intentId, intentRevision, ...rest } = input;
   if (intentId !== undefined && intentRevision !== undefined)
@@ -13836,7 +13971,7 @@ var claudeReports = (journal, source) => gen2(function* () {
 });
 var piReports = (call, source, text) => gen2(function* () {
   const { project } = yield* readState(call.directory);
-  if (!basename3(source).endsWith(".workflow.jsonl"))
+  if (!basename4(source).endsWith(".workflow.jsonl"))
     return yield* piRecordReports(text, source, project.assignments.flatMap(({ id, specialist }) => {
       const agentId = specialist?.agentId;
       return agentId !== undefined && (agentId.startsWith(PI_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX)) ? [{ id, agentId }] : [];
@@ -13855,11 +13990,11 @@ var ASSIGNMENT_COMMANDS = [
     notes: ["the draft rules are under assignment dispatch"],
     flags: { input: "string" },
     positionals: 0,
-    run: ({ update, input }) => gen2(function* () {
-      const draft = yield* input(AssignmentInput);
+    run: (call) => gen2(function* () {
+      const draft = yield* call.input(AssignmentInput);
       const id = yield* newId("assignment");
       const now = yield* nowIso;
-      const { assignment } = yield* update((snapshot) => completeDraft(snapshot, draft).pipe(flatMap2((complete) => createAssignment(snapshot.project, complete, { id, now }))));
+      const { assignment } = yield* call.update((snapshot) => validateResources(call, draft.operationalResources).pipe(andThen2(completeDraft(snapshot, draft)), flatMap2((complete) => createAssignment(snapshot.project, complete, { id, now }))));
       return { id, state: assignment.state };
     })
   },
@@ -13885,6 +14020,7 @@ var ASSIGNMENT_COMMANDS = [
       const started = yield* update((snapshot) => gen2(function* () {
         const id = "id" in request ? request.id : newAssignmentId;
         const project = "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now);
+        yield* validateResources(call, (yield* findAssignment(project, id)).operationalResources);
         if (settings.host !== "pi" && (yield* findAssignment(project, id)).screen === true)
           return yield* new InvalidDraft({
             message: `The screen capability is available under the pi host only; this is the ${settings.host} host. Dispatch the Assignment without screen`
@@ -14012,7 +14148,7 @@ var ASSIGNMENT_COMMANDS = [
     positionals: 1,
     state: "peek",
     run: (call) => gen2(function* () {
-      const source = resolve4(call.cwd, idArgument(call.args.positionals));
+      const source = resolve5(call.cwd, idArgument(call.args.positionals));
       const text = yield* io(source, () => Bun.file(source).text());
       const found = (yield* call.config).host === "pi" ? yield* piReports(call, source, text) : yield* claudeReports(text, source);
       const reports = yield* forEach2(found.reports, ({ id, report }) => writeReport(call, id, report).pipe(map4((path) => ({ id, path, words: wordCount(report) }))));
@@ -14048,7 +14184,7 @@ var ASSIGNMENT_COMMANDS = [
 
 import { mkdir as mkdir4, mkdtemp, rm as rm5 } from "fs/promises";
 import { tmpdir } from "os";
-import { join as join9 } from "path";
+import { join as join10 } from "path";
 class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
   get message() {
     return this.reason;
@@ -14140,9 +14276,9 @@ var launch = (host, options) => scoped2(gen2(function* () {
     return yield* failed2(`no Chromium was found; ${options.chromiumFix}`);
   const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
   const folders = {
-    profile: join9(base, FOLDERS.profile),
-    config: join9(base, FOLDERS.config),
-    harness: join9(base, FOLDERS.harness)
+    profile: join10(base, FOLDERS.profile),
+    config: join10(base, FOLDERS.config),
+    harness: join10(base, FOLDERS.harness)
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
@@ -14207,12 +14343,12 @@ var liveHost = {
     },
     catch: (cause) => failed2(`cannot start ${spec.command}: ${reason(cause)}`)
   }),
-  devToolsPort: (profile) => tryPromise2(() => Bun.file(join9(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
+  devToolsPort: (profile) => tryPromise2(() => Bun.file(join10(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
     return;
   })),
   answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map4((response) => response.ok), orElseSucceed2(() => false)),
   temporaryDirectory: (prefix) => tryPromise2({
-    try: () => mkdtemp(join9(tmpdir(), prefix)),
+    try: () => mkdtemp(join10(tmpdir(), prefix)),
     catch: (cause) => failed2(`cannot create a temporary directory: ${reason(cause)}`)
   }),
   makeDirectory: (path) => tryPromise2({
@@ -14238,7 +14374,7 @@ var liveHost = {
 import { existsSync, readdirSync } from "fs";
 import { posix as posix2, win32 as win322 } from "path";
 
-import { delimiter, join as join10, posix, win32 } from "path";
+import { delimiter, join as join11, posix, win32 } from "path";
 var {$: $3 } = globalThis.Bun;
 var pathKey = (env, insensitive = process.platform === "win32") => {
   if (!insensitive || env.PATH !== undefined)
@@ -14247,8 +14383,8 @@ var pathKey = (env, insensitive = process.platform === "win32") => {
 };
 var pathWithBunBin = (env, options) => {
   const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join10(options.home, ".bun");
-  const bunBin = join10(root, "bin");
+  const root = options.bunInstall ? options.bunInstall : join11(options.home, ".bun");
+  const bunBin = join11(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
 };
 var isInside = (api, parent, path) => {
@@ -14269,7 +14405,7 @@ var findCommand = (env, command, options) => {
   const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
   return fromNullishOr(options?.strict === undefined ? Bun.which(command, { PATH: path }) : strictWhich(command, path, options.strict));
 };
-var EMPTY_BUNFIG = join10(import.meta.dir, "empty-bunfig.toml");
+var EMPTY_BUNFIG = join11(import.meta.dir, "empty-bunfig.toml");
 
 class Shell extends Service()("holyagent/Shell") {
   static live = (env) => {
@@ -14409,14 +14545,14 @@ var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
-import { lstat as lstat3, realpath as realpath4 } from "fs/promises";
-import { dirname as dirname5, isAbsolute as isAbsolute2, join as join13, relative as relative4, resolve as resolve6, sep as sep6 } from "path";
+import { lstat as lstat4, realpath as realpath5 } from "fs/promises";
+import { dirname as dirname6, isAbsolute as isAbsolute4, join as join14, relative as relative4, resolve as resolve7, sep as sep7 } from "path";
 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
-import { chmod, mkdir as mkdir5, realpath as realpath3, rename as rename4, rm as rm6, writeFile as writeFile2 } from "fs/promises";
-import { basename as basename4, dirname as dirname4, join as join11 } from "path";
+import { chmod, mkdir as mkdir5, realpath as realpath4, rename as rename4, rm as rm6, writeFile as writeFile2 } from "fs/promises";
+import { basename as basename5, dirname as dirname5, join as join12 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -14456,12 +14592,12 @@ var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, o
 var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince);
 var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
   const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists());
-  const target = exists ? yield* fileOperation(path, "write", () => realpath3(path)) : path;
+  const target = exists ? yield* fileOperation(path, "write", () => realpath4(path)) : path;
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join11(dirname4(target), `.${basename4(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname4(target), "write", () => mkdir5(dirname4(target), { recursive: true }));
+  const temporary = join12(dirname5(target), `.${basename5(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname5(target), "write", () => mkdir5(dirname5(target), { recursive: true }));
   yield* tryPromise2({
     try: () => writeFile2(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
@@ -14511,7 +14647,7 @@ var applyDefaults = (existing, defaults) => {
   return { merged, entries: [...entries.values()] };
 };
 
-import { join as join12, resolve as resolve5 } from "path";
+import { join as join13, resolve as resolve6 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String4),
   value: Unknown2
@@ -14519,8 +14655,8 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join12(userFiles(env).claudeDir, "holyagent", "setup-records.json");
-var keyOf = (file) => resolve5(file);
+var recordPath = (env) => join13(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var keyOf = (file) => resolve6(file);
 var load = (env) => gen2(function* () {
   const path = recordPath(env);
   const raw = yield* readJsonObject(path);
@@ -14730,25 +14866,25 @@ var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
 var SCOPES = ["user", "project", "local"];
 var within = (parent, child) => {
   const path = relative4(parent, child);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep6}`) && !isAbsolute2(path);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep7}`) && !isAbsolute4(path);
 };
-var real = (path) => tryPromise2(() => realpath4(path)).pipe(orElseSucceed2(() => {
+var real = (path) => tryPromise2(() => realpath5(path)).pipe(orElseSucceed2(() => {
   return;
 }));
-var present3 = (path) => tryPromise2(() => lstat3(path)).pipe(as2(true), orElseSucceed2(() => false));
-var identity2 = (path) => tryPromise2(() => lstat3(path, { bigint: true })).pipe(map4((stats) => `${stats.dev}:${stats.ino}`), orElseSucceed2(() => {
+var present3 = (path) => tryPromise2(() => lstat4(path)).pipe(as2(true), orElseSucceed2(() => false));
+var identity2 = (path) => tryPromise2(() => lstat4(path, { bigint: true })).pipe(map4((stats) => `${stats.dev}:${stats.ino}`), orElseSucceed2(() => {
   return;
 }));
 var isSymlink = (path) => tryPromise2({
-  try: () => lstat3(path),
+  try: () => lstat4(path),
   catch: (cause) => cause
 }).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
 var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
   if (scope === "user")
     return;
-  const parts = relative4(cwd, file).split(sep6);
+  const parts = relative4(cwd, file).split(sep7);
   for (let depth = 1;depth <= parts.length; depth++) {
-    const path = join13(cwd, ...parts.slice(0, depth));
+    const path = join14(cwd, ...parts.slice(0, depth));
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
         message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
@@ -14760,20 +14896,20 @@ var claudeFolder = fn2("claudeFolder")(function* (cwd) {
   const shell = yield* Shell;
   const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
   const line = top.stdout.trim();
-  const named = top.exitCode === 0 && line !== "" ? resolve6(line) : undefined;
+  const named = top.exitCode === 0 && line !== "" ? resolve7(line) : undefined;
   const realTop = named === undefined ? undefined : yield* real(named);
   const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present3(join13(named, ".git")));
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present3(join14(named, ".git")));
   const root = trusted ? named : cwd;
   const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-  return { folder: join13(root, ".claude"), root, trusted, notice };
+  return { folder: join14(root, ".claude"), root, trusted, notice };
 });
 var fileName = (scope) => scope === "project" ? "settings.json" : "settings.local.json";
 var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   if (scope === "user")
     return { file: userFiles(env).settings };
   const { folder, notice } = yield* claudeFolder(cwd);
-  const file = join13(folder, fileName(scope));
+  const file = join14(folder, fileName(scope));
   for (const path of [folder, file]) {
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
@@ -14784,19 +14920,19 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   return { file, ...notice === undefined ? {} : { notice } };
 });
 var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
-  const roots = [resolve6(cwd)];
-  for (let folder = resolve6(cwd);; folder = dirname5(folder)) {
-    if (yield* present3(join13(folder, ".git"))) {
+  const roots = [resolve7(cwd)];
+  for (let folder = resolve7(cwd);; folder = dirname6(folder)) {
+    if (yield* present3(join14(folder, ".git"))) {
       if (folder !== roots[0])
         roots.push(folder);
       break;
     }
-    if (dirname5(folder) === folder)
+    if (dirname6(folder) === folder)
       break;
   }
   return roots.flatMap((root) => [
-    join13(root, ".claude", "settings.json"),
-    join13(root, ".claude", "settings.local.json")
+    join14(root, ".claude", "settings.json"),
+    join14(root, ".claude", "settings.local.json")
   ]);
 });
 var enablement = fn2("enablement")(function* (folder, file) {
@@ -14808,8 +14944,8 @@ var enablement = fn2("enablement")(function* (folder, file) {
 });
 var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) {
   const shell = yield* Shell;
-  const name = relative4(root, file).split(sep6).join("/");
-  const folderName = relative4(root, folder).split(sep6).join("/");
+  const name = relative4(root, file).split(sep7).join("/");
+  const folderName = relative4(root, folder).split(sep7).join("/");
   const listed = yield* shell.run("git", ["ls-files", "--cached", "-z"], { cwd: root });
   if (listed.exitCode !== 0)
     return "git could not say whether it tracks it";
@@ -14827,7 +14963,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
   const own = yield* identity2(file);
   if (own !== undefined) {
     for (const entry of tracked) {
-      if ((yield* identity2(join13(root, entry))) === own)
+      if ((yield* identity2(join14(root, entry))) === own)
         return "git tracks it";
     }
   }
@@ -14839,7 +14975,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
       if (component === folderName || seen.has(component))
         continue;
       seen.add(component);
-      if ((yield* identity2(join13(root, component))) === home)
+      if ((yield* identity2(join14(root, component))) === home)
         return `git tracks ${component} as ${folderName}`;
     }
   }
@@ -14852,8 +14988,8 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
 });
 var installedScope = fn2("installedScope")(function* (cwd) {
   const { folder, root, trusted } = yield* claudeFolder(cwd);
-  const local = join13(folder, fileName("local"));
-  const project = join13(folder, fileName("project"));
+  const local = join14(folder, fileName("local"));
+  const project = join14(folder, fileName("project"));
   const notices = [];
   const found = yield* enablement(folder, local);
   if (found === "enabled") {
@@ -14907,17 +15043,17 @@ var setupNotice = (env, cwd) => {
   }));
 };
 
-import { lstat as lstat4, mkdir as mkdir6, open as open3 } from "fs/promises";
+import { lstat as lstat5, mkdir as mkdir6, open as open3 } from "fs/promises";
 import { tmpdir as tmpdir2, userInfo } from "os";
-import { join as join14 } from "path";
+import { join as join15 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join14(tmpdir2(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join14(markers(), sessionId);
+var markers = () => join15(tmpdir2(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join15(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir6(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat4(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir6(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat5(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -14926,7 +15062,7 @@ var create2 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId
 var markRulesDelivered = (sessionId) => create2(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create2;
 
-import { join as join15 } from "path";
+import { join as join16 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -15082,7 +15218,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join15(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join16(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -15203,13 +15339,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join15(root, folderName);
+  const legacy = join16(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join15(legacy, "intents", folder);
+    const base = join16(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -15217,7 +15353,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join15(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join16(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -15228,10 +15364,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join15(base, path), to: join15(target, path) });
+      state.notes.push({ from: join16(base, path), to: join16(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join15(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join16(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -15333,13 +15469,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join15(root, folderName);
+  const legacy = join16(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join15(legacy, folder);
+    const base = join16(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -15353,7 +15489,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join15(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join16(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -15364,10 +15500,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join15(base, path), to: join15(target, path) });
+      state.notes.push({ from: join16(base, path), to: join16(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join15(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join16(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -15572,7 +15708,7 @@ var pushTargets = (line) => simpleCommands(line).flatMap((words) => {
 });
 
 var dependsOn = (a, b) => a.dependencies.includes(b.id);
-var independent = (a, b) => !dependsOn(a, b) && !dependsOn(b, a) && !(isWriter(a.roleTask) && isWriter(b.roleTask) && firstOverlap(a.ownershipPaths, b.ownershipPaths) !== undefined);
+var independent = (a, b) => !dependsOn(a, b) && !dependsOn(b, a) && !(isWriter(a.roleTask) && isWriter(b.roleTask) && (Boolean(a.operationalResources?.length || b.operationalResources?.length) || firstOverlap(a.ownershipPaths, b.ownershipPaths) !== undefined));
 var parallelSet = (ready, kind) => ready.filter(kind).reduce((chosen, next) => chosen.every((other) => independent(other, next)) ? [...chosen, next] : chosen, []);
 var awaited = (project, review) => isReviewer(review.roleTask) ? review.independentFrom.filter((id) => {
   const state = project.assignments.find((row) => row.id === id)?.state;
@@ -15772,6 +15908,55 @@ var planNotes = (words) => [
   `\`continues\` lists Ready work that continues a warm specialist, by ${words.message} beside the workflow. \`fallback\` is the same work as direct subagents, for a session where the ${words.workflowTool} tool is disabled or unavailable: its writers launch together, and the \`afterwards\` reviews launch once the writers they depend on are terminal`
 ];
 var OVERVIEW_COMMANDS = [
+  {
+    path: ["handoff"],
+    usage: "handoff [--intent <id>]",
+    summary: "Summarize recorded open work for another session, without changing state",
+    notes: [
+      "By default includes every open Intent and all its Assignments; --intent selects one open Intent by id.",
+      "Branches, pull requests, requirements and outcomes are recorded facts, not live checks; current PR and CI status are unknown."
+    ],
+    flags: { intent: "string" },
+    positionals: 0,
+    state: "peek",
+    run: ({ directory, args, cwd, env }) => gen2(function* () {
+      yield* requireHandoffState(cwd, env, directory);
+      const snapshot = yield* readOpenState(directory);
+      const id = stringFlag(args, "intent");
+      const intents = id === undefined ? byId(snapshot.project.intents) : [yield* findIntent(snapshot.project, id)];
+      return {
+        source: "recorded local state; live PR and CI status unknown",
+        intents: intents.map((intent) => ({
+          id: intent.id,
+          revision: intent.revision,
+          state: intent.state,
+          objective: intent.objective,
+          requirements: intent.requirements,
+          assignments: byId(snapshot.project.assignments.filter((row) => row.intentId === intent.id)).map((row) => ({
+            id: row.id,
+            revision: row.intentRevision,
+            role: row.roleTask,
+            objective: row.objective,
+            state: row.state,
+            outcome: row.result ?? null,
+            acceptance: row.acceptance ?? null,
+            scope: row.scope,
+            constraints: row.constraints,
+            criteria: row.criteria,
+            evidence: row.evidence,
+            ownershipPaths: row.ownershipPaths,
+            dependencies: row.dependencies,
+            independentFrom: row.independentFrom,
+            followUpOf: row.followUpOf ?? null,
+            recordedAgent: row.specialist?.agentId ?? null,
+            ...row.operationalResources === undefined ? {} : { recordedOperationalResources: row.operationalResources }
+          })),
+          recordedBranches: byId(snapshot.links.branches.filter((row) => row.intentId === intent.id)),
+          recordedPullRequests: byId(snapshot.links.pulls.filter((row) => row.intentId === intent.id))
+        }))
+      };
+    })
+  },
   {
     path: ["plan"],
     usage: "plan",
@@ -23342,7 +23527,7 @@ ${cleanedBelow}
   }, true)
 ];
 
-import { join as join16, relative as relative5 } from "path";
+import { join as join17, relative as relative5 } from "path";
 var {$: $4 } = globalThis.Bun;
 class NothingToMigrate extends TaggedError2("NothingToMigrate") {
   get message() {
@@ -23431,7 +23616,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => Array.fromAsync(new Bun.Glob("*").scan({ cwd: root, dot: true, onlyFiles: true })));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join16(root, name));
+    const text = yield* readText(join17(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -23505,7 +23690,7 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join18 } from "path";
+import { join as join19 } from "path";
 
 var WEB_KIT_PACKAGE = "pi-web-kit";
 var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
@@ -23520,7 +23705,7 @@ var piPackages = (config, profile = providerProfile(config), form = "normal", de
   return names.map((name) => piPackageSource(name));
 };
 
-import { isAbsolute as isAbsolute3, join as join17 } from "path";
+import { isAbsolute as isAbsolute5, join as join18 } from "path";
 var BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE];
 var BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
 var BROWSE_PAIR_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page when no browser has it and pairs the browser (\`${BROWSE_COMMAND} pair\` prints a code to enter in the extension's options instead)`;
@@ -23530,9 +23715,9 @@ var browseDataDirectory = (env) => {
   if (home !== undefined)
     return home;
   const data = firstNonEmpty(env["XDG_DATA_HOME"]);
-  return join17(data !== undefined && isAbsolute3(data) ? data : join17(homeDirectory(env), ".local", "share"), "browse");
+  return join18(data !== undefined && isAbsolute5(data) ? data : join18(homeDirectory(env), ".local", "share"), "browse");
 };
-var browsePairingFile = (env) => join17(browseDataDirectory(env), "browser-tokens.json");
+var browsePairingFile = (env) => join18(browseDataDirectory(env), "browser-tokens.json");
 var Open = Record(String4, Unknown2);
 var Pairing = StructWithRest(Struct({
   token: String4.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
@@ -23571,7 +23756,7 @@ var BROWSE_EXTENSION_IDS = [
 var browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory(env);
   if (platform === "darwin") {
-    const support = join17(home, "Library", "Application Support");
+    const support = join18(home, "Library", "Application Support");
     return [
       ["Google Chrome", "Google/Chrome"],
       ["Google Chrome Beta", "Google/Chrome Beta"],
@@ -23582,21 +23767,21 @@ var browserDirectories = (env, platform = process.platform) => {
       ["Opera", "com.operasoftware.Opera"],
       ["Vivaldi", "Vivaldi"],
       ["Arc", "Arc/User Data"]
-    ].map(([name = "", folder = ""]) => ({ name, directory: join17(support, folder) }));
+    ].map(([name = "", folder = ""]) => ({ name, directory: join18(support, folder) }));
   }
   if (platform === "win32") {
-    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join17(home, "AppData", "Local");
-    const roaming = firstNonEmpty(env["APPDATA"]) ?? join17(home, "AppData", "Roaming");
+    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join18(home, "AppData", "Local");
+    const roaming = firstNonEmpty(env["APPDATA"]) ?? join18(home, "AppData", "Roaming");
     return [
-      { name: "Google Chrome", directory: join17(local, "Google", "Chrome", "User Data") },
-      { name: "Microsoft Edge", directory: join17(local, "Microsoft", "Edge", "User Data") },
-      { name: "Brave", directory: join17(local, "BraveSoftware", "Brave-Browser", "User Data") },
-      { name: "Vivaldi", directory: join17(local, "Vivaldi", "User Data") },
-      { name: "Opera", directory: join17(roaming, "Opera Software", "Opera Stable") }
+      { name: "Google Chrome", directory: join18(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join18(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join18(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join18(local, "Vivaldi", "User Data") },
+      { name: "Opera", directory: join18(roaming, "Opera Software", "Opera Stable") }
     ];
   }
   const configured = firstNonEmpty(env["XDG_CONFIG_HOME"]);
-  const config = configured !== undefined && isAbsolute3(configured) ? configured : join17(home, ".config");
+  const config = configured !== undefined && isAbsolute5(configured) ? configured : join18(home, ".config");
   return [
     ["Google Chrome", "google-chrome"],
     ["Google Chrome Beta", "google-chrome-beta"],
@@ -23606,7 +23791,7 @@ var browserDirectories = (env, platform = process.platform) => {
     ["Brave", "BraveSoftware/Brave-Browser"],
     ["Opera", "opera"],
     ["Vivaldi", "vivaldi"]
-  ].map(([name = "", folder = ""]) => ({ name, directory: join17(config, folder) }));
+  ].map(([name = "", folder = ""]) => ({ name, directory: join18(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
   profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String4, Open)) }), [Open]))
@@ -23622,12 +23807,12 @@ var isDisabled = (setting) => {
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 };
 var findBrowseExtension = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
-  const state = yield* readOptional(join17(directory, "Local State"));
+  const state = yield* readOptional(join18(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
-    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join17(directory, profile, file)).pipe(map4((text) => {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join18(directory, profile, file)).pipe(map4((text) => {
       const parsed = text === undefined ? undefined : decodeUnknownOption2(Preferences)(text, {
         onExcessProperty: "error"
       });
@@ -23732,8 +23917,8 @@ var piAgentDirectory = (env) => {
   const home = homeDirectory(env);
   const set = firstNonEmpty(env["PI_CODING_AGENT_DIR"]);
   if (set === undefined)
-    return join18(home, ".pi", "agent");
-  return set === "~" ? home : /^~[/\\]/.test(set) ? join18(home, set.slice(2)) : set;
+    return join19(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join19(home, set.slice(2)) : set;
 };
 var piSettingsSources = (file) => gen2(function* () {
   const exists = yield* fileOperation(file, "read", () => Bun.file(file).exists());
@@ -23747,7 +23932,7 @@ var piSettingsSources = (file) => gen2(function* () {
   }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
   return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
 });
-var piSettingsFiles = (env, cwd) => [join18(piAgentDirectory(env), "settings.json"), join18(cwd, ".pi", "settings.json")];
+var piSettingsFiles = (env, cwd) => [join19(piAgentDirectory(env), "settings.json"), join19(cwd, ".pi", "settings.json")];
 var piPresenceFiles = (env, cwd, scope) => {
   const [globalFile, projectFile] = piSettingsFiles(env, cwd);
   return scope === "user" ? [globalFile] : [globalFile, projectFile];
@@ -23899,7 +24084,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function*
   }));
 });
 
-import { join as join19, resolve as resolve7 } from "path";
+import { join as join20, resolve as resolve8 } from "path";
 
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
@@ -23963,21 +24148,21 @@ var locate2 = (env, cwd, scope, logical) => {
       return;
     const explicit = firstNonEmpty(env["BILI_CONFIG_FILE"]);
     if (explicit !== undefined)
-      return resolve7(cwd, explicit);
-    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join19(home, ".config");
-    return join19(base, "billion-context", "billion-context.json");
+      return resolve8(cwd, explicit);
+    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join20(home, ".config");
+    return join20(base, "billion-context", "billion-context.json");
   }
   if (logical === PI_FFF_FILE)
-    return project ? undefined : join19(piAgentDirectory(env), "pi-fff.json");
+    return project ? undefined : join20(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
-    return project ? join19(cwd, ".pi", name) : join19(piAgentDirectory(env), name);
+    return project ? join20(cwd, ".pi", name) : join20(piAgentDirectory(env), name);
   }
   if (logical.startsWith(PI_PREFIX)) {
     const name = logical.slice(PI_PREFIX.length);
-    return project ? join19(cwd, ".pi", name) : join19(home, ".pi", name);
+    return project ? join20(cwd, ".pi", name) : join20(home, ".pi", name);
   }
-  return project || !logical.startsWith("~/") ? undefined : join19(home, logical.slice(2));
+  return project || !logical.startsWith("~/") ? undefined : join20(home, logical.slice(2));
 };
 var keyName = ({ path }) => path.join(".");
 var inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf));
@@ -24255,7 +24440,7 @@ var searchToolLines = (cwd, format) => gen2(function* () {
   return yield* forEach2(TOOLS, (tool) => locateTool(tool, cwd, shell.which).pipe(map4((found) => format(tool, found))));
 });
 
-import { join as join22 } from "path";
+import { join as join23 } from "path";
 
 var reportOne = (env, capability, features, options, platform) => gen2(function* () {
   const form = options.form ?? "normal";
@@ -24295,8 +24480,8 @@ var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform
   return lines.flat();
 });
 
-import { join as join20 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join20(stateDirectory(cwd), CONFIG_FILE);
+import { join as join21 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join21(stateDirectory(cwd), CONFIG_FILE);
 var objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
@@ -24438,7 +24623,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
 });
 
 import { stat as stat3 } from "fs/promises";
-import { join as join21 } from "path";
+import { join as join22 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
   browserArtifactsAfterDays: 14,
@@ -24451,21 +24636,21 @@ var restoreSettings = (path, previous, unchangedSince) => previous === undefined
 var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
-var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join21(homeDirectory(env), ".t3");
-var t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json");
+var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join22(homeDirectory(env), ".t3");
+var t3SettingsFile = (env) => join22(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => tryPromise2(() => stat3(path)).pipe(map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory(env);
   if (platform === "darwin") {
     const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-    const simulator = join21(developer, "Platforms", "iPhoneSimulator.platform");
+    const simulator = join22(developer, "Platforms", "iPhoneSimulator.platform");
     if (yield* isDirectory2(simulator))
       return `Xcode (${developer})`;
   }
   const sdkFolders = [
     firstNonEmpty(env["ANDROID_HOME"]),
     firstNonEmpty(env["ANDROID_SDK_ROOT"]),
-    platform === "darwin" ? join21(home, "Library", "Android", "sdk") : platform === "win32" ? join21(firstNonEmpty(env["LOCALAPPDATA"]) ?? join21(home, "AppData", "Local"), "Android", "Sdk") : join21(home, "Android", "Sdk")
+    platform === "darwin" ? join22(home, "Library", "Android", "sdk") : platform === "win32" ? join22(firstNonEmpty(env["LOCALAPPDATA"]) ?? join22(home, "AppData", "Local"), "Android", "Sdk") : join22(home, "Android", "Sdk")
   ];
   for (const folder of sdkFolders) {
     if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -24786,7 +24971,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join22(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join22(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join23(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join23(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present2("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -24925,9 +25110,9 @@ var doctor = fn2("doctor")(function* (env, options) {
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
 });
 
-import { lstat as lstat5, mkdir as mkdir7, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile3 } from "fs/promises";
+import { lstat as lstat6, mkdir as mkdir7, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile3 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname6, join as join23, posix as posix3, win32 as win323 } from "path";
+import { basename as basename6, dirname as dirname7, join as join24, posix as posix3, win32 as win323 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -26132,8 +26317,8 @@ var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join23(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join23(directory, file)}`, cause)
+      try: () => Bun.write(join24(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join24(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -26152,11 +26337,11 @@ var importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
 });
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join23(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join24(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
 }));
 var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join23(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join24(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
 var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
@@ -26167,7 +26352,7 @@ var privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
     yield* fileSystem(`cannot create ${folder}`, () => mkdir7(folder, { recursive: true, mode: 448 }));
   const found = yield* tryPromise2({
-    try: () => lstat5(folder),
+    try: () => lstat6(folder),
     catch: (cause) => cause
   }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
   if (found === undefined || uid === undefined)
@@ -26211,38 +26396,38 @@ var promote = (temporary, directory, packages, lock) => gen2(function* () {
 });
 var STALE_AFTER_MS = 60 * 60 * 1000;
 var newestChange = (path) => gen2(function* () {
-  const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join23(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join23(path, "node_modules"))];
+  const modified = (entry) => tryPromise2(() => lstat6(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map4((names) => names.map((name) => join24(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join24(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 });
 var sweepStale = (directory, uid) => gen2(function* () {
-  const parent = dirname6(directory);
-  const prefix = `.${basename5(directory)}-`;
+  const parent = dirname7(directory);
+  const prefix = `.${basename6(directory)}-`;
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir2(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join23(parent, name);
-    const found = yield* tryPromise2(() => lstat5(path));
+    const path = join24(parent, name);
+    const found = yield* tryPromise2(() => lstat6(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
 }).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join23(dirname6(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join24(dirname7(directory), `.${basename6(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join23(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join24(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove);
 var loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join23(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join24(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -26252,7 +26437,7 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
   });
   if (options.directory === undefined)
     yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
-  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname6(directory)])
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname7(directory)])
     yield* privateFolder(folder, uid, true);
   yield* privateFolder(directory, uid, false);
   if (!(yield* installed(directory, packages, lock))) {
@@ -26261,9 +26446,9 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join23(directory, TUI_BUNDLE);
+  const target = join24(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join23(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join24(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });

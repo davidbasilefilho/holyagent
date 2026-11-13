@@ -1,4 +1,4 @@
-import { Console, Data, Effect, Option } from "effect"
+import { Console, Data, Effect } from "effect"
 
 import {
   compareVersions,
@@ -10,7 +10,7 @@ import {
 
 /** A pull request breaks the release-branch model of this repository (see AGENTS.md). */
 export class BranchModelViolation extends Data.TaggedError("BranchModelViolation")<{
-  readonly rule: "main-base" | "branch-version" | "release-base"
+  readonly rule: "main-base"
   readonly base: string
   readonly head: string
   readonly detail: string
@@ -47,46 +47,17 @@ export interface PullRequest {
   readonly version: string
 }
 
-/** `release/<v>/<rest>`: the release a branch belongs to and the rest of its name. */
-const RELEASE_BRANCH = /^release\/([^/]+)\/(.+)$/
-
-/**
- * Checks a pull request against the release-branch model: into `main` only from
- * `release/<v>/integration`, a release branch's `<v>` equal to the version of its head, and into a
- * `release/<v>/...` branch only from a branch of the same release. Fails with the first rule
- * broken.
- */
+/** Requires pull requests into main to come from dev. */
 export const checkBranchModel = ({
   base,
   head,
-  version,
+  version: _version,
 }: PullRequest): Effect.Effect<void, BranchModelViolation | InvalidVersion> => {
   const violation = (rule: BranchModelViolation["rule"], detail: string) =>
     Effect.fail(new BranchModelViolation({ rule, base, head, detail }))
-  const headRelease = RELEASE_BRANCH.exec(head)
-  const baseRelease = RELEASE_BRANCH.exec(base)
   return Effect.gen(function* () {
-    if (headRelease !== null) {
-      // Compared as versions, not strings, so `0.02.1` or a legacy `-Z` suffix is not a mismatch
-      // by spelling alone and a malformed package.json fails here rather than on `main` only.
-      const headVersion = yield* parseVersion(version)
-      const named = yield* Effect.option(parseVersion(headRelease[1] ?? ""))
-      if (Option.isNone(named) || compareVersions(named.value, headVersion) !== 0)
-        return yield* violation(
-          "branch-version",
-          `the branch names release ${headRelease[1]} but the head carries version ${version}`,
-        )
-    }
-    if (base === "main" && !(headRelease !== null && headRelease[2] === "integration"))
-      return yield* violation(
-        "main-base",
-        "only release/<v>/integration may open a pull request into main",
-      )
-    if (baseRelease !== null && headRelease?.[1] !== baseRelease[1])
-      return yield* violation(
-        "release-base",
-        `a pull request into a release/${baseRelease[1]}/... branch must come from a branch of release ${baseRelease[1]}`,
-      )
+    if (base === "main" && head !== "dev")
+      return yield* violation("main-base", "only dev may open a pull request into main")
   })
 }
 

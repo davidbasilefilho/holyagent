@@ -29,7 +29,8 @@ export type DispatchBlock =
  * is Succeeded and accepted at its revision. Dependencies named in `assumeAccepted` count as
  * accepted, for planning a run that will finish them first. Writers in different work trees may own
  * the same paths, since each tree has its own files: with the key of the work tree in `workTree`, a
- * Running writer counts only when it runs in that work tree or its work tree is not known.
+ * Running writer counts only when it runs in that work tree or its work tree is not known. An
+ * operational writer waits for every Running writer, regardless of work tree, and vice versa.
  */
 export const dispatchBlock = (
   project: Project,
@@ -45,7 +46,7 @@ export const dispatchBlock = (
   if (intent.revision !== assignment.intentRevision)
     return new StaleRevision({ given: assignment.intentRevision, live: intent.revision })
   const writes = isWriter(assignment.roleTask)
-  if (writes && assignment.ownershipPaths.length === 0)
+  if (writes && assignment.ownershipPaths.length === 0 && !assignment.operationalResources?.length)
     return new MissingOwnership({ roleTask: assignment.roleTask })
   for (const id of assignment.dependencies) {
     if (assumeAccepted.has(id)) continue
@@ -65,6 +66,15 @@ export const dispatchBlock = (
   if (writes)
     for (const running of project.assignments) {
       if (running.state !== "Running" || !isWriter(running.roleTask)) continue
+      if (assignment.operationalResources?.length || running.operationalResources?.length)
+        return new OwnershipConflict({
+          id: assignment.id,
+          runningId: running.id,
+          path:
+            assignment.operationalResources?.[0]?.target ??
+            running.operationalResources?.[0]?.target ??
+            "operational resource",
+        })
       const elsewhere = running.specialist?.workTree
       if (workTree !== undefined && elsewhere !== undefined && elsewhere !== workTree) continue
       const path = firstOverlap(assignment.ownershipPaths, running.ownershipPaths)

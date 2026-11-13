@@ -56,7 +56,8 @@ const independent = (a: Assignment, b: Assignment) =>
   !(
     isWriter(a.roleTask) &&
     isWriter(b.roleTask) &&
-    firstOverlap(a.ownershipPaths, b.ownershipPaths) !== undefined
+    (Boolean(a.operationalResources?.length || b.operationalResources?.length) ||
+      firstOverlap(a.ownershipPaths, b.ownershipPaths) !== undefined)
   )
 
 /** The Assignments of a kind that can all run side by side, taken in order. */

@@ -50,7 +50,8 @@ const writeNamed = (call: Call, name: string, assignmentId: string, text: string
  * renderPrompt}).
  */
 export const briefText = (assignment: Assignment, agent: string, host: AgentHost): string => {
-  const assignmentText = renderPrompt(assignment, agent)
+  const resources = assignment.operationalResources?.map(({ target }) => `- ${target}`).join("\n")
+  const assignmentText = `${renderPrompt(assignment, agent)}${resources ? `\nOperational resources (write only here):\n${resources}` : ""}`
   const firstPass = host === "pi" ? firstPassPrompt(assignment.roleTask) : undefined
   return firstPass === undefined
     ? assignmentText

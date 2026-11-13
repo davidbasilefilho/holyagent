@@ -2,8 +2,11 @@ import { Effect } from "effect"
 
 import { CLAUDE_WORDS, type HostWords, wordsFor } from "../domain/host.ts"
 import { recommend } from "../domain/plan.ts"
+import { findIntent } from "../domain/project.ts"
 import { workTreeKey } from "../state/local.ts"
 import { readOpenState, type Snapshot } from "../state/store.ts"
+import { requireHandoffState } from "../state/tree.ts"
+import { stringFlag } from "./args.ts"
 import { agentHostOf } from "./config.ts"
 import { nowIso } from "./context.ts"
 import { intentInUse, resolveIntent } from "./intent.ts"
@@ -104,6 +107,67 @@ const planNotes = (words: HostWords): ReadonlyArray<string> => [
 
 /** The `plan`, `status` and `reconcile` commands. */
 export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
+  {
+    path: ["handoff"],
+    usage: "handoff [--intent <id>]",
+    summary: "Summarize recorded open work for another session, without changing state",
+    notes: [
+      "By default includes every open Intent and all its Assignments; --intent selects one open Intent by id.",
+      "Branches, pull requests, requirements and outcomes are recorded facts, not live checks; current PR and CI status are unknown.",
+    ],
+    flags: { intent: "string" },
+    positionals: 0,
+    state: "peek",
+    run: ({ directory, args, cwd, env }) =>
+      Effect.gen(function* () {
+        yield* requireHandoffState(cwd, env, directory)
+        const snapshot = yield* readOpenState(directory)
+        const id = stringFlag(args, "intent")
+        const intents =
+          id === undefined
+            ? byId(snapshot.project.intents)
+            : [yield* findIntent(snapshot.project, id)]
+        return {
+          source: "recorded local state; live PR and CI status unknown",
+          intents: intents.map((intent) => ({
+            id: intent.id,
+            revision: intent.revision,
+            state: intent.state,
+            objective: intent.objective,
+            requirements: intent.requirements,
+            assignments: byId(
+              snapshot.project.assignments.filter((row) => row.intentId === intent.id),
+            ).map((row) => ({
+              id: row.id,
+              revision: row.intentRevision,
+              role: row.roleTask,
+              objective: row.objective,
+              state: row.state,
+              outcome: row.result ?? null,
+              acceptance: row.acceptance ?? null,
+              scope: row.scope,
+              constraints: row.constraints,
+              criteria: row.criteria,
+              evidence: row.evidence,
+              ownershipPaths: row.ownershipPaths,
+              dependencies: row.dependencies,
+              independentFrom: row.independentFrom,
+              followUpOf: row.followUpOf ?? null,
+              recordedAgent: row.specialist?.agentId ?? null,
+              ...(row.operationalResources === undefined
+                ? {}
+                : { recordedOperationalResources: row.operationalResources }),
+            })),
+            recordedBranches: byId(
+              snapshot.links.branches.filter((row) => row.intentId === intent.id),
+            ),
+            recordedPullRequests: byId(
+              snapshot.links.pulls.filter((row) => row.intentId === intent.id),
+            ),
+          })),
+        }
+      }),
+  },
   {
     path: ["plan"],
     usage: "plan",

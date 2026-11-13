@@ -7,6 +7,7 @@ import {
   AssignmentDraft,
   AssignmentState,
   createAssignment,
+  type OperationalResource,
   type Outcome,
 } from "../domain/assignment.ts"
 import {
@@ -25,7 +26,9 @@ import { agentFor, agentsFor, RoleTask, routeFor } from "../domain/route.ts"
 import { detectForm } from "../setup/form.ts"
 import { io } from "../state/files.ts"
 import { workTreeKey } from "../state/local.ts"
+import { validateOperationalResources } from "../state/operational.ts"
 import { readState, type Snapshot } from "../state/store.ts"
+import { operationalWorktrees } from "../state/tree.ts"
 import { booleanFlag, choiceFlag, requiredFlag, stringFlag } from "./args.ts"
 import { briefPath, briefText, writeBrief, writeReport } from "./brief.ts"
 import { agentHostOf, type Launch, launchesOf } from "./config.ts"
@@ -57,14 +60,25 @@ const AssignmentInput = Schema.Struct({
   intentRevision: Schema.optionalKey(Revision),
 })
 
-const DRAFT_SHAPE = `{roleTask: ${RoleTask.literals.join("|")}, objective, scope?: [text], constraints?: [text], criteria: [{text, blocking, dimension: behavior|regressions|tests|scope|style|repo-standards}], evidence?: [label], ownershipPaths?: [path] (required for writers), dependencies?: [assignmentId], independentFrom?: [assignmentId], followUpOf?: assignmentId, screen?: boolean, intentId?, intentRevision?}`
+const DRAFT_SHAPE = `{roleTask: ${RoleTask.literals.join("|")}, objective, scope?: [text], constraints?: [text], criteria: [{text, blocking, dimension: behavior|regressions|tests|scope|style|repo-standards}], evidence?: [label], ownershipPaths?: [path], operationalResources?: [{kind: local-path, target: absolutePath}], dependencies?: [assignmentId], independentFrom?: [assignmentId], followUpOf?: assignmentId, screen?: boolean, intentId?, intentRevision?}`
 
 const DRAFT_NOTES: ReadonlyArray<string> = [
   "required: roleTask, objective and criteria; unknown fields are refused",
   "evidence labels are answered by the specialist by name; keep them few and observable (checks-run, changed-paths, diff-file)",
   "screen: true when the Assignment needs to see or drive a screen (a desktop app, a real browser, the page shown in T3); its specialist then gets the computer-use, browser-use and T3 preview tools, and under the Codex provider runs on GPT-6.1 Terra at medium or higher effort. Pi host only; the dispatch prints the agent to launch, whose name ends in -screen",
   "ownershipPaths: relative portable paths that must not overlap a Running writer's in the same work tree; dependencies must be accepted at the live revision; a review names the work it must be independent from in independentFrom; a repair or follow-up sets followUpOf",
+  "a writer needs ownershipPaths or operationalResources; an operational target is an absolute local path outside known worktrees, and an operational writer waits for every Running writer in the shared state",
 ]
+
+const validateResources = (
+  call: Call,
+  resources: ReadonlyArray<OperationalResource> | undefined,
+) =>
+  resources?.length
+    ? operationalWorktrees(call.root, call.env).pipe(
+        Effect.flatMap((roots) => validateOperationalResources(resources, roots)),
+      )
+    : Effect.void
 
 const completeDraft = (snapshot: Snapshot, input: typeof AssignmentInput.Type) =>
   Effect.gen(function* () {
@@ -295,13 +309,14 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
     notes: ["the draft rules are under assignment dispatch"],
     flags: { input: "string" },
     positionals: 0,
-    run: ({ update, input }) =>
+    run: (call) =>
       Effect.gen(function* () {
-        const draft = yield* input(AssignmentInput)
+        const draft = yield* call.input(AssignmentInput)
         const id = yield* newId("assignment")
         const now = yield* nowIso
-        const { assignment } = yield* update((snapshot) =>
-          completeDraft(snapshot, draft).pipe(
+        const { assignment } = yield* call.update((snapshot) =>
+          validateResources(call, draft.operationalResources).pipe(
+            Effect.andThen(completeDraft(snapshot, draft)),
             Effect.flatMap((complete) => createAssignment(snapshot.project, complete, { id, now })),
           ),
         )
@@ -343,6 +358,10 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             const id = "id" in request ? request.id : newAssignmentId
             const project =
               "id" in request ? snapshot.project : yield* withPlanned(snapshot, request, id, now)
+            yield* validateResources(
+              call,
+              (yield* findAssignment(project, id)).operationalResources,
+            )
             // Refused before anything starts: the other host has no screen tools to grant, and a
             // dispatch that dropped the capability would hand the specialist a task it cannot do.
             if (settings.host !== "pi" && (yield* findAssignment(project, id)).screen === true)
