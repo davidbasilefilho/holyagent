@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-silent-handoff-omissions-for",
   "objective": "Repair silent handoff omissions for pending branch-state migration and correct live-status help.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only handoff/state resolution and focused fixtures/docs"
   ],
@@ -53,7 +53,37 @@
     "agentId": "/root/r034_handoff_command",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T13:46:51.466Z"
+    "startedAt": "2026-11-13T13:46:51.466Z",
+    "finishedAt": "2026-11-13T13:54:19.417Z"
+  },
+  "result": "status: done\nchanged:\n- packages/runtime/src/cli/overview.ts\n- packages/runtime/src/state/tree.ts\n- packages/runtime/tests/handoff.test.ts\n- docs/handoff.md\nchecks:\n- bun test packages/runtime/tests/handoff.test.ts (before repair: pending-state expectation fails) -> exit 1\n- bun test packages/runtime/tests/handoff.test.ts packages/runtime/tests/state-branch.test.ts -> exit 0\n- bun test packages/runtime/tests/handoff.test.ts (final) -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- The combined tests passed 64 cases; final handoff tests passed 3 cases, 58 assertions. Type check covered 322 files, lint 323, format 744. Build and full verify were deferred as instructed. A pending standard checkout now fails peek without creating a lock, affecting all peek callers during that incomplete state.\nevidence:\n- Handoff never silently omits pending recorded state and remains read-only: Branch-mode fixtures reproduce the old empty result and verify refusal for pending records in current or other worktrees, missing shared checkout, and unfinished checkout; state files and worktree registration remain unchanged.\n- Help and regression fixtures distinguish recorded state from live status truthfully: Both host help tests assert current PR and CI status unknown; fixtures cover corrupt mixed records and successful shared state.\n- checks-run: Red/green focused tests, type, lint and format listed above.\n- changed-paths: overview.ts, state/tree.ts, handoff.test.ts and docs/handoff.md.\n- diff-file: /workspace/work/034/handoff-repair.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Real Git regression and mutation evidence closes the review finding; focused type/lint/format pass, combined final validation follows.",
+    "criteria": [
+      {
+        "criterion": "Handoff never silently omits pending recorded state and remains read-only",
+        "support": "Branch-mode fixtures reproduce the old empty result and verify refusal for pending records in current or other worktrees, missing shared checkout, and unfinished checkout; state files and worktree registration remain unchanged."
+      },
+      {
+        "criterion": "Help and regression fixtures distinguish recorded state from live status truthfully",
+        "support": "Both host help tests assert current PR and CI status unknown; fixtures cover corrupt mixed records and successful shared state."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Red/green focused tests, type, lint and format listed above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "overview.ts, state/tree.ts, handoff.test.ts and docs/handoff.md."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/handoff-repair.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T13:46:51.466Z"
 }
