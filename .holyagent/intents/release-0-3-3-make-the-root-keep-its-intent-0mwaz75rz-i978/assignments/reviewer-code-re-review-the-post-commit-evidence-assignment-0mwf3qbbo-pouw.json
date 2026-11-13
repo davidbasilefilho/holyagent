@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-post-commit-evidence",
   "objective": "Re-review the post-commit evidence collection ordering repair for code correctness.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "d1cd4a0ef0758efe16cd49f09a32265971094ddc..11f32c53e64ee72bfda3efd0256043d2d0bd9f9b; previousfindingandnewregressionsonly."
   ],
@@ -37,7 +37,9 @@
     "agentId": "/root/r034_guidance_review_code",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T14:58:24.085Z"
+    "startedAt": "2026-11-13T14:58:24.085Z",
+    "finishedAt": "2026-11-13T15:06:33.993Z"
   },
+  "result": "status: partial\nchecks:\n- mise exec -- bun test packages/runtime/tests/sessioncontext.test.ts packages/runtime/tests/requirements.test.ts packages/runtime/tests/instructions.test.ts packages/integrations/claude/tests/plugin.test.ts packages/integrations/pi/tests/session-context.test.ts packages/integrations/pi/tests/pi.test.ts -> exit 0\nblockers:\n- Visual baseline routing can load too late: packages/runtime/src/instructions/claude-5.5/root/skills.md:4 (also gpt-6 and kimi-k3.1 root/skills.md:6) only requires visual-judging before the first visual specialist dispatch. A Worker.implementation may edit rendered source first; the pre-edit baseline instruction in claude-5.5/skills/visual-judging/SKILL.md:41 is then discovered after the original was lost. Route the skill before any task source edits for visual work and cover that ordering.\nnotes:\n- First-pass code-review tool unavailable; manual independent re-review. Actual model and host behavior was not run; full verify deferred. Focused log: /tmp/guidance-final-code-test.log.\nevidence:\n- Post-commit evidence ordering gap is closed across families and current harnesses without new blockers: Not met: visual baseline skill can load after implementation edits. Performance route loads its skill before delegation; both skills specify committed collection, immutable original and previous revision progression.\n- reviewed-range: d1cd4a0ef0758efe16cd49f09a32265971094ddc...11f32c53e64ee72bfda3efd0256043d2d0bd9f9b; exact HEAD, clean worktree.\n- findings: Blocking visual baseline routing gap; see blockers. Generated asset parity and coverage checks passed; no context budget regression observed.\n- checks-run: Focused mise exec bun test: 188 pass, 0 fail, 8861 assertions across six files; /tmp/guidance-final-code-test.log. Prior independent build and 558 focused passes recorded in guidance-order-build-report.json.",
   "createdAt": "2026-11-13T14:58:24.085Z"
 }
