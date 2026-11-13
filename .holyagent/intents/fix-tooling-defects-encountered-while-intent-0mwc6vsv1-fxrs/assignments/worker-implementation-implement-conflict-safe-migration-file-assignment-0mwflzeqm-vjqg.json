@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mwflzeqm-vjqg",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-conflict-safe-migration-file",
+  "objective": "Implement conflict safe migration file publication and conservative source cleanup helpers.",
+  "state": "Running",
+  "scope": [
+    "Work only in /workspace/work/holyagent-034-core. Own new files packages/core/src/state/migration-files.ts and packages/core/tests/migration-files.test.ts. Do not edit tree.ts, journal/index/runner files or existing regression tests. Read the completed migration journal types and index helper contract.",
+    "Implement publishMigrationFiles({ root, files, authorize }) over typed journal file postimages. root is the caller-trusted canonical target Git worktree root; paths are canonical relative Git paths. For each file, existing expected postimage/mode is an idempotent no-op. Unexpected existing content, deletion of a preexisting owned path, a symlink or changed parent must fail without overwrite. For an originally absent path, publish exact validated bytes atomically without replacing a file created by another writer. Reuse portable Core state helpers and choose a safe no-clobber primitive. Recheck authority before new writes, preserve file data/mode, and leave recoverable partial publication on interruption.",
+    "Implement cleanupMigrationSources({ root, source, authorize, ...optionalTrustedIndexCheck }) conservatively. Remove only still-matching owned untracked legacy source files after the caller verifies the target is fully published. Retain tracked source files or changed versions instead of discarding staged/unstaged data; return retained/conflict information. Missing already-cleaned paths are idempotent. Caller controls any legitimate untracking policy later. No guessed git restore/reset and no writes outside canonical roots.",
+    "Use Effect, tagged errors, strict decoded persisted boundaries and safe symlink/parent/root checks. Do not claim OS filesystem isolation. Windows UID/mode behavior must not be assumed POSIX; portable behavior should remain viable and platform limitations explicit. No blanket confirmations or new dependencies.",
+    "Add actual temporary filesystem tests for normal creation, duplicate retry, existing conflicting bytes, user-created destination after preparation, symlink target/parent, path escape, tracked source retention, modified source retention, safe matching untracked cleanup and interrupted/retried publication. No actual shared state or user files.",
+    "Coordinate callback shape with /root/migration_runner_module when it exists. No whole-worktree gates during peer edits; isolated tests allowed, record exact results. Save /workspace/work/034/migration-files-module-report.json, .diff and API contract. Finish actual helper code, not another risk/options handoff."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Migration filesystem helpers publish only expected owned postimages without clobbering conflicts and preserve tracked or changed source data",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "diff-file",
+    "module-api",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/state/migration-files.ts",
+    "packages/core/tests/migration-files.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T23:29:21.502Z"
+  },
+  "createdAt": "2026-11-13T23:29:21.502Z"
+}
