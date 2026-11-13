@@ -34,7 +34,7 @@ test("TOON escapes terminal controls without changing nested records, keys or ta
 })
 
 test("public and internal Pi entries keep CLI results and stdin compatible", async () => {
-  root = await mkdtemp(join(tmpdir(), "holyagent-pi-entries-"))
+  root = await fixture("holyagent-pi-entries-")
   const env = { ...process.env, HOME: root, HOLYAGENT_HOST: "pi" }
   const entries = ["pi-entry.ts", "pi-public-entry.ts"].map((name) =>
     join(import.meta.dir, "../src/hooks", name),
@@ -47,21 +47,27 @@ test("public and internal Pi entries keep CLI results and stdin compatible", asy
         stdin: new TextEncoder().encode("{}"),
       }),
     )
+    expect(results[0]?.exitCode).not.toBeNull()
+    expect(results[1]?.exitCode).not.toBeNull()
     expect(results[0]?.exitCode).toBe(results[1]?.exitCode)
     expect(results[0]?.stdout.toString()).toBe(results[1]?.stdout.toString())
     expect(results[0]?.stderr.toString()).toBe(results[1]?.stderr.toString())
   }
-})
+}, 60_000)
 
 test.skipIf(process.platform === "win32" || Bun.which("script") === null)(
   "the internal Pi entry keeps setup line based on a terminal",
   async () => {
-    root = await mkdtemp(join(tmpdir(), "holyagent-plain-tty-"))
+    root = await fixture("holyagent-plain-tty-")
     const entry = join(import.meta.dir, "../src/hooks/pi-entry.ts")
     const command = [process.execPath, entry, "setup", "--dry-run", "--skip-ctx7"]
       .map((part) => `'${part.replaceAll("'", "'\\''")}'`)
       .join(" ")
-    const child = Bun.spawnSync(["script", "-q", "-e", "-c", command, "/dev/null"], {
+    const scriptArgs = (cmd: string) =>
+      process.platform === "darwin"
+        ? ["script", "-q", "/dev/null", "sh", "-c", cmd]
+        : ["script", "-q", "-e", "-c", cmd, "/dev/null"]
+    const child = Bun.spawnSync(scriptArgs(command), {
       cwd: root,
       env: {
         HOME: root,
@@ -72,13 +78,14 @@ test.skipIf(process.platform === "win32" || Bun.which("script") === null)(
         PATH: process.env["PATH"],
       },
     })
+    expect(child.exitCode).not.toBeNull()
     const output = child.stdout.toString()
     expect(output).toContain("stdin or stdout is not a terminal")
     expect(output).not.toContain("installing the setup interface")
     expect(output).not.toContain("\u001b")
     const publicEntry = join(import.meta.dir, "../src/hooks/pi-public-entry.ts")
     const publicCommand = command.replace(entry, publicEntry)
-    const publicChild = Bun.spawnSync(["script", "-q", "-e", "-c", publicCommand, "/dev/null"], {
+    const publicChild = Bun.spawnSync(scriptArgs(publicCommand), {
       cwd: root,
       env: {
         HOME: root,
@@ -89,10 +96,22 @@ test.skipIf(process.platform === "win32" || Bun.which("script") === null)(
         PATH: process.env["PATH"],
       },
     })
+    expect(publicChild.exitCode).not.toBeNull()
     // An unbuilt source tree has no setup bundle; reaching its loader proves this entry opted in.
     expect(publicChild.stdout.toString()).toContain("the interface bundle")
   },
+  60_000,
 )
+
+const fixture = async (prefix: string) => {
+  const dir = await mkdtemp(join(tmpdir(), prefix))
+  const git = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], { cwd: dir })
+  if (git.exitCode !== 128) {
+    await rm(dir, { recursive: true, force: true })
+    throw new Error(`Fixture must be outside a Git repository: ${dir}`)
+  }
+  return dir
+}
 
 let root = ""
 afterEach(async () => {
@@ -100,7 +119,7 @@ afterEach(async () => {
 })
 
 test("CLI guidance is plain under forced color and keeps its structured records on both hosts", async () => {
-  root = await mkdtemp(join(tmpdir(), "holyagent-plain-cli-"))
+  root = await fixture("holyagent-plain-cli-")
   const cli = (argv: string[], host: string, input?: unknown) =>
     Effect.runPromise(
       run(argv, {
@@ -152,10 +171,10 @@ test("CLI guidance is plain under forced color and keeps its structured records 
     expect(shown.code).toBe(0)
     expect(decode(shown.stdout)).toMatchObject({ objective, requirements: ["first", "last"] })
   }
-})
+}, 60_000)
 
 test("search displays forced colors and control bytes as plain text", async () => {
-  root = await mkdtemp(join(tmpdir(), "holyagent-plain-search-"))
+  root = await fixture("holyagent-plain-search-")
   const file = join(root, "sample.txt")
   await Bun.write(file, "needle \u001b[31m data\n")
   const main = join(import.meta.dir, "../src/cli/main.ts")
@@ -183,13 +202,13 @@ test("search displays forced colors and control bytes as plain text", async () =
     expect(wrapped.exitCode).toBe(direct.exitCode)
     expect(wrapped.stderr.toString()).toContain(args[0] ?? "")
   }
-})
+}, 60_000)
 
 test.skipIf(process.platform === "win32")(
   "search handles controls split across subprocess chunks on both streams",
   async () => {
-    root = await mkdtemp(join(tmpdir(), "holyagent-search-chunks-"))
-    const bin = await mkdtemp(join(tmpdir(), "holyagent-search-bin-"))
+    root = await fixture("holyagent-search-chunks-")
+    const bin = await fixture("holyagent-search-bin-")
     try {
       const fake = join(bin, "fd")
       await Bun.write(
