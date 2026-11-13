@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "implement-a-squash-compatible-repair",
   "objective": "Implement a squash-compatible repair path for a failed, unpublished release without an artificial version bump.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only /workspace/work/holyagent-033-repair, branch release/0.3.3/fix/publication-repair based on main44c79ab2. Carry exact reviewed five-file provenance fix from bea61f99 (generator/dist manifest, publishing test, npm-publishing script/test), without old squash history or any 0.3.4 feature.",
     "Extend branch-model for exact release/<version>/fix/publication-repair heads into main. Normal integration/newer-version behavior stays. Extend required version job: same-version repair allowed only on this named path when main/head exactly equal, branch version matches, and exact holyagent version is verified unpublished in actual public npm registry. Registry error/offline/auth/malformed/identity mismatch must fail closed; published exact versions, lookalikes, downgrades and normal same-version releases reject. No hardcoded version/PR/one-time status bypass. Use strict Effect Schema at external data boundary, Effect/tagged errors, injectable lookup; prevent shell interpolation of refs. No new dependencies/actions/token/provenance fallback.",
@@ -50,7 +50,37 @@
     "agentId": "/root/r033_squash_publication_repair",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T19:02:29.382Z"
+    "startedAt": "2026-11-13T19:02:29.382Z",
+    "finishedAt": "2026-11-13T19:15:27.255Z"
+  },
+  "result": "status: done\nchanged:\n- .github/workflows/validation.yml\n- packages/integrations/pi/dist/package.json\n- packages/integrations/pi/publishing.test.ts\n- packages/integrations/pi/src/generate.ts\n- scripts/npm-publishing.test.ts\n- scripts/npm-publishing.ts\n- scripts/pr-checks.test.ts\n- scripts/pr-checks.ts\n- scripts/workflows.test.ts\nchecks:\n- bun install --frozen-lockfile --ignore-scripts -> exit 0\n- bun test scripts/pr-checks.test.ts scripts/workflows.test.ts scripts/npm-publishing.test.ts packages/integrations/pi/publishing.test.ts -> exit 0\n- bunx --no-install mise run build -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run verify (initial) -> exit 1\n- bunx --no-install mise run verify (final) -> exit 1\n- git diff --check on assigned paths -> exit 0\n- lookupPublished(0.3.3) against public npm -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run test -- packages/integrations/pi/tests/bash.test.ts -t cancellation -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 0\nnotes:\n- Five provenance files exactly match bea61f99. Focused tests: 71 passed. Public npm reported 0.3.3 absent at check time. Initial formatting and type errors were corrected. Log: /workspace/work/034/033-verify-final.log.\n- Unsupervised verify timed out waiting for a terminated grandchild PID; PID 1 does not reap. Existing supervisor rerun: 3506 pass, 2 skip, 0 fail; log /workspace/work/034/033-verify-supervised.log. Original failure retained in /workspace/work/034/033-verify-final.log.\nevidence:\n- Assigned repair satisfies the authorized contract while preserving safeguards and unrelated scope: Focused suite: 71 pass; registry, workflow and CLI covered; provenance files match bea61f99.\n- Meaningful current checks and remaining limits are recorded accurately: Supervised verify exit 0: 3506 pass, 2 skip, 0 fail; prior unsupervised timeout retained in log.\n- checks-run: See checks array and /workspace/work/034/033-verify-final.log.\n- changed-paths: See changed_paths array.\n- diff-file: /workspace/work/034/033-squash-repair-report.diff",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "Guarded repair policy, provenance backport and quoted workflow wiring pass 71 focused checks, real public registry absence check, and supervised full3506pass2skip. Original unsupervised timeout is retained honestly; no tests weakened.",
+    "criteria": [
+      {
+        "criterion": "Assigned repair satisfies the authorized contract while preserving safeguards and unrelated scope",
+        "support": "Focused suite: 71 pass; registry, workflow and CLI covered; provenance files match bea61f99."
+      },
+      {
+        "criterion": "Meaningful current checks and remaining limits are recorded accurately",
+        "support": "Supervised verify exit 0: 3506 pass, 2 skip, 0 fail; prior unsupervised timeout retained in log."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "See checks array and /workspace/work/034/033-verify-final.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "See changed_paths array."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/033-squash-repair-report.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T19:02:29.382Z"
 }
