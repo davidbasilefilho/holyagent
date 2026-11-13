@@ -16,7 +16,7 @@ import {
 import { MATERIALITY_FILE } from "../src/agents.ts"
 import { INSTRUCTIONS_DIRECTORY } from "../src/files.ts"
 import { DESIGN_CORE_FILE, generate } from "../src/generate.ts"
-import { ROOT } from "./built.ts"
+import { field, ROOT } from "./built.ts"
 
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8")
 const generated = await generate()
@@ -97,7 +97,10 @@ describe("the platform design skills", () => {
     for (const name of DESIGN_SKILLS) {
       const text = skill(name)
       expect({ name, named: text.includes(`\nname: ${name}\n`) }).toEqual({ name, named: true })
-      expect({ name, opens: /^description: Use when /m.test(text) }).toEqual({ name, opens: true })
+      expect({ name, opens: field(text, "description")?.startsWith("Use when ") }).toEqual({
+        name,
+        opens: true,
+      })
     }
   })
 

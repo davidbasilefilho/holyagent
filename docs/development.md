@@ -41,7 +41,9 @@ A new harness gets its own folder under `packages/integrations/`. It reuses the 
 
 ## Getting mise
 
-mise is a dev dependency (`mise` in `package.json`, the npm package mise's own docs recommend, a caret range like every dependency, and listed in `trustedDependencies`), so `bun install` installs it into `node_modules/.bin`. Bun runs a package's install script only when the package is trusted, and the trust entry lets this one fetch the `mise` binary for your platform and link it; that script runs `npm` through `node`, so both must be on `PATH` when you install, and it comes from npm and runs on your machine. Because `trustedDependencies` replaces Bun's default list, `@anthropic-ai/claude-code` and `lefthook` are listed there too. Run the commands through Bun, which finds the local binary. `bunx --no-install mise` never fetches a missing local mise from the registry: Bun uses a mise on `PATH` if there is one, and otherwise the command fails:
+Install native mise before installing the development dependencies. The npm wrapper is not used: its Windows binary package is unavailable and its install hook makes `bun i` fail. On Windows, run `winget install --id jdx.mise --exact` (or the Windows installer's `-Dev` option); on other systems follow [mise's installation guide](https://mise.jdx.dev/getting-started.html). CI uses `jdx/mise-action`.
+
+`bunx --no-install mise` resolves mise on PATH without downloading the npm wrapper:
 
 ```sh
 bun install --frozen-lockfile
@@ -49,7 +51,7 @@ bunx --no-install mise install
 bunx --no-install mise run verify
 ```
 
-`mise install` installs the pinned Bun and upgrades it to canary, and `mise run verify` runs the gates. The `package.json` scripts (`bun run verify`, `bun run build`) do the same, since Bun puts `node_modules/.bin` on their `PATH`. A mise already on `PATH` works too: the installers' `--dev` option (`-Dev` on Windows) installs one, and `bun add -g --trust mise` installs it globally (after a plain `bun add -g`, run `bun pm -g trust mise`). The rest of this page writes `mise run ...` for either. CI installs its own mise with `jdx/mise-action`. These commands are described here, not verified on Windows.
+`mise install` installs the pinned tools and upgrades Bun to canary. The upgrade child drops inherited `BUN_OPTIONS` and, on Windows, `PSModulePath`, so a PowerShell 7 host does not make Windows PowerShell load an incompatible archive module. Development installs run the hooks setup only when local lefthook and native mise are available; production installs skip it.
 
 ## Commands
 

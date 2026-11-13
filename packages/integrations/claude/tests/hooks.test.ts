@@ -1319,7 +1319,7 @@ describe("hook session-start", () => {
         ),
       )
       expect(text).toContain(
-        '`holyagent <command>` is `bun --no-env-file --config="/opt/plugin/scripts/empty-bunfig.toml" "/opt/plugin/scripts/holyagent.js" <command>`',
+        '`holyagent <command>` means `bun --no-env-file --config="/opt/plugin/scripts/empty-bunfig.toml" "/opt/plugin/scripts/holyagent.js" <command>`',
       )
       expect(text).toContain(
         "read `/opt/plugin/agents/holyagent.md` with the Read tool before acting",

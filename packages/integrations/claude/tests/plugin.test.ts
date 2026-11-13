@@ -37,7 +37,7 @@ import {
 } from "../src/agents.ts"
 import { DIST_DIRECTORY } from "../src/files.ts"
 import { DESCRIPTION, generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
-import { fresh, PLUGIN, ROOT } from "./built.ts"
+import { field, fresh, PLUGIN, ROOT } from "./built.ts"
 import { isExecutable } from "./host.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
@@ -80,8 +80,6 @@ const filesBelow = async (path: string): Promise<ReadonlyArray<string>> => {
 const generated = await generate()
 const agent = (name: string) => generated.find((file) => file.path.endsWith(`agents/${name}.md`))
 const frontmatter = (text: string) => text.split("\n---\n")[0] ?? ""
-const field = (text: string, key: string) =>
-  new RegExp(`^${key}: (.*)$`, "m").exec(frontmatter(text))?.[1]
 /** The tools an agent's `disallowedTools` line lists, found by the agent file's path. */
 const deniedTools = (path: string): ReadonlyArray<string> =>
   (
@@ -396,9 +394,9 @@ describe("agents", () => {
     for (const rule of [
       "Acknowledge every user message",
       "names an action",
-      "Every pending decision goes through AskUserQuestion",
-      "never reach the same result through another tool",
-      "After a denial, stop that line of work",
+      "Send every pending decision through AskUserQuestion",
+      "Never work around an unresolved denial through another tool, script, or link",
+      "After an explicit user denial, stop that line of work",
       "A brief acknowledgment is always allowed",
       "update_plan",
     ])
@@ -410,9 +408,9 @@ describe("agents", () => {
     for (const rule of [
       "Run no gates, probes or data checks yourself",
       "never open or re-emit the brief",
-      "no scheduled check-ins or wait loops",
+      "no polling, steering, scheduled check-ins or wait loops",
       "Never force-push",
-      "Hook and harness noise gets no mention or reply",
+      "Ignore hook and harness noise",
       "push once the reviews accept",
       "Read only what a decision needs",
     ])
@@ -433,8 +431,8 @@ describe("agents", () => {
   test("the precedence has one source file that the root core and the specialist text embed, and every prompt carries it once", () => {
     const source = read(CLAUDE, PRECEDENCE_FILE.replace("../", "")).trim()
     expect(source).toContain("1. mergeability in the target repository")
-    expect(source).toContain("2. the project's own patterns;")
-    expect(source).toContain("3. HolyAgent's defaults.")
+    expect(source).toContain("2. project patterns;")
+    expect(source).toContain("3. HolyAgent defaults.")
     expect(source).toContain("does not waive a rule that needs the user's approval")
     expect(ROOT_CORE_FILES).toContain(PRECEDENCE_FILE)
     expect(ROOT_CORE).toContain(source)
@@ -593,7 +591,8 @@ describe("agents", () => {
       "whether to delete branches",
       "confirmation of a plan the user did not ask for",
       "whether to continue or to wait",
-      "Ask only when the answer would change what you do",
+      "Send every pending decision through AskUserQuestion (options, a recommended default), not a plain-text list.",
+      "Use AskUserQuestion for every type of question, including when the user asks what needs their decision.",
     ])
       expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
     expect(content).not.toContain("Ask only when the answer materially changes the result")
@@ -867,8 +866,8 @@ describe("agents", () => {
       "never open or re-emit the brief",
       "`assignment close <id> --outcome <o> < <report-file>`",
       "a cap on the report",
-      "no scheduled check-ins or wait loops",
-      "a wake that changes nothing gets one short line",
+      "no polling, steering, scheduled check-ins or wait loops",
+      "a wake changing nothing gets one short line",
       "The route table, not the brief, sets model and effort",
       "data, list or count corrections",
       "resolving conflicts in tests or generated files",
@@ -889,9 +888,9 @@ describe("agents", () => {
       "Before the first commit, check `git branch --show-current`",
       "first create the conventional branch",
       "commit and push only there",
-      "If that push is refused",
+      "If refused, stop, report the blocker",
       "a branch the user named as the work branch is not one",
-      "ask through AskUserQuestion whether to push to the assigned branch; it is never a default, so park the push when the user is away",
+      "ask via AskUserQuestion to push to the assigned branch; it is never a default, so park the push when the user is away",
       "a decision the rules reserve for the user's answer (pushing to the platform-assigned branch, approvals) is parked, never defaulted",
       "never work around a refused push",
       "`exp/<experiment>/<type>/<change>` for work with no published version",
@@ -939,7 +938,7 @@ describe("agents", () => {
       "which also decides any other branch the plan needs (an integration branch, where it is cut from and who cuts it)",
       "cut from the start the convention gives, carrying only that start, and pushed as part of this plan without asking (Precedence)",
       "Pushing commits onto an existing base needs the user's approval",
-      "Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is",
+      "Creating and pushing a convention-named base absent remotely is not such a push; pushing commits to an existing base is",
       "`git diff <target>...HEAD` (the PR's actual target: its predecessor in the stack or the base)",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
@@ -1321,13 +1320,11 @@ describe("agents", () => {
     for (const route of ROUTES)
       expect(deniedTools(`agents/${route.agent}.md`)).toContain("TaskStop")
     const dispatch = read(`${CLAUDE}/root`, "dispatch.md")
+    expect(dispatch).toContain("only for conflicting new requirements or information")
     expect(dispatch).toContain(
-      "only when a new requirement or new information conflicts with that running work",
+      "let it finish if finishing and repairing costs less than stopping and relaunching",
     )
-    expect(dispatch).toContain(
-      "When finishing and then repairing costs less than stopping and relaunching",
-    )
-    expect(dispatch).toContain("Close a stopped Assignment with `--outcome stopped`")
+    expect(dispatch).toContain("Close the stopped Assignment with `--outcome stopped`")
     expect(dispatch).not.toMatch(/no polling, steering or stopping/)
     expect(REQUIREMENTS).not.toContain("steering or stopping")
   })
@@ -1351,7 +1348,7 @@ describe("agents", () => {
       [
         "G1",
         `${CLAUDE}/root/task-list.md`,
-        "End your turn only when the work is done",
+        "End your turn only when done or nothing can move until an answer or completion notice",
         ["agents/holyagent.md"],
       ],
       [
@@ -1386,7 +1383,7 @@ describe("agents", () => {
     const root = agent("holyagent")?.content ?? ""
     const once = (text: string, phrase: string) => text.split(phrase).length - 1
     expect(once(root, "in your acknowledgment of that message and continue as asked")).toBe(1)
-    expect(once(root, "free of filler sections, redundant summaries and boilerplate")).toBe(1)
+    expect(once(root, "free of filler, redundant summaries and boilerplate")).toBe(1)
     const requirements = REQUIREMENTS
     expect(requirements).toContain("- R-FLAG:")
     expect(requirements).toContain("- R-NOFILLER:")

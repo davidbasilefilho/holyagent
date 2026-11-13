@@ -100,12 +100,15 @@ describe("the capability helpers of the setup session", () => {
     expect(OFFERS.map((offer) => offer.name)).toEqual(
       CAPABILITIES.map((capability) => capability.name),
     )
-    expect(OFFERS.every((offer) => offer.unavailable === undefined)).toBe(true)
+    const unsupported = process.platform === "win32" ? ["processes"] : []
+    expect(
+      OFFERS.filter((offer) => offer.unavailable !== undefined).map((offer) => offer.name),
+    ).toEqual(unsupported)
     expect(
       capabilityOffers(HEADLESS)
         .filter((offer) => offer.unavailable !== undefined)
         .map((offer) => offer.name),
-    ).toEqual(["computer-use"])
+    ).toEqual([...unsupported, "computer-use"])
   })
 
   test("the switches of a config are read by key, and only the differing ones are written", () => {
@@ -152,7 +155,16 @@ describe("the capability helpers of the setup session", () => {
       detail:
         "on in the config; not offered in the headless form (it drives a graphical session and this machine has none)",
     })
-    expect(byName["processes"]).toEqual({ mark: "=", name: "processes", detail: "stays off" })
+    expect(byName["processes"]).toEqual(
+      process.platform === "win32"
+        ? {
+            mark: "~",
+            name: "processes",
+            detail:
+              "off in the config; not offered in the headless form (its package does not support win32, only darwin, linux)",
+          }
+        : { mark: "=", name: "processes", detail: "stays off" },
+    )
   })
 
   test("a review without a T3 preview holds the capability lines alone", () => {

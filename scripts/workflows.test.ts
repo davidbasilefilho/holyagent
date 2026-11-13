@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 
 const repoRoot = join(import.meta.dir, "..")
@@ -72,20 +73,140 @@ describe("the workflows", () => {
     else expect(document["permissions"]).toBeUndefined()
   })
 
+  test("only authorized job permissions grant write access", () => {
+    const grants = files().flatMap((file) => {
+      const jobs = (parse(file)["jobs"] ?? {}) as Record<
+        string,
+        { permissions?: Record<string, unknown> }
+      >
+      return Object.entries(jobs).flatMap(([id, job]) =>
+        Object.entries(job.permissions ?? {})
+          .filter(([, value]) => value === "write")
+          .map(([permission]) => `${file}#${id}:${permission}`),
+      )
+    })
+    expect(grants.sort()).toEqual([
+      ".github/workflows/dev.yml#prerelease:contents",
+      ".github/workflows/dev.yml#publish:id-token",
+      ".github/workflows/publish.yml#dev:contents",
+      ".github/workflows/publish.yml#dev:id-token",
+      ".github/workflows/publish.yml#stable:contents",
+      ".github/workflows/publish.yml#stable:id-token",
+      ".github/workflows/stable.yml#publish:id-token",
+      ".github/workflows/stable.yml#release:contents",
+    ])
+  })
+
   test("only the tag and release jobs hold contents: write", () => {
     const writers = files().flatMap((file) => {
       const document = parse(file)
-      const jobs = (document["jobs"] ?? {}) as Record<string, { permissions?: unknown }>
+      const jobs = (document["jobs"] ?? {}) as Record<
+        string,
+        { permissions?: Record<string, unknown> }
+      >
       return Object.entries(jobs)
-        .filter(([, job]) => JSON.stringify(job.permissions ?? {}).includes('"write"'))
-        .map(([id, job]) => `${file}#${id}:${JSON.stringify(job.permissions)}`)
+        .filter(([, job]) => job.permissions?.contents === "write")
+        .map(([id]) => `${file}#${id}`)
     })
     expect(writers.sort()).toEqual([
-      '.github/workflows/dev.yml#prerelease:{"contents":"write"}',
-      '.github/workflows/publish.yml#dev:{"contents":"write"}',
-      '.github/workflows/publish.yml#stable:{"contents":"write"}',
-      '.github/workflows/stable.yml#release:{"contents":"write"}',
+      ".github/workflows/dev.yml#prerelease",
+      ".github/workflows/publish.yml#dev",
+      ".github/workflows/publish.yml#stable",
+      ".github/workflows/stable.yml#release",
     ])
+  })
+
+  test("only the stable and dev publishing jobs hold id-token: write", () => {
+    const writers = files().flatMap((file) => {
+      const document = parse(file)
+      const jobs = (document["jobs"] ?? {}) as Record<
+        string,
+        { permissions?: Record<string, unknown> }
+      >
+      return Object.entries(jobs)
+        .filter(([, job]) => job.permissions?.["id-token"] === "write")
+        .map(([id]) => `${file}#${id}`)
+    })
+    expect(writers.sort()).toEqual([
+      ".github/workflows/dev.yml#publish",
+      ".github/workflows/publish.yml#dev",
+      ".github/workflows/publish.yml#stable",
+      ".github/workflows/stable.yml#publish",
+    ])
+  })
+})
+
+describe("publication authority", () => {
+  test.each(["stable", "dev"])(
+    "%s npm job requires the npm environment and a protected ref",
+    (name) => {
+      const jobs = parse(`.github/workflows/${name}.yml`)["jobs"] as Record<
+        string,
+        { environment?: string; if?: string }
+      >
+      expect(jobs["publish"]?.environment).toBe("npm")
+      expect(jobs["publish"]?.if).toContain("github.ref_protected")
+      expect(jobs["publish"]?.if).toBe(
+        name === "stable"
+          ? "github.ref == 'refs/heads/main' && github.ref_protected"
+          : "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
+      )
+    },
+  )
+})
+
+describe("release lookup", () => {
+  test.each(["404", "500"])(
+    "handles HTTP %s without treating operational failures as absent",
+    (status) => {
+      const dir = mkdtempSync(join(tmpdir(), "release-lookup-"))
+      try {
+        mkdirSync(join(dir, "bin"))
+        writeFileSync(join(dir, "bin", "jq"), "#!/bin/sh\nprintf '0.3.3\\n'\n", { mode: 0o755 })
+        writeFileSync(
+          join(dir, "bin", "gh"),
+          `#!/bin/sh
+case "$*" in
+  *git/ref/tags*) echo "commit abc"; exit 0 ;;
+  *release*create*) touch created; exit 0 ;;
+  *) echo "HTTP ${status}" >&2; exit 1 ;;
+esac
+`,
+          { mode: 0o755 },
+        )
+        const action = parse(".github/actions/tag-release/action.yml") as {
+          runs: { steps: Array<{ run: string }> }
+        }
+        const script = action.runs.steps[0]?.run ?? ""
+        const result = Bun.spawnSync(["bash", "-c", `export PATH="$PWD/bin:$PATH"\n${script}`], {
+          cwd: dir,
+          env: {
+            ...process.env,
+            GITHUB_REPOSITORY: "owner/repo",
+            SHA: "abc",
+            PRERELEASE: "false",
+            NOTES: "notes",
+          },
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+        expect(result.exitCode).toBe(status === "404" ? 0 : 1)
+        expect(readdirSync(dir).includes("created")).toBe(status === "404")
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  )
+})
+
+describe("release readiness", () => {
+  test("validates on macOS as well as Linux and Windows", () => {
+    const jobs = parse(".github/workflows/validation.yml")["jobs"] as Record<
+      string,
+      { "runs-on"?: string; steps?: Array<{ run?: string }> }
+    >
+    expect(jobs["macos"]?.["runs-on"]).toBe("macos-latest")
+    expect(jobs["macos"]?.steps?.some((step) => step.run === "mise run verify")).toBe(true)
   })
 })
 
@@ -104,16 +225,16 @@ describe("publish.yml", () => {
     expect(publish.on.push["branches-ignore"]).toEqual(["holyagent/state"])
   })
 
-  test("calls stable on main and dev elsewhere, only after validation", () => {
+  test("calls stable on protected main and dev on protected integration branches, only after validation", () => {
     expect(publish.jobs["validation"]?.uses).toBe("./.github/workflows/validation.yml")
     expect(publish.jobs["stable"]).toMatchObject({
       needs: "validation",
-      if: "github.ref == 'refs/heads/main'",
+      if: "github.ref == 'refs/heads/main' && github.ref_protected",
       uses: "./.github/workflows/stable.yml",
     })
     expect(publish.jobs["dev"]).toMatchObject({
       needs: "validation",
-      if: "github.ref != 'refs/heads/main'",
+      if: "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
       uses: "./.github/workflows/dev.yml",
     })
   })
@@ -138,6 +259,7 @@ describe("validation.yml", () => {
       "branch-model",
       "check",
       "installers",
+      "macos",
       "version",
       "windows",
     ])

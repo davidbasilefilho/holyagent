@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { $ } from "bun"
 
-import { isCanary } from "./toolchain.ts"
+import { isCanary, upgradeEnvironment } from "./toolchain.ts"
 
 describe("isCanary", () => {
   test("names a canary build by its revision text", () => {
@@ -19,5 +19,18 @@ describe("the toolchain script", () => {
       .nothrow()
     expect(result.exitCode).toBe(2)
     expect(result.stderr.toString()).toContain("usage:")
+  })
+})
+
+describe("the upgrade environment", () => {
+  test("drops inherited flags and PowerShell 7 modules only for the Windows child", () => {
+    const env = { BUN_OPTIONS: "--smol", PSModulePath: "PowerShell7/Modules", PATH: "keep" }
+    expect(upgradeEnvironment(env, "win32")).toEqual({
+      BUN_OPTIONS: undefined,
+      PSModulePath: undefined,
+      PATH: "keep",
+    })
+    expect(upgradeEnvironment(env, "linux").PSModulePath).toBe(env.PSModulePath)
+    expect(env.BUN_OPTIONS).toBe("--smol")
   })
 })

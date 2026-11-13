@@ -34,7 +34,13 @@ const holy = async (argv: ReadonlyArray<string>, stdin?: string) => {
       : $`${process.execPath} ${MAIN} ${argv} < ${new Response(stdin)}`
   const result = await shell
     .cwd(project)
-    .env({ ...process.env, HOME: home, USERPROFILE: home })
+    .env({
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      PI_CODING_AGENT_DIR: join(home, ".pi", "agent"),
+      HOLYAGENT_HOST: "claude",
+    })
     .quiet()
     .nothrow()
   return {

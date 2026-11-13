@@ -1,6 +1,6 @@
 ---
 name: state-mode
-description: Use before a clone's first Intent, to choose where holyagent state lives.
+description: "Use before a clone's first Intent, to choose where holyagent state lives."
 ---
 
 # State mode

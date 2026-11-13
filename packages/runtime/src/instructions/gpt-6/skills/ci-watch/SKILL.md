@@ -1,6 +1,6 @@
 ---
 name: ci-watch
-description: Use when a pushed branch or PR needs its CI watched or judged, its merge state is in question, or a review bot has commented.
+description: "Use when a pushed branch or PR needs its CI watched or judged, its merge state is in question, or a review bot has commented."
 ---
 
 # CI

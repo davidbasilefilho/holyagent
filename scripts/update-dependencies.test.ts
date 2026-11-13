@@ -25,6 +25,7 @@ import {
   surveyPiPackages,
   surveyPypiPackages,
   Usage,
+  withoutNpmMise,
 } from "./update-dependencies.ts"
 
 const pin = (current: string, next: string): Pin => ({
@@ -362,7 +363,7 @@ describe("PyPI package pins", () => {
   test("the repository pins browser-use exactly, in the form the updater writes", async () => {
     const repository = join(import.meta.dir, "..")
     const text = await Bun.file(join(repository, PYPI_PACKAGE_PINS)).text()
-    expect(JSON.parse(text)).toEqual({ "browser-use": "1.0.0" })
+    expect(JSON.parse(text)).toEqual({ "browser-use": "1.0.2" })
     expect(await Effect.runPromise(renderPypiPins(repository, new Map()))).toBe(text)
   })
 
@@ -458,5 +459,22 @@ describe("PyPI package pins", () => {
     expect(JSON.parse(text)).toEqual({ "browser-use": "1.1.0", "old-line": "3.0.0" })
     expect(Object.keys(JSON.parse(text) as object)).toEqual(["browser-use", "old-line"])
     expect(text.endsWith("}\n")).toBe(true)
+  })
+})
+
+describe("the native mise toolchain", () => {
+  test("removes the unsupported npm wrapper through the updater without dropping other dependencies", () => {
+    const original = {
+      devDependencies: { mise: "^2026.0.0", lefthook: "^2.0.0" },
+      trustedDependencies: ["mise", "lefthook"],
+      private: true,
+    }
+    expect(withoutNpmMise(original)).toEqual({
+      devDependencies: { lefthook: "^2.0.0" },
+      trustedDependencies: ["lefthook"],
+      private: true,
+    })
+    expect(original.devDependencies.mise).toBe("^2026.0.0")
+    expect(withoutNpmMise(withoutNpmMise(original))).toEqual(withoutNpmMise(original))
   })
 })

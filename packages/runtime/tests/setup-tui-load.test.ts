@@ -891,7 +891,7 @@ describe("the real install and import steps", () => {
     await symlink(
       join(import.meta.dir, "../../../node_modules"),
       join(target, "node_modules"),
-      "dir",
+      process.platform === "win32" ? "junction" : "dir",
     )
     await writeFile(join(target, INSTALLED_MARKER), markerText(TUI_PACKAGES, TUI_LOCK))
     const bundle = join(import.meta.dir, "../../integrations/claude/dist/scripts", TUI_BUNDLE)

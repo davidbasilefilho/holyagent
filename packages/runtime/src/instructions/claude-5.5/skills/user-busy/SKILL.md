@@ -1,6 +1,6 @@
 ---
 name: user-busy
-description: Use when the user says they are away, asleep or busy and not to be asked anything. Holds how the root keeps working without questions, what it settles by default, what it parks for the user's return, and how it reports them.
+description: "Use when the user says they are away, asleep or busy and not to be asked anything. Holds how the root keeps working without questions, what it settles by default, what it parks for the user's return, and how it reports them."
 ---
 
 # User busy

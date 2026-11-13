@@ -65,6 +65,20 @@ const SYNTHETIC: CapabilityDefinition = {
 }
 
 describe("the capability registry", () => {
+  test("does not offer the POSIX-only process package on native Windows", () => {
+    const capability = CAPABILITIES.find(
+      (entry) => entry.feature === "processes",
+    ) as CapabilityDefinition
+    expect(unavailableIn(capability, "normal", "win32-x64")).toContain("does not support win32")
+    expect(unavailableIn(capability, "headless", "linux-x64")).toBeUndefined()
+    expect(
+      capabilityPackages(DEFAULT_CONFIG.pi.features, "normal", CAPABILITIES, "win32-x64"),
+    ).not.toContain("@aliou/pi-processes")
+    expect(
+      capabilityPackages(DEFAULT_CONFIG.pi.features, "normal", CAPABILITIES, "linux-x64"),
+    ).toContain("@aliou/pi-processes")
+  })
+
   test("every entry is one switch of pi.features with the registry's default, and no other switch exists", async () => {
     const decoded = await Effect.runPromise(Schema.decodeUnknownEffect(Config)({}))
     const features = decoded.pi.features as Record<string, unknown>
@@ -136,7 +150,7 @@ describe("the capability registry", () => {
     await expect(Effect.runPromise(unknown)).rejects.toThrow()
   })
 
-  test("the packages of the default config are what the 0.3.0 table loaded, in the same order", () => {
+  test("the default packages preserve registry order and omit unavailable platform packages", () => {
     expect(piPackages(DEFAULT_CONFIG)).toEqual([
       piPackageSource("pi-provider-kimi-code"),
       ...(
@@ -149,7 +163,9 @@ describe("the capability registry", () => {
           "computerUse",
           "fff",
         ] as const
-      ).map((feature) => piPackageSource(FEATURE_PACKAGES[feature])),
+      )
+        .filter((feature) => feature !== "processes" || process.platform !== "win32")
+        .map((feature) => piPackageSource(FEATURE_PACKAGES[feature])),
     ])
   })
 })
@@ -343,7 +359,7 @@ describe("the browser-use capability entry", () => {
   })
 
   test("the headless server is browser-use at an exact PyPI pin, run by uvx with no uv config and the public index", () => {
-    expect(PYPI_PACKAGE_VERSIONS[BROWSER_USE_PACKAGE]).toBe("1.0.0")
+    expect(PYPI_PACKAGE_VERSIONS[BROWSER_USE_PACKAGE]).toBe("1.0.2")
     expect(PYPI_INDEX).toBe("https://pypi.org/simple")
     expect(BROWSER_USE_MCP_SERVER).toEqual({
       name: "browser_use",
@@ -353,7 +369,7 @@ describe("the browser-use capability entry", () => {
         "--default-index",
         "https://pypi.org/simple",
         "--from",
-        "browser-use==1.0.0",
+        "browser-use==1.0.2",
         "browser-use",
         "--cli-mcp",
       ],

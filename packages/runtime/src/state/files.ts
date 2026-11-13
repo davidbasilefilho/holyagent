@@ -1,6 +1,6 @@
-// `rename` is the one node: import. Bun has no rename or move API, and the atomic replace is what
-// makes a write all-or-nothing. The rest is Bun: Bun.file reads and Bun.write makes directories.
-import { rename, rm } from "node:fs/promises"
+// Node supplies atomic replacement and Windows long-path writes, which Bun.write does not support.
+import { mkdir, rename, rm, writeFile } from "node:fs/promises"
+import { dirname } from "node:path"
 
 import { Effect, Schema } from "effect"
 
@@ -61,7 +61,14 @@ export const encodeJson = <S extends Schema.Codec<unknown, unknown, never, never
  */
 export const commitFile = (path: string, content: string) => {
   const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`
-  return io(path, () => Bun.write(temporary, content)).pipe(
+  // Bun.write cannot create Windows paths beyond MAX_PATH, even when Git supports them.
+  const write =
+    process.platform === "win32"
+      ? io(path, () => mkdir(dirname(temporary), { recursive: true })).pipe(
+          Effect.andThen(io(path, () => writeFile(temporary, content))),
+        )
+      : io(path, () => Bun.write(temporary, content))
+  return write.pipe(
     Effect.andThen(io(path, () => rename(temporary, path))),
     Effect.tapError(() => io(temporary, () => rm(temporary, { force: true })).pipe(Effect.ignore)),
   )

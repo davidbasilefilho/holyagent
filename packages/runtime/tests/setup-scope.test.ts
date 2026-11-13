@@ -520,14 +520,17 @@ describe("holyagent doctor --scope", () => {
 })
 
 /** Runs one command line in-process from `cwd`; the config folder is a temp folder. */
-const cli = (argv: ReadonlyArray<string>, cwd: string) =>
-  Effect.runPromise(
+const cli = async (argv: ReadonlyArray<string>, cwd: string) => {
+  // Scope tests must not install real Pi packages merely because pi is on the developer PATH.
+  await write(join(home, ".holyagent", "config.json"), { pi: { enable: false } })
+  return Effect.runPromise(
     run(argv, {
       cwd,
       env: { HOME: home, CLAUDE_CONFIG_DIR: join(home, "claude"), PATH: process.env.PATH },
       stdin: Effect.fail(new StdinMissing({ reason: "no stdin in this test" })),
     }),
   )
+}
 
 describe("--scope as a command flag", () => {
   test("rejects a scope that is not user, project or local, and writes nothing", async () => {

@@ -1,6 +1,6 @@
 ---
 name: dev-server
-description: Use when visual work needs a running, capturable render target: a web app or static build, a terminal UI, a desktop app, or an Android or iOS app.
+description: "Use when visual work needs a running, capturable render target: a web app or static build, a terminal UI, a desktop app, or an Android or iOS app."
 ---
 
 # Render targets

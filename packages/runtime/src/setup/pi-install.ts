@@ -9,6 +9,7 @@ import {
   listsAtPin,
   loadPiConfig,
   parseNpmSource,
+  piAgentDirectory,
   piPresenceFiles,
   piSettingsFiles,
   piSettingsSources,
@@ -139,7 +140,10 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       lines.push(added(`pi ${source}: would install with ${command}`))
       continue
     }
-    const result = yield* shell.run("pi", args, { cwd })
+    const result = yield* shell.run("pi", args, {
+      cwd,
+      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
+    })
     lines.push(
       result.exitCode === 0
         ? added(`pi ${source}: installed with ${command}`)
@@ -153,7 +157,10 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`))
       continue
     }
-    const result = yield* shell.run("pi", args, { cwd })
+    const result = yield* shell.run("pi", args, {
+      cwd,
+      env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
+    })
     lines.push(
       result.exitCode === 0
         ? skipped(`pi npm:${name}: removed with ${command}; its feature is off`)

@@ -22,13 +22,16 @@ describe("the dev toolchain check", () => {
     expect(hasDevToolchain(await makeRoot())).toBe(false)
   })
 
-  test("is true when node_modules/.bin has the mise shim", async () => {
+  test("is true with dev dependencies and a native mise command", async () => {
     const root = await makeRoot()
     const bin = join(root, "node_modules", ".bin")
     await mkdir(bin, { recursive: true })
     const shim = join(bin, process.platform === "win32" ? "mise.cmd" : "mise")
     await writeFile(shim, "")
     await chmod(shim, 0o755)
+    const hook = join(bin, process.platform === "win32" ? "lefthook.cmd" : "lefthook")
+    await writeFile(hook, "")
+    await chmod(hook, 0o755)
     expect(hasDevToolchain(root)).toBe(true)
   })
 })

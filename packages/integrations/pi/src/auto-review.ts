@@ -128,11 +128,11 @@ const APPROVE_USAGE =
 
 /**
  * Registers Codex auto-review on Pi: a `tool_call` gate that sends the calls the classifier picks
- * to the `codex-auto-review` reviewer before they run, and the `/approve` command that lifts one
- * denied action for a single retry. The gate is inert (it returns at once, and `/approve` says
- * auto-review is off) while `host.settings()` is `undefined`, which only the user's own config
- * causes, or while the active model is not served by the Codex provider: then no call is classified
- * and none is reviewed.
+ * to the Codex reviewer before they run, and the `/approve` command that lifts one denied action
+ * for a single retry. The gate is inert (it returns at once, and `/approve` says auto-review is
+ * off) while `host.settings()` is `undefined`, which only the user's own config causes, or while
+ * the active model is not served by the Codex provider: then no call is classified and none is
+ * reviewed.
  *
  * - `tool_call`: classifies the call; a reviewed call runs on an allow and is blocked on a deny, a
  *   timeout or a failed review, and the breaker interrupts the turn after repeated denials.

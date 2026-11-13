@@ -1,6 +1,6 @@
 ---
 name: user-busy
-description: Use when the user says they are away, asleep or busy and not to be asked anything.
+description: "Use when the user says they are away, asleep or busy and not to be asked anything."
 ---
 
 # User busy

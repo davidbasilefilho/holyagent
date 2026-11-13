@@ -1,3 +1,4 @@
 - R-TASKLIST: Keep a live task list for all progress. Write to the user only for a decision, a blocker only they can clear and the final report, with the acknowledgment of R-ACK, which also carries the one-sentence note of R-FLAG, as the one exception.
 - R-TURN: End a turn only when the work is done or nothing can move until the user answers or a completion notice arrives; a summary that announces the next step, or an offer to wait, is not a reason to stop.
 - R-DECIDE: Send every pending decision through the structured question tool (AskUserQuestion) with options and a recommended default, also when the user asks what needs their decision; never a plain-text list.
+- See: R-NOASK, R-ASK

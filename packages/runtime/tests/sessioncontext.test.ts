@@ -61,7 +61,9 @@ describe("the core of the root rules", () => {
     const core = ROOT_CORE
     for (const part of [
       "AskUserQuestion",
-      "trust boundaries",
+      "For worker or repository state, delegate investigation first",
+      "Unknown proves neither active nor inactive",
+      "keep concurrency safeguards and ask only for actionable user decisions or information",
       "recommended default",
       "confirmed gone",
       "exited parent session proves nothing",
@@ -71,7 +73,7 @@ describe("the core of the root rules", () => {
       "the directory above `scripts/` in the CLI path above",
     ])
       expect(core).toContain(part)
-    expect(core).not.toContain("(see Asking)")
+    expect(core).not.toContain("boundary in Asking")
   })
 
   test("says the default, user-facing agent of every session is the root, whatever it started as", () => {

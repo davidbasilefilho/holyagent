@@ -1,6 +1,6 @@
 ---
 name: mobile-design
-description: Use when building, reshaping or judging the visual design of a phone or tablet app on iOS, iPadOS or Android. Holds the shared design core, rules shared by both platforms, an iOS and iPadOS section, an Android section, a refuse list and the capture checklist.
+description: "Use when building, reshaping or judging the visual design of a phone or tablet app on iOS, iPadOS or Android. Holds the shared design core, rules shared by both platforms, an iOS and iPadOS section, an Android section, a refuse list and the capture checklist."
 ---
 
 # Mobile design

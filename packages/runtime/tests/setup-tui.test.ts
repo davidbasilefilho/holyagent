@@ -78,7 +78,8 @@ describe("the setup interface, review and apply", () => {
     expect(text).toContain("+ Pi provider")
     expect(text).toContain("- Agent device access       off; nothing written")
     expect(text).toContain("ALWAYS APPLIED")
-    expect(text).toContain("= Branch naming             already set")
+    await screen.keys("pagedown")
+    expect(screen.lines().join("\n")).toContain("= Branch naming             already set")
     expect(screen.lines().find(ROW("❯"))).toBe("❯ Apply")
     expect(screen.applies).toEqual([])
   })
@@ -244,8 +245,6 @@ describe("the setup interface, look", () => {
   })
 
   test("NO_COLOR draws in the terminal's own colour and keeps bold", async () => {
-    // Four rows taller than a plain terminal: the review lists one line per capability, and the Pi
-    // provider line has to stay inside the page after the thirteenth.
     const screen = await shown({
       width: 80,
       height: 28,
@@ -257,7 +256,7 @@ describe("the setup interface, look", () => {
     expect(listing).toContain('default bold "HolyAgent  ·  setup"')
     expect(listing).toContain('default bold "❯ Agent device access       [ ] disabled"')
     expect(screen.lines()[5]).toBe("❯ Agent device access       [ ] disabled")
-    await screen.keys("enter")
+    await screen.keys("enter", "pagedown")
     expect(spanListing(screen)).not.toMatch(/#[0-9a-f]{6}/)
     expect(screen.lines().join("\n")).toContain("+ Pi provider")
   })
