@@ -32,6 +32,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_release_ci_current",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T17:28:06.273Z"
