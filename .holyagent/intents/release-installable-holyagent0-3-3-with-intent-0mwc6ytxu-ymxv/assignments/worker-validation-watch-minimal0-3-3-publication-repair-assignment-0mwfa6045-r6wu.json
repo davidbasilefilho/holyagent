@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwfa6045-r6wu",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 30,
+  "roleTask": "Worker.validation",
+  "slug": "watch-minimal0-3-3-publication-repair",
+  "objective": "Watch minimal0.3.3 publication repair PR126 and report exact current-head hosted results.",
+  "state": "Running",
+  "scope": [
+    "PR126 ready, head46963a4040cec3c42a8b432bf26e526704ea2dfa, branch release/0.3.3/fix/npm-provenance-metadata targeting release/0.3.3/integration. Use gh pr checks126 --watch, current head snapshot and logs. No writes or reruns. Verify Linux/macOS/Windows/installers/branch-model terminal results in both relevant workflows; version intentionally skipped on integration target."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT validation and ci-watch. Read-only Git/GitHub/source allowed. No VCS/config/state writes or source/generated edits, no live Pi/model or publication. User says publish0.3.3 before investigating executable error; do NOT investigate bin/executable/0.3.4 current failures.",
+    "On failure get exact assertions with GitHub connector logs if gh redirect403. Unknown/skipped not actual validation. Main remains0.3.3 and versionpolicyblocks sameversionpromotion; do not alter check or repo settings. Root owns next merge and publication.",
+    "Report /workspace/work/034/033-publication-ci-report.json with EXACT schema {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}. Validate JSON field types locally before finish; <=200words, long logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Current repair head checks merge state and actionable failures are accurately reported",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "head",
+    "checks-run",
+    "failures",
+    "merge-state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T17:58:33.749Z"
+  },
+  "createdAt": "2026-11-13T17:58:33.749Z"
+}
