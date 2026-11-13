@@ -64,6 +64,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/routing_policy_repair",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T22:56:21.469Z"
