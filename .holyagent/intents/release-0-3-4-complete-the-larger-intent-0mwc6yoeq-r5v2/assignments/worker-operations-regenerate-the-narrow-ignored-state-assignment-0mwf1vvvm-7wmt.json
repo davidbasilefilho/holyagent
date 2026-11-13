@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "regenerate-the-narrow-ignored-state",
   "objective": "Regenerate the narrow ignored-state handoff repair before commit.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Build only; source stable. Final fullverify after independent re-review."
   ],
@@ -36,7 +36,33 @@
     "agentId": "/root/r034_state_final_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T14:06:44.770Z"
+    "startedAt": "2026-11-13T14:06:44.770Z",
+    "finishedAt": "2026-11-13T14:08:21.721Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent.js\nchecks:\n- bunx --no-install mise run build -> exit 0\n- cmp state-ignored-before-hashes.txt state-ignored-after-hashes.txt -> exit 0\nnotes:\n- Build used the specified toolchain environment; log: /workspace/work/034/state-ignored-build.log.\n- Tracked non-generated source hashes remained stable. Full verification deferred as instructed.\nevidence:\n- Generated artifacts match the ignored-state repair without source edits: Build exited 0 with repaired source; tracked non-generated hashes before and after matched.\n- checks-run: Build exit 0; source hash comparison exit 0; full verification deferred.\n- changed-paths: packages/integrations/claude/dist/scripts/holyagent.js; packages/integrations/pi/dist/scripts/holyagent.js.\n- diff-file: /workspace/work/034/state-ignored-generated.diff",
+  "acceptance": {
+    "revision": 13,
+    "rationale": "Generated artifacts rebuilt from narrow repair; source hashes stable.",
+    "criteria": [
+      {
+        "criterion": "Generated artifacts match the ignored-state repair without source edits",
+        "support": "Build exited 0 with repaired source; tracked non-generated hashes before and after matched."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Build exit 0; source hash comparison exit 0; full verification deferred."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/claude/dist/scripts/holyagent.js; packages/integrations/pi/dist/scripts/holyagent.js."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/state-ignored-generated.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T14:06:44.770Z"
 }
