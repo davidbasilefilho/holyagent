@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwewhpmu-hwh5",
+  "intentId": "intent-0mwewgx8e-sh5o",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "validate-release0-3-3-main-target-branch",
+  "objective": "Validate release0.3.3 main-target branch/version gates and prepare to monitor release PR CI.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/holyagent-release033 at9c8edee7bf9a82e062121e89c507f4b76cc09ae9; targetmain074bc72a"
+  ],
+  "constraints": [
+    "Read AGENTS.md,.claude/CLAUDE.md,holyagent worker-validation role and ci-watch skill. User explicitly says go untilmain, Terra low-xhigh; directfallback. No source/VCS/state edits or workflowreruns. Integration tree matches verified/reviewed61a7adc, so do not repeat fullverify unless new changes invalidate evidence. Each newworktree needs own frozeninstall: use pinnedcanary mise exec -- bun install --frozen-lockfile --ignore-scripts (specialists must not write sharedgit hooks; root alreadyinstalled). Toolsenv MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Can mise trust this repo config within tasktoolsstate if needed. Inspect scripts/pr-checks.ts, run meaningful branch-model for base main/head release/0.3.3/integration and versiongate using actual fetchedmain; no manualversionedits. Verifytreeunchanged. Existing integration Publish43416856899 running; inspect status/read-only logs if failed, distinguish releasevalidation and actual npmpublish. Root creates releasePR soon; report localgate results promptly then continue hostedwatch when parent suppliesPRnumber. Polling via gh --watch session shortyields, progressparent~60s. Save initial report /workspace/work/release033-gates.md, logs /workspace/work/release033-logs. Reportunder200words."
+  ],
+  "criteria": [
+    {
+      "text": "Release branch and version gates pass against actual main",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Release tracked tree remains unchanged and prior verification is applicable",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "head-sha",
+    "changed-paths"
+  ],
+  "ownershipPaths": [
+    "node_modules"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T11:35:45.414Z"
+  },
+  "createdAt": "2026-11-13T11:35:45.414Z"
+}
