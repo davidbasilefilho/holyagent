@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "independently-verify-the-two-hosted-ci",
   "objective": "Independently verify the two hosted-CI fixture repairs preserve the read-only handoff and operational reservation assertions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read committed range edce18fee6579d591d59a629765225e2e0e955cd..78366e7459c144c2f6c77a6075964ced06c433a9 in /workspace/work/holyagent-034-state",
     "Review /workspace/work/034/state-macos-fixture-repair-report.json and its diff; run meaningful focused tests through mise"
@@ -43,7 +43,37 @@
     "agentId": "/root/r034_fixture_independent_review",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T17:24:27.645Z"
+    "startedAt": "2026-11-13T17:24:27.645Z",
+    "finishedAt": "2026-11-13T17:26:53.180Z"
+  },
+  "result": "status: done\nchecks:\n- bunx --no-install mise run test -- packages/runtime/tests/handoff.test.ts packages/runtime/tests/operational-ownership.test.ts -> exit 0\nnotes:\n- No blocking findings. Fixture-local Git configuration precedes the snapshot; recursive Git and root listings, state bytes, status and worktree checks remain. Decoded operationalResources equality checks the entire array, exact kind and target, with brief and conflict checks retained.\n- Linux focused tests passed. Hosted macOS and Windows verification remains pending; the precise macOS maintenance race is not confirmed. Base tests were not run: these fixture repairs address platform-specific failures and cannot reliably reproduce them on Linux.\nevidence:\n- Both committed CI fixture repairs preserve the asserted production invariants without weakening coverage: handoff.test.ts snapshots and operational-ownership.test.ts decoded equality and conflict assertions reviewed.\n- Focused checks pass and remaining hosted platform verification is stated accurately: Focused mise suite exit 0; hosted macOS and Windows pending.\n- reviewed-range: edce18fee6579d591d59a629765225e2e0e955cd..78366e7459c144c2f6c77a6075964ced06c433a9; supplied diff matches.\n- findings: None blocking.\n- checks-run: bunx --no-install mise run test -- packages/runtime/tests/handoff.test.ts packages/runtime/tests/operational-ownership.test.ts: exit 0, 15 pass, 0 fail, 137 assertions.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Independent immutable-range review preserves no-write and full decoded resource equality; 15 focused tests pass. Hosted Windows and macOS remain pending.",
+    "criteria": [
+      {
+        "criterion": "Both committed CI fixture repairs preserve the asserted production invariants without weakening coverage",
+        "support": "handoff.test.ts snapshots and operational-ownership.test.ts decoded equality and conflict assertions reviewed."
+      },
+      {
+        "criterion": "Focused checks pass and remaining hosted platform verification is stated accurately",
+        "support": "Focused mise suite exit 0; hosted macOS and Windows pending."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "edce18fee6579d591d59a629765225e2e0e955cd..78366e7459c144c2f6c77a6075964ced06c433a9; supplied diff matches."
+      },
+      {
+        "label": "findings",
+        "support": "None blocking."
+      },
+      {
+        "label": "checks-run",
+        "support": "bunx --no-install mise run test -- packages/runtime/tests/handoff.test.ts packages/runtime/tests/operational-ownership.test.ts: exit 0, 15 pass, 0 fail, 137 assertions."
+      }
+    ]
   },
   "createdAt": "2026-11-13T17:24:27.645Z"
 }
