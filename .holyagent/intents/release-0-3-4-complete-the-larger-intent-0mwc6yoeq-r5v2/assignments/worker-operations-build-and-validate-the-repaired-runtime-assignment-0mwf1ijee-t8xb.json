@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwf1ijee-t8xb",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 13,
+  "roleTask": "Worker.operations",
+  "slug": "build-and-validate-the-repaired-runtime",
+  "objective": "Build and validate the repaired runtime-state slice before root commit.",
+  "state": "Running",
+  "scope": [
+    "Generated build and full final verification of B source only."
+  ],
+  "constraints": [
+    "Work only /workspace/work/holyagent-034-state. Writers terminal. No VCS/actual .git/.holyagent writes, no extraagents/network model calls. Root owns commit/state. Read AGENTS.md/.claude/CLAUDE.md. Only generated files may change; sourcehashes must stay fixed. Report unexpected source changes/gate failure before fixes.",
+    "Build then full verify through mise, with toolchain env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify is required to reap testdescendants; do not weaken tests. No deps/pin changes. Frozen install --ignore-scripts only if needed.",
+    "JSON /workspace/work/034/state-final-build-report.json status done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]. Generateddiff /workspace/work/034/state-generated.diff. Sourcebaseline11f7565 plus accepted ownership/handoff repair diffs. Report command exit counts andsourcehashstable; final<=150words/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Generated artifacts match repaired source and full verification passes",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No unowned source changes are introduced",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf0ddmb-uwah",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T13:56:22.070Z"
+  },
+  "createdAt": "2026-11-13T13:56:22.070Z"
+}
