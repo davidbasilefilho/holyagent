@@ -40,6 +40,7 @@
     "assignment-0mwf5ms5e-5wsj"
   ],
   "specialist": {
+    "agentId": "/root/r034_fixture_independent_review",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T17:24:27.645Z"
