@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "restore-precise-approval-context-and",
   "objective": "Restore precise approval-context and automatic-tool-rejection wording within existing prompt budgets.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Minimal Claude root wording correction and source/context policy checks."
   ],
@@ -35,7 +35,33 @@
     "agentId": "/root/r034_iteration_guidance",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T14:10:41.941Z"
+    "startedAt": "2026-11-13T14:10:41.941Z",
+    "finishedAt": "2026-11-13T14:15:16.032Z"
+  },
+  "result": "status: done\nchanged:\n- packages/runtime/src/instructions/claude-5.5/root/identity.md\n- packages/runtime/src/instructions/claude-5.5/root/delegating.md\nchecks:\n- bunx --no-install mise run test -- scripts/root-question-policy.test.ts packages/runtime/tests/sessioncontext.test.ts packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts packages/integrations/pi/tests/session-context.test.ts -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- Generated freshness remains pending the root-coordinated build; no generated assets edited.\n- Diff includes existing uncommitted changes in the two owned files.\nevidence:\n- Approval boundary policy wording and unchanged context-budget checks pass: Root policy and focused context and instruction tests pass; source preserves exact approval scope, rejection and host boundary language under existing budgets.\n- checks-run: See checks array and /workspace/work/034/guidance-wording-*.log.\n- changed-paths: Two root files listed in changed_paths.\n- diff-file: /workspace/work/034/guidance-wording.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Focused policy and context tests preserve full approval provenance and automatic tool rejection wording at unchanged budgets.",
+    "criteria": [
+      {
+        "criterion": "Approval boundary policy wording and unchanged context-budget checks pass",
+        "support": "Root policy and focused context and instruction tests pass; source preserves exact approval scope, rejection and host boundary language under existing budgets."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "See checks array and /workspace/work/034/guidance-wording-*.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Two root files listed in changed_paths."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/guidance-wording.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T14:10:41.941Z"
 }
