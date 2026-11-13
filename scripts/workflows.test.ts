@@ -286,6 +286,14 @@ describe("validation.yml", () => {
     }
   })
 
+  test("version passes the event head ref as a quoted environment variable", () => {
+    const step = validation.jobs["version"]?.steps?.find(
+      (item) => item.name === "Check the version",
+    )
+    expect(step?.env).toEqual({ HEAD_REF: "${{ github.head_ref }}" })
+    expect(step?.run).toBe('bun scripts/pr-checks.ts version main . "$HEAD_REF"')
+  })
+
   test("only a pull request run is cancelled by a newer run", () => {
     expect(validation.concurrency["cancel-in-progress"]).toBe(
       "${{ github.event_name == 'pull_request' }}",
