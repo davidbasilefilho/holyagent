@@ -1,0 +1,75 @@
+{
+  "id": "assignment-0mwfjc6py-nqqr",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.debugging",
+  "slug": "implement-a-bounded-cancellable",
+  "objective": "Implement a bounded cancellable migration with safe recovery rather than stopping at the unbounded Git commit ambiguity.",
+  "state": "Running",
+  "scope": [
+    "WORKTREE /workspace/work/holyagent-034-core branchrelease/0.3.4/feat/shared-core HEAD6ebdf1e pluspreserveduncommittedfailingregressionfrompriorworker; confirmedgoneafterenvironmentrestart. Solewriterhere. Read /workspace/work/034/core-migration-bounds-repair-report.json +incremental.diff andprevious core-state-revocation-repair-report.json/core-state-authority-security-rereview-report.json. Prioractualproof: realGitmigrationcommitstall meansFiber.interruptdoesnotreturnwithin3s (4pass1fail), becausecurrentlyuninterruptiblecopied/stagedlivestate. Separateprobe killedwaitingcommitprocessgroupafterrealcommitadvancedHEAD; exit -9 doesNOTprovecommitfailed. Priorreportpartial, notaccepted. Keepallthisevidenceandfailingtest.",
+    "The task remains authorized implementation untilsafecomplete, notonlyfindingasmallrepair. A larger internallyversionedtransaction/recoverymechanismisallowedwhennecessary. Investigateexistingidempotence/stateinspectionandGitatomiccommit/refsemantics, thenimplementtheleastcomplexsafecompletepath. A persistentstrict-schemajournal/stagedmigrationwithownedpreimages/expectedcommit/treeandinterruption-awareidempotentrecovery isoneacceptableoption; anotherprovedsafeoptionisfine. Do not stopmerelybecausenaiverollbackunsafe or exitcodeambiguous. Do notmaskblockerbydisablingtest/claimingunboundedcriticalsectionacceptable.",
+    "Mustpreservepreexistingstate/index/worktreeedits andoriginalsource. PreparationmustnotpublishpartialliveState, andcleanupofsourceonlyaftercommitpointverified. Onabort/timeout/ambiguouscommit, no destructiveguessedreset orcontinueddescendantwritesaftercallerreturns; retainpreciserecoverablemetadata/originalsourceandmake nextauthorizedretryreconcileactualHEAD/tree/index safely. Ifexternaluserchangesconflict, failactionablywithoutoverwritingthem. AnynewjournalversionedstrictSchema, pathsderivedfromtrustedroot/canonicalrelativepaths,nofollow/pathtraversal, excludedfrompublication/statehistoryasappropriate, no secretsdump. ExistingCore repair-statusfeaturesmayhelp.",
+    "Freshoperation+state.initializeauthoritymustgateallnewinit/migration/locksetupwritesafterpreparatoryasyncwaits; readonlyhostsnonmutatingpeek. PreviouslyauthorizedboundedatomicOSoperationmayfinishconsistently, butnoinstantaneous-revocation/rollbackclaimorunboundedEffectuninterruptibleGit. Ifusingtimeouts, enforceindependentactualprocessboundandwholeownedchildtermination; Effect.timeoutmaskedbyuninterruptibilityisnotabound. Don'tgloballytimeoutlegitimatelongsetupinstalls. Optionalcompatibleprocess-helperextensionallowed; separateCore-hostextractionusesstate/process.ts, do notbreakexistingcallers.",
+    "ProvewithmeaningfuldeterministicrealGitfixtures: stallINSIDEmigrationcommit, abort/timeoutboundedcallerreturn/nochildrenlaterwrites; ambiguoussuccessfulcommitfollowedbykillrecovercorrectly; preexistingstate/indexeditsretained; originalsourceandnextauthorizedretryconsistent; readOnly/revocationandcheckoutretrytestsremain. Noactualrepo/account/network/PCoperations, fixturesoutsideGitancestryandindependentmodules. Don'tsleepblindlyorrelaxdeadlines/assertions.",
+    "Workthroughoptions/probesandthenimplementation. Ifspecificblockingdesignchoice arises, sendrootconcreteevidence/alternativeswhilecontinuingindependentparts; no userapprovalisneededforreversibleimplementationinsideexistingscope. Youmaychooseappropriateinternalrecoverydesign basedsourcefacts, no newgeneralapprovalflows. Preservecrossplatformsemantics; actualWindows/Mac testslater, labelplatformlimitsaccurately.",
+    "Build/static+focusedCore/state/migration/cancellation/realNodeSDKtests, onefullsupervisedverifyonlyafterfinalcandidate; no mutationsduringgates. PriorCorehostcurrentlyportingbusinessAPIsinotherworktree, no crosswrites. Contextfutureunionaddssetup,doctor.read/fix,vcs.commit/identity/pr; preserveonlatermerge, no neededitthatbranch.",
+    "Save /workspace/work/034/core-migration-recovery-complete-report.json and completeincremental.diff from6ebdf1eincludingpriorfailingregression. Explaintransactionbound/commitverification/recoveryandactualred-greenproofunder400words+paths/logs. Preserveoriginalpartialreports; do notlabelpartial asdone. No subagentsneeded; rootownsallstate/VCS."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Migration interruption or timeout returns within a proven bound with consistent recoverable source index and shared state even after an ambiguous successful commit",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Read only revocation path safety preexisting edits and authorized state compatibility are preserved without guessed destructive rollback",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Deterministic stalled and ambiguous real Git recovery tests current build static and full verification pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "red-green-proof",
+    "transaction-and-recovery",
+    "integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/state",
+    "packages/core/tests",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/state-hook-locks.test.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "docs/core-api.md",
+    "docs/native-tools.md",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfivgoh-3vlb",
+  "specialist": {
+    "agentId": "/root/core_migration_bounds_repair",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T22:15:18.790Z"
+  },
+  "createdAt": "2026-11-13T22:15:18.790Z"
+}
