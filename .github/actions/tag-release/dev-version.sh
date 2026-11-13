@@ -6,6 +6,6 @@ set -euo pipefail
 version="$(jq -r .version package.json)"
 [[ "$version" =~ ^(0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))(-[1-9][0-9]*)?$ ]] || { echo 'Invalid version' >&2; exit 1; }
 version="${BASH_REMATCH[1]}"
-timestamp="$(git show -s --format=%ct "$GITHUB_SHA")"
-[[ "$timestamp" =~ ^[0-9]+$ ]] || { echo 'Invalid commit timestamp' >&2; exit 1; }
-printf '%s-dev.%s.g%s\n' "$version" "$(date -u -d "@$timestamp" +%Y-%m-%d.%H-%M-%S)" "${GITHUB_SHA:0:7}"
+timestamp="$(TZ=UTC0 git show -s --format=%cd --date=format-local:%Y-%m-%d.%H-%M-%S "$GITHUB_SHA")"
+[[ "$timestamp" =~ ^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\.([01][0-9]|2[0-3])-[0-5][0-9]-[0-5][0-9]$ ]] || { echo 'Invalid commit timestamp' >&2; exit 1; }
+printf '%s-dev.%s.g%s\n' "$version" "$timestamp" "${GITHUB_SHA:0:7}"
