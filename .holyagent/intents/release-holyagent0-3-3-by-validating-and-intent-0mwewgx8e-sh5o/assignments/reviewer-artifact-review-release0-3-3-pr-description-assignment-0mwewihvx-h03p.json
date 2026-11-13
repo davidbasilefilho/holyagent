@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwewihvx-h03p",
+  "intentId": "intent-0mwewgx8e-sh5o",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-release0-3-3-pr-description",
+  "objective": "Review release0.3.3 PR description before opening it into main.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/release033-body.txt; release main..9c8edee7"
+  ],
+  "constraints": [
+    "Read HolyAgent reviewer-artifact rules and prior context. User authorized go untilmain and Terra low-xhigh, directfallback. No source/VCS/state edits. Draftauthor assignment-0mwewgyav-p1ls independent. Verify version0.3.3 scope, crossplatform/Pi fixes and npm releaseflow against previous accepted PRbody/workflows. Exacttreeaudit /workspace/work/release033-audit.md confirms9c8 treeidentical61a7adc, so prior3498pass2skip0fail applies tocontent. Newtargetmain CI cannot be claimed passedyet. No npmpublicationclaim or false validation-to-publishtarballhandoff. Prefer minor precise findings not stylistic churn. Save /workspace/work/release033-body-review.md under120words."
+  ],
+  "criteria": [
+    {
+      "text": "Release PR description is accurate and claims only established validation",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-artifact",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [
+    "assignment-0mwewgyav-p1ls"
+  ],
+  "independentFrom": [
+    "assignment-0mwewgyav-p1ls"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T11:36:22.030Z"
+  },
+  "createdAt": "2026-11-13T11:36:22.030Z"
+}
