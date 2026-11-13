@@ -47,8 +47,9 @@
   },
   "result": "result: Reconciled the release records in /workspace/work/034/state-reconciliation.md.\n\nchanged: Scratch report only; no repository or HolyAgent state changes.\n\nchecks: Read the related Intent records and relevant Assignment records through the CLI; checked Git object and ancestry status.\n\nblockers: Historical handoff commit `0167e289` is absent locally. Its accepted writer report survives, but its independent reviews were cancelled. npm publication and user-machine capability checks remain unresolved.\n\nquestions: none\n\nevidence:\nExisting pending work and evidence are reconciled without duplicate or false completion: The report maps the existing Intents, distinguishes the 0.3.3 squash release from individual recovery commits, and retains unresolved requirements.\nOwnership and worker status uncertainty is preserved accurately: CLI lists six current Running assignments; historic cloud workers were closed following recorded user confirmation, while remote liveness outside synced state remains unknown.\nintent-map: /workspace/work/034/state-reconciliation.md maps the umbrella and five related Intents.\nworker-status: `assignment list --all --state Running` and the 0.3.3 Intent provide the current and historical status evidence.\nproposed-updates: The report recommends updating existing status requirements and sequencing shared-file implementation and review assignments.\n",
   "acceptance": {
-    "revision": 10,
-    "rationale": "Existing Intents, merged-source evidence, lost commits, current ownership and unexecuted real-service checks were accurately reconciled.",
+    "revision": 11,
+    "carriedFrom": 10,
+    "rationale": "The inspected source tree is unchanged. New budget/profile and shared-harness requirements do not invalidate this bounded architecture/evidence/bootstrap result; implementation remains separately required at revision11.",
     "criteria": [
       {
         "criterion": "Existing pending work and evidence are reconciled without duplicate or false completion",
