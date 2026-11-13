@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "implement-the-migration-phase-runner",
   "objective": "Implement the migration phase runner using the completed journal and private-index helpers.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /workspace/work/holyagent-034-core. Own new files packages/core/src/state/migration-runner.ts and packages/core/tests/migration-runner.test.ts. Do not edit tree.ts or the completed journal/index modules. The broad integration attempt made no edits; your task is this smaller executable engine, not a design report.",
     "Read actual migration-journal.ts, migration-index.ts and their API reports under /workspace/work/034. Implement runMigrationTransaction with typed trusted IO callbacks for readRef, CAS ref update, file publication, index publication and safe source cleanup, plus prepareMigrationCommit/journal helpers. Callback adapters into tree.ts are a later task; keep the engine independent of legacy layout.",
@@ -45,7 +45,9 @@
     "agentId": "/root/core_migration_journal_implementation",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T23:29:20.748Z"
+    "startedAt": "2026-11-13T23:29:20.748Z",
+    "finishedAt": "2026-11-13T23:43:26.534Z"
   },
+  "result": "status: done\nchanged:\n- packages/core/src/state/migration-runner.ts\n- packages/core/tests/migration-runner.test.ts\nchecks:\n- isolated /tmp copy: bun test packages/core/tests/migration-runner.test.ts -> exit 0\n- isolated /tmp copy: bun check --no-script -> exit 0\n- bunx --no-install mise run fmt -- packages/core/src/state/migration-runner.ts packages/core/tests/migration-runner.test.ts -> exit 0\nnotes:\n- Standalone runner only; integration and real Git end-to-end verification remain with root. evidence: Effect migration runner implements durable idempotent phase recovery and prompt interruption with trusted root ref and authority checks: Implemented using the durable journal and trusted callbacks; isolated tests cover phase recovery, ref reconciliation, authorization, branch and commit verification. Actual Git and file/index semantics depend on adapters. changed-paths: packages/core/src/state/migration-runner.ts; packages/core/tests/migration-runner.test.ts. diff-file: /workspace/work/034/migration-runner-module.diff module-api: /workspace/work/034/migration-runner-module-api.md; exports runMigrationTransaction, typed service/options/preparation interfaces and MigrationRunnerConflict. checks-run: Isolated /tmp copy: bun test, 11 pass, 50 assertions; bun check passes four files. Focused formatting passed. Combined project gates and real Git integration not run.\nevidence:\n- Effect migration runner implements durable idempotent phase recovery and prompt interruption with trusted root ref and authority checks: Implemented using the durable journal and trusted callbacks; isolated tests cover phase recovery, ref reconciliation, authorization, branch and commit verification. Actual Git and file/index semantics depend on adapters.\n- changed-paths: packages/core/src/state/migration-runner.ts; packages/core/tests/migration-runner.test.ts.\n- diff-file: /workspace/work/034/migration-runner-module.diff\n- module-api: /workspace/work/034/migration-runner-module-api.md; exports runMigrationTransaction, typed service/options/preparation interfaces and MigrationRunnerConflict.\n- checks-run: Isolated /tmp copy: bun test, 11 pass, 50 assertions; bun check passes four files. Focused formatting passed. Combined project gates and real Git integration not run.",
   "createdAt": "2026-11-13T23:29:20.748Z"
 }
