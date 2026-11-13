@@ -42,6 +42,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/migration_file_module",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T23:29:21.502Z"
