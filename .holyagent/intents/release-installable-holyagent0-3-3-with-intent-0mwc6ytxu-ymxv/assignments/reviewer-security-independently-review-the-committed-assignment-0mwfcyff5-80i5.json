@@ -39,6 +39,7 @@
     "assignment-0mwfcg880-vh45"
   ],
   "specialist": {
+    "agentId": "/root/r033_final_security_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T19:16:39.185Z"
