@@ -39,6 +39,7 @@
     "assignment-0mwf9smeq-miox"
   ],
   "specialist": {
+    "agentId": "/root/r033_publication_security_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T17:55:55.688Z"
