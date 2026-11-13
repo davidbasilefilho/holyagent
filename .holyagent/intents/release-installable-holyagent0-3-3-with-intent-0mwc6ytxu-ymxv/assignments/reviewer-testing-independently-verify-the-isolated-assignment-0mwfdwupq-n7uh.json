@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.testing",
   "slug": "independently-verify-the-isolated",
   "objective": "Independently verify the isolated Windows release-lookup fixture repair preserves coverage and prevents real CLI fallback.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Immutable repair range0b30619..HEAD in /workspace/work/holyagent-033-repair (root supplies exact head in launcher). Only scripts/workflows.test.ts changed. Review /workspace/work/034/033-windows-release-lookup-repair-report.json and diff, actual unchanged .github/actions/tag-release/action.yml, distinct404releasecreate/exit0 vs500no-create/exit1, command-call assertions/diagnostics, Bash functions and PATH isolation. No newproductionactions, testskips or timebound changes.",
     "Actual Windows oldhead0b had Validation exit4expected0 but Publish Windows passed. Exact old cause unknown due absentstderr, do not attribute toenvironment or specific binarywithoutproof. Recheck baseline against immutable44c79ab2 if relevant, not stale local main074. Mutation evidence must show treating500asabsent and bypassingstub fail without touching real CLI. Run meaningful focused suite throughmise; no fullrepeat needed for test-only scope."
@@ -41,7 +41,37 @@
     "agentId": "/root/r033_windows_lookup_testing_review",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T19:43:25.310Z"
+    "startedAt": "2026-11-13T19:43:25.310Z",
+    "finishedAt": "2026-11-13T19:45:30.731Z"
+  },
+  "result": "status: done\nchecks:\n- bunx --no-install mise exec -- bun test scripts/workflows.test.ts -> exit 0\nnotes:\n- No material testing findings. The old Windows validation exit 4 has no captured stderr; its exact cause remains unknown. Hosted Windows rerun is pending. Full verify was not repeated per assignment. Mutation results are the author's, not independently rerun.\nevidence:\n- Fixture isolation repair preserves meaningful publication error coverage without material testing findings: Unchanged action: 404 asserts exit 0 and creation; 500 asserts exit 1 and no creation. Logged jq and gh calls assert both lookups and creation; Bash functions precede executable lookup and PATH excludes the real CLI. Author reports both 500-as-absent and gh-bypass mutations failed safely.\n- Checks and unverified Windows cause or execution limits are reported accurately: Focused suite passed locally; Windows was not run here and the old failure cause is unknown. Author reports mutation checks and other gates; root owns hosted recheck.\n- reviewed-range: 0b30619faa4d73ddbdfc666358804ee84962f92a..68f7ed8a9c1cd5e099fc0c763706dd13d25e5e66; only scripts/workflows.test.ts changed; action unchanged.\n- findings: No material findings; no source writes or skips.\n- checks-run: Focused workflow suite: exit 0, 27 passed, 0 failed, 102 assertions.",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "Independent current-range review runs27 focused tests and confirms unchanged action plus distinct404/500 outcomes and no real CLI fallback. Hosted Windows remains required; exact old cause is unknown.",
+    "criteria": [
+      {
+        "criterion": "Fixture isolation repair preserves meaningful publication error coverage without material testing findings",
+        "support": "Unchanged action: 404 asserts exit 0 and creation; 500 asserts exit 1 and no creation. Logged jq and gh calls assert both lookups and creation; Bash functions precede executable lookup and PATH excludes the real CLI. Author reports both 500-as-absent and gh-bypass mutations failed safely."
+      },
+      {
+        "criterion": "Checks and unverified Windows cause or execution limits are reported accurately",
+        "support": "Focused suite passed locally; Windows was not run here and the old failure cause is unknown. Author reports mutation checks and other gates; root owns hosted recheck."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "0b30619faa4d73ddbdfc666358804ee84962f92a..68f7ed8a9c1cd5e099fc0c763706dd13d25e5e66; only scripts/workflows.test.ts changed; action unchanged."
+      },
+      {
+        "label": "findings",
+        "support": "No material findings; no source writes or skips."
+      },
+      {
+        "label": "checks-run",
+        "support": "Focused workflow suite: exit 0, 27 passed, 0 failed, 102 assertions."
+      }
+    ]
   },
   "createdAt": "2026-11-13T19:43:25.310Z"
 }
