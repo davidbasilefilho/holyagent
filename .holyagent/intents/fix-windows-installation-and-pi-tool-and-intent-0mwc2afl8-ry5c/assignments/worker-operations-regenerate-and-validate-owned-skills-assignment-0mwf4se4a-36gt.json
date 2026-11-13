@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf4se4a-36gt",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-and-validate-owned-skills",
+  "objective": "Regenerate and validate owned-skills-build for committed independent review.",
+  "state": "Running",
+  "scope": [
+    "Ownedskillswriterterminal; privateownedassetlayout/source33files androotpackage pi.skillsremoval. BaseAdoesnotcontainCperformance skillyet; no missingmapexpected untilfutureintegration. Buildmustremoveobsoletegeneratedglobalskillfolders andwriteprivateassets. Do notintroducesourcefixes."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-skills. No sourceedits, actualVCS/statewrites, extraagents, livecalls, dependency/versionchanges. RootownsVCS/state; onlygeneratedchanges. Hash trackedANDuntrackednongeneratedsource before/after. RepoAGENTS/.claude apply.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. bunx --no-install mise run build then python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify. Onfailure compactexactnames/assertions notfixorweaken.",
+    "JSON /workspace/work/034/owned-skills-build-report.json with status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]. Diff /workspace/work/034/owned-skills-build.diff. Exactcriterion/evidencelabelkeys; <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested generated and validation gates pass with source unchanged",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:28:00.634Z"
+  },
+  "createdAt": "2026-11-13T15:28:00.634Z"
+}
