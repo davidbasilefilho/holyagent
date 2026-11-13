@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mwewlb82-cgub",
+  "intentId": "intent-0mwewgx8e-sh5o",
+  "intentRevision": 1,
+  "roleTask": "Worker.debugging",
+  "slug": "determine-why-integration-npm-oidc",
+  "objective": "Determine why integration npm OIDC publication fails with ENEEDAUTH before deciding release readiness.",
+  "state": "Running",
+  "scope": [
+    "scripts/npm-publishing.ts",
+    ".github/workflows/{publish,dev,stable}.yml",
+    "failed dev publish run43416856899/job131861265745",
+    "npm trusted-publishing client behavior"
+  ],
+  "constraints": [
+    "Read AGENTS.md,.claude/CLAUDE.md and holyagent worker-debugging role in /workspace/work/holyagent-release033. User 'go until it is on main' authorizes necessary fixes/PR/mainmerge, Terra low-xhigh; directfallback. This task is read-only investigation: no source/VCS/state edits, actual publication, token writes, credential/security-setting changes or workflow reruns. Local branch/version gates pass. Integrationdevpublish failed after pack, error npm ENEEDAUTH requiring login. Root obtained logs via purpose-built connector tools.mcp__codex_apps__github_fetch_workflow_job_logs({repo_full_name:'davidbasilefilho/holyagent',job_id:131861265745}); gh/curl redirected logstorage forbidden. Fetch via connector and print only relevant filtered context. Investigate exact npm/node tool versions, OIDC ACTIONS_ID_TOKEN_REQUEST_* inheritance and permissions, workflow identity claims/trustedpublisher binding requirements, npm client automatic OIDC flow. Read public authoritative npm docs/current installed npm source as needed, no secrets in reports. npm environment and bootstrap package exist; public trustedpublisher config unavailable. Need concrete reproduction or file:line/env trace before recommending code fix; distinguish remote configuration blocker from code defect. Can use mock OIDC/registry or npm --dry-run only if it never publishes and only local test endpoints. Report options/tradeoffs if architecture change needed. Save /workspace/work/npm-oidc-diagnosis.md under350words and report conclusions promptly to root. Existing tree/tests reviewed, avoid broad unrelated audit. No subagents."
+  ],
+  "criteria": [
+    {
+      "text": "Failure cause is supported by logs and code or client behavior evidence",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Proposed next step preserves trusted publishing and approval boundaries",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "source-trace",
+    "recommendation"
+  ],
+  "ownershipPaths": [
+    "npm-diagnosis"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T11:38:33.363Z"
+  },
+  "createdAt": "2026-11-13T11:38:33.363Z"
+}
