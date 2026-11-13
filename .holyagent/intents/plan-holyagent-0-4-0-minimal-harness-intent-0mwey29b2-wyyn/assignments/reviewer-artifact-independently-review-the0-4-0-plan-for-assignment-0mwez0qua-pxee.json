@@ -31,6 +31,7 @@
     "assignment-0mweyjwc8-79qs"
   ],
   "specialist": {
+    "agentId": "/root/r040_plan_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T12:46:32.674Z"
