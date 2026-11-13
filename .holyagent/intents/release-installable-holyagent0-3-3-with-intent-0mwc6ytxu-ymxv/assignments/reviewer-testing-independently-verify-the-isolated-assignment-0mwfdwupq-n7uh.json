@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mwfdwupq-n7uh",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Reviewer.testing",
+  "slug": "independently-verify-the-isolated",
+  "objective": "Independently verify the isolated Windows release-lookup fixture repair preserves coverage and prevents real CLI fallback.",
+  "state": "Running",
+  "scope": [
+    "Immutable repair range0b30619..HEAD in /workspace/work/holyagent-033-repair (root supplies exact head in launcher). Only scripts/workflows.test.ts changed. Review /workspace/work/034/033-windows-release-lookup-repair-report.json and diff, actual unchanged .github/actions/tag-release/action.yml, distinct404releasecreate/exit0 vs500no-create/exit1, command-call assertions/diagnostics, Bash functions and PATH isolation. No newproductionactions, testskips or timebound changes.",
+    "Actual Windows oldhead0b had Validation exit4expected0 but Publish Windows passed. Exact old cause unknown due absentstderr, do not attribute toenvironment or specific binarywithoutproof. Recheck baseline against immutable44c79ab2 if relevant, not stale local main074. Mutation evidence must show treating500asabsent and bypassingstub fail without touching real CLI. Run meaningful focused suite throughmise; no fullrepeat needed for test-only scope."
+  ],
+  "constraints": [
+    "Read current AGENTS/GPT testing role. Read-only Git/source/tests allowed, no source/generated/VCS/config/state writes, subagents or live Pi/model/publication/executable investigation. Afterreview write authorized scratch report.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Root handles exact-head hosted recheck and publication. If fullneeded use existing supervisor, do not weaken tests.",
+    "Save /workspace/work/034/033-windows-lookup-testing-review-report.json exact schema status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]; validate keys/fields, <=250words."
+  ],
+  "criteria": [
+    {
+      "text": "Fixture isolation repair preserves meaningful publication error coverage without material testing findings",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Checks and unverified Windows cause or execution limits are reported accurately",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfdqrud-wlze"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T19:43:25.310Z"
+  },
+  "createdAt": "2026-11-13T19:43:25.310Z"
+}
