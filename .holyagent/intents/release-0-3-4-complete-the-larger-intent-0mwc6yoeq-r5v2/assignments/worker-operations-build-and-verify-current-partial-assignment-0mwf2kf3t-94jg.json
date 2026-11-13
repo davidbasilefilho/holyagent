@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwf2kf3t-94jg",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 13,
+  "roleTask": "Worker.operations",
+  "slug": "build-and-verify-current-partial",
+  "objective": "Build and verify current partial subscription-routing source before review.",
+  "state": "Running",
+  "scope": [
+    "Build/fullverifyonly, sourceunchanged."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-routing. Writerterminal, read /workspace/work/034/routing-report.json. No actualVCS/statewrites/sourcefixes/externalcalls/depschanges/extraagents. Generatedonly maychange; sourcehashesstable. Existingreporulesapply.",
+    "Standardenv MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Buildvia bunx --no-install mise run build then python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify. Captureprecisefailuresbeforefix, not broadrepeatsifgreen.",
+    "JSON /workspace/work/034/routing-build-report.json correctCLIshape/exactkeys; diff /workspace/work/034/routing-generated.diff, <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Routing generated assets and full verification pass without source edits",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_state_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:25:49.433Z"
+  },
+  "createdAt": "2026-11-13T14:25:49.433Z"
+}
