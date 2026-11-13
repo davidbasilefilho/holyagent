@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mwf34phm-kkw5",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-internal-holyagent-cli-output",
+  "objective": "Make the internal HolyAgent CLI output plain text and concise natural-language guidance.",
+  "state": "Running",
+  "scope": [
+    "Internal CLI messages/emission/help/errors/version, focused regression coverage and accurate docs."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-cli fromacceptedc3. Read repoAGENTS/.claude andappropriateimplementationrole; instruction-writing skill for model-facing output wording. Userexplicitnewrequest persisted toolsIntent6 andumbrella14. ProducttextEnglish perrepo; userconversationPortuguese. InternalCLI only (bundledscripts used byagentsPi/Claude), no publicsetupUIredesign. No liveuserPC/modelrequests/depschanges/subagents/actualVCS/.git/.holyagentwrites. RootownsVCS/state. TempCLI/Gitfixturesallowed.",
+    "All internalCLI textualoutput NOANSI/colors/bold/styling/terminalescapesequences regardlessTTY,NO_COLOR,FORCE_COLOR/CLICOLOR_FORCE etc. Avoid decoratedUI/spinners/icons forCLIguidance. Use short natural-language prompt-like help/error/confirmationinstructions that tellagent relevant nextaction, retain exact validationpath/identifiers/error semantics. Version identity canremainnecessaryplainversionstring; don'tpadwithfluff. Preserve stdout/stderr/exitcodes/cancellation andstrictschemaerrors.",
+    "Preserve necessary structured facts (Intentrequirements/Assignmentcriteria/IDs/state/dispatchprompt) in existing plain data format where consumed, not artificiallyturnallrecorddataintoambiguousprose. No silent metadata truncation. Avoidinventingnewprotocol/--json modes unlessactualneedprovenandrootsettled. No genericnatural-language reinterpretation ofmachineerrorclasses; precise usefulfeedbackwithoutdumpingexcessdata. Existing explicitmachinedata staysplain, human-readableguidancebecomesnaturalshort. Applysharedemissiononceforbothhosts, notperharnessduplicates.",
+    "Inspect rg/fd/rawpassthrough andnestedsubprocessstderr forANSI bypass; neverstripnecessaryfilecontent/JSONbytes silently. Prefer disableformatting atownedproducer/invocation andsafelyrenderterminalcontrols whereoutputboundaryneedsit; handleescapechunkscorrectlyifstreaming. Do not breakCLIpassthroughargument/exit semantics. RootDnativebranch nowaddsprivatecancellationIPC inhooks/pi-entry.ts/cli/main.ts andstate/store.ts, plusassignmentreportJSONinput; keepoutputchangeslocalized/reportmergeseams, don'teditotherbranch.",
+    "Baselineproveexistinguserissue/currentoutput examples, meaningfulcolored-env/TTY-likehostparameter tests forhelp/error/version/confirmations+stablefacts acrossPiClaude. Update exactexpectedmessagetests onlywhenintendedmeaningpreserved; don'tweakenvalidators. Addactualversiononlyifexistingcontractmissingandnaturalextensionneeded; stateanynewAPI. No hugephrase-by-phrasegoldenmirror tests. Run focusedCLI+affectedtests/type/lint/fmt via mise; generatedbuild/fullverifyrootlater.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Frozeninstall --ignore-scripts ifneeded. Reportnewtoolingissueswithrepro. Keepworkingthroughrequestedcode+checks; sourceoutsideownershipaskfirst.",
+    "JSON /workspace/work/034/plain-cli-report.json correctCLIshape/exactkeys; diff /workspace/work/034/plain-cli.diff. Includecompactbefore/after examples. Final<=300words/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Internal CLI emits plain undecorated text across hosts even under forced-color conditions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Help errors version and confirmations use short natural guidance while preserving essential data",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Exit stderr schemas cancellation and structured record contracts remain compatible",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Focused plain-output and affected CLI checks pass without unrelated UI changes",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "before-after"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli",
+    "packages/runtime/src/hooks/pi-entry.ts",
+    "packages/runtime/tests/cli-output.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "docs/agent-cli-output.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_handoff_command",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T14:41:36.010Z"
+  },
+  "createdAt": "2026-11-13T14:41:36.010Z"
+}
