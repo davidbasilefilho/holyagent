@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwevmizk-t526",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Worker.mechanical",
+  "slug": "correct-the-one-tarball-handoff-accuracy",
+  "objective": "Correct the one tarball-handoff accuracy issue in the drafted PR120 description.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/pr120-body.txt"
+  ],
+  "constraints": [
+    "Same HolyAgent worker-mechanical rules; user authorized continue PR120 audit/revise/merge, Terra low-xhigh, direct fallback. No repository/VCS/state edits. Reviewer found phrase 'hand the same packed tarball from validation to publication and release' inaccurate: validation.yml produces no tarball; stable/dev pack AFTER validation, publish that tarball and give it to GitHub release. Replace with concise accurate phrase such as 'Publish the generated public holyagent package through npm OIDC, then hand the same tarball to the GitHub release.' Restrict npm publication phrase to protected main/release integration branches (current 'protected release branches' imprecise). Keep all other text and FINAL_VERIFY_RESULT token. Save corrected body in same outside-repo path; report /workspace/work/pr120-body-repair-report.md under100 words."
+  ],
+  "criteria": [
+    {
+      "text": "Tarball handoff and protected publication branches are described accurately",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "changed-paths",
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "pr-description"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwevkfpi-y1ne",
+  "specialist": {
+    "agentId": "/root/pr_description",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T11:11:30.464Z"
+  },
+  "createdAt": "2026-11-13T11:11:30.464Z"
+}
