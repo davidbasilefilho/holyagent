@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "backport-only-the-proven-npm-provenance",
   "objective": "Backport only the proven npm provenance metadata fix needed to publish stable0.3.3.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only /workspace/work/holyagent-033-publish, branch release/0.3.3/fix/npm-provenance-metadata at9c8edee7 whose tree equals main44c79ab2. The stable npm publish currently fails E422 missing repository.url; proven fix exists in /workspace/work/holyagent-034 commit e2899081 and focused scripts/npm-publishing and Pi manifest tests. Backport only generator repository metadata and strict tarball manifest repository preflight plus minimal meaningful tests. Preserve0.3.3 version and existing old release/integration workflows.",
     "No executable/bin/setup investigation or fix: user explicitly says publish0.3.3 FIRST, then if bunx error persists handle in0.3.4. Do not copy0.3.4 routing/core/output/guidance/branch-model changes. Source only four relevant Pi generation/test and npm-publishing script/test files, generated dist manifest through build."
@@ -47,7 +47,41 @@
     "agentId": "/root/r034_native_tools",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T17:48:09.458Z"
+    "startedAt": "2026-11-13T17:48:09.458Z",
+    "finishedAt": "2026-11-13T17:54:59.648Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/pi/dist/package.json\n- packages/integrations/pi/publishing.test.ts\n- packages/integrations/pi/src/generate.ts\n- scripts/npm-publishing.test.ts\n- scripts/npm-publishing.ts\nchecks:\n- bun install --frozen-lockfile --ignore-scripts -> exit 0\n- bun test packages/integrations/pi/publishing.test.ts scripts/npm-publishing.test.ts (red before implementation) -> exit 1\n- bun fmt --no-script packages/integrations/pi/publishing.test.ts scripts/npm-publishing.test.ts -> exit 0\n- bunx --no-install mise run build -> exit 0\n- bun test packages/integrations/pi/publishing.test.ts scripts/npm-publishing.test.ts (green) -> exit 0\n- npm pack --offline --ignore-scripts; validate extracted actual package manifest -> exit 0\n- run publishArtifact against actual offline tarball with injected GitHub and npm fakes -> exit 0\n- git diff --check -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 0\n- (cd packages/integrations/pi/dist && bun pm pack --destination /tmp/holyagent-033-bun-pack-peR2kG); inspect tarball manifest; run publishArtifact with injected GitHub and npm fakes -> exit 0\nnotes:\n- Install scripts were disabled to avoid the prepare hook writing shared .git/hooks, forbidden by the assignment; no dependency pins changed.\n- Full verify: 3500 pass, 2 skip, 0 fail; type, lint and formatting checks passed. See /workspace/work/034/033-publication-verify.log.\n- Usual integration-to-main version check requires a version strictly greater than current main 0.3.3; this unchanged-version repair requires a separately authorized promotion route. No guards or workflows were changed and no publication was attempted.\n- Bun-packed actual 0.3.3 tarball /tmp/holyagent-033-bun-pack-peR2kG/holyagent-0.3.3.tgz has shasum 9a31e6672af2cd2d64e6e09ee340b2a1683bd7a8; extracted manifest matches repository/type/directory and mocked preflight reached repository, tag, view, publish in order. npm-pack evidence above remains separate; no network or live publish was invoked.\nevidence:\n- Minimal metadata and provenance preflight repair is backported without0.3.4 changes or guard weakening: Generator and generated Pi manifest supply exact repository metadata; packed manifest is validated against repository context and directory before network/npm calls. Only five authorized paths changed.\n- Meaningful regression packaging and current full verification checks pass: Focused red/green tests, real Bun-packed and npm-packed offline tarballs with mocked publication preflight, and supervised verify (3500 pass, 2 skip, 0 fail) passed.\n- checks-run: See checks array and /workspace/work/034/033-publication-verify.log.\n- changed-paths: packages/integrations/pi/dist/package.json, packages/integrations/pi/publishing.test.ts, packages/integrations/pi/src/generate.ts, scripts/npm-publishing.test.ts, scripts/npm-publishing.ts\n- diff-file: /workspace/work/034/033-publication-metadata.diff\n- publication-limitations: Main already has version 0.3.3 and the required promotion check requires an increase; no workflow or guard was modified, and no publication was attempted.",
+  "acceptance": {
+    "revision": 30,
+    "rationale": "Five-path backport preserves0.3.3 and existing guards. Full3500pass2skip plus real Bun-packed manifest and mocked publication preflight verify the known E422 correction; actual publication remains pending.",
+    "criteria": [
+      {
+        "criterion": "Minimal metadata and provenance preflight repair is backported without0.3.4 changes or guard weakening",
+        "support": "Generator and generated Pi manifest supply exact repository metadata; packed manifest is validated against repository context and directory before network/npm calls. Only five authorized paths changed."
+      },
+      {
+        "criterion": "Meaningful regression packaging and current full verification checks pass",
+        "support": "Focused red/green tests, real Bun-packed and npm-packed offline tarballs with mocked publication preflight, and supervised verify (3500 pass, 2 skip, 0 fail) passed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "See checks array and /workspace/work/034/033-publication-verify.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/integrations/pi/dist/package.json, packages/integrations/pi/publishing.test.ts, packages/integrations/pi/src/generate.ts, scripts/npm-publishing.test.ts, scripts/npm-publishing.ts"
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/033-publication-metadata.diff"
+      },
+      {
+        "label": "publication-limitations",
+        "support": "Main already has version 0.3.3 and the required promotion check requires an increase; no workflow or guard was modified, and no publication was attempted."
+      }
+    ]
   },
   "createdAt": "2026-11-13T17:48:09.458Z"
 }
