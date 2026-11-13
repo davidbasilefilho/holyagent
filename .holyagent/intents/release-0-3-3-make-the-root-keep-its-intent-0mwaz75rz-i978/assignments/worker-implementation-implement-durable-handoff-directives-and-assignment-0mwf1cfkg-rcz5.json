@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "implement-durable-handoff-directives-and",
   "objective": "Implement durable handoff directives and cross-platform visual/performance iteration guidance for HolyAgent 0.3.4.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Model-facing requirements, all three family translations, skill assembly and coverage, focused instruction tests and human docs."
   ],
@@ -57,7 +57,45 @@
     "agentId": "/root/r034_iteration_guidance",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T13:51:37.168Z"
+    "startedAt": "2026-11-13T13:51:37.168Z",
+    "finishedAt": "2026-11-13T13:56:21.393Z"
+  },
+  "result": "status: done\nchanged:\n- packages/runtime/src/instructions/claude-5.5/design-core/core.md\n- packages/runtime/src/instructions/claude-5.5/roles/reviewer-visual/captures.md\n- packages/runtime/src/instructions/claude-5.5/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/claude-5.5/root/delegating.md\n- packages/runtime/src/instructions/claude-5.5/root/identity.md\n- packages/runtime/src/instructions/claude-5.5/skills/visual-judging/SKILL.md\n- packages/runtime/src/instructions/coverage.ts\n- packages/runtime/src/instructions/gpt-6/design-core/core.md\n- packages/runtime/src/instructions/gpt-6/roles/reviewer-visual/captures.md\n- packages/runtime/src/instructions/gpt-6/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/gpt-6/root/delegating.md\n- packages/runtime/src/instructions/gpt-6/root/identity.md\n- packages/runtime/src/instructions/gpt-6/skills/visual-judging/SKILL.md\n- packages/runtime/src/instructions/kimi-k3.1/design-core/core.md\n- packages/runtime/src/instructions/kimi-k3.1/roles/reviewer-visual/captures.md\n- packages/runtime/src/instructions/kimi-k3.1/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/kimi-k3.1/root/delegating.md\n- packages/runtime/src/instructions/kimi-k3.1/root/identity.md\n- packages/runtime/src/instructions/kimi-k3.1/skills/visual-judging/SKILL.md\n- packages/runtime/src/instructions/requirements/design-core/core.md\n- packages/runtime/src/instructions/requirements/roles/reviewer-visual/captures.md\n- packages/runtime/src/instructions/requirements/roles/worker-visual/purpose.md\n- packages/runtime/src/instructions/requirements/root/delegating.md\n- packages/runtime/src/instructions/requirements/root/identity.md\n- packages/runtime/src/instructions/requirements/skills/visual-judging/SKILL.md\n- packages/runtime/tests/instructions.test.ts\n- docs/iteration-evidence.md\n- packages/runtime/src/instructions/claude-5.5/skills/performance-iteration/SKILL.md\n- packages/runtime/src/instructions/gpt-6/skills/performance-iteration/SKILL.md\n- packages/runtime/src/instructions/kimi-k3.1/skills/performance-iteration/SKILL.md\n- packages/runtime/src/instructions/requirements/skills/performance-iteration/SKILL.md\nchecks:\n- bun install --frozen-lockfile --ignore-scripts -> exit 0\n- bunx --no-install mise run instructions:scaffold -> exit 0\n- bunx --no-install mise run test -- packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\n- Bun in-memory Claude and Pi generate() skill checks -> exit 0\nnotes:\n- Generated artifacts deferred to root. First direct bun test failed before dependencies were installed; focused mise test passed after installation.\n- In-memory generator check used Bun directly; no generated files written.\nevidence:\n- Shared handoff durability directives are implemented requirements-first for all current families: R-HANDOFF and each family root/identity.md specify state pushes and replaceable Intent handoff.\n- Visual iteration compares immutable task baseline and previous commit with truthful interaction evidence: R-VISUAL-ITERATION and worker, reviewer, root visual and design-core translations specify comparisons and evidence.\n- Optimization guidance establishes user target and controlled original-and-previous per-commit measurements: R-PERFORMANCE and R-PERFORMANCE-ROUTE are translated into all family skills and routing.\n- Both supported harnesses assemble the guidance and focused checks pass without changing unrelated behavior: 33 focused tests pass; in-memory Claude and Pi generators emitted performance skill; type, lint and format gates passed.\n- checks-run: See checks array; full build and verify deferred to root per assignment.\n- changed-paths: See changed_paths array.\n- diff-file: /workspace/work/034/guidance.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Requirements/all-family translations and in-memory generators cover requested cycles;33focused tests and type/lint/format pass; independent review follows.",
+    "criteria": [
+      {
+        "criterion": "Shared handoff durability directives are implemented requirements-first for all current families",
+        "support": "R-HANDOFF and each family root/identity.md specify state pushes and replaceable Intent handoff."
+      },
+      {
+        "criterion": "Visual iteration compares immutable task baseline and previous commit with truthful interaction evidence",
+        "support": "R-VISUAL-ITERATION and worker, reviewer, root visual and design-core translations specify comparisons and evidence."
+      },
+      {
+        "criterion": "Optimization guidance establishes user target and controlled original-and-previous per-commit measurements",
+        "support": "R-PERFORMANCE and R-PERFORMANCE-ROUTE are translated into all family skills and routing."
+      },
+      {
+        "criterion": "Both supported harnesses assemble the guidance and focused checks pass without changing unrelated behavior",
+        "support": "33 focused tests pass; in-memory Claude and Pi generators emitted performance skill; type, lint and format gates passed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "See checks array; full build and verify deferred to root per assignment."
+      },
+      {
+        "label": "changed-paths",
+        "support": "See changed_paths array."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/guidance.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T13:51:37.168Z"
 }
