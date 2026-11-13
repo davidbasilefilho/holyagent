@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "watch-minimal0-3-3-publication-repair",
   "objective": "Watch minimal0.3.3 publication repair PR126 and report exact current-head hosted results.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "PR126 ready, head46963a4040cec3c42a8b432bf26e526704ea2dfa, branch release/0.3.3/fix/npm-provenance-metadata targeting release/0.3.3/integration. Use gh pr checks126 --watch, current head snapshot and logs. No writes or reruns. Verify Linux/macOS/Windows/installers/branch-model terminal results in both relevant workflows; version intentionally skipped on integration target."
   ],
@@ -34,7 +34,9 @@
     "agentId": "/root/r033_publication_ci_watch",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T17:58:33.749Z"
+    "startedAt": "2026-11-13T17:58:33.749Z",
+    "finishedAt": "2026-11-13T18:18:29.210Z"
   },
+  "result": "interrupted",
   "createdAt": "2026-11-13T17:58:33.749Z"
 }
