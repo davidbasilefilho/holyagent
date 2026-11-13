@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-the-one-stale-npm-publication",
   "objective": "Correct the one stale npm-publication statement in the already changed parity document.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only /workspace/work/holyagent-033-repair docs/pi/claude-parity.md near line146, noted in /workspace/work/034/033-final-artifact-review-report.json. Replace the pre-existing 'There is no npm publishing' statement with accurate current protected CI/Bun-pack/npm trusted publishing guidance, preferably link existing docs/npm-publishing.md. Preserve surrounding comparison and do not claim stable0.3.3 already published."
   ],
@@ -34,7 +34,29 @@
     "agentId": "/root/r033_no_draft_carry",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T19:19:48.665Z"
+    "startedAt": "2026-11-13T19:19:48.665Z",
+    "finishedAt": "2026-11-13T19:21:07.844Z"
+  },
+  "result": "status: done\nchanged:\n- docs/pi/claude-parity.md\nchecks:\n- configured mise exec bun fmt --check --no-script docs/pi/claude-parity.md -> exit 0\n- git diff --check -- docs/pi/claude-parity.md -> exit 0\n- rg publication statement and link in docs/pi/claude-parity.md -> exit 0\nnotes:\n- Product tests and build not rerun for this documentation-only correction.\nevidence:\n- The stale publication statement is corrected without unrelated changes or unsupported release claims: Replaced the stale sentence with protected CI, Bun packing and npm trusted publishing guidance linked to npm-publishing.md.\n- checks-run: Scoped format, diff whitespace and reference checks passed.\n- changed-paths: docs/pi/claude-parity.md",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "One stale paragraph corrected with existing guide link; scoped formatting/reference/diff checks pass, no product source or publication claims changed.",
+    "criteria": [
+      {
+        "criterion": "The stale publication statement is corrected without unrelated changes or unsupported release claims",
+        "support": "Replaced the stale sentence with protected CI, Bun packing and npm trusted publishing guidance linked to npm-publishing.md."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Scoped format, diff whitespace and reference checks passed."
+      },
+      {
+        "label": "changed-paths",
+        "support": "docs/pi/claude-parity.md"
+      }
+    ]
   },
   "createdAt": "2026-11-13T19:19:48.665Z"
 }
