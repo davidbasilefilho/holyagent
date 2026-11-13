@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwf4sd3h-p3pp",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-and-validate-plain-cli-ready",
+  "objective": "Regenerate and validate plain-cli-ready-build for committed independent review.",
+  "state": "Running",
+  "scope": [
+    "Latestquotedhelp/hintrepairterminal. Buildthenfocusedinput/host/cli-output/tools/generatorfreshnesstests. No fullverify untilcommittedreview."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-cli. No sourceedits, actualVCS/statewrites, extraagents, livecalls, dependency/versionchanges. RootownsVCS/state; onlygeneratedchanges. Hash trackedANDuntrackednongeneratedsource before/after. RepoAGENTS/.claude apply.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. bunx --no-install mise run build thenrelevantfocusedtestsviamiseexec. No fullverifyyet. Onfailure compactexactnames/assertions notfixorweaken.",
+    "JSON /workspace/work/034/plain-cli-ready-build-report.json with status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]. Diff /workspace/work/034/plain-cli-ready-build.diff. Exactcriterion/evidencelabelkeys; <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested generated and validation gates pass with source unchanged",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_state_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:27:59.309Z"
+  },
+  "createdAt": "2026-11-13T15:27:59.309Z"
+}
