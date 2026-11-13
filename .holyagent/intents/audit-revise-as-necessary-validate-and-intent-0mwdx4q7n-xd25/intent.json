@@ -15,6 +15,7 @@
     "COMPLETED2026-11-13: PR120 squash-merged by authorized expected-head API into release/0.3.3/integration, merge commit9c8edee7bf9a82e062121e89c507f4b76cc09ae9. GitHub confirmed merged=true,stateclosed,merged_at2026-11-13T11:24:45Z, and fetched integration remote tip equals merge SHA. Work branch61a7adc retained, primary checkout main retained, clean tracked tree. No branch deletion/force push/settings or credential changes/manual publication. No further task work required. Normal merge-triggered release workflow is separate from this completed merge; npm publication is not claimed. Four historical unaccepted initial reports are superseded by accepted repairs/re-reviews/final validation, retained as truthful history. Update/close this Intent and push state."
   ],
   "revision": 1,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "Completed: PR #120 squash-merged into release/0.3.3/integration at 9c8edee7bf9a82e062121e89c507f4b76cc09ae9 after independent reviews, full verify and green exact-head cross-platform CI.",
   "createdAt": "2026-11-12T19:05:53.075Z"
 }
