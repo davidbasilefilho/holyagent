@@ -5,7 +5,7 @@
   "roleTask": "Librarian.research",
   "slug": "refine0-3-4-scoring-profile-design-using",
   "objective": "Refine0.3.4 scoring/profile design using the user's100-dollar baseline and20-dollar fast targets with explicit Terra/Sonnet roots.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Existing mixed-provider/scoring requirement and source /workspace/work/034/routing-research.md",
     "Public mypriors.com plan and benchmark evidence; Pi/Claude route/profile integration"
@@ -46,7 +46,41 @@
     "agentId": "/root/r034_routing_research",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T12:33:27.316Z"
+    "startedAt": "2026-11-13T12:33:27.316Z",
+    "finishedAt": "2026-11-13T12:51:14.971Z"
+  },
+  "result": "result: Profile and scoring contracts are documented; plan-specific evidence is still insufficient to rank all required candidates.\n\nchanged: [routing-profiles.md](/workspace/work/034/routing-profiles.md), [routing-profiles-report.md](/workspace/work/034/routing-profiles-report.md), and four public data snapshots under `/workspace/work/034/`.\n\nchecks: Read the revision 11 umbrella Intent and repository routing paths. Four unauthenticated public data requests exited 0. No model calls or tests were run.\n\nblockers: The plan snapshot lacks exact GPT-6.1 Terra and Kimi K3.1 rows. Priors’ benchmark API returns API task cost, so its values cannot directly supply $100 or $20 subscription scores.\n\nquestions: none.\n\nnotes: The $100 and $20 figures are per-provider plan targets in the proposed contract; combined subscriptions may cost more.\n\nevidence:\nProfile design honors100-dollar and20-dollar targets and explicit root preferences: Normal and fast profiles preserve existing selections until explicitly activated; fast uses Terra for the Pi Codex root and Sonnet for the Claude root.\nScoring and provider capability contracts remain evidence-backed with honest exclusions: Only candidates with comparable plan-specific evidence and verified required capabilities receive scores; missing evidence is an explicit exclusion, not zero.\nsources: [Priors methodology](https://www.mypriors.com/benchmarks/methodology), its public API and [Claude subagent documentation](https://code.claude.com/docs/en/sub-agents); dated snapshots and commands are in the reports.\ndata-contract: Versioned model, effort, benchmark, harness, plan, cost derivation, confidence and capability records; normalized scores lie in [0,1].\nrecommended-paths: Implement per-role Pi providers and Claude-specific session and subagent controls, with explicit preset activation and visible policy fallbacks.\nunknowns: Exact plan costs and entitlements, model alias mapping, comparable reviewer benchmarks, and runtime capability exposure remain unverified.\n",
+  "acceptance": {
+    "revision": 11,
+    "rationale": "Profile contract honors explicit100/20-dollar targets and Terra/Sonnet roots, with sourced eligibility/exclusions; incomplete optimized data remains explicitly open.",
+    "criteria": [
+      {
+        "criterion": "Profile design honors100-dollar and20-dollar targets and explicit root preferences",
+        "support": "Normal and fast profiles preserve existing selections until explicitly activated; fast uses Terra for the Pi Codex root and Sonnet for the Claude root."
+      },
+      {
+        "criterion": "Scoring and provider capability contracts remain evidence-backed with honest exclusions",
+        "support": "Only candidates with comparable plan-specific evidence and verified required capabilities receive scores; missing evidence is an explicit exclusion, not zero."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "sources",
+        "support": "[Priors methodology](https://www.mypriors.com/benchmarks/methodology), its public API and [Claude subagent documentation](https://code.claude.com/docs/en/sub-agents); dated snapshots and commands are in the reports."
+      },
+      {
+        "label": "data-contract",
+        "support": "Versioned model, effort, benchmark, harness, plan, cost derivation, confidence and capability records; normalized scores lie in [0,1]."
+      },
+      {
+        "label": "recommended-paths",
+        "support": "Implement per-role Pi providers and Claude-specific session and subagent controls, with explicit preset activation and visible policy fallbacks."
+      },
+      {
+        "label": "unknowns",
+        "support": "Exact plan costs and entitlements, model alias mapping, comparable reviewer benchmarks, and runtime capability exposure remain unverified."
+      }
+    ]
   },
   "createdAt": "2026-11-13T12:33:27.316Z"
 }
