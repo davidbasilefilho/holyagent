@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwfe3629-ade3",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.validation",
+  "slug": "watch-the-independently-reviewed-test",
+  "objective": "Watch the independently reviewed test-isolation repair on final publication PR129.",
+  "state": "Running",
+  "scope": [
+    "Exact PR129 current head68f7ed8a9c1cd5e099fc0c763706dd13d25e5e66. Only scripts/workflows.test.ts changed since0b: isolated Bash functions/PATH, actual-call assertions and diagnostics; author27tests+mutations/static and independent testing27pass. Prior version/branch-model and othergates passed; Windows oneof2failedold0b, exactcauseunknown. Watch newhead gh pr checks129 --watch toterminal, all actualLinux/macOS/Windows/installers/requiredversion/branch-model outcomes.",
+    "Read failure logs if needed via GitHub connector when gh redirect403. No writes/reruns/sourcechanges. User confirmed version was not removed; new version job handles exception and must remain correctly passing. No executable investigation before actual stable publication."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT validation+ci-watch; read-only Git/GitHub/logs. No source/VCS/config/state/remote writes or subagents, paid/livePi/publication. Root owns exactheadmerge and subsequent main publishing. Bind evidence tonew68 only, oldresultsarehistory, skipsnotvalidation.",
+    "If new failure, report exact diagnosticstdout/stderr nowincludedinfixture and sourceassertions; do not assumeoldcauseproven or environmental. Keep samegate twice repro rule in mind; root handles nextscope.",
+    "Save /workspace/work/034/033-final-pr-ci-recheck-report.json EXACT schema status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]. Validate arrays/numericexits/keys, <=250words; logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Current repaired head gates and actionable failures are accurately reported",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "head",
+    "checks-run",
+    "failures",
+    "merge-state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfdbuj3-wg9d",
+  "specialist": {
+    "agentId": "/root/r033_final_pr_ci_watch",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T19:48:19.953Z"
+  },
+  "createdAt": "2026-11-13T19:48:19.953Z"
+}
