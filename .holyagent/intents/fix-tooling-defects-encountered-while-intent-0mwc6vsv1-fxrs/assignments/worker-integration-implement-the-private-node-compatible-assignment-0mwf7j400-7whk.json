@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mwf7j400-7whk",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Worker.integration",
+  "slug": "implement-the-private-node-compatible",
+  "objective": "Implement the private Node-compatible core package with real typed HolyAgent application operations.",
+  "state": "Running",
+  "scope": [
+    "New Core worktree based on reviewed B edce18f. Read /workspace/work/034/core-package-map.md and tools Intent8. User requires actual functionality in another package used directly by CLI/Pi. D subprocess/IPC bridge is superseded. Implement private @holyagent/core with real typed Effect APIs and strict shared schemas for Intent/Assignment lifecycle/reports/plan/status/reconcile/handoff/state mode/migration plus needed domain/state/config/routing helpers. Actual business logic must move out of CLI handlers, not wrap run(argv) or Command.run."
+  ],
+  "constraints": [
+    "Read repo AGENTS.md, .claude/CLAUDE.md and the applicable GPT role. Root owns VCS, state and external actions; never draft PRs. No actual .git/.holyagent writes, commits/checkouts, live Pi/model calls, user-machine installs or extra agents. Temporary Git/SDK/home fixtures are allowed. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; checks through mise.",
+    "Report JSON status EXACTLY done|partial|blocked, changed_paths, checks:[{command,exit:number}], blockers, notes, evidence:[{key,support}]. Final <=350 words; long logs outside repo. Keep working through the requested implementation/checks.",
+    "First publish concrete API/schema/context contracts and notify root; then continue real implementation. Root will assign separate CLI and Pi consumer wiring once the surface stabilizes; don't edit consumer source outside your paths yet. Preserve compatibility re-exports as needed, no permanent duplicate implementation or core->runtime/CLI cycle. Node-safe closure must execute under actual Node with Bun absent. Minimal Node standard helpers/Effect adapters are fine; no abstract-everything rewrite.",
+    "Port B ownership/handoff and D uninterruptible persistence; read D code and E routing source/reports as contracts. Preserve old records, aliases, lock tokens, state branches, report/brief artifacts and all error/validation semantics. Protect cancellation through persistence/commit AND required post-state artifacts, keeping initial reads cancellable; no crash-atomic claim. Trusted host authority/context is constructed by adapters, never model input. Per-operation capabilities deny unknown/unsupported operations. CLI rendering/help and public UI remain consumers.",
+    "Add private manifest version0.3.4, existing Effect range only, internal workspace:* links, version-copy entry and updater workspace-lock-only refresh preserving external pins. Necessary internal graph/same-version relocations are authorized by the user's package request; no broad bun update, new third-party dependency or public publisher. Regenerate lock through tooling, never hand-edit it.",
+    "Meaningful direct Node/Bun parity tests: create/dispatch/record/close/accept, strict excess fields/errors, old records, contention/interruption, read-only handoff, real linked-worktree ownership, report/brief completion. No CLI subprocess in API tests; Git subprocess is legitimate. No source writes to actual operational state. Do not stop at empty APIs/scaffolding. Report integration needs for C/G performance map and F/D lifecycle. Focused check/lint/fmt; root coordinates generated build/full verify. Save /workspace/work/034/core-package-report.json and core-package.diff."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned functional package or CLI repair is implemented with accurate behavior and preserved safeguards",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Meaningful direct-runtime and regression checks pass within the assigned scope",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "remaining-integration"
+  ],
+  "ownershipPaths": [
+    "packages/core",
+    "packages/runtime/src/domain",
+    "packages/runtime/src/state",
+    "packages/runtime/src/config",
+    "packages/runtime/src/api",
+    "packages/runtime/src/index.ts",
+    "packages/runtime/package.json",
+    "packages/integrations/pi/package.json",
+    "scripts/update-dependencies.ts",
+    "scripts/update-dependencies.test.ts",
+    "scripts/bump-version.ts",
+    "scripts/bump-version.test.ts",
+    "bun.lock",
+    "docs/core-api.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_native_tools",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T16:44:46.465Z"
+  },
+  "createdAt": "2026-11-13T16:44:46.465Z"
+}
