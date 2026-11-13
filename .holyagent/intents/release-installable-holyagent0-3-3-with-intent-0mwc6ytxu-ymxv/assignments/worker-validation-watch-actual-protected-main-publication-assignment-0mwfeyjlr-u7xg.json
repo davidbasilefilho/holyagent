@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mwfeyjlr-u7xg",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.validation",
+  "slug": "watch-actual-protected-main-publication",
+  "objective": "Watch actual protected-main publication of stable HolyAgent0.3.3 and verify registry and release results.",
+  "state": "Running",
+  "scope": [
+    "PR129 merged by squash as main460f9453fe031325d45993ad38fffb8c21f22d50. Watch exact push Publish run43499104894 https://github.com/davidbasilefilho/holyagent/actions/runs/43499104894 through validation then stable npm publish/GitHub release. Versionroot remains0.3.3. No early success claim: PRmerge and packagebuild are not publication.",
+    "On failure obtain exact job/step/logs, preferably GitHub connector if gh redirect403. Report actions needed, no automaticrerun/settingswrites. Known intermittentWindows5sfixturetimeout onpriorheadhasgenuinePRsuccess+singlepushretry success; preservecauseunknown. Currentmainrun mustactuallypass beforepublisher runs.",
+    "After successful npm publish and workflow/release completion, verify public npm exact holyagent@0.3.3 name/version/dist-tags(latest)/repository/integrity and GitHub stable tag holyagent-0.3.3, prereleasefalse,draftfalse, packageasset and tagcommitmatchingmainSHA. Read only, no install/publish/authchanges. Do NOT investigate executable/bin error yet; root will do post-publication phase. Distinguish partial npm success from GH release failure."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT validation+ci-watch. Read-only gh/Git/registry/logs only; no source/generated/VCS/config/state/remote writes, reruns, model/Pi calls, extraagents or userPC operations. Root owns all effects and declarescompletion on evidence.",
+    "Bind all statuses to actualmain460f/run43499104894; don'tusehistoricalmain44failedE422 ordevprereleasebeaasstableproof. Existingrequiredchecks/provenance/OIDC/immutabilitystay. Fetch concisemetadata, no secrets or hugepayload dumps.",
+    "Save /workspace/work/034/033-main-publication-report.json exactschema {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; validatefields/exits/keys, <=300words with actualURLs/versions/SHAs, logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Actual stable publication and release outcomes are proven for the merged main commit or accurately reported as blocked",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "main",
+    "checks-run",
+    "npm-publication",
+    "github-release",
+    "failures"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfekahl-dmf4",
+  "specialist": {
+    "agentId": "/root/r033_resumed_ci_watch",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T20:12:43.839Z"
+  },
+  "createdAt": "2026-11-13T20:12:43.839Z"
+}
