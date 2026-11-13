@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "independently-verify-the-bounded-removal",
   "objective": "Independently verify the bounded removal of repeated owned guidance instructions preserves every family and role contract.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Immutable narrow repair d9f21e91b6861e4ff5261b00b81fd33f7f22690f..e4e9cd5a in /workspace/work/holyagent-034-skills. Originald9feature code/artifactreviews accepted; inspect only sharedguidanceRouter prefix sentence removal and generated66files, plus familyrole text to verify no instruction lost. Originalreport /workspace/work/034/owned-guidance-duplicate-repair-report.json has140focusedpass/build/fmt. Familyrootphrases preserve loadondemandtrigger while sharedprefixnow only userthirdpartyavailability. Do not broaden intonewpolicy.",
     "Read instruction-writing skill and GPT reviewerartifact role. Save /workspace/work/034/owned-guidance-duplicate-artifact-review-report.json. No source writes, no fullreverify; bounded fresh artifactcoverage test ifuseful."
@@ -36,7 +36,9 @@
     "agentId": "/root/owned_duplicate_artifact_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T21:04:25.931Z"
+    "startedAt": "2026-11-13T21:04:25.931Z",
+    "finishedAt": "2026-11-13T21:07:53.560Z"
   },
+  "result": "status: done\nchecks:\n- git diff --unified=0 d9f21e91b6861e4ff5261b00b81fd33f7f22690f e4e9cd5a; inspect family skills, role artifacts and assembly -> exit 0\nblockers:\n- Routed specialist guidance no longer has a general instruction to read the relevant file on demand.\nnotes:\n- Met: root family skills retain the on-demand directive. Gap: specialist prompts do not include root/skills.md; reviewer-artifact prompts list instruction-writing paths without a directive to read them. Visual specialists retain explicit design-skill instructions, but that does not cover other roles. No source changes or fresh test run.\nevidence:\n- Committed duplicate removal preserves on demand role guidance and all family requirement coverage without contradictory instructions: Gap: skills.ts:310 removes the only shared read directive for specialist routers. Claude reviewer-artifact.md:91-92, Pi Kimi reviewer-artifact.md:156-157 and Pi GPT-6 reviewer-artifact.md:146-147 only list a trigger and path. Each family root/skills.md retains the directive, but specialist assembly appends guidanceRouter directly (claude/src/agents.ts:346), not root/skills.md. R-OWNEDROUTES requires each role to route guidance for reading on demand.\n- checks-run: Read-only diff, source, family and generated artifact inspection; no fresh test. Prior repair report records build, 140 focused tests and fmt passing.\n- reviewed-range: d9f21e91b6861e4ff5261b00b81fd33f7f22690f..e4e9cd5a; 66 changed files, including 64 generated agent prompts, bundle and source.\n- findings: One blocking gap above; no contradiction identified in inspected change.",
   "createdAt": "2026-11-13T21:04:25.931Z"
 }
