@@ -36,6 +36,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/watch_ci",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T11:12:31.660Z"
