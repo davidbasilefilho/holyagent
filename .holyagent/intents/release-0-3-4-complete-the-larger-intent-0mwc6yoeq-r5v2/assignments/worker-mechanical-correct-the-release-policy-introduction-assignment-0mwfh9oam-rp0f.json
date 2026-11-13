@@ -36,6 +36,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwfgp42p-zdz1",
   "specialist": {
+    "agentId": "/root/development_policy_claim_repair",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T21:17:22.366Z"
