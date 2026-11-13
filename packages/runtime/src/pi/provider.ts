@@ -103,8 +103,8 @@ export const routeModel = (
   key: RouteKey,
   options: { readonly screen?: boolean } = {},
 ): ModelRoute => {
-  const profile = providerProfile(config)
   const row = config.pi.routes[key]
+  const profile = PROVIDERS[row.provider ?? config.pi.provider]
   const { model, thinking } =
     options.screen === true && profile.screenRoute !== undefined ? profile.screenRoute(row) : row
   return {
@@ -147,7 +147,11 @@ export const routedModels = (config: Config): ReadonlyArray<ModelRoute> =>
 
 /** The variables the launcher sets on a Pi process for the provider the config selects. */
 export const providerEnv = (config: Config): Readonly<Record<string, string>> =>
-  providerProfile(config).env
+  Object.fromEntries(
+    Object.values(config.pi.routes).flatMap((row) =>
+      Object.entries(PROVIDERS[row.provider ?? config.pi.provider].env),
+    ),
+  )
 
 /**
  * The Pi package source of the selected provider's extension, with its pinned release, or
@@ -168,17 +172,37 @@ export type WebChoice =
 export const WEB_KIT_TOOLS: ReadonlyArray<string> = ["web_search", "web_fetch"]
 
 /**
- * Chooses the web tools. `off` has none. `pi-web-kit` loads that package, the fallback for a login
- * that cannot use the provider's tools. `provider` uses the provider extension's tools while it
- * offers some, and loads `pi-web-kit` only when it offers none, so the two never run together. The
- * profile is a parameter so a provider without web tools can be tested.
+ * Lists possible web tools without asserting that any tool is installed, active or authorized.
+ * Provider mode names the known Kimi tools regardless of the model provider; the explicit kit mode
+ * also names its own tools. The host gates calls using the session's actual active tools.
  */
 export const webChoice = (
-  profile: ProviderProfile,
+  _profile: ProviderProfile,
   mode: Config["pi"]["features"]["web"],
 ): WebChoice =>
   mode === "off"
     ? { source: "off", tools: [] }
-    : mode === "provider" && profile.webTools.length > 0
-      ? { source: "provider", tools: profile.webTools }
-      : { source: "pi-web-kit", tools: WEB_KIT_TOOLS }
+    : mode === "provider"
+      ? { source: "provider", tools: PROVIDERS["kimi-coding-global"].webTools }
+      : {
+          source: "pi-web-kit",
+          tools: [...PROVIDERS["kimi-coding-global"].webTools, ...WEB_KIT_TOOLS],
+        }
+
+/** Observed host exposure is distinct from an account's unknown service entitlement. */
+export const nativeSearchInventory = (
+  registered: ReadonlyArray<string>,
+  active: ReadonlyArray<string>,
+): { readonly state: "exposed" | "disabled" | "unknown"; readonly reason: string } =>
+  !registered.includes("moonshot_search")
+    ? {
+        state: "unknown",
+        reason: "Kimi search is not exposed; installation or enablement is unknown",
+      }
+    : !active.includes("moonshot_search")
+      ? { state: "disabled", reason: "Kimi search is registered but inactive" }
+      : {
+          state: "exposed",
+          reason:
+            "Kimi search is active; OAuth and account entitlement are checked by the tool on use",
+        }

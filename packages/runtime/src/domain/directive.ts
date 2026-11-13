@@ -4,6 +4,7 @@ import { firstOverlap } from "./paths.ts"
 import {
   agentFor,
   type Effort,
+  type IntendedLaunch,
   isReviewer,
   type Model,
   routeFor,
@@ -24,6 +25,10 @@ export interface ExecutionConfig {
    * means `normal`.
    */
   readonly screenForm?: ScreenForm
+  /** A profile launch requested now; it is not proof of an agent's observed model. */
+  readonly intendedLaunch?: IntendedLaunch
+  /** A selected profile cannot reuse a worker without a trusted observed launch identity. */
+  readonly profileRouting?: true
 }
 
 /** The default configuration. */
@@ -157,6 +162,16 @@ export const directiveFor = (
   config: ExecutionConfig,
 ): Directive => {
   const route = routeFor(assignment.roleTask)
+  // Neither host reports a trusted observed model in its record call. Do not continue a worker
+  // whose requested profile identity is unverified, or reuse one for a new profile selection.
+  if (config.profileRouting === true || config.intendedLaunch !== undefined)
+    return {
+      action: "spawn",
+      agent: agentFor(route, assignment.screen, config.screenForm),
+      model: route.model,
+      effort: route.effort,
+      reason: "the selected route has no observed warm-worker identity",
+    }
   const candidate: Candidate = {
     assignment,
     model: route.model,
@@ -164,7 +179,9 @@ export const directiveFor = (
     now: Date.parse(now),
     ttlMs: config.ttlMinutes * 60_000,
   }
-  let pool = registry.filter((entry) => !isWorkflowAgent(entry.agentId))
+  let pool = registry.filter(
+    (entry) => !isWorkflowAgent(entry.agentId) && entry.intendedLaunch === undefined,
+  )
   for (const [name, passes] of STAGES) {
     pool = pool.filter((entry) => passes(entry, candidate))
     if (pool.length === 0)

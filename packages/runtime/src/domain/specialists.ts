@@ -4,7 +4,7 @@ import { type Assignment, relatedIds } from "./assignment.ts"
 import { SpecialistMismatch } from "./errors.ts"
 import { AgentId, AssignmentId } from "./ids.ts"
 import { Text, Timestamp } from "./primitives.ts"
-import { Effort, Model, RoleTask } from "./route.ts"
+import { Effort, IntendedLaunch, Model, RoleTask } from "./route.ts"
 
 /** What the registry remembers of one launched specialist, so the root can reuse it warm. */
 export const SpecialistEntry = Schema.Struct({
@@ -12,6 +12,8 @@ export const SpecialistEntry = Schema.Struct({
   roleTask: RoleTask,
   model: Model,
   effort: Effort,
+  /** A requested launch identity, not an observation of what the host ran. */
+  intendedLaunch: Schema.optionalKey(IntendedLaunch),
   /** The Assignments it worked on, in the order they were bound. */
   assignments: Schema.Array(AssignmentId),
   /** The Assignments those named as dependencies, independence or follow-up. */
@@ -100,6 +102,9 @@ export const bindSpecialist = (
           roleTask: assignment.roleTask,
           model: launch.model,
           effort: launch.effort,
+          ...(assignment.specialist?.intendedLaunch === undefined
+            ? {}
+            : { intendedLaunch: assignment.specialist.intendedLaunch }),
           assignments: [assignment.id],
           related: relatedIds(assignment),
           paths,
@@ -107,6 +112,14 @@ export const bindSpecialist = (
           ...(assignment.screen === true ? { screen: true } : {}),
         },
       ] satisfies Registry
+    if (
+      assignment.specialist?.intendedLaunch !== undefined &&
+      JSON.stringify(known.intendedLaunch) !== JSON.stringify(assignment.specialist.intendedLaunch)
+    )
+      return yield* new SpecialistMismatch({
+        agentId: launch.agentId,
+        detail: "the recorded intended launch identity is missing or differs",
+      })
     if (
       known.roleTask !== assignment.roleTask ||
       known.model !== launch.model ||

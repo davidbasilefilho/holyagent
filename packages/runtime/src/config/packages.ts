@@ -1,4 +1,4 @@
-import { type ProviderProfile, providerProfile, webChoice } from "../pi/provider.ts"
+import { type ProviderProfile, providerProfile, PROVIDERS, webChoice } from "../pi/provider.ts"
 import {
   CAPABILITIES,
   type CapabilityDefinition,
@@ -35,7 +35,14 @@ export const piPackages = (
   const { enable, features } = config.pi
   if (!enable) return []
   const names: ReadonlyArray<PiPackageName> = [
-    ...(profile.package === undefined ? [] : [profile.package]),
+    ...new Set(
+      [
+        profile.package,
+        ...Object.values(config.pi.routes).map(
+          (row) => PROVIDERS[row.provider ?? config.pi.provider].package,
+        ),
+      ].filter((name): name is PiPackageName => name !== undefined),
+    ),
     ...capabilityPackages(features, form, definitions, platform),
     ...(webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []),
   ]

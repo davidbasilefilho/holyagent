@@ -61,6 +61,18 @@ export const Effort = Schema.Literals(["medium", "high", "xhigh"])
 /** One effort level. */
 export type Effort = typeof Effort.Type
 
+/** A planned profile launch; this records intent, not the model observed by the host. */
+export const IntendedLaunch = Schema.Struct({
+  host: Schema.Literals(["pi", "claude"]),
+  provider: Schema.String,
+  model: Schema.String,
+  effort: Schema.String,
+  profile: Schema.Literals(["normal", "fast"]),
+  evidenceRevision: Schema.optionalKey(Schema.String),
+})
+/** The requested identity of a profile-selected launch. */
+export type IntendedLaunch = typeof IntendedLaunch.Type
+
 /** What an Assignment of a route may change: nothing, or only its ownership paths. */
 export const Mutability = Schema.Literals(["ReadOnly", "ScopedWrite"])
 /** One mutability. */

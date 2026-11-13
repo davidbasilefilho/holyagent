@@ -1,12 +1,13 @@
 import { join } from "node:path"
 
-import { Effect, Schema } from "effect"
+import { Clock, Effect, Schema } from "effect"
 
-import { loadConfig as loadHolyagentConfig } from "../config/load.ts"
+import { loadConfig as loadHolyagentConfig, loadConfigWithSource } from "../config/load.ts"
 import { DEFAULT_CONFIG, type ExecutionConfig } from "../domain/directive.ts"
 import { AGENT_HOSTS, type AgentHost } from "../domain/host.ts"
-import { type RoleTask, routeFor } from "../domain/route.ts"
+import { type IntendedLaunch, type RoleTask, routeFor } from "../domain/route.ts"
 import { routeModel, subagentModel } from "../pi/provider.ts"
+import { type RoutingSelection, selectConfiguredRoute } from "../routing/selection.ts"
 import { claudeConfigDirectory } from "../setup/environment.ts"
 import { detectForm } from "../setup/form.ts"
 import { readText } from "../state/files.ts"
@@ -135,12 +136,30 @@ export const workflowsAvailable = (env: Host["env"], root: string) => {
  * a screen Assignment.
  */
 export const loadConfig = (env: Host["env"], root: string) =>
-  Effect.all({
-    ttlMinutes: reuseTtl(env),
-    workflowsAvailable: workflowsAvailable(env, root),
-    host: agentHostOf(env),
-    screenForm: Effect.succeed(detectForm(env).form),
-  }).pipe(Effect.map((config): ExecutionConfig => config))
+  Effect.gen(function* () {
+    const host = yield* agentHostOf(env)
+    const workflows = yield* workflowsAvailable(env, root)
+    // Pi's workflow host can resolve a requested model to a different provider. A profile uses
+    // direct Agent calls, whose explicit model can be checked by the host's tool-call gate.
+    const piConfig =
+      host === "pi"
+        ? yield* loadHolyagentConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(
+            Effect.map((config) => config.pi),
+            Effect.orElseSucceed(() => undefined),
+          )
+        : undefined
+    const profileRouting =
+      piConfig?.enable === false
+        ? false
+        : given(env["HOLYAGENT_ROUTING_PROFILE"]) !== undefined || piConfig?.profile !== undefined
+    return {
+      ttlMinutes: yield* reuseTtl(env),
+      workflowsAvailable: workflows && !(host === "pi" && profileRouting),
+      host,
+      screenForm: detectForm(env).form,
+      ...(profileRouting ? { profileRouting: true as const } : {}),
+    } satisfies ExecutionConfig
+  })
 
 /**
  * The model and effort a dispatch prints for a specialist, which the root passes to its launcher as
@@ -151,29 +170,72 @@ export interface Launch {
   readonly model?: string
   /** The reasoning effort (pi: thinking level) the host launches the specialist at. */
   readonly effort?: string
+  /** Present only for an explicitly activated subscription profile. */
+  readonly routing?: RoutingSelection
+  /** Requested launch identity; it is not an observation of the running model. */
+  readonly intendedLaunch?: IntendedLaunch
 }
 
-/**
- * Resolves the {@link Launch} of each role task under a host, for an Assignment that carries the
- * screen capability when `screen` is true. Claude launches a specialist on its route's model alias
- * and effort, and has no screen capability. Pi launches it on the model and thinking level of its
- * row in the `pi.routes` table of the HolyAgent config (the user's file under the project's, as the
- * `config` command loads it), written as `@tintinweb/pi-subagents` takes them; a screen Assignment
- * takes the provider's screen route instead (Codex: GPT-6.1 Terra at medium or above, see
- * `routeModel`). With `pi.enable` off no row applies and the specialist inherits the session's
- * model and thinking. A pi config that cannot be loaded fails as ConfigInvalid, and Claude never
- * reads it.
- */
+/** Explicit session profile activation; absent keeps the existing host policy. */
+export const ROUTING_PROFILE_VARIABLE = "HOLYAGENT_ROUTING_PROFILE"
+
+/** Resolves each specialist launch before dispatch, preserving explicit per-role overrides. */
 export const launchesOf = (env: Host["env"], root: string, host: AgentHost) =>
-  host === "claude"
-    ? Effect.succeed((roleTask: RoleTask, _screen?: boolean): Launch => {
+  Effect.gen(function* () {
+    const raw = given(env[ROUTING_PROFILE_VARIABLE])
+    const requested =
+      raw === undefined
+        ? undefined
+        : yield* Schema.decodeUnknownEffect(Schema.Literals(["normal", "fast"]))(raw).pipe(
+            Effect.mapError(
+              () =>
+                new Usage({
+                  message: `${ROUTING_PROFILE_VARIABLE} must be normal or fast, not "${raw}"`,
+                  hint: `Unset ${ROUTING_PROFILE_VARIABLE} to retain the current policy.`,
+                }),
+            ),
+          )
+    // Claude's old path never read a HolyAgent config. Preserve it unless the profile is explicit.
+    if (host === "claude" && requested === undefined)
+      return (roleTask: RoleTask, _screen?: boolean): Launch => {
         const { model, effort } = routeFor(roleTask)
         return { model, effort }
-      })
-    : loadHolyagentConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(
-        Effect.map((config) => (roleTask: RoleTask, screen?: boolean): Launch => {
-          if (!config.pi.enable) return {}
-          const route = routeModel(config, roleTask, { screen: screen === true })
-          return { model: subagentModel(route), effort: route.thinking }
-        }),
+      }
+    const { config, written } = yield* loadConfigWithSource({
+      projectDirectories: [stateDirectory(root)],
+      env,
+    })
+    const profile = requested ?? (host === "pi" ? config.pi.profile : undefined)
+    const now = new Date(yield* Clock.currentTimeMillis).toISOString()
+    return (roleTask: RoleTask, screen?: boolean): Launch => {
+      if (host === "pi" && !config.pi.enable) return {}
+      if (profile === undefined) {
+        const route = routeModel(config, roleTask, { screen: screen === true })
+        return { model: subagentModel(route), effort: route.thinking }
+      }
+      const chosen = selectConfiguredRoute(
+        config,
+        written,
+        host,
+        roleTask,
+        screen === true,
+        profile,
+        now,
       )
+      return {
+        model: chosen.model,
+        effort: chosen.effort,
+        routing: chosen,
+        intendedLaunch: {
+          host,
+          provider: chosen.provider,
+          model: chosen.model,
+          effort: chosen.effort,
+          profile,
+          ...(chosen.evidenceRevision === undefined
+            ? {}
+            : { evidenceRevision: chosen.evidenceRevision }),
+        },
+      }
+    }
+  })

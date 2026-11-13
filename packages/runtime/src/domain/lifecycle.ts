@@ -51,6 +51,7 @@ export const dispatch = (
         ...(directive.action === "continue" ? { agentId: directive.agentId } : {}),
         model: route.model,
         effort: route.effort,
+        ...(config.intendedLaunch === undefined ? {} : { intendedLaunch: config.intendedLaunch }),
         startedAt: now,
         ...(workTree === undefined ? {} : { workTree }),
       },

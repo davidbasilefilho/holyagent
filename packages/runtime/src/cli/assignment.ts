@@ -110,6 +110,21 @@ const directiveView = (directive: Directive, host: AgentHost, launch: Launch) =>
         model: launch.model,
         effort: launch.effort,
         reason: directive.reason,
+        ...(launch.routing === undefined
+          ? {}
+          : {
+              routing: present({
+                kind: launch.routing.kind,
+                score: launch.routing.score,
+                coverage: launch.routing.coverage,
+                evidenceRevision: launch.routing.evidenceRevision,
+                plan: launch.routing.plan,
+                monthlyUsd: launch.routing.monthlyUsd,
+                taskCostUsd: launch.routing.taskCostUsd,
+                measuredAt: launch.routing.measuredAt,
+                reason: launch.routing.reason,
+              }),
+            }),
       })
 
 const ExistingRef = Schema.Struct({ id: AssignmentId })
@@ -349,12 +364,21 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
               return yield* new InvalidDraft({
                 message: `The screen capability is available under the pi host only; this is the ${settings.host} host. Dispatch the Assignment without screen`,
               })
+            const target = yield* findAssignment(project, id)
+            const launch = launchOf(target.roleTask, target.screen)
+            if (launch.routing?.error !== undefined)
+              return yield* new Usage({
+                message: launch.routing.error,
+                hint: "Choose a compatible explicit screen route or change the Assignment.",
+              })
             const dispatched = yield* dispatch(
               project,
               snapshot.specialists,
               id,
               now,
-              settings,
+              launch.intendedLaunch === undefined
+                ? settings
+                : { ...settings, intendedLaunch: launch.intendedLaunch },
               workTreeKey(call.root),
             )
             // Written before the transition commits, so a brief that cannot be stored leaves the
@@ -374,6 +398,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
             )
             return {
               ...dispatched,
+              launch,
               prompt: dispatchPrompt(dispatched.assignment, agent, path, wordsFor(settings.host)),
             }
           }),
@@ -382,11 +407,7 @@ export const ASSIGNMENT_COMMANDS: ReadonlyArray<Command> = [
           {
             id: started.assignment.id,
             state: started.assignment.state,
-            ...directiveView(
-              started.directive,
-              settings.host,
-              launchOf(started.assignment.roleTask, started.assignment.screen),
-            ),
+            ...directiveView(started.directive, settings.host, started.launch),
           },
           "prompt",
           started.prompt,

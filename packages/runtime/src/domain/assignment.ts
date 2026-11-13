@@ -12,7 +12,7 @@ import { decodeInput } from "./input.ts"
 import { pathProblem, PortablePath } from "./paths.ts"
 import { Revision, Text, TextList, Timestamp } from "./primitives.ts"
 import { type Change, findIntent, type Project, requireLive, requireOpen } from "./project.ts"
-import { Effort, isWriter, Model, RoleTask } from "./route.ts"
+import { Effort, IntendedLaunch, isWriter, Model, RoleTask } from "./route.ts"
 import { Slug, slugOf } from "./slug.ts"
 
 /** What a mergeability check looks at. */
@@ -54,6 +54,8 @@ export const Specialist = Schema.Struct({
   agentId: Schema.optionalKey(AgentId),
   model: Model,
   effort: Effort,
+  /** The selected route requested at dispatch; it is not an observed host model. */
+  intendedLaunch: Schema.optionalKey(IntendedLaunch),
   startedAt: Timestamp,
   finishedAt: Schema.optionalKey(Timestamp),
   /**

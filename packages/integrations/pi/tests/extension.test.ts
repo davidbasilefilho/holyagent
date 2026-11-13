@@ -3171,7 +3171,7 @@ describe("the root's excluded tools", () => {
     }
   })
 
-  test("a session that is not the root starts with none", async () => {
+  test("a worker starts without root exclusions but cannot call web tools without Search", async () => {
     const hold = gate()
     const api = fakeApi(
       (callOf, runtime) =>
@@ -3191,7 +3191,9 @@ describe("the root's excluded tools", () => {
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     for (const name of EXCLUDED)
-      expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+      expect(await api.emit("tool_call", call(name))).toEqual(
+        name.startsWith("moonshot_") ? blocked : [undefined],
+      )
     hold.open()
     await started
   })
@@ -3217,16 +3219,32 @@ describe("the root's excluded tools", () => {
     }
   })
 
-  test("other sessions and a pi.enable that is off are not held to them", async () => {
-    for (const options of [
-      { flag: "specialist" },
-      { flag: "session" },
-      { sessionName: "worker-implementation#a1b2c3d4" },
-    ]) {
+  test("other sessions and a pi.enable that is off are not held to root exclusions", async () => {
+    for (const options of [{ flag: "specialist" }, { flag: "session" }]) {
       const { api } = await run(healthy("/missing"), options)
       for (const name of EXCLUDED)
         expect(await api.emit("tool_call", call(name))).toEqual([undefined])
     }
+    const worker = await run(healthy("/missing"), { sessionName: "worker-implementation#a1b2c3d4" })
+    for (const name of EXCLUDED)
+      expect(await worker.api.emit("tool_call", call(name))).toEqual(
+        name.startsWith("moonshot_") ? blocked : [undefined],
+      )
+    const librarian = await run(healthy("/missing"), {
+      sessionName: "librarian-lookup#a1b2c3d4",
+      activeTools: ["moonshot_search", "moonshot_fetch"],
+    })
+    for (const name of ["moonshot_search", "moonshot_fetch"])
+      expect(await librarian.api.emit("tool_call", call(name))).toEqual([undefined])
+    const unavailable = await run(healthy("/missing"), {
+      sessionName: "librarian-lookup#a1b2c3d4",
+      activeTools: [],
+      startOnly: true,
+    })
+    const notices = await nextMessages(unavailable.api)
+    expect(
+      notices.some((message) => String(message?.content).includes("Kimi search is not exposed")),
+    ).toBe(true)
     for (const config of [DISABLED]) {
       const { api } = await run(healthy("/missing", { config: { stdout: config } }))
       for (const name of EXCLUDED)
@@ -4290,5 +4308,44 @@ describe("auto-review under the extension", () => {
       "kimi-coding-global",
     )
     expect(await reviewed(otherModel.api)).toBeUndefined()
+  })
+})
+
+describe("profile routing host gate", () => {
+  const registry = { getAvailable: () => [{ provider: "openai-codex", id: "gpt-6.1-sol" }] }
+  const call = (toolName: string, model = "openai-codex/gpt-6.1-sol") => ({
+    toolName,
+    input: { subagent_type: "reviewer-code", model, prompt: "fixture" },
+  })
+
+  test("confirmed Pi profile gates both direct and workflow aliases without changing legacy behavior", async () => {
+    const profiled = JSON.stringify({ ...DEFAULTS, pi: { ...DEFAULTS.pi, profile: "fast" } })
+    const { api } = await run(healthy("/missing", { config: { stdout: `${profiled}\n` } }), {
+      members: { modelRegistry: registry },
+    })
+    for (const tool of ["Agent", "agent"]) {
+      expect(await api.emit("tool_call", call(tool))).toEqual([undefined])
+      expect(await api.emit("tool_call", call(tool, "kimi-coding/gpt-6.1-sol"))).toEqual([
+        expect.objectContaining({ block: true }),
+      ])
+    }
+    for (const toolName of ["SubagentWorkflow", "subagent_workflow"])
+      expect(await api.emit("tool_call", { toolName, input: {} })).toEqual([
+        expect.objectContaining({ block: true }),
+      ])
+    const legacy = await run(healthy("/missing"))
+    expect(await legacy.api.emit("tool_call", call("Agent", "kimi-coding/gpt-6.1-sol"))).toEqual([
+      undefined,
+    ])
+  })
+
+  test("explicit profile stays fail-closed if configuration cannot be read", async () => {
+    const { api } = await run(
+      healthy("/missing", { config: { code: 4, stderr: "invalid config" } }),
+      { env: { HOLYAGENT_ROUTING_PROFILE: "fast" }, members: { modelRegistry: registry } },
+    )
+    expect(await api.emit("tool_call", call("Agent", "kimi-coding/gpt-6.1-sol"))).toEqual([
+      expect.objectContaining({ block: true }),
+    ])
   })
 })

@@ -10153,7 +10153,7 @@ var init_project = __esm(() => {
   init_errors();
 });
 
-var Role, Task, RoleTask, Model, Effort, Mutability, Independence, Capability, spec = (role, task, model, effort, mutability, independence, capabilities = []) => ({ role, task, model, effort, mutability, independence, capabilities }), SPECS, routeFor = (roleTask) => ({
+var Role, Task, RoleTask, Model, Effort, IntendedLaunch, Mutability, Independence, Capability, spec = (role, task, model, effort, mutability, independence, capabilities = []) => ({ role, task, model, effort, mutability, independence, capabilities }), SPECS, routeFor = (roleTask) => ({
   roleTask,
   agent: `${SPECS[roleTask].role}-${SPECS[roleTask].task}`.toLowerCase(),
   ...SPECS[roleTask]
@@ -10201,6 +10201,14 @@ var init_route = __esm(() => {
   ]);
   Model = Literals(["haiku", "sonnet"]);
   Effort = Literals(["medium", "high", "xhigh"]);
+  IntendedLaunch = Struct({
+    host: Literals(["pi", "claude"]),
+    provider: String6,
+    model: String6,
+    effort: String6,
+    profile: Literals(["normal", "fast"]),
+    evidenceRevision: optionalKey2(String6)
+  });
   Mutability = Literals(["ReadOnly", "ScopedWrite"]);
   Independence = Literals([
     "DisjointWrites",
@@ -10357,6 +10365,7 @@ var init_assignment = __esm(() => {
     agentId: optionalKey2(AgentId),
     model: Model,
     effort: Effort,
+    intendedLaunch: optionalKey2(IntendedLaunch),
     startedAt: Timestamp,
     finishedAt: optionalKey2(Timestamp),
     workTree: optionalKey2(Text)
@@ -10412,6 +10421,14 @@ var init_assignment = __esm(() => {
 
 var DEFAULT_CONFIG, WORKFLOW_AGENT_PREFIX = "workflow:", PI_AGENT_PREFIX = "pi:", PI_WORKFLOW_AGENT_PREFIX = "pi-workflow:", isWorkflowAgent = (agentId) => agentId.startsWith(WORKFLOW_AGENT_PREFIX) || agentId.startsWith(PI_WORKFLOW_AGENT_PREFIX), independenceSubjects = (assignment) => isReviewer(assignment.roleTask) ? [...assignment.dependencies, ...assignment.independentFrom] : assignment.independentFrom, touched = (entry, id) => entry.assignments.includes(id) || entry.related.includes(id), STAGES, RELEVANCE, relevance = (entry, assignment) => RELEVANCE.findIndex(([, relevant]) => relevant(entry, assignment)), compareEntries = (assignment) => (a, b) => relevance(a, assignment) - relevance(b, assignment) || Date.parse(b.lastFinishedAt ?? "") - Date.parse(a.lastFinishedAt ?? "") || (a.agentId < b.agentId ? -1 : 1), directiveFor = (assignment, registry, now, config) => {
   const route = routeFor(assignment.roleTask);
+  if (config.profileRouting === true || config.intendedLaunch !== undefined)
+    return {
+      action: "spawn",
+      agent: agentFor(route, assignment.screen, config.screenForm),
+      model: route.model,
+      effort: route.effort,
+      reason: "the selected route has no observed warm-worker identity"
+    };
   const candidate = {
     assignment,
     model: route.model,
@@ -10419,7 +10436,7 @@ var DEFAULT_CONFIG, WORKFLOW_AGENT_PREFIX = "workflow:", PI_AGENT_PREFIX = "pi:"
     now: Date.parse(now),
     ttlMs: config.ttlMinutes * 60000
   };
-  let pool = registry.filter((entry) => !isWorkflowAgent(entry.agentId));
+  let pool = registry.filter((entry) => !isWorkflowAgent(entry.agentId) && entry.intendedLaunch === undefined);
   for (const [name, passes] of STAGES) {
     pool = pool.filter((entry) => passes(entry, candidate));
     if (pool.length === 0)
@@ -10802,6 +10819,117 @@ var init_routes = __esm(() => {
   };
 });
 
+var EvidenceDataset, rankCandidates = (dataset, candidates, comparison) => {
+  const now = Date.parse(comparison.now);
+  const fresh = (date) => {
+    const age = now - Date.parse(date);
+    return Number.isFinite(age) && age >= 0 && age <= comparison.maxAgeDays * 86400000;
+  };
+  const evaluated = candidates.map((candidate) => {
+    const reasons = [];
+    let unknown = false;
+    if (candidate.role !== comparison.role || candidate.harness !== comparison.harness || candidate.tier !== comparison.tier)
+      reasons.push("noncomparable_candidate");
+    if (candidate.availability !== "yes") {
+      reasons.push(`availability_${candidate.availability}`);
+      unknown ||= candidate.availability === "unknown";
+    }
+    for (const capability of new Set([
+      ...comparison.requiredCapabilities,
+      ...candidate.requiredCapabilities
+    ])) {
+      const state = candidate.capabilities[capability] ?? "unknown";
+      if (state !== "yes") {
+        reasons.push(`capability_${capability}_${state}`);
+        unknown ||= state === "unknown";
+      }
+    }
+    if (!candidate.identityStable)
+      reasons.push("unstable_identity");
+    const rows = dataset.rows.filter((row) => row.role === candidate.role && row.harness === candidate.harness && row.provider === candidate.provider && row.model === candidate.model && row.effort === candidate.effort && row.plan === candidate.plan && row.tier === candidate.tier && row.benchmark === comparison.benchmark && row.benchmarkVersion === comparison.benchmarkVersion && row.benchmarkHarness === comparison.benchmarkHarness && row.qualityUnit === comparison.qualityUnit);
+    const row = rows[0];
+    if (rows.length !== 1 || row === undefined)
+      reasons.push(rows.length === 0 ? "missing_evidence" : "ambiguous_evidence");
+    else {
+      if (!fresh(dataset.retrievedAt) || !fresh(dataset.generatedAt) || !fresh(row.measuredAt) || !fresh(row.planSourceDate))
+        reasons.push("stale_evidence");
+      if (row.costKind !== "subscription")
+        reasons.push("api_price_fallback");
+      if (row.monthlyUsd > (comparison.tier === "normal" ? 100 : 20))
+        reasons.push("plan_exceeds_target");
+      if (row.direction !== "higher" || !Number.isFinite(row.quality) || row.quality < 0 || !Number.isFinite(row.taskCostUsd) || row.taskCostUsd <= 0 || !/^https?:\/\/\S+$/i.test(row.sourceUrl) || !/^https?:\/\/\S+$/i.test(row.planSourceUrl) || !row.confidence.trim() || !row.region.trim() || !row.allowance.trim() || !row.utilization.trim() || !row.cacheAssumptions.trim() || !candidate.plan.trim() || !row.benchmark.trim() || !row.benchmarkVersion.trim() || !row.benchmarkHarness.trim() || !row.qualityUnit.trim() || !Number.isFinite(row.monthlyUsd) || row.monthlyUsd <= 0 || !dataset.revision.trim())
+        reasons.push("noncomparable_evidence");
+    }
+    const value = row === undefined ? 0 : row.quality / row.taskCostUsd;
+    if (reasons.length === 0 && !Number.isFinite(value))
+      reasons.push("noncomparable_evidence");
+    return { candidate, reasons, unknown, value };
+  });
+  const max = Math.max(0, ...evaluated.filter((item) => item.reasons.length === 0).map((item) => item.value));
+  return {
+    candidates: evaluated.map(({ candidate, reasons, unknown, value }) => reasons.length > 0 ? { candidate, eligibility: unknown ? "unknown" : "excluded", reasons } : { candidate, eligibility: "eligible", reasons, score: max === 0 ? 0 : value / max }),
+    optimization: evaluated.some(({ reasons }) => reasons.length > 0) ? "pending" : "complete"
+  };
+}, selectRoute = (dataset, candidates, comparison, policy) => {
+  const ranked = rankCandidates(dataset, candidates, comparison);
+  const winner = ranked.candidates.filter((item) => item.eligibility === "eligible" && item.score !== undefined).toSorted((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+  if (winner?.score !== undefined)
+    return {
+      kind: "ranked",
+      candidate: winner.candidate,
+      score: winner.score,
+      optimization: ranked.optimization,
+      diagnostics: ranked.candidates
+    };
+  const reasons = [
+    ...policy.role === comparison.role && policy.harness === comparison.harness && policy.tier === comparison.tier ? [] : ["noncomparable_policy"],
+    ...policy.availability === "yes" ? [] : [`availability_${policy.availability}`],
+    ...[...new Set([...comparison.requiredCapabilities, ...policy.requiredCapabilities])].flatMap((capability) => policy.capabilities[capability] === "yes" ? [] : [`capability_${capability}_${policy.capabilities[capability] ?? "unknown"}`])
+  ];
+  return reasons.length > 0 ? { kind: "unavailable", reasons, optimization: "pending", diagnostics: ranked.candidates } : {
+    kind: "unscored-policy",
+    candidate: policy,
+    optimization: "pending",
+    diagnostics: ranked.candidates
+  };
+};
+var init_evidence = __esm(() => {
+  init_dist();
+  EvidenceDataset = Struct({
+    version: Literal2(1),
+    revision: String6,
+    retrievedAt: String6,
+    generatedAt: String6,
+    rows: ArraySchema(Struct({
+      role: String6,
+      harness: String6,
+      provider: String6,
+      model: String6,
+      effort: String6,
+      plan: String6,
+      region: String6,
+      monthlyUsd: Number6,
+      allowance: String6,
+      utilization: String6,
+      cacheAssumptions: String6,
+      tier: Literals(["normal", "fast"]),
+      benchmark: String6,
+      benchmarkVersion: String6,
+      benchmarkHarness: String6,
+      qualityUnit: String6,
+      direction: Literals(["higher", "lower"]),
+      quality: Number6,
+      taskCostUsd: Number6,
+      costKind: Literals(["subscription", "api-fallback"]),
+      measuredAt: String6,
+      sourceUrl: String6,
+      planSourceUrl: String6,
+      planSourceDate: String6,
+      confidence: String6
+    }))
+  });
+});
+
 var BILLION_CONTEXT_GUARDRAILS_FILE;
 var init_guardrails = __esm(() => {
   BILLION_CONTEXT_GUARDRAILS_FILE = {
@@ -11172,22 +11300,32 @@ var init_capabilities = __esm(() => {
 });
 
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value))), VcsSettings, PiProvider, Thinking, ModelId, KIMI_ROOT = "k3.1-pro", KIMI_SPECIALIST = "kimi-for-coding", kimi = (model, thinking) => ({ model, thinking }), KIMI_ROUTES, PROVIDER_ROUTES, route = () => defaulted(Struct({
+  provider: optionalKey2(PiProvider),
   model: optionalKey2(ModelId),
   thinking: optionalKey2(Thinking)
 }), {}), ROUTE_FIELDS, WebMode, CodemodeMode, T3Scope, Enabled, AutoReviewPolicy, capabilitySwitch = (on) => defaulted(Enabled, on), CAPABILITY_FIELDS, PI_FIELDS, PiAsWritten, PiResolved, withProviderRoutes = (pi) => {
   const defaults = PROVIDER_ROUTES[pi.provider];
   const routes = Object.fromEntries(Object.keys(defaults).map((key) => [
     key,
-    {
-      model: pi.routes[key].model ?? defaults[key].model,
-      thinking: pi.routes[key].thinking ?? defaults[key].thinking
-    }
+    (() => {
+      const override = pi.routes[key];
+      const provider = override.provider ?? pi.provider;
+      const baseline = PROVIDER_ROUTES[provider][key];
+      const profileModel = pi.profile === "fast" && key === "root" && provider === "openai-codex" ? "gpt-6.1-terra" : baseline.model;
+      return {
+        ...override.provider === undefined ? {} : { provider: override.provider },
+        model: override.model ?? profileModel,
+        thinking: override.thinking ?? baseline.thinking
+      };
+    })()
   ]));
   return { ...pi, routes };
-}, PiSection, ClaudeSection, Config, ConfigFile, defaultConfig;
+}, PiSection, DeclaredCandidate, RoutingBenchmark, RoutingSettings, ClaudeSection, Config, ConfigFile, defaultConfig;
 var init_schema = __esm(() => {
   init_dist();
+  init_route();
   init_routes();
+  init_evidence();
   init_capabilities();
   VcsSettings = Struct({
     api: optionalKey2(Boolean3),
@@ -11235,6 +11373,7 @@ var init_schema = __esm(() => {
   PI_FIELDS = {
     enable: defaulted(Enabled, true),
     provider: defaulted(PiProvider, "kimi-coding-global"),
+    profile: optionalKey2(Literals(["normal", "fast"])),
     routes: defaulted(Struct(ROUTE_FIELDS), {}),
     features: defaulted(Struct({
       web: defaulted(WebMode, "provider"),
@@ -11256,18 +11395,52 @@ var init_schema = __esm(() => {
     ...PI_FIELDS,
     routes: Struct(Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [
       key,
-      Struct({ model: String6, thinking: Thinking })
+      Struct({
+        provider: optionalKey2(PiProvider),
+        model: String6,
+        thinking: Thinking
+      })
     ])))
   }));
   PiSection = defaulted(PiAsWritten.pipe(decodeTo2(PiResolved, {
     decode: transform(withProviderRoutes),
     encode: transform((pi) => pi)
   })), {});
+  DeclaredCandidate = Struct({
+    role: RoleTask,
+    harness: Literals(["pi", "claude"]),
+    provider: Literals(["kimi-coding-global", "openai-codex", "anthropic"]),
+    model: ModelId,
+    effort: Thinking,
+    plan: String6,
+    tier: Literals(["normal", "fast"]),
+    availability: Literals(["yes", "no", "unknown"]),
+    capabilities: Record(String6, Literals(["yes", "no", "unknown"])),
+    requiredCapabilities: ArraySchema(String6),
+    identityStable: Boolean3
+  });
+  RoutingBenchmark = Struct({
+    role: RoleTask,
+    harness: Literals(["pi", "claude"]),
+    benchmark: String6,
+    benchmarkVersion: String6,
+    benchmarkHarness: String6,
+    qualityUnit: String6,
+    requiredCapabilities: ArraySchema(String6)
+  });
+  RoutingSettings = Struct({
+    version: Literal2(1),
+    evidence: EvidenceDataset,
+    candidates: ArraySchema(DeclaredCandidate),
+    benchmarks: ArraySchema(RoutingBenchmark),
+    maxAgeDays: Int.check(isBetween2({ minimum: 1, maximum: 365 }))
+  });
   ClaudeSection = defaulted(Record(String6, Never2), {});
   Config = Struct({
     vcs: defaulted(VcsSettings, {}),
     pi: PiSection,
-    claude: ClaudeSection
+    claude: ClaudeSection,
+    routing: optionalKey2(RoutingSettings)
   });
   ConfigFile = toEncoded2(Config);
   defaultConfig = decodeUnknownEffect2(Config)({});
@@ -11289,7 +11462,7 @@ var HOME_VARIABLE = "HOLYAGENT_HOME", userConfigFile = (env) => join3(firstNonEm
     return value;
   const entries = Object.entries(value);
   return Object.fromEntries(rest.length === 0 ? entries.filter(([name]) => name !== key) : entries.map(([name, item]) => [name, name === key ? withoutAt(item, rest) : item]));
-}, mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, USER_ONLY.reduce((kept, path) => withoutAt(kept, path), project))), JsonValue, withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value, readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map5(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message }))))), loadConfig = ({ projectDirectories, env = process.env }) => gen2(function* () {
+}, mergeFiles = (user, project) => FINAL_OFF.reduce((merged, { path, off }) => valueAt(user, path) === off ? setAt(merged, path, off) : merged, merge3(user, USER_ONLY.reduce((kept, path) => withoutAt(kept, path), project))), JsonValue, withoutNullVcs = (value) => isRecord(value) && value["vcs"] === null ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "vcs")) : value, readConfigFile = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(undefined) : decodeUnknownEffect2(JsonValue)(text).pipe(map5(withoutNullVcs), flatMap2(decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })), mapError2((error) => new ConfigInvalid({ path, reason: error.message }))))), loadConfigWithSource = ({ projectDirectories, env = process.env }) => gen2(function* () {
   const userPath = userConfigFile(env);
   const user = yield* readConfigFile(userPath);
   let project;
@@ -11302,8 +11475,10 @@ var HOME_VARIABLE = "HOLYAGENT_HOME", userConfigFile = (env) => join3(firstNonEm
       break;
     }
   }
-  return yield* decodeUnknownEffect2(Config)(mergeFiles(user ?? {}, project ?? {})).pipe(mapError2((error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message })));
-});
+  const written = yield* decodeUnknownEffect2(ConfigFile, { onExcessProperty: "error" })(mergeFiles(user ?? {}, project ?? {})).pipe(mapError2((error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message })));
+  const config = yield* decodeUnknownEffect2(Config)(written).pipe(mapError2((error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message })));
+  return { config, written };
+}), loadConfig = (sources) => loadConfigWithSource(sources).pipe(map5(({ config }) => config));
 var init_load = __esm(() => {
   init_dist();
   init_environment();
@@ -13071,6 +13246,7 @@ var SpecialistEntry, union2 = (a, b) => [
         roleTask: assignment.roleTask,
         model: launch.model,
         effort: launch.effort,
+        ...assignment.specialist?.intendedLaunch === undefined ? {} : { intendedLaunch: assignment.specialist.intendedLaunch },
         assignments: [assignment.id],
         related: relatedIds(assignment),
         paths,
@@ -13078,6 +13254,11 @@ var SpecialistEntry, union2 = (a, b) => [
         ...assignment.screen === true ? { screen: true } : {}
       }
     ];
+  if (assignment.specialist?.intendedLaunch !== undefined && JSON.stringify(known.intendedLaunch) !== JSON.stringify(assignment.specialist.intendedLaunch))
+    return yield* new SpecialistMismatch({
+      agentId: launch.agentId,
+      detail: "the recorded intended launch identity is missing or differs"
+    });
   if (known.roleTask !== assignment.roleTask || known.model !== launch.model || known.effort !== launch.effort || known.screen === true !== (assignment.screen === true))
     return yield* new SpecialistMismatch({
       agentId: launch.agentId,
@@ -13108,6 +13289,7 @@ var init_specialists = __esm(() => {
     roleTask: RoleTask,
     model: Model,
     effort: Effort,
+    intendedLaunch: optionalKey2(IntendedLaunch),
     assignments: ArraySchema(AssignmentId),
     related: ArraySchema(AssignmentId),
     paths: ArraySchema(Text),
@@ -15600,6 +15782,7 @@ var dispatch = (project, registry, assignmentId, now, config, workTree) => gen2(
       ...directive.action === "continue" ? { agentId: directive.agentId } : {},
       model: route.model,
       effort: route.effort,
+      ...config.intendedLaunch === undefined ? {} : { intendedLaunch: config.intendedLaunch },
       startedAt: now,
       ...workTree === undefined ? {} : { workTree }
     }
@@ -15755,8 +15938,8 @@ var init_apply_patch = __esm(() => {
 });
 
 var PROVIDERS, providerProfile = (config) => PROVIDERS[config.pi.provider], routeModel = (config, key, options = {}) => {
-  const profile = providerProfile(config);
   const row = config.pi.routes[key];
+  const profile = PROVIDERS[row.provider ?? config.pi.provider];
   const { model, thinking } = options.screen === true && profile.screenRoute !== undefined ? profile.screenRoute(row) : row;
   return {
     key,
@@ -15768,7 +15951,10 @@ var PROVIDERS, providerProfile = (config) => PROVIDERS[config.pi.provider], rout
 }, ROOT_MODEL_PAIR, rootModelSettings = (config) => {
   const { provider, model, thinking } = routeModel(config, "root");
   return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking };
-}, subagentModel = ({ provider, model }) => `${provider}/${model}`, WEB_KIT_TOOLS, webChoice = (profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" && profile.webTools.length > 0 ? { source: "provider", tools: profile.webTools } : { source: "pi-web-kit", tools: WEB_KIT_TOOLS };
+}, subagentModel = ({ provider, model }) => `${provider}/${model}`, WEB_KIT_TOOLS, webChoice = (_profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" ? { source: "provider", tools: PROVIDERS["kimi-coding-global"].webTools } : {
+  source: "pi-web-kit",
+  tools: [...PROVIDERS["kimi-coding-global"].webTools, ...WEB_KIT_TOOLS]
+};
 var init_provider = __esm(() => {
   init_pi_packages2();
   init_apply_patch();
@@ -15796,6 +15982,108 @@ var init_provider = __esm(() => {
   };
   ROOT_MODEL_PAIR = ["defaultProvider", "defaultModel"];
   WEB_KIT_TOOLS = ["web_search", "web_fetch"];
+});
+
+var selectConfiguredRoute = (config, written, host, role, screen, profile, now) => {
+  const override = host === "pi" ? written.pi?.routes?.[role] : undefined;
+  const base = host === "pi" ? routeModel(config, role, { screen }) : undefined;
+  const fallback = {
+    provider: base?.provider ?? "anthropic",
+    model: base === undefined ? routeFor(role).model : subagentModel(base),
+    effort: base?.thinking ?? routeFor(role).effort
+  };
+  const screenConflict = screen && override !== undefined && (override.model !== undefined && override.model !== base?.model || override.thinking !== undefined && override.thinking !== base?.thinking);
+  const policy = (reason) => ({
+    ...fallback,
+    profile,
+    kind: "unscored-policy",
+    coverage: "pending",
+    ...config.routing === undefined ? {} : { evidenceRevision: config.routing.evidence.revision },
+    reason,
+    ...screenConflict ? {
+      error: "The explicit Pi route conflicts with the screen model or minimum thinking; choose a screen-compatible route."
+    } : {}
+  });
+  const settings = config.routing;
+  if (settings === undefined)
+    return policy("No subscription evidence configured; existing policy is unscored.");
+  const benchmarks = settings.benchmarks.filter((item) => item.role === role && item.harness === host);
+  const benchmark = benchmarks[0];
+  if (benchmarks.length !== 1 || benchmark === undefined || !benchmark.benchmark || !benchmark.benchmarkVersion || !benchmark.benchmarkHarness || !benchmark.qualityUnit)
+    return policy("No unique comparable role benchmark; existing policy is unscored.");
+  const configuredProviders = new Set([
+    config.pi.provider,
+    ...Object.values(config.pi.routes).flatMap((row) => row.provider === undefined ? [] : [row.provider])
+  ]);
+  const candidates = settings.candidates.filter((candidate) => candidate.role === role && candidate.harness === host && candidate.tier === profile).map((candidate) => {
+    const compatibleProvider = host === "pi" ? candidate.provider !== "anthropic" && configuredProviders.has(candidate.provider) : candidate.provider === "anthropic" && ["sonnet", "opus", "haiku", "fable"].includes(candidate.model);
+    const compatibleEffort = host === "pi" ? !(candidate.model === "gpt-6.1-terra" && !["low", "medium", "high", "xhigh"].includes(candidate.effort)) && !(screen && ["off", "minimal", "low"].includes(candidate.effort)) : ["medium", "high", "xhigh"].includes(candidate.effort);
+    const compatibleOverride = override === undefined || (override.provider === undefined || override.provider === candidate.provider) && (override.model === undefined || override.model === candidate.model) && (override.thinking === undefined || override.thinking === candidate.effort);
+    return {
+      ...candidate,
+      requiredCapabilities: [...candidate.requiredCapabilities, "configured-route"],
+      capabilities: {
+        ...candidate.capabilities,
+        "configured-route": compatibleProvider && compatibleEffort && compatibleOverride ? "yes" : "no"
+      }
+    };
+  });
+  const comparison = {
+    role,
+    harness: host,
+    tier: profile,
+    benchmark: benchmark.benchmark,
+    benchmarkVersion: benchmark.benchmarkVersion,
+    benchmarkHarness: benchmark.benchmarkHarness,
+    qualityUnit: benchmark.qualityUnit,
+    now,
+    maxAgeDays: settings.maxAgeDays,
+    requiredCapabilities: [
+      ...new Set(["tools", ...benchmark.requiredCapabilities, ...screen ? ["vision"] : []])
+    ]
+  };
+  const decision = selectRoute(settings.evidence, candidates, comparison, {
+    role,
+    harness: host,
+    provider: "",
+    model: "",
+    effort: "",
+    plan: "",
+    tier: profile,
+    availability: "unknown",
+    capabilities: {},
+    requiredCapabilities: [],
+    identityStable: false
+  });
+  if (decision.kind !== "ranked") {
+    const reasons = decision.diagnostics.flatMap((item) => item.reasons.map((reason) => `${item.candidate.model}:${reason}`)).slice(0, 3);
+    return policy(`No eligible comparable subscription evidence; existing policy is unscored${reasons.length === 0 ? "; no declared candidates" : `; ${reasons.join(", ")}`}.`);
+  }
+  const selected = decision.candidate;
+  const evidence = settings.evidence.rows.find((row) => row.role === role && row.harness === host && row.tier === profile && row.provider === selected.provider && row.model === selected.model && row.effort === selected.effort && row.plan === selected.plan && row.benchmark === benchmark.benchmark && row.benchmarkVersion === benchmark.benchmarkVersion && row.benchmarkHarness === benchmark.benchmarkHarness && row.qualityUnit === benchmark.qualityUnit);
+  const provider = host === "pi" ? PROVIDERS[selected.provider].id : "anthropic";
+  return {
+    provider,
+    model: host === "pi" ? `${provider}/${selected.model}` : selected.model,
+    effort: selected.effort,
+    profile,
+    kind: "ranked",
+    score: decision.score,
+    coverage: decision.optimization,
+    evidenceRevision: settings.evidence.revision,
+    plan: selected.plan,
+    ...evidence === undefined ? {} : {
+      monthlyUsd: evidence.monthlyUsd,
+      taskCostUsd: evidence.taskCostUsd,
+      measuredAt: evidence.measuredAt
+    },
+    reason: `Configured declarations; entitlement unknown; benchmark proxy ${benchmark.benchmarkHarness}.`
+  };
+};
+var init_selection = __esm(() => {
+  init_route();
+  init_provider();
+  init_evidence();
 });
 
 import { join as join8 } from "path";
@@ -15828,20 +16116,60 @@ var TTL_VARIABLE = "HOLYAGENT_REUSE_TTL_MINUTES", HOST_VARIABLE = "HOLYAGENT_HOS
       hint: `Unset ${WORKFLOWS_VARIABLE} to let the host decide.`
     })));
   return agentHostOf(env).pipe(flatMap2((host) => host === "pi" ? succeed6(false) : claudeWorkflowsAvailable(env, root)));
-}, loadConfig2 = (env, root) => all2({
-  ttlMinutes: reuseTtl(env),
-  workflowsAvailable: workflowsAvailable(env, root),
-  host: agentHostOf(env),
-  screenForm: succeed6(detectForm(env).form)
-}).pipe(map5((config) => config)), launchesOf = (env, root, host) => host === "claude" ? succeed6((roleTask, _screen) => {
-  const { model, effort } = routeFor(roleTask);
-  return { model, effort };
-}) : loadConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(map5((config) => (roleTask, screen) => {
-  if (!config.pi.enable)
-    return {};
-  const route = routeModel(config, roleTask, { screen: screen === true });
-  return { model: subagentModel(route), effort: route.thinking };
-}));
+}, loadConfig2 = (env, root) => gen2(function* () {
+  const host = yield* agentHostOf(env);
+  const workflows = yield* workflowsAvailable(env, root);
+  const piConfig = host === "pi" ? yield* loadConfig({ projectDirectories: [stateDirectory(root)], env }).pipe(map5((config) => config.pi), orElseSucceed2(() => {
+    return;
+  })) : undefined;
+  const profileRouting = piConfig?.enable === false ? false : given(env["HOLYAGENT_ROUTING_PROFILE"]) !== undefined || piConfig?.profile !== undefined;
+  return {
+    ttlMinutes: yield* reuseTtl(env),
+    workflowsAvailable: workflows && !(host === "pi" && profileRouting),
+    host,
+    screenForm: detectForm(env).form,
+    ...profileRouting ? { profileRouting: true } : {}
+  };
+}), ROUTING_PROFILE_VARIABLE = "HOLYAGENT_ROUTING_PROFILE", launchesOf = (env, root, host) => gen2(function* () {
+  const raw = given(env[ROUTING_PROFILE_VARIABLE]);
+  const requested = raw === undefined ? undefined : yield* decodeUnknownEffect2(Literals(["normal", "fast"]))(raw).pipe(mapError2(() => new Usage({
+    message: `${ROUTING_PROFILE_VARIABLE} must be normal or fast, not "${raw}"`,
+    hint: `Unset ${ROUTING_PROFILE_VARIABLE} to retain the current policy.`
+  })));
+  if (host === "claude" && requested === undefined)
+    return (roleTask, _screen) => {
+      const { model, effort } = routeFor(roleTask);
+      return { model, effort };
+    };
+  const { config, written } = yield* loadConfigWithSource({
+    projectDirectories: [stateDirectory(root)],
+    env
+  });
+  const profile = requested ?? (host === "pi" ? config.pi.profile : undefined);
+  const now = new Date(yield* currentTimeMillis2).toISOString();
+  return (roleTask, screen) => {
+    if (host === "pi" && !config.pi.enable)
+      return {};
+    if (profile === undefined) {
+      const route = routeModel(config, roleTask, { screen: screen === true });
+      return { model: subagentModel(route), effort: route.thinking };
+    }
+    const chosen = selectConfiguredRoute(config, written, host, roleTask, screen === true, profile, now);
+    return {
+      model: chosen.model,
+      effort: chosen.effort,
+      routing: chosen,
+      intendedLaunch: {
+        host,
+        provider: chosen.provider,
+        model: chosen.model,
+        effort: chosen.effort,
+        profile,
+        ...chosen.evidenceRevision === undefined ? {} : { evidenceRevision: chosen.evidenceRevision }
+      }
+    };
+  };
+});
 var init_config = __esm(() => {
   init_dist();
   init_load();
@@ -15849,6 +16177,7 @@ var init_config = __esm(() => {
   init_host();
   init_route();
   init_provider();
+  init_selection();
   init_environment();
   init_form();
   init_files();
@@ -15905,7 +16234,20 @@ var PLUGIN_NAMESPACE = "holyagent", AssignmentInput, DRAFT_SHAPE, DRAFT_NOTES, c
   agent: agentTypeFor(host, directive.agent),
   model: launch.model,
   effort: launch.effort,
-  reason: directive.reason
+  reason: directive.reason,
+  ...launch.routing === undefined ? {} : {
+    routing: present({
+      kind: launch.routing.kind,
+      score: launch.routing.score,
+      coverage: launch.routing.coverage,
+      evidenceRevision: launch.routing.evidenceRevision,
+      plan: launch.routing.plan,
+      monthlyUsd: launch.routing.monthlyUsd,
+      taskCostUsd: launch.routing.taskCostUsd,
+      measuredAt: launch.routing.measuredAt,
+      reason: launch.routing.reason
+    })
+  }
 }), ExistingRef, OutcomeFlag, OUTCOMES, dispatchOutput = (words) => ({
   output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool${words.launchNote === undefined ? "" : `. ${words.launchNote}`}`
 }), recordHelp = (words) => ({
@@ -16060,18 +16402,26 @@ var init_assignment2 = __esm(() => {
             return yield* new InvalidDraft({
               message: `The screen capability is available under the pi host only; this is the ${settings.host} host. Dispatch the Assignment without screen`
             });
-          const dispatched = yield* dispatch(project, snapshot.specialists, id, now, settings, workTreeKey(call.root));
+          const target = yield* findAssignment(project, id);
+          const launch = launchOf(target.roleTask, target.screen);
+          if (launch.routing?.error !== undefined)
+            return yield* new Usage({
+              message: launch.routing.error,
+              hint: "Choose a compatible explicit screen route or change the Assignment."
+            });
+          const dispatched = yield* dispatch(project, snapshot.specialists, id, now, launch.intendedLaunch === undefined ? settings : { ...settings, intendedLaunch: launch.intendedLaunch }, workTreeKey(call.root));
           const agent = agentTypeFor(settings.host, agentFor(routeFor(dispatched.assignment.roleTask), dispatched.assignment.screen, settings.screenForm));
           const path = yield* writeBrief(call, dispatched.assignment.id, briefText(dispatched.assignment, agent, settings.host));
           return {
             ...dispatched,
+            launch,
             prompt: dispatchPrompt(dispatched.assignment, agent, path, wordsFor(settings.host))
           };
         }));
         return new WithTrailer({
           id: started.assignment.id,
           state: started.assignment.state,
-          ...directiveView(started.directive, settings.host, launchOf(started.assignment.roleTask, started.assignment.screen))
+          ...directiveView(started.directive, settings.host, started.launch)
         }, "prompt", started.prompt);
       })
     },
@@ -25617,7 +25967,10 @@ var WEB_KIT_PACKAGE = "pi-web-kit", piPackages = (config, profile = providerProf
   if (!enable)
     return [];
   const names = [
-    ...profile.package === undefined ? [] : [profile.package],
+    ...new Set([
+      profile.package,
+      ...Object.values(config.pi.routes).map((row) => PROVIDERS[row.provider ?? config.pi.provider].package)
+    ].filter((name) => name !== undefined)),
     ...capabilityPackages(features, form, definitions, platform),
     ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
   ];
@@ -25998,21 +26351,12 @@ var init_settings4 = __esm(() => {
   init_guardrails();
 });
 
-var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`), T3_TOOL, T3_VISUAL, toolSettings = (config, profile = providerProfile(config), form = "normal", platform) => {
+var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&"), patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`), T3_TOOL, T3_VISUAL, toolSettings = (config, _profile = providerProfile(config), form = "normal", platform) => {
   const { enable, features } = config.pi;
   if (!enable)
     return [];
-  const web = webChoice(profile, features.web);
   return [
     { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
-    ...web.source === "provider" && profile.toolsFile !== undefined ? [
-      {
-        file: profile.toolsFile,
-        content: {
-          tools: Object.fromEntries(web.tools.map((tool) => [tool, { enabled: true }]))
-        }
-      }
-    ] : [],
     ...enabledCapabilities(features, { form, platform, provider: config.pi.provider }).flatMap((capability) => capability.settings).filter((patch) => patch.whileOn === undefined || features[patch.whileOn] === true)
   ];
 };

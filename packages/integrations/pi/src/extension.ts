@@ -24,6 +24,7 @@ import {
 } from "../../../runtime/src/config/capabilities.ts"
 import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
+import { agentFor, ROUTES } from "../../../runtime/src/domain/route.ts"
 import {
   DEFAULT_PI_ROLE,
   parseOutput,
@@ -41,7 +42,11 @@ import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
 import { justBashOn } from "../../../runtime/src/pi/bash/settings.ts"
 import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
 import { APPLY_PATCH_TOOL } from "../../../runtime/src/pi/codex/apply-patch.ts"
-import { providerEnv } from "../../../runtime/src/pi/provider.ts"
+import {
+  nativeSearchInventory,
+  providerEnv,
+  WEB_KIT_TOOLS,
+} from "../../../runtime/src/pi/provider.ts"
 import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
 import { PI_ROOT_PROMPT, PI_ROOT_PROMPTS } from "../../../runtime/src/pi/root-prompt.ts"
 import {
@@ -484,6 +489,7 @@ interface Collected {
    * session reads them, since the root and the specialists both run on its models.
    */
   readonly codex?: CodexSettings
+  readonly uniformCodex?: true
   /**
    * What the user-level config, read alone, decides for auto-review. Present on every result,
    * whether the config was readable or not, and never from the project's config.
@@ -506,6 +512,9 @@ interface Collected {
   readonly tools?: Pick<ToolArgs, "tools" | "excludeTools">
   /** The config the provider checks read, present for the root after a collection that ended well. */
   readonly config?: Config
+  readonly webMode?: Config["pi"]["features"]["web"]
+  /** Whether a successfully read config explicitly enables profile routing. */
+  readonly profileRouting?: boolean
 }
 
 /**
@@ -540,6 +549,9 @@ interface Held {
   started: boolean
   /** The Codex provider's settings once the config is read, or undefined for another provider. */
   codex: CodexSettings | undefined
+  uniformCodex: boolean
+  webMode: Config["pi"]["features"]["web"] | undefined
+  profileRouting: boolean
   /**
    * The session's auto-review settings: on with the default policy from the start, fixed once by
    * the first collection to the user-level config's choice. The project's config has no part.
@@ -604,7 +616,14 @@ const settingsFor = (
   return {
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
+    webMode: config.pi.features.web,
     ...(codex === undefined ? {} : { codex }),
+    ...(config.pi.provider === "openai-codex" &&
+    Object.values(config.pi.routes).every(
+      (row) => (row.provider ?? config.pi.provider) === "openai-codex",
+    )
+      ? { uniformCodex: true as const }
+      : {}),
     ...(justBashOn(config) ? { justBash: true as const } : {}),
     ...(role === "specialist" ? { screenServers: screenServers(config, form) } : {}),
     ...(role === "root"
@@ -617,6 +636,48 @@ const settingsFor = (
         }
       : {}),
   }
+}
+
+/** Refuse fuzzy provider fallback on profile launches; workflows lack a per-child veto. */
+export const refuseProfileLaunch = (
+  event: { readonly toolName: string; readonly input: Readonly<Record<string, unknown>> },
+  active: boolean,
+  registry:
+    | {
+        readonly getAvailable: () => ReadonlyArray<{
+          readonly provider: string
+          readonly id: string
+        }>
+      }
+    | undefined,
+): ToolCallEventResult | undefined => {
+  if (!active) return undefined
+  if (event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow")
+    return {
+      block: true,
+      reason:
+        "Profile routing requires direct Agent calls: this workflow host may substitute a different provider. Run plan and use its direct-agent fallback.",
+    }
+  if (event.toolName !== "Agent" && event.toolName !== "agent") return undefined
+  const model = event.input["model"]
+  if (typeof model !== "string" || !model.includes("/"))
+    return {
+      block: true,
+      reason:
+        "Profile routing requires the exact provider/model from assignment dispatch; no inherited or fuzzy model is allowed.",
+    }
+  const slash = model.indexOf("/")
+  const provider = model.slice(0, slash)
+  const id = model.slice(slash + 1)
+  const available = Effect.runSync(
+    Effect.try(() => registry?.getAvailable()).pipe(Effect.orElseSucceed(() => undefined)),
+  )
+  if (!available?.some((entry) => entry.provider === provider && entry.id === id))
+    return {
+      block: true,
+      reason: `Exact model ${model} is not available with configured authentication. Check the provider, model and login; entitlement remains unverified.`,
+    }
+  return undefined
 }
 
 /**
@@ -639,6 +700,46 @@ export const refuseExcludedTool = (
         reason: `The root may not use ${event.toolName}. Delegate the work to a specialist that has it.`,
       }
     : undefined
+
+/** Require an explicit fallback and respect disabled native tools. */
+export const refusePrematureWebFallback = (
+  event: { readonly toolName: string },
+  mode: Config["pi"]["features"]["web"] | undefined,
+  _registered: ReadonlyArray<string>,
+  active: ReadonlyArray<string>,
+): ToolCallEventResult | undefined => {
+  const native = event.toolName === "moonshot_search" || event.toolName === "moonshot_fetch"
+  if (native && (mode === "off" || !active.includes(event.toolName)))
+    return { block: true, reason: "Native web tool is off or inactive in this session." }
+  if (!WEB_KIT_TOOLS.includes(event.toolName)) return undefined
+  if (mode !== "pi-web-kit")
+    return { block: true, reason: "Web fallback requires explicit pi-web-kit configuration." }
+  return undefined
+}
+
+/** A provider cannot grant search to a specialist without that capability. */
+const searchSpecialist = (agent: string | undefined): boolean =>
+  ROUTES.some(
+    (route) =>
+      route.capabilities.includes("Search") &&
+      [
+        agentFor(route, false),
+        agentFor(route, true, "normal"),
+        agentFor(route, true, "headless"),
+      ].includes(agent ?? ""),
+  )
+
+/** A provider cannot grant search to a specialist without that capability. */
+export const refuseUnassignedWebTool = (
+  event: { readonly toolName: string },
+  agent: string | undefined,
+): ToolCallEventResult | undefined => {
+  if (!["moonshot_search", "moonshot_fetch", ...WEB_KIT_TOOLS].includes(event.toolName))
+    return undefined
+  return searchSpecialist(agent)
+    ? undefined
+    : { block: true, reason: "This specialist does not have the Search capability." }
+}
 
 /** Where the extension finds what it runs. */
 export interface ExtensionOptions {
@@ -1191,7 +1292,10 @@ export const createExtension =
             } satisfies Collected
           }
           const role = yield* roleOf
-          configured = settingsFor(config, role, bound, machineForm())
+          configured = {
+            ...settingsFor(config, role, bound, machineForm()),
+            profileRouting: config.pi.profile !== undefined,
+          }
           // Status first, then reconcile: for a project that keeps state, status makes the state
           // worktree that the next calls read.
           const status = yield* holyagent(signal, project, "status").pipe(
@@ -1469,6 +1573,10 @@ export const createExtension =
       taken.pending = collected.then((result) => {
         if (own.signal.aborted) return undefined
         taken.gatesOff = result?.gatesOff === true
+        if (result?.enabled === false) taken.profileRouting = false
+        else if (result?.profileRouting !== undefined)
+          taken.profileRouting =
+            result.profileRouting || (env["HOLYAGENT_ROUTING_PROFILE"]?.trim() ?? "") !== ""
         if (result?.rootPrompt === true) taken.rootPrompt = true
         else if (result?.enabled === false) taken.rootPrompt = false
         // Only the user's own `pi.enable: false` clears the set; otherwise it grows, so a later
@@ -1480,12 +1588,44 @@ export const createExtension =
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)
         if (result !== undefined) taken.codex = result.codex
+        if (result !== undefined) taken.uniformCodex = result.uniformCodex === true
+        if (result !== undefined) taken.webMode = result.webMode
         if (result?.autoReview !== undefined) taken.autoReview.fix(result.autoReview)
         if (result !== undefined) taken.justBash = result.justBash === true
         if (result?.justBash === true) bash.enable(ctx.cwd)
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
-          if (result?.codex !== undefined) taken.specialistNotice = activateApplyPatch(result.codex)
+          if (result?.webMode === "provider" && searchSpecialist(childAgent(pi.getSessionName()))) {
+            const inventory = Effect.runSync(
+              Effect.try(() =>
+                nativeSearchInventory(
+                  pi.getAllTools().map(({ name }) => name),
+                  pi.getActiveTools(),
+                ),
+              ).pipe(
+                Effect.orElseSucceed(() => ({
+                  state: "unknown" as const,
+                  reason: "native tool inventory failed",
+                })),
+              ),
+            )
+            if (inventory.state !== "exposed")
+              taken.specialistNotice = joinOptional(
+                taken.specialistNotice,
+                notice(
+                  `${inventory.reason}; search availability is unknown or disabled. Configure pi-web-kit explicitly if you intend to use it.`,
+                ),
+              )
+          }
+          if (
+            result?.codex !== undefined &&
+            (ctx.model?.provider === "openai-codex" ||
+              (ctx.model === undefined && result.uniformCodex === true))
+          )
+            taken.specialistNotice = joinOptional(
+              taken.specialistNotice,
+              activateApplyPatch(result.codex),
+            )
           if (result?.screenServers !== undefined)
             taken.specialistNotice = joinOptional(
               taken.specialistNotice,
@@ -1527,6 +1667,9 @@ export const createExtension =
         t3Gate: false,
         t3Root: false,
         codex: undefined,
+        uniformCodex: false,
+        webMode: undefined,
+        profileRouting: (env["HOLYAGENT_ROUTING_PROFILE"]?.trim() ?? "") !== "",
         autoReview: createAutoReviewSettings(),
         justBash: false,
         probe: undefined,
@@ -1556,6 +1699,7 @@ export const createExtension =
       "before_agent_start",
       (
         event,
+        ctx,
       ):
         | Promise<BeforeAgentStartEventResult | undefined>
         | BeforeAgentStartEventResult
@@ -1572,7 +1716,11 @@ export const createExtension =
             applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true)
           // The Codex provider runs the GPT-6 family: the root's prompt is that family's, a
           // specialist's own prompt is swapped for it, and the skills Pi lists are its copies.
-          const family = taken?.codex?.family
+          const family =
+            ctx.model?.provider === "openai-codex" ||
+            (ctx.model === undefined && taken?.uniformCodex === true)
+              ? taken?.codex?.family
+              : undefined
           const own = child
             ? family === undefined
               ? event.systemPrompt
@@ -1648,10 +1796,32 @@ export const createExtension =
 
     // The gates stand down only for the user's own `pi.enable: false`; a project's cannot lift them,
     // nor take an exclusion away. The root's excluded tools are refused first, whatever else the call is.
-    pi.on("tool_call", (event) =>
+    pi.on("tool_call", (event, ctx) =>
       held?.gatesOff === true
         ? undefined
-        : (refuseExcludedTool(event, held?.excluded ?? []) ??
+        : ((held?.profileRouting === true
+            ? refuseProfileLaunch(
+                event,
+                true,
+                event.toolName === "Agent" || event.toolName === "agent"
+                  ? Effect.runSync(
+                      Effect.try(() => ctx.modelRegistry).pipe(
+                        Effect.orElseSucceed(() => undefined),
+                      ),
+                    )
+                  : undefined,
+              )
+            : undefined) ??
+          refuseExcludedTool(event, held?.excluded ?? []) ??
+          (isChild()
+            ? (refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ??
+              refusePrematureWebFallback(
+                event,
+                held?.webMode,
+                pi.getAllTools().map(({ name }) => name),
+                pi.getActiveTools(),
+              ))
+            : undefined) ??
           (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
           refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ??
           Effect.runPromise(

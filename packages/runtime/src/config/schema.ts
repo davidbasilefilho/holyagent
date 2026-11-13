@@ -1,7 +1,8 @@
 import { Effect, Schema, SchemaGetter } from "effect"
 
-import type { RoleTask } from "../domain/route.ts"
+import { RoleTask } from "../domain/route.ts"
 import { CODEX_ROUTES } from "../pi/codex/routes.ts"
+import { EvidenceDataset } from "../routing/evidence.ts"
 import { CAPABILITIES, type CapabilityFeature } from "./capabilities.ts"
 
 /**
@@ -58,6 +59,8 @@ export type RouteKey = "root" | RoleTask
 
 /** The model and reasoning level of one route-table row. */
 export interface RouteChoice {
+  /** A per-role provider override; absent uses the section's provider. */
+  readonly provider?: PiProvider
   readonly model: string
   readonly thinking: Thinking
 }
@@ -132,6 +135,7 @@ export const PROVIDER_ROUTES: Readonly<
 const route = () =>
   defaulted(
     Schema.Struct({
+      provider: Schema.optionalKey(PiProvider),
       model: Schema.optionalKey(ModelId),
       thinking: Schema.optionalKey(Thinking),
     }),
@@ -147,9 +151,8 @@ const ROUTE_FIELDS = Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [k
 }
 
 /**
- * How a session reaches the web: `provider` uses the provider extension's own tools (Kimi's
- * `moonshot_search` and `moonshot_fetch`) and loads no package, `pi-web-kit` loads that package
- * instead (the fallback for a login that cannot use the provider's tools), `off` has no web tools.
+ * How a session reaches the web: `provider` permits installed native tools, `pi-web-kit` explicitly
+ * loads the fallback package, and `off` has no web tools. No mode enables a provider's tools.
  */
 export const WebMode = Schema.Literals(["provider", "pi-web-kit", "off"])
 /** One web mode. */
@@ -191,6 +194,7 @@ const CAPABILITY_FIELDS = Object.fromEntries(
 const PI_FIELDS = {
   enable: defaulted(Enabled, true),
   provider: defaulted(PiProvider, "kimi-coding-global"),
+  profile: Schema.optionalKey(Schema.Literals(["normal", "fast"])),
   routes: defaulted(Schema.Struct(ROUTE_FIELDS), {}),
   features: defaulted(
     Schema.Struct({
@@ -228,10 +232,15 @@ const PiResolved = Schema.toType(
       Object.fromEntries(
         Object.keys(KIMI_ROUTES).map((key) => [
           key,
-          Schema.Struct({ model: Schema.String, thinking: Thinking }),
+          Schema.Struct({
+            provider: Schema.optionalKey(PiProvider),
+            model: Schema.String,
+            thinking: Thinking,
+          }),
         ]),
       ) as {
         readonly [Key in RouteKey]: Schema.Struct<{
+          provider: Schema.optionalKey<typeof PiProvider>
           model: Schema.String
           thinking: typeof Thinking
         }>
@@ -250,10 +259,20 @@ const withProviderRoutes = (pi: typeof PiAsWritten.Type): typeof PiResolved.Enco
   const routes = Object.fromEntries(
     (Object.keys(defaults) as Array<RouteKey>).map((key) => [
       key,
-      {
-        model: pi.routes[key].model ?? defaults[key].model,
-        thinking: pi.routes[key].thinking ?? defaults[key].thinking,
-      },
+      (() => {
+        const override = pi.routes[key]
+        const provider = override.provider ?? pi.provider
+        const baseline = PROVIDER_ROUTES[provider][key]
+        const profileModel =
+          pi.profile === "fast" && key === "root" && provider === "openai-codex"
+            ? "gpt-6.1-terra"
+            : baseline.model
+        return {
+          ...(override.provider === undefined ? {} : { provider: override.provider }),
+          model: override.model ?? profileModel,
+          thinking: override.thinking ?? baseline.thinking,
+        }
+      })(),
     ]),
   ) as typeof PiResolved.Encoded.routes
   return { ...pi, routes }
@@ -270,6 +289,43 @@ const PiSection = defaulted(
   {},
 )
 
+/** A declared candidate is a configured allowlist entry, not a live entitlement check. */
+const DeclaredCandidate = Schema.Struct({
+  role: RoleTask,
+  harness: Schema.Literals(["pi", "claude"]),
+  provider: Schema.Literals(["kimi-coding-global", "openai-codex", "anthropic"]),
+  model: ModelId,
+  effort: Thinking,
+  plan: Schema.String,
+  tier: Schema.Literals(["normal", "fast"]),
+  availability: Schema.Literals(["yes", "no", "unknown"]),
+  capabilities: Schema.Record(Schema.String, Schema.Literals(["yes", "no", "unknown"])),
+  requiredCapabilities: Schema.Array(Schema.String),
+  identityStable: Schema.Boolean,
+})
+
+/** The exact benchmark and required model capabilities for one role and harness. */
+const RoutingBenchmark = Schema.Struct({
+  role: RoleTask,
+  harness: Schema.Literals(["pi", "claude"]),
+  benchmark: Schema.String,
+  benchmarkVersion: Schema.String,
+  benchmarkHarness: Schema.String,
+  qualityUnit: Schema.String,
+  requiredCapabilities: Schema.Array(Schema.String),
+})
+
+/** Opt-in, versioned subscription evidence and declared candidate allowlist. */
+export const RoutingSettings = Schema.Struct({
+  version: Schema.Literal(1),
+  evidence: EvidenceDataset,
+  candidates: Schema.Array(DeclaredCandidate),
+  benchmarks: Schema.Array(RoutingBenchmark),
+  maxAgeDays: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 365 })),
+})
+/** One configured subscription routing dataset. */
+export type RoutingSettings = typeof RoutingSettings.Type
+
 /** The `claude` section: read only by the Claude plugin. It holds no option yet. */
 const ClaudeSection = defaulted(Schema.Record(Schema.String, Schema.Never), {})
 
@@ -282,6 +338,7 @@ export const Config = Schema.Struct({
   vcs: defaulted(VcsSettings, {}),
   pi: PiSection,
   claude: ClaudeSection,
+  routing: Schema.optionalKey(RoutingSettings),
 })
 /** The HolyAgent config with every default filled in. */
 export type Config = typeof Config.Type

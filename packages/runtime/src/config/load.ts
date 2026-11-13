@@ -164,7 +164,7 @@ export interface ConfigSources {
  * (`pi.features.autoReview`, `pi.autoReview`) are the user file's alone. A missing file reads as an
  * empty one; a bad file stops the load with ConfigInvalid for that file.
  */
-export const loadConfig = ({ projectDirectories, env = process.env }: ConfigSources) =>
+export const loadConfigWithSource = ({ projectDirectories, env = process.env }: ConfigSources) =>
   Effect.gen(function* () {
     const userPath = userConfigFile(env)
     const user = yield* readConfigFile(userPath)
@@ -178,10 +178,22 @@ export const loadConfig = ({ projectDirectories, env = process.env }: ConfigSour
         break
       }
     }
-    // Both files decoded on their own, so this only fills in defaults; it cannot refuse a setting.
-    return yield* Schema.decodeUnknownEffect(Config)(mergeFiles(user ?? {}, project ?? {})).pipe(
+    // Preserve the written values as well as the resolved defaults so explicit routes stay explicit.
+    const written = yield* Schema.decodeUnknownEffect(ConfigFile, { onExcessProperty: "error" })(
+      mergeFiles(user ?? {}, project ?? {}),
+    ).pipe(
       Effect.mapError(
         (error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message }),
       ),
     )
+    const config = yield* Schema.decodeUnknownEffect(Config)(written).pipe(
+      Effect.mapError(
+        (error) => new ConfigInvalid({ path: projectPath ?? userPath, reason: error.message }),
+      ),
+    )
+    return { config, written }
   })
+
+/** Loads the resolved config without its source-level override information. */
+export const loadConfig = (sources: ConfigSources) =>
+  loadConfigWithSource(sources).pipe(Effect.map(({ config }) => config))

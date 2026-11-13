@@ -12252,6 +12252,14 @@ var RoleTask = Literals([
 ]);
 var Model = Literals(["haiku", "sonnet"]);
 var Effort = Literals(["medium", "high", "xhigh"]);
+var IntendedLaunch = Struct({
+  host: Literals(["pi", "claude"]),
+  provider: String4,
+  model: String4,
+  effort: String4,
+  profile: Literals(["normal", "fast"]),
+  evidenceRevision: optionalKey2(String4)
+});
 var Mutability = Literals(["ReadOnly", "ScopedWrite"]);
 var Independence = Literals([
   "DisjointWrites",
@@ -14546,6 +14554,40 @@ var screenRoute = (row) => {
   return choice(TERRA, higher);
 };
 
+var EvidenceDataset = Struct({
+  version: Literal2(1),
+  revision: String4,
+  retrievedAt: String4,
+  generatedAt: String4,
+  rows: ArraySchema(Struct({
+    role: String4,
+    harness: String4,
+    provider: String4,
+    model: String4,
+    effort: String4,
+    plan: String4,
+    region: String4,
+    monthlyUsd: Number5,
+    allowance: String4,
+    utilization: String4,
+    cacheAssumptions: String4,
+    tier: Literals(["normal", "fast"]),
+    benchmark: String4,
+    benchmarkVersion: String4,
+    benchmarkHarness: String4,
+    qualityUnit: String4,
+    direction: Literals(["higher", "lower"]),
+    quality: Number5,
+    taskCostUsd: Number5,
+    costKind: Literals(["subscription", "api-fallback"]),
+    measuredAt: String4,
+    sourceUrl: String4,
+    planSourceUrl: String4,
+    planSourceDate: String4,
+    confidence: String4
+  }))
+});
+
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed5(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
@@ -14584,6 +14626,7 @@ var PROVIDER_ROUTES = {
   "openai-codex": CODEX_ROUTES
 };
 var route = () => defaulted(Struct({
+  provider: optionalKey2(PiProvider),
   model: optionalKey2(ModelId),
   thinking: optionalKey2(Thinking)
 }), {});
@@ -14601,6 +14644,7 @@ var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [cap
 var PI_FIELDS = {
   enable: defaulted(Enabled, true),
   provider: defaulted(PiProvider, "kimi-coding-global"),
+  profile: optionalKey2(Literals(["normal", "fast"])),
   routes: defaulted(Struct(ROUTE_FIELDS), {}),
   features: defaulted(Struct({
     web: defaulted(WebMode, "provider"),
@@ -14622,17 +14666,28 @@ var PiResolved = toType2(Struct({
   ...PI_FIELDS,
   routes: Struct(Object.fromEntries(Object.keys(KIMI_ROUTES).map((key) => [
     key,
-    Struct({ model: String4, thinking: Thinking })
+    Struct({
+      provider: optionalKey2(PiProvider),
+      model: String4,
+      thinking: Thinking
+    })
   ])))
 }));
 var withProviderRoutes = (pi) => {
   const defaults = PROVIDER_ROUTES[pi.provider];
   const routes = Object.fromEntries(Object.keys(defaults).map((key) => [
     key,
-    {
-      model: pi.routes[key].model ?? defaults[key].model,
-      thinking: pi.routes[key].thinking ?? defaults[key].thinking
-    }
+    (() => {
+      const override = pi.routes[key];
+      const provider = override.provider ?? pi.provider;
+      const baseline = PROVIDER_ROUTES[provider][key];
+      const profileModel = pi.profile === "fast" && key === "root" && provider === "openai-codex" ? "gpt-6.1-terra" : baseline.model;
+      return {
+        ...override.provider === undefined ? {} : { provider: override.provider },
+        model: override.model ?? profileModel,
+        thinking: override.thinking ?? baseline.thinking
+      };
+    })()
   ]));
   return { ...pi, routes };
 };
@@ -14640,11 +14695,41 @@ var PiSection = defaulted(PiAsWritten.pipe(decodeTo2(PiResolved, {
   decode: transform(withProviderRoutes),
   encode: transform((pi) => pi)
 })), {});
+var DeclaredCandidate = Struct({
+  role: RoleTask,
+  harness: Literals(["pi", "claude"]),
+  provider: Literals(["kimi-coding-global", "openai-codex", "anthropic"]),
+  model: ModelId,
+  effort: Thinking,
+  plan: String4,
+  tier: Literals(["normal", "fast"]),
+  availability: Literals(["yes", "no", "unknown"]),
+  capabilities: Record(String4, Literals(["yes", "no", "unknown"])),
+  requiredCapabilities: ArraySchema(String4),
+  identityStable: Boolean3
+});
+var RoutingBenchmark = Struct({
+  role: RoleTask,
+  harness: Literals(["pi", "claude"]),
+  benchmark: String4,
+  benchmarkVersion: String4,
+  benchmarkHarness: String4,
+  qualityUnit: String4,
+  requiredCapabilities: ArraySchema(String4)
+});
+var RoutingSettings = Struct({
+  version: Literal2(1),
+  evidence: EvidenceDataset,
+  candidates: ArraySchema(DeclaredCandidate),
+  benchmarks: ArraySchema(RoutingBenchmark),
+  maxAgeDays: Int.check(isBetween({ minimum: 1, maximum: 365 }))
+});
 var ClaudeSection = defaulted(Record(String4, Never2), {});
 var Config = Struct({
   vcs: defaulted(VcsSettings, {}),
   pi: PiSection,
-  claude: ClaudeSection
+  claude: ClaudeSection,
+  routing: optionalKey2(RoutingSettings)
 });
 var ConfigFile = toEncoded2(Config);
 var defaultConfig = decodeUnknownEffect2(Config)({});
@@ -17048,8 +17133,8 @@ var PROVIDERS = {
 };
 var providerProfile = (config) => PROVIDERS[config.pi.provider];
 var routeModel = (config, key, options = {}) => {
-  const profile = providerProfile(config);
   const row = config.pi.routes[key];
+  const profile = PROVIDERS[row.provider ?? config.pi.provider];
   const { model, thinking } = options.screen === true && profile.screenRoute !== undefined ? profile.screenRoute(row) : row;
   return {
     key,
@@ -17060,9 +17145,19 @@ var routeModel = (config, key, options = {}) => {
   };
 };
 var routedModels = (config) => Object.keys(config.pi.routes).map((key) => routeModel(config, key));
-var providerEnv = (config) => providerProfile(config).env;
+var providerEnv = (config) => Object.fromEntries(Object.values(config.pi.routes).flatMap((row) => Object.entries(PROVIDERS[row.provider ?? config.pi.provider].env)));
 var WEB_KIT_TOOLS = ["web_search", "web_fetch"];
-var webChoice = (profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" && profile.webTools.length > 0 ? { source: "provider", tools: profile.webTools } : { source: "pi-web-kit", tools: WEB_KIT_TOOLS };
+var webChoice = (_profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" ? { source: "provider", tools: PROVIDERS["kimi-coding-global"].webTools } : {
+  source: "pi-web-kit",
+  tools: [...PROVIDERS["kimi-coding-global"].webTools, ...WEB_KIT_TOOLS]
+};
+var nativeSearchInventory = (registered, active) => !registered.includes("moonshot_search") ? {
+  state: "unknown",
+  reason: "Kimi search is not exposed; installation or enablement is unknown"
+} : !active.includes("moonshot_search") ? { state: "disabled", reason: "Kimi search is registered but inactive" } : {
+  state: "exposed",
+  reason: "Kimi search is active; OAuth and account entitlement are checked by the tool on use"
+};
 
 var DETAIL_CHARS = 400;
 
@@ -17728,12 +17823,13 @@ var build = (tools, excludeTools, noMcp, env) => ({
   ]
 });
 var has = (capabilities, capability) => capabilities.includes(capability);
-var toolArgs = (config, key, profile = providerProfile(config), options = {}) => {
+var toolArgs = (config, key, profile = PROVIDERS[config.pi.routes[key].provider ?? config.pi.provider], options = {}) => {
   const { features } = config.pi;
-  const enabled = enabledCapabilities(features, { provider: config.pi.provider });
+  const provider = config.pi.routes[key].provider ?? config.pi.provider;
+  const enabled = enabledCapabilities(features, { provider });
   const formEnabled = enabledCapabilities(features, {
     form: options.form ?? "normal",
-    provider: config.pi.provider
+    provider
   });
   const noMcp = !features.mcp;
   const env = {
@@ -18762,7 +18858,7 @@ var COMPACT_THRESHOLD_SHARE = 0.9;
 var FALLBACK_CONTEXT_WINDOW = 272000;
 var MINIMUM_THRESHOLD = 1000;
 var compactThreshold = (contextWindow) => Math.max(MINIMUM_THRESHOLD, Math.floor((contextWindow ?? FALLBACK_CONTEXT_WINDOW) * COMPACT_THRESHOLD_SHARE));
-var contextManagementOn = (config) => config.pi.provider === "openai-codex" && config.pi.features.contextManagement && !config.pi.features.contextCompression;
+var contextManagementOn = (config) => (config.pi.provider === "openai-codex" || Object.values(config.pi.routes).some((row) => row.provider === "openai-codex")) && config.pi.features.contextManagement && !config.pi.features.contextCompression;
 var Request = Struct({ model: String4, input: ArraySchema(Unknown2) });
 var CompactionItem = Struct({
   type: Literal2("compaction"),
@@ -19079,14 +19175,14 @@ import { chmod, lstat, readlink, realpath, symlink } from "node:fs/promises";
 import { basename as basename2, dirname as dirname2, join as join4, resolve as resolve4 } from "node:path";
 import { Type } from "typebox";
 var codexSettings = (config) => {
-  if (config.pi.provider !== "openai-codex")
+  if (config.pi.provider !== "openai-codex" && !Object.values(config.pi.routes).some((row) => row.provider === "openai-codex"))
     return;
-  const profile = providerProfile(config);
+  const profile = PROVIDERS["openai-codex"];
   return {
     family: profile.family,
     contextManagement: contextManagementOn(config),
     lunaReserve: config.pi.features.lunaReserve,
-    applyPatchAgents: RoleTask.literals.flatMap((roleTask) => toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL) ? [
+    applyPatchAgents: RoleTask.literals.flatMap((roleTask) => (config.pi.routes[roleTask].provider ?? config.pi.provider) === "openai-codex" && toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL) ? [
       agentFor(routeFor(roleTask), false),
       agentFor(routeFor(roleTask), true, "normal"),
       agentFor(routeFor(roleTask), true, "headless")
@@ -19447,7 +19543,9 @@ var settingsFor = (config, role, bound = [], form = "normal") => {
   return {
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
+    webMode: config.pi.features.web,
     ...codex === undefined ? {} : { codex },
+    ...config.pi.provider === "openai-codex" && Object.values(config.pi.routes).every((row) => (row.provider ?? config.pi.provider) === "openai-codex") ? { uniformCodex: true } : {},
     ...justBashOn(config) ? { justBash: true } : {},
     ...role === "specialist" ? { screenServers: screenServers(config, form) } : {},
     ...role === "root" ? {
@@ -19459,10 +19557,59 @@ var settingsFor = (config, role, bound = [], form = "normal") => {
     } : {}
   };
 };
+var refuseProfileLaunch = (event, active, registry) => {
+  if (!active)
+    return;
+  if (event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow")
+    return {
+      block: true,
+      reason: "Profile routing requires direct Agent calls: this workflow host may substitute a different provider. Run plan and use its direct-agent fallback."
+    };
+  if (event.toolName !== "Agent" && event.toolName !== "agent")
+    return;
+  const model = event.input["model"];
+  if (typeof model !== "string" || !model.includes("/"))
+    return {
+      block: true,
+      reason: "Profile routing requires the exact provider/model from assignment dispatch; no inherited or fuzzy model is allowed."
+    };
+  const slash = model.indexOf("/");
+  const provider = model.slice(0, slash);
+  const id = model.slice(slash + 1);
+  const available = runSync2(try_2(() => registry?.getAvailable()).pipe(orElseSucceed2(() => {
+    return;
+  })));
+  if (!available?.some((entry) => entry.provider === provider && entry.id === id))
+    return {
+      block: true,
+      reason: `Exact model ${model} is not available with configured authentication. Check the provider, model and login; entitlement remains unverified.`
+    };
+  return;
+};
 var refuseExcludedTool = (event, excluded) => excluded.some((pattern) => toolMatches(pattern, event.toolName)) ? {
   block: true,
   reason: `The root may not use ${event.toolName}. Delegate the work to a specialist that has it.`
 } : undefined;
+var refusePrematureWebFallback = (event, mode, _registered, active) => {
+  const native = event.toolName === "moonshot_search" || event.toolName === "moonshot_fetch";
+  if (native && (mode === "off" || !active.includes(event.toolName)))
+    return { block: true, reason: "Native web tool is off or inactive in this session." };
+  if (!WEB_KIT_TOOLS.includes(event.toolName))
+    return;
+  if (mode !== "pi-web-kit")
+    return { block: true, reason: "Web fallback requires explicit pi-web-kit configuration." };
+  return;
+};
+var searchSpecialist = (agent) => ROUTES.some((route) => route.capabilities.includes("Search") && [
+  agentFor(route, false),
+  agentFor(route, true, "normal"),
+  agentFor(route, true, "headless")
+].includes(agent ?? ""));
+var refuseUnassignedWebTool = (event, agent) => {
+  if (!["moonshot_search", "moonshot_fetch", ...WEB_KIT_TOOLS].includes(event.toolName))
+    return;
+  return searchSpecialist(agent) ? undefined : { block: true, reason: "This specialist does not have the Search capability." };
+};
 var isFile = (path) => runSync2(try_2(() => statSync2(path, { throwIfNoEntry: false })?.isFile() === true).pipe(orElseSucceed2(() => false)));
 var hasExecutableBit = (path) => runSync2(try_2(() => ((statSync2(path, { throwIfNoEntry: false })?.mode ?? 0) & 73) !== 0).pipe(orElseSucceed2(() => false)));
 var ABSOLUTE_FOLDER = { posix: /^\//, win32: /^(?:[a-zA-Z]:[\\/]|[\\/]{2})/ };
@@ -19704,7 +19851,10 @@ var createExtension = ({
           };
         }
         const role = yield* roleOf;
-        configured = settingsFor(config, role, bound, machineForm());
+        configured = {
+          ...settingsFor(config, role, bound, machineForm()),
+          profileRouting: config.pi.profile !== undefined
+        };
         const status = yield* holyagent(signal, project, "status").pipe(flatMap2((text) => parseOutput("status", text)));
         const reconcile = RECONCILED.has(reason) ? yield* holyagent(signal, project, "reconcile").pipe(flatMap2((text) => parseOutput("reconcile", text))) : undefined;
         const directory = yield* fromResult2(folder);
@@ -19832,6 +19982,10 @@ var createExtension = ({
       if (own.signal.aborted)
         return;
       taken.gatesOff = result?.gatesOff === true;
+      if (result?.enabled === false)
+        taken.profileRouting = false;
+      else if (result?.profileRouting !== undefined)
+        taken.profileRouting = result.profileRouting || (env["HOLYAGENT_ROUTING_PROFILE"]?.trim() ?? "") !== "";
       if (result?.rootPrompt === true)
         taken.rootPrompt = true;
       else if (result?.enabled === false)
@@ -19844,6 +19998,10 @@ var createExtension = ({
         applyEnvironment(env, result.providerEnvironment, true);
       if (result !== undefined)
         taken.codex = result.codex;
+      if (result !== undefined)
+        taken.uniformCodex = result.uniformCodex === true;
+      if (result !== undefined)
+        taken.webMode = result.webMode;
       if (result?.autoReview !== undefined)
         taken.autoReview.fix(result.autoReview);
       if (result !== undefined)
@@ -19852,8 +20010,16 @@ var createExtension = ({
         bash.enable(ctx.cwd);
       if (!taken.started && result?.enabled !== false) {
         taken.started = true;
-        if (result?.codex !== undefined)
-          taken.specialistNotice = activateApplyPatch(result.codex);
+        if (result?.webMode === "provider" && searchSpecialist(childAgent(pi.getSessionName()))) {
+          const inventory = runSync2(try_2(() => nativeSearchInventory(pi.getAllTools().map(({ name }) => name), pi.getActiveTools())).pipe(orElseSucceed2(() => ({
+            state: "unknown",
+            reason: "native tool inventory failed"
+          }))));
+          if (inventory.state !== "exposed")
+            taken.specialistNotice = joinOptional(taken.specialistNotice, notice(`${inventory.reason}; search availability is unknown or disabled. Configure pi-web-kit explicitly if you intend to use it.`));
+        }
+        if (result?.codex !== undefined && (ctx.model?.provider === "openai-codex" || ctx.model === undefined && result.uniformCodex === true))
+          taken.specialistNotice = joinOptional(taken.specialistNotice, activateApplyPatch(result.codex));
         if (result?.screenServers !== undefined)
           taken.specialistNotice = joinOptional(taken.specialistNotice, registerScreen(result.screenServers, taken.t3));
         if (result?.config !== undefined)
@@ -19893,6 +20059,9 @@ var createExtension = ({
       t3Gate: false,
       t3Root: false,
       codex: undefined,
+      uniformCodex: false,
+      webMode: undefined,
+      profileRouting: (env["HOLYAGENT_ROUTING_PROFILE"]?.trim() ?? "") !== "",
       autoReview: createAutoReviewSettings(),
       justBash: false,
       probe: undefined,
@@ -19903,7 +20072,7 @@ var createExtension = ({
     return gather(held, ctx, event.reason);
   });
   pi.on("session_compact", (_event, ctx) => held === undefined ? undefined : gather(held, ctx, "compact"));
-  pi.on("before_agent_start", (event) => {
+  pi.on("before_agent_start", (event, ctx) => {
     const child = isChild();
     if (!child)
       applyEnvironment(env, hostEnvironment(pi.getActiveTools()), false);
@@ -19914,7 +20083,7 @@ var createExtension = ({
     const result = (collected) => {
       if (!child && collected?.environment !== undefined)
         applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true);
-      const family = taken?.codex?.family;
+      const family = ctx.model?.provider === "openai-codex" || ctx.model === undefined && taken?.uniformCodex === true ? taken?.codex?.family : undefined;
       const own = child ? family === undefined ? event.systemPrompt : familyAgentPrompt(event.systemPrompt, childAgent(pi.getSessionName()) ?? "", family, packageRoot) : undefined;
       const filled = own === undefined ? undefined : fillPackageRoot(own, packageRoot, platformPath);
       const rooted = !child && taken?.rootPrompt === true ? `${fillPackageRoot(family === undefined ? PI_ROOT_PROMPT : PI_ROOT_PROMPTS[family], packageRoot, platformPath)}
@@ -19956,7 +20125,9 @@ ${event.systemPrompt}` : undefined;
     return message === undefined ? undefined : { message };
   });
   pi.registerToolRenderer(workflowRenderers);
-  pi.on("tool_call", (event) => held?.gatesOff === true ? undefined : refuseExcludedTool(event, held?.excluded ?? []) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
+  pi.on("tool_call", (event, ctx) => held?.gatesOff === true ? undefined : (held?.profileRouting === true ? refuseProfileLaunch(event, true, event.toolName === "Agent" || event.toolName === "agent" ? runSync2(try_2(() => ctx.modelRegistry).pipe(orElseSucceed2(() => {
+    return;
+  }))) : undefined) : undefined) ?? refuseExcludedTool(event, held?.excluded ?? []) ?? (isChild() ? refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ?? refusePrematureWebFallback(event, held?.webMode, pi.getAllTools().map(({ name }) => name), pi.getActiveTools()) : undefined) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
   pi.on("session_shutdown", () => release());
   registerCodex(pi, {
     settings: () => held?.codex,
@@ -19998,6 +20169,9 @@ export {
   refuseExcludedTool,
   refuseNonSpecialist,
   refuseNonSpecialistWorkflow,
+  refusePrematureWebFallback,
+  refuseProfileLaunch,
+  refuseUnassignedWebTool,
   runtimeArgs,
   sanitizeWorkflowName,
   scriptArgs,

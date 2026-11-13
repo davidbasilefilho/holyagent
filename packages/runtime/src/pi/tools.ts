@@ -16,7 +16,7 @@ import type { Config, RouteKey } from "../config/schema.ts"
 import { type Capability, routeFor } from "../domain/route.ts"
 import { justBashEnvironment } from "./bash/settings.ts"
 import { FFF_TOOLS } from "./fff/settings.ts"
-import { type ProviderProfile, providerProfile, webChoice } from "./provider.ts"
+import { type ProviderProfile, providerProfile, PROVIDERS, webChoice } from "./provider.ts"
 
 /** Pi's built-in tools that read: they replace `Read`, `Grep` and `Glob` for every role. */
 export const READ_TOOLS: ReadonlyArray<string> = ["read", "grep", "find", "ls"]
@@ -157,16 +157,17 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
 export const toolArgs = (
   config: Config,
   key: RouteKey,
-  profile: ProviderProfile = providerProfile(config),
+  profile: ProviderProfile = PROVIDERS[config.pi.routes[key].provider ?? config.pi.provider],
   options: { readonly screen?: boolean; readonly form?: CapabilityForm } = {},
 ): ToolArgs => {
   const { features } = config.pi
-  const enabled = enabledCapabilities(features, { provider: config.pi.provider })
+  const provider = config.pi.routes[key].provider ?? config.pi.provider
+  const enabled = enabledCapabilities(features, { provider })
   // What the form offers: a headless machine has no desktop, so a specialist launched for it has
   // no computer-use tools, not even a visual role, whose own tools they are in the normal form.
   const formEnabled = enabledCapabilities(features, {
     form: options.form ?? "normal",
-    provider: config.pi.provider,
+    provider,
   })
   const noMcp = !features.mcp
   const env = {
@@ -278,8 +279,6 @@ export {
  * with `pi.enable` off. A switched-off capability adds nothing, since its package is not loaded,
  * and neither does one the `form` does not offer (the headless form has no computer use):
  *
- * - The provider's web tools, enabled in the provider extension's settings, while the web choice is
- *   the provider's (they are off by default);
  * - The codemode mode (`pi.codemode.mode`, `only` by default) in Pi's settings, since no command-line
  *   argument sets it;
  * - The `settings` of each enabled capability in the registry (`CAPABILITIES`), in its order: the
@@ -295,25 +294,14 @@ export {
  */
 export const toolSettings = (
   config: Config,
-  profile: ProviderProfile = providerProfile(config),
+  _profile: ProviderProfile = providerProfile(config),
   form: CapabilityForm = "normal",
   platform?: string,
 ): ReadonlyArray<SettingsPatch> => {
   const { enable, features } = config.pi
   if (!enable) return []
-  const web = webChoice(profile, features.web)
   return [
     { file: PI_SETTINGS_FILE, content: { codemode: { mode: config.pi.codemode.mode } } },
-    ...(web.source === "provider" && profile.toolsFile !== undefined
-      ? [
-          {
-            file: profile.toolsFile,
-            content: {
-              tools: Object.fromEntries(web.tools.map((tool) => [tool, { enabled: true }])),
-            },
-          },
-        ]
-      : []),
     ...enabledCapabilities(features, { form, platform, provider: config.pi.provider })
       .flatMap((capability) => capability.settings)
       .filter(

@@ -129,14 +129,14 @@ describe("the Codex provider profile", () => {
     expect(PROVIDERS["kimi-coding-global"].writeTools).toEqual([])
   })
 
-  test("selecting Codex loads no provider package; the web kit stands in for the provider's tools", () => {
+  test("selecting Codex loads no provider package or implicit fallback", () => {
     expect(piPackages(CODEX)).not.toContain(piPackages(DEFAULT_CONFIG)[0])
     expect(piPackages(CODEX)[0]).toStartWith("npm:@tintinweb/pi-subagents@")
     expect(piPackages(CODEX).filter((source) => source.includes("pi-provider-kimi-code"))).toEqual(
       [],
     )
-    expect(webChoice(providerProfile(CODEX), "provider").source).toBe("pi-web-kit")
-    expect(piPackages(CODEX).some((source) => source.includes("pi-web-kit"))).toBe(true)
+    expect(webChoice(providerProfile(CODEX), "provider").source).toBe("provider")
+    expect(piPackages(CODEX).some((source) => source.includes("pi-web-kit"))).toBe(false)
     expect(toolSettings(CODEX).some((patch) => patch.file.includes("providers/"))).toBe(false)
   })
 
