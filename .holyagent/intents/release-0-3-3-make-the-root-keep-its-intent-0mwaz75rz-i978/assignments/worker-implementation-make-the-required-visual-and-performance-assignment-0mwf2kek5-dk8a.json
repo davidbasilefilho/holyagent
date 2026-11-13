@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mwf2kek5-dk8a",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "make-the-required-visual-and-performance",
+  "objective": "Make the required visual and performance evidence cycle executable around root-owned commits.",
+  "state": "Running",
+  "scope": [
+    "Requirements/all-family on-demand visual and performance skill ordering and focused coverage tests."
+  ],
+  "constraints": [
+    "Continue /workspace/work/holyagent-034-guidance at d1cd4a0. Allreviewersterminal. Read guidance-review-artifact.json findingtrace: writerscannotcommit, rootcommitsafterwritersterminal, currentguidanceaskswritersforpercommitevidencebutno postcommitcollector -> actualSHAcomparisons can'texist. Repair orderinginrequirementsfirst andallfamilies, on-demandskillsdetails, preservecontextbudgetsandall existingbehavior. Root sourceVCSexclusive remains.",
+    "Explicitbaselinecollection BEFORE any tasksourceedits and preserveimmutable originalrevision/artifacts/conditions. Rootcreates each sourcecommit then dispatches qualified existing specialist evidence collection/measurement on that ACTUAL commit beforeindependentreview/acceptance/push, comparingtooriginalandprevious. No new specialistrole needed; use appropriate existingvisual/operations/validationcompetencyharnessadapted. Precommitexploratorymeasurements don'tsubstituteactualcommitcomparison. Store reports/artifacts associatedwithSHA outside sourcecommit as needed toavoidrecursive evidence-onlycommit loop; persistedstate/handoffmustpointtoevidence truthfully. Missingruntime/capture =>concreteUnknown/blocker perrequestedtarget, neverfakecompletion.",
+    "Do notchange rootVCS/approvalrules/or0.4architecture. Put proceduraldetailsinvisual-judging/performance skill (alreadyrootroutesbeforetask), minimalifanyrootroutertext; scope throughsharedrequirements+coverage+allfamilies/currentPiClaudeassemblies. Ensurebaselinecannotbeoverwrittenandpreviouscomparisonprogressesaftereachcommit. Preservethreevisualrepairrounds/creativechoice/goalquery/noinventeddata.",
+    "No actualVCS/.git/.holyagentwrites/depschanges/extraagents/modelcalls. Standardenv MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Run focusedinstruction/assembly/context/approvalpolicytests +type/lint/fmt throughmise, no generatededits/build/fullverify yet. Keepworkinguntilchecked.",
+    "JSON /workspace/work/034/guidance-evidence-order-report.json correctCLIshape/exactkeys; diff /workspace/work/034/guidance-evidence-order.diff. <=250wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Original baseline is collected before edits and actual per-commit evidence is dispatched after root commits",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Cross-family and harness guidance preserves budgets approval boundaries and truthful evidence",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/tests/instructions.test.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "docs/iteration-evidence.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf20yvo-13go",
+  "specialist": {
+    "agentId": "/root/r034_iteration_guidance",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T14:25:48.725Z"
+  },
+  "createdAt": "2026-11-13T14:25:48.725Z"
+}
