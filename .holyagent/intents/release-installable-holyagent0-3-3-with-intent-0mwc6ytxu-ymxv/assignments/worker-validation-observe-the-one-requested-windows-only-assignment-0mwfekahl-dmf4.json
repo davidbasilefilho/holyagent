@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwfekahl-dmf4",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.validation",
+  "slug": "observe-the-one-requested-windows-only",
+  "objective": "Observe the one requested Windows-only retry on the unchanged publication repair commit.",
+  "state": "Running",
+  "scope": [
+    "Exact PR129 head68f7ed8a9c1cd5e099fc0c763706dd13d25e5e66. PR Validation43495400483 all six jobs passed. PushPublish43495202915 failed Windows132126363476 at default5000ms HTTP404 fixture test, resultnull/emptyoutput, one dangling processkilled. Root requested single-job rerun using gh run rerun --job132126363476; no code or assertions changed.",
+    "Watch latest attempt of43495202915 toterminal and identify rerunWindows jobID/result. Verify current PRhead and latest context outcomes. Superseded/cancelledattempts aren'tcurrentgates; preserve oldfailedattempt in report. Nevercallflake/environmentcauseproven; no sourcechange or blanketretry. If retryfails, fetch complete newfailurelogdiagnostics and report beforeanyfurtheraction."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT validation/ci-watch. Read-only Git/GitHub/logs only; no VCS/config/state/source/remote writes or further reruns/subagents/modelcalls/publication/executable investigation. Root owns merge and subsequentmainstablepublish. No user settingschange needed;versionmandatoryalreadypassed.",
+    "Save /workspace/work/034/033-windows-single-retry-report.json exact JSON status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]. Validate arrays/keys/exits, <=250words, logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Same-commit retry outcome is accurately reported with original failure and remaining uncertainty preserved",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "head",
+    "checks-run",
+    "failures",
+    "merge-state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfe3629-ade3",
+  "specialist": {
+    "agentId": "/root/r033_resumed_ci_watch",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T20:01:38.842Z"
+  },
+  "createdAt": "2026-11-13T20:01:38.842Z"
+}
