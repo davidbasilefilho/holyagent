@@ -32,6 +32,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r033_promotion_route",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T18:05:48.295Z"
