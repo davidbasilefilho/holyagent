@@ -1,0 +1,48 @@
+{
+  "id": "assignment-0mwf1uygw-axhe",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-and-verify-the-repaired",
+  "objective": "Regenerate and verify the repaired instruction guidance within existing context budgets.",
+  "state": "Running",
+  "scope": [
+    "Build and full verify only in guidanceworktree."
+  ],
+  "constraints": [
+    "Work exclusively /workspace/work/holyagent-034-guidance. Writerrepairterminal, read /workspace/work/034/guidance-repair-report.json: all11previousfailcasespass, finalgeneratedfreshnesspending. No sourcefixes/actualVCS/.git/.holyagent writes/dependencychanges/extraagents/networkmodelcalls. Build modifies generatedonly,sourcehashesstaystable.",
+    "Toolchain standard /workspace/work/tools env andrepoAGENTS/.claude rules. Run bunx --no-install mise run build then python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify with MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Reportfailurescompact/sourcehashes, don'tfixorbroadenifgreen.",
+    "JSON correctshape /workspace/work/034/guidance-repaired-build-report.json, generateddiff /workspace/work/034/guidance-repaired-generated.diff. Exactcriteria/labels keys. <=150wordfinal, logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Generated instruction assets and full verification pass within unchanged context budgets",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No unowned source changes are introduced",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf1h7s3-g8eb",
+  "specialist": {
+    "agentId": "/root/r034_state_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:06:01.472Z"
+  },
+  "createdAt": "2026-11-13T14:06:01.472Z"
+}
