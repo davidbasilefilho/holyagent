@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mwfgybha-yjyg",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "restore-explicit-on-demand-guidance",
+  "objective": "Restore explicit on demand guidance reading for specialist prompts while removing only the root duplication.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-skills clean e4e9cd5a, prior d9f21e91 feature accepted code/artifact; narrowduplicatewordingrepair e4 got blockingartifactfinding. Exactreport /workspace/work/034/owned-guidance-duplicate-artifact-review-report.json traces skills.ts310 removal as onlygeneralreadingdirective forspecialists; per-family root/skills texts aren't includedinspecialists. Restore explicit relevant guidance read directive for specialist routes in everyfamily; keep concise userthirdpartyavailability. Avoid redundant rootgeneralinstruction because rootfamilytexts alreadycarryit.",
+    "Fix minimum sharedrouter/generatorlogic and meaningful scopedguidancetest that failsif specialistloadinstructionmissing. Preserve exactownedroles/router/guidancepaths, on-demandno bodypreload, userthirdpartycatalog. NoCperformance integration yet, root mergesC later. Requirementsfirst ifactual model-facingrequirement changes; load .claude/skills/requirements/SKILL.md and instruction-writing guidance; preserve existingR-OWNEDROUTES.",
+    "Build+scopedruntime/Pi/Claudegenerationtests+staticgates; no needwholeverify since originalbranchandnarrowrepair alreadyverified and onlytextbranching changes. Save /workspace/work/034/owned-guidance-specialist-repair-report.json and incremental.diff frome4e9cd5a."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "Every specialist role retains explicit relevant guidance reading while root instructions avoid duplication across all families",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Meaningful scoped guidance tests build and static checks pass without unrelated instruction changes",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/skills.ts",
+    "packages/runtime/tests/scoped-skills.test.ts",
+    "packages/integrations/pi/tests/scoped-skills.test.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/events_wildcard_repair",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T21:08:32.542Z"
+  },
+  "createdAt": "2026-11-13T21:08:32.542Z"
+}
