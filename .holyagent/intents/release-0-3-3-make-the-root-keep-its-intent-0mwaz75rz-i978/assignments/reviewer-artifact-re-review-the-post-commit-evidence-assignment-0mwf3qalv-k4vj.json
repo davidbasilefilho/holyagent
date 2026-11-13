@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwf3qalv-k4vj",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "re-review-the-post-commit-evidence",
+  "objective": "Re-review the post-commit evidence collection ordering repair for artifact correctness.",
+  "state": "Running",
+  "scope": [
+    "d1cd4a0ef0758efe16cd49f09a32265971094ddc..11f32c53e64ee72bfda3efd0256043d2d0bd9f9b; previousfindingandnewregressionsonly."
+  ],
+  "constraints": [
+    "Read-only /workspace/work/holyagent-034-guidance exact11f32c53e64ee72bfda3efd0256043d2d0bd9f9b. Writers/buildterminal, guidance-order-build-report.json records558focusedpass/sourcehashstable. Read prior guidance-review-artifact.json and guidance-evidence-order-report.json/diff. NoactualVCS/statewrites/extraagents/livecalls. RepoAGENTS/.claude/instruction-writing/role standards apply. Mustbeindependentfromallguidancewriters; formalindependence linksnewrepair.",
+    "Close precise prior evidence-order finding: baseline BEFORE anysourceedits; root-onlyVCS then qualifiedcollector on actualcommit compares immutableoriginal+previous BEFOREreview/accept/push; externalSHA-associatedartifactsavoidevidencecommitrecursion. Visual andperformance both, all3families.",
+    "Toolchain requiredexplicitly: env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH mise exec -- bun test <relevantfiles>. Do NOT use defaultbarebunxmissingPATH. Fullverify afterreviews, notyourscope. Actualruntimeunavailablehonest, no unrequestedpolicyfeatures.",
+    "JSON /workspace/work/034/guidance-final-review-artifact.json correctCLIshape/exactkeys, <=200wordfinal/logsexternal. Findings requiretrace/repro."
+  ],
+  "criteria": [
+    {
+      "text": "Post-commit evidence ordering gap is closed across families and current harnesses without new blockers",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf2kek5-dk8a"
+  ],
+  "followUpOf": "assignment-0mwf2dyza-ujo1",
+  "specialist": {
+    "agentId": "/root/r034_guidance_review_artifact",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T14:58:23.156Z"
+  },
+  "createdAt": "2026-11-13T14:58:23.156Z"
+}
