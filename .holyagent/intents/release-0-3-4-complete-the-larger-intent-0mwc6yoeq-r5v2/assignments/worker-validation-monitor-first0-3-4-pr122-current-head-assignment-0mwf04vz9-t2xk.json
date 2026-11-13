@@ -39,6 +39,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_watch_flow_ci",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T13:17:45.573Z"
