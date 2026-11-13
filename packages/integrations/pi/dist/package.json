@@ -4,6 +4,11 @@
   "description": "HolyAgent for Pi: its skills, its 18 specialists and an extension, built from the shared holyagent runtime.",
   "license": "Apache-2.0",
   "author": "davidbasilefilho",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davidbasilefilho/holyagent",
+    "directory": "packages/integrations/pi/dist"
+  },
   "type": "module",
   "keywords": [
     "pi-package"
