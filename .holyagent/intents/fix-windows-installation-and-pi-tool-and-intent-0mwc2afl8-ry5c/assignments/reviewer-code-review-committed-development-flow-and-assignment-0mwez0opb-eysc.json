@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "review-committed-development-flow-and",
   "objective": "Review committed development-flow and provenance changes for correctness, regressions and minimal scope.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Committed range44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a..e28990817cb5a0e233c7673a98594320afb973ef in /workspace/work/holyagent-034"
   ],
@@ -42,7 +42,9 @@
     "agentId": "/root/r034_flow_review_code",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T12:46:29.903Z"
+    "startedAt": "2026-11-13T12:46:29.903Z",
+    "finishedAt": "2026-11-13T12:48:54.185Z"
   },
+  "result": "result: Blocked: macOS validation and future version bumps fail.\nchanged: /workspace/work/034/flow-review-code.md\nchecks: Focused four-file Bun test via mise with /workspace/work/tools/mise state/data/cache, exit 0: 52 pass, 0 fail. Built-in /code-review unavailable: no Skill tool. Full verify not rerun; writer reported 3487 pass, 2 skips on Linux. macOS and Windows not run.\nblockers:\n- .github/actions/tag-release/dev-version.sh:11 uses GNU date -d; packages/integrations/pi/publishing.test.ts:30-41 invokes it unconditionally, and .github/workflows/validation.yml macos job runs verify. macOS BSD date rejects -d, producing a malformed version and failing validation. The dev handoff test also executes this script. Use a portable test seam or portable UTC conversion.\n- packages/integrations/pi/publishing.test.ts:41 hard-codes 0.3.4. The next prescribed bump changes package.json and script output, so verification fails even when versioning is correct. Assert against the manifest version or an isolated fixture.\nquestions: none\nnotes: Retired release-branch checks match the requested main/dev model. Generated repository metadata matches the recorded E422 URL; actual npm publishing, dev protection and npm deployment policy remain unverified. Tag preflight, artifact handoff and permissions inspected; existing npm versions are rejected on rerun. Windows shell portability was not executed.\nevidence:\nCommitted release-flow slice has no unaddressed merge blockers: Two blockers above; committed file and CI traces.\nReview covers exact committed scope without treating prerequisites as completed: Read component intent revision 3 and umbrella revision 11; immutable diff and workflow callers; remote settings and publication unverified.\nreviewed-range: 44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a...e28990817cb5a0e233c7673a98594320afb973ef.\nfindings: macOS date incompatibility and fixed 0.3.4 test expectation, above.\nchecks-run: Focused 52 tests passed on Linux; /code-review unavailable; platform jobs and full verify not independently run.\n",
   "createdAt": "2026-11-13T12:46:29.903Z"
 }
