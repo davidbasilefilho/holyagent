@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mwf2s8cg-zx7s",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 13,
+  "roleTask": "Worker.implementation",
+  "slug": "reconcile-pi-setup-doctor-and-undo",
+  "objective": "Reconcile Pi setup doctor and undo regression coverage with native-search permission preservation.",
+  "state": "Running",
+  "scope": [
+    "Recorded16setup-pi-settings failures, truthful documentation and necessary narrowly proven lifecycle fixes."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-routing. Originalroutingwriterterminal, nowworkingdifferentEVENTStree; generatedbuilderterminal. Read /workspace/work/034/routing-build-report.json with16exactfailures and routing-report.json. Sourcealreadychanges toolSettings tostopautomaticallyenablingoptionalKimitools, so newsetupdoesn'twriteKimitoolssettings; upstream/useropt-inneeded. Rootapproves this permissionpreserving behavior IFexistinguseron/offvaluesunchanged. RootbaselineVCSsamec3, allcurrentroutinguncommitted, do notresetoroverwriteit. RootownsVCS/state.",
+    "Knownsource: packages/runtime/src/pi/tools.ts removed providerwebsettingsenabled:true patches, schema WebMode nowselectsavailabletools withoutgrantingprovideropt-in. Existing16setup/doctor/undo tests assumeKimisettingscreatedownedbynewsetup, soadapt REAL expectednewlifecycle assertions instead ofdelete/weakenwholechecks. Preserveexplicitoffandon/pre-existingfilevalues; doctordoesn'tclaimdisablednativewebready withoutactionableopt-in; undo DOESNOTremoveuserownedKimisettings. Historicalownedsetupmarker/snapshotundo muststillrestorewhatitactuallyowned underoldrelease; ifproductionbugfound showreprothenminimalownedsourcefix. Don'tre-enabletoolssilentlyjusttogreen.",
+    "Reviewactualfixturesbeforedecidingall16intentional; test meaningfulupdatedpermissionpreservation pluslegacyundo fromrecordedoldownership ifapplicable. Docsactualenabled/exposedvsentitled distinctions, manualopt-in instructions sourceverifiedlockedKimi0.6.13. No requiredliveaccount or paidcalls. Reportonlygenuinemissinghostcontract; no rankedselectorworkhere.",
+    "No actualVCS/.git/.holyagentwrites, extraagents, globaluserPCoperations, dependencies/pinchanges, generatededits. ExistingAGENTS/.claude rules. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Focusedsetup+provider/routingtests, type/lint/fmt via mise, no build/fullverify yet.",
+    "JSON /workspace/work/034/routing-setup-repair-report.json correctCLIshape/exactkeys, diff /workspace/work/034/routing-setup-repair.diff. Final<=250words/logsexternal. Ifactualtestfilediffers fromownershippath, askrootbeforeediting; nootherbroadcleanup."
+  ],
+  "criteria": [
+    {
+      "text": "Setup doctor and undo preserve explicit native-search permissions and recorded ownership",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "All16recorded failures are resolved with meaningful current and historical lifecycle coverage",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/setup-pi-settings.test.ts",
+    "packages/runtime/src/setup/pi-settings.ts",
+    "packages/runtime/src/pi/tools.ts",
+    "docs/routing.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T14:31:53.920Z"
+  },
+  "createdAt": "2026-11-13T14:31:53.920Z"
+}
