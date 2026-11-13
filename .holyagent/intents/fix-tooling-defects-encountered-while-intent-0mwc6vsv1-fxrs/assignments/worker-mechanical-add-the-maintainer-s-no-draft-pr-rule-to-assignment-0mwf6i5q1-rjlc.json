@@ -1,0 +1,38 @@
+{
+  "id": "assignment-0mwf6i5q1-rjlc",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 7,
+  "roleTask": "Worker.mechanical",
+  "slug": "add-the-maintainer-s-no-draft-pr-rule-to",
+  "objective": "Add the maintainer's no-draft-PR rule to the repository AGENTS.md.",
+  "state": "Running",
+  "scope": [
+    "EDITONLY /workspace/work/holyagent-034/AGENTS.md onrelease/0.3.4/chore/development-flow c3c93510. UserexplicitlyauthorizesAGENTS.md update despitefilepermissionrule. UnderCommitsandpullrequests add: Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending. Keepminimalonebullet, consistentEnglishandreason; nootherpolicy/version/dependencyedits. AllfuturePRsready; existing123alreadyconvertedReady. NoVCS/actual.git/statewrites/subagents. No testsneededforthisreversibledoc-onlychange, inspectdiff/format. JSON /workspace/work/034/no-draft-policy-report.json statusEXACTdone|partial|blocked,checks:[{command,exit}],changed_paths,blockers,notes,evidence:[{key,support}]; diff /workspace/work/034/no-draft-policy.diff. <=150wordfinal."
+  ],
+  "constraints": [
+    "RepoAGENTS/.claude/roleinstructionsapply. RootownsVCS/state/usersecuritysettings; no externalwrites orsourcechangesexceptexplicitAGENTS.mdwriter. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. ReportJSONstatus EXACTLY done|partial|blocked,checks exitsNUMBERSnotstrings/null,exactcriterion/evidencelabelkeys."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned artifact or architecture scope is completed accurately with stated limits",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "findings"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T16:16:02.425Z"
+  },
+  "createdAt": "2026-11-13T16:16:02.425Z"
+}
