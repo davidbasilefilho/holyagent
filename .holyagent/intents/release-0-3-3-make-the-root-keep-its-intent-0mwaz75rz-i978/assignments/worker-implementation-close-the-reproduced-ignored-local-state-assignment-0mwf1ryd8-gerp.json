@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mwf1ryd8-gerp",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-reproduced-ignored-local-state",
+  "objective": "Close the reproduced ignored-local-state omission in read-only handoff.",
+  "state": "Running",
+  "scope": [
+    "Bounded handoff completeness guard, actual branch-mode fixtures and accurate docs."
+  ],
+  "constraints": [
+    "Continue B /workspace/work/holyagent-034-state at f2110f1fd9b855a28217d299f46731eba4f5632d. Allreviewers terminal. Read state-rereview-{code,security,testing}.json in /workspace/work/034 and security repro /tmp/holyagent-handoff-review-repro.ts. No actualVCS/.git/.holyagent writes, externalcalls/modelcalls/depschanges/subagents. Temporary Git/state fixtures allowed. Root owns commits/state; existing repo/toolchain rules apply.",
+    "Reproduced: migrationmarker present; ignored local .holyagent intent samepath assharedintent divergentobjective; gitstatus empty and handoff exit0 outputs sharedonly. tree.ts1227 comparesbytes onlyiffile.status, status excludesignored. Repair realno-writecompleteness guard, add red/green realGitfixture withmarker+ignoredsamepathdivergentfile. Must refuseactionably orrepresentallrecordedstate withoutmigration/writes. Coverotherworktreealias/mixedpaths as relevant; don't alter migrationalgorithms broadly or assume Gitstatusmeansno ignoredstate.",
+    "Preserve treatmentof clean tracked historicalstatecopies where designintentionally permits them; if status/provenance cannotdisambiguatestalevsnew ignoredcopy, default truthfulactionableunavailable ratherthan silentlycomplete. Document exactlimits. Do not blindly causeevery ordinary migratedhistoricalrepo tofailwithoutconsidering legitimatecase; tests need cleantrackedhistoricalcopy behavior plus ignoreddivergence. Extend freshrepo fixture to asserttrulyemptyoutputandno writes. Don'tchange unrelatedCLIsemantics.",
+    "Run focusedhandoff+statebranch+operationaltests and type/lint/fmt throughmise. Then rootcoordinatedbuild/fullverify/commit/re-review; no fullverify/build generatededits now. JSON /workspace/work/034/handoff-ignored-repair-report.json correctCLIshape exactkeys; diff /workspace/work/034/handoff-ignored-repair.diff. Final<=250words/logsexternal. Keepworkinguntilfixchecked."
+  ],
+  "criteria": [
+    {
+      "text": "Marked ignored divergent state cannot silently disappear from a read-only handoff",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Real Git fixtures cover the omission and preserve fresh and historical-state behavior without writes",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/state/tree.ts",
+    "packages/runtime/tests/handoff.test.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "docs/handoff.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf16b4a-7l4u",
+  "specialist": {
+    "agentId": "/root/r034_handoff_command",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T14:03:41.372Z"
+  },
+  "createdAt": "2026-11-13T14:03:41.372Z"
+}
