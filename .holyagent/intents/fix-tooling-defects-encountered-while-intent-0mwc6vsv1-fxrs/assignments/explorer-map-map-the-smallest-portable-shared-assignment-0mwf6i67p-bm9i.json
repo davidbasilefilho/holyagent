@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mwf6i67p-bm9i",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 7,
+  "roleTask": "Explorer.map",
+  "slug": "map-the-smallest-portable-shared",
+  "objective": "Map the smallest portable shared functional package architecture for direct CLI and Pi native consumers.",
+  "state": "Running",
+  "scope": [
+    "READONLY allcurrentfeaturetrees: holyagent-034(A), -state(B), -guidance(C), -tools(D), -routing(E), -events(F), -skills(G), -cli(H). NewuserrequiresactualfunctionalityanotherpackageusedbyCLIandnativePi DIRECTLY, notspawningCLI orcallingCLIargvparser. CurrentDbridgeisa supersededoptiondoNOTrecommendit. Give2validlibrary-firstoptions/tradeoffs: moveCLIto@holyagent/cli andkeepactualruntime APIs in@holyagent/runtime, vsintroduceprivate@holyagent/core andthinexistingCLI. Inspectactualdependencygraph/Bun-onlyimports/businesslogicinsideCLIhandlers/config/routing/warmmetadata/hooks/setup; quantifyportableNodeeffectservices needed andexactpublicAPIs. Preserve strictEffectSchema/taggederrors/directrootauthority fromtrustedlaunch/config, state storelocking+uninterruptiblecriticalpersist, oldrecords/ownership/readonlyhandoff, stdoutstyleinCLIonly. DirecttypednativefunctionsNOT executeCLIinprocess genericargv. Nativeunsupportedhook/stdio/privilegedops mayremainexplicitcapabilitylimits; no CLI fallback disguisednative. Node/Bun adapters isolateBunimports; showactualminimalSDK/Nodebundleverificationplan andCLIparitytests. Avoidbroadmonoreporewrite/extra3rdpartydeps. Newprivateworkspacepackage/sameversiondepgraphchangesrequiredbyuserareauthorized; preserveexternalpins, identifyupdater/build lockregen path withoutunrelatedupgrades. No newnpmtrustedpublisheriflibrarybundledprivate. No source/VCS/.git/statewrites/subagents/livecalls. Architectureplanningnowwhilefeaturetreesfinalize, implementationafterrootdecision. File /workspace/work/034/core-package-map.md plusJSON /workspace/work/034/core-package-map-report.json exactCLIshape/statusenum; <=450wordfinal, detailedtracesoutside. Also identifycomposableintegrationorder avoidinglost C/Gprivate-map performanceID andF/Dflags."
+  ],
+  "constraints": [
+    "RepoAGENTS/.claude/roleinstructionsapply. RootownsVCS/state/usersecuritysettings; no externalwrites orsourcechangesexceptexplicitAGENTS.mdwriter. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. ReportJSONstatus EXACTLY done|partial|blocked,checks exitsNUMBERSnotstrings/null,exactcriterion/evidencelabelkeys."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned artifact or architecture scope is completed accurately with stated limits",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T16:16:03.061Z"
+  },
+  "createdAt": "2026-11-13T16:16:03.061Z"
+}
