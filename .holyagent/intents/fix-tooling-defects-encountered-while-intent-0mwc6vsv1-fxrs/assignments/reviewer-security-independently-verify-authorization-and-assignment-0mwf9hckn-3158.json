@@ -33,6 +33,7 @@
     "assignment-0mwf520wn-jh9q"
   ],
   "specialist": {
+    "agentId": "/root/r034_events_current_security_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T17:39:23.495Z"
