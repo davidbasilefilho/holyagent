@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "make-the-internal-holyagent-cli-output",
   "objective": "Make the internal HolyAgent CLI output plain text and concise natural-language guidance.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Internal CLI messages/emission/help/errors/version, focused regression coverage and accurate docs."
   ],
@@ -59,7 +59,9 @@
     "agentId": "/root/r034_handoff_command",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T14:41:36.010Z"
+    "startedAt": "2026-11-13T14:41:36.010Z",
+    "finishedAt": "2026-11-13T14:58:26.865Z"
   },
+  "result": "status: done\nchanged:\n- packages/runtime/src/cli/errors.ts\n- packages/runtime/src/cli/program.ts\n- packages/runtime/src/cli/tools.ts\n- packages/runtime/tests/cli-output.test.ts\n- packages/runtime/tests/tools.test.ts\n- docs/agent-cli-output.md\nchecks:\n- bun test packages/runtime/tests/cli-output.test.ts (before repair) -> exit 1\n- bun test packages/runtime/tests/cli-output.test.ts packages/runtime/tests/cli.test.ts packages/runtime/tests/tools.test.ts packages/runtime/tests/stdin.test.ts -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- 167 tests passed, 2 skipped (Windows and unavailable fd), 0 failed. Build/full verify deferred. Search output escapes terminal controls rather than preserving byte-for-byte stdout; files stay unchanged. Bun.spawn is used for concurrent backpressured stdout/stderr streaming and split UTF-8 control handling. The CLI main entry is a merge seam with native cancellation work.\nevidence:\n- Internal CLI emits plain undecorated text across hosts even under forced-color conditions: Forced-color Pi/Claude guidance tests and actual rg --color=always test pass; child-generated and split stdout/stderr controls are escaped.\n- Help errors version and confirmations use short natural guidance while preserving essential data: Top help and acceptance/state hints shortened; version unchanged; structured Intent confirmations and requirements verified.\n- Exit stderr schemas cancellation and structured record contracts remain compatible: Search arguments pass unchanged; actual rg -e and --glob incomplete-option exit codes match direct execution. Schema, exit and record tests pass; child is killed on interruption.\n- Focused plain-output and affected CLI checks pass without unrelated UI changes: Focused suite exit 0: 167 pass, 2 skip; type, lint, format exit 0.\n- checks-run: Commands and exits above; no build or full verification.\n- changed-paths: See changed_paths; tools.test.ts was explicitly authorized by root.\n- diff-file: /workspace/work/034/plain-cli.diff\n- before-after: Before, rg --color=always emitted ESC styling and a malformed command echoed raw ESC; after, terminal controls appear as \\u001b without altering search arguments. Top help now starts 'Run holyagent <command> [args].'",
   "createdAt": "2026-11-13T14:41:36.010Z"
 }
