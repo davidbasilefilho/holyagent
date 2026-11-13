@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -133,7 +133,15 @@ test("branch-mode handoff refuses pending state and an unavailable state branch 
         stdin: Effect.fail(new StdinMissing({ reason: "no input" })),
       }),
     )
-  expect((await cli("pi")).code).toBe(0)
+  const freshFiles = (await readdir(join(root, ".git"), { recursive: true })).toSorted()
+  const freshRoot = (await readdir(root)).toSorted()
+  const fresh = await cli("pi")
+  expect(fresh.code).toBe(0)
+  expect((decode(fresh.stdout) as { intents: unknown[] }).intents).toEqual([])
+  expect((await readdir(join(root, ".git"), { recursive: true })).toSorted()).toEqual(freshFiles)
+  expect((await readdir(root)).toSorted()).toEqual(freshRoot)
+  expect(git("status", "--porcelain=v1", "--untracked-files=all")).toBe("")
+  expect(await Bun.file(join(root, ".holyagent", "config.json")).exists()).toBe(false)
   const record = intentFile(join(root, ".holyagent"), intent())
   await mkdir(dirname(record), { recursive: true })
   await Bun.write(record, JSON.stringify(intent()))
@@ -171,6 +179,76 @@ test("branch-mode handoff refuses pending state and an unavailable state branch 
   const complete = await cli("pi")
   expect(complete.code).toBe(0)
   expect(complete.stdout).toContain(intent().id)
+})
+
+test("a marked ignored divergent record is refused while a clean tracked historical copy remains valid", async () => {
+  root = await realpath(await mkdtemp(join(tmpdir(), "holyagent-handoff-ignored-")))
+  const git = (...args: string[]) => {
+    const result = Bun.spawnSync(["git", ...args], {
+      cwd: root,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    })
+    expect(result.exitCode).toBe(0)
+    return result.stdout.toString()
+  }
+  git("init", "-b", "main")
+  await Bun.write(join(root, ".gitignore"), "/.holyagent/\n/shared/\n")
+  const old = intent({ objective: "Historical objective" })
+  const local = intentFile(join(root, ".holyagent"), old)
+  await mkdir(dirname(local), { recursive: true })
+  await Bun.write(local, JSON.stringify(old))
+  git("add", ".gitignore")
+  git("add", "-f", local)
+  git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.test",
+    "commit",
+    "-m",
+    "historical state",
+  )
+  const shared = join(root, "shared")
+  git("worktree", "add", "-b", "holyagent/state", shared)
+  const current = intent({ objective: "Shared objective" })
+  const sharedFile = intentFile(join(shared, ".holyagent"), current)
+  await Bun.write(sharedFile, JSON.stringify(current))
+  const markerDir = join(root, ".git", "holyagent", "migrated")
+  await mkdir(markerDir, { recursive: true })
+  const marker = new Bun.CryptoHasher("sha1").update(root).digest("hex").slice(0, 16)
+  await Bun.write(join(markerDir, marker), "")
+  const cli = (host: string) =>
+    Effect.runPromise(
+      run(["handoff"], {
+        cwd: root,
+        env: { HOLYAGENT_HOST: host },
+        stdin: Effect.fail(new StdinMissing({ reason: "no input" })),
+      }),
+    )
+  expect((await cli("pi")).code).toBe(0)
+  git("rm", "--cached", local)
+  git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.test",
+    "commit",
+    "-m",
+    "remove historical tracking",
+  )
+  expect(git("status", "--porcelain=v1", "--untracked-files=all")).toBe("")
+  const worktrees = git("worktree", "list", "--porcelain")
+  for (const host of ["pi", "claude"]) {
+    const result = await cli(host)
+    expect(result.code).not.toBe(0)
+    expect(result.stderr).toContain("reconcile")
+  }
+  expect(await Bun.file(local).text()).toBe(JSON.stringify(old))
+  expect(await Bun.file(sharedFile).text()).toBe(JSON.stringify(current))
+  expect(git("status", "--porcelain=v1", "--untracked-files=all")).toBe("")
+  expect(git("worktree", "list", "--porcelain")).toBe(worktrees)
+  await Bun.write(local, JSON.stringify(current))
+  expect((await cli("pi")).code).toBe(0)
 })
 
 test("handoff does not create a lock for an unfinished standard state checkout", async () => {

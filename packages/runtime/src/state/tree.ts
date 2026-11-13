@@ -1219,12 +1219,29 @@ export const requireHandoffState = (cwd: string, env: Environment, directory: st
             "recorded state awaits migration; run a state command from this worktree, then retry handoff",
         })
       const entries = yield* workTreeEntries(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" })
+      const trackedResult = yield* git(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
+        "ls-files",
+        "--cached",
+        "-z",
+        "--",
+        `${STATE_DIRECTORY}/intents`,
+      ])
+      if (trackedResult.code !== 0)
+        return yield* failed(
+          entry.path,
+          ["ls-files", "--cached", "-z", "--", `${STATE_DIRECTORY}/intents`],
+          trackedResult,
+        )
+      const tracked = new Set(
+        trackedResult.stdout.split("\0").map((path) => path.slice(STATE_DIRECTORY.length + 1)),
+      )
       for (const file of entries.filter((item) => item.path.startsWith("intents/"))) {
         const target = join(directory, file.path)
         if (
           !(yield* isPlainFile(source, file.path)) ||
           !(yield* isPlainFile(directory, file.path)) ||
-          (file.status !== undefined && !(yield* sameBytes(join(source, file.path), target)))
+          ((file.status !== undefined || !tracked.has(file.path)) &&
+            !(yield* sameBytes(join(source, file.path), target)))
         )
           return yield* new StateIo({
             path: source,
