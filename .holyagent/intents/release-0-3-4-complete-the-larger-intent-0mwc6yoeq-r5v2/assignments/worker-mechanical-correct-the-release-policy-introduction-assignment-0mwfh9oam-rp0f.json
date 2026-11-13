@@ -43,5 +43,29 @@
     "finishedAt": "2026-11-13T21:26:30.080Z"
   },
   "result": "status: done\nchanged:\n- AGENTS.md\nchecks:\n- bunx --no-install mise run fmt:check -> exit 0\n- git diff --check -> exit 0\nnotes:\n- Format check: 736 files formatted. Full verification was not required for this text-only change.\nevidence:\n- Release policy introduction no longer claims unconfigured ruleset enforcement while all prescribed protections remain intact: AGENTS.md introduction describes the release convention and CI checks; the diff changes no policy bullets.\n- checks-run: Format check and git diff --check both exited 0.\n- changed-paths: AGENTS.md only.\n- diff-file: /workspace/work/034/incremental.diff",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Committed7b69947 preservesallpolicyand removesunsupportedconfiguredclaim; independentartifactrereviewpassed, fmt/diffcheckpass.",
+    "criteria": [
+      {
+        "criterion": "Release policy introduction no longer claims unconfigured ruleset enforcement while all prescribed protections remain intact",
+        "support": "AGENTS.md introduction describes the release convention and CI checks; the diff changes no policy bullets."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Format check and git diff --check both exited 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "AGENTS.md only."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/incremental.diff"
+      }
+    ]
+  },
   "createdAt": "2026-11-13T21:17:22.366Z"
 }
