@@ -36,7 +36,7 @@ Rules for working in this repository, each with the reason it exists. Claude Cod
 
 ## The release-branch model
 
-This repository's own convention, enforced by CI and rulesets; HolyAgent's instructions do not carry it.
+This repository's release convention includes CI checks; HolyAgent's instructions do not carry it.
 
 - Work PRs target `dev`; normal release PRs promote `dev` to `main` with a version strictly newer than `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
 - A deployment failure alone does not require a version bump. For a focused repair of an unpublished release, create `release/<version>/fix/publication-repair` from fresh `main` and squash its PR directly into `main`. The `version` check requires exact main/head version equality and confirmation that the exact npm version is absent. Never downgrade or overwrite an immutable published version. Retry an already published artifact only after verifying identical identity and provenance; product or source changes to a published artifact require a new version.
