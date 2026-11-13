@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "map-the-smallest-portable-shared",
   "objective": "Map the smallest portable shared functional package architecture for direct CLI and Pi native consumers.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "READONLY allcurrentfeaturetrees: holyagent-034(A), -state(B), -guidance(C), -tools(D), -routing(E), -events(F), -skills(G), -cli(H). NewuserrequiresactualfunctionalityanotherpackageusedbyCLIandnativePi DIRECTLY, notspawningCLI orcallingCLIargvparser. CurrentDbridgeisa supersededoptiondoNOTrecommendit. Give2validlibrary-firstoptions/tradeoffs: moveCLIto@holyagent/cli andkeepactualruntime APIs in@holyagent/runtime, vsintroduceprivate@holyagent/core andthinexistingCLI. Inspectactualdependencygraph/Bun-onlyimports/businesslogicinsideCLIhandlers/config/routing/warmmetadata/hooks/setup; quantifyportableNodeeffectservices needed andexactpublicAPIs. Preserve strictEffectSchema/taggederrors/directrootauthority fromtrustedlaunch/config, state storelocking+uninterruptiblecriticalpersist, oldrecords/ownership/readonlyhandoff, stdoutstyleinCLIonly. DirecttypednativefunctionsNOT executeCLIinprocess genericargv. Nativeunsupportedhook/stdio/privilegedops mayremainexplicitcapabilitylimits; no CLI fallback disguisednative. Node/Bun adapters isolateBunimports; showactualminimalSDK/Nodebundleverificationplan andCLIparitytests. Avoidbroadmonoreporewrite/extra3rdpartydeps. Newprivateworkspacepackage/sameversiondepgraphchangesrequiredbyuserareauthorized; preserveexternalpins, identifyupdater/build lockregen path withoutunrelatedupgrades. No newnpmtrustedpublisheriflibrarybundledprivate. No source/VCS/.git/statewrites/subagents/livecalls. Architectureplanningnowwhilefeaturetreesfinalize, implementationafterrootdecision. File /workspace/work/034/core-package-map.md plusJSON /workspace/work/034/core-package-map-report.json exactCLIshape/statusenum; <=450wordfinal, detailedtracesoutside. Also identifycomposableintegrationorder avoidinglost C/Gprivate-map performanceID andF/Dflags."
   ],
@@ -31,7 +31,33 @@
     "agentId": "/root/r034_core_package_map",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T16:16:03.061Z"
+    "startedAt": "2026-11-13T16:16:03.061Z",
+    "finishedAt": "2026-11-13T16:34:34.673Z"
+  },
+  "result": "status: done\nchanged:\n- /workspace/work/034/core-package-map.md\n- /workspace/work/034/core-package-map-report.json\nchecks:\n- Read package manifests, runtime and Pi source, state and feature tree integration seams -> exit 0\n- Validate report JSON and required evidence keys -> exit 0\nnotes:\n- Architecture map reflects parallel feature trees that may change; implementation and proposed verification were not run.\n- Option 2 is recommended; exact API input shapes must follow integrated CLI contracts.\n- Existing D subprocess bridge is superseded.\nevidence:\n- Assigned artifact or architecture scope is completed accurately with stated limits: /workspace/work/034/core-package-map.md maps both options, typed operations, state guarantees, portability seams, integration order, package maintenance, and validation plan; source trees were inspected read-only and may be moving.\n- checks-run: Read-only source inspection; JSON parse and required-key validation, exit 0. No product tests run for this architecture-only task.\n- changed-paths: /workspace/work/034/core-package-map.md and /workspace/work/034/core-package-map-report.json only.\n- findings: The CLI handlers contain application behavior; Node cannot safely import the current runtime barrel; preserve B state and D uninterruptible persistence, add C performance-iteration to G private guidance, and unify F/D root flag lifecycle. See map for source traces and tradeoffs.",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Scoped artifact/research evidence is complete and accurately states operational and verification limits; no server import or product behavior is claimed.",
+    "criteria": [
+      {
+        "criterion": "Assigned artifact or architecture scope is completed accurately with stated limits",
+        "support": "/workspace/work/034/core-package-map.md maps both options, typed operations, state guarantees, portability seams, integration order, package maintenance, and validation plan; source trees were inspected read-only and may be moving."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Read-only source inspection; JSON parse and required-key validation, exit 0. No product tests run for this architecture-only task."
+      },
+      {
+        "label": "changed-paths",
+        "support": "/workspace/work/034/core-package-map.md and /workspace/work/034/core-package-map-report.json only."
+      },
+      {
+        "label": "findings",
+        "support": "The CLI handlers contain application behavior; Node cannot safely import the current runtime barrel; preserve B state and D uninterruptible persistence, add C performance-iteration to G private guidance, and unify F/D root flag lifecycle. See map for source traces and tradeoffs."
+      }
+    ]
   },
   "createdAt": "2026-11-13T16:16:03.061Z"
 }
