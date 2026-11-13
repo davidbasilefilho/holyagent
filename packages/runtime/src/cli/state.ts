@@ -1,10 +1,5 @@
-import { Effect, Schema } from "effect"
-
-import { StateMode } from "../state/mode.ts"
-import { readStateMode, setStateMode } from "../state/tree.ts"
-import { Usage } from "./errors.ts"
+import { coreCommand } from "./core.ts"
 import type { Command } from "./types.ts"
-import { present } from "./views.ts"
 
 /** The `state` commands. */
 export const STATE_COMMANDS: ReadonlyArray<Command> = [
@@ -22,21 +17,7 @@ export const STATE_COMMANDS: ReadonlyArray<Command> = [
     stateless: true,
     positionals: 1,
     optional: true,
-    run: ({ args, cwd, env }) =>
-      Effect.gen(function* () {
-        const [given] = args.positionals
-        if (given === undefined) return present({ ...(yield* readStateMode(cwd, env)) })
-        const mode = yield* Schema.decodeUnknownEffect(StateMode)(given).pipe(
-          Effect.mapError(
-            () =>
-              new Usage({
-                message: `"${given}" is not a state mode`,
-                hint: "Usage: holyagent state mode [branch|work|local]",
-              }),
-          ),
-        )
-        const { previous } = yield* setStateMode(cwd, env, mode)
-        return present({ ...(yield* readStateMode(cwd, env)), previous })
-      }),
+    core: true,
+    run: coreCommand("state mode"),
   },
 ]

@@ -3,7 +3,9 @@ import {
   cpSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -358,12 +360,38 @@ describe("a bump followed by one build", () => {
         recursive: true,
         filter: (path) => !BUILT.includes(path) && !SKIPPED.includes(basename(path)),
       })
-      for (const link of ["node_modules", "packages/runtime/node_modules"])
-        symlinkSync(
-          join(repository, link),
-          join(copy, link),
-          process.platform === "win32" ? "junction" : "dir",
-        )
+      symlinkSync(
+        join(repository, "node_modules"),
+        join(copy, "node_modules"),
+        process.platform === "win32" ? "junction" : "dir",
+      )
+      for (const workspace of ["packages/core", "packages/runtime", "packages/integrations/pi"]) {
+        const source = join(repository, workspace, "node_modules")
+        const destination = join(copy, workspace, "node_modules")
+        mkdirSync(destination, { recursive: true })
+        for (const name of readdirSync(source)) {
+          if (name === ".bin" || name === "@holyagent") continue
+          const names = name.startsWith("@")
+            ? readdirSync(join(source, name)).map((child) => join(name, child))
+            : [name]
+          for (const dependency of names) {
+            mkdirSync(dirname(join(destination, dependency)), { recursive: true })
+            symlinkSync(
+              realpathSync(join(source, dependency)),
+              join(destination, dependency),
+              process.platform === "win32" ? "junction" : "dir",
+            )
+          }
+        }
+        if (workspace !== "packages/core") {
+          mkdirSync(join(destination, "@holyagent"), { recursive: true })
+          symlinkSync(
+            join(copy, "packages/core"),
+            join(destination, "@holyagent/core"),
+            process.platform === "win32" ? "junction" : "dir",
+          )
+        }
+      }
       const { to } = await Effect.runPromise(bumpVersions(copy, "minor"))
       // The same two builds, in the same order, as the `build` task.
       for (const name of ["claude", "pi"]) {
@@ -396,9 +424,9 @@ describe("a bump followed by one build", () => {
         marketplace: marketplace.plugins.map(({ version }) => version),
         lockfile: Object.values(lock.workspaces).flatMap(({ version }) => version ?? []),
       }).toEqual({
-        files: [to, to, to, to, to, to],
+        files: Array.from({ length: VERSION_COPIES.length + 3 }, () => to),
         marketplace: [to],
-        lockfile: [to, to, to],
+        lockfile: Array.from({ length: VERSION_COPIES.length }, () => to),
       })
     } finally {
       rmSync(copy, { recursive: true, force: true })

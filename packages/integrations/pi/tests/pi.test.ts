@@ -132,6 +132,7 @@ describe("the package manifest", () => {
       description: DESCRIPTION,
       keywords: ["pi-package"],
       license: "Apache-2.0",
+      bin: { holyagent: "./scripts/holyagent-public.js" },
     })
     expect(packageJson.version).toBe(readJson("package.json")["version"] as string)
   })
@@ -198,8 +199,17 @@ describe("the runtime scripts", () => {
     generated.find((file) => file.path === `${DIST_DIRECTORY}/${path}`)
 
   test("the package ships the wrapper, its empty Bun config and the runtime bundle", async () => {
-    for (const path of ["scripts/holyagent", "scripts/empty-bunfig.toml", "scripts/holyagent.js"])
+    for (const path of [
+      "scripts/holyagent",
+      "scripts/empty-bunfig.toml",
+      "scripts/holyagent.js",
+      "scripts/holyagent-public.js",
+    ])
       expect({ path, shipped: scriptsOf(path) !== undefined }).toEqual({ path, shipped: true })
+    expect(scriptsOf("scripts/holyagent-public.js")?.executable).toBe(true)
+    expect((readJson("package.json")["bin"] as Record<string, string>)["holyagent"]).toBe(
+      "./packages/integrations/pi/dist/scripts/holyagent-public.js",
+    )
     expect(scriptsOf("scripts/holyagent")?.executable).toBe(true)
     const wrapper = join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent")
     expect(await isExecutable(wrapper)).toBe(true)
@@ -640,6 +650,7 @@ describe("the extension", () => {
         "on tool_call",
         "on tool_call",
         "registerCommand approve",
+        "registerFlag holyagent-native-root",
         "registerFlag holyagent-role",
         "registerTool apply_patch",
         "registerToolRenderer",

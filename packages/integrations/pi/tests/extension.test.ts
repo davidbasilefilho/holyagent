@@ -11,7 +11,7 @@ import type {
   ToolRendererResolver,
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent"
-import { Effect, Schema } from "effect"
+import { Effect, Exit, Schema } from "effect"
 
 import { PLUGIN_NAMESPACE } from "../../../runtime/src/cli/assignment.ts"
 import { HOST_VARIABLE, WORKFLOWS_VARIABLE } from "../../../runtime/src/cli/config.ts"
@@ -20,6 +20,7 @@ import { CLAUDE_SPECIALISTS } from "../../../runtime/src/cli/workflow-check.ts"
 import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import {
+  parseOutput,
   PI_ROOT_CORE,
   PI_ROOT_PLACEHOLDER,
   PI_SESSION_REMINDER,
@@ -39,7 +40,8 @@ import {
   CMD_NOT_FOUND,
   COMMAND_TIMEOUT_MS,
   CONTEXT_MESSAGE,
-  createExtension,
+  type CoreServices,
+  createExtension as actualCreateExtension,
   CUT_OFF_REPORT,
   EMPTY_REPORT,
   type ExtensionOptions,
@@ -66,6 +68,130 @@ import { familyAgentPrompt, promptBody } from "../src/families.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import { AGENT_TYPES, SCREEN_SPECIALIST_NAMES, SPECIALIST_NAMES } from "../src/specialists.ts"
 import { removeTemporary } from "./temp-folder.ts"
+
+// The original lifecycle tests use a deterministic in-memory host, not a real CLI process.
+// They supply a semantic core port so lifecycle and policy regressions remain testable after the
+// production extension switched to direct Node core calls. Real direct integration is tested in
+// native-direct.test.ts.
+const createExtension =
+  (options: ExtensionOptions = {}) =>
+  (pi: ExtensionAPI) => {
+    let cached: string | undefined
+    const runtime = (project: string, signal: AbortSignal, ...words: ReadonlyArray<string>) =>
+      Effect.gen(function* () {
+        const platform = options.platform ?? process.platform
+        const path = options.platformPath ?? (platform === "win32" ? win32 : posix)
+        const root = options.packageRoot ?? PACKAGE_ROOT
+        const argv = [...runtimeArgs(root, path), PI_PROJECT_FLAG, project, ...words]
+        const search = options.bunSearch ?? {}
+        const launch = (program: string) =>
+          platform === "win32" && /\.cmd$/i.test(program)
+            ? cmdExeArguments(program, argv)
+            : { ok: true as const, args: argv }
+        const failed = (reason: string) =>
+          new Error(`\`holyagent ${words.join(" ")}\` failed: ${reason}`)
+        const attempt = (looked: boolean): Effect.Effect<ExecResult, Error> =>
+          Effect.suspend(() => {
+            if (cached === undefined || !launch(cached).ok) {
+              const found = findBun(platform, path, search, (program) => {
+                const choice = launch(program)
+                return choice.ok ? undefined : choice.reason
+              })
+              if (!found.found) return Effect.fail(failed(found.looked))
+              cached = found.program
+            }
+            const program = cached
+            const cmd = launch(program)
+            if (!cmd.ok) return Effect.fail(failed(cmd.reason))
+            const shim = platform === "win32" && /\.cmd$/i.test(program)
+            const action = Effect.acquireUseRelease(
+              Effect.sync(() => {
+                const stop = new AbortController()
+                const settled = pi
+                  .exec(shim ? "cmd.exe" : program, [...cmd.args], {
+                    cwd: root,
+                    signal: AbortSignal.any([signal, stop.signal]),
+                    timeout: COMMAND_TIMEOUT_MS,
+                  })
+                  .then(
+                    (result) => Effect.succeed(result),
+                    (error) => Effect.fail(failed(String(error))),
+                  )
+                return { stop, settled }
+              }),
+              ({ settled }) =>
+                Effect.callback<ExecResult, Error>((resume) => {
+                  void settled.then((answer) => resume(answer))
+                  const abort = () => resume(Effect.fail(failed("it was stopped")))
+                  if (signal.aborted) abort()
+                  signal.addEventListener("abort", abort, { once: true })
+                  return Effect.sync(() => signal.removeEventListener("abort", abort))
+                }),
+              ({ stop, settled }, exit) =>
+                Exit.isSuccess(exit)
+                  ? Effect.void
+                  : Effect.sync(() => stop.abort()).pipe(
+                      Effect.andThen(Effect.promise(() => settled)),
+                      Effect.timeoutOption(options.graceMs ?? 2_000),
+                      Effect.asVoid,
+                    ),
+            )
+            const retry = () => {
+              cached = undefined
+              return attempt(true)
+            }
+            const gone = () =>
+              !looked && !signal.aborted && search.exists !== undefined && !search.exists(program)
+            return action.pipe(
+              Effect.matchEffect({
+                onFailure: (error) => (gone() ? retry() : Effect.fail(error)),
+                onSuccess: (result) =>
+                  (result.code !== 0 || result.killed) && gone() ? retry() : Effect.succeed(result),
+              }),
+            )
+          })
+        const result = yield* attempt(false)
+        if (result.code !== 0 || result.killed) {
+          const first = result.stderr
+            .split("\n")
+            .map((line) => line.trim())
+            .find(Boolean)
+          const reason = result.killed
+            ? "it timed out or was stopped"
+            : first === undefined
+              ? `exit ${result.code}`
+              : first.replace(/^error: /, "")
+          return yield* Effect.fail(failed(reason))
+        }
+        return result.stdout
+      })
+    const coreServices: CoreServices = {
+      config: (project, folders, signal) =>
+        runtime(project, signal, "config", ...folders).pipe(
+          Effect.flatMap((text) =>
+            Schema.decodeUnknownEffect(Schema.fromJsonString(Config), {
+              onExcessProperty: "error",
+            })(text),
+          ),
+        ),
+      directory: (project, top, git, signal) =>
+        git
+          ? runtime(project, signal, "state", "mode").pipe(
+              Effect.flatMap((text) => parseOutput("state mode", text)),
+              Effect.map((value) => value["directory"]),
+            )
+          : Effect.succeed(join(top, ".holyagent")),
+      status: (project, signal) =>
+        runtime(project, signal, "status").pipe(
+          Effect.flatMap((text) => parseOutput("status", text)),
+        ),
+      reconcile: (project, signal) =>
+        runtime(project, signal, "reconcile").pipe(
+          Effect.flatMap((text) => parseOutput("reconcile", text)),
+        ),
+    }
+    return actualCreateExtension({ ...options, coreServices })(pi)
+  }
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
 // The model reads the wrapper's path with `/` only, drive letter included on Windows.
@@ -3171,7 +3297,7 @@ describe("the root's excluded tools", () => {
     }
   })
 
-  test("a session that is not the root starts with none", async () => {
+  test("a worker starts without root exclusions but cannot call web tools without Search", async () => {
     const hold = gate()
     const api = fakeApi(
       (callOf, runtime) =>
@@ -3191,7 +3317,9 @@ describe("the root's excluded tools", () => {
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
     for (const name of EXCLUDED)
-      expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+      expect(await api.emit("tool_call", call(name))).toEqual(
+        name.startsWith("moonshot_") ? blocked : [undefined],
+      )
     hold.open()
     await started
   })
@@ -3217,16 +3345,32 @@ describe("the root's excluded tools", () => {
     }
   })
 
-  test("other sessions and a pi.enable that is off are not held to them", async () => {
-    for (const options of [
-      { flag: "specialist" },
-      { flag: "session" },
-      { sessionName: "worker-implementation#a1b2c3d4" },
-    ]) {
+  test("other sessions and a pi.enable that is off are not held to root exclusions", async () => {
+    for (const options of [{ flag: "specialist" }, { flag: "session" }]) {
       const { api } = await run(healthy("/missing"), options)
       for (const name of EXCLUDED)
         expect(await api.emit("tool_call", call(name))).toEqual([undefined])
     }
+    const worker = await run(healthy("/missing"), { sessionName: "worker-implementation#a1b2c3d4" })
+    for (const name of EXCLUDED)
+      expect(await worker.api.emit("tool_call", call(name))).toEqual(
+        name.startsWith("moonshot_") ? blocked : [undefined],
+      )
+    const librarian = await run(healthy("/missing"), {
+      sessionName: "librarian-lookup#a1b2c3d4",
+      activeTools: ["moonshot_search", "moonshot_fetch"],
+    })
+    for (const name of ["moonshot_search", "moonshot_fetch"])
+      expect(await librarian.api.emit("tool_call", call(name))).toEqual([undefined])
+    const unavailable = await run(healthy("/missing"), {
+      sessionName: "librarian-lookup#a1b2c3d4",
+      activeTools: [],
+      startOnly: true,
+    })
+    const notices = await nextMessages(unavailable.api)
+    expect(
+      notices.some((message) => String(message?.content).includes("Kimi search is not exposed")),
+    ).toBe(true)
     for (const config of [DISABLED]) {
       const { api } = await run(healthy("/missing", { config: { stdout: config } }))
       for (const name of EXCLUDED)
@@ -4290,5 +4434,44 @@ describe("auto-review under the extension", () => {
       "kimi-coding-global",
     )
     expect(await reviewed(otherModel.api)).toBeUndefined()
+  })
+})
+
+describe("profile routing host gate", () => {
+  const registry = { getAvailable: () => [{ provider: "openai-codex", id: "gpt-6.1-sol" }] }
+  const call = (toolName: string, model = "openai-codex/gpt-6.1-sol") => ({
+    toolName,
+    input: { subagent_type: "reviewer-code", model, prompt: "fixture" },
+  })
+
+  test("confirmed Pi profile gates both direct and workflow aliases without changing legacy behavior", async () => {
+    const profiled = JSON.stringify({ ...DEFAULTS, pi: { ...DEFAULTS.pi, profile: "fast" } })
+    const { api } = await run(healthy("/missing", { config: { stdout: `${profiled}\n` } }), {
+      members: { modelRegistry: registry },
+    })
+    for (const tool of ["Agent", "agent"]) {
+      expect(await api.emit("tool_call", call(tool))).toEqual([undefined])
+      expect(await api.emit("tool_call", call(tool, "kimi-coding/gpt-6.1-sol"))).toEqual([
+        expect.objectContaining({ block: true }),
+      ])
+    }
+    for (const toolName of ["SubagentWorkflow", "subagent_workflow"])
+      expect(await api.emit("tool_call", { toolName, input: {} })).toEqual([
+        expect.objectContaining({ block: true }),
+      ])
+    const legacy = await run(healthy("/missing"))
+    expect(await legacy.api.emit("tool_call", call("Agent", "kimi-coding/gpt-6.1-sol"))).toEqual([
+      undefined,
+    ])
+  })
+
+  test("explicit profile stays fail-closed if configuration cannot be read", async () => {
+    const { api } = await run(
+      healthy("/missing", { config: { code: 4, stderr: "invalid config" } }),
+      { env: { HOLYAGENT_ROUTING_PROFILE: "fast" }, members: { modelRegistry: registry } },
+    )
+    expect(await api.emit("tool_call", call("Agent", "kimi-coding/gpt-6.1-sol"))).toEqual([
+      expect.objectContaining({ block: true }),
+    ])
   })
 })

@@ -3746,7 +3746,6 @@ var FEATURE_PACKAGES = Object.fromEntries(CAPABILITIES.flatMap((capability) => {
   const [first] = formContent(capability, "normal")?.packages ?? [];
   return first === undefined ? [] : [[capability.feature, first]];
 }));
-
 var inCi = (env) => {
   const value = env["CI"]?.trim().toLowerCase();
   return value !== undefined && !["", "0", "false", "no", "off"].includes(value);

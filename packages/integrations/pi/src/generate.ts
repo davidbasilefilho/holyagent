@@ -51,6 +51,9 @@ export const DESCRIPTION =
  */
 export const RUNTIME_SOURCE = "packages/runtime/src/hooks/pi-entry.ts"
 
+/** The public CLI entry, which enables interactive setup. */
+export const PUBLIC_SOURCE = "packages/runtime/src/hooks/pi-public-entry.ts"
+
 /**
  * The entry the package bundles as `scripts/just-bash.js` (see `SHELL_BUNDLE`): the shell process
  * the extension starts with Bun for each bash call, with just-bash inside. A bundle of its own,
@@ -107,6 +110,7 @@ export const manifest = (): GeneratedFile => ({
       directory: "packages/integrations/pi/dist",
     },
     type: "module",
+    bin: { holyagent: "./scripts/holyagent-public.js" },
     keywords: ["pi-package"],
     files: PACKAGE_FILES,
     pi: {
@@ -161,11 +165,11 @@ const shell = (): Promise<string> =>
  * go, so the text is the same on every machine, and the note that names the source follows Bun's
  * `// @bun` pragma, which stays first after the shebang.
  */
-const runtime = (): Promise<string> =>
+const runtime = (source: string): Promise<string> =>
   Effect.runPromise(
-    bundleModule(join(REPOSITORY, RUNTIME_SOURCE), {
+    bundleModule(join(REPOSITORY, source), {
       target: "bun",
-      note: generatedNote(RUNTIME_SOURCE),
+      note: generatedNote(source),
     }),
   )
 
@@ -205,7 +209,12 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       path: inPackage("scripts/empty-bunfig.toml"),
       content: `# ${generatedNote(BUNFIG_SOURCE)}\n${await readSource(BUNFIG_SOURCE)}`,
     },
-    { path: inPackage("scripts/holyagent.js"), content: await runtime() },
+    { path: inPackage("scripts/holyagent.js"), content: await runtime(RUNTIME_SOURCE) },
+    {
+      path: inPackage("scripts/holyagent-public.js"),
+      content: await runtime(PUBLIC_SOURCE),
+      executable: true,
+    },
     { path: inPackage(`scripts/${SHELL_BUNDLE}`), content: await shell() },
     {
       path: inPackage(`scripts/${TUI_BUNDLE}`),

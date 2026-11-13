@@ -7,6 +7,7 @@ import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works
 import { Effect, Schema } from "effect"
 
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { parseOutput } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { assignmentStatusOf, type PiOutcome } from "../../../runtime/src/pi/journal.ts"
 import { routedModels } from "../../../runtime/src/pi/provider.ts"
@@ -192,9 +193,30 @@ const start = (directory: string, sessionName?: string) => {
     },
   ) as unknown as ExtensionContext
   // A POSIX machine, whatever the platform the tests run on.
-  createExtension({ packageRoot: PACKAGE_ROOT, env: {}, platform: "linux", bunSearch: BUN_SEARCH })(
-    api as unknown as ExtensionAPI,
-  )
+  createExtension({
+    packageRoot: PACKAGE_ROOT,
+    env: {},
+    platform: "linux",
+    bunSearch: BUN_SEARCH,
+    coreServices: {
+      config: () => Effect.succeed(DEFAULTS),
+      directory: () => Effect.succeed(directory),
+      status: () => {
+        ran.push("status")
+        return parseOutput(
+          "status",
+          "intents[1]{id,revision,objective,running,unaccepted}:\n  intent-a,1,Ship the thing,0,0\n",
+        )
+      },
+      reconcile: () => {
+        ran.push("reconcile")
+        return parseOutput(
+          "reconcile",
+          "running[1]{id,role,agent,startedAt}:\n  assignment-1,Worker.implementation,agent-1,null\n",
+        )
+      },
+    },
+  })(api as unknown as ExtensionAPI)
   /** Delivers a fixture event to the handlers registered for its type; the results are returned. */
   const deliver = async (event: Record<string, unknown>): Promise<Array<unknown>> => {
     const results: Array<unknown> = []

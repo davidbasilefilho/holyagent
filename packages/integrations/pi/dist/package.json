@@ -10,6 +10,9 @@
     "directory": "packages/integrations/pi/dist"
   },
   "type": "module",
+  "bin": {
+    "holyagent": "./scripts/holyagent-public.js"
+  },
   "keywords": [
     "pi-package"
   ],

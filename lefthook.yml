@@ -38,4 +38,4 @@ pre-commit:
     # are staged too, so the commit carries every copy of the version; otherwise they are left alone.
     - name: versions
       glob: package.json
-      run: git add -- packages/runtime/package.json packages/integrations/claude/package.json packages/integrations/pi/package.json bun.lock
+      run: git add -- packages/core/package.json packages/runtime/package.json packages/integrations/claude/package.json packages/integrations/pi/package.json bun.lock

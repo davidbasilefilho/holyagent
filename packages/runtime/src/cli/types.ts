@@ -165,6 +165,8 @@ export interface Command {
   readonly positionals: number
   /** True when the last positional may be left out. */
   readonly optional?: true
+  /** This adapter delegates state handling to core; preliminary resolution is read-only. */
+  readonly core?: true
   /** Produces the value printed as TOON. */
   readonly run: (call: Call) => Effect.Effect<unknown, unknown>
 }

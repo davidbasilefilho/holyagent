@@ -478,3 +478,37 @@ describe("the native mise toolchain", () => {
     expect(withoutNpmMise(withoutNpmMise(original))).toEqual(withoutNpmMise(original))
   })
 })
+
+describe("workspace-only lock refresh", () => {
+  test("adds a workspace without changing locked external packages", async () => {
+    const repository = join(import.meta.dir, "..")
+    for (const file of [
+      "package.json",
+      "bun.lock",
+      "packages/core/package.json",
+      "packages/runtime/package.json",
+      "packages/integrations/claude/package.json",
+      "packages/integrations/pi/package.json",
+    ]) {
+      await Bun.write(join(root, file), Bun.file(join(repository, file)))
+    }
+    await Bun.write(
+      join(root, "packages/new-fixture/package.json"),
+      JSON.stringify({ name: "@holyagent/new-fixture", version: "0.3.4", private: true }),
+    )
+    const before = Bun.JSONC.parse(await Bun.file(join(root, "bun.lock")).text()) as {
+      packages: Record<string, unknown>
+    }
+    await Effect.runPromise(execute(["--workspace-lock-only", root]))
+    const after = Bun.JSONC.parse(await Bun.file(join(root, "bun.lock")).text()) as {
+      packages: Record<string, unknown>
+      workspaces: Record<string, unknown>
+    }
+    expect(after.workspaces["packages/new-fixture"]).toBeDefined()
+    const external = (packages: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(packages).filter(([name]) => !name.startsWith("@holyagent/")),
+      )
+    expect(external(after.packages)).toEqual(external(before.packages))
+  })
+})

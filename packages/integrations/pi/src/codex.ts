@@ -36,7 +36,7 @@ import {
   UsageStatusUnavailable,
 } from "../../../runtime/src/pi/codex/luna-reserve.ts"
 import { CODEX_PROVIDER_ID } from "../../../runtime/src/pi/codex/routes.ts"
-import { providerProfile } from "../../../runtime/src/pi/provider.ts"
+import { PROVIDERS } from "../../../runtime/src/pi/provider.ts"
 import { toolArgs } from "../../../runtime/src/pi/tools.ts"
 
 /**
@@ -60,13 +60,18 @@ export interface CodexSettings {
  * provider runs exactly as before.
  */
 export const codexSettings = (config: Config): CodexSettings | undefined => {
-  if (config.pi.provider !== "openai-codex") return undefined
-  const profile = providerProfile(config)
+  if (
+    config.pi.provider !== "openai-codex" &&
+    !Object.values(config.pi.routes).some((row) => row.provider === "openai-codex")
+  )
+    return undefined
+  const profile = PROVIDERS["openai-codex"]
   return {
     family: profile.family,
     contextManagement: contextManagementOn(config),
     lunaReserve: config.pi.features.lunaReserve,
     applyPatchAgents: RoleTask.literals.flatMap((roleTask) =>
+      (config.pi.routes[roleTask].provider ?? config.pi.provider) === "openai-codex" &&
       toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL)
         ? [
             agentFor(routeFor(roleTask), false),
