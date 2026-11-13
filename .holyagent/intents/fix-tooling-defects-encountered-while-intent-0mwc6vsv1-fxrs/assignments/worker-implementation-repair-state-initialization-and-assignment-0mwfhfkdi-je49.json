@@ -1,0 +1,74 @@
+{
+  "id": "assignment-0mwfhfkdi-je49",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-state-initialization-and",
+  "objective": "Repair state initialization and migration authorization before any Core API side effect.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core cleancommitted5b1b6e2. Independentsecurityreport /workspace/work/034/core-checkpoint-security-review-report.json hasvalidatedmediumblocker: context.withState authorizesread then mutatingresolveState beforeunder-lockauthrecheck; branchstatebootstrap/migrateWorkTree cancreateworktree/copy/commit/delete/gitindex changes via read orafterrevocation. Readexacttrace reportand source; reproduce safely in realGit fixturesoutsideactualrepo.",
+    "Make every state initialization/migration write require appropriate current write authority BEFORE actualeffects, including recheck in relevantinitialization/migration lock. Readonlycapability mustnotimplicitlymutatestate/index/worktree. Revokedoncegrantedauthoritymustnotwriteafterwaitingforinitialization. Preserve existingdeliberateCLIinit/migrationuse and nativeknownstateCRUD; no new blanketuserconfirmationflow orBun/CLI/parserbridge. Typedauthority and schema boundaries remainexplicit; no trustinuser/modelinput-as-approval. Avoid deadlocksnestedlocks and unintendedcancellationpartialmigrations.",
+    "Meaningful red→green tests for read-onlyhost with unmigratedstate andrevoke-while-waiting path, assert source/index/sharedstateunmodified/noorphanwrites asappropriate, authorizedwrite CLI/directnative pathsremainfunctional. Fix minimalrelevantinitialization/context, clientsifstrictsignaturesrequire, docs statewhatreadmeans accurately. No otherfeatureintegration orpackagecompletionscopehere.",
+    "Carry documentation seam fromcodereviewifsmall: docs/hooks.md hand-runsetupguidance mustreflect internalentryplain/noTUI and separatepublicnpmUI; no change tointentionalinternalnoANSI contract. Build+static+focusedCoreSDK/state/auth/migration/CLI andsupervisedfullverify ifstatebehaviorchange requires. No mutationsduringtestgates. Save /workspace/work/034/core-state-authority-repair-report.json and incremental.diff from5b1b6e2."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "Read only or revoked Core authority cannot cause implicit state initialization migration index or worktree writes",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Authorized CLI and native state operations retain compatible locking cancellation and migration behavior",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Meaningful isolated Git authorization regression tests and current candidate build static and state verification pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "red-green-proof"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/state",
+    "packages/core/tests",
+    "packages/runtime/src/cli/core.ts",
+    "packages/runtime/src/native/catalog.ts",
+    "packages/integrations/pi/src/native-tools.ts",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/state-mode.test.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "docs/core-api.md",
+    "docs/native-tools.md",
+    "docs/hooks.md",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfgluop-h1ed",
+  "specialist": {
+    "agentId": "/root/events_wildcard_repair",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T21:21:57.222Z"
+  },
+  "createdAt": "2026-11-13T21:21:57.222Z"
+}
