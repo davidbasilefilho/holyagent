@@ -46,6 +46,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwf2nlwa-qcxy",
   "specialist": {
+    "agentId": "/root/events_wildcard_repair",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T20:59:40.974Z"
