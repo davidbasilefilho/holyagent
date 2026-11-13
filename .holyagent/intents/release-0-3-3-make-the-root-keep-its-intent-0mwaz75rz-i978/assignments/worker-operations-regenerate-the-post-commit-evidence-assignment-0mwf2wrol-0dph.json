@@ -1,0 +1,43 @@
+{
+  "id": "assignment-0mwf2wrol-0dph",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "regenerate-the-post-commit-evidence",
+  "objective": "Regenerate the post-commit evidence-order guidance for immutable review.",
+  "state": "Running",
+  "scope": [
+    "Build and focusedinstruction/assembly/policy/contextchecks only."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-guidance. Sourcewriterterminal, read guidance-evidence-order-report.json. Onlygeneratededits/sourcehashesstaystable. No actualVCS/statewrites/sourcefixes/extraagents/depschanges/modelcalls. Existingreporulesapply.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. bunx --no-install mise run build then focusedtests frompreviousguidancebuild plus instructiontestnewordering. No fullverify yet untilcommittedre-review. Ifsourcefreshnessstillfails report exactfiles withoutfix.",
+    "JSON /workspace/work/034/guidance-order-build-report.json correctCLIshape/exactkeys, generateddiff /workspace/work/034/guidance-order-generated.diff. <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Repaired guidance builds and focused parity budget and policy checks pass without source changes",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf26vee-0sgr",
+  "specialist": {
+    "agentId": "/root/r034_state_final_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:35:25.605Z"
+  },
+  "createdAt": "2026-11-13T14:35:25.605Z"
+}
