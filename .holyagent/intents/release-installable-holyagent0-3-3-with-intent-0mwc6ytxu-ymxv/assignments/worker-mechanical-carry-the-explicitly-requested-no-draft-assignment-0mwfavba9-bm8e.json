@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "carry-the-explicitly-requested-no-draft",
   "objective": "Carry the explicitly requested no-draft PR policy into the minimal0.3.3 ancestry reconciliation.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work ONLY /workspace/work/holyagent-release033 AGENTS.md on branch release/0.3.3/chore/reconcile-main. Root has an intentional git merge --no-commit -s ours origin/main in progress to reconcile previous squash history, retaining already-reviewed publication repair. Do not touch merge/index/refs or run any VCS write.",
     "Add ONLY the single no-draft PR policy bullet already committed in /workspace/work/holyagent-034 AGENTS.md at b95759de, under existing Commits and pull requests. User explicitly said put it down in AGENTS.md that you must never do draft prs. Copy that single bullet exactly; preserve old0.3.3 integration/version rules and all other text. Do not copy0.3.4 dev/main migration."
@@ -35,7 +35,33 @@
     "agentId": "/root/r033_no_draft_carry",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T18:18:14.625Z"
+    "startedAt": "2026-11-13T18:18:14.625Z",
+    "finishedAt": "2026-11-13T18:20:08.142Z"
+  },
+  "result": "status: done\nchanged:\n- AGENTS.md\nchecks:\n- git diff --check -- AGENTS.md -> exit 0\nnotes:\n- Documentation-only change; product tests not run.\nevidence:\n- Only the user-authorized no-draft policy is added without changing0.3.3 release rules: Diff adds only the exact no-draft bullet; release rules unchanged.\n- checks-run: git diff --check -- AGENTS.md passed.\n- changed-paths: AGENTS.md\n- diff-file: /workspace/work/034/033-no-draft-carry.diff",
+  "acceptance": {
+    "revision": 30,
+    "rationale": "Exact authorized no-draft line copied; existing0.3.3 release rules remain unchanged and diff-check passes.",
+    "criteria": [
+      {
+        "criterion": "Only the user-authorized no-draft policy is added without changing0.3.3 release rules",
+        "support": "Diff adds only the exact no-draft bullet; release rules unchanged."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "git diff --check -- AGENTS.md passed."
+      },
+      {
+        "label": "changed-paths",
+        "support": "AGENTS.md"
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/033-no-draft-carry.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T18:18:14.625Z"
 }
