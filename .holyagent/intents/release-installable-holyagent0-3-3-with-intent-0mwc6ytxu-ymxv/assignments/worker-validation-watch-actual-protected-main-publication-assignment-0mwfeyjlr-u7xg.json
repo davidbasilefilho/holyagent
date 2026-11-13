@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "watch-actual-protected-main-publication",
   "objective": "Watch actual protected-main publication of stable HolyAgent0.3.3 and verify registry and release results.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "PR129 merged by squash as main460f9453fe031325d45993ad38fffb8c21f22d50. Watch exact push Publish run43499104894 https://github.com/davidbasilefilho/holyagent/actions/runs/43499104894 through validation then stable npm publish/GitHub release. Versionroot remains0.3.3. No early success claim: PRmerge and packagebuild are not publication.",
     "On failure obtain exact job/step/logs, preferably GitHub connector if gh redirect403. Report actions needed, no automaticrerun/settingswrites. Known intermittentWindows5sfixturetimeout onpriorheadhasgenuinePRsuccess+singlepushretry success; preservecauseunknown. Currentmainrun mustactuallypass beforepublisher runs.",
@@ -38,7 +38,41 @@
     "agentId": "/root/r033_resumed_ci_watch",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T20:12:43.839Z"
+    "startedAt": "2026-11-13T20:12:43.839Z",
+    "finishedAt": "2026-11-13T20:46:38.469Z"
+  },
+  "result": "status: done\nchecks:\n- gh run watch 43499104894 --exit-status -> exit 0\n- gh run view 43499104894 --json headSha,status,conclusion -> exit 0\n- gh release view holyagent-0.3.3 --json tagName,isDraft,isPrerelease,assets,url,targetCommitish -> exit 0\n- gh api repos/davidbasilefilho/holyagent/git/ref/tags/holyagent-0.3.3 --jq .object -> exit 0\n- curl -fsSL https://registry.npmjs.org/holyagent/0.3.3 -> exit 22\n- curl registry metadata and inspect dist-tags -> exit 0\n- npm view holyagent@0.3.3 --prefer-online with fresh scratch cache and public registry -> exit 1\n- cache-busted no-cache registry version, packument and tarball HEAD requests -> exit 0\n- fresh no-cache registry version and packument queries -> exit 0\nnotes:\n- Earlier 404 preceded npm's recorded publication at 20:28:39.258Z; delay mechanism unknown. Attestation payload was inspected by the independent trace, not cryptographically verified. Push-context version and branch-model skipped; actual PR checks passed.\nevidence:\n- Actual stable publication and release outcomes are proven for the merged main commit or accurately reported as blocked: Main workflow and GitHub release succeeded; fresh public npm metadata confirms 0.3.3 and latest.\n- main: Publish 43499104894 completed success at 460f9453fe031325d45993ad38fffb8c21f22d50.\n- checks-run: Linux, macOS, Windows, installers, stable publish and stable release passed; dev skipped.\n- npm-publication: Fresh registry exact version returns holyagent 0.3.3, latest 0.3.3, repository github.com/davidbasilefilho/holyagent, directory packages/integrations/pi/dist; integrity sha512-nI9DQdebEhO6O7lJmgoAplw+sOYXLoo+TYj0Q778zP/+iC8Te5uEFGB+TkyPwGHM/3Zt4IFVkKYASBxWzTZZDg==. Independent trace found npm and release tarballs byte-identical and matching integrity.\n- github-release: https://github.com/davidbasilefilho/holyagent/releases/tag/holyagent-0.3.3 is non-draft, non-prerelease, has holyagent-0.3.3.tgz, and tag points to 460f9453fe031325d45993ad38fffb8c21f22d50.\n- failures: No workflow job failed. Earlier public version and tarball 404 occurred before npm's recorded publication; exact delay cause unknown. Attestation payload names main commit and run, but signature not verified.",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "Main workflow, stable release/tag/asset and fresh public npm0.3.3/latest are verified. Artifact bytes match integrity; attestation payload inspected without claiming independent signature verification.",
+    "criteria": [
+      {
+        "criterion": "Actual stable publication and release outcomes are proven for the merged main commit or accurately reported as blocked",
+        "support": "Main workflow and GitHub release succeeded; fresh public npm metadata confirms 0.3.3 and latest."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "main",
+        "support": "Publish 43499104894 completed success at 460f9453fe031325d45993ad38fffb8c21f22d50."
+      },
+      {
+        "label": "checks-run",
+        "support": "Linux, macOS, Windows, installers, stable publish and stable release passed; dev skipped."
+      },
+      {
+        "label": "npm-publication",
+        "support": "Fresh registry exact version returns holyagent 0.3.3, latest 0.3.3, repository github.com/davidbasilefilho/holyagent, directory packages/integrations/pi/dist; integrity sha512-nI9DQdebEhO6O7lJmgoAplw+sOYXLoo+TYj0Q778zP/+iC8Te5uEFGB+TkyPwGHM/3Zt4IFVkKYASBxWzTZZDg==. Independent trace found npm and release tarballs byte-identical and matching integrity."
+      },
+      {
+        "label": "github-release",
+        "support": "https://github.com/davidbasilefilho/holyagent/releases/tag/holyagent-0.3.3 is non-draft, non-prerelease, has holyagent-0.3.3.tgz, and tag points to 460f9453fe031325d45993ad38fffb8c21f22d50."
+      },
+      {
+        "label": "failures",
+        "support": "No workflow job failed. Earlier public version and tarball 404 occurred before npm's recorded publication; exact delay cause unknown. Attestation payload names main commit and run, but signature not verified."
+      }
+    ]
   },
   "createdAt": "2026-11-13T20:12:43.839Z"
 }
