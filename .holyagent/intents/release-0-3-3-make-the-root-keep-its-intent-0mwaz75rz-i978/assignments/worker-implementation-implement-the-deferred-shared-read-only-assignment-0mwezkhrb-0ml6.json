@@ -50,6 +50,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_handoff_command",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T13:01:54.024Z"
