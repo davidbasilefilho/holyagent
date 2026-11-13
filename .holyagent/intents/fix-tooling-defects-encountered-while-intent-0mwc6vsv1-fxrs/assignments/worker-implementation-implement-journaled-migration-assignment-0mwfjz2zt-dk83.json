@@ -1,0 +1,78 @@
+{
+  "id": "assignment-0mwfjz2zt-dk83",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-journaled-migration",
+  "objective": "Implement journaled migration publication and recovery so cancellation is bounded and preexisting edits survive.",
+  "state": "Running",
+  "scope": [
+    "SOLEWRITER /workspace/work/holyagent-034-core branchrelease/0.3.4/feat/shared-core HEAD6ebdf1e pluspreservedredtests. DiagnosisisCOMPLETE. Read /workspace/work/034/core-migration-recovery-complete-report.json/diff and core-migration-recovery-red.log. Fourpass/THREEred realGitregressions: stalledcommitcancellationhangs; commitalreadyadvancesHEADthenstall/killstillambiguous; successfulmigrationconsumesunrelatedstagedtargetedit. No safeproductionrepairyet. Previousdebuggersstoppedatdiagnosis; yourroleistoimplementthefix, notreturnanotheroptions-onlyhandoff.",
+    "Chosen design: private migration tree/commit plus strict durable recovery journal, followedbyconflict-checkedref/index/worktreepublication. InternalversionedrecoverymetadataandlargerreversibleimplementationareAUTHORIZEDwithintheexistingbugfixscope; no artificialone-line/small-diffrestriction ornewuserapprovalneeded. Keepallpriorredtests/probes and adaptinstrumentationtotheactualnewcommitpointwhennecessary; do notweakenassertions.",
+    "1. Underappropriateinitialization/domainlocksandliveoperation+state.initializegrant, preflightsource/target/HEAD/indexandplannedownedfiles. Preservepreexistingstaged/unstagedentries. Buildmigrationdelta inPRIVATEindex/worktree seededfromexistingHEAD, withouttouchingrealindex/worktree. Commitonlymigration-ownednew/approvedpaths; skipalready-representedidenticalpathswithoutaccidentallycommittingtheirpreexistingedits. UseGitcommitobject/treeconstruction; sign/hooks/normalVCSbehavioroutsidemetadataareunchanged. Snapshotparent/expectedtree/commitandper-pathpre/postimagesneededforrecovery.",
+    "2. Writeversionedstrict-schemajournalatomicallybeforelivepublication; recordexpectedparent/commit and ownedpaths/preimages/sourceindexfacts. Deriveallpathsfromtrustedroot/canonicalrelativepaths; nofollowchecks, nojournal-payload/secretsinlogs, ignored/privateownershipmetadata, refuseunexpectedunowned/corruptjournalinstead ofoverwriting. Persistenceatomicsmallfilewritecanfinishonceauthorized; no unboundedGitunderEffect.uninterruptible.",
+    "3. PublishrefusingCASexpectedparent→knowncommit. Gitexit/abortdoesNOTdecidewhetherrefadvanced. Onretry,reconcileactualHEADagainstknownparent/expectedcommit (orotherwiseconflict) andvalidatedpre/postimages. Publishonlymigration-ownedindexentries/fileswithproperGitindex.lock/CAS/conflictchecks, preservingallunrelatedindex/worktreeedits. Realindexmustnotbeoverwrittenfromabeforeimageifuserchangedit. Idempotentper-pathpublication/recoveryacceptsonlyexpectedpre/poststate; unexpectedexternalchangesfailactionablywithoutguessedreset.",
+    "4. Cleanupsourceonlyafterverifiedcommitandcompletecoherenttargetpublication. Preservepreexistingsource/indexedits; refuseorretainconflictingownedsourcepathswithactionablerecoveryratherthandiscardingthem. Keepjournaluntilsafecompletion; interrupt/timeoutcanleavepreciserecoverablejournal/originalsource, neverfalselycompleteorcontinuedchildwrites. Protectpeek/readersfrompartialpublicationviaexistinglockpluspending-journalcheck/recovery-neededview; readonlyhostsneverinitialize/mutate. Nextauthorizedretrymustrecoverfrombefore-CAS,after-CAS-before-response,andpartialpublicationwithoutdataloss.",
+    "Maintainallnewmutationauthoritychecksafterpreparatoryasyncreads/fetch/waits. Keepcheckoutinterruptible+retrytest. Bound/killownGitprocesseswhereappropriateusingbackward-compatiblemigration-onlyoptionsinstate/process.ts; do notgloballytimeoutsetuporotherlonglegitimatecommands. PreferinterruptibleGitwithjournalrecoveryoverunboundedcriticalregion. Already-startedboundedatomicOSunitmayfinish, noinstantaneousrollbackclaim. Normalcancelmustreturnwithprovedbound.",
+    "ImplementactualproductioncodeandmeaningfuldeterministicrealGitstalled/ambiguous-success/retry/indexpreservation/readOnly/revocationtests. Preserveexistingdomain/state/CLI/nativeSDKsemanticsorcorrectanolddata-lossassumptionwithstrongerproof. No actualrepo/account/network/paidmodel/PCoperations. AllfixturesoutsideactualGitancestry. No additionalagentsneeded.",
+    "Runfocusedstate/migration/cancellation/NodeSDKchecks,build/staticandonefinalsupervisedfullverifyaftercandidatereallyworks. Nevermutatewhilegatesrunning. Ifarchitecturehasspecificnewcontradiction,sendrootconcretealternativeswhilecontinuingindependentimplementation; stoppingmerelybecausesolutionneedsjournal/indexreconciliationdoesnotcompleteauthorizedtask.",
+    "OtherworktreeCore-hostalreadyportedcompleteNodeSDKsetup/VCS/FSports; usesexistingstate/process.ts. Preserveoldfunctionsignatureswithoptionalextensionsandcontextfuturecapabilityliterals(setup,doctor.read/fix,vcs.commit/identity/pr)whenparentmerges. No crossworktreewrites.",
+    "Save /workspace/work/034/core-migration-journal-implementation-report.json and completeincremental.diff from6ebdf1eincludingexistingredtests. Explaintransaction/recovery/boundsandactualred-greenproofunder400wordspluspaths/logs. Keeppriorpartialreportsunaltered. Neverclaimsuccesswithoutrealtests."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Journaled migration returns within proven cancellation bounds and recovers correctly before and after an ambiguous committed ref update",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Preexisting source target index and worktree edits readonly authority and revocation constraints remain safe without destructive guessed rollback",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Real stalled ambiguous success and staged edit regressions pass alongside current focused build static full verification",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "red-green-proof",
+    "transaction-and-recovery",
+    "integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/state",
+    "packages/core/tests",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/state-hook-locks.test.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "docs/core-api.md",
+    "docs/native-tools.md",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfjc6py-nqqr",
+  "specialist": {
+    "agentId": "/root/events_wildcard_repair",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T22:33:07.050Z"
+  },
+  "createdAt": "2026-11-13T22:33:07.050Z"
+}
