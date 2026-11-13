@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "independently-verify-authorization-and",
   "objective": "Independently verify authorization and cancellation boundaries of event wait and external snake-case aliases.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work /workspace/work/holyagent-034-events; committed c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..1823b2d. Inspect wait-for-agents.ts, tool-aliases.ts, extension registration, auto-review and runtime canonicalPiToolName/toolMatches policy. Aliases may not bypass original name rules, provenance/schema/pinned source checks, cancellation or literal workflow guard. Root flag/user+merged config revocation and child noninheritance verified host evidence. No approval inheritance invention or installed third-party edits."
   ],
@@ -36,7 +36,9 @@
     "agentId": "/root/r034_events_current_security_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T17:39:23.495Z"
+    "startedAt": "2026-11-13T17:39:23.495Z",
+    "finishedAt": "2026-11-13T17:49:10.934Z"
   },
+  "result": "status: done\nchecks:\n- bun test packages/integrations/pi/tests/tool-aliases.test.ts packages/integrations/pi/tests/wait-for-agents.test.ts -> exit 0\n- git diff --check c3c935108a3bd3958f6dbcb7bc2d96f11eba212b...1823b2d -> exit 0\nnotes:\n- Optional suspected policy regression: packages/runtime/src/pi/tools.ts:226-227 canonicalizes alias names before wildcard matching; agent* no longer matches agent and subagent_* no longer matches subagent_workflow. The source is a wildcard exclusion policy, the sink is rootActiveTools or refuseExcludedTool; no reachable exclusion using these patterns was established, and current generated root exclusions do not contain them. Impact depends on an applicable exclusion and tool authority; not a validated vulnerability.\nevidence:\n- No introduced or worsened security finding remains in event and alias authority boundaries: No validated findings in the scoped review. Alias execution retains original nested host checks, and both names reach specialist and workflow gates; configuration revocation and wait cancellation are enforced. Generated extension changes mirror the reviewed implementation.\n- reviewed-range: git diff c3c935108a3bd3958f6dbcb7bc2d96f11eba212b...1823b2d; HEAD resolves to 1823b2d874e8fa9b01d2fa939d0ab8bdb7b00afe.\n- first-pass: Reviewed tool-call arguments, lifecycle events, root flag and configuration through alias registration, provenance and schema checks, nested execution, authorization, workflow guards and cancellation. Inspected generated extension and scripts; no additional validated findings.\n- findings: No validated findings; wildcard policy regression is optional and its reachable security precondition remains unestablished.\n- checks-run: Focused alias and wait tests: exit 0, 10 passed, 0 failed, 78 assertions. git diff --check: exit 0. No live host exploit or full gate.",
   "createdAt": "2026-11-13T17:39:23.495Z"
 }
