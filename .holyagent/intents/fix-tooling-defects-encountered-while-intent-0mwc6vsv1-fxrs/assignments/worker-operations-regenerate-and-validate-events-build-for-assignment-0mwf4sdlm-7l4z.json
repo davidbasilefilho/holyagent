@@ -33,6 +33,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_events_build",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T15:27:59.962Z"
