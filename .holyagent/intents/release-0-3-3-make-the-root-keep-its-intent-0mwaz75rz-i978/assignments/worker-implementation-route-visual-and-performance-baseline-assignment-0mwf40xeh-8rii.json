@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "route-visual-and-performance-baseline",
   "objective": "Route visual and performance baseline instructions before any task source-writing dispatch.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read guidance-final-review-artifact.json and code.json in /workspace/work/034. Root/skills.md loadsvisual-judging onlybeforefirstvisualspecialist, afterordinaryimplementationmayalreadyeditsource. RequirementsFIRSTfixR-SKILLS+all3familyroot/skills.md toloadatvisual-taskstart BEFORE anytasksource-writingAssignment. Baselinecollectoroperationitselfallowed; complete/acceptbaselinebefore sourcewriterdispatch. Makeperformance rootrouter explicitpre-edit/predispatchtoo, preservetargetquery+original/previous+postcommitordering. Minimalwording/unchangedbudgets. Gprivate-guidancebranchrootroutersmustmergethis timingcontract. Sourceonlyinstruction/context/approvalpolicy/in-memoryassemblytests+type/lint/fmt. No generatedbuild/fullverify."
   ],
@@ -41,7 +41,37 @@
     "agentId": "/root/r034_iteration_guidance",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T15:06:39.257Z"
+    "startedAt": "2026-11-13T15:06:39.257Z",
+    "finishedAt": "2026-11-13T15:27:54.632Z"
+  },
+  "result": "status: done\nchanged:\n- packages/runtime/src/instructions/claude-5.5/root/delegating.md\n- packages/runtime/src/instructions/claude-5.5/root/identity.md\n- packages/runtime/src/instructions/claude-5.5/root/skills.md\n- packages/runtime/src/instructions/coverage.ts\n- packages/runtime/src/instructions/gpt-6/root/delegating.md\n- packages/runtime/src/instructions/gpt-6/root/skills.md\n- packages/runtime/src/instructions/kimi-k3.1/root/delegating.md\n- packages/runtime/src/instructions/kimi-k3.1/root/skills.md\n- packages/runtime/src/instructions/requirements/root/delegating.md\n- packages/runtime/src/instructions/requirements/root/skills.md\n- packages/runtime/src/instructions/requirements/skills/visual-judging/SKILL.md\n- packages/runtime/tests/instructions.test.ts\nchecks:\n- bunx --no-install mise run test -- scripts/root-question-policy.test.ts packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts packages/runtime/tests/sessioncontext.test.ts packages/integrations/pi/tests/session-context.test.ts -> exit 0\n- bunx --no-install mise exec -- bun (in-memory Claude and Pi generator trigger check) -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- Generated files await the root-coordinated build.\n- One initial assembly invocation failed because its PATH omitted mise; the corrected invocation passed.\n- Preserve the timing contract when merging private guidance branch root routers.\nevidence:\n- Baseline guidance loads and baseline evidence completes before visual or performance source edits can begin: R-SKILLS, R-PERFORMANCE-ROUTE and all family routers require task-start loading and accepted baseline before source-writing dispatch; the baseline collector may run first.\n- All-family triggers and unchanged budget policy checks pass: 96 focused tests pass; both in-memory harness assemblies contain triggers. Type, lint and format pass with unchanged budget and policy tests.\n- checks-run: See checks array and /workspace/work/034/guidance-trigger-*.log.\n- changed-paths: See changed_paths.\n- diff-file: /workspace/work/034/guidance-trigger.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Focused source repair and policy checks pass, preserved existing contracts; generated final gates follow.",
+    "criteria": [
+      {
+        "criterion": "Baseline guidance loads and baseline evidence completes before visual or performance source edits can begin",
+        "support": "R-SKILLS, R-PERFORMANCE-ROUTE and all family routers require task-start loading and accepted baseline before source-writing dispatch; the baseline collector may run first."
+      },
+      {
+        "criterion": "All-family triggers and unchanged budget policy checks pass",
+        "support": "96 focused tests pass; both in-memory harness assemblies contain triggers. Type, lint and format pass with unchanged budget and policy tests."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "See checks array and /workspace/work/034/guidance-trigger-*.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "See changed_paths."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/guidance-trigger.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T15:06:39.257Z"
 }
