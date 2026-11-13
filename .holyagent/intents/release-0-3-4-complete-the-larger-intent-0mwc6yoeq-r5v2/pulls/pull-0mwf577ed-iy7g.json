@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mwf577ed-iy7g",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "number": 123,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/123",
+  "branch": "release/0.3.4/feat/runtime-state",
+  "base": "dev",
+  "created": false,
+  "recordedAt": "2026-11-13T15:39:31.765Z"
+}
