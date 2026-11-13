@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mwf2e0k3-vq4n",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 5,
+  "roleTask": "Worker.integration",
+  "slug": "repair-native-pi-tools-to-execute",
+  "objective": "Repair native Pi tools to execute through a typed pipe-capable Bun CLI bridge compatible with the Node host.",
+  "state": "Running",
+  "scope": [
+    "Portable native catalog, Pi native bridge/registration and tests, precise docs."
+  ],
+  "constraints": [
+    "Continue /workspace/work/holyagent-034-tools, builderterminal nofileschanged. Read native-build-report.json and toolsIntentrevision5 rootdecision. Implement selected option2 typedportablecatalog and fixedinternallyencodedCLIchild withpipes, existing Bun lookup/Windows conventions. No genericargv/shell, no fakechildroleauthority; no Bun-only imports inPi. Preserve explicit flagexecution+inventory gates andunderlyingPi nestedtoolpermissions. Sensitive setup/doctorfix/VCS unsupportedforapprovalboundaries remainsvalidclassification. CLIsharedstrictvalidation exercised throughactualbundledentry.",
+    "Preserve stdout/stderr/exit, strictdecode, assignmentclose/accept stdinWITHOUTtempfiles or payloadleak onargv; test success/failure/invalidschema/stdin/cancel preaborted+inflightchild/cleanup boundedoutput andWindowsargumentquoting/provenance. Nodepipebridge mayuseNode APIs becausePiNodehostlacksBun; Effect errors/tagged/strictschema repo rules stillapply. Prove realcodemodehooks+childisolation afterbridge. Noexternalizationtosilencebuild.",
+    "No actualVCS/statewrites/dependency/pinchanges/networkmodelcalls/extraagents. TempGit/SDKmockfixturesallowed; root owns commits. Existingrepo/toolchainenvapply. Sourceonly, generatedbuild/fullverifyrootlater. Run focusedtests/type/lint/fmt including priorCLIregression. Keepworkingthroughfixchecks.",
+    "JSON /workspace/work/034/native-bridge-repair-report.json correctCLIshape/exactkeys, fullupdateddiff /workspace/work/034/native-tools.diff plusrepairdiff /workspace/work/034/native-bridge-repair.diff. Final<=300words/logsexternal. Surfaceonly genuinecontractblocker/options, no earlyfoundationstop."
+  ],
+  "criteria": [
+    {
+      "text": "Typed native tools execute the existing CLI safely in the Pi Node host without Bun runtime imports",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Stdout errors stdin interruption and child cleanup preserve existing CLI semantics",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Trusted role and approval boundaries survive real SDK codemode and child-isolation checks",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/native",
+    "packages/runtime/tests/native-tools.test.ts",
+    "packages/runtime/src/cli/assignment.ts",
+    "packages/integrations/pi/src/native-tools.ts",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests/native-tools.test.ts",
+    "docs/native-tools.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf1dz2m-r3qc",
+  "specialist": {
+    "agentId": "/root/r034_native_tools",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:20:50.643Z"
+  },
+  "createdAt": "2026-11-13T14:20:50.643Z"
+}
