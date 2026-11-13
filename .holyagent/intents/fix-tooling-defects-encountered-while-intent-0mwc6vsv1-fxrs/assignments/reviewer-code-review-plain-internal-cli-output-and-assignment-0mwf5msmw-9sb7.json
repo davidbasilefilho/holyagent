@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf5msmw-9sb7",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.code",
+  "slug": "review-plain-internal-cli-output-and",
+  "objective": "Review plain internal CLI output and search-stream behavior.",
+  "state": "Running",
+  "scope": [
+    "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..e778f69439a30b9f639f87a7f77c40c3bfc06df6"
+  ],
+  "constraints": [
+    "WorkREADONLY /workspace/work/holyagent-034-cli. Readreporules/roleinstructions and /workspace/work/034 relatedreports. Allpreviouswriters/buildterminal, sourcesfixedexceptassignedrepair. No actualVCS/.git/.holyagentwrites, depschanges, extraagents, livePi/modelcalls oruserPCoperations. TempGit/SDKfixturesallowed. Rootownscommits/push/state. Findingsrequireconcreterepro/file:linetracewithimpact. ",
+    "ImmutableHrange. Userrequiresplain/noANSI/styles/colorsforinternalCLIhelp/errors/version/confirmations, shortnaturalpromptguidance. DataIDs/criteria/statepreservedinplainstructuredformat. ReviewCLIoutputsanitizecoversallownedemissionpaths inclforcedTTY/env, rawrg/fdargvUNCHANGED, literalterminalcontrolsrenderedvisible notdeleted, streamingchunksUTF8/C0/C1/OSC, malformedrg-e/--globexit2 unchanged, stdoutstderr/schema/cancelcontracts. ScopeinternalCLI NOTpublicinteractiveinstallerredesign. Source/buildreport165pass1skip; previousfull2wordingfailfixed79checks; finalfullafterreview. Checkmeaningfultestsallpaths, sourcecode+docs consistency. Dnativeerrorentry/mainnotonthisbranch,futuremergeseamnotintroducedhere.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; focusedchecksthroughmise. JSON /workspace/work/034/plain-cli-review-code-report.json status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}], exactkeys. Repairdiff /workspace/work/034/plain-cli-review-code.diff. <=300wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned committed scope has no unaddressed concrete blockers",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf34phm-kkw5",
+    "assignment-0mwf40ynd-1jfb"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T15:51:39.128Z"
+  },
+  "createdAt": "2026-11-13T15:51:39.128Z"
+}
