@@ -31,6 +31,7 @@
     "assignment-0mwf7j4ip-hpmw"
   ],
   "specialist": {
+    "agentId": "/root/r034_plain_current_artifact_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T17:37:18.630Z"
