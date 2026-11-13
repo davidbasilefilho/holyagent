@@ -1,10 +1,32 @@
 # Repository pitfalls
 
-Rules for working in this repository, each with the reason it exists. The contributing rules are in `.claude/CLAUDE.md`.
+Rules for working in this repository, each with the reason it exists. Claude Code reads `AGENTS.md` directly, so repository instructions live here.
 
 ## The session agent
 
-- Every session in this repository works as the holyagent root, whatever agent it started as: "the root" in these rules and in `.claude/CLAUDE.md` is the default, user-facing agent, which is you. Read `packages/integrations/claude/dist/agents/holyagent.md` before acting and run all work through an Intent and Assignments dispatched to the specialists, without being reminded; a session that read "the root" as someone else's role edited and committed in the main thread.
+- Every session in this repository works as the holyagent root, whatever agent it started as: "the root" in these rules is the default, user-facing agent, which is you. Read `packages/integrations/claude/dist/agents/holyagent.md` before acting and run all work through an Intent and Assignments dispatched to the specialists, without being reminded; a session that read "the root" as someone else's role edited and committed in the main thread.
+
+## Code
+
+- Use Effect for effects and errors, and model failures as tagged errors. In runtime and CLI source, compose with Effect instead of try/catch, `new Promise`, Promise statics or async functions; the linter enforces this (`bunfig.toml`). Call `Effect.runPromise` only at integration boundaries.
+- Use Effect Schema (`import { Schema } from "effect"`) at every data boundary: decode first with `onExcessProperty: "error"`, then validate domain rules.
+- Prefer Bun APIs over Node equivalents, and fall back to `node:` where Bun has none.
+- Use the Bun Shell `$` from "bun" wherever a process would be spawned.
+- Add only tools that do something Bun and the configured toolchain do not already do. Bun covers the runtime, tests, type-check, lint and format, and lint plugins configured in `bunfig.toml` are part of that toolchain.
+- Write JSDoc on every exported or public function, type, type alias and interface.
+- Start a skill description with the situation, then what the skill does, so a model can tell when to load it.
+
+## Done
+
+`mise.toml` is the source of commands; `package.json` scripts and the git hooks delegate to it. Run the gates through mise, because it first checks for the canary Bun that provides `bun check`, `bun lint` and `bun fmt`.
+
+- Done means `mise run verify` passes (type-check, lint, format check and tests).
+- When plugin sources change, rebuild the generated plugin with `mise run build`; the pre-commit hook runs it too.
+
+## Commits
+
+- Follow Conventional Commits, in English.
+- Write as the author, in first person or neutral voice, about what the change does and why. Keep agents, Claude, sessions and "the user" out of the text, and leave attribution trailers off.
 
 ## Branches and worktrees
 
@@ -14,10 +36,10 @@ Rules for working in this repository, each with the reason it exists. The contri
 
 ## The release-branch model
 
-This repository's own convention, enforced by CI and rulesets; HolyAgent's instructions do not carry it.
+This repository's release convention includes CI checks; HolyAgent's instructions do not carry it.
 
-- Work PRs target `dev`; release PRs promote `dev` to `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
-- Only `dev` opens a PR into `main`. The `branch-model` check enforces that rule and `version` requires the head's version to advance over `main`, so a release cannot merge without its bump.
+- Work PRs target `dev`; normal release PRs promote `dev` to `main` with a version strictly newer than `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
+- A deployment failure alone does not require a version bump. For a focused repair of an unpublished release, create `release/<version>/fix/publication-repair` from fresh `main` and squash its PR directly into `main`. The `version` check requires exact main/head version equality and confirmation that the exact npm version is absent. Never downgrade or overwrite an immutable published version. Retry an already published artifact only after verifying identical identity and provenance; product or source changes to a published artifact require a new version.
 - Protect `main` and `dev` (PRs only, no force push, no deletion) and `holyagent-*` tags (no update, no deletion). Required checks are the job ids `check`, `windows`, `installers` and `branch-model`, plus `version` on `main`. Renaming a job drops its check from protection until the ruleset names the new one.
 - Branch pushes run validation, then publish stable on protected `main` or a development release on protected `dev`. Development versions use the commit UTC time and short SHA. Tags never trigger publication.
 - Pin every external action to a full commit SHA with a `# vX.Y.Z` comment, and give `contents: write` only to the jobs that tag and release. A moving tag can change what runs with the repository's token; `scripts/workflows.test.ts` checks both rules.
@@ -28,6 +50,7 @@ This repository's own convention, enforced by CI and rulesets; HolyAgent's instr
 
 ## Commits and pull requests
 
+- Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending, so every PR is available for review.
 - Keep each PR to one reviewable change. When branch rules allow, stack on the preceding open owner PR and set the PR base to the branch the work started from, so each review shows only its own change.
 - `holyagent vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `lefthook.yml`) keeps agent attribution out of commits made with plain Git too.
 - Pass `holyagent vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.

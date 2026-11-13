@@ -1,4 +1,4 @@
-import { Console, Data, Effect } from "effect"
+import { Console, Data, Effect, Schema } from "effect"
 
 import {
   compareVersions,
@@ -36,7 +36,7 @@ export class VersionNotNewer extends Data.TaggedError("VersionNotNewer")<{
 export class Usage extends Data.TaggedError("Usage")<{ readonly args: ReadonlyArray<string> }> {
   /** The description shown to the user. */
   override get message() {
-    return `Expected "branch-model <base> <head> [root]" or "version <main-root> <head-root>"; got ${this.args.join(" ") || "nothing"}`
+    return `Expected "branch-model <base> <head> [root]" or "version <main-root> <head-root> [head-ref]"; got ${this.args.join(" ") || "nothing"}`
   }
 }
 
@@ -47,7 +47,9 @@ export interface PullRequest {
   readonly version: string
 }
 
-/** Requires pull requests into main to come from dev. */
+const REPAIR_BRANCH = /^release\/([^/]+)\/fix\/publication-repair$/
+
+/** Requires pull requests into main to come from dev or the focused repair branch. */
 export const checkBranchModel = ({
   base,
   head,
@@ -56,8 +58,11 @@ export const checkBranchModel = ({
   const violation = (rule: BranchModelViolation["rule"], detail: string) =>
     Effect.fail(new BranchModelViolation({ rule, base, head, detail }))
   return Effect.gen(function* () {
-    if (base === "main" && head !== "dev")
-      return yield* violation("main-base", "only dev may open a pull request into main")
+    if (base === "main" && head !== "dev" && !REPAIR_BRANCH.test(head))
+      return yield* violation(
+        "main-base",
+        "only dev or a publication-repair branch may open a pull request into main",
+      )
   })
 }
 
@@ -70,6 +75,72 @@ export const checkVersionNewer = (
     const [mainVersion, headVersion] = yield* Effect.all([parseVersion(main), parseVersion(head)])
     if (compareVersions(headVersion, mainVersion) <= 0)
       return yield* new VersionNotNewer({ main, head })
+  })
+
+/** The public registry could not establish whether a version was published. */
+export class RegistryError extends Data.TaggedError("RegistryError")<{ readonly detail: string }> {
+  /** The description shown to the user. */
+  override get message() {
+    return this.detail
+  }
+}
+
+const Fields = Schema.Record(Schema.String, Schema.Unknown)
+const open = <F extends Schema.Struct.Fields>(fields: F) =>
+  Schema.StructWithRest(Schema.Struct(fields), [Fields])
+const RegistryVersion = open({ name: Schema.Literal("holyagent"), version: Schema.String })
+
+/** Queries the exact public npm version and fails closed on unavailable or malformed metadata. */
+export const lookupPublished = (
+  version: string,
+  request: (url: string, init: RequestInit) => Promise<Response> = fetch,
+): Effect.Effect<boolean, RegistryError> =>
+  Effect.gen(function* () {
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        request(`https://registry.npmjs.org/holyagent/${encodeURIComponent(version)}`, {
+          headers: { Accept: "application/json" },
+          redirect: "error",
+          signal: AbortSignal.timeout(10000),
+        }),
+      catch: (cause) =>
+        new RegistryError({ detail: `Public npm registry request failed: ${String(cause)}` }),
+    })
+    if (response.status === 404) return false
+    if (!response.ok)
+      return yield* new RegistryError({ detail: `Public npm registry returned ${response.status}` })
+    const body = yield* Effect.tryPromise({
+      try: (): Promise<unknown> => response.json(),
+      catch: (cause) =>
+        new RegistryError({ detail: `Invalid npm registry JSON: ${String(cause)}` }),
+    })
+    const metadata = yield* Schema.decodeUnknownEffect(RegistryVersion, {
+      onExcessProperty: "error",
+    })(body).pipe(
+      Effect.mapError(
+        (cause) => new RegistryError({ detail: `Invalid npm registry metadata: ${String(cause)}` }),
+      ),
+    )
+    if (metadata.version !== version)
+      return yield* new RegistryError({ detail: "Invalid npm registry version identity" })
+    return true
+  })
+
+/** Allows an equal version only for the exact repair branch and an unpublished npm version. */
+export const checkReleaseVersion = (
+  main: string,
+  head: string,
+  headRef: string,
+  lookup: (version: string) => Effect.Effect<boolean, RegistryError> = lookupPublished,
+): Effect.Effect<void, VersionNotNewer | InvalidVersion | RegistryError> =>
+  Effect.gen(function* () {
+    const [mainVersion, headVersion] = yield* Effect.all([parseVersion(main), parseVersion(head)])
+    const comparison = compareVersions(headVersion, mainVersion)
+    const repair = REPAIR_BRANCH.exec(headRef)
+    if (comparison > 0 && repair === null) return
+    if (comparison !== 0 || main !== head || repair?.[1] !== head)
+      return yield* new VersionNotNewer({ main, head })
+    if (yield* lookup(head)) return yield* new VersionNotNewer({ main, head })
   })
 
 /**
@@ -88,12 +159,20 @@ export const main = (args: ReadonlyArray<string>) =>
         readVersion(first, "package.json"),
         readVersion(second, "package.json"),
       ])
-      yield* checkVersionNewer(mainVersion, headVersion)
+      yield* checkReleaseVersion(mainVersion, headVersion, third ?? "")
     } else return yield* new Usage({ args })
     yield* Console.log("ok")
   }).pipe(
     Effect.catch(
-      (error: BranchModelViolation | VersionNotNewer | InvalidVersion | ManifestError | Usage) =>
+      (
+        error:
+          | BranchModelViolation
+          | VersionNotNewer
+          | InvalidVersion
+          | ManifestError
+          | RegistryError
+          | Usage,
+      ) =>
         Console.error(`error: ${error._tag}: ${error.message}`).pipe(
           Effect.andThen(
             Effect.sync(() => {

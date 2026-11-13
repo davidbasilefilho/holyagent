@@ -1,6 +1,6 @@
 # Development
 
-The contributing rules are in `.claude/CLAUDE.md`; this page explains the layout and the tooling behind them.
+The contributing rules are in `AGENTS.md`; this page explains the layout and the tooling behind them.
 
 ## Layout
 
@@ -180,17 +180,17 @@ Versions follow ZeroVer, `0.X.Y`: the major stays 0, a minor bump advances X and
 
 ## Branches, CI and releases
 
-Work happens on branches with PRs targeting `dev`. The first PR of a release carries the version bump as its own commit (`mise run bump:patch` or `bump:minor`); a release PR promotes `dev` to `main`. [AGENTS.md](../AGENTS.md) states the rules and their reasons; this section is the machinery behind them.
+Work happens on branches with PRs targeting `dev`. The first PR of a release carries the version bump as its own commit (`mise run bump:patch` or `bump:minor`); a release PR promotes `dev` to `main`. A focused repair of an unpublished release may instead use `release/<version>/fix/publication-repair` from fresh `main`, squashed directly into `main`, without a version bump. [AGENTS.md](../AGENTS.md) states the rules and their reasons; this section is the machinery behind them.
 
 **Validation** (`.github/workflows/validation.yml`) runs on pull requests (opened, pushed to, reopened and edited, so a changed base is checked again) and is callable, so `publish.yml` runs the same jobs for a push. Its jobs and their status check names, which are the job ids:
 
-| Check          | Runs on              | Does                                                                                                                                                      |
-| -------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check`        | PRs and calls        | The gates, the freshness check of the generated plugin and Pi package, plugin validation and shellcheck                                                   |
-| `windows`      | PRs and calls        | The test suite on `windows-latest`                                                                                                                        |
-| `installers`   | PRs and calls        | Parses both installers                                                                                                                                    |
-| `branch-model` | PRs only             | `scripts/pr-checks.ts branch-model <base> <head>`: only `dev` targets `main`, after the inline guard rejects a fork                                       |
-| `version`      | PRs into `main` only | `scripts/pr-checks.ts version`: the head's root `package.json` version is strictly greater than `main`'s (`compareVersions` in `scripts/bump-version.ts`) |
+| Check          | Runs on              | Does                                                                                                                                              |
+| -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check`        | PRs and calls        | The gates, generated artifact freshness, plugin validation and shellcheck                                                                         |
+| `windows`      | PRs and calls        | The test suite on `windows-latest`                                                                                                                |
+| `installers`   | PRs and calls        | Parses both installers                                                                                                                            |
+| `branch-model` | PRs only             | Allows `dev` or the exact publication-repair branch into `main`, after the inline guard rejects a fork                                            |
+| `version`      | PRs into `main` only | Normal releases require a version strictly newer than `main`; publication repairs require exact main/head equality and an unpublished npm version |
 
 Both PR-only jobs fail a pull request whose head repository is not this one, because a fork picks its branch names freely. An inline shell step runs first in each of them, before checkout, and compares the head repository with this repository case-insensitively. A new push or edit cancels an older run for the same pull request, but never a push run called by `publish.yml`: cancelling that would fail the publish and leave the commit untagged. A job skipped by its `if` reports as passed, so `version` can be required on `main` and `branch-model` on every protected branch without blocking other PRs.
 
