@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mwfgp42p-zdz1",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Worker.integration",
+  "slug": "integrate-published-main-policy-and",
+  "objective": "Integrate published main policy and metadata into the 0.3.4 development-flow branch while preserving protected main/dev release behavior.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034 branch release/0.3.4/chore/development-flow at b95759de59c1cc0fcb129c1d57909cddf3b945bd. Root fetched origin/main460f9453 and began git merge --no-commit --no-ff origin/main. Merge pending,6 conflict files: AGENTS.md,docs/development.md,packages/integrations/pi/publishing.test.ts,scripts/npm-publishing.test.ts,scripts/pr-checks.test.ts,scripts/pr-checks.ts. Resolve source content ONLY; root handles staging and merge commit.",
+    "Preserve0.3.4 main/dev migration (workPRsdev,normalreleasepromotesdev→main; protecteddev deterministic prerelease npmdev and GH), AND latest main bounded same-version unpublished publication-repair exception (fresh main-based release/<v>/fix/publication-repair directmain squash; exact equality+registry404; failclosed malformed/network/auth/published), public package correctrepository metadata/preflight, Windows Bash release-lookup fixtures, all useful contributing rules in rootAGENTS.",
+    "Latestmain deliberately removed .claude/CLAUDE.md and packages/runtime/CLAUDE.md because Claude reads AGENTS.md; never restore. RootAGENTS mustretain noDraft and no gratuitous version bump for faileddeployment, immutable published artifact/sourcechange nuance. Do not change actual settings/checknames/protection. Normalrelease stilladvancesversion; focusedrepair not a blanketbypass.",
+    "Reconcile main/dev docs and publishing/regression tests so they assert finalpolicy honestly; no0.4 PRstack simplification yet. Build fromsource, focused workflows/pr-checks/publishing/installers docs/parity tests plusstaticgates; fullverify supervised ifneeded for confidence. Mainmetadata tests and0.3.4 deterministic versiontests bothremainmeaningful."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs.",
+    "User explicitly authorized AGENTS edits, noDraft and CLAUDE removal and deployment-failure nuance; avoid new approval requirements. Read instruction-writing skill if touching model-facing text. No staged conflict writes/index/.git operations: root alone git add/commit. Save report /workspace/work/034/development-main-forward-report.json and diff /workspace/work/034/development-main-forward.diff; include conflicts-resolved evidence."
+  ],
+  "criteria": [
+    {
+      "text": "Main dev release flow preserves the bounded unpublished repair exception and fails closed on published or unknown registry state",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Consolidated AGENTS no draft policy publication nuance and main metadata survive integration without CLAUDE resurrection",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Resolved source generated build static gates and focused release tests pass without weakening requirements",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "conflicts-resolved"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md",
+    "docs/development.md",
+    "docs/pi/claude-parity.md",
+    "README.md",
+    "scripts/pr-checks.ts",
+    "scripts/pr-checks.test.ts",
+    "scripts/npm-publishing.test.ts",
+    "scripts/workflows.test.ts",
+    "packages/integrations/pi/publishing.test.ts",
+    ".github/workflows",
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T21:01:23.041Z"
+  },
+  "createdAt": "2026-11-13T21:01:23.041Z"
+}
