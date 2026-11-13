@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mwf0ddmb-uwah",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 12,
+  "roleTask": "Worker.operations",
+  "slug": "coordinate-the-runtime-state-generated",
+  "objective": "Coordinate the runtime-state generated build and full gate after both source writers completed.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/holyagent-034-state atc3c9351 plus accepted ownership/handoff source changes"
+  ],
+  "constraints": [
+    "Read HolyAgent worker-operations role and umbrella requirements. User authorized0.3.4 develop/release/Terra low-xhigh; direct fallback. Both writers are terminal: operational ownership assignment-0mwezkhag-z0nw and handoff assignment-0mwezkhrb-0ml6. Their changed paths are disjoint. No VCS/.git/real .holyagent writes or remote actions.",
+    "Run task-local env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Dependencies already ready. Run bunx --no-install mise run build, then python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify. No test weakening/skips beyond conditional suite behavior.",
+    "Only generated output writes are allowed. If source conflict, lint or genuine gate failure appears, report exact failure to root without fixing writer-owned code; narrow diagnosis allowed. Use current source tests and normal gates; isolated lifecycle fixtures may create their own temporary state, never mutate shared real state. Record source manifest/tree/diff before/after; generated changes expected but source must stay stable.",
+    "Save /workspace/work/034/state-build-report.md with final plain evidence: block and /workspace/work/034/state-combined.diff including new files via an appropriate safe diff method, logs outside repo. Report under200words with full counts and changed generated paths."
+  ],
+  "criteria": [
+    {
+      "text": "Combined state source builds generated artifacts and passes full verify",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Coordinated build changes only expected generated paths",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "generated-paths",
+    "source-stability",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    ".claude-plugin/marketplace.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T13:24:21.683Z"
+  },
+  "createdAt": "2026-11-13T13:24:21.683Z"
+}
