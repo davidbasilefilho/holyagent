@@ -35,6 +35,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/core_completion_map",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T21:19:11.598Z"
