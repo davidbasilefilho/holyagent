@@ -138,7 +138,7 @@ export class Shell extends Context.Service<
     readonly run: (
       command: string,
       args: ReadonlyArray<string>,
-      options: { readonly cwd: string },
+      options: { readonly cwd: string; readonly env?: Env },
     ) => Effect.Effect<ShellResult>
   }
 >()("holyagent/Shell") {
@@ -159,7 +159,7 @@ export class Shell extends Context.Service<
             try: () =>
               $`${command} ${args}`
                 .cwd(options.cwd)
-                .env(definedEnv({ ...env, [bunBin.key]: bunBin.value }))
+                .env(definedEnv({ ...env, ...options.env, [bunBin.key]: bunBin.value }))
                 .quiet()
                 .nothrow()
                 .then((result) => ({

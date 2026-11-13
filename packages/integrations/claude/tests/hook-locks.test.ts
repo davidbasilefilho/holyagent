@@ -166,7 +166,8 @@ describe("agent-launch hook and CLI processes contending for the state lock", ()
     for (const result of launches) {
       expect(result.killed).toBe(false)
       expect(result.code).toBe(0)
-      expect(result.ms).toBeLessThan(result.timeoutMs - 1500)
+      // The host timeout bounds the process; parent observation also includes scheduling and work
+      // outside the lock wait. The held-lock tests below check the shared wait and hand-back.
       // It recorded the launch or handed it back; it neither failed nor hung.
       expect(result.stdout).toMatch(
         /recorded agent agent-\d for|could not record the launch of .* \(StateLocked\)/,

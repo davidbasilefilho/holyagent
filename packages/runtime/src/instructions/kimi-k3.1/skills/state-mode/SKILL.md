@@ -1,6 +1,6 @@
 ---
 name: state-mode
-description: Use before a clone's first Intent, to choose where holyagent state lives. Holds the signals that pick the state mode (branch, work or local) and the command that records it.
+description: "Use before a clone's first Intent, to choose where holyagent state lives. Holds the signals that pick the state mode (branch, work or local) and the command that records it."
 ---
 
 # State mode

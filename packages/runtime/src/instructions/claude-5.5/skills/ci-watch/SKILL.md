@@ -1,6 +1,6 @@
 ---
 name: ci-watch
-description: Use when a branch or PR has been pushed and its CI needs watching or judging, its merge state is in question, or a review bot has commented. Holds how the root watches checks, aggregates results for the current head, diagnoses failures and decides merge-readiness.
+description: "Use when a branch or PR has been pushed and its CI needs watching or judging, its merge state is in question, or a review bot has commented. Holds how the root watches checks, aggregates results for the current head, diagnoses failures and decides merge-readiness."
 ---
 
 # CI

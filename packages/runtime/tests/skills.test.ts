@@ -32,6 +32,21 @@ afterEach(async () => {
 })
 
 describe("the skill files", () => {
+  test.each(FAMILIES)(
+    "all skill frontmatter is valid YAML with a string description in %s",
+    async (family) => {
+      const files = await Effect.runPromise(skillFiles(family, (source) => source))
+      for (const { path, content } of files.filter(({ path }) => path.endsWith("SKILL.md"))) {
+        const header = content.split("\n---\n")[0]?.replace(/^---\n/, "") ?? ""
+        const parsed = Bun.YAML.parse(header) as Record<string, unknown>
+        expect({ path, descriptionType: typeof parsed["description"] }).toEqual({
+          path,
+          descriptionType: "string",
+        })
+        expect(String(parsed["description"]).length).toBeGreaterThan(0)
+      }
+    },
+  )
   test("leave out dotfiles, dot folders and symbolic links, and ship the rest", async () => {
     const root = await makeRoot()
     const skills = join(root, "claude-5.5", "skills")

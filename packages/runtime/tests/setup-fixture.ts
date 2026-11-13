@@ -61,6 +61,8 @@ export interface Ran {
   readonly line: string
   /** The working directory the command was asked to run in. */
   readonly cwd: string
+  /** Explicit child-only environment, when the caller supplied it. */
+  readonly env?: Readonly<Record<string, string | undefined>>
 }
 
 const packageCommands: Readonly<Record<string, string>> = { ctx7: "ctx7" }
@@ -93,7 +95,13 @@ export const fakeShell = (options: {
       run: (command, args, runOptions) =>
         Effect.sync(() => {
           const line = [command, ...args].join(" ")
-          calls.push({ command, args, line, cwd: runOptions.cwd })
+          calls.push({
+            command,
+            args,
+            line,
+            cwd: runOptions.cwd,
+            ...(runOptions.env === undefined ? {} : { env: runOptions.env }),
+          })
           const result = { exitCode: 0, stdout: "", stderr: "", ...options.respond?.(line) }
           const add = command === "bun" ? args.indexOf("add") : -1
           const global = add >= 0 && args[add + 1] === "-g" ? args[add + 2] : undefined

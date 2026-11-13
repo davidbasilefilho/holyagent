@@ -45,6 +45,8 @@ const environment = (extra: Record<string, string> = {}) => ({
   HOLYAGENT_HOST: "pi",
   T3CODE_HOME: t3Home,
   ANDROID_HOME: androidSdk,
+  // Do not let the host's Xcode override the fixture's Android SDK choice.
+  DEVELOPER_DIR: join(home, "no-xcode"),
   ...extra,
 })
 

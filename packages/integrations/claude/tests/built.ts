@@ -5,6 +5,16 @@ import { join } from "node:path"
 import { build } from "../build.ts"
 import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 
+/** Reads a scalar from generated YAML frontmatter, including quoted strings. */
+export const field = (text: string, key: string): string | undefined => {
+  const header = text.split("\n---\n")[0]
+  if (!header) return undefined
+  const parsed = Bun.YAML.parse(header)
+  if (typeof parsed !== "object" || parsed === null || !(key in parsed)) return undefined
+  const value = (parsed as Record<string, unknown>)[key]
+  return typeof value === "string" || typeof value === "boolean" ? String(value) : undefined
+}
+
 /** The repository root. */
 export const ROOT = REPOSITORY
 

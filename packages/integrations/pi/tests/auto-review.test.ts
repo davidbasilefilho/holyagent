@@ -189,7 +189,7 @@ describe("the tool_call gate", () => {
     expect(requests).toHaveLength(0)
     expect(await module.call("bash", RISKY)).toEqual({})
     expect(requests).toHaveLength(1)
-    expect(requests[0]?.model).toBe("codex-auto-review")
+    expect(requests[0]?.model).toBe("gpt-6-luna")
     expect(requests[0]?.prompt).toContain("[1] user: clean the build output")
     expect(module.notices[0]).toContain("Automatic approval review approved")
   })

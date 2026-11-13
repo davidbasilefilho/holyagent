@@ -8,6 +8,19 @@ const revisionOfBun = async (): Promise<string> =>
   (await $`${process.execPath} --revision`.quiet().nothrow().text()).trim()
 
 /**
+ * The isolated environment for Bun upgrading: flags and incompatible Windows PowerShell modules
+ * stay out.
+ */
+export const upgradeEnvironment = (
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv => ({
+  ...env,
+  BUN_OPTIONS: undefined,
+  ...(platform === "win32" ? { PSModulePath: undefined } : {}),
+})
+
+/**
  * Checks (`check`, the default) or ensures (`upgrade`) that Bun is a canary build, the only kind
  * with `bun check`, `bun lint` and `bun fmt`. It is a script rather than shell text in `mise.toml`,
  * so the gates run the same under sh and cmd. `check` exits 1 with the fix on a stable build.
@@ -26,7 +39,8 @@ const main = async (mode: string): Promise<number> => {
     )
     return 1
   }
-  const env = { ...process.env, BUN_OPTIONS: undefined }
+  // A PowerShell 7 host can leak its module path to Windows PowerShell 5, breaking Expand-Archive.
+  const env = upgradeEnvironment()
   const upgraded = await $`${process.execPath} upgrade --canary`.env(env).nothrow()
   return upgraded.exitCode
 }

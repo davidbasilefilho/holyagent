@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -2015,8 +2015,9 @@ describe("telling a child from the root", () => {
       packageRoot: "C:\\Users\\me\\pkg",
       platformPath: win32,
     })
+    expect(delivered?.systemPrompt).toBe(fillPackageRoot(prompt, "C:\\Users\\me\\pkg", win32))
     expect(delivered?.systemPrompt).toBe(
-      "run C:/Users/me/pkg/scripts/holyagent status, then C:/Users/me/pkg/scripts/holyagent rg x .",
+      "run bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent.js' status, then bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent.js' rg x .",
     )
     // The wrapper of a Windows root is not the one the fake answers for, so the config is
     // unreadable and the provider's variables are the defaults'; the host and the worker cap are
@@ -2028,6 +2029,54 @@ describe("telling a child from the root", () => {
     const { api } = await run(healthy("/missing"), { sessionName: "reviewer-code#a1b2c3d4" })
     const results = await api.emit("before_agent_start", { systemPrompt: "plain" })
     expect(results).toEqual([undefined])
+  })
+
+  test("host-neutral CLI examples are wired to the installed package too", () => {
+    expect(fillPackageRoot("Run \u0060holyagent status\u0060.", "C:\\pkg", win32)).toBe(
+      "Run \u0060bun --no-env-file --config='C:/pkg/scripts/empty-bunfig.toml' 'C:/pkg/scripts/holyagent.js' status\u0060.",
+    )
+  })
+
+  test.skipIf(process.platform === "win32")(
+    "Unix prompt commands execute the installed wrapper with their arguments",
+    async () => {
+      const directory = await mkdtemp(join(tmpdir(), "holyagent-prompt-"))
+      try {
+        const root = join(directory, "My Apps' $(touch injected); package")
+        const scripts = join(root, "scripts")
+        await mkdir(scripts, { recursive: true })
+        const wrapper = join(scripts, "holyagent")
+        await Bun.write(wrapper, '#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        await chmod(wrapper, 0o755)
+        for (const prompt of [
+          "`holyagent status --project 'my project'`",
+          `${PI_ROOT_PLACEHOLDER}/scripts/holyagent status --project 'my project'`,
+        ]) {
+          const command = fillPackageRoot(prompt, root).replaceAll("`", "")
+          const child = Bun.spawn(["sh", "-c", command], {
+            cwd: directory,
+            stdout: "pipe",
+            stderr: "pipe",
+          })
+          expect(await child.exited).toBe(0)
+          expect(await new Response(child.stdout).text()).toBe("status\n--project\nmy project\n")
+        }
+        expect(await Bun.file(join(directory, "injected")).exists()).toBe(false)
+      } finally {
+        await removeTemporary(directory)
+      }
+    },
+  )
+
+  test("Windows CLI prompts use isolated Bun rather than a non-executable shell wrapper", () => {
+    const prompt = fillPackageRoot(
+      PI_ROOT_PLACEHOLDER + "/scripts/holyagent --version",
+      "C:\\Program Files\\holyagent",
+      win32,
+    )
+    expect(prompt).toBe(
+      "bun --no-env-file --config='C:/Program Files/holyagent/scripts/empty-bunfig.toml' 'C:/Program Files/holyagent/scripts/holyagent.js' --version",
+    )
   })
 
   test("fillPackageRoot writes the folder with the platform separator turned to /", () => {
@@ -2771,6 +2820,24 @@ describe("the root's system prompt", () => {
 })
 
 describe("the root's tools", () => {
+  test("activates registered FFF search tools and leaves them callable through codemode", async () => {
+    const search = ["grep", "find", "multi_grep"]
+    const { api } = await run(healthy("/missing"), {
+      activeTools: ["read", "bash"],
+      allTools: ["read", "bash", "codemode", ...search],
+    })
+    expect(api.pi.getActiveTools()).toEqual(["read", "bash", "codemode", ...search])
+    for (const name of search)
+      expect(
+        await api.emit("tool_call", {
+          toolName: name,
+          toolCallId: "search",
+          input: {},
+          parentToolCallId: "code",
+        }),
+      ).toEqual([undefined])
+  })
+
   const ACTIVE = ["read", "bash", "write", "edit", "todo", "moonshot_search", "computer_use_click"]
 
   test("are its active selection plus codemode, minus the tools it excludes", async () => {
@@ -2911,14 +2978,7 @@ describe("the root's excluded tools", () => {
   // fff's tools under both name sets: override mode's, and the default mode's, which the package also
   // registers under `--fff-mode`, `PI_FFF_MODE` and a working directory it does not index.
   const FFF = ["grep", "find", "multi_grep", "ffgrep", "fffind", "fff-multi-grep"]
-  const EXCLUDED = [
-    "write",
-    "edit",
-    "computer_use_click",
-    "moonshot_search",
-    "moonshot_fetch",
-    ...FFF,
-  ]
+  const EXCLUDED = ["write", "edit", "computer_use_click", "moonshot_search", "moonshot_fetch"]
   const webKit = JSON.stringify({
     ...DEFAULTS,
     pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, web: "pi-web-kit" } },
@@ -2933,7 +2993,7 @@ describe("the root's excluded tools", () => {
         blocked,
       )
     }
-    for (const name of ["read", "bash", "codemode", "todo"])
+    for (const name of ["read", "bash", "codemode", "todo", ...FFF])
       expect(await api.emit("tool_call", call(name))).toEqual([undefined])
   })
 

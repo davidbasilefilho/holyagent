@@ -41,10 +41,10 @@ const withFeatures = (features: Partial<Config["pi"]["features"]>): Config => ({
 /** A provider whose extension offers no web tools, to try the fallback. */
 const NO_WEB_PROVIDER: ProviderProfile = { ...PROVIDERS["kimi-coding-global"], webTools: [] }
 
-const READ = ["read", "grep", "find", "ls"]
+const READ = ["read", "grep", "find", "ls", "multi_grep", "ffgrep", "fffind", "fff-multi-grep"]
 const MOONSHOT = ["moonshot_search", "moonshot_fetch"]
 // What @ff-labs/pi-fff registers, under Pi's own names in override mode and under its own otherwise
-// (the default mode, --fff-mode, PI_FFF_MODE, a working directory it does not index); the root has none.
+// (the default mode, --fff-mode, PI_FFF_MODE, a working directory it does not index); every role has them.
 const FFF_TOOLS = ["grep", "find", "multi_grep", "ffgrep", "fffind", "fff-multi-grep"]
 const WEB_KIT = ["web_search", "web_fetch"]
 // Pi offers `powershell` beside `bash` on Windows; a role has both or neither.
@@ -129,13 +129,13 @@ describe("toolArgs for the specialists", () => {
   test("argv renders --tools, then --exclude-tools only when something is excluded", () => {
     expect(toolArgs(DEFAULT_CONFIG, "Explorer.map").argv).toEqual([
       "--tools",
-      "read,grep,find,ls,codemode",
+      "read,grep,find,ls,multi_grep,ffgrep,fffind,fff-multi-grep,codemode",
       "--exclude-tools",
       "write,edit,bash,powershell",
     ])
     expect(toolArgs(DEFAULT_CONFIG, "Worker.implementation").argv).toEqual([
       "--tools",
-      "read,grep,find,ls,write,edit,bash,powershell,codemode",
+      "read,grep,find,ls,multi_grep,ffgrep,fffind,fff-multi-grep,write,edit,bash,powershell,codemode",
     ])
   })
 })
@@ -143,23 +143,22 @@ describe("toolArgs for the specialists", () => {
 describe("toolArgs for the root", () => {
   test("adds codemode to the default selection and takes write, edit, computer use and web away", () => {
     expect(toolArgs(DEFAULT_CONFIG, "root")).toEqual({
-      tools: ["+codemode"],
+      tools: ["+codemode", ...FFF_TOOLS.map((name) => `+${name}`)],
       excludeTools: [
         "write",
         "edit",
         ...COMPUTER_USE_TOOLS,
         ...BROWSE_TOOLS,
         ...BROWSER_USE_ALL_TOOLS,
-        ...FFF_TOOLS,
         ...MOONSHOT,
       ],
       noMcp: false,
       env: { PI_CODEMODE_MAX_WORKERS: "4", ...BILLION_CONTEXT_GUARDRAILS_OFF },
       argv: [
         "--tools",
-        "+codemode",
+        "+codemode,+grep,+find,+multi_grep,+ffgrep,+fffind,+fff-multi-grep",
         "--exclude-tools",
-        "write,edit,computer_use_*,mcp__browse__*,mcp__browser_use__*,grep,find,multi_grep,ffgrep,fffind,fff-multi-grep,moonshot_search,moonshot_fetch",
+        "write,edit,computer_use_*,mcp__browse__*,mcp__browser_use__*,moonshot_search,moonshot_fetch",
       ],
     })
   })
@@ -194,7 +193,7 @@ describe("toolArgs for the root", () => {
     expect(exclusions("off")).toEqual(["write", "edit"])
   })
 
-  test("excludes the tools fff's override mode registers only while pi.features.fff is on, and never from a specialist", () => {
+  test("allows the FFF tools for root and specialists only while the capability is on", () => {
     const on = toolArgs(
       withFeatures({ fff: true, computerUse: false, browserUse: false, web: "off" }),
       "root",
@@ -203,12 +202,16 @@ describe("toolArgs for the root", () => {
       withFeatures({ fff: false, computerUse: false, browserUse: false, web: "off" }),
       "root",
     )
-    expect(on.excludeTools).toEqual(["write", "edit", ...FFF_TOOLS])
+    expect(on.excludeTools).toEqual(["write", "edit"])
+    expect(on.tools).toEqual(["+codemode", ...FFF_TOOLS.map((name) => `+${name}`)])
+    expect(off.tools).toEqual(["+codemode"])
     expect(off.excludeTools).toEqual(["write", "edit"])
     for (const role of RoleTask.literals)
-      expect(toolArgs(DEFAULT_CONFIG, role).tools).toEqual(
-        toolArgs(withFeatures({ fff: false }), role).tools,
-      )
+      expect(toolArgs(DEFAULT_CONFIG, role).tools).toEqual([
+        ...toolArgs(withFeatures({ fff: false }), role).tools.slice(0, 4),
+        ...FFF_TOOLS.filter((name) => name !== "grep" && name !== "find"),
+        ...toolArgs(withFeatures({ fff: false }), role).tools.slice(4),
+      ])
   })
 
   test("the worker cap follows pi.codemode.maxWorkers for the root and every specialist", () => {

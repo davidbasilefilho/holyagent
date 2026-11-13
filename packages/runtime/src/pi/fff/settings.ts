@@ -30,14 +30,13 @@ export const FFF_RETIRED_SETTINGS = { followSymlinks: false } as const
 /**
  * Every tool name `@ff-labs/pi-fff` registers at the pin of `pi-packages.json` (0.11.0,
  * `OVERRIDE_TOOL_NAMES` and `FFF_TOOL_NAMES` of `src/index.ts`); a pin move must recheck the list,
- * {@link FFF_OVERRIDE_SETTINGS} and {@link FFF_NATIVE_HOSTS} against the package. The root does not
- * use any of them: its search rule names `holyagent rg` and `holyagent fd`. Pi's default selection
- * leaves `grep` and `find` out of the root's active tools, but the package activates every tool it
- * registers, so the root excludes them to keep what it had. Override mode registers `grep`, `find`
- * and `multi_grep`; the package's default mode, the `--fff-mode` flag or `PI_FFF_MODE` over the
- * file, and override mode with the working directory opted out of indexing register `ffgrep`,
- * `fffind` and `fff-multi-grep` instead, so both sets are excluded, whichever mode ends up in
- * force.
+ * {@link FFF_OVERRIDE_SETTINGS} and {@link FFF_NATIVE_HOSTS} against the package. The root and
+ * specialists use these through codemode. The root explicitly activates registered FFF tools, and
+ * specialist allowlists include the extension tools as well as its builtin replacement names.
+ * Override mode registers `grep`, `find` and `multi_grep`; the package's default mode, the
+ * `--fff-mode` flag or `PI_FFF_MODE` over the file, and override mode with the working directory
+ * opted out of indexing register `ffgrep`, `fffind` and `fff-multi-grep` instead, so both sets are
+ * allowed, whichever mode ends up in force.
  */
 export const FFF_TOOLS: ReadonlyArray<string> = [
   "grep",

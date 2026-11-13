@@ -1,6 +1,6 @@
 ---
 name: mobile-design
-description: Use when building, reshaping or judging the visual design of a phone or tablet app on iOS, iPadOS or Android.
+description: "Use when building, reshaping or judging the visual design of a phone or tablet app on iOS, iPadOS or Android."
 ---
 
 # Mobile design

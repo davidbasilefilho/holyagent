@@ -1,6 +1,6 @@
 ---
 name: visual-judging
-description: Use before the first Worker.visual or Reviewer.visual dispatch, and when rendered work (a web page, terminal UI, desktop or mobile screen) is accepted, repaired or explained visually.
+description: "Use before the first Worker.visual or Reviewer.visual dispatch, and when rendered work (a web page, terminal UI, desktop or mobile screen) is accepted, repaired or explained visually."
 ---
 
 # Judging visual work

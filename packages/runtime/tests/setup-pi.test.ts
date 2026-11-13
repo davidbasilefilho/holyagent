@@ -77,13 +77,15 @@ const CAPABILITY_LINES_OK = [
   "ok   pi capability context-compression: normal form, both, 1 package listed at its pin",
   "ok   pi capability todo: normal form, root, 1 package listed at its pin",
   "ok   pi capability ask: normal form, root, 1 package listed at its pin",
-  "ok   pi capability processes: normal form, root, 1 package listed at its pin",
+  process.platform === "win32"
+    ? "~ pi capability processes: not offered in the normal form (its package does not support win32, only darwin, linux); nothing is expected of it"
+    : "ok   pi capability processes: normal form, root, 1 package listed at its pin",
   "ok   pi capability mcp: normal form, both, nothing to install",
   "ok   pi capability computer-use: normal form, specialists, 1 package listed at its pin",
   "ok   pi capability browser-use: normal form, specialists, nothing to install",
   BROWSE_PAIRING_OK,
   "ok   pi capability just-bash: normal form, both, nothing to install",
-  "ok   pi capability fff: normal form, specialists, 1 package listed at its pin",
+  "ok   pi capability fff: normal form, both, 1 package listed at its pin",
 ]
 const PI_LINES_OK = [BASE_OK, FORM_OK, ...CAPABILITY_LINES_OK]
 const IN_USE = { HOLYAGENT_HOST: "pi" }
@@ -162,6 +164,8 @@ describe("holyagent doctor, Pi checks", () => {
         // The default provider is Kimi, so a capability of the Codex provider is not listed.
         ...CAPABILITIES.filter((capability) => !("provider" in capability)).flatMap(
           (capability) => {
+            if (capability.name === "processes" && process.platform === "win32")
+              return [CAPABILITY_LINES_OK[4] as string]
             // A capability with no package of its own has nothing to list.
             if (capability.name === "mcp" || capability.name === "just-bash")
               return [
@@ -254,7 +258,7 @@ describe("holyagent doctor, Pi checks", () => {
       expect(lineNamed(report, "pi base packages")).toBe(BASE_OK)
       expect(report.lines.filter((line) => /^ok {3}pi (form|capability)/.test(line))).toEqual([
         FORM_OK,
-        ...CAPABILITY_LINES_OK,
+        ...CAPABILITY_LINES_OK.filter((line) => line.startsWith("ok ")),
       ])
     }
   })
@@ -505,7 +509,7 @@ describe("holyagent doctor, capabilities", () => {
     expect(names).toEqual([
       "ok   pi capability subagents",
       "ok   pi capability context-compression",
-      "FAIL pi capability processes",
+      process.platform === "win32" ? "~ pi capability processes" : "FAIL pi capability processes",
       "ok   pi capability mcp",
       "ok   pi capability computer-use",
       "ok   pi capability browser-use",
@@ -513,7 +517,7 @@ describe("holyagent doctor, capabilities", () => {
       "ok   pi capability just-bash",
       "ok   pi capability fff",
     ])
-    expect(report.ok).toBe(false)
+    expect(report.ok).toBe(process.platform === "win32")
   })
 
   test.skipIf(process.platform === "darwin" || process.platform === "win32")(
@@ -589,7 +593,7 @@ describe("holyagent doctor, capabilities", () => {
       const source = "npm:@ff-labs/pi-fff@0.11.0"
       for (const form of ["normal", "headless"] as const) {
         expect(await probe(entry, form, [source], [], "linux-arm64")).toBe(
-          `ok   pi capability fff: ${form} form, specialists, 1 package listed at its pin`,
+          `ok   pi capability fff: ${form} form, both, 1 package listed at its pin`,
         )
         expect(await probe(entry, form, [], [], "linux-x64")).toStartWith(
           "FAIL pi capability fff: npm:@ff-labs/pi-fff@0.11.0 is not listed",
@@ -736,6 +740,11 @@ describe("holyagent setup, Pi packages", () => {
     expect(report.ok).toBe(true)
     expect(piCommands(shell)).toEqual(DEFAULT_SOURCES.map((source) => `pi install ${source}`))
     expect(shell.calls.every((call) => call.cwd === home)).toBe(true)
+    expect(
+      shell.calls
+        .filter((call) => call.command === "pi")
+        .every((call) => call.env?.["PI_CODING_AGENT_DIR"] === piAgentDirectory({ HOME: home })),
+    ).toBe(true)
     expect(piStep(report)).toEqual(
       DEFAULT_SOURCES.map((source) => `+ pi ${source}: installed with pi install ${source}`),
     )

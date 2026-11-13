@@ -1,6 +1,6 @@
 ---
 name: visual-judging
-description: Use before the first Worker.visual or Reviewer.visual dispatch, and when rendered work (a web page, terminal UI, desktop or mobile screen) is accepted, repaired or explained visually. Holds how the root picks the platform design skill, makes its own final pass on the reviewer's captures and decides acceptance, what makes a discrepancy material, how repair rounds run, and when to build an explanatory HTML page.
+description: "Use before the first Worker.visual or Reviewer.visual dispatch, and when rendered work (a web page, terminal UI, desktop or mobile screen) is accepted, repaired or explained visually. Holds how the root picks the platform design skill, makes its own final pass on the reviewer's captures and decides acceptance, what makes a discrepancy material, how repair rounds run, and when to build an explanatory HTML page."
 ---
 
 # Judging visual work

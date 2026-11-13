@@ -1,6 +1,6 @@
 ---
 name: desktop-design
-description: Use when building, reshaping or judging the visual design of a desktop app on Windows, macOS or GNOME. Holds the shared design core, rules shared by desktop platforms, a Windows, a macOS and a GNOME section, a refuse list and the capture checklist.
+description: "Use when building, reshaping or judging the visual design of a desktop app on Windows, macOS or GNOME. Holds the shared design core, rules shared by desktop platforms, a Windows, a macOS and a GNOME section, a refuse list and the capture checklist."
 ---
 
 # Desktop design

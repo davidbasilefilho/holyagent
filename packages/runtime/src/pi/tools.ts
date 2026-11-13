@@ -15,6 +15,7 @@ import {
 import type { Config, RouteKey } from "../config/schema.ts"
 import { type Capability, routeFor } from "../domain/route.ts"
 import { justBashEnvironment } from "./bash/settings.ts"
+import { FFF_TOOLS } from "./fff/settings.ts"
 import { type ProviderProfile, providerProfile, webChoice } from "./provider.ts"
 
 /** Pi's built-in tools that read: they replace `Read`, `Grep` and `Glob` for every role. */
@@ -180,11 +181,22 @@ export const toolArgs = (
       ...enabled.flatMap((capability) => capability.tools.rootExclude),
       ...webChoice(profile, features.web).tools,
     ]
-    return build([CODEMODE_ENTRY], excluded, noMcp, env)
+    return build(
+      [
+        CODEMODE_ENTRY,
+        ...(formEnabled.some((capability) => capability.feature === "fff")
+          ? FFF_TOOLS.map((tool) => `+${tool}`)
+          : []),
+      ],
+      excluded,
+      noMcp,
+      env,
+    )
   }
   const { capabilities, roleTask } = routeFor(key)
   const tools = [
     ...READ_TOOLS,
+    ...(formEnabled.some((capability) => capability.feature === "fff") ? FFF_TOOLS : []),
     ...(has(capabilities, "Write") ? [...WRITE_TOOLS, ...profile.writeTools] : []),
     ...(has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : []),
     ...(has(capabilities, "Search") ? webChoice(profile, features.web).tools : []),
@@ -230,9 +242,12 @@ export const rootActiveTools = (
     const name = entry.startsWith("+") ? entry.slice(1) : entry
     return name.includes("*") ? registered.filter((tool) => toolMatches(name, tool)) : [name]
   })
-  return [...new Set([...active, ...added])].filter(
-    (tool) => !args.excludeTools.some((pattern) => toolMatches(pattern, tool)),
-  )
+  return [
+    ...new Set([
+      ...active,
+      ...added.filter((name) => !FFF_TOOLS.includes(name) || registered.includes(name)),
+    ]),
+  ].filter((tool) => !args.excludeTools.some((pattern) => toolMatches(pattern, tool)))
 }
 
 /** The arguments of the root and each of the 18 specialists, the root first. */

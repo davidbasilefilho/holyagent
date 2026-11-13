@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { chmod, mkdtemp, rm } from "node:fs/promises"
+import { chmod, mkdtemp, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { delimiter, dirname, join } from "node:path"
 
@@ -116,8 +116,8 @@ describe.skipIf(!posix)("the command line passes through to the program on PATH"
     expect(result).toEqual({ stdout: "", stderr: "", code: 0 })
     expect((await Bun.file(join(bin, "rg.args")).text()).split("\n").slice(0, -1)).toEqual(argv)
     // The project is under a temp folder that may be a symlink, so compare resolved paths.
-    expect(await Bun.file(join(bin, "rg.cwd")).text()).toContain(
-      (await Bun.$`realpath ${project}`.text()).trim(),
+    expect(await realpath((await Bun.file(join(bin, "rg.cwd")).text()).trim())).toBe(
+      await realpath(project),
     )
   })
 

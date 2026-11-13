@@ -1,7 +1,7 @@
 import { Data, Effect, Schema } from "effect"
 
-/** The model the reviewer runs on, as Codex's own auto-review does (`GUARDIAN_PREFERRED_MODEL`). */
-export const REVIEW_MODEL = "codex-auto-review"
+/** The Codex model used for strict-schema action reviews. */
+export const REVIEW_MODEL = "gpt-6-luna"
 
 /**
  * How long a review may take before it counts as timed out: 90 seconds, Codex's
@@ -9,11 +9,8 @@ export const REVIEW_MODEL = "codex-auto-review"
  */
 export const REVIEW_TIMEOUT_MS = 90_000
 
-/**
- * The reasoning effort of the reviewer. Codex asks for `low` whenever the review model supports it,
- * and `codex-auto-review` is the review model.
- */
-export const REVIEW_REASONING_EFFORT = "low"
+/** The reasoning effort used for action reviews. */
+export const REVIEW_REASONING_EFFORT = "medium"
 
 /** The reviewer's risk levels, as Codex's `GuardianRiskLevel`. */
 export const RISK_LEVELS = ["low", "medium", "high", "critical"] as const

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -10,6 +10,7 @@ import { DEFAULT_CONFIG } from "../src/domain/directive.ts"
 import { closeIntent, createIntent } from "../src/domain/intent.ts"
 import { dispatch, record } from "../src/domain/lifecycle.ts"
 import { toPosix } from "../src/domain/paths.ts"
+import { commitFile } from "../src/state/files.ts"
 import { stateDirectory } from "../src/state/layout.ts"
 import { WorkTree } from "../src/state/local.ts"
 import { loadOpenProject, readState, updateState } from "../src/state/store.ts"
@@ -85,6 +86,15 @@ const files = async (path: string): Promise<string[]> =>
   (await readdir(path, { recursive: true })).map((entry) => toPosix(entry)).toSorted()
 
 describe("state store", () => {
+  test("atomically writes and replaces state beyond Windows MAX_PATH without temporary leftovers", async () => {
+    const folder = join(root, "long".repeat(22), "path".repeat(22), "state".repeat(15))
+    const file = join(folder, "record.json")
+    expect(file.length).toBeGreaterThan(260)
+    await Effect.runPromise(commitFile(file, "first"))
+    await Effect.runPromise(commitFile(file, "second"))
+    expect(await readFile(file, "utf8")).toBe("second")
+    expect(await readdir(folder)).toEqual(["record.json"])
+  })
   test("an empty directory reads as an empty project", async () => {
     const state = await Effect.runPromise(readState(directory))
     expect(state.project).toEqual({ intents: [], assignments: [] })
@@ -297,7 +307,7 @@ describe("state store", () => {
   })
 
   test("a lock left by a dead process is broken", async () => {
-    const child = Bun.spawn(["true"])
+    const child = Bun.spawn([process.execPath, "-e", "process.exit(0)"])
     await child.exited
     await mkdir(join(directory, "local"), { recursive: true })
     await Bun.write(

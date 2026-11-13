@@ -167,15 +167,30 @@ jobs:
       - name: Check the toolchain
         run: mise run toolchain
 
-      # Lifecycle scripts are skipped because the `mise` dev dependency's preinstall installs
-      # @jdxcode/mise-windows-x64, a package npm does not publish (404 for every version), so it
-      # fails on Windows. Nothing here needs them: mise-action already put mise on PATH, and the
-      # other scripts (git hooks, the Claude Code binary) are not used by the tests.
+      # Use the native mise supplied above; exercise trusted lifecycle scripts on Windows too.
       - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
+        run: bun install --frozen-lockfile
 
       - name: Test
         run: mise run test
+
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up tools
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify
+        run: mise run verify
 
   installers:
     runs-on: ubuntu-latest

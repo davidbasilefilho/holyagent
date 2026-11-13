@@ -359,7 +359,11 @@ describe("a bump followed by one build", () => {
         filter: (path) => !BUILT.includes(path) && !SKIPPED.includes(basename(path)),
       })
       for (const link of ["node_modules", "packages/runtime/node_modules"])
-        symlinkSync(join(repository, link), join(copy, link))
+        symlinkSync(
+          join(repository, link),
+          join(copy, link),
+          process.platform === "win32" ? "junction" : "dir",
+        )
       const { to } = await Effect.runPromise(bumpVersions(copy, "minor"))
       // The same two builds, in the same order, as the `build` task.
       for (const name of ["claude", "pi"]) {
@@ -418,7 +422,11 @@ describe("a build whose version sync fails", () => {
         "packages/runtime/src/instructions/skills.ts",
       ])
         cpSync(join(repository, file), join(copy, file), { recursive: true })
-      symlinkSync(join(repository, "node_modules"), join(copy, "node_modules"))
+      symlinkSync(
+        join(repository, "node_modules"),
+        join(copy, "node_modules"),
+        process.platform === "win32" ? "junction" : "dir",
+      )
       await Bun.write(join(copy, "package.json"), JSON.stringify({ version: "1.x" }))
       const build =
         await $`${process.execPath} ${join(copy, "packages/integrations/claude/build.ts")}`

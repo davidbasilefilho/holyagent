@@ -361,6 +361,23 @@ export const manifestFiles = (root: string) =>
     return ["package.json", ...new Set(found.flat())].toSorted()
   })
 
+/** Removes the npm mise wrapper, whose Windows binary package does not exist; use native mise. */
+export const withoutNpmMise = (
+  manifest: Readonly<Record<string, unknown>>,
+): Record<string, unknown> => {
+  const result = { ...manifest }
+  for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
+    const table = result[field]
+    if (table !== null && typeof table === "object" && !Array.isArray(table) && "mise" in table) {
+      const { mise: _mise, ...rest } = table as Record<string, unknown>
+      result[field] = rest
+    }
+  }
+  if (Array.isArray(result["trustedDependencies"]))
+    result["trustedDependencies"] = result["trustedDependencies"].filter((name) => name !== "mise")
+  return result
+}
+
 const surveyPackages = (root: string) =>
   Effect.gen(function* () {
     const files = yield* manifestFiles(root)
@@ -370,7 +387,10 @@ const surveyPackages = (root: string) =>
           Schema.decodeUnknownEffect(Schema.fromJsonString(Fields), strict)(text),
         ),
         Effect.mapError((cause) => new FileError({ file, cause })),
-        Effect.map((manifest) => ({ file, dependencies: packageDependencies(manifest) })),
+        Effect.map((manifest) => ({
+          file,
+          dependencies: packageDependencies(withoutNpmMise(manifest)),
+        })),
       ),
     )
     const releases = yield* resolveAll(
@@ -499,7 +519,10 @@ const renderRanges = (root: string, packages: Survey["packages"]) =>
         Schema.fromJsonString(Fields),
         strict,
       )(text).pipe(Effect.mapError((cause) => new FileError({ file, cause })))
-      return [file, `${JSON.stringify(withPackageRanges(manifest, ranges), null, 2)}\n`] as const
+      return [
+        file,
+        `${JSON.stringify(withoutNpmMise(withPackageRanges(manifest, ranges)), null, 2)}\n`,
+      ] as const
     }),
   )
 

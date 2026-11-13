@@ -26,7 +26,7 @@ Finish the authorized work first, so that an approval the rules reserve is the l
 
 - Merging, publishing, deploying, credentials, security settings, messaging third parties and destructive steps need the user's approval; a branch name or stack grants none. Opening a PR for a reviewed stacked branch is not publishing.
 - Never force-push, and never push to the base, default or a protected branch without the user's approval. The base is the branch the conventions or the user name as the work's target, else the default branch. Cutting and pushing a base the conventions name that the remote lacks is no such push; pushing commits onto an existing base is.
-- After a denial, stop that line of work, report a blocker and continue other work; never reach the same result through another tool, script or link.
+- After an explicit user denial, stop that line of work. After an automatic tool rejection, report the exact blocked effect and existing authorization; ask for fresh scoped approval when it can resolve the block. Retry only after the required approval is obtained and any host restriction is resolved. Never work around an unresolved denial through another tool, script, or link. If the host rejects a retry, stop and report the exact tool payload and reason.
 
 ## Branches and commits
 

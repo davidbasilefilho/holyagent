@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 
 import { BROWSER_USE_MCP_SERVER } from "../../../runtime/src/config/capabilities.ts"
+import { PYPI_PACKAGE_VERSIONS } from "../../../runtime/src/config/pypi-packages.ts"
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
 import {
   HEADLESS_SCREEN_AGENT_SUFFIX,
@@ -75,7 +76,12 @@ describe("the servers a screen specialist registers", () => {
     const { args, command, launchesChromium } = BROWSER_USE_MCP_SERVER
     expect([command, launchesChromium]).toEqual(["uvx", true])
     expect(args.slice(0, 3)).toEqual(["--no-config", "--default-index", "https://pypi.org/simple"])
-    expect(args.slice(-4)).toEqual(["--from", "browser-use==1.0.0", "browser-use", "--cli-mcp"])
+    expect(args.slice(-4)).toEqual([
+      "--from",
+      `browser-use==${PYPI_PACKAGE_VERSIONS["browser-use"]}`,
+      "browser-use",
+      "--cli-mcp",
+    ])
   })
 
   test("a switched-off capability adds none, and neither does the MCP extension being off", () => {
