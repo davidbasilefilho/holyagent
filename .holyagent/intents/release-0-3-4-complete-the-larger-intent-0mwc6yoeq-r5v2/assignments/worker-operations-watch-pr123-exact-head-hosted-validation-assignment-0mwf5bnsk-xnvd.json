@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "watch-pr123-exact-head-hosted-validation",
   "objective": "Watch PR123 exact-head hosted validation to terminal and report actionable failures.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "GitHubPR123 edce18fee6579d591d59a629765225e2e0e955cd checks/pushruns/threads/merge-state only."
   ],
@@ -36,7 +36,9 @@
     "agentId": "/root/r034_state_pr123_ci",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T15:42:59.636Z"
+    "startedAt": "2026-11-13T15:42:59.636Z",
+    "finishedAt": "2026-11-13T16:42:54.627Z"
   },
+  "result": "status: done\nchecks:\n- gh run list --commit edce18fee6579d591d59a629765225e2e0e955cd -> exit 0\n- gh pr view 123 --json headRefOid,baseRefName,mergeStateStatus,reviewDecision,isDraft,url,statusCheckRollup -> exit 0\n- gh api graphql reviewThreads for PR 123 -> exit 0\n- gh pr view 123 --json headRefOid,mergeStateStatus,isDraft,statusCheckRollup -> exit 0\n- GitHub connector fetch workflow job logs 131985178616 and 131984892478 -> exit 0\nblockers:\n- Both macOS Verify and Windows Test jobs failed in PR and push runs.\nnotes:\n- PR validation tested merge commit 543e9f4 of head edce18f into base 44c79ab; push run tested the head. Both macOS Verify jobs failed packages/runtime/tests/handoff.test.ts:141: expected recursive .git listing included objects/maintenance.lock but received listing did not. Investigate transient Git maintenance and preserve the no-write assertion.\n- Both Windows Test jobs failed packages/runtime/tests/operational-ownership.test.ts:184: expect(show.stdout).toContain(target) for the Claude and Pi host cases. The output encodes Windows backslashes as doubled backslashes, while target contains single backslashes; compare decoded structured output or otherwise account for serialization while preserving the assertion. Both jobs: 3452 passed, 56 skipped, 2 failed.\n- Version skipped for dev; push branch-model, dev, and stable jobs skipped. Skips are not validation. PR is no longer draft.\nevidence:\n- blocking criterion: Exact-head hosted runs completed with actionable macOS and Windows log evidence; review threads reported.\n- checks-run: PR run 43454567912 and push run 43454483542 completed failure. macOS jobs 131985178100 and 131984892403 and Windows jobs 131985178616 and 131984892478 failed; check and installers succeeded in both; PR branch-model succeeded.\n- ci-state: Failed; all reported checks completed. Version, push branch-model, dev and stable skipped.\n- threads: Earlier GraphQL reviewThreads returned zero nodes and hasNextPage false.\n- merge-state: GitHub mergeStateStatus UNSTABLE; isDraft false at latest observation.",
   "createdAt": "2026-11-13T15:42:59.636Z"
 }
