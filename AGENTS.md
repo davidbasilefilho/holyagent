@@ -29,6 +29,7 @@ This repository's own convention, enforced by CI and rulesets; HolyAgent's instr
 
 ## Commits and pull requests
 
+- Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending, so every PR is available for review.
 - Keep each PR to one reviewable change. When branch rules allow, stack on the preceding open owner PR and set the PR base to the branch the work started from, so each review shows only its own change.
 - `holyagent vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `lefthook.yml`) keeps agent attribution out of commits made with plain Git too.
 - Pass `holyagent vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
