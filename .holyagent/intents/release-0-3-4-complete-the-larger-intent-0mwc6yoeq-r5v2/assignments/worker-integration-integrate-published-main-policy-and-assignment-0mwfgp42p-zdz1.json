@@ -61,6 +61,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/development_main_forward",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T21:01:23.041Z"
