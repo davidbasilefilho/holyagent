@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mwfdqrud-wlze",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.debugging",
+  "slug": "diagnose-and-repair-the-windows-release",
+  "objective": "Diagnose and repair the Windows release-lookup fixture failure without weakening publication checks.",
+  "state": "Running",
+  "scope": [
+    "Work only /workspace/work/holyagent-033-repair on current PR129 head0b30619. Validation Windows job132114797916 run43491854458 failed scripts/workflows.test.ts:193 release lookup HTTP404: expected exit0 got4. Log /tmp/033-windows-validation.log; 3455pass53skip1fail. Exact same head Publish Windows passed. All other gates incl required version/branch-model passed.",
+    "Inspect actual .github/actions/tag-release/action.yml and test fixture. scripts/workflows.test.ts release-lookup fixture was unchanged from main except unrelated version wiring checks; do not call it environmental without baseline evidence. Diagnose shell/fake gh/jq command isolation on Windows, possible accidental real CLI invocation/auth exit4, and ensure fixture actually executes intended stub and never touches live GitHub. Portable shell function stubs may be appropriate only if evidence supports equivalent coverage. Preserve real production action, distinct404vs500 exit/create assertions; no skipped Windows cases, longer deadlines, blanket reruns or assertion weakening.",
+    "Read logs/source, run focused current and appropriate baseline/control/mutation to prove cause/coverage. Test-only fix preferred; if production bug exists report evidence and request source ownership from root before edit. Add useful failure diagnostics if needed. No npm executable-offering investigation: this is required release gate repair, explicitly authorized."
+  ],
+  "constraints": [
+    "Read current AGENTS/GPT debugging role. Own scripts/workflows.test.ts ONLY. No source action/workflow changes, deps/version/guard changes, actual VCS/.git/.holyagent/config writes, subagents or live Pi/paid model/publication. Read-only Git allowed. Test fixtures use isolated /tmp dirs outside repo and mocked external calls. Root owns commit/push/state.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Focused suite/static gates appropriate; no full repeat until root requests. For any full invocation use existing python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify.",
+    "Save /workspace/work/034/033-windows-release-lookup-repair-report.json and .diff, exact schema status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]. Exact criteria/labels; <=300wordsummary. Preserve uncertainty actual Windows pass requires hosted rerun."
+  ],
+  "criteria": [
+    {
+      "text": "Windows fixture repair preserves real publication script behavior and distinct absence versus operational-failure assertions",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Meaningful regression evidence supports the fix and platform verification limits are explicit",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "cause",
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "scripts/workflows.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfcg7pi-hk7z",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T19:38:41.653Z"
+  },
+  "createdAt": "2026-11-13T19:38:41.653Z"
+}
