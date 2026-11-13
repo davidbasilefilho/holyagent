@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwevnfep-v8za",
+  "intentId": "intent-0mwdx4q7n-xd25",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.artifact",
+  "slug": "close-the-corrected-pr-description",
+  "objective": "Close the corrected PR description tarball-handoff claim before publication.",
+  "state": "Running",
+  "scope": [
+    "/workspace/work/pr120-body.txt"
+  ],
+  "constraints": [
+    "Same prior HolyAgent artifact reviewer rules, user resumed PR120 audit/revise/merge with Terra low-xhigh; direct fallback. No source/VCS/state edits/outward messages. Only compare corrected second paragraph to workflows; original blocking phrase validation-to-publication removed. FINAL_VERIFY_RESULT is still token; root now has accepted full verify evidence3498 pass2 conditional skips0fail on61a7adc and will substitute exactly; new-head hosted CI pending. Save /workspace/work/pr120-body-rereview.md; under100 words."
+  ],
+  "criteria": [
+    {
+      "text": "PR description is accurate concise and makes no unsupported claims",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "reviewed-artifact",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [
+    "assignment-0mwevmizk-t526"
+  ],
+  "independentFrom": [
+    "assignment-0mwevmizk-t526"
+  ],
+  "followUpOf": "assignment-0mwevlhfk-eyj2",
+  "specialist": {
+    "agentId": "/root/pr_description_review",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T11:12:12.481Z"
+  },
+  "createdAt": "2026-11-13T11:12:12.481Z"
+}
