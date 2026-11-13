@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-reproduced-ignored-local-state",
   "objective": "Close the reproduced ignored-local-state omission in read-only handoff.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Bounded handoff completeness guard, actual branch-mode fixtures and accurate docs."
   ],
@@ -45,7 +45,37 @@
     "agentId": "/root/r034_handoff_command",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T14:03:41.372Z"
+    "startedAt": "2026-11-13T14:03:41.372Z",
+    "finishedAt": "2026-11-13T14:06:43.935Z"
+  },
+  "result": "status: done\nchanged:\n- packages/runtime/src/state/tree.ts\n- packages/runtime/tests/handoff.test.ts\n- docs/handoff.md\nchecks:\n- bun test packages/runtime/tests/handoff.test.ts (before fix) -> exit 1\n- bun test packages/runtime/tests/handoff.test.ts packages/runtime/tests/state-branch.test.ts packages/runtime/tests/operational-ownership.test.ts -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- Focused suite: 77 passed, 605 assertions. Type check: 322 files; lint: 323; format: 744. Build and full verification deferred as instructed. Windows not exercised.\nevidence:\n- Marked ignored divergent state cannot silently disappear from a read-only handoff: The guard distinguishes indexed records from ignored/untracked files and refuses divergent latter files, including when git status is empty; the regression failed before the fix and passes now.\n- Real Git fixtures cover the omission and preserve fresh and historical-state behavior without writes: Fixture tests marked ignored divergence on both hosts, clean tracked historical divergence, matching ignored records, fresh empty output, unchanged source files and worktree registrations.\n- checks-run: Focused red/green suite, type, lint and format listed above.\n- changed-paths: packages/runtime/src/state/tree.ts; packages/runtime/tests/handoff.test.ts; docs/handoff.md.\n- diff-file: /workspace/work/034/handoff-ignored-repair.diff",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Real marked ignored-state red/green regression, historical tracked/fresh/matching cases and77focused tests plus type/lint/format pass; committed independent re-review follows.",
+    "criteria": [
+      {
+        "criterion": "Marked ignored divergent state cannot silently disappear from a read-only handoff",
+        "support": "The guard distinguishes indexed records from ignored/untracked files and refuses divergent latter files, including when git status is empty; the regression failed before the fix and passes now."
+      },
+      {
+        "criterion": "Real Git fixtures cover the omission and preserve fresh and historical-state behavior without writes",
+        "support": "Fixture tests marked ignored divergence on both hosts, clean tracked historical divergence, matching ignored records, fresh empty output, unchanged source files and worktree registrations."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Focused red/green suite, type, lint and format listed above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/src/state/tree.ts; packages/runtime/tests/handoff.test.ts; docs/handoff.md."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/handoff-ignored-repair.diff"
+      }
+    ]
   },
   "createdAt": "2026-11-13T14:03:41.372Z"
 }
