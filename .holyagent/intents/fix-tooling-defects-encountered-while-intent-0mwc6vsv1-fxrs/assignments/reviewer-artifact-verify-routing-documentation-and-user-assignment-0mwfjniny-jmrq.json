@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "verify-routing-documentation-and-user",
   "objective": "Verify routing documentation and user visible claims accurately describe profiles and real scoring limitations.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read immutable c3c935108a3bd3958f6dbcb7bc2d96f11eba212b...f70c650c /workspace/work/holyagent-034-routing, especiallydocs/routing.md (21lines) andpublichelp/configerrorsfornewprofiles. Priorfinalgates915focused/full3518pass2skip; actualbenchmarkdatasetmissing. Mustnotclaimmeasuredoptimalranking/realaccountplanentitlementorobservedlaunchidentityfromdeclaredmetadata. UserfastCodexrootTerra andClaudefastROOTSonnet (notjustspecialists), explicitoverrides/harnessrootselectionlimitsaccurate.",
     "Readactualsourceenough tocheckdocs claim; docs-implementation mismatchrequiresprecisetrace, no testsneededformereprose. Preserve user/thirdpartyproviders and no inventedaccountsetupclaims. Save /workspace/work/034/routing-current-artifact-review-report.json; no writesoutsideownreport."
@@ -39,7 +39,9 @@
     "agentId": "/root/routing_current_artifact_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T22:24:07.487Z"
+    "startedAt": "2026-11-13T22:24:07.487Z",
+    "finishedAt": "2026-11-13T22:56:20.818Z"
   },
+  "result": "status: done\nchanged:\n- /workspace/work/034/routing-current-artifact-review-report.json\nchecks:\n- Read AGENTS.md, runtime AGENTS.md, reviewer-artifact directives, immutable diff, routing docs and routing/config/dispatch source -> exit 0\nblockers:\n- Documentation describes candidate list as a model allowlist although the unscored fallback can dispatch a model absent from that list.\n- Documentation says root model choice remains an explicit host launch setting, omitting that Pi setup can derive and write its default root model from pi.profile.\nnotes:\n- No tests run: prose review only. Prior gate results and market-data availability were not independently verified.\n- docs/routing.md:13: “the candidate list is an allowlist of models” overstates enforcement: selection.ts:42-64 and 143-151 return the existing fallback if evidence or eligible candidates are missing, independent of candidate list. Qualify this as applying to ranked candidates.\n- docs/routing.md:5: “Root model choice remains an explicit host launch setting” omits Pi setup defaults: schema.ts:266-272 resolves a fast Codex root to Terra; provider.ts:127-135 and setup/pi-settings.ts:162,441 use it to set Pi defaults when unset. Profile alone does not change an already running root.\n- evidence: Routing documentation and visible claims match actual provider harness profile and missing data behavior without unsupported optimization claims: gap; see both quoted documentation mismatches above. checks-run: read-only source and artifact inspection; no tests. reviewed-range: c3c935108a3bd3958f6dbcb7bc2d96f11eba212b...f70c650c7facf70845a43f1749b2a15455618caa, HEAD verified. findings: two documentation gaps; scoring and entitlement caveats otherwise consistent with inspected selection and evidence code.\nevidence:\n- checks-run: Read-only source and artifact inspection; no tests.\n- reviewed-range: c3c935108a3bd3958f6dbcb7bc2d96f11eba212b...f70c650c7facf70845a43f1749b2a15455618caa; HEAD verified.\n- findings: Two documentation gaps: candidate allowlist does not constrain unscored fallback; Pi setup may derive and write root defaults from pi.profile.\n- Routing documentation and visible claims match actual provider harness profile and missing data behavior without unsupported optimization claims: Gap: docs/routing.md lines 5 and 13 overstate root launch settings and candidate allowlist; source traces in notes.",
   "createdAt": "2026-11-13T22:24:07.487Z"
 }
