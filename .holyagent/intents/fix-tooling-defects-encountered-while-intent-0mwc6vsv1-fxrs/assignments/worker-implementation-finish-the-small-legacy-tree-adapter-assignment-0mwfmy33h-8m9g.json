@@ -1,0 +1,75 @@
+{
+  "id": "assignment-0mwfmy33h-8m9g",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "finish-the-small-legacy-tree-adapter",
+  "objective": "Finish the small legacy tree adapter using the four implemented migration modules and pass the real regressions.",
+  "state": "Running",
+  "scope": [
+    "SOLE WRITER /workspace/work/holyagent-034-core. HEAD6ebdf1e plus preserved partial tree/tests and FOUR complete modules: migration-journal.ts, migration-index.ts, migration-files.ts, migration-runner.ts. Their authors are terminal. APIs are documented in /workspace/work/034/migration-runner-module-api.md, migration-index-module-api.md and migration-files-module-api.txt. Isolated tests: runner11, index6, journal4, files4. Do not research/reimplement the transaction architecture; the missing work is layout/Git adapters and one runner call in tree.ts.",
+    "Read current migrateWorkTree and resolveState/peek paths. Build a plan from the existing source state file enumeration. Roots are source project Git worktree and target state Git worktree; paths include .holyagent/. Capture base64 bytes, Git file mode and source blob digests/tracking facts without changing live state. prepare callback delegates prepareMigrationCommit; location is a safely created owned private journal parent. Journal must be present before CAS ref publication.",
+    "Wire runMigrationTransaction services: readRef via qualified refs/heads/holyagent/state; compareAndSwapRef via interruptible git update-ref with expected parent; verifyCommit via verifyMigrationCommit; publishFiles via publishMigrationFiles; publishIndex via publishMigrationIndex; verifyTarget combines verifyMigrationFiles and verifyMigrationIndex; cleanupSource via cleanupMigrationSources plus the existing migration completion marker. Convert retained changed/tracking-unknown into an actionable conflict; tracked paths may deliberately remain to preserve staged/unstaged source versions and must be documented. No destructive git restore/reset.",
+    "Remove the obsolete uninterruptible live-copy/commit path and blanket dirty-target refusal; helper pre/postimage checks preserve unrelated staging. Recheck the supplied live authorization before each new mutation. Acquire appropriate existing initialization/domain locks without nesting the same lock recursively. Existing normal state operations resolve storage before their domain lock; inspect actual paths and preserve lock order. Calls through the runner remain interruptible, and its durable phases handle abort after CAS.",
+    "Add pure pending-journal detection to branch peek/read resolution so readers do not observe partially published files. A read-only context must not create directories or recover. A write/init-authorized retry must use the existing journal, verify roots/branch against trusted current context, and finish the recorded transaction. Source roots may not be taken unchecked from payload; a pending other-worktree transaction should fail actionably instead of erasing data.",
+    "Use existing portable state/path/process helpers and real Git argv. No new external dependencies or CLI proxy. Handle Windows semantics without claiming POSIX UID/executable guarantees. Preserve source-retention work and adjust only old unsafe cleanup assumptions with stronger data-preservation tests.",
+    "Run the existing THREE real-Git red regressions, adapting their interception from git commit to the real CAS ref operation without weakening assertions: stalled operation cancellation; CAS succeeded before child response/abort then successful retry; unrelated staged/unstaged target data preserved after successful migration. Include helper suites, read-only/revocation/checkout retry and Node SDK checks. Fix adapters until these pass, then build/static and one supervised full verify.",
+    "Other Core-host branch31a9702 is independently merging routing and later needs this final repair. Do not edit that worktree. Preserve existing signatures/capability literals when parent merges. No paid/live account/network/actual shared-state operations; fixtures outside repository ancestry.",
+    "Save /workspace/work/034/core-migration-tree-adapter-report.json and full incremental.diff from6ebdf1e including all untracked helper/test files. Deliver actual working adapters, not another list saying the existing helpers need integration. If a specific helper bug blocks wiring, repair it (you own them now) and continue. Preserve original partial/failing evidence."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Legacy storage adapter runs the journaled transaction with prompt abort and verified retry across the actual Git ref commit point",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Source and unrelated target staged data readonly readers revocation and lock ordering stay safe during normal and recovered migration",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "The three real Git regressions helper and Node suites current build static full verification pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "red-green-proof",
+    "transaction-and-recovery",
+    "integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/state",
+    "packages/core/tests",
+    "packages/runtime/tests/state-branch.test.ts",
+    "packages/runtime/tests/state-hook-locks.test.ts",
+    "packages/runtime/tests/migrate.test.ts",
+    "packages/runtime/tests/cli.test.ts",
+    "docs/core-api.md",
+    "docs/native-tools.md",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/migration_index_module",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T23:56:19.373Z"
+  },
+  "createdAt": "2026-11-13T23:56:19.373Z"
+}
