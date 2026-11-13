@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mweyjwc8-79qs",
+  "intentId": "intent-0mwey29b2-wyyn",
+  "intentRevision": 2,
+  "roleTask": "Explorer.map",
+  "slug": "plan0-4-0-minimal-harness-installation",
+  "objective": "Plan0.4.0 minimal harness installation and native Codex/cloud support with task-proportional orchestration and fast profiles.",
+  "state": "Running",
+  "scope": [
+    "Existing0.4.0 planning Intent intent-0mwey29b2-wyyn",
+    "Pi/Claude current adapters and official Codex local/cloud interfaces"
+  ],
+  "constraints": [
+    "User authorized planning0.4.0 only while0.3.4 implementation continues. Read that planning Intent revision2 and HolyAgent explorer-map role. No source/dependency/installation/VCS/state/account/security writes or live paid model calls. Single bounded architecture/public-docs planning pass; no subagents. Worktree /workspace/work/holyagent-034 read-only.",
+    "Required plan: bunx holyagent setup pi|claude|codex installs just correct extension/plugin; native Codex context_management, beneficial configuration/caching optimization and Codex Cloud compatibility; simpler agents with direct handling of simple tasks and orchestration depth/count matching complexity; gh-pr-stack becomes optional skill, groups coherent changes to reduce stack size; shared non-harness-specific changes adapted for every supported harness.",
+    "Fast presets: target100-dollar baseline and20-dollar fast tier for every provider/harness. Sonnet specifically Claude fast ROOT; Terra preferred Codex fast-root example instead of Sol. Distinguish root selection from specialist ranking and actual account/capability availability. Do not invent measured benchmark winners.",
+    "Use available public web tool mcp__codex_apps__search_service_web_run and official OpenAI/Codex/GitHub docs/source. Verify local/cloud installation/config/skills/plugin support before promising uniform APIs. Optimization inventory must say evidence, expected gain, measurement and rollback; do not disable useful features/guards speculatively.",
+    "Propose 2-3 options only for material architecture decisions, choose practical default, then installer idempotence/scope/uninstall contract, supported-harness matrix, optional PR skill boundary, proportionality decision guide, cross-harness conformance tests, dependency-ordered implementation/acceptance. Save /workspace/work/034/040-plan.md plus /workspace/work/034/040-plan-report.md with terminal evidence. Return under500words; no0.4.0 implementation."
+  ],
+  "criteria": [
+    {
+      "text": "Plan covers all explicit 0.4.0 requirements with task-proportional architecture",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Codex and cloud capability claims are sourced or explicitly unknown",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "architecture-options",
+    "phased-plan",
+    "unknowns"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T12:33:26.648Z"
+  },
+  "createdAt": "2026-11-13T12:33:26.648Z"
+}
