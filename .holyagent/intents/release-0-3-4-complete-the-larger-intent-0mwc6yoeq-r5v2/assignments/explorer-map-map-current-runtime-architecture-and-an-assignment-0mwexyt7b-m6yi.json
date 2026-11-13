@@ -47,8 +47,9 @@
   },
   "result": "result: Runtime architecture mapped and implementation slices proposed in /workspace/work/034/runtime-map.md.\nchanged: /workspace/work/034/runtime-map.md only.\nchecks: Source, existing tests, related Intents, local reports and Git history inspected; tests were not run for this read-only assignment.\nblockers: Pi host support for worker-completion and user-input wakeups, and safe forwarding of external tool aliases, remains unverified.\nquestions: None.\nnotes: The map identifies shared files that require writer sequencing. No matching handoff commit or local report was found; inaccessible historical artifacts remain unknown.\nevidence:\nCurrent behavior and missing release contracts are traced to source: The map traces CLI dispatch, Pi tool selection and gates, workflow validation, ownership, skills, wait and handoff to source and existing tests.\nImplementation plan preserves authority boundaries and supports independent slices: The map specifies role-gated command adapters, preserved repository locks, and disjoint ownership groups with shared-file sequencing.\nsource-map: /workspace/work/034/runtime-map.md, “Contracts and current evidence.”\noptions: /workspace/work/034/runtime-map.md, “Design options and sequencing.”\nrecommended-paths: /workspace/work/034/runtime-map.md, suggested implementation slices A–E.\n",
   "acceptance": {
-    "revision": 10,
-    "rationale": "Source-traced options and scoped path sequencing preserve CLI authority and repository locks; host wait and alias contracts still need proof.",
+    "revision": 11,
+    "carriedFrom": 10,
+    "rationale": "The inspected source tree is unchanged. New budget/profile and shared-harness requirements do not invalidate this bounded architecture/evidence/bootstrap result; implementation remains separately required at revision11.",
     "criteria": [
       {
         "criterion": "Current behavior and missing release contracts are traced to source",
