@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mwf8phge-0pau",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Worker.integration",
+  "slug": "wire-the-internal-cli-and-pi-native",
+  "objective": "Wire the internal CLI and Pi native tools directly to the shared core package.",
+  "state": "Running",
+  "scope": [
+    "Core worktree: thin CLI consumers, direct Node Pi consumers, legacy helper consolidation and functional parity tests."
+  ],
+  "constraints": [
+    "Work ONLY /workspace/work/holyagent-034-core, continuing your completed core implementation. Read executable core contracts/docs. You may adjust core APIs while wiring, but keep business decisions in core and strict schemas/authority. Never draft PRs; root owns all source VCS/state. No actual .git/.holyagent writes, external actions, live Pi/model requests, user-machine installs or extra agents. Temporary Node/SDK/Git fixtures are allowed. No external dependency upgrades.",
+    "Replace actual state-management logic in CLI handlers with calls to intent/assignment/overview/migration core functions; CLI retains argv/help/plain rendering/stdin/exit adaptation. Preserve every existing flag, selected Intent behavior/links, dispatch prompts/briefs, reports, branch recording and TaggedError semantics. Shared config/profile/lifecycle/warm selection must not be duplicated back in CLI. Consolidate runtime Pi guardrails/settings/routes/journal/provider copies to core compatibility exports so they cannot drift. Utility/host-only unsupported native operations stay explicitly classified, never hidden CLI fallback.",
+    "Implement Pi holyagent_* tools using actual @holyagent/core Effects and the shared schemas, no prepared argv, run(argv), parsing CLI stdout, native-process or spawning holyagent CLI. Reference D tree only for policy/inventory/real SDK tests; do NOT copy or merge the superseded subprocess/IPC bridge. Core contains the protected persistence already. Expose every supported core operation; classify every integrated CLI command including handoff, hooks/stdio/passthrough/setup/VCS. Registration, inventory AND execution enforce explicit no-default holyagent-native-root flag plus successful user AND merged enabled config; unknown/off fails closed. Revoke running fibers and deny stale calls on disable/shutdown; hidden registry metadata is not authorization.",
+    "Use Node-safe makeContext/loadConfigWithSource and actual core helpers, never CLI helpers for config/status. Host authorize callback is live and adapter-owned; model input cannot supply authority/cwd/host. Preserve actual host tool_call/nested permissions. Propagate AbortSignal to Effect, retaining protected writes/artifact completion and accurate cancelled/may-completed results. Text display escapes terminal controls; structured details remain exact. No claim this secures specialist shell commands or cross-host identity.",
+    "Preserve E's profile routing capability: core plans direct fallback when profiles active; port actual exact authenticated/configured model-registry gate for Agent/agent and refuse SubagentWorkflow/subagent_workflow under activated profile/ranking so upstream fuzzy resolver cannot switch provider. Legacy non-profile behavior stays. Read E source/diff as needed, no other-tree edits. F wait/alias and C/G guidance are later merges: keep root flag/config lifecycle centralized and provide the confirmed-enabled signal; don't overwrite their requirements when root integrates them.",
+    "Preserve latest H plain output and internal/public setup-origin separation when adapting CLI entries. H repaired source is /workspace/work/holyagent-034-cli plus /workspace/work/034/plain-cli-control-repair.diff (not all committed yet). Copy only needed presenter/entry changes into your owned tree, document provenance. The public bin explicitly opts into existing setup UI; internal entry stays plain even on TTY. Preserve version/deps; root package.json may change ONLY its authorized bin mapping, never version/pins/pi.skills wholesale. Pi generate.ts must bundle both entries and the Node-safe native extension.",
+    "Shared package is private and bundled; no new npm publisher. Dependency graph/lock changes go through the new workspace-lock-only updater; preserve external versions. No generated dist edits or full build/verify yet; root coordinates those. Source contract changes must retain direct Node/Bun core tests and CLI/native parity. Actual Node bundle with Bun absent must execute a native tool directly and via SDK codemode while a spy proves no CLI invocation; Git subprocesses are allowed. Test root/child/off/unknown/reload/error/extra-field/cancel paths and real state effects, not only wrapper mocks.",
+    "Run meaningful focused suites, type/lint/fmt through env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Keep working until both consumers actually call core; no foundation-only terminal report. Genuine host limitation needs source/options. JSON /workspace/work/034/core-consumers-report.json status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit:number}],blockers,notes,evidence:[{key,support}]. Full diff /workspace/work/034/core-consumers.diff. Final <=350 words; logs outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "Actual CLI functionality and supported Pi tools consume shared core APIs directly without CLI proxying",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Authority schemas cancellation state semantics and plain output remain compatible across consumers",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Real Node SDK and parity tests prove direct execution and deny unsupported or unauthorized paths",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "remaining-integration"
+  ],
+  "ownershipPaths": [
+    "packages/core",
+    "packages/runtime/src/cli",
+    "packages/runtime/src/hooks",
+    "packages/runtime/src/pi",
+    "packages/runtime/src/native",
+    "packages/runtime/src/api",
+    "packages/runtime/src/index.ts",
+    "packages/runtime/package.json",
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/package.json",
+    "packages/integrations/claude/src/generate.ts",
+    "packages/runtime/tests",
+    "package.json",
+    "docs/core-api.md",
+    "docs/native-tools.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf7j400-7whk",
+  "specialist": {
+    "agentId": "/root/r034_native_tools",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T17:17:43.455Z"
+  },
+  "createdAt": "2026-11-13T17:17:43.455Z"
+}
