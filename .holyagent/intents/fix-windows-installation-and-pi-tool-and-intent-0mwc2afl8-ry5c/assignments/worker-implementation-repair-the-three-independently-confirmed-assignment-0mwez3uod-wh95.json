@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-three-independently-confirmed",
   "objective": "Repair the three independently confirmed portability and version-evolution blockers in the0.3.4 release slice.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     ".github/actions/tag-release/dev-version.sh",
     "packages/integrations/pi/publishing.test.ts"
@@ -45,7 +45,37 @@
     "agentId": "/root/r034_development_flow",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T12:48:57.613Z"
+    "startedAt": "2026-11-13T12:48:57.613Z",
+    "finishedAt": "2026-11-13T12:51:14.547Z"
+  },
+  "result": "result: Repaired UTC portability, metadata failure handling and future-version test coverage.\nchanged: .github/actions/tag-release/dev-version.sh; packages/integrations/pi/publishing.test.ts.\nchecks: mise exec -- bun test packages/integrations/pi/publishing.test.ts before repair -> exit 1, 3 pass, 2 fail; controlled date failure returned malformed output and exit 0. After repair -> exit 0, 5 pass, 0 fail, 51 expectations. bunx --no-install mise run check -> exit 0, 318 files; lint -> exit 0, 319 files; fmt:check -> exit 0, 738 files. Full verify and native macOS/Windows not run; root schedules final broad gate.\nblockers: none.\nquestions: none.\nnotes: Git formats commit time with TZ=UTC0; failure or invalid output stops before a version is emitted. Fixture rejects GNU date use and exercises a 0.3.5 version without modifying the root manifest.\nevidence:\nDevelopment version generation is portable and fails closed on metadata errors: Git UTC formatting, tested with a failing date executable and simulated failed, empty and malformed Git output.\nRegression coverage survives future version bumps and fails before repair: root version is read dynamically; isolated 0.3.5 fixture passes; old helper returned exit 0 for failed conversion in red run.\nchecks-run: focused red and green tests and check, lint, fmt:check counts above.\nchanged-paths: .github/actions/tag-release/dev-version.sh; packages/integrations/pi/publishing.test.ts.\ndiff-file: /workspace/work/034/flow-repair.diff.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Controlled old-helper red proves masked failure, Git UTC formatting removes GNU dependency, future-version and bad-metadata tests pass with type/lint/format; independent committed repair review still required.",
+    "criteria": [
+      {
+        "criterion": "Development version generation is portable and fails closed on metadata errors",
+        "support": "Git UTC formatting, tested with a failing date executable and simulated failed, empty and malformed Git output."
+      },
+      {
+        "criterion": "Regression coverage survives future version bumps and fails before repair",
+        "support": "root version is read dynamically; isolated 0.3.5 fixture passes; old helper returned exit 0 for failed conversion in red run."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "focused red and green tests and check, lint, fmt:check counts above."
+      },
+      {
+        "label": "changed-paths",
+        "support": ".github/actions/tag-release/dev-version.sh; packages/integrations/pi/publishing.test.ts."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/flow-repair.diff."
+      }
+    ]
   },
   "createdAt": "2026-11-13T12:48:57.613Z"
 }
