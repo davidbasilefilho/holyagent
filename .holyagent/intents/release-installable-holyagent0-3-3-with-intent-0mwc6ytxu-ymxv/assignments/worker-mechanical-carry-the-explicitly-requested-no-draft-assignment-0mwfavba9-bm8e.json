@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwfavba9-bm8e",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 30,
+  "roleTask": "Worker.mechanical",
+  "slug": "carry-the-explicitly-requested-no-draft",
+  "objective": "Carry the explicitly requested no-draft PR policy into the minimal0.3.3 ancestry reconciliation.",
+  "state": "Running",
+  "scope": [
+    "Work ONLY /workspace/work/holyagent-release033 AGENTS.md on branch release/0.3.3/chore/reconcile-main. Root has an intentional git merge --no-commit -s ours origin/main in progress to reconcile previous squash history, retaining already-reviewed publication repair. Do not touch merge/index/refs or run any VCS write.",
+    "Add ONLY the single no-draft PR policy bullet already committed in /workspace/work/holyagent-034 AGENTS.md at b95759de, under existing Commits and pull requests. User explicitly said put it down in AGENTS.md that you must never do draft prs. Copy that single bullet exactly; preserve old0.3.3 integration/version rules and all other text. Do not copy0.3.4 dev/main migration."
+  ],
+  "constraints": [
+    "Read AGENTS/.claude rules. This AGENTS.md edit has explicit user authorization. Source ownership one file only, no .git/.holyagent/deps/generated/other edits. Read-only git permitted; root owns active merge, commit, PR and state. No subagents or executable investigation.",
+    "Keep bounded: inspect diff showing only one requested bullet; no product test/build needed for documentation-only edit. Save /workspace/work/034/033-no-draft-carry-report.json and diff with exact JSON shape {status:'done',changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}, <=150words."
+  ],
+  "criteria": [
+    {
+      "text": "Only the user-authorized no-draft policy is added without changing0.3.3 release rules",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T18:18:14.625Z"
+  },
+  "createdAt": "2026-11-13T18:18:14.625Z"
+}
