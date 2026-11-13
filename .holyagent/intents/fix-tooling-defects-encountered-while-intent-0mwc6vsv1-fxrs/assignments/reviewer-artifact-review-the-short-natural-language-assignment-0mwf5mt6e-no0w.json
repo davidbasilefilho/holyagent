@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf5mt6e-no0w",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.artifact",
+  "slug": "review-the-short-natural-language",
+  "objective": "Review the short natural-language internal CLI guidance and user documentation.",
+  "state": "Running",
+  "scope": [
+    "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..e778f69439a30b9f639f87a7f77c40c3bfc06df6"
+  ],
+  "constraints": [
+    "WorkREADONLY /workspace/work/holyagent-034-cli. Readreporules/roleinstructions and /workspace/work/034 relatedreports. Allpreviouswriters/buildterminal, sourcesfixedexceptassignedrepair. No actualVCS/.git/.holyagentwrites, depschanges, extraagents, livePi/modelcalls oruserPCoperations. TempGit/SDKfixturesallowed. Rootownscommits/push/state. Findingsrequireconcreterepro/file:linetracewithimpact. ",
+    "Userverbatim in toolsIntent6:erro/help/version/etcCLIoutputplainnoformat/colors andmessagespromptlikenaturalshort. Readerrors/program/tools/docsagent-cli-output.md andplain-cli-report/wording/readybuildreports. Essentialrecordsremainplainstructureddata, notlostsemanticstoambiguousprose. Checkhelpquotingcorrect, errorsactionableconcise precise, data/versionidentitynotfluff, claimsnoactualANSItruthfulforce-color childcontrolsescapedNOTchildflagoverride. Readinstruction-writingskill. AllownedCLIpaths/nontty+TTYprompts, nooverclaimpublicUIorbyteexactsearch. ImmutableHrange. No sourceedits, nofullverify.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; focusedchecksthroughmise. JSON /workspace/work/034/plain-cli-review-artifact-report.json status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}], exactkeys. Repairdiff /workspace/work/034/plain-cli-review-artifact.diff. <=300wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned committed scope has no unaddressed concrete blockers",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf34phm-kkw5",
+    "assignment-0mwf40ynd-1jfb"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T15:51:39.831Z"
+  },
+  "createdAt": "2026-11-13T15:51:39.831Z"
+}
