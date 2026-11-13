@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf20yvo-13go",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "restore-precise-approval-context-and",
+  "objective": "Restore precise approval-context and automatic-tool-rejection wording within existing prompt budgets.",
+  "state": "Running",
+  "scope": [
+    "Minimal Claude root wording correction and source/context policy checks."
+  ],
+  "constraints": [
+    "Continue /workspace/work/holyagent-034-guidance only. Buildworkerterminal. Read /workspace/work/034/guidance-repaired-build-report.json. Twofailures scripts/root-question-policy.test.ts:40 expects approval context, its exact scope and provenance (missing its); :48 expects automatic tool rejection (source says automatic rejection). Restore precise required sourcewording, preserve authorization/denial semantics andallfamiliesconsistentbehavior. No testweakening/budgetincrease, no unrequestedrefactor. Requirementsbehaviorunchanged, familystylisticwordingonly. No actualVCS/statewrites/modelcalls/subagents/depschanges. Existing toolchain/reporulesapply.",
+    "Run scripts/root-question-policy.test.ts plus contextbudgetandguidancepolicy/instructions sourcechecks, type/lint/fmt; generatedfreshnesspendinguntilbuildexpected. No generatededits/fullverify/build. Return JSON /workspace/work/034/guidance-wording-report.json correctCLIshape exactkeys; diff /workspace/work/034/guidance-wording.diff. <=150wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Approval boundary policy wording and unchanged context-budget checks pass",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions/claude-5.5/root"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf1my7e-pmzo",
+  "specialist": {
+    "agentId": "/root/r034_iteration_guidance",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T14:10:41.941Z"
+  },
+  "createdAt": "2026-11-13T14:10:41.941Z"
+}
