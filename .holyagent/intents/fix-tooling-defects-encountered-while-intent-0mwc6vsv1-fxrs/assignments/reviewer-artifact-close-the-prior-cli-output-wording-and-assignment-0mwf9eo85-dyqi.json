@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "close-the-prior-cli-output-wording-and",
   "objective": "Close the prior CLI output wording and recovery instruction findings on the committed repair.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work /workspace/work/holyagent-034-cli; bounded e778f69439a30b9f639f87a7f77c40c3bfc06df6..eaf9981d. Prior artifact report /workspace/work/034/plain-cli-review-artifact-report.json. Check concise natural plain internal output, actual executable command with assignment ID/report stdin, structured facts preserved, public setup distinction accurate. Code/security independent accepted and full3494pass2skip; do not repeat full gates."
   ],
@@ -34,7 +34,33 @@
     "agentId": "/root/r034_plain_current_artifact_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T17:37:18.630Z"
+    "startedAt": "2026-11-13T17:37:18.630Z",
+    "finishedAt": "2026-11-13T17:39:00.657Z"
+  },
+  "result": "status: done\nchecks:\n- git diff e778f69439a30b9f639f87a7f77c40c3bfc06df6..eaf9981d -- packages/runtime/src/cli/errors.ts docs/agent-cli-output.md packages/runtime/src/cli/entry.ts packages/runtime/src/cli/main.ts -> exit 0\n- bun test packages/runtime/tests/cli-output.test.ts -> exit 127\nnotes:\n- Focused test could not start: bun is not on PATH. Full gates were not repeated as assigned; accepted prior result is 3494 pass, 2 skip.\nevidence:\n- The prior CLI artifact findings are resolved and current guidance matches actual behavior: Met: errors.ts:96 names holyagent, the assignment ID and report stdin for both paths; assignment.ts:429-431,500-504 confirms their inputs. docs/agent-cli-output.md:3 matches entry.ts:35-48 and public Pi entry behavior; structured-output tests cover escaped values.\n- reviewed-range: e778f69439a30b9f639f87a7f77c40c3bfc06df6..eaf9981d; HEAD eaf9981d845693c448c37b29898b9877dcc8153a, clean tree.\n- findings: No remaining artifact gaps in prior findings or touched guidance.\n- checks-run: Read prior report, repair diff, relevant source and tests; focused Bun test exit 127, executable unavailable. No full gates per assignment.",
+  "acceptance": {
+    "revision": 8,
+    "rationale": "Independent artifact re-review confirms repaired executable/stdin guidance and public/internal distinction; current code/security checks and full3494 tests already pass. Its own test launch127 is retained honestly, not counted as validation.",
+    "criteria": [
+      {
+        "criterion": "The prior CLI artifact findings are resolved and current guidance matches actual behavior",
+        "support": "Met: errors.ts:96 names holyagent, the assignment ID and report stdin for both paths; assignment.ts:429-431,500-504 confirms their inputs. docs/agent-cli-output.md:3 matches entry.ts:35-48 and public Pi entry behavior; structured-output tests cover escaped values."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "e778f69439a30b9f639f87a7f77c40c3bfc06df6..eaf9981d; HEAD eaf9981d845693c448c37b29898b9877dcc8153a, clean tree."
+      },
+      {
+        "label": "findings",
+        "support": "No remaining artifact gaps in prior findings or touched guidance."
+      },
+      {
+        "label": "checks-run",
+        "support": "Read prior report, repair diff, relevant source and tests; focused Bun test exit 127, executable unavailable. No full gates per assignment."
+      }
+    ]
   },
   "createdAt": "2026-11-13T17:37:18.630Z"
 }
