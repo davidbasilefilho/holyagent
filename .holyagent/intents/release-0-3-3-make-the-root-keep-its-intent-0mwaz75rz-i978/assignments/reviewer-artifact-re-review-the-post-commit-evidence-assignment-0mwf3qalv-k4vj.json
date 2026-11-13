@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "re-review-the-post-commit-evidence",
   "objective": "Re-review the post-commit evidence collection ordering repair for artifact correctness.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "d1cd4a0ef0758efe16cd49f09a32265971094ddc..11f32c53e64ee72bfda3efd0256043d2d0bd9f9b; previousfindingandnewregressionsonly."
   ],
@@ -37,7 +37,9 @@
     "agentId": "/root/r034_guidance_review_artifact",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T14:58:23.156Z"
+    "startedAt": "2026-11-13T14:58:23.156Z",
+    "finishedAt": "2026-11-13T15:06:32.486Z"
   },
+  "result": "status: done\nchecks:\n- mise exec -- bun test packages/runtime/tests/instructions.test.ts packages/runtime/tests/requirements.test.ts packages/integrations/claude/tests/plugin.test.ts packages/integrations/pi/tests/pi.test.ts (specified MISE and PATH environment) -> exit 0\nblockers:\n- Visual baseline loading can occur after task edits: packages/runtime/src/instructions/gpt-6/root/skills.md:6 requires visual-judging only before the first visual specialist dispatch, while its SKILL.md:50 contains the instruction to collect the original baseline before any task source edits. For a visual task with an implementation writer dispatched first or concurrently, that writer can change source before the root loads the baseline instruction. Equivalent family routers have the same timing. Load visual-judging and complete baseline collection before any task writer starts.\nnotes:\n- The post-commit collector order is explicit for visual and performance work across all three families; artifacts are associated with commit SHA outside source commits. No live runtime exercised. Log: /workspace/work/034/guidance-final-review-artifact-test.log.\nevidence:\n- Post-commit evidence ordering gap is closed across families and current harnesses without new blockers: Not fully met: the before-edits visual baseline remains reachable too late; see blockers. Post-commit collection is explicitly ordered before review, acceptance and push.\n- reviewed-range: d1cd4a0ef0758efe16cd49f09a32265971094ddc..11f32c53e64ee72bfda3efd0256043d2d0bd9f9b; HEAD matched.\n- findings: One blocking visual baseline routing gap; see blockers for trace and scenario.\n- checks-run: Focused mise environment test: 145 passed, 0 failed; source and generated guidance inspected. Full verification deferred per brief.",
   "createdAt": "2026-11-13T14:58:23.156Z"
 }
