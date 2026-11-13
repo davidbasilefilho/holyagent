@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "draft-accurate-concise-release0-3-3-pr",
   "objective": "Draft accurate concise release0.3.3 PR description targetingmain.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "release0.3.3 main..integration range and prior reviewedPR120 body"
   ],
@@ -32,7 +32,29 @@
     "agentId": "/root/pr_description",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T11:35:09.992Z"
+    "startedAt": "2026-11-13T11:35:09.992Z",
+    "finishedAt": "2026-11-13T11:36:19.899Z"
+  },
+  "result": "result: Release description drafted; suggested title: release: 0.3.3.\nchanged: /workspace/work/release033-body.txt, /workspace/work/release033-body-report.md\nchecks: Reviewed main..HEAD log and diff stat and prior PR body; no tests run for prose.\nblockers: none\nquestions: none\nnotes: none\nevidence:\nRelease description accurately summarizes final scope and existing validation: Draft covers version, cross-platform changes, publishing, and supplied verification results.\ndraft-path: /workspace/work/release033-body.txt\nchecks-run: git log and git diff --stat main..HEAD, and cat prior body, exit 0.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Draft covers the full release scope without claiming new-target CI or publication success.",
+    "criteria": [
+      {
+        "criterion": "Release description accurately summarizes final scope and existing validation",
+        "support": "Draft covers version, cross-platform changes, publishing, and supplied verification results."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "draft-path",
+        "support": "/workspace/work/release033-body.txt"
+      },
+      {
+        "label": "checks-run",
+        "support": "git log and git diff --stat main..HEAD, and cat prior body, exit 0."
+      }
+    ]
   },
   "createdAt": "2026-11-13T11:35:09.992Z"
 }
