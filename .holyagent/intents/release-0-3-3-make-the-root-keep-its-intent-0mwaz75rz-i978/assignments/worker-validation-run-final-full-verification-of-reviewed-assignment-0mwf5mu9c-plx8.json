@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwf5mu9c-plx8",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.validation",
+  "slug": "run-final-full-verification-of-reviewed",
+  "objective": "Run final full verification of reviewed guidance commit e95cb517.",
+  "state": "Running",
+  "scope": [
+    "Exacte95cb5178a6d33300b8f4f8ec4e8654d092bcba3 clean. Allsource/generated/buildterminal; artifact/code re-reviews accepted, priorsecurity208focusedpassapprovalsemanticsuntouched; source558focusedpassed. No build/sourcefixes. RunONLYfullverify python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify; reporthead/hash/cleanstatusbeforeafter. No extra repeatsifgreen. Productionliveharness/modelcomplianceunknownno fakeclaim."
+  ],
+  "constraints": [
+    "WorkONLY /workspace/work/holyagent-034-guidance. Readreporules/roleinstructions and /workspace/work/034 relatedreports. Allpreviouswriters/buildterminal, sourcesfixedexceptassignedrepair. No actualVCS/.git/.holyagentwrites, depschanges, extraagents, livePi/modelcalls oruserPCoperations. TempGit/SDKfixturesallowed. Rootownscommits/push/state. Keepworkingthroughrequestedfix+checks; no generatededits/build/fullverifyunlessspecificallyverificationtask. ",
+    "Exacte95cb5178a6d33300b8f4f8ec4e8654d092bcba3 clean. Allsource/generated/buildterminal; artifact/code re-reviews accepted, priorsecurity208focusedpassapprovalsemanticsuntouched; source558focusedpassed. No build/sourcefixes. RunONLYfullverify python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify; reporthead/hash/cleanstatusbeforeafter. No extra repeatsifgreen. Productionliveharness/modelcomplianceunknownno fakeclaim.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; focusedchecksthroughmise. JSON /workspace/work/034/guidance-reviewed-verify-report.json status EXACTLY done|partial|blocked,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}], exactkeys. Repairdiff /workspace/work/034/guidance-reviewed-verify.diff. <=300wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Requested repair or verification meets its stated contract without weakening safeguards",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/tests/instructions.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T15:51:41.232Z"
+  },
+  "createdAt": "2026-11-13T15:51:41.232Z"
+}
