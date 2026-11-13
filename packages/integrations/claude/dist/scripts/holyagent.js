@@ -8541,7 +8541,7 @@ var REFUSED_ERRORS = new Set([
   "StateModeRefused",
   ...VCS_REFUSED_ERRORS
 ]);
-var insufficientAcceptanceHint = (words) => `Nothing was recorded. ${words.askForSupport} for the missing support, then run assignment close <id> --outcome success --accept <rationale> with the corrected report, or assignment accept <id> --rationale <text> --report. For a workflow agent, draft a follow-up with followUpOf.`;
+var insufficientAcceptanceHint = (words, id) => `Nothing was recorded. ${words.askForSupport} for the missing support, then run \`holyagent assignment close ${id} --outcome success --accept <rationale>\` with the corrected report on stdin. For a succeeded, unaccepted assignment, you can instead run \`holyagent assignment accept ${id} --rationale <text> --report\` with the report on stdin. For a workflow agent, draft a follow-up with followUpOf.`;
 var HINTS = {
   StdinMissing: "Give the input as --input '<json>' or pipe it in, for example: echo '...' | holyagent <command>; see --help.",
   NoActiveIntent: "Pick one with `holyagent intent use <id>`, or start one with `holyagent intent create`.",
@@ -8584,7 +8584,7 @@ var describeFailure = (error, words = CLAUDE_WORDS) => {
   return {
     tag,
     message: plainText(message),
-    hint: plainText(error instanceof Usage ? error.hint : tag === "InsufficientAcceptance" ? insufficientAcceptanceHint(words) : HINTS[tag] ?? "Run `holyagent --help` for the commands."),
+    hint: plainText(error instanceof Usage ? error.hint : tag === "InsufficientAcceptance" ? insufficientAcceptanceHint(words, typeof error === "object" && error !== null && "id" in error ? String(error.id) : "<id>") : HINTS[tag] ?? "Run `holyagent --help` for the commands."),
     code: USAGE_ERRORS.has(tag) ? EXIT.usage : REFUSED_ERRORS.has(tag) ? EXIT.refused : EXIT.state
   };
 };
@@ -9817,6 +9817,9 @@ var RawString = class {
     this.value = value;
   }
 };
+function rawString(value) {
+  return new RawString(value);
+}
 function isRawString(value) {
   return value instanceof RawString;
 }
@@ -26760,6 +26763,14 @@ var COMMANDS = [
   ...HOOK_COMMANDS
 ];
 
+var encodeRecord = (value) => encode2(value, {
+  replacer: (_key, item) => typeof item === "string" && /[\u007f-\u009f]/.test(item) ? rawString(`"${escapeString(item)}"`) : item
+}).replace(/[\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
+var renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
+${plainText(output.label)}:
+${plainText(output.text)}
+` : `${encodeRecord(output)}
+`;
 var forWords = (command, words) => command.forHost === undefined ? command : { ...command, ...command.forHost(words) };
 var help = (command, words) => {
   const { usage, summary, input, output, notes, flags } = forWords(command, words);
@@ -26861,11 +26872,7 @@ var execute = (given, host) => gen2(function* () {
     };
   if (output instanceof Streamed)
     return { stdout: emitted.join(""), stderr: "", code: output.code };
-  const stdout = output instanceof WithTrailer ? `${encode2(output.fields)}
-${output.label}:
-${plainText(output.text)}
-` : `${encode2(output)}
-`;
+  const stdout = renderRecord(output);
   return { stdout, stderr: "", code: 0 };
 });
 var failed4 = (error, env) => hostForText(env).pipe(map4((agent) => {
@@ -26888,10 +26895,17 @@ for (const stream of [process.stdout, process.stderr])
     throw error;
   });
 var write = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause)));
-await runPromise2(run2(Bun.argv.slice(2), {
+var main = (interactiveSetup = false) => runPromise2(run2(Bun.argv.slice(2), {
   cwd: process.cwd(),
   env: process.env,
   stdin,
   emit: (text) => write(process.stdout, text),
-  terminal: { stdin: Boolean(process.stdin.isTTY), stdout: Boolean(process.stdout.isTTY) }
+  ...interactiveSetup ? {
+    terminal: {
+      stdin: Boolean(process.stdin.isTTY),
+      stdout: Boolean(process.stdout.isTTY)
+    }
+  } : {}
 }).pipe(tap2((result) => write(process.stdout, result.stdout).pipe(andThen2(write(process.stderr, result.stderr)), andThen2(sync2(() => void (process.exitCode = result.code)))))));
+
+await main();

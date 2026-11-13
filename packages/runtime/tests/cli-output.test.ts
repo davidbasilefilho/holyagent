@@ -7,7 +7,92 @@ import { decode } from "@toon-format/toon"
 import { Effect } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
-import { run } from "../src/cli/program.ts"
+import { encodeRecord, renderRecord, run } from "../src/cli/program.ts"
+import { WithTrailer } from "../src/cli/types.ts"
+
+test("TOON escapes terminal controls without changing nested records, keys or tables", () => {
+  const record = {
+    "key\u009b": "literal \\u009b and \u009b and \u001b",
+    rows: [
+      { "field\u007f": "\u009b", nested: { value: "\\u009b" } },
+      { "field\u007f": "\\u009b", nested: { value: "x\u009by" } },
+    ],
+    "key\\u009b": "distinct",
+  }
+  const encoded = encodeRecord(record)
+  for (const character of encoded) {
+    const code = character.charCodeAt(0)
+    expect((code < 32 && code !== 9 && code !== 10) || (code >= 127 && code <= 159)).toBe(false)
+  }
+  expect(decode(encoded)).toEqual(record)
+  const trailer = renderRecord(new WithTrailer(record, "prompt", "line\u009b\nnext"))
+  const [fields, text] = trailer.split("\nprompt:\n")
+  expect(fields).toBeDefined()
+  expect(decode(fields ?? "")).toEqual(record)
+  expect(text).toBe("line\\u009b\nnext\n")
+  expect(trailer).not.toMatch(/[\u007f-\u009f]/)
+})
+
+test("public and internal Pi entries keep CLI results and stdin compatible", async () => {
+  root = await mkdtemp(join(tmpdir(), "holyagent-pi-entries-"))
+  const env = { ...process.env, HOME: root, HOLYAGENT_HOST: "pi" }
+  const entries = ["pi-entry.ts", "pi-public-entry.ts"].map((name) =>
+    join(import.meta.dir, "../src/hooks", name),
+  )
+  for (const argv of [["--version"], ["config", join(root, ".holyagent")], ["intent", "create"]]) {
+    const results = entries.map((entry) =>
+      Bun.spawnSync([process.execPath, entry, ...argv], {
+        cwd: root,
+        env,
+        stdin: new TextEncoder().encode("{}"),
+      }),
+    )
+    expect(results[0]?.exitCode).toBe(results[1]?.exitCode)
+    expect(results[0]?.stdout.toString()).toBe(results[1]?.stdout.toString())
+    expect(results[0]?.stderr.toString()).toBe(results[1]?.stderr.toString())
+  }
+})
+
+test.skipIf(process.platform === "win32" || Bun.which("script") === null)(
+  "the internal Pi entry keeps setup line based on a terminal",
+  async () => {
+    root = await mkdtemp(join(tmpdir(), "holyagent-plain-tty-"))
+    const entry = join(import.meta.dir, "../src/hooks/pi-entry.ts")
+    const command = [process.execPath, entry, "setup", "--dry-run", "--skip-ctx7"]
+      .map((part) => `'${part.replaceAll("'", "'\\''")}'`)
+      .join(" ")
+    const child = Bun.spawnSync(["script", "-q", "-e", "-c", command, "/dev/null"], {
+      cwd: root,
+      env: {
+        HOME: root,
+        CLAUDE_CONFIG_DIR: join(root, "claude"),
+        T3CODE_HOME: root,
+        HOLYAGENT_HOST: "pi",
+        TERM: "xterm-256color",
+        PATH: process.env["PATH"],
+      },
+    })
+    const output = child.stdout.toString()
+    expect(output).toContain("stdin or stdout is not a terminal")
+    expect(output).not.toContain("installing the setup interface")
+    expect(output).not.toContain("\u001b")
+    const publicEntry = join(import.meta.dir, "../src/hooks/pi-public-entry.ts")
+    const publicCommand = command.replace(entry, publicEntry)
+    const publicChild = Bun.spawnSync(["script", "-q", "-e", "-c", publicCommand, "/dev/null"], {
+      cwd: root,
+      env: {
+        HOME: root,
+        CLAUDE_CONFIG_DIR: join(root, "claude"),
+        T3CODE_HOME: root,
+        HOLYAGENT_HOST: "pi",
+        TERM: "xterm-256color",
+        PATH: process.env["PATH"],
+      },
+    })
+    // An unbuilt source tree has no setup bundle; reaching its loader proves this entry opted in.
+    expect(publicChild.stdout.toString()).toContain("the interface bundle")
+  },
+)
 
 let root = ""
 afterEach(async () => {
@@ -55,12 +140,13 @@ test("CLI guidance is plain under forced color and keeps its structured records 
         const code = character.charCodeAt(0)
         expect((code < 32 && code !== 9 && code !== 10) || (code >= 127 && code <= 159)).toBe(false)
       }
-    const objective = `Keep every requirement ${host}`
+    const objective = `Keep every requirement ${host} \u009b and literal \\u009b`
     const created = await cli(["intent", "create"], host, {
       objective,
       requirements: ["first", "last"],
     })
     expect(created.code).toBe(0)
+    expect(created.stdout).not.toMatch(/[\u007f-\u009f]/)
     expect(decode(created.stdout)).toMatchObject({ objective, state: "Open" })
     const shown = await cli(["intent", "show"], host)
     expect(shown.code).toBe(0)

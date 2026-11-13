@@ -1,4 +1,4 @@
-import { encode } from "@toon-format/toon"
+import { encode, escapeString, rawString } from "@toon-format/toon"
 import { Cause, Effect } from "effect"
 
 import { version } from "../../../../package.json" with { type: "json" }
@@ -21,6 +21,26 @@ export interface Result {
   readonly stderr: string
   readonly code: number
 }
+
+/** Encodes TOON without terminal control bytes, preserving the decoded values and keys. */
+export const encodeRecord = (value: unknown): string =>
+  encode(value, {
+    // TOON's encoder quotes keys containing C1 controls, but may leave such values unquoted.
+    // Force only those values into quoted strings so the Unicode escapes decode correctly.
+    replacer: (_key, item) =>
+      typeof item === "string" && /[\u007f-\u009f]/.test(item)
+        ? rawString(`"${escapeString(item)}"`)
+        : item,
+  }).replace(
+    /[\u007f-\u009f]/g,
+    (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  )
+
+/** Renders a structured command result and its optional plain-text trailer. */
+export const renderRecord = (output: unknown): string =>
+  output instanceof WithTrailer
+    ? `${encodeRecord(output.fields)}\n${plainText(output.label)}:\n${plainText(output.text)}\n`
+    : `${encodeRecord(output)}\n`
 
 /** The command with the help text of a host's `words`. */
 const forWords = (command: Command, words: HostWords): Command =>
@@ -167,10 +187,7 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
       }
     if (output instanceof Streamed)
       return { stdout: emitted.join(""), stderr: "", code: output.code }
-    const stdout =
-      output instanceof WithTrailer
-        ? `${encode(output.fields)}\n${output.label}:\n${plainText(output.text)}\n`
-        : `${encode(output)}\n`
+    const stdout = renderRecord(output)
     return { stdout, stderr: "", code: 0 }
   })
 

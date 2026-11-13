@@ -92,8 +92,8 @@ const REFUSED_ERRORS = new Set([
   ...VCS_REFUSED_ERRORS,
 ])
 
-const insufficientAcceptanceHint = (words: HostWords) =>
-  `Nothing was recorded. ${words.askForSupport} for the missing support, then run assignment close <id> --outcome success --accept <rationale> with the corrected report, or assignment accept <id> --rationale <text> --report. For a workflow agent, draft a follow-up with followUpOf.`
+const insufficientAcceptanceHint = (words: HostWords, id: string) =>
+  `Nothing was recorded. ${words.askForSupport} for the missing support, then run \`holyagent assignment close ${id} --outcome success --accept <rationale>\` with the corrected report on stdin. For a succeeded, unaccepted assignment, you can instead run \`holyagent assignment accept ${id} --rationale <text> --report\` with the report on stdin. For a workflow agent, draft a follow-up with followUpOf.`
 
 const HINTS: Readonly<Record<string, string>> = {
   StdinMissing:
@@ -182,7 +182,12 @@ export const describeFailure = (error: unknown, words: HostWords = CLAUDE_WORDS)
       error instanceof Usage
         ? error.hint
         : tag === "InsufficientAcceptance"
-          ? insufficientAcceptanceHint(words)
+          ? insufficientAcceptanceHint(
+              words,
+              typeof error === "object" && error !== null && "id" in error
+                ? String(error.id)
+                : "<id>",
+            )
           : (HINTS[tag] ?? "Run `holyagent --help` for the commands."),
     ),
     code: USAGE_ERRORS.has(tag) ? EXIT.usage : REFUSED_ERRORS.has(tag) ? EXIT.refused : EXIT.state,
