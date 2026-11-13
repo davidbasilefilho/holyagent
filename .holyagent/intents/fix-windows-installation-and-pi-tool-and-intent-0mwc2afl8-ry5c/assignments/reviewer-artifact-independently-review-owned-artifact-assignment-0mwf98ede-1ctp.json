@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mwf98ede-1ctp",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 4,
+  "roleTask": "Reviewer.artifact",
+  "slug": "independently-review-owned-artifact",
+  "objective": "Independently review owned-artifact current committed change.",
+  "state": "Running",
+  "scope": [
+    "Review c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..d9f21e91b6861e4ff5261b00b81fd33f7f22690f: requirements-first all three instruction families, owned role guidance map correctness, private on-demand routing/no global body preload, docs on host limitations/third-party preservation, documentation-lookup/Context7 provenance. No actual security isolation or host per-role filter claim. Existing performance-iteration from separate C not merged here yet: integration owner will add exact map entry; do not call absent independent branch feature a regression."
+  ],
+  "constraints": [
+    "Work only /workspace/work/holyagent-034-skills; read AGENTS.md and matching GPT role directives. Read-only Git/source allowed. No source/generated edits, VCS writes, Git config, .holyagent writes or paid/live Pi calls. Be independent from named author; do not launch subagents.",
+    "Evidence current immutable commit; meaningful focused checks through mise where role permits. Environment MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "Save /workspace/work/034/owned-artifact-current-review-report.json. Exact JSON shape {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}. Every criterion/label exact key. <=300words, logs external. Report actionable findings with file/line/reproduction; do not merely claim no findings."
+  ],
+  "criteria": [
+    {
+      "text": "The committed change satisfies its stated contract with no unresolved material review findings",
+      "blocking": true,
+      "dimension": "style"
+    },
+    {
+      "text": "Relevant regression evidence and actual host limitations are preserved accurately",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf3onqq-igcn"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T17:32:25.922Z"
+  },
+  "createdAt": "2026-11-13T17:32:25.922Z"
+}
