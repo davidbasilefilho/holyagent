@@ -69,6 +69,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwf8phge-0pau",
   "specialist": {
+    "agentId": "/root/core_resume_repair",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T20:58:50.905Z"
