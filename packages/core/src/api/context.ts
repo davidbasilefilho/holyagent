@@ -31,6 +31,7 @@ export type Capability =
   | "reconcile"
   | "handoff"
   | "migrate"
+  | "state.initialize"
   | "stateMode.read"
   | "stateMode.write"
 
@@ -91,7 +92,31 @@ export const withState = <A, E, R>(
 ) =>
   Effect.gen(function* () {
     if (context.authorize(capability) !== true) return yield* new Unauthorized({ capability })
-    const state = yield* resolveState(context.cwd, context.env, ensure, capability !== "handoff")
+    const readOnly = [
+      "intent.show",
+      "intent.list",
+      "assignment.show",
+      "assignment.list",
+      "assignment.reports",
+      "plan",
+      "status",
+      "reconcile",
+      "handoff",
+    ].includes(capability)
+    const canInitialize = context.authorize("state.initialize") === true
+    if (!canInitialize && !readOnly && ensure !== "peek")
+      return yield* new Unauthorized({ capability: "state.initialize" })
+    const authorizeInitialization = requireCapability(context, capability).pipe(
+      Effect.andThen(requireCapability(context, "state.initialize")),
+    )
+    const state = yield* resolveState(
+      context.cwd,
+      context.env,
+      canInitialize ? ensure : "peek",
+      capability !== "handoff",
+      undefined,
+      authorizeInitialization,
+    )
     return yield* use({
       root: state.root,
       directory: state.directory,

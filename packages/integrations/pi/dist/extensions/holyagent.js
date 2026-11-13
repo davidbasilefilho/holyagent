@@ -10726,7 +10726,7 @@ var editExclude = (top, common, env, edit, done, patience = WORKTREE_PATIENCE) =
     yield* commitFile(path, body);
   }), patience);
 });
-var ensureExcluded = (top, common, env, patience) => editExclude(top, common, env, (lines) => stateModeOf(top, env).pipe(map4((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry, patience);
+var ensureExcluded = (top, common, env, patience, authorize) => editExclude(top, common, env, (lines) => authorize.pipe(andThen2(stateModeOf(top, env)), map4((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry, patience);
 var excludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed5(withEntry(lines)));
 var unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed5(withoutMarked(lines)));
 var isDirectory = (path) => io(path, () => stat2(path)).pipe(map4((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed5(false)));
@@ -10851,7 +10851,8 @@ var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS) => git(to
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
 ], timeout)), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed5(false)));
 var readyMarker = (path) => `${path}.ready`;
-var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE) => withFileLock(join6(common, "holyagent", "worktree.lock"), gen2(function* () {
+var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join6(common, "holyagent", "worktree.lock"), gen2(function* () {
+  yield* authorize;
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
   if (again !== undefined) {
@@ -10960,10 +10961,11 @@ var pruneEmpty = (folder, from) => gen2(function* () {
   }
 });
 var migrationMarker = (common, top) => io(top, () => realpath2(top)).pipe(map4((real) => join6(common, "holyagent", "migrated", createHash2("sha1").update(real).digest("hex").slice(0, 16))));
-var migrateWorkTree = (top, common, worktree, env, commit, patience = STATE_PATIENCE) => {
+var migrateWorkTree = (top, common, worktree, env, commit, patience = STATE_PATIENCE, authorize = void_3) => {
   const source = stateDirectory(top);
   const target = stateDirectory(worktree);
   return migrationMarker(common, top).pipe(flatMap2((marker) => fileExists(marker).pipe(flatMap2((done) => done ? void_3 : requireStateFolder(target).pipe(andThen2(kindAt(source)), flatMap2((kind) => kind !== undefined && kind !== "directory" ? void_3 : withStateLock(target, gen2(function* () {
+    yield* authorize;
     if (yield* fileExists(marker))
       return;
     const entries = yield* workTreeEntries(top, env);
@@ -11084,15 +11086,17 @@ var locate = (cwd, env) => gen2(function* () {
 `).map((path) => fromGitPath(path));
   return { top, common };
 });
-var resolveState = (cwd, env, ensure, online = true, patience) => gen2(function* () {
+var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_3) => gen2(function* () {
   const repository = yield* locate(cwd, env);
   if (repository === undefined)
     return { root: cwd, directory: stateDirectory(cwd) };
   const { top, common } = repository;
   const mode = yield* stateModeOf(top, env);
   if (mode !== "branch") {
-    if (mode === "local" && ensure !== "peek")
-      yield* ensureExcluded(top, common, env, patience);
+    if (mode === "local" && ensure !== "peek") {
+      yield* authorize;
+      yield* ensureExcluded(top, common, env, patience, authorize);
+    }
     return { root: top, directory: stateDirectory(top), resolved: { mode } };
   }
   const branch = yield* stateBranch(top, env);
@@ -11107,11 +11111,11 @@ var resolveState = (cwd, env, ensure, online = true, patience) => gen2(function*
       cause: "the state worktree is not ready; wait for its checkout to finish and retry"
     });
   const make = ensure === "create" || ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed));
-  const ensured = found !== undefined && settled ? { kind: "ready", path: found, created: false } : found === undefined && !make ? { kind: "absent" } : yield* ensureWorktree(top, common, env, branch, standard, {
+  const ensured = found !== undefined && settled ? { kind: "ready", path: found, created: false } : found === undefined && !make ? { kind: "absent" } : yield* authorize.pipe(andThen2(ensureWorktree(top, common, env, branch, standard, {
     make,
     peek: ensure === "peek",
     online
-  }, patience);
+  }, patience, authorize)));
   if (ensured.kind === "deferred")
     return { root: top, directory: stateDirectory(top), resolved };
   if (ensured.kind === "absent") {
@@ -11127,8 +11131,10 @@ var resolveState = (cwd, env, ensure, online = true, patience) => gen2(function*
       ...listed.filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}${sep3}`)).map((entry) => entry.path)
     ] : [top];
     for (const source of new Set(sources))
-      if (source !== worktree && (yield* isDirectory(source)))
-        yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message, [], resolved), patience);
+      if (source !== worktree && (yield* isDirectory(source))) {
+        yield* authorize;
+        yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message, [], resolved), patience, authorize);
+      }
   }
   return { root: top, directory, resolved };
 });
@@ -11542,7 +11548,22 @@ var decode2 = (schema, input) => decodeInput(schema, input);
 var withState = (context, capability, ensure, use) => gen2(function* () {
   if (context.authorize(capability) !== true)
     return yield* new Unauthorized({ capability });
-  const state = yield* resolveState(context.cwd, context.env, ensure, capability !== "handoff");
+  const readOnly = [
+    "intent.show",
+    "intent.list",
+    "assignment.show",
+    "assignment.list",
+    "assignment.reports",
+    "plan",
+    "status",
+    "reconcile",
+    "handoff"
+  ].includes(capability);
+  const canInitialize = context.authorize("state.initialize") === true;
+  if (!canInitialize && !readOnly && ensure !== "peek")
+    return yield* new Unauthorized({ capability: "state.initialize" });
+  const authorizeInitialization = requireCapability(context, capability).pipe(andThen2(requireCapability(context, "state.initialize")));
+  const state = yield* resolveState(context.cwd, context.env, canInitialize ? ensure : "peek", capability !== "handoff", undefined, authorizeInitialization);
   return yield* use({
     root: state.root,
     directory: state.directory,
