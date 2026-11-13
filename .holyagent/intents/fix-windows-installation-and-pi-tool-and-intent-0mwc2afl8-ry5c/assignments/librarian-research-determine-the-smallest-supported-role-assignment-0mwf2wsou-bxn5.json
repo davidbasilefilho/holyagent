@@ -1,0 +1,46 @@
+{
+  "id": "assignment-0mwf2wsou-bxn5",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 3,
+  "roleTask": "Librarian.research",
+  "slug": "determine-the-smallest-supported-role",
+  "objective": "Determine the smallest supported role-scoped owned-skill and Context7 migration design for Pi and Claude.",
+  "state": "Running",
+  "scope": [
+    "Current source generators/roles/setup, lockedPi1.5.0/pi-subagents0.23.2 APIs and authoritativeClaude skills/agentdocs."
+  ],
+  "constraints": [
+    "Read-only /workspace/work/holyagent-034 acceptedA sourcec3; sourceotherfeaturetreesread-only ifneeded. Existing research /workspace/work/034/instruction-plan.md/runtime-map.md/host-contracts.md givespriorpointers buttrue rolefilteringunproved. Userrequiresremoveexternalstandalone ~/.agents/skills/context7-cli in favorHolyAgent-owned roleappropriateguidance, scope skills perrole inBOTH integrations withoutunnecessaryembedding. ActualuserPCcleanupisuser-owned/notaccessiblehere; do notinspect/deleteuserfilesorchangeglobalsettings. No extraagents/VCS/statewrites/livePiCLI/modelcalls/depschanges. ScratchSDKfixturesread-onlysourcesallowed.",
+    "Find2–3concreteoptionswith source/APIproofandtradeoffs. Distinguish roleappropriate progressive loading vsactualskilldiscoveryfiltering vssecurityauthority. Claudeagentfrontmatter skillpreload mayinjectwholebody, globalplugin skills mayremain visible: don'tclaimhiddenwithoutproof. Pi resources_discover/additionalSkillsPaths/noSkills/agentloaderoptions: inspectactualpublichost+subagentcontracts andtestharmless SDK/resourceLoader proof forpromisingoption, neverpatchinstalledpackage. Preserveuser-ownedskills/providerswhenfilteringonlyHolyAgentownedassets.",
+    "MapexistingContext7global install/removalownedsetupsteps/undo markers andtruthfulmigration. Preferoneowneddocumentationlookupskill withprovenance/perroletrigger, nofixeddesignrecipes/newdependencies. Ensure requirements-firstallfamilies+coverage, rooton-demandrouter notallbodies. Planmustidentify exactfileownership/disjointseams: Cchangesvisual/perfskills rootidentity/delegating/coverage, Fchangesworkflow/search/coverage, EchangesPiagentprofiles/config soavoidunnecessaryoverlap; ownrole-skillassembly/generators/setup as needed.",
+    "Useofficialhostdocs/sourceversioned notassumecurrentmaster. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Ifpublicwebneeded discovertool notcurlcredential. Reportactualunknownlimitsandboundedfollowupchecks.",
+    "Save /workspace/work/034/scoped-skills-design.md andJSON /workspace/work/034/scoped-skills-research-report.json correctCLIshape/exactkeys. Final<=400words, traces/probesexternal. Stopafterevidencedrecommendation; no implementation."
+  ],
+  "criteria": [
+    {
+      "text": "Role-scoping recommendation is grounded in actual Pi and Claude discovery and loading capabilities",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Owned Context7 migration preserves user files and progressive loading across families",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "sources",
+    "checks-run",
+    "file-map",
+    "open-questions"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T14:35:26.910Z"
+  },
+  "createdAt": "2026-11-13T14:35:26.910Z"
+}
