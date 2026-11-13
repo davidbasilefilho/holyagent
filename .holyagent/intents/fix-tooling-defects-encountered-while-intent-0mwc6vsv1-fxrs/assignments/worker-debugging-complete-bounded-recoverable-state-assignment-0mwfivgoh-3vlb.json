@@ -64,7 +64,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwfi1lgo-86h4",
   "specialist": {
-    "agentId": "/root/plain_hosted_repair",
+    "agentId": "/root/core_migration_bounds_repair",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T22:02:18.545Z"
