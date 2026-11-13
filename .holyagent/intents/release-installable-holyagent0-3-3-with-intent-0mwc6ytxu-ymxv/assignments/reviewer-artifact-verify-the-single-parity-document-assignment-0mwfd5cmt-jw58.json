@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwfd5cmt-jw58",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Reviewer.artifact",
+  "slug": "verify-the-single-parity-document",
+  "objective": "Verify the single parity-document publication correction closes the prior optional finding.",
+  "state": "Running",
+  "scope": [
+    "Work /workspace/work/holyagent-033-repair. Read exact committed repair range f3d4632..HEAD (root supplies immutable head in launcher). Only docs/pi/claude-parity.md paragraph should change: remove stale no-npm-publishing claim, describe protected CI/Bun pack/npm trusted publishing and valid guide link without claiming stable0.3.3 published. Preserve prior complete artifact review of all other paths."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT artifact role. Read-only Git/source checks only, no source/VCS/state/generated/config writes, model calls, or full gate repeat. No executable investigation. Write authorized /workspace/work/034/033-parity-artifact-rereview-report.json exact JSON schema status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}], <=150words."
+  ],
+  "criteria": [
+    {
+      "text": "The publication documentation finding is closed with accurate guidance and unchanged unrelated content",
+      "blocking": true,
+      "dimension": "style"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfd2hmg-2oeo"
+  ],
+  "followUpOf": "assignment-0mwfcyfxd-29bj",
+  "specialist": {
+    "agentId": "/root/r033_final_artifact_review",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T19:22:02.165Z"
+  },
+  "createdAt": "2026-11-13T19:22:02.165Z"
+}
