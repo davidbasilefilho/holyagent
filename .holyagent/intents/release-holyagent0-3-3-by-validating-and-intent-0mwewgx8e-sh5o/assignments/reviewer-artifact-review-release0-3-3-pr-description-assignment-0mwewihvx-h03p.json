@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-release0-3-3-pr-description",
   "objective": "Review release0.3.3 PR description before opening it into main.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "/workspace/work/release033-body.txt; release main..9c8edee7"
   ],
@@ -34,7 +34,29 @@
     "agentId": "/root/release_body_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T11:36:22.030Z"
+    "startedAt": "2026-11-13T11:36:22.030Z",
+    "finishedAt": "2026-11-13T11:38:56.509Z"
+  },
+  "result": "result: Accepted with the specified publication-time substitution.\nchanged: /workspace/work/release033-body-review.md\nchecks: Reviewed replacement sentence against prior evidence; no tests run for prose.\nblockers: none, provided the substitution is made before publication.\nquestions: none\nnotes: Replace the final sentence with “Current-head checks are required before merging into main.”\nevidence:\nRelease PR description is accurate and claims only established validation: met with the specified substitution; main-PR checks remain required, and prior tree-level verification is supported by release033-audit.md.\nreviewed-artifact: /workspace/work/release033-body.txt with the specified substitution.\nfindings: No remaining blocking findings with that substitution.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Release body accepted with exact normative final-sentence substitution; prior full verification applies to identical release tree.",
+    "criteria": [
+      {
+        "criterion": "Release PR description is accurate and claims only established validation",
+        "support": "met with the specified substitution; main-PR checks remain required, and prior tree-level verification is supported by release033-audit.md."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-artifact",
+        "support": "/workspace/work/release033-body.txt with the specified substitution."
+      },
+      {
+        "label": "findings",
+        "support": "No remaining blocking findings with that substitution."
+      }
+    ]
   },
   "createdAt": "2026-11-13T11:36:22.030Z"
 }
