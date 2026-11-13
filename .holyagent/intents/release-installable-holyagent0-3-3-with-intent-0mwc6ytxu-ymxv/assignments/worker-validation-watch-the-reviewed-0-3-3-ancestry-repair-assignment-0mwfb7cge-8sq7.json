@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwfb7cge-8sq7",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 30,
+  "roleTask": "Worker.validation",
+  "slug": "watch-the-reviewed-0-3-3-ancestry-repair",
+  "objective": "Watch the reviewed 0.3.3 ancestry repair and record publication prerequisites while admin settings are pending.",
+  "state": "Running",
+  "scope": [
+    "PR127 head2a635a3023d1d0802a5d997412ef35acd0c1c843 targets release/0.3.3/integration. Watch gh pr checks127 --watch to terminal; exact current-head Linux/macOS/Windows/installers/branch-model results. PR128 currently headbea61f99 targets main and is CONFLICTING because old squash ancestry; report snapshot, do not wait indefinitely for it to change.",
+    "Optionally observe push Publish workflow on integrationbea61f99, including automatic dev prerelease outcome. This is not stable0.3.3 publication; do not claim stable until main trusted publishing succeeds. User has not yet enabled merge commits or waived required version. No mutations."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT validation and ci-watch. Read-only gh/Git/API/logs; no VCS/config/state/source/generated writes, reruns, live model/Pi or publication. Do not investigate executable offering error or0.3.4 failures; user says publish stable0.3.3 first.",
+    "Use connector logs if gh redirect403. Distinguish actual gates, skips, pending, missing and expected conflicts. Root handles admin request, merges and publication. Keep heads bound to evidence and report changes rather than stale success.",
+    "Report /workspace/work/034/033-ancestry-ci-report.json exact schema {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}. Validate field types; <=250wordsummary, logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Current ancestry head CI and promotion prerequisites are accurately reported",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "heads",
+    "checks-run",
+    "failures",
+    "merge-state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T18:27:36.014Z"
+  },
+  "createdAt": "2026-11-13T18:27:36.014Z"
+}
