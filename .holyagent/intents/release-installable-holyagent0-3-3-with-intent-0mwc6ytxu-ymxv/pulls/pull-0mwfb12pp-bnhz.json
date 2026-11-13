@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mwfb12pp-bnhz",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "number": 127,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/127",
+  "branch": "release/0.3.3/chore/reconcile-main",
+  "base": "release/0.3.3/integration",
+  "created": true,
+  "recordedAt": "2026-11-13T18:22:43.453Z"
+}
