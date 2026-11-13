@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mwf98cpk-fi4c",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-plain-code-current",
+  "objective": "Independently review plain-code current committed change.",
+  "state": "Running",
+  "scope": [
+    "Bounded re-review e778f69439a30b9f639f87a7f77c40c3bfc06df6..eaf9981d. Resolve previous /workspace/work/034/plain-cli-review-code-report.json and testing report findings: lossless C1 TOON keys/values/trailers, executable recovery with report stdin, public npm entry vs internal plain TTY setup. Verify generated source and meaningful tests. Full3494pass2skip already recorded; focused checks only where needed."
+  ],
+  "constraints": [
+    "Work only /workspace/work/holyagent-034-cli; read AGENTS.md and matching GPT role directives. Read-only Git/source allowed. No source/generated edits, VCS writes, Git config, .holyagent writes or paid/live Pi calls. Be independent from named author; do not launch subagents.",
+    "Evidence current immutable commit; meaningful focused checks through mise where role permits. Environment MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "Save /workspace/work/034/plain-code-current-review-report.json. Exact JSON shape {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}. Every criterion/label exact key. <=300words, logs external. Report actionable findings with file/line/reproduction; do not merely claim no findings."
+  ],
+  "criteria": [
+    {
+      "text": "The committed change satisfies its stated contract with no unresolved material review findings",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Relevant regression evidence and actual host limitations are preserved accurately",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf7j4ip-hpmw"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T17:32:23.769Z"
+  },
+  "createdAt": "2026-11-13T17:32:23.769Z"
+}
