@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mwf1my7e-pmzo",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-guidance-context-budget",
+  "objective": "Repair guidance context-budget regressions and update exact assembly expectations for the newly added skill.",
+  "state": "Running",
+  "scope": [
+    "Existing guidance source, requirements/coverage and directly affected instruction/plugin tests."
+  ],
+  "constraints": [
+    "Continue only /workspace/work/holyagent-034-guidance. Read /workspace/work/034/guidance-final-build-report.json and guidance-verify.log for exact11failure evidence. Buildworker terminal; generated files exist but writer edits source only. No actualVCS/statewrites, no subagents/modelcalls/remotechanges/depspinchanges. Existing userauthorization/rules/toolchain apply.",
+    "New roottext exceeded existing context budgets, removed status/objective and truncates requirementdisclosure. Preserve budget thresholds and require real status/Intent requirements to fit; don'traise budgets/delete coverage/weaken assertions to pass. Compact or progressively disclose guidance and existing redundant instruction text within current behaviorrequirements, allfamilies requirementsfirst; use minimal root router for on-demandskill. Preserve requested statepush/statushandoff semantics and original+previous visual/perfcycle. Account forcloudstaticparts andPiremainder with realfocusedtests.",
+    "Legitimate new performance skill changes exactexpectedskillsets/requirementreachability in plugin.test; update expectedsets to include it andensure propercoverage+roleassemblies, do notremove integrity assertions or unrelated oldskillschecks. Investigate mismatch rather thanassume all11samecause. Repo conventionsfirst; no0.4orchestrationredesign.",
+    "Run all previously failing files plus relevant instructions tests/type/lint/fmt; nofullverify/build yet rootcoordinatedlater. Toolchain env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Don'tresetgeneratedpeerassets. Fullnewdiff /workspace/work/034/guidance-repair.diff and JSON /workspace/work/034/guidance-repair-report.json correctCLIshape/exactkeys; <=250wordfinal, detailedlogsout."
+  ],
+  "criteria": [
+    {
+      "text": "Existing context budgets retain usable status and whole requirements without weakening tests",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "New skill and all-family behavior coverage matches both harness assemblies",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "All previously failing focused checks and type lint format pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/runtime/tests/instructions.test.ts",
+    "packages/runtime/tests/sessioncontext.test.ts",
+    "packages/integrations/claude/tests/plugin.test.ts",
+    "packages/integrations/pi/tests/session-context.test.ts",
+    "packages/integrations/pi/tests/extension.test.ts",
+    "docs/iteration-evidence.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf1cfkg-rcz5",
+  "specialist": {
+    "agentId": "/root/r034_iteration_guidance",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T13:59:47.882Z"
+  },
+  "createdAt": "2026-11-13T13:59:47.882Z"
+}
