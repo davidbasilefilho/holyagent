@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "identify-the-smallest-complete-reusable",
   "objective": "Identify the smallest complete reusable library boundary for the actual HolyAgent CLI functionality and native Pi consumers.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read immutable5b1b6e2 in /workspace/work/holyagent-034-core plus /workspace/work/034/core-resume-api-inventory.md, docs/core-api.md and native-tools.md. User exact architecturalinstruction: 'a cli interna deve ter sua funcionalidade real em outro pacote que ela usa, para ferramentas nativasPi executarem funcionalidadesnativamente sem chamarCLI'. Current@holyagent/core actualtypedstate/orchestration effectsusedCLI andnativeNode pass; inventorylabels runtimeownedsetupdoctor,VCS,hooks,passthrough,browser asremaining. Evaluate that label against actualsource: are these alreadyreusablelibrary modules withthinCLIadapters, or actualbusinesslogicstrandedbehindCLI? Provide preciseexportpaths/callgraphs not assumedgap.",
     "Give2small concrete architectureoptions ifneeded tofullysatisfy user'sactualreusegoal, withtradeoffs NodeSDKcompatibility/effecttypedAPI/authority/packaging/cost. Prefer minimalcomplete design; hostprotocol/presentation adapters canstayharnessspecific, don't inventrequirement toexposeeveryrawprocess/stdio serverasmodeltool. Mustnotclaimfullgoalcomplete ifactualbusinesslogiconlyreachablethroughCLIparser remains.",
@@ -38,7 +38,33 @@
     "agentId": "/root/core_completion_map",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T21:19:11.598Z"
+    "startedAt": "2026-11-13T21:19:11.598Z",
+    "finishedAt": "2026-11-13T21:24:58.267Z"
+  },
+  "result": "status: done\nchanged:\n- /workspace/work/034/core-completion-map.md\n- /workspace/work/034/core-completion-map-report.json\nchecks:\n- git rev-parse HEAD -> exit 0\nnotes:\n- Read-only source map; no live operations or tests. Recommendations and detailed call graphs are in core-completion-map.md.\nevidence:\n- Remaining reusable functionality gaps and minimum complete architecture options are traced to actual source and host contracts (scope): Map distinguishes existing internal Effect modules, CLI-only composition, Bun-dependent services and Pi capability checks, and proposes two Node-safe boundaries.\n- source-map: Appendix maps package exports and state, setup/doctor, VCS, hooks, passthrough and browser call paths.\n- options-and-tradeoffs: Preferred extension of core and alternate Node-safe runtime application entry compare packaging, Effect API, Node compatibility, authority and cost.\n- checks-run: Read-only inspection and git rev-parse HEAD verified immutable 5b1b6e2; no state or account operations.",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Actualexport/callgraphs confirm onlyfullCLI compositions and Nodeports remain; two concreteoptions compared. Select extending existingprivateCore, retaininghostpresentation/protocoladapters, with no new blanketapprovalflow.",
+    "criteria": [
+      {
+        "criterion": "Remaining reusable functionality gaps and minimum complete architecture options are traced to actual source and host contracts",
+        "support": "Map distinguishes existing internal Effect modules, CLI-only composition, Bun-dependent services and Pi capability checks, and proposes two Node-safe boundaries."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "source-map",
+        "support": "Appendix maps package exports and state, setup/doctor, VCS, hooks, passthrough and browser call paths."
+      },
+      {
+        "label": "options-and-tradeoffs",
+        "support": "Preferred extension of core and alternate Node-safe runtime application entry compare packaging, Effect API, Node compatibility, authority and cost."
+      },
+      {
+        "label": "checks-run",
+        "support": "Read-only inspection and git rev-parse HEAD verified immutable 5b1b6e2; no state or account operations."
+      }
+    ]
   },
   "createdAt": "2026-11-13T21:19:11.598Z"
 }
