@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mwf40ynd-1jfb",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Worker.implementation",
+  "slug": "correct-quoted-cli-help-syntax-and",
+  "objective": "Correct quoted CLI help syntax and reconcile the intended concise evidence hint.",
+  "state": "Running",
+  "scope": [
+    "Read plain-cli-final-build-report.json: input.test156expects --input '<json>' quoting; restorecorrectquotesnotunsafeunquotedJSONplaceholder. host.test340 oldhintmissing supportchangedto missing evidence: selectclearnaturalshortwordingandnecessaryliteralexpectedhintwithoutweakeningevidence/hostroutingassertions. Preserveplainoutput/forcedcolor/controlrender/unchangedrgargv/malformedexit2/taggederrors/recorddata. Runinput/host/CLIoutput/tools+type/lint/fmt; no generatedbuild/fullverify."
+  ],
+  "constraints": [
+    "Workonly /workspace/work/holyagent-034-cli. Allpreviousbuilders/reviewers terminal. No actualVCS/.git/.holyagentwrites/depschanges/extraagents/livecalls/generatededits. RootownsVCS/state. RepoAGENTS/.claude/role rulesapply. Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; checksthroughmise.",
+    "JSON /workspace/work/034/plain-cli-wording-report.json correctCLIshape/exactkeys; diff /workspace/work/034/plain-cli-wording.diff. Final<=200words/logsexternal. Keepworkingthroughfixchecks."
+  ],
+  "criteria": [
+    {
+      "text": "Quoted help and concise evidence hints pass affected tests without output or validation regressions",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/errors.ts",
+    "packages/runtime/tests/input.test.ts",
+    "packages/runtime/tests/host.test.ts",
+    "packages/runtime/tests/cli-output.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwf34phm-kkw5",
+  "specialist": {
+    "agentId": "/root/r034_handoff_command",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T15:06:40.873Z"
+  },
+  "createdAt": "2026-11-13T15:06:40.873Z"
+}
