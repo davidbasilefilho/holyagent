@@ -1,0 +1,83 @@
+{
+  "id": "assignment-0mwfm5a9e-89ll",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.integration",
+  "slug": "resolve-the-routing-merge-into-shared",
+  "objective": "Resolve the routing merge into shared Core and finish the trusted typed Agent launch gate.",
+  "state": "Running",
+  "scope": [
+    "Work only in /workspace/work/holyagent-034-core-host. HEAD31a9702 is the complete Core host application extraction (3577 tests passed), with a root-started pending merge of subscription-routing65f45bf (f70c650c plus interim guard, Codex eligibility and docs repair). Git index has conflicts; root alone will stage/commit. Source schema/domain/config/runtime conflicts are primarily Core canonical implementations versus old runtime bodies. Preserve Core canonical functions and runtime compatibility re-exports; port any missing E changes into Core rather than restoring duplicate implementations. Rebuild generated conflicts from source.",
+    "Read /workspace/work/034/routing-policy-repair-report.json, routing-current-security-review-report.json, routing-current-code-review-report.json, routing-current-artifact-review-report.json, and core-host-api-inventory.md. The E branch could only fail closed because it lacked a Node-safe trusted dispatch/config reader. This target HAS real typed @holyagent/core assignment, config-with-source and routing APIs; implement the actual adapter here. Do not leave all valid profiled Agent calls blocked.",
+    "Bind each managed Agent direct/chain/parallel launch to trusted current role/screen and persisted dispatch selection or an independently computed current trusted configured selection. Use Core typed read-only context and actual persisted assignment data/config provenance, never model-supplied approval or expected-model fields. Input assignment IDs are untrusted lookup keys, not authority. Verify matching role/screen/status/selection; compare exact authenticated provider/model and applicable effort. Reject unknown, stale or conflicting selections clearly. Preserve trusted explicit overrides, policy fallback with missing real dataset, inactive-profile legacy behavior and third-party resources.",
+    "Use actual Core services directly: no HolyAgent CLI process, argv/parser proxy, Bun subprocess or duplicate config-selection implementation in the Node gate. A read-only lookup must not initialize or migrate state: grant only needed read capabilities and deny state.initialize. Current assignments are normally created before their launch; unavailable authority fails closed with actionable redispatch guidance. Use the SDK model registry only as authentication/model availability proof, not route or account-plan proof.",
+    "Preserve E's Codex writer eligibility correction based on actual selected provider while excluding read-only roles, exact registry checks, workflow refusal under active profiles, cache identity rules, native web discovery and honest docs. Preserve the completed Core setup/doctor/VCS APIs, injected FS/no-follow validation, Usage class identity, G private guidance and public/internal CLI split. No Root source writes in the separate state-migration worktree.",
+    "Add real isolated Core-state + Node SDK gate tests proving a valid profiled launch is permitted, authenticated out-of-policy input rejected, role/screen/assignment mismatch rejected, explicit trusted override honored, missing-data fallback works, direct/chain/parallel cases and alias names consistent, read lookup does not write. Keep fake registry/host ports isolated; no paid/live Pi/account operations. Preserve existing legacy tests and native registration denial for injected semantic test ports.",
+    "Run focused Core/Pi/routing/CLI compatibility tests, build/static and one supervised full verify on final resolved candidate. No source mutations during gates. Pending later state migration repair and F/C/B integrations must remain explicit, not claimed already present.",
+    "Save /workspace/work/034/core-routing-integrated-report.json and complete incremental.diff against31a9702 including all pending merged/untracked files. List every conflict resolution and remaining integration seam. Actual valid Core-backed launches are required; another report that a trusted adapter is absent is not completion because the target now supplies it."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Core backed profile gate permits valid trusted launches and denies authenticated role assignment or configured selection mismatches without CLI proxying",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Canonical Core routing and host applications preserve overrides fallback role tools legacy behavior and file safety after conflict resolution",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Real typed Core and Node launch gate tests current build static and supervised full verification pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "red-green-proof",
+    "conflicts-resolved",
+    "integration-seams"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/api",
+    "packages/core/src/config",
+    "packages/core/src/domain",
+    "packages/core/src/routing",
+    "packages/core/src/pi",
+    "packages/core/src/index.ts",
+    "packages/core/tests",
+    "packages/runtime/src/cli",
+    "packages/runtime/src/config",
+    "packages/runtime/src/domain",
+    "packages/runtime/src/routing",
+    "packages/runtime/src/pi",
+    "packages/runtime/tests",
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/integrations/claude/dist",
+    "docs/routing.md",
+    "docs/core-api.md",
+    "docs/native-tools.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/core_host_application_resume",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T23:33:55.634Z"
+  },
+  "createdAt": "2026-11-13T23:33:55.634Z"
+}
