@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mwezkhag-z0nw",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-safe-explicit-operational",
+  "objective": "Implement safe explicit operational resource ownership for non-repository user-file work without weakening repository locks.",
+  "state": "Running",
+  "scope": [
+    "Shared assignment/domain/state ownership and CLI Assignment input",
+    "Backward-compatible serialized records and isolated runtime tests"
+  ],
+  "constraints": [
+    "User authorizes developing/releasing0.3.4 using existing HolyAgent Intents and GPT6.1Terra low-xhigh. Read AGENTS.md,.claude/CLAUDE.md and worker-implementation role, plus umbrella intent-0mwc6yoeq-r5v2 revision12 and your component Intent. Direct fallback because Workflow tool unavailable. Historical0.3.3 deferral is superseded.",
+    "Work /workspace/work/holyagent-034-state, branch release/0.3.4/feat/runtime-state at independently reviewed c3c9351. Frozen397packages already installed. Another writer has disjoint paths; coordinate any shared interfaces through parent before touching another ownership path. No VCS, .git, actual .holyagent, account/security writes or user-machine installation. Isolated temporary state fixtures in tests are allowed. Root owns version control and real state.",
+    "Shared behavior must work for both current harnesses Pi/Claude; implement shared runtime behavior once and don't add Pi-only assumptions to shared commands. No0.4.0 implementation. Preserve Effect/error/strict Schema/JSDoc conventions. Tool env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "Run meaningful focused changed-scope tests plus type/lint/format; no generated build or full verify until both writers terminal and root coordinates. Save detailed notes/diff outside repository and a final plain report ending evidence: with exact labels. Do not silently relax tests/budgets. No further agents.",
+    "Read /workspace/work/034/runtime-map.md and existing InvalidPath/MissingOwnership reproductions in component Intent. Existing ownershipPaths repository semantics stay strict; '..' never becomes an allowed repository path. Add a separately typed operational/external resource claim namespace, with explicit target and trusted host/scope identity/canonicalization. Writers may reserve only operational resources without fake source paths; empty both still fails.",
+    "Resource overlap must be real and fail closed: resolve existing symlinks/closest existing parents, normalize platform case semantics, reject repository paths and aliases under ANY relevant worktree as external bypass, reject ambiguous/unsupported identities, and preserve repository ownership conflicts and unrelated code-writer independence. Do not accept a caller-supplied host key as proof of disjointness. Explain cross-host/shared-network limitations honestly; no unknown active worker clears. Prefer a small clear contract over a universal permission system.",
+    "Maintain defaults/migration for old Assignment records and normal repository-only writes; avoid unnecessarily emitting new fields on old records. Scheduling claims are not filesystem permissions or authenticated user approval. Add meaningful tests for the observed user-level-only operation, mixed/empty claims, overlaps, symlink/case paths, repository alias attempts and backward compatibility; bound OS-specific cases honestly.",
+    "Ownership files include domain and state plus cli assignment input/program host context, but DO NOT edit cli/overview.ts or cli/commands.ts, instruction trees or integration generators. If those need change, notify root. New focused docs may be docs/operational-ownership.md. Save /workspace/work/034/ownership-report.md and ownership.diff, report under350words. Publish your new public claim type/host identity interface promptly so later native-tool integration can use it."
+  ],
+  "criteria": [
+    {
+      "text": "Operational ownership supports non-repo work while preserving repository and overlap safeguards",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Existing state records and repository-only workflows remain compatible with meaningful regression tests",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "public-interface",
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/domain",
+    "packages/runtime/src/state",
+    "packages/runtime/src/cli/assignments.ts",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/errors.ts",
+    "packages/runtime/src/cli/host.ts",
+    "packages/runtime/tests/assignment.test.ts",
+    "packages/runtime/tests/readiness.test.ts",
+    "packages/runtime/tests/ownership.test.ts",
+    "packages/runtime/tests/operational-ownership.test.ts",
+    "packages/runtime/tests/cli-assignment.test.ts",
+    "docs/operational-ownership.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T13:01:53.416Z"
+  },
+  "createdAt": "2026-11-13T13:01:53.416Z"
+}
