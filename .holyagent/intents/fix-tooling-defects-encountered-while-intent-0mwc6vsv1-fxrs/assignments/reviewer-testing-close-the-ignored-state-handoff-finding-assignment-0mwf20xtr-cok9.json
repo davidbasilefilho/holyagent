@@ -33,6 +33,7 @@
   ],
   "followUpOf": "assignment-0mwf1opmn-ctog",
   "specialist": {
+    "agentId": "/root/r034_state_review_testing",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T14:10:40.576Z"
