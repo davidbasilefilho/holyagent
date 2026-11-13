@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mwfa5ceo-4uro",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "number": 126,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/126",
+  "branch": "release/0.3.3/fix/npm-provenance-metadata",
+  "base": "release/0.3.3/integration",
+  "created": true,
+  "recordedAt": "2026-11-13T17:58:03.024Z"
+}
