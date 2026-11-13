@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "verify-the-single-parity-document",
   "objective": "Verify the single parity-document publication correction closes the prior optional finding.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work /workspace/work/holyagent-033-repair. Read exact committed repair range f3d4632..HEAD (root supplies immutable head in launcher). Only docs/pi/claude-parity.md paragraph should change: remove stale no-npm-publishing claim, describe protected CI/Bun pack/npm trusted publishing and valid guide link without claiming stable0.3.3 published. Preserve prior complete artifact review of all other paths."
   ],
@@ -34,7 +34,33 @@
     "agentId": "/root/r033_final_artifact_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T19:22:02.165Z"
+    "startedAt": "2026-11-13T19:22:02.165Z",
+    "finishedAt": "2026-11-13T19:23:40.069Z"
+  },
+  "result": "status: done\nchecks:\n- git diff --check f3d4632dc5462144e0df6c2ef12b4777145e6c53..0b30619faa4d73ddbdfc666358804ee84962f92a -> exit 0\n- git diff --stat f3d4632dc5462144e0df6c2ef12b4777145e6c53..0b30619faa4d73ddbdfc666358804ee84962f92a -> exit 0\nnotes:\n- Full gate not repeated per assignment.\nevidence:\n- The publication documentation finding is closed with accurate guidance and unchanged unrelated content: Met: docs/pi/claude-parity.md:146 now links the existing npm guide; docs/npm-publishing.md and stable.yml/dev.yml support the protected CI, Bun pack and trusted publishing description. No 0.3.3 publication claim; one line changed.\n- reviewed-range: f3d4632dc5462144e0df6c2ef12b4777145e6c53..0b30619faa4d73ddbdfc666358804ee84962f92a\n- findings: Prior stale no-npm-publishing claim removed; no new findings.\n- checks-run: git diff --check and git diff --stat exited 0; one file, one line replaced.",
+  "acceptance": {
+    "revision": 31,
+    "rationale": "Bounded committed documentation re-review confirms stale statement corrected, valid link and no unrelated changes; prior code/security and full-test evidence remain unaffected.",
+    "criteria": [
+      {
+        "criterion": "The publication documentation finding is closed with accurate guidance and unchanged unrelated content",
+        "support": "Met: docs/pi/claude-parity.md:146 now links the existing npm guide; docs/npm-publishing.md and stable.yml/dev.yml support the protected CI, Bun pack and trusted publishing description. No 0.3.3 publication claim; one line changed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-range",
+        "support": "f3d4632dc5462144e0df6c2ef12b4777145e6c53..0b30619faa4d73ddbdfc666358804ee84962f92a"
+      },
+      {
+        "label": "findings",
+        "support": "Prior stale no-npm-publishing claim removed; no new findings."
+      },
+      {
+        "label": "checks-run",
+        "support": "git diff --check and git diff --stat exited 0; one file, one line replaced."
+      }
+    ]
   },
   "createdAt": "2026-11-13T19:22:02.165Z"
 }
