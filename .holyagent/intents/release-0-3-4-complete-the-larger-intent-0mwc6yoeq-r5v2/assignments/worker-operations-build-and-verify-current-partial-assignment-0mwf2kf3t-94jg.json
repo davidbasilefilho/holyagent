@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "build-and-verify-current-partial",
   "objective": "Build and verify current partial subscription-routing source before review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Build/fullverifyonly, sourceunchanged."
   ],
@@ -36,7 +36,9 @@
     "agentId": "/root/r034_state_build",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T14:25:49.433Z"
+    "startedAt": "2026-11-13T14:25:49.433Z",
+    "finishedAt": "2026-11-13T14:31:53.006Z"
   },
+  "result": "status: blocked\nchanged:\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent.js\nchecks:\n- bunx --no-install mise run build -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 1\nblockers:\n- holyagent setup, Pi tool settings > writes every key toolSettings returns into Pi's global files, beside what the files hold\n- holyagent setup, Pi tool settings > a second run changes nothing and says so\n- holyagent setup, Pi tool settings > never overwrites a value the user set, and a user's off wins for the risky settings\n- holyagent setup, Pi tool settings > a file that is not a JSON object stays untouched with a failed line, and the others are written\n- holyagent setup, Pi tool settings > a dry run shows what would be added and writes nothing, not even the record\n- holyagent setup, Pi tool settings > a feature the config turns off writes no setting for it\n- holyagent setup, Pi tool settings > PI_CODING_AGENT_DIR moves Pi's agent files, and BILI_CONFIG_FILE or XDG_CONFIG_HOME Billion Context's\n- holyagent setup, Pi tool settings > project and local scope write the project's .pi folder, decide from the project's config, and leave the global files alone\n- holyagent setup, Pi tool settings > project and local scope leave a key the user's global file sets, whatever its value\n- holyagent setup, Pi tool settings > project and local scope refuse a symlinked settings file, and the other files are still written\n- holyagent setup, Pi tool settings > a symlink below the .pi folder is refused too\n- holyagent doctor, Pi tool settings > names each file that lacks keys, with the setup command, without failing\n- holyagent setup --undo, Pi tool settings > removes the keys setup added while they still equal what it wrote, and keeps everything else\n- holyagent setup --undo, Pi tool settings > keeps a value the user changed since, and a key the user already had before setup\n- holyagent setup --undo, Pi tool settings > backs out a feature the config has turned off since, and needs neither Pi nor the config\n- holyagent setup --undo, Pi tool settings > a file that is not a JSON object is a failed line and stays as it is\nnotes:\n- Verify: 3480 pass, 2 conditional skips, 16 fail, 25080 assertions across 121 files. Failures in packages/runtime/tests/setup-pi-settings.test.ts: Kimi settings file absent and expected setup/doctor/undo output differs; e.g. dry run expected 5 lines, received 4. See /workspace/work/034/routing-verify.log lines 1650–1954.\nevidence:\n- Routing generated assets and full verification pass without source edits: Build exit 0; verify exit 1 with 16 Pi settings tests failing; source hashes stable.\n- checks-run: Build exit 0 and supervised verify exit 1; detailed logs /workspace/work/034/routing-build.log and routing-verify.log.\n- changed-paths: 3 generated paths listed; 0 paths outside generated ownership changed. Source manifests in /workspace/work/034.\n- diff-file: /workspace/work/034/routing-generated.diff includes tracked and new generated files.",
   "createdAt": "2026-11-13T14:25:49.433Z"
 }
