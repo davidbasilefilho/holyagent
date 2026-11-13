@@ -1,6 +1,6 @@
 # Development
 
-The contributing rules are in `.claude/CLAUDE.md`; this page explains the layout and the tooling behind them.
+The contributing rules are in `AGENTS.md`; this page explains the layout and the tooling behind them.
 
 ## Layout
 
@@ -180,17 +180,17 @@ Versions follow ZeroVer, `0.X.Y`: the major stays 0, a minor bump advances X and
 
 ## Branches, CI and releases
 
-Each release `0.X.Y` has an integration branch, `release/0.X.Y/integration`, cut from `main`. Work happens on `release/0.X.Y/<type>/<change>`, one branch and one PR per reviewable change, and those PRs target the integration branch. The first PR carries the version bump as its own commit (`mise run bump:patch` or `bump:minor`); only the integration branch opens a PR into `main`. [AGENTS.md](../AGENTS.md) states the rules and their reasons; this section is the machinery behind them.
+Each release `0.X.Y` has an integration branch, `release/0.X.Y/integration`, cut from `main`. Work happens on `release/0.X.Y/<type>/<change>`, one branch and one PR per reviewable change, and those PRs target the integration branch. The first PR carries the version bump as its own commit (`mise run bump:patch` or `bump:minor`); the integration branch opens the normal release PR into `main`. A focused repair of an unpublished release may instead use `release/<version>/fix/publication-repair` from fresh `main`, squashed directly into `main`, without a version bump. [AGENTS.md](../AGENTS.md) states the rules and their reasons; this section is the machinery behind them.
 
 **Validation** (`.github/workflows/validation.yml`) runs on pull requests (opened, pushed to, reopened and edited, so a changed base is checked again) and is callable, so `publish.yml` runs the same jobs for a push. Its jobs and their status check names, which are the job ids:
 
-| Check          | Runs on              | Does                                                                                                                                                       |
-| -------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check`        | PRs and calls        | The gates, the freshness check of the generated plugin and Pi package, plugin validation and shellcheck                                                    |
-| `windows`      | PRs and calls        | The test suite on `windows-latest`                                                                                                                         |
-| `installers`   | PRs and calls        | Parses both installers                                                                                                                                     |
-| `branch-model` | PRs only             | `scripts/pr-checks.ts branch-model <base> <head>`: the three branch rules in AGENTS.md, after the inline guard, which runs first, fails a head from a fork |
-| `version`      | PRs into `main` only | `scripts/pr-checks.ts version`: the head's root `package.json` version is strictly greater than `main`'s (`compareVersions` in `scripts/bump-version.ts`)  |
+| Check          | Runs on              | Does                                                                                                                                                                                                    |
+| -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check`        | PRs and calls        | The gates, the freshness check of the generated plugin and Pi package, plugin validation and shellcheck                                                                                                 |
+| `windows`      | PRs and calls        | The test suite on `windows-latest`                                                                                                                                                                      |
+| `installers`   | PRs and calls        | Parses both installers                                                                                                                                                                                  |
+| `branch-model` | PRs only             | `scripts/pr-checks.ts branch-model <base> <head>`: the three branch rules in AGENTS.md, after the inline guard, which runs first, fails a head from a fork                                              |
+| `version`      | PRs into `main` only | `scripts/pr-checks.ts version`: normal releases require a head version strictly greater than `main`; publication repairs require exact main/head version equality and absence of that exact npm version |
 
 Both PR-only jobs fail a pull request whose head repository is not this one, because a fork picks its branch names freely. An inline shell step runs first in each of them, before checkout, and compares the head repository with this repository case-insensitively. A new push or edit cancels an older run for the same pull request, but never a push run called by `publish.yml`: cancelling that would fail the publish and leave the commit untagged. A job skipped by its `if` reports as passed, so `version` can be required on `main` and `branch-model` on every protected branch without blocking other PRs.
 

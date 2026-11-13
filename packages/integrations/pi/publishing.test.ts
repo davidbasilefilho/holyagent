@@ -3,6 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { manifest } from "./src/generate.ts"
+
 const root = join(import.meta.dir, "../../..")
 type Step = {
   name?: string
@@ -18,6 +20,13 @@ const workflow = (name: string) =>
   }
 
 describe("npm publication", () => {
+  test("generated public manifest identifies the provenance repository", () => {
+    expect((JSON.parse(manifest().content) as { repository: unknown }).repository).toEqual({
+      type: "git",
+      url: "https://github.com/davidbasilefilho/holyagent",
+      directory: "packages/integrations/pi/dist",
+    })
+  })
   test("a numeric short SHA with a leading zero is valid in the dev prerelease", () => {
     const version = `0.3.3-dev-${"0123456"}`
     expect(Bun.semver.satisfies(version, version)).toBe(true)

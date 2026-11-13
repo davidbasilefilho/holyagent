@@ -33,7 +33,7 @@ On Pi, [T3 Code](docs/pi/t3-code.md) is the primary interface and the plain `pi`
 
 ## Development
 
-The contributing rules are in [.claude/CLAUDE.md](.claude/CLAUDE.md) and the pitfalls of this repository in [AGENTS.md](AGENTS.md). The layout, the tooling, the generated plugin and versioning are in [docs/development.md](docs/development.md).
+The contributing rules and repository pitfalls are in [AGENTS.md](AGENTS.md). The layout, the tooling, the generated plugin and versioning are in [docs/development.md](docs/development.md).
 
 ```sh
 bun install --frozen-lockfile   # install native mise first; see docs/development.md
