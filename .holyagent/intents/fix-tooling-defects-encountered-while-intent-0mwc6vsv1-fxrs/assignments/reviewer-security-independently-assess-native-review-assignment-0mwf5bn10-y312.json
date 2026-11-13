@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwf5bn10-y312",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 6,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-assess-native-review",
+  "objective": "Independently assess native-review-security on its immutable committed range.",
+  "state": "Running",
+  "scope": [
+    "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..65a4084aa9307318e0d597a1ba7a06f103b0a6bd"
+  ],
+  "constraints": [
+    "Read-only /workspace/work/holyagent-034-tools exactrangeend, sourcewriters/buildterminal. ReadrepoAGENTS/.claude/appropriate role. NoactualVCS/statewrites,sourceedits,extraagents,livePi/modelcalls; isolatedSDK/Gitfixturesallowed. Findingsrequireconcreterepro/file:linetracewithimpact. Do notbroadenintounrequestedfeatures.",
+    "Assessactualnativeauthority/hostpermissionboundarybothnamesnestedCLI; explicitprocessrootflagnotinheritedbychildren, no callerroletrust/globaloffoverride. IPCstrictcancel-onlycontrol, stdinpayloadnotargv/tempfiles, processspawnnoshell/outputbounds/abort/shutdownnoorphans. Statecriticalsectioninterruptionvscrashlimits accurate no fictitiousatomicity. PrivilegedVCS/setup/doctorheldunsupportedratherthanbypassshellapproval. Lookforintroducedprivilege/data/commandinjection/cancellationcorruption withrepro/source-to-sink. Manualfirst-passifbuiltinabsentdocumenthonestly. Don'tclaimnativegatingblocksall specialist-shellCLI ordistributedauth. PrivateIPClaunchnotgenericremotecontrol.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH; focusedchecksviamiseexec. No fullverifyrepeat. JSON /workspace/work/034/native-review-security.json status EXACTLY done|partial|blocked,changed_paths:[],checks:[{command,exit}],blockers,notes,evidence:[{key,support}], exactkeys. <=300wordfinal/logsexternal."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned committed scope has no unaddressed concrete blockers",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Behavior authority and evidence limits are assessed accurately",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf1dz2m-r3qc",
+    "assignment-0mwf2e0k3-vq4n",
+    "assignment-0mwf40y3g-wmvw"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T15:42:58.644Z"
+  },
+  "createdAt": "2026-11-13T15:42:58.644Z"
+}
