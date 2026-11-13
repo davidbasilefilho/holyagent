@@ -32,6 +32,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r033_post_publication_executable",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T20:46:39.228Z"
