@@ -13824,6 +13824,11 @@ ${ran.stdout}`.trim().split(`
   const found = yield* checkedOut(listed, branch);
   const standard = join4(common, "holyagent", worktreeFolder(branch));
   const settled = found !== undefined && (!(yield* samePath(found, standard)) || (yield* fileExists(readyMarker(standard))));
+  if (ensure === "peek" && found !== undefined && !settled)
+    return yield* new StateIo({
+      path: found,
+      cause: "the state worktree is not ready; wait for its checkout to finish and retry"
+    });
   const make = ensure === "create" || ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed));
   const ensured = found !== undefined && settled ? { kind: "ready", path: found, created: false } : found === undefined && !make ? { kind: "absent" } : yield* ensureWorktree(top, common, env, branch, standard, {
     make,
@@ -13849,6 +13854,50 @@ ${ran.stdout}`.trim().split(`
         yield* migrateWorkTree(source, common, worktree, env, (message) => commitState(directory, env, message, [], resolved), patience);
   }
   return { root: top, directory, resolved };
+}), requireHandoffState = (cwd, env, directory) => gen2(function* () {
+  const repository = yield* locate(cwd, env);
+  if (repository === undefined || (yield* stateModeOf(repository.top, env)) !== "branch")
+    return;
+  const { top, common } = repository;
+  const branch = yield* stateBranch(top, env);
+  const listed = yield* listWorktrees(top, env);
+  const stateWorktree = yield* checkedOut(listed, branch);
+  if (stateWorktree === undefined && ((yield* refExists(top, env, `refs/heads/${branch}`)) || (yield* refExists(top, env, `refs/remotes/origin/${branch}`))))
+    return yield* new StateIo({
+      path: directory,
+      cause: `the recorded state branch ${branch} is not checked out; run a state command to make it available, then retry handoff`
+    });
+  const own = join4(common, "holyagent");
+  for (const entry of listed) {
+    if (entry.prunable || stateWorktree !== undefined && (yield* samePath(entry.path, stateWorktree)) || entry.path.startsWith(`${own}${sep2}`))
+      continue;
+    const source = stateDirectory(entry.path);
+    yield* requireStateFolder(source);
+    const records = join4(source, "intents");
+    const kind = yield* kindAt(records);
+    if (kind === undefined)
+      continue;
+    if (kind !== "directory")
+      return yield* new StateIo({
+        path: records,
+        cause: "recorded state is not a directory; inspect it before retrying handoff"
+      });
+    const marker = yield* migrationMarker(common, entry.path);
+    if (!(yield* fileExists(marker)))
+      return yield* new StateIo({
+        path: source,
+        cause: "recorded state awaits migration; run a state command from this worktree, then retry handoff"
+      });
+    const entries = yield* workTreeEntries(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" });
+    for (const file of entries.filter((item) => item.path.startsWith("intents/"))) {
+      const target = join4(directory, file.path);
+      if (!(yield* isPlainFile(source, file.path)) || !(yield* isPlainFile(directory, file.path)) || file.status !== undefined && !(yield* sameBytes(join4(source, file.path), target)))
+        return yield* new StateIo({
+          path: source,
+          cause: "recorded state differs from the shared state; inspect and reconcile this worktree before retrying handoff"
+        });
+    }
+  }
 }), requireRepository = (cwd, env) => locate(cwd, env).pipe(flatMap2((repository) => repository === undefined ? fail5(new StateIo({
   path: cwd,
   cause: "not a git repository; the state modes apply inside one, and outside it the state is the .holyagent folder of the project"
@@ -18013,6 +18062,7 @@ var init_overview = __esm(() => {
   init_project();
   init_local();
   init_store();
+  init_tree();
   init_args();
   init_config();
   init_context();
@@ -18026,12 +18076,13 @@ var init_overview = __esm(() => {
       summary: "Summarize recorded open work for another session, without changing state",
       notes: [
         "By default includes every open Intent and all its Assignments; --intent selects one open Intent by id.",
-        "Branches and pull requests are recorded facts, not live checks; CI and current PR status are unknown unless described in the requirements or outcomes."
+        "Branches, pull requests, requirements and outcomes are recorded facts, not live checks; current PR and CI status are unknown."
       ],
       flags: { intent: "string" },
       positionals: 0,
       state: "peek",
-      run: ({ directory, args }) => gen2(function* () {
+      run: ({ directory, args, cwd, env }) => gen2(function* () {
+        yield* requireHandoffState(cwd, env, directory);
         const snapshot = yield* readOpenState(directory);
         const id = stringFlag(args, "intent");
         const intents = id === undefined ? byId(snapshot.project.intents) : [yield* findIntent(snapshot.project, id)];

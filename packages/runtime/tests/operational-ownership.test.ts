@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 
 import { decode } from "@toon-format/toon"
+import { $ } from "bun"
 import { Effect } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
@@ -27,6 +28,97 @@ afterEach(() => rm(base, { recursive: true, force: true, maxRetries: 5 }))
 const resource = (target: string) => [{ kind: "local-path" as const, target }]
 const validate = (target: string, roots = [root]) =>
   Effect.runPromiseExit(validateOperationalResources(resource(target), roots))
+
+// The mutation run replaces only Git's worktree discovery output, leaving all CLI paths intact.
+const discoveryEnvironment = async (): Promise<Record<string, string>> => {
+  if (process.env.HOLYAGENT_TEST_CWD_ONLY !== "1") return {}
+  if (process.platform === "win32") throw new Error("The discovery mutation fixture requires sh")
+  const git = Bun.which("git")
+  if (git === null) throw new Error("Git is required")
+  const bin = join(home, "shim")
+  await mkdir(bin)
+  const shim = join(bin, "git")
+  await Bun.write(
+    shim,
+    `#!/bin/sh
+if [ "$1" = worktree ] && [ "$2" = list ] && [ "$3" = --porcelain ] && [ "$4" = -z ]; then
+  printf 'worktree %s\\0\\0' "$PWD"
+  exit 0
+fi
+exec "$HOLYAGENT_TEST_REAL_GIT" "$@"
+`,
+  )
+  await chmod(shim, 0o755)
+  return { PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`, HOLYAGENT_TEST_REAL_GIT: git }
+}
+
+const linkedRepository = async () => {
+  await $`git init -q -b main`.cwd(root).quiet()
+  await $`git -c user.name=Fixture -c user.email=fixture@example.com -c core.hooksPath=/dev/null -c commit.gpgsign=false commit -q --allow-empty -m seed`
+    .cwd(root)
+    .quiet()
+  await $`git config --local holyagent.stateMode local`.cwd(root).quiet()
+  const linked = join(base, "linked")
+  const addLinked = () =>
+    $`git -c core.hooksPath=/dev/null worktree add -q --detach ${linked}`.cwd(root).quiet()
+  const extra = await discoveryEnvironment()
+  const cli = (argv: ReadonlyArray<string>, input?: unknown) =>
+    Effect.runPromise(
+      run(argv, {
+        cwd: root,
+        env: { HOME: home, ...extra },
+        stdin:
+          input === undefined
+            ? Effect.fail(new StdinMissing({ reason: "none" }))
+            : Effect.succeed(JSON.stringify(input)),
+      }),
+    )
+  expect((await cli(["intent", "create"], { objective: "Linked worktree" })).code).toBe(0)
+  return { addLinked, cli, linked }
+}
+
+const linkedDraft = (target: string) => ({
+  roleTask: "Worker.implementation",
+  objective: "External operation",
+  criteria: [{ text: "works", blocking: true, dimension: "behavior" }],
+  operationalResources: resource(target),
+})
+
+describe("registered linked worktree", () => {
+  test("rejects creation in another registered worktree without changing assignments", async () => {
+    const { addLinked, cli, linked } = await linkedRepository()
+    await addLinked()
+    const before = await cli(["assignment", "list", "--all", "--full"])
+    expect(before.code).toBe(0)
+    const rejected = await cli(["assignment", "create"], linkedDraft(join(linked, "new", "file")))
+    expect(rejected.stderr).toContain("overlaps a repository worktree")
+    expect(rejected.code).not.toBe(0)
+    const after = await cli(["assignment", "list", "--all", "--full"])
+    expect(after.stdout).toBe(before.stdout)
+    if (process.platform !== "win32") {
+      const alias = join(home, "linked-alias")
+      await symlink(linked, alias)
+      const aliasRejected = await cli(["assignment", "create"], linkedDraft(join(alias, "file")))
+      expect(aliasRejected.stderr).toContain("overlaps a repository worktree")
+      expect((await cli(["assignment", "list", "--all", "--full"])).stdout).toBe(before.stdout)
+    }
+  }, 60_000)
+
+  test("revalidates dispatch after another worktree is registered and leaves it Ready", async () => {
+    const { addLinked, cli, linked } = await linkedRepository()
+    const created = await cli(["assignment", "create"], linkedDraft(join(linked, "new", "file")))
+    expect(created.code).toBe(0)
+    const id = String((decode(created.stdout) as { id: string }).id)
+    await addLinked()
+    const before = await cli(["assignment", "show", id, "--full"])
+    expect(before.stdout).toContain("Ready")
+    const rejected = await cli(["assignment", "dispatch"], { id })
+    expect(rejected.stderr).toContain("overlaps a repository worktree")
+    expect(rejected.code).not.toBe(0)
+    const after = await cli(["assignment", "show", id, "--full"])
+    expect(after.stdout).toBe(before.stdout)
+  }, 60_000)
+})
 
 describe("operational path validation", () => {
   test("allows an external missing target and rejects worktrees, their parents, and traversal", async () => {

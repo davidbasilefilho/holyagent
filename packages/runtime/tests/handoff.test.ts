@@ -73,6 +73,8 @@ test("handoff dispatches a complete recorded summary, filters it, and leaves sta
     expect((await cli(["--help"], host)).stdout).toContain("handoff [--intent <id>]")
     const help = await cli(["handoff", "--help"], host)
     expect(help.stdout).toContain("--intent")
+    expect(help.stdout).toContain("current PR and CI status are unknown")
+    expect(help.stdout).not.toContain("unknown unless")
     const all = await cli(["handoff"], host)
     expect(all.code).toBe(0)
     const result = decode(all.stdout) as { source: string; intents: Array<Record<string, unknown>> }
@@ -100,4 +102,107 @@ test("handoff dispatches a complete recorded summary, filters it, and leaves sta
   expect(failure.code).not.toBe(0)
   expect(failure.stderr).toContain("error:")
   expect(await Bun.file(corrupt).text()).toBe('{"unexpected":true}')
+})
+
+test("branch-mode handoff refuses pending state and an unavailable state branch without writing", async () => {
+  root = await mkdtemp(join(tmpdir(), "holyagent-handoff-git-"))
+  const git = (...args: string[]) => {
+    const result = Bun.spawnSync(["git", ...args], {
+      cwd: root,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    })
+    expect(result.exitCode).toBe(0)
+    return result.stdout.toString()
+  }
+  git("init", "-b", "main")
+  git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.test",
+    "commit",
+    "--allow-empty",
+    "-m",
+    "initial",
+  )
+  const cli = (host: string) =>
+    Effect.runPromise(
+      run(["handoff"], {
+        cwd: root,
+        env: { HOLYAGENT_HOST: host, GIT_OPTIONAL_LOCKS: "0" },
+        stdin: Effect.fail(new StdinMissing({ reason: "no input" })),
+      }),
+    )
+  expect((await cli("pi")).code).toBe(0)
+  const record = intentFile(join(root, ".holyagent"), intent())
+  await mkdir(dirname(record), { recursive: true })
+  await Bun.write(record, JSON.stringify(intent()))
+  const before = git("status", "--porcelain=v1", "--untracked-files=all")
+  for (const host of ["pi", "claude"]) {
+    const pending = await cli(host)
+    expect(pending.code).not.toBe(0)
+    expect(pending.stderr).toContain("migrat")
+  }
+  expect(git("status", "--porcelain=v1", "--untracked-files=all")).toBe(before)
+  expect(await Bun.file(record).text()).toBe(JSON.stringify(intent()))
+  git("branch", "holyagent/state")
+  await rm(join(root, ".holyagent"), { recursive: true })
+  const missing = await cli("pi")
+  expect(missing.code).not.toBe(0)
+  expect(missing.stderr).toContain("state")
+  const shared = join(root, "shared")
+  const other = join(root, "other")
+  git("worktree", "add", shared, "holyagent/state")
+  git("worktree", "add", "-b", "other", other)
+  const sharedRecord = intentFile(join(shared, ".holyagent"), intent())
+  const otherRecord = intentFile(join(other, ".holyagent"), intent({ id: "intent-b" }))
+  await mkdir(dirname(sharedRecord), { recursive: true })
+  await mkdir(dirname(otherRecord), { recursive: true })
+  await Bun.write(sharedRecord, JSON.stringify(intent()))
+  await Bun.write(otherRecord, "{corrupt")
+  const worktrees = git("worktree", "list", "--porcelain")
+  const mixed = await cli("claude")
+  expect(mixed.code).not.toBe(0)
+  expect(mixed.stderr).toContain("migrat")
+  expect(await Bun.file(otherRecord).text()).toBe("{corrupt")
+  expect(await Bun.file(sharedRecord).text()).toBe(JSON.stringify(intent()))
+  expect(git("worktree", "list", "--porcelain")).toBe(worktrees)
+  await rm(join(other, ".holyagent"), { recursive: true })
+  const complete = await cli("pi")
+  expect(complete.code).toBe(0)
+  expect(complete.stdout).toContain(intent().id)
+})
+
+test("handoff does not create a lock for an unfinished standard state checkout", async () => {
+  root = await mkdtemp(join(tmpdir(), "holyagent-handoff-pending-"))
+  const git = (...args: string[]) => {
+    const result = Bun.spawnSync(["git", ...args], { cwd: root })
+    expect(result.exitCode).toBe(0)
+  }
+  git("init", "-b", "main")
+  git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.test",
+    "commit",
+    "--allow-empty",
+    "-m",
+    "initial",
+  )
+  const common = join(root, ".git", "holyagent")
+  await mkdir(common, { recursive: true })
+  const hash = new Bun.CryptoHasher("sha1").update("holyagent/state").digest("hex").slice(0, 10)
+  git("worktree", "add", "-b", "holyagent/state", join(common, `holyagent-state-${hash}`))
+  const before = (await readdir(common)).toSorted()
+  const result = await Effect.runPromise(
+    run(["handoff"], {
+      cwd: root,
+      env: { HOLYAGENT_HOST: "pi" },
+      stdin: Effect.fail(new StdinMissing({ reason: "no input" })),
+    }),
+  )
+  expect(result.code).not.toBe(0)
+  expect(result.stderr).toContain("not ready")
+  expect((await readdir(common)).toSorted()).toEqual(before)
 })

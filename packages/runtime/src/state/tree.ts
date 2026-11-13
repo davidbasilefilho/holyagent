@@ -1115,6 +1115,11 @@ export const resolveState = (
     const settled =
       found !== undefined &&
       (!(yield* samePath(found, standard)) || (yield* fileExists(readyMarker(standard))))
+    if (ensure === "peek" && found !== undefined && !settled)
+      return yield* new StateIo({
+        path: found,
+        cause: "the state worktree is not ready; wait for its checkout to finish and retry",
+      })
     const make =
       ensure === "create" ||
       (ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed)))
@@ -1168,6 +1173,66 @@ export const resolveState = (
           )
     }
     return { root: top, directory, resolved } satisfies StateTree
+  })
+
+/** Refuses a handoff when branch-mode records cannot be represented by its read-only snapshot. */
+export const requireHandoffState = (cwd: string, env: Environment, directory: string) =>
+  Effect.gen(function* () {
+    const repository = yield* locate(cwd, env)
+    if (repository === undefined || (yield* stateModeOf(repository.top, env)) !== "branch") return
+    const { top, common } = repository
+    const branch = yield* stateBranch(top, env)
+    const listed = yield* listWorktrees(top, env)
+    const stateWorktree = yield* checkedOut(listed, branch)
+    if (
+      stateWorktree === undefined &&
+      ((yield* refExists(top, env, `refs/heads/${branch}`)) ||
+        (yield* refExists(top, env, `refs/remotes/origin/${branch}`)))
+    )
+      return yield* new StateIo({
+        path: directory,
+        cause: `the recorded state branch ${branch} is not checked out; run a state command to make it available, then retry handoff`,
+      })
+    const own = join(common, "holyagent")
+    for (const entry of listed) {
+      if (
+        entry.prunable ||
+        (stateWorktree !== undefined && (yield* samePath(entry.path, stateWorktree))) ||
+        entry.path.startsWith(`${own}${sep}`)
+      )
+        continue
+      const source = stateDirectory(entry.path)
+      yield* requireStateFolder(source)
+      const records = join(source, "intents")
+      const kind = yield* kindAt(records)
+      if (kind === undefined) continue
+      if (kind !== "directory")
+        return yield* new StateIo({
+          path: records,
+          cause: "recorded state is not a directory; inspect it before retrying handoff",
+        })
+      const marker = yield* migrationMarker(common, entry.path)
+      if (!(yield* fileExists(marker)))
+        return yield* new StateIo({
+          path: source,
+          cause:
+            "recorded state awaits migration; run a state command from this worktree, then retry handoff",
+        })
+      const entries = yield* workTreeEntries(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" })
+      for (const file of entries.filter((item) => item.path.startsWith("intents/"))) {
+        const target = join(directory, file.path)
+        if (
+          !(yield* isPlainFile(source, file.path)) ||
+          !(yield* isPlainFile(directory, file.path)) ||
+          (file.status !== undefined && !(yield* sameBytes(join(source, file.path), target)))
+        )
+          return yield* new StateIo({
+            path: source,
+            cause:
+              "recorded state differs from the shared state; inspect and reconcile this worktree before retrying handoff",
+          })
+      }
+    }
   })
 
 /** The state mode of a clone and where its state lives. */

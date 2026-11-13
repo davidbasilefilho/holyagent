@@ -5,6 +5,7 @@ import { recommend } from "../domain/plan.ts"
 import { findIntent } from "../domain/project.ts"
 import { workTreeKey } from "../state/local.ts"
 import { readOpenState, type Snapshot } from "../state/store.ts"
+import { requireHandoffState } from "../state/tree.ts"
 import { stringFlag } from "./args.ts"
 import { agentHostOf } from "./config.ts"
 import { nowIso } from "./context.ts"
@@ -112,13 +113,14 @@ export const OVERVIEW_COMMANDS: ReadonlyArray<Command> = [
     summary: "Summarize recorded open work for another session, without changing state",
     notes: [
       "By default includes every open Intent and all its Assignments; --intent selects one open Intent by id.",
-      "Branches and pull requests are recorded facts, not live checks; CI and current PR status are unknown unless described in the requirements or outcomes.",
+      "Branches, pull requests, requirements and outcomes are recorded facts, not live checks; current PR and CI status are unknown.",
     ],
     flags: { intent: "string" },
     positionals: 0,
     state: "peek",
-    run: ({ directory, args }) =>
+    run: ({ directory, args, cwd, env }) =>
       Effect.gen(function* () {
+        yield* requireHandoffState(cwd, env, directory)
         const snapshot = yield* readOpenState(directory)
         const id = stringFlag(args, "intent")
         const intents =
