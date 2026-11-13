@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "prove-supported-pi-host-contracts-for",
   "objective": "Prove supported Pi host contracts for root waiting, external tool aliases and native command dispatch before implementation.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Pinned Pi1.5.0 SDK/runtime and @tintinweb/pi-subagents0.23.2 event/tool APIs",
     "Existing HolyAgent role/tool gate/abort/runtime command interfaces"
@@ -47,7 +47,41 @@
     "agentId": "/root/r034_host_contracts",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T12:33:25.966Z"
+    "startedAt": "2026-11-13T12:33:25.966Z",
+    "finishedAt": "2026-11-13T12:45:09.371Z"
+  },
+  "result": "result: Host contracts established with an explicit workflow-wait limitation; full wait remains blocked pending an upstream workflow lifecycle event or changing dispatch to top-level agents.\nchanged: /workspace/work/034/host-contracts.md, /workspace/work/034/host-contract-report.md, /workspace/work/034/host-contract-probes/lifecycle.mjs; task-local extracted tarball under host-contract-probes/subagents/; no repository source changed.\nchecks: `/workspace/work/tools/bun/bin/bun /workspace/work/034/host-contract-probes/lifecycle.mjs` -> exit 0, 1 PASS; actual bus and input-routing method with fake receiver. `bun -e 'import { COMMANDS } from \"./packages/runtime/src/cli/commands.ts\"; console.log(COMMANDS.length)'` -> exit 0, 35 commands. `npm view` -> exit 1, unavailable default npm cache; direct pinned registry tarball extraction with curl -> exit 0. Repository gates not run: read-only research, no repository change.\nblockers: pi-subagents exposes top-level completion only; workflow completion is held behind parent turn_end so a blocking wait prevents the notification. Real-host lifecycle and alias permission tests remain unrun.\nquestions: none.\nnotes: AgentSession input hook runs before queuing, with slash-command, compaction, handled-input and host limitations described in detail. Safe aliases can use `ctx.executeTool` with both names gated; discovery/activation and model-only tools restrict universal renaming. No global install or model calls.\nevidence:\nWait lifecycle and input contracts are established or precisely limited: /workspace/work/034/host-contracts.md, Completion and user input; fixture exit 0; workflow limit explicitly demonstrated by source.\nTool invocation and alias recommendation preserves hooks roles and cancellation: /workspace/work/034/host-contracts.md, External names and safe forwarding; nested official executeTool plus both-name gate and fail-closed compatibility requirements.\nsource-trace: Pinned Pi 1.5.0 and pi-subagents 0.23.2 source paths and line ranges in /workspace/work/034/host-contracts.md.\nchecks-run: fixture exit 0, 1 PASS; runtime COMMANDS inventory exit 0, 35 entries; no real-host or repository gate claimed.\nrecommended-interface: root-only event-ledger wait with unsupported workflow result; typed shared command authorization, host adapters and nested executeTool aliases; detailed report includes races and cache limitations.\nunknowns: real Pi RPC/TUI and hooks/permission/cancellation end-to-end, effective cache retention, workflow lifecycle public event, Claude equivalent, older user Pi hosts and Windows.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Pinned source and harmless probe establish top-level events/input and safe ctx.executeTool; workflow wait limitation explicitly proven rather than hidden.",
+    "criteria": [
+      {
+        "criterion": "Wait lifecycle and input contracts are established or precisely limited",
+        "support": "/workspace/work/034/host-contracts.md, Completion and user input; fixture exit 0; workflow limit explicitly demonstrated by source."
+      },
+      {
+        "criterion": "Tool invocation and alias recommendation preserves hooks roles and cancellation",
+        "support": "/workspace/work/034/host-contracts.md, External names and safe forwarding; nested official executeTool plus both-name gate and fail-closed compatibility requirements."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "source-trace",
+        "support": "Pinned Pi 1.5.0 and pi-subagents 0.23.2 source paths and line ranges in /workspace/work/034/host-contracts.md."
+      },
+      {
+        "label": "checks-run",
+        "support": "fixture exit 0, 1 PASS; runtime COMMANDS inventory exit 0, 35 entries; no real-host or repository gate claimed."
+      },
+      {
+        "label": "recommended-interface",
+        "support": "root-only event-ledger wait with unsupported workflow result; typed shared command authorization, host adapters and nested executeTool aliases; detailed report includes races and cache limitations."
+      },
+      {
+        "label": "unknowns",
+        "support": "real Pi RPC/TUI and hooks/permission/cancellation end-to-end, effective cache retention, workflow lifecycle public event, Claude equivalent, older user Pi hosts and Windows."
+      }
+    ]
   },
   "createdAt": "2026-11-13T12:33:25.966Z"
 }
