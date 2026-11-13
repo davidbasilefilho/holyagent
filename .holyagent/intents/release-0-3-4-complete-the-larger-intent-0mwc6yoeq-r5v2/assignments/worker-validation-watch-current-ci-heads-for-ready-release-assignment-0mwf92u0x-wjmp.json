@@ -1,0 +1,40 @@
+{
+  "id": "assignment-0mwf92u0x-wjmp",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 16,
+  "roleTask": "Worker.validation",
+  "slug": "watch-current-ci-heads-for-ready-release",
+  "objective": "Watch current CI heads for ready release PRs122,123,124 and report exact terminal results and actionable failures.",
+  "state": "Running",
+  "scope": [
+    "Observe PR122 b95759de59c1cc0fcb129c1d57909cddf3b945bd, PR123 78366e7459c144c2f6c77a6075964ced06c433a9, PR124 e95cb5178a6d33300b8f4f8ec4e8654d092bcba3",
+    "Use gh pr checks --watch for pushed heads; read CI logs via gh or available GitHub connector if redirects fail. No reruns or remote writes."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT worker.validation and ci-watch skill in /workspace/work/holyagent-034. Only read remote/source, write scratch report/logs. Never claim old head or skips as validation. No VCS/state/security changes or live Pi/model calls.",
+    "Check actual head before final snapshots, collect Linux/macOS/Windows/installers/branch-model plus npm publication outcome where relevant. Find exact failed assertion/log if failure, inspect source read-only; base/environment attribution only with evidence. Known old123 macOS and Windows failures were repaired, new hosted results required.",
+    "Report /workspace/work/034/release-ci-current-report.json status done|partial|blocked, notes array, numeric exit codes, changed_paths:[], blockers:[], exact evidence keys; <=300 word summary, long logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Current head CI results and failed assertions are accurately reported without unsupported platform or publication claims",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "heads",
+    "checks-run",
+    "failures",
+    "merge-state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T17:28:06.273Z"
+  },
+  "createdAt": "2026-11-13T17:28:06.273Z"
+}
