@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "review-the-short-natural-language",
   "objective": "Review the short natural-language internal CLI guidance and user documentation.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..e778f69439a30b9f639f87a7f77c40c3bfc06df6"
   ],
@@ -36,7 +36,9 @@
     "agentId": "/root/r034_plain_cli_review_artifact",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T15:51:39.831Z"
+    "startedAt": "2026-11-13T15:51:39.831Z",
+    "finishedAt": "2026-11-13T16:42:59.963Z"
   },
+  "result": "status: partial\nchecks:\n- git diff c3c935108a3bd3958f6dbcb7bc2d96f11eba212b e778f69439a30b9f639f87a7f77c40c3bfc06df6 -- packages/runtime/src/cli/errors.ts packages/runtime/src/cli/program.ts packages/runtime/src/cli/tools.ts docs/agent-cli-output.md -> exit 0\n- command -v assignment -> exit 1\nblockers:\n- InsufficientAcceptance recovery hint omits the executable and stdin instructions; docs claim plain output without excluding interactive setup.\nnotes:\n- Read-only review; no source edits or full verification. errors.ts:96 gives commands starting with assignment, not holyagent, and omits corrected report on stdin; assignment.ts:431,504 require report input. docs/agent-cli-output.md:3 overstates the scope: setup.ts:123 describes an interactive screen and setup/tui/app.tsx:137-153 applies styles.\nevidence:\n- Assigned committed scope has no unaddressed concrete blockers (regressions): Not met: errors.ts:96 recovery commands lack holyagent and stdin; documentation overstates plain output for interactive setup.\n- reviewed-range: c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..e778f69439a30b9f639f87a7f77c40c3bfc06df6\n- findings: errors.ts:96 recovery is not executable as shown and omits report stdin (assignment.ts:431,504); docs/agent-cli-output.md:3 overlooks interactive setup (setup.ts:123; setup/tui/app.tsx:137-153).\n- checks-run: Read source, documentation, instruction-writing skill and prior reports; inspected committed diff and checked command lookup. No full verification per assignment.",
   "createdAt": "2026-11-13T15:51:39.831Z"
 }
