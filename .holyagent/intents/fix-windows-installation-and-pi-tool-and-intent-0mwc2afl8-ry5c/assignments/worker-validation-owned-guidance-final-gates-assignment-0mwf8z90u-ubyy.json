@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "owned-guidance-final-gates",
   "objective": "owned-guidance-final-gates",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Validate completed owned-role guidance and layout tests. Build generated assets and run full verify, plus existing offline packaging checks if not part verify. Prior production writers terminal; no source repairs yourself."
   ],
@@ -39,7 +39,33 @@
     "agentId": "/root/r034_owned_guidance_final_gates",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T17:25:19.086Z"
+    "startedAt": "2026-11-13T17:25:19.086Z",
+    "finishedAt": "2026-11-13T17:30:42.008Z"
+  },
+  "result": "status: done\nchanged:\n- packages/integrations/claude/dist\n- packages/integrations/pi/extensions\n- packages/integrations/pi/skills\n- packages/integrations/pi/agents\n- packages/integrations/pi/scripts\nchecks:\n- bunx --no-install mise run build -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 0\n- bun pm pack --destination /workspace/work/034 (packages/integrations/pi/dist) -> exit 0\nnotes:\n- Baseline unknown; no VCS operations permitted.\n- Build generated 40 Claude and 141 Pi files; exact changes not independently determined without VCS.\n- Verify: 3493 pass, 2 platform-specific skips, 0 fail, 121 files.\nevidence:\n- Generated assets are rebuilt and current full verification results are accurately reported: Build and supervised verify exited 0; logs /workspace/work/034/owned-guidance-build.log and /workspace/work/034/owned-guidance-verify.log.\n- checks-run: Build, full verify, bun pm pack; all exit 0. Package log /workspace/work/034/owned-guidance-pack.log.\n- changed-paths: Build outputs under packages/integrations/claude/dist and packages/integrations/pi; exact changed paths unknown under no-VCS constraint.\n- failures: None; 2 tests skipped as recorded in verify log.",
+  "acceptance": {
+    "revision": 4,
+    "rationale": "Current generated assets, full3493pass2skip verify and offline141-file package archive pass; current-head code and artifact review remains separate.",
+    "criteria": [
+      {
+        "criterion": "Generated assets are rebuilt and current full verification results are accurately reported",
+        "support": "Build and supervised verify exited 0; logs /workspace/work/034/owned-guidance-build.log and /workspace/work/034/owned-guidance-verify.log."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Build, full verify, bun pm pack; all exit 0. Package log /workspace/work/034/owned-guidance-pack.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "Build outputs under packages/integrations/claude/dist and packages/integrations/pi; exact changed paths unknown under no-VCS constraint."
+      },
+      {
+        "label": "failures",
+        "support": "None; 2 tests skipped as recorded in verify log."
+      }
+    ]
   },
   "createdAt": "2026-11-13T17:25:19.086Z"
 }
