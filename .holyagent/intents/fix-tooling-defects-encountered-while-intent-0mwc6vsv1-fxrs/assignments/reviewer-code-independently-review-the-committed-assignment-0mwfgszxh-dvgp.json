@@ -41,6 +41,7 @@
     "assignment-0mwf2nlwa-qcxy"
   ],
   "specialist": {
+    "agentId": "/root/events_wildcard_code_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T21:04:24.293Z"
