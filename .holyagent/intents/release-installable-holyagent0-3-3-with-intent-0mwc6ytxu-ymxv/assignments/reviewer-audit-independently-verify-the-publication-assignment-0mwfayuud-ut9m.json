@@ -1,0 +1,45 @@
+{
+  "id": "assignment-0mwfayuud-ut9m",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 30,
+  "roleTask": "Reviewer.audit",
+  "slug": "independently-verify-the-publication",
+  "objective": "Independently verify the publication ancestry reconciliation preserves all reviewed source and only adds the requested no-draft rule.",
+  "state": "Running",
+  "scope": [
+    "Work /workspace/work/holyagent-release033 immutable commit2a635a3023d1d0802a5d997412ef35acd0c1c843, parents bea61f99ed4b3e899a24e45694476200531f8b64 and main44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a. Compare to publication repair #126, which merged as bea with a tree identical to reviewed46963a4 and passed all hosted platforms.",
+    "Verify old9c8edee7 tree equals44c79ab2 main, so preserving bea source during explicit ours merge drops no main content; main is now an ancestor. Against bea the only tree change must be one exact user-authorized no-draft bullet in AGENTS.md, matching b95759de rule. Old0.3.3 version/release/workflow guards and all functional/generated files unchanged. This merge MUST later be merged with merge commit to retain parents; repository currently permits squash only and root will ask user admin to enable merge commits. No settings change approved yet."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT audit role. Read-only git/source assertions allowed, no source/generated/Git/state/config writes or paid/live calls. Root owns VCS. No extra agents or executable investigation. Write only authorized external report.",
+    "No new product tests or full verify needed for one-line policy plus ancestry; verify immutable source and graph with meaningful exact git assertions. Save /workspace/work/034/033-ancestry-audit-report.json exact shape status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]. <=200words with exact criterion/label keys, validate field types before final."
+  ],
+  "criteria": [
+    {
+      "text": "Reconciliation preserves all reviewed publication source and main content while carrying only the authorized no-draft policy",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Main ancestry is present and actual merge-method and version limitations are stated accurately",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "reviewed-head",
+    "checks-run",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfavba9-bm8e"
+  ],
+  "specialist": {
+    "model": "haiku",
+    "effort": "high",
+    "startedAt": "2026-11-13T18:20:59.942Z"
+  },
+  "createdAt": "2026-11-13T18:20:59.942Z"
+}
