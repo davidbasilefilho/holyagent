@@ -37,6 +37,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwf3onqq-igcn",
   "specialist": {
+    "agentId": "/root/r034_owned_duplicate_repair",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T17:37:17.861Z"
