@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mwf1h7s3-g8eb",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.operations",
+  "slug": "build-generated-artifacts-and-validate",
+  "objective": "Build generated artifacts and validate the repaired guidance slice before root commit.",
+  "state": "Running",
+  "scope": [
+    "Build and full verify on exact current guidance source; no source fixes."
+  ],
+  "constraints": [
+    "Work exclusively in /workspace/work/holyagent-034-guidance. Other source writers in other worktrees are independent. B state repairs and C guidance writers are terminal. No further source edits in this tree until report.",
+    "Read repository AGENTS.md/.claude/CLAUDE.md; root owns VCS/state. No commits/checkouts/actual .git/.holyagent writes, no external service/model/PC/admin calls, no extra agents. Frozen deps only if needed --ignore-scripts, pins unchanged.",
+    "Toolchain env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via mise; run build then full verify with python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify. Supervisor required only to reap test descendants in this container; do not weaken tests. Capture command/exit/counts, detailed logs external. Only generated artifacts may change; unexpected source changes/gate failures report root before fixing.",
+    "Return JSON {status,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key,support}]} exact keys, <=150word final.",
+    "Save JSON /workspace/work/034/guidance-final-build-report.json and generated diff /workspace/work/034/guidance-generated.diff. Confirm source hashes stable across build and verify, include evidence."
+  ],
+  "criteria": [
+    {
+      "text": "Generated artifacts match source and full verification passes",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "No unowned source changes are introduced",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/claude/dist",
+    "packages/integrations/pi/dist",
+    ".claude-plugin",
+    "packages/integrations/claude/.claude-plugin",
+    "packages/integrations/pi/package.json"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r034_state_build",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T13:55:20.355Z"
+  },
+  "createdAt": "2026-11-13T13:55:20.355Z"
+}
