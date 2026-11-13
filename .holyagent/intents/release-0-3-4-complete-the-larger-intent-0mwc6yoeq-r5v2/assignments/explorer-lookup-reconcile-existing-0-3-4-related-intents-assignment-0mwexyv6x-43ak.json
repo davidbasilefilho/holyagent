@@ -39,6 +39,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_state_reconcile",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T12:17:05.385Z"
