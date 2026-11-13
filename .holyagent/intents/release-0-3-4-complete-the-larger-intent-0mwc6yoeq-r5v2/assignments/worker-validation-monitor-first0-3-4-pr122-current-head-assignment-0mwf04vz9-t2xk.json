@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwf04vz9-t2xk",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 12,
+  "roleTask": "Worker.validation",
+  "slug": "monitor-first0-3-4-pr122-current-head",
+  "objective": "Monitor first0.3.4 PR122 current-head hosted validation and diagnose actual failures.",
+  "state": "Running",
+  "scope": [
+    "PR122 base dev, expected headc3c935108a3bd3958f6dbcb7bc2d96f11eba212b"
+  ],
+  "constraints": [
+    "User authorized0.3.4 develop/release and Terra low-xhigh; direct fallback. Read HolyAgent worker-validation and ci-watch. No source/VCS/state or remote configuration/rerun/publish/merge writes. Root is awaiting explicit approval for dev protection and npm environment dev allowlist; do NOT merge or claim activation even if CI passes.",
+    "Monitor gh pr checks122 --watch --interval20, with short tool yields and progress to parent ~60seconds. Verify exact head before/after and latest per-head workflow attempts; ignore superseded cancellations. Need check/windows/macos/installers/branch-model and GitGuardian; version skips because targetdev. Sourcefullverify3488pass2conditional skips0fail. New Bash/Git UTC publishing tests particularly need native macOS/Windows results.",
+    "Dev was created from verified main44c79ab2. Its initial branch-creation Publish validates oldsource but does not publish; distinguish that from PR validation. Existing featurebranch Publish validates c3 and doesn't publish. Any real current-head failure: fetch exact failing job logs via purpose-built github_fetch_workflow_job_logs (works while gh/curl storage redirects may403), print only relevant excerpt, trace concrete cause; no speculative environmental label.",
+    "Save /workspace/work/034/flow-current-ci.md with final plain evidence: block, exact head/job outcomes/URLs/review threads/merge status and activation limitation. Report under180words. No other agents."
+  ],
+  "criteria": [
+    {
+      "text": "First release-flow PR current-head hosted validation passes",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "CI evidence is tied to exact head and distinguishes remote activation prerequisites",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "head-sha",
+    "workflow-urls",
+    "merge-state"
+  ],
+  "ownershipPaths": [
+    "ci-monitor"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T13:17:45.573Z"
+  },
+  "createdAt": "2026-11-13T13:17:45.573Z"
+}
