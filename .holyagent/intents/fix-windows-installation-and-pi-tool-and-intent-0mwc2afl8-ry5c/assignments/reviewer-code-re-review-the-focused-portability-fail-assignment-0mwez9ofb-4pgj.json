@@ -1,0 +1,47 @@
+{
+  "id": "assignment-0mwez9ofb-4pgj",
+  "intentId": "intent-0mwc2afl8-ry5c",
+  "intentRevision": 3,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-focused-portability-fail",
+  "objective": "Re-review the focused portability/fail-closed repair and close all original flow blockers.",
+  "state": "Running",
+  "scope": [
+    "Committed e28990817cb5a0e233c7673a98594320afb973ef..c3c935108a3bd3958f6dbcb7bc2d96f11eba212b; two files only"
+  ],
+  "constraints": [
+    "Same original HolyAgent role/user authority and immutable-scope rules. Work /workspace/work/holyagent-034; no source/VCS/state writes. Re-review only repair after original independent reports. No additional artifact review required because docs are unchanged; code review should include future-version and meaningful regression coverage, security review must close masked conversion failure.",
+    "Check portable Git UTC conversion, invalid/missing metadata exit and no malformed success output, future root versions from manifest/controlled fixture, deterministic same commit/timezone semantics, and tests that fail old code. Native macOS/Windows CI still required later; don't falsely label Linux fake-date fixture as native validation. Writer focused5pass and type/lint/format passed; final full gate is scheduled after acceptance.",
+    "Use explicit tools env paths under /workspace/work/tools/mise to run bounded tests if useful. Save final /workspace/work/034/flow-rereview-code.md with a final plain evidence: block and exact labels. Report under200words. No repeat broad audit or other agents."
+  ],
+  "criteria": [
+    {
+      "text": "Focused repair closes all original flow blockers without new regressions",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regression evidence covers portable failure paths and future versions",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwez3uod-wh95"
+  ],
+  "followUpOf": "assignment-0mwez0opb-eysc",
+  "specialist": {
+    "agentId": "/root/r034_flow_review_code",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T12:53:29.447Z"
+  },
+  "createdAt": "2026-11-13T12:53:29.447Z"
+}
