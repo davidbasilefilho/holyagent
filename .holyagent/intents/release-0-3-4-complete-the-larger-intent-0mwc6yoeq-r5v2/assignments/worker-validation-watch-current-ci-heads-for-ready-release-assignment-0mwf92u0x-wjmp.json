@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "watch-current-ci-heads-for-ready-release",
   "objective": "Watch current CI heads for ready release PRs122,123,124 and report exact terminal results and actionable failures.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Observe PR122 b95759de59c1cc0fcb129c1d57909cddf3b945bd, PR123 78366e7459c144c2f6c77a6075964ced06c433a9, PR124 e95cb5178a6d33300b8f4f8ec4e8654d092bcba3",
     "Use gh pr checks --watch for pushed heads; read CI logs via gh or available GitHub connector if redirects fail. No reruns or remote writes."
@@ -35,7 +35,9 @@
     "agentId": "/root/r034_release_ci_current",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T17:28:06.273Z"
+    "startedAt": "2026-11-13T17:28:06.273Z",
+    "finishedAt": "2026-11-13T17:53:53.121Z"
   },
+  "result": "{\n  \"status\": \"done\",\n  \"notes\": [\n    \"PR122\\u2013124 watches exited 0; both Linux, macOS, Windows and installer jobs passed, branch-model passed; final heads matched, merge states CLEAN.\",\n    \"PR125 watch exited 1; both Linux and installers passed, branch-model passed; both macOS and Windows jobs failed; merge state UNSTABLE.\",\n    \"PR125 macOS both jobs: cli-output.test.ts:76 expected stdout to contain \\\"stdin or stdout is not a terminal\\\", received \\\"\\\"; 3492 pass, 3 skip, 1 fail.\",\n    \"PR125 Windows Publish: cli-output.test.ts:50 expected null received 0; line 166 expected 0 received null; both tests timed out at 5000ms; 3440 pass, 55 skip, 2 fail. Standalone Windows line 50 expected null received 2; timed out at 5000ms, 3441 pass, 1 fail.\",\n    \"No base or environmental attribution established. PR publication jobs stable and dev skipped; no publication claimed.\",\n    \"Earlier read: main 44c79ab2cb87c4030b81ca5f46bbb005f2e85e5a version 0.3.3. Public npm holyagent latest 0.3.3-bootstrap.0; versions 0.0.0-stage and 0.3.3-bootstrap.0; bootstrap manifest has no bin. This is a point-in-time snapshot.\",\n    \"evidence:\\nCurrent head CI results and failed assertions are accurately reported without unsupported platform or publication claims: final snapshots /workspace/work/034/pr{122,123,124,125}-ci-snapshot.json and GitHub job logs.\\nheads: 122 b95759de59c1cc0fcb129c1d57909cddf3b945bd; 123 78366e7459c144c2f6c77a6075964ced06c433a9; 124 e95cb5178a6d33300b8f4f8ec4e8654d092bcba3; 125 eaf9981d845693c448c37b29898b9877dcc8153a.\\nchecks-run: gh pr checks --watch exit codes 0,0,0,1 respectively; snapshots give job URLs.\\nfailures: PR125 jobs 132056261907, 132056034794, 132056035516, 132056262254; assertion details above; GitHub connector logs.\\nmerge-state: final gh pr view exit 0; 122\\u2013124 CLEAN, 125 UNSTABLE.\"\n  ],\n  \"exit_codes\": {\n    \"watch_122\": 0,\n    \"watch_123\": 0,\n    \"watch_124\": 0,\n    \"watch_125\": 1,\n    \"final_snapshots\": 0,\n    \"npm_view\": 0\n  },\n  \"changed_paths\": [],\n  \"blockers\": [\n    \"PR125 macOS and Windows checks failed.\"\n  ]\n}\n",
   "createdAt": "2026-11-13T17:28:06.273Z"
 }
