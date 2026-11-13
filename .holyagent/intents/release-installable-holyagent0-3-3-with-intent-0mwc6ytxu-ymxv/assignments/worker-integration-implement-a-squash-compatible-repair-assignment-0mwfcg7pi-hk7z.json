@@ -47,6 +47,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r033_squash_publication_repair",
     "model": "sonnet",
     "effort": "medium",
     "startedAt": "2026-11-13T19:02:29.382Z"
