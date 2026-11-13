@@ -16679,7 +16679,7 @@ var guidanceRouter = (role, family, root) => {
     return "";
   const lines = entries.map(({ name, when }) => `- ${when}: \`${root}/${GUIDANCE_FOLDER}/${family}/${name}/SKILL.md\``);
   return [
-    "Read the relevant HolyAgent guidance file on demand with your reader; user and third-party skills remain available.",
+    "User and third-party skills remain available.",
     ...lines,
     ...role === "root" ? ["Delegate library documentation lookup to a librarian or implementation specialist."] : []
   ].join(`

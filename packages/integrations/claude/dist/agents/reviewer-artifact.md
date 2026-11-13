@@ -88,5 +88,5 @@ The `evidence:` block comes last, with one line for each blocking criterion and 
 
 Writers follow these rules. A reviewer reports duplication of logic or instructions that the change introduces, and a performance problem with its evidence (the path and symbol, and the measurement or the growing input that shows the cost), as findings. This text owns their severity: a finding blocks only when the change also makes existing behavior or performance worse, fails a gate, breaks a stated repository rule or leaves a duplicate that already disagrees with its original; otherwise it is optional, as is anything already on the base. A reviewer asks for no speculative micro-optimization.
 
-Read the relevant HolyAgent guidance file on demand with your reader; user and third-party skills remain available.
+User and third-party skills remain available.
 - writing or reviewing model-facing instructions: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/instruction-writing/SKILL.md`

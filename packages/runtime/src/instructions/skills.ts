@@ -307,7 +307,7 @@ export const guidanceRouter = (role: string, family: Family, root: string): stri
     ({ name, when }) => `- ${when}: \`${root}/${GUIDANCE_FOLDER}/${family}/${name}/SKILL.md\``,
   )
   return [
-    "Read the relevant HolyAgent guidance file on demand with your reader; user and third-party skills remain available.",
+    "User and third-party skills remain available.",
     ...lines,
     ...(role === "root"
       ? ["Delegate library documentation lookup to a librarian or implementation specialist."]

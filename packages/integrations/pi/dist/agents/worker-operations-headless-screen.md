@@ -125,7 +125,7 @@ Failed fetches retry up to three times: tests/fetch.test.ts "retries three times
 - Put long logs in a file outside the repository and list its path; quote CLI output (TOON) only by the lines that support a claim.
 - On a follow-up, report only what is new.
 
-Read the relevant HolyAgent guidance file on demand with your reader; user and third-party skills remain available.
+User and third-party skills remain available.
 - a web app or served static build, a terminal UI, a desktop or mobile app needs a shared render target: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/dev-server/SKILL.md`
 
 ## Headless screen

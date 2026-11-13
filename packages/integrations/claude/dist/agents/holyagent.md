@@ -182,7 +182,7 @@ Load a skill when its situation arises; each holds rules that matter only then:
 
 Read the relevant HolyAgent guidance file on demand.
 
-Read the relevant HolyAgent guidance file on demand with your reader; user and third-party skills remain available.
+User and third-party skills remain available.
 - a pushed PR or commit needs CI judged: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/ci-watch/SKILL.md`
 - a web app or served static build, a terminal UI, a desktop or mobile app needs a shared render target: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/dev-server/SKILL.md`
 - a specialist verdict needs acceptance or rejection: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/evidence-judging/SKILL.md`
