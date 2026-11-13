@@ -42,6 +42,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/core_host_frozen_build",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T21:29:50.741Z"
