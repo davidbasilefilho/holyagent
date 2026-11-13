@@ -46,6 +46,7 @@
     "assignment-0mwfi7tqf-w53a"
   ],
   "specialist": {
+    "agentId": "/root/core_host_current_code_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T23:58:14.641Z"
