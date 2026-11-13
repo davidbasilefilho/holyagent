@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mwf16b4a-7l4u",
+  "intentId": "intent-0mwaz75rz-i978",
+  "intentRevision": 4,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-silent-handoff-omissions-for",
+  "objective": "Repair silent handoff omissions for pending branch-state migration and correct live-status help.",
+  "state": "Running",
+  "scope": [
+    "Read-only handoff/state resolution and focused fixtures/docs"
+  ],
+  "constraints": [
+    "User authorizes0.3.4 develop/release/HolyAgent/Terra low-xhigh. Read worker-implementation role and relevant Intents; direct fallback. Work /workspace/work/holyagent-034-state at11f756589ece8907912a11e43187fbb4407e5ccb. Two disjoint repair writers run in parallel; no shared source writes without coordination. No actual VCS/.git/.holyagent/admin/account/security writes or publication. Tests may create isolated temporary Git repositories/worktrees/state as fixtures.",
+    "Tool env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Run meaningful red/green changed-scope tests and type/lint/format, no build/fullverify until both terminal/rootcoordinates. Don't repair peer's in-progress files.",
+    "Save concise reportJSON in CLI --report-json shape {status,changed_paths,checks:[{command,exit}],blockers,notes,evidence:[{key:'EXACT brief criterion/label',support:'...'}]}, actual doublequotedJSON. Detailed notes/diff outside repo; report under250words, no more agents.",
+    "Read /workspace/work/034/state-review-security.json and state-review-artifact.json. Reproduce the source-traced omission first: default branch mode peek resolves an absent shared state directory while local .holyagent records await migration, so handoff can report empty; also examine existing shared state plus unmigrated records in a registered other worktree. If trace contradicted, report evidence before speculative change.",
+    "Repair conservatively: either nonmutating complete reconciliation or explicit actionable read-only failure when complete state is unavailable/awaits migration. Do not create/migrate/checkout/write state in a read command, silently drop pending records or mark empty as complete. Distinguish truly empty fresh repo from unavailable committed/shared or local pending records. Prefer a small truthful failure seam over reimplementing all migration. Preserve status/other CLI behavior unless a proven shared read bug justifies bounded fix.",
+    "Help overview.ts currently says liveCI/PRstatus unknown 'unless described in requirements/outcomes'; descriptions are recorded, never actual current proof. Correct that clause and preserve explicit recorded/live distinction in docs/output.",
+    "Cover branch-mode actual Git/worktree fixtures plus no-write assertions and corrupt/mixed state. Same source behavior for Pi/Claude. You own state/tree.ts and CLI read seam/program/command definitions if needed; operational peer owns tests only and must coordinate any discovery bug. Save /workspace/work/034/handoff-repair-report.json and handoff-repair.diff."
+  ],
+  "criteria": [
+    {
+      "text": "Handoff never silently omits pending recorded state and remains read-only",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Help and regression fixtures distinguish recorded state from live status truthfully",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/overview.ts",
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/command.ts",
+    "packages/runtime/src/state/tree.ts",
+    "packages/runtime/src/state/store.ts",
+    "packages/runtime/src/state/errors.ts",
+    "packages/runtime/tests/handoff.test.ts",
+    "packages/runtime/tests/state-branch.test.ts",
+    "docs/handoff.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwezkhrb-0ml6",
+  "specialist": {
+    "agentId": "/root/r034_handoff_command",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T13:46:51.466Z"
+  },
+  "createdAt": "2026-11-13T13:46:51.466Z"
+}
