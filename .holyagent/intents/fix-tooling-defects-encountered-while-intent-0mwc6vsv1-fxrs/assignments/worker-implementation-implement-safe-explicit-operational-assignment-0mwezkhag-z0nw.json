@@ -55,6 +55,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_operational_ownership",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T13:01:53.416Z"
