@@ -5,7 +5,7 @@
   "roleTask": "Worker.integration",
   "slug": "wire-the-implemented-journal-and-private",
   "objective": "Wire the implemented journal and private-index helpers into a working cancellable state migration and prove recovery end to end.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in /workspace/work/holyagent-034-core, branch release/0.3.4/feat/shared-core at 6ebdf1e plus preserved partial changes and four new helper/test files. Both module writers are terminal; you are sole writer here. Read /workspace/work/034/migration-journal-module-report.json, migration-index-module-api.md, migration-index-module-report.json, and the two actual new modules. They exist and have isolated tests; no need to repeat architecture research or return another design-only handoff.",
     "Journal exports beginMigrationJournal, readMigrationJournal, advanceMigrationJournal, finishMigrationJournal and strict types/errors. Index helper exports prepareMigrationCommit and publishMigrationIndex; returns known parent/tree/commit, semantic owned-index fingerprints and per-path blob pre/postimages. Index publication holds index.lock and preserves unrelated current entries. Four real Git index tests and four journal tests passed in isolated copies; combined repository validation is still required.",
@@ -70,7 +70,9 @@
     "agentId": "/root/core_host_application_resume",
     "model": "sonnet",
     "effort": "medium",
-    "startedAt": "2026-11-13T23:05:21.002Z"
+    "startedAt": "2026-11-13T23:05:21.002Z",
+    "finishedAt": "2026-11-13T23:23:08.750Z"
   },
+  "result": "status: partial\nchanged:\n- packages/core/src/state/migration-index.ts\n- packages/core/src/state/migration-journal.ts\n- packages/core/src/state/tree.ts\n- packages/core/tests/migration-index.test.ts\n- packages/core/tests/migration-journal.test.ts\n- packages/core/tests/revocation.test.ts\n- packages/runtime/tests/state-branch.test.ts\nchecks:\n- bunx --no-install mise run test -- packages/core/tests/migration-index.test.ts packages/core/tests/migration-journal.test.ts packages/core/tests/revocation.test.ts -> exit 1\nblockers:\n- Journal and index helpers are not integrated; cancellation, recovery and reader-safety criteria remain unproven.\nnotes:\n- HEAD 6ebdf1e; preserved preexisting partial changes and helper files, no edits made in this follow-up.\nevidence:\n- Integrated journaled migration cancels within a proven bound and recovers correctly before and after ref publication without partial reader visibility: Not met: current migration remains uninterruptible and helpers are not integrated.\n- Source target staged and unstaged edits read only and revoked authority remain safe with precise conflict handling: Not met: existing broad dirty-target refusal blocks unrelated staged edits; initial tests preserve source versions and revocation checks pass.\n- All real Git migration regressions helper tests Node compatibility build static and supervised full verification pass: Not met: initial combined suite exit 1, 14 pass and 3 fail; no final build or verify run.\n- checks-run: Initial module and revocation suite log: /workspace/work/034/core-migration-integrated-initial.log.\n- changed-paths: Seven preserved paths in changed_paths; no changes authored in this follow-up.\n- diff-file: /workspace/work/034/core-migration-integrated-incremental.diff includes tracked changes and untracked helper files relative to 6ebdf1e.\n- red-green-proof: Red confirmed: stalled commit, committed-before-abort, unrelated staged target; no green result.\n- transaction-and-recovery: /workspace/work/034/core-migration-transaction-notes.md records required boundaries and unresolved risks.\n- integration-seams: Host application branch 31a9702 is separate; migration remains incomplete and must pass aggregate verification after integration.",
   "createdAt": "2026-11-13T23:05:21.002Z"
 }
