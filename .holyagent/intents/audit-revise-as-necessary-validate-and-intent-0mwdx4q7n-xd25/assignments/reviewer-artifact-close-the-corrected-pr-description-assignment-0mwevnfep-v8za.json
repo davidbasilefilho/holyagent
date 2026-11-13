@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "close-the-corrected-pr-description",
   "objective": "Close the corrected PR description tarball-handoff claim before publication.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "/workspace/work/pr120-body.txt"
   ],
@@ -35,7 +35,29 @@
     "agentId": "/root/pr_description_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T11:12:12.481Z"
+    "startedAt": "2026-11-13T11:12:12.481Z",
+    "finishedAt": "2026-11-13T11:12:50.042Z"
+  },
+  "result": "result: Pass; the corrected tarball claim matches the workflows. Replace FINAL_VERIFY_RESULT with the accepted exact verification result before publication.\nevidence:\nPR description is accurate concise and makes no unsupported claims: Pass for the corrected second paragraph; protected branch gates and tarball publication and release transfer are in publish.yml, stable.yml and dev.yml.\nreviewed-artifact: /workspace/work/pr120-body.txt, second paragraph, against those workflows.\nfindings: No remaining blocker in the corrected claim; publication remains explicitly unverified.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Independent review confirms corrected publication flow; root substitutes accepted final verify evidence only.",
+    "criteria": [
+      {
+        "criterion": "PR description is accurate concise and makes no unsupported claims",
+        "support": "Pass for the corrected second paragraph; protected branch gates and tarball publication and release transfer are in publish.yml, stable.yml and dev.yml."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "reviewed-artifact",
+        "support": "/workspace/work/pr120-body.txt, second paragraph, against those workflows."
+      },
+      {
+        "label": "findings",
+        "support": "No remaining blocker in the corrected claim; publication remains explicitly unverified."
+      }
+    ]
   },
   "createdAt": "2026-11-13T11:12:12.481Z"
 }
