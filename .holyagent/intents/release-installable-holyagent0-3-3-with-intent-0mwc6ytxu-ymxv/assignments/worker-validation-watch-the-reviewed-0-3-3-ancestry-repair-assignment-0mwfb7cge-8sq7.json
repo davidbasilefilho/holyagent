@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "watch-the-reviewed-0-3-3-ancestry-repair",
   "objective": "Watch the reviewed 0.3.3 ancestry repair and record publication prerequisites while admin settings are pending.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "PR127 head2a635a3023d1d0802a5d997412ef35acd0c1c843 targets release/0.3.3/integration. Watch gh pr checks127 --watch to terminal; exact current-head Linux/macOS/Windows/installers/branch-model results. PR128 currently headbea61f99 targets main and is CONFLICTING because old squash ancestry; report snapshot, do not wait indefinitely for it to change.",
     "Optionally observe push Publish workflow on integrationbea61f99, including automatic dev prerelease outcome. This is not stable0.3.3 publication; do not claim stable until main trusted publishing succeeds. User has not yet enabled merge commits or waived required version. No mutations."
@@ -35,7 +35,9 @@
     "agentId": "/root/r033_ancestry_ci_watch",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T18:27:36.014Z"
+    "startedAt": "2026-11-13T18:27:36.014Z",
+    "finishedAt": "2026-11-13T19:13:25.748Z"
   },
+  "result": "stopped",
   "createdAt": "2026-11-13T18:27:36.014Z"
 }
