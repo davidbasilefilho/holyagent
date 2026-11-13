@@ -36,6 +36,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_events_current_code_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T17:37:56.789Z"
