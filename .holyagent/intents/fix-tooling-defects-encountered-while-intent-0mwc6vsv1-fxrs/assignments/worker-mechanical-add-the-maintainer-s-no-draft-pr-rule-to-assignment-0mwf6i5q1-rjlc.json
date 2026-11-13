@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "add-the-maintainer-s-no-draft-pr-rule-to",
   "objective": "Add the maintainer's no-draft-PR rule to the repository AGENTS.md.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "EDITONLY /workspace/work/holyagent-034/AGENTS.md onrelease/0.3.4/chore/development-flow c3c93510. UserexplicitlyauthorizesAGENTS.md update despitefilepermissionrule. UnderCommitsandpullrequests add: Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending. Keepminimalonebullet, consistentEnglishandreason; nootherpolicy/version/dependencyedits. AllfuturePRsready; existing123alreadyconvertedReady. NoVCS/actual.git/statewrites/subagents. No testsneededforthisreversibledoc-onlychange, inspectdiff/format. JSON /workspace/work/034/no-draft-policy-report.json statusEXACTdone|partial|blocked,checks:[{command,exit}],changed_paths,blockers,notes,evidence:[{key,support}]; diff /workspace/work/034/no-draft-policy.diff. <=150wordfinal."
   ],
@@ -33,7 +33,33 @@
     "agentId": "/root/r034_no_draft_policy",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T16:16:02.425Z"
+    "startedAt": "2026-11-13T16:16:02.425Z",
+    "finishedAt": "2026-11-13T16:34:33.175Z"
+  },
+  "result": "status: done\nchanged:\n- /workspace/work/holyagent-034/AGENTS.md\nchecks:\n- git diff --check -- AGENTS.md -> exit 0\n- git diff -- AGENTS.md -> exit 0\nnotes:\n- Documentation-only change; tests not run as instructed.\nevidence:\n- Assigned artifact or architecture scope is completed accurately with stated limits: Added one no-draft pull request policy bullet under Commits and pull requests, including its rationale.\n- checks-run: git diff --check and diff inspection passed; tests were not required.\n- changed-paths: AGENTS.md only; diff saved to /workspace/work/034/no-draft-policy.diff.\n- findings: No findings or blockers.",
+  "acceptance": {
+    "revision": 7,
+    "rationale": "Scoped artifact/research evidence is complete and accurately states operational and verification limits; no server import or product behavior is claimed.",
+    "criteria": [
+      {
+        "criterion": "Assigned artifact or architecture scope is completed accurately with stated limits",
+        "support": "Added one no-draft pull request policy bullet under Commits and pull requests, including its rationale."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "git diff --check and diff inspection passed; tests were not required."
+      },
+      {
+        "label": "changed-paths",
+        "support": "AGENTS.md only; diff saved to /workspace/work/034/no-draft-policy.diff."
+      },
+      {
+        "label": "findings",
+        "support": "No findings or blockers."
+      }
+    ]
   },
   "createdAt": "2026-11-13T16:16:02.425Z"
 }
