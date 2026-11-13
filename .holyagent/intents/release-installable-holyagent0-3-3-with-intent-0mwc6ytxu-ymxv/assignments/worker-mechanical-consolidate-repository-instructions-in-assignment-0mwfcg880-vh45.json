@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mwfcg880-vh45",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Worker.mechanical",
+  "slug": "consolidate-repository-instructions-in",
+  "objective": "Consolidate repository instructions in AGENTS.md and document failed-deployment version nuance.",
+  "state": "Running",
+  "scope": [
+    "Work only /workspace/work/holyagent-033-repair. Remove .claude/CLAUDE.md, migrate useful contributing code/gate/commit rules into root AGENTS.md, remove obsolete pointer, and record reason: Claude Code now reads AGENTS.md directly. Rename/migrate packages/runtime/CLAUDE.md to scoped packages/runtime/AGENTS.md; preserve its rules. Do not transfer a deleted file's own edit-permission clause into a new blanket approval rule. Preserve repo-specific instructions; avoid duplicates.",
+    "Add exact previously authorized no-draft bullet from2a635a3 AGENTS.md. Update release/version rules: deployment failure alone does not force version bump; keep same version for focused unpublished release repair from fresh main-based release/<version>/fix/publication-repair directly to main using squash. Required version check verifies exact main/head equality and exact npm version absence; normal releases still integration/newer, no downgrades or overwriting published immutable versions. Retry an already published artifact only with verified identical identity/provenance; product/source changes to a published artifact need a new version. Match implementation owner's contract.",
+    "Update only actual repository onboarding/contributing references in README.md/docs as needed; preserve exact README sections. Inventory other CLAUDE.md references but preserve product setup templates, generated integrations and user/global CLAUDE files outside this repo-instructions request. No product executable investigation or optional cleanup. Read instruction-writing skill."
+  ],
+  "constraints": [
+    "Read repo AGENTS/CLAUDE rules and matching GPT role. User explicitly authorizes repository instruction removal and failed-publication version exception. Root owns VCS/state; no actual .git/.holyagent writes, commits, pushes, settings changes or subagents. Read-only Git allowed. No live Pi/paid model/publication, no bin/executable investigation before stable publication. No dependencies/pins/version/workflow permission changes. Keep work bounded until done.",
+    "Environment MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Integration owner initializes new worktree with frozen install --ignore-scripts, runs focused meaningful checks and type/lint/fmt; final full verify/build after both writers terminal, root will delegate it. Documentation-only writer needs diff/reference checks; no product tests or build.",
+    "Save /workspace/work/034/033-instructions-consolidation-report.json and .diff including untracked/deleted files. Exact JSON {status:'done'|'partial'|'blocked',changed_paths:string[],checks:[{command:string,exit:number}],blockers:string[],notes:string[],evidence:[{key:string,support:string}]}; exact criterion/label keys, validate schema fields, <=300wordsummary, logs external."
+  ],
+  "criteria": [
+    {
+      "text": "Assigned repair satisfies the authorized contract while preserving safeguards and unrelated scope",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Meaningful current checks and remaining limits are recorded accurately",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "AGENTS.md",
+    ".claude/CLAUDE.md",
+    "packages/runtime/CLAUDE.md",
+    "packages/runtime/AGENTS.md",
+    "README.md",
+    "docs"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "/root/r033_no_draft_carry",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-13T19:02:30.048Z"
+  },
+  "createdAt": "2026-11-13T19:02:30.048Z"
+}
