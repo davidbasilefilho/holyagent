@@ -33,6 +33,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/r034_owned_skills_build",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-13T15:28:00.634Z"
