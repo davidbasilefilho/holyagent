@@ -39,6 +39,7 @@
     "assignment-0mweyjv9o-v7vg"
   ],
   "specialist": {
+    "agentId": "/root/r034_flow_review_artifact",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T12:46:32.011Z"
