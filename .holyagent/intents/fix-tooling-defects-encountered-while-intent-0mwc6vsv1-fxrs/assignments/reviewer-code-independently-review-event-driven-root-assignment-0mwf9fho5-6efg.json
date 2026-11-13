@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mwf9fho5-6efg",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-event-driven-root",
+  "objective": "Independently review event-driven root wait and safe tool aliases, and verify the committed head.",
+  "state": "Running",
+  "scope": [
+    "Work /workspace/work/holyagent-034-events; committed c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..1823b2d. Review real pinned host probes and reports events-global-repair/events-regenerated-check in /workspace/work/034. Root event/user/timeout/cancel/shutdown races, workflow no reliable completion fallback, cache TTL honestly unknown, alias exact source/schema/pin checks, both name policy canonicalization, no upstream package edits. Shared literal workflow examples remain enforced across three families/PiClaude."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT code-review role; actual first-pass prompt will be prepended by launcher. No source/generated/VCS/Git config/.holyagent writes. Read-only Git and tests allowed; no live Pi or paid calls, no subagents.",
+    "Run focused checks where review needs them and ONE current full verify through python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify. Environment MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH.",
+    "Report /workspace/work/034/events-code-current-review-report.json exact schema status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]; <=300words, logs external. Every criterion/label exact key. Actionable findings file/line/realistic path."
+  ],
+  "criteria": [
+    {
+      "text": "Committed wait and aliases satisfy runtime contracts without material code or regression findings",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Current full verification passes and platform and host limits are recorded accurately",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "first-pass",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T17:37:56.789Z"
+  },
+  "createdAt": "2026-11-13T17:37:56.789Z"
+}
