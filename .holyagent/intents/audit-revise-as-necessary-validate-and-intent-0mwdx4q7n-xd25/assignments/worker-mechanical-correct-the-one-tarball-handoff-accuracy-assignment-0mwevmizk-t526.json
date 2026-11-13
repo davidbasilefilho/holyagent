@@ -5,7 +5,7 @@
   "roleTask": "Worker.mechanical",
   "slug": "correct-the-one-tarball-handoff-accuracy",
   "objective": "Correct the one tarball-handoff accuracy issue in the drafted PR120 description.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "/workspace/work/pr120-body.txt"
   ],
@@ -33,7 +33,29 @@
     "agentId": "/root/pr_description",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-13T11:11:30.464Z"
+    "startedAt": "2026-11-13T11:11:30.464Z",
+    "finishedAt": "2026-11-13T11:12:11.771Z"
+  },
+  "result": "result: Corrected the publication branches and tarball handoff.\nchanged: /workspace/work/pr120-body.txt, /workspace/work/pr120-body-repair-report.md\nchecks: Read corrected draft; FINAL_VERIFY_RESULT remains present. No tests run for this prose edit.\nblockers: none\nquestions: none\nnotes: none\nevidence:\nTarball handoff and protected publication branches are described accurately: The draft describes protected main and release integration branches and the published tarball's handoff to the GitHub release.\nchanged-paths: /workspace/work/pr120-body.txt, /workspace/work/pr120-body-repair-report.md\nchecks-run: Read corrected draft and checked the placeholder.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Corrected phrase now describes pack after validation and publication-to-release same-tarball handoff on protected main/integration branches.",
+    "criteria": [
+      {
+        "criterion": "Tarball handoff and protected publication branches are described accurately",
+        "support": "The draft describes protected main and release integration branches and the published tarball's handoff to the GitHub release."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "changed-paths",
+        "support": "/workspace/work/pr120-body.txt, /workspace/work/pr120-body-repair-report.md"
+      },
+      {
+        "label": "checks-run",
+        "support": "Read corrected draft and checked the placeholder."
+      }
+    ]
   },
   "createdAt": "2026-11-13T11:11:30.464Z"
 }
