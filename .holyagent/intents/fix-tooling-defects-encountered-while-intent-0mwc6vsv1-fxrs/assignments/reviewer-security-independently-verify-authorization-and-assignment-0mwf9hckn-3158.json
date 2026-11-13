@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwf9hckn-3158",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 8,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-verify-authorization-and",
+  "objective": "Independently verify authorization and cancellation boundaries of event wait and external snake-case aliases.",
+  "state": "Running",
+  "scope": [
+    "Work /workspace/work/holyagent-034-events; committed c3c935108a3bd3958f6dbcb7bc2d96f11eba212b..1823b2d. Inspect wait-for-agents.ts, tool-aliases.ts, extension registration, auto-review and runtime canonicalPiToolName/toolMatches policy. Aliases may not bypass original name rules, provenance/schema/pinned source checks, cancellation or literal workflow guard. Root flag/user+merged config revocation and child noninheritance verified host evidence. No approval inheritance invention or installed third-party edits."
+  ],
+  "constraints": [
+    "Read AGENTS/GPT security role; actual first-pass prompt prepended by launcher. Read-only Git/source and harmless focused tests allowed; no source/generated/VCS/config/.holyagent writes, no live model/Pi calls, no subagents. No exploit against live host.",
+    "Environment MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Own source review plus focused evidence; full gate is being run by separate independent code reviewer, do not duplicate.",
+    "Report /workspace/work/034/events-security-current-review-report.json exact schema {status:'done'|'partial'|'blocked',changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}. <=300wordsummary. Every criterion/label exact key, findings file/line/precondition/source-sink evidence."
+  ],
+  "criteria": [
+    {
+      "text": "No introduced or worsened security finding remains in event and alias authority boundaries",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "reviewed-range",
+    "first-pass",
+    "findings",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwf520wn-jh9q"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T17:39:23.495Z"
+  },
+  "createdAt": "2026-11-13T17:39:23.495Z"
+}
