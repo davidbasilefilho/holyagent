@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "correct-quoted-cli-help-syntax-and",
   "objective": "Correct quoted CLI help syntax and reconcile the intended concise evidence hint.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read plain-cli-final-build-report.json: input.test156expects --input '<json>' quoting; restorecorrectquotesnotunsafeunquotedJSONplaceholder. host.test340 oldhintmissing supportchangedto missing evidence: selectclearnaturalshortwordingandnecessaryliteralexpectedhintwithoutweakeningevidence/hostroutingassertions. Preserveplainoutput/forcedcolor/controlrender/unchangedrgargv/malformedexit2/taggederrors/recorddata. Runinput/host/CLIoutput/tools+type/lint/fmt; no generatedbuild/fullverify."
   ],
@@ -39,7 +39,33 @@
     "agentId": "/root/r034_handoff_command",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-13T15:06:40.873Z"
+    "startedAt": "2026-11-13T15:06:40.873Z",
+    "finishedAt": "2026-11-13T15:27:55.433Z"
+  },
+  "result": "status: done\nchanged:\n- packages/runtime/src/cli/program.ts\n- packages/runtime/src/cli/errors.ts\nchecks:\n- bunx --no-install mise exec -- bun test packages/runtime/tests/input.test.ts packages/runtime/tests/host.test.ts packages/runtime/tests/cli-output.test.ts packages/runtime/tests/tools.test.ts -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\nnotes:\n- Focused tests: 79 pass, 1 Windows skip; type: 319 files, lint: 320 files, format: 740 files. Existing assertions remain unchanged. Build and full verify deferred as instructed.\nevidence:\n- Quoted help and concise evidence hints pass affected tests without output or validation regressions: Top help now quotes '<json>'; host-specific hints say missing support. Focused input, host, plain-output and tools tests pass, including strict decoding and search arguments.\n- checks-run: Focused tests, type, lint and format listed above, all exit 0.\n- changed-paths: packages/runtime/src/cli/program.ts and packages/runtime/src/cli/errors.ts.\n- diff-file: /workspace/work/034/plain-cli-wording.diff (two-line follow-up against the preceding uncommitted work).",
+  "acceptance": {
+    "revision": 6,
+    "rationale": "Focused source repair and policy checks pass, preserved existing contracts; generated final gates follow.",
+    "criteria": [
+      {
+        "criterion": "Quoted help and concise evidence hints pass affected tests without output or validation regressions",
+        "support": "Top help now quotes '<json>'; host-specific hints say missing support. Focused input, host, plain-output and tools tests pass, including strict decoding and search arguments."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Focused tests, type, lint and format listed above, all exit 0."
+      },
+      {
+        "label": "changed-paths",
+        "support": "packages/runtime/src/cli/program.ts and packages/runtime/src/cli/errors.ts."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/plain-cli-wording.diff (two-line follow-up against the preceding uncommitted work)."
+      }
+    ]
   },
   "createdAt": "2026-11-13T15:06:40.873Z"
 }
