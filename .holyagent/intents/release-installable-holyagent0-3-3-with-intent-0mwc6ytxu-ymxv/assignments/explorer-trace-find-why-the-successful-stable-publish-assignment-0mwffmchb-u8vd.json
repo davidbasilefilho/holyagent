@@ -1,0 +1,41 @@
+{
+  "id": "assignment-0mwffmchb-u8vd",
+  "intentId": "intent-0mwc6ytxu-ymxv",
+  "intentRevision": 31,
+  "roleTask": "Explorer.trace",
+  "slug": "find-why-the-successful-stable-publish",
+  "objective": "Find why the successful stable publish step did not make holyagent0.3.3 visible in public npm.",
+  "state": "Running",
+  "scope": [
+    "Read-only bounded diagnosis of main460f9453, Publish43499104894 success and GH stabletag/asset0.3.3 exist, but fresh no-cache public npm exactversion/tarball404 andpackumentMISS omits0.3.3/latestbootstrap. Read /workspace/work/034/033-main-publication-report.json and actualstablejoblogs, scripts/npm-publishing.ts/mainentry, bunfig/mise/env/publishconfig and effective invocation. No assumptions cachedabsenceispropagation afterfreshMISS. No npm binary-offering investigation; this is actual publication correctness.",
+    "Trace real command/Effect execution and expected side effect; check dryrun/staging/registry or suppressed response/entry no-op using source and controlled offline subprocess probe if needed. All probe projects/tempfiles outside actualrepo ancestry, fake npm and intercepted GitHub fetch only, never run real npm publish. Source read-only; no credentials printed. Identify exact supported facts vs hypothesis. Propose smallest safe recovery preserving existing immutabletagholyagent0.3.3 at460f and existingcorrectartifact; do not update/delete tags, republishblindly, bumpversion, weakenprovenance or bypassguards."
+  ],
+  "constraints": [
+    "Read AGENTS and GPT Explorer.trace directives. Work /workspace/work/holyagent-033-repair read-only; no actualsource/.git/.holyagent/config/remote writes, subagents or livePi/modelcalls. Harmless controlled fake-network process probes allowed, external public readonlymetadata/logs allowed. Existing GH/NPMcredvalues neverdumped. Root ownsmaterialdecisions/actions.",
+    "Env MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. No fullgates needed for diagnosis. Save longlogs outside repo; keepworkinguntilcause/correct concreteblockevidenced.",
+    "Save /workspace/work/034/033-publication-discrepancy-trace-report.json exact JSON status done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]. Exactcriterion/labels, validatefields, <=350wordsummary."
+  ],
+  "criteria": [
+    {
+      "text": "Publication discrepancy is traced to evidence-backed cause or a precise remaining uncertainty with safe recovery options",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "source-path",
+    "runtime-evidence",
+    "registry-state",
+    "recovery",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-13T20:31:14.352Z"
+  },
+  "createdAt": "2026-11-13T20:31:14.352Z"
+}
