@@ -36,6 +36,7 @@
   ],
   "followUpOf": "assignment-0mwfh69ti-wf8g",
   "specialist": {
+    "agentId": "/root/development_policy_artifact_rereview",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-13T21:31:12.231Z"
