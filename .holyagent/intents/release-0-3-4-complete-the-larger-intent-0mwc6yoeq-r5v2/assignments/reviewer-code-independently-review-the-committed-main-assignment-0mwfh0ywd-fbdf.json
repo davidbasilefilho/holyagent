@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mwfh0ywd-fbdf",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-the-committed-main",
+  "objective": "Independently review the committed main-forward integration of the 0.3.4 development flow.",
+  "state": "Running",
+  "scope": [
+    "Committed range b95759de59c1cc0fcb129c1d57909cddf3b945bd...a26d8ce88cfeca5115f0b1b0af9bb199bcbfc74d (mergeparents b957,main460f) in /workspace/work/holyagent-034. Review current integration against bothparents with read-only git. Original0.3.4main/dev alreadyreviewed; thismerge preserves consolidatedAGENTS/noDraft/deploymentnuance, metadata/provenance, bounded unpublishedsamerepair directmain, Windowsisolationtest changes. No actual settingswrites.",
+    "Focus correctnormaldev→main strictlynewer versus exactrepairref/equalversion/realnpm404 only; malformed/network/auth/publishedfailclosed; no downgrade/overwrite; public metadata/provenancepreserved; meaningful regressiontests. Authorreport /workspace/work/034/development-main-forward-report.json, diff sameprefix.diff; full3494pass2skip/focused59. Independentlyrun focusedcurrenthead releasechecks and report /workspace/work/034/development-main-code-review-report.json."
+  ],
+  "constraints": [
+    "\nFirst pass: code-review.\n\nYou are the first pass of a code review. Find defects in the committed range and prove each one. The review is read-only: write no comments and no fixes, and change no file, branch or index.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other, and leave the uncommitted changes of the shared tree out. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve, say which one and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff of the range with `git diff`, quoting the ref names for the shell.\n2. Read the code around each change: the callers, the callees and the tests that cover it. A change is judged in its context, not alone.\n3. List candidate defects the change introduces or exposes. Look at wrong results, regressions of existing behavior, unhandled error and failure paths, empty, null and boundary input, ordering and concurrency, leaked resources, broken compatibility of an interface or stored data, and tests that cannot fail.\n4. Trace each candidate to a realistic failure: the input or state, the path through the code, and the wrong result a user or caller sees. Drop a candidate you cannot trace to one.\n5. Label each remaining finding.\n   - blocker: a realistic failure in normal use, data loss, or a break of existing behavior.\n   - optional: a real but unlikely or minor failure.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one, then reviews on its own and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the file, the line and the symbol;\n- the failure, in one or two sentences, as input, path and result;\n- the label;\n- how you know: what you read, or the command you ran and its result.\n\nExample entry:\n\n- `src/cart.ts:42`, `total`: an empty cart divides by `items.length`, so `checkout` shows \"NaN\" as the price. blocker. Read `total` and its caller `checkout`; `bun test cart` with an empty cart fails.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered. Leave style, naming and taste out.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only after actual0.3.4 publication. Stable0.3.3 is published; npm executable bug now belongs0.3.4. No republish of immutable0.3.3.",
+    "Read applicable AGENTS and GPT6 role directives under packages/runtime/src/instructions/gpt-6/roles. You are delegated specialist; root handles state/acceptance/VCS. No VCS writes, commits, merges, .git/.holyagent/config edits or actual CLI state mutations. Read-only Git allowed. No live paid model/Pi sessions or user-PC actions. Preserve dirty checkpoint and unrelated authored files. No new CLAUDE instruction files.",
+    "All test fixture projects outside repo ancestry using /tmp/mkdtemp; detect/reject enclosing actual Git root. No actual shared state mutations.",
+    "Toolchain: export MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config; PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Use bunx --no-install mise run <task>. Full Linux verify only python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify because PID1 tail lacks orphan reaping; never weaken tests/deadlines to hide failures. Build generated assets from source, no direct edits. Preserve external pins.",
+    "Report JSON schema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; each criterion/evidence key answered exactly. Report under350words plus path inventory; detailed logs outside repo /workspace/work/034. Return report filepath, counts and blockers, no long logs."
+  ],
+  "criteria": [
+    {
+      "text": "No blocking correctness regression remains in committed development flow and publication repair integration",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Independent current head release policy tests pass with meaningful fail closed coverage",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "first-pass",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfgp42p-zdz1"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-13T21:10:36.205Z"
+  },
+  "createdAt": "2026-11-13T21:10:36.205Z"
+}
