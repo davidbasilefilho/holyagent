@@ -16605,7 +16605,7 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
   catch: (cause) => new SetupFailure({
     message: `cannot ${what} ${path}: ${cause instanceof Error ? cause.message : String(cause)}`
   })
-}), isJsonObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value), fileExists2 = (path) => tryPromise2(() => Bun.file(path).exists()).pipe(orElseSucceed2(() => false)), readJsonObject = (path) => readJsonObjectSnapshot(path).pipe(map5((snapshot) => snapshot.value)), readJsonObjectSnapshot = (path) => gen2(function* () {
+}), isJsonObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value), readJsonObject = (path) => readJsonObjectSnapshot(path).pipe(map5((snapshot) => snapshot.value)), readJsonObjectSnapshot = (path) => gen2(function* () {
   const text = yield* readJsonText(path);
   if (text === undefined)
     return { value: empty4, text };
@@ -26882,7 +26882,6 @@ var init_t3_settings = __esm(() => {
   });
 });
 
-import { join as join22 } from "path";
 var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on", neutralDirectory = (env) => homeDirectory(env), ensureGlobal, installCtx7, asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))), setup;
 var init_steps = __esm(() => {
   init_dist();
@@ -26892,7 +26891,6 @@ var init_steps = __esm(() => {
   init_capabilities2();
   init_environment();
   init_form();
-  init_json_file();
   init_pi_check();
   init_pi_install();
   init_pi_settings();
@@ -26924,31 +26922,8 @@ var init_steps = __esm(() => {
     return { usable: true, lines };
   });
   installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
-    const shell = yield* Shell;
-    const files = userFiles(env);
-    const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
-    if (!global.usable)
-      return global.lines;
-    const skillReady = (yield* fileExists2(join22(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join22(files.claudeDir, "rules", "context7.md")));
-    if (skillReady)
-      return [...global.lines, present2("ctx7 skill: already installed")];
-    const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
-    const setupArgs = ["setup", "--cli", "--claude", "--yes"];
-    const args = apiKey !== undefined ? [...setupArgs, "--api-key", apiKey] : (yield* fileExists2(files.ctx7Credentials)) ? setupArgs : undefined;
-    if (args === undefined) {
-      return [
-        ...global.lines,
-        skipped("ctx7 skill: no CONTEXT7_API_KEY and no saved login; run `ctx7 login` or export CONTEXT7_API_KEY, then re-run")
-      ];
-    }
-    if (dryRun) {
-      return [...global.lines, added("ctx7 skill: would install with ctx7 setup --cli --claude")];
-    }
-    const result = yield* shell.run("ctx7", args, { cwd: neutralDirectory(env) });
-    return [
-      ...global.lines,
-      result.exitCode === 0 ? added("ctx7 skill: installed with ctx7 setup --cli --claude") : failed3("ctx7 setup", result)
-    ];
+    const result = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
+    return result.lines;
   });
   setup = fn2("setup")(function* (env, options) {
     const scope = options.scope ?? "user";
@@ -28234,7 +28209,7 @@ var TUI_PACKAGES = {
 
 import { lstat as lstat5, mkdir as mkdir7, mkdtemp as mkdtemp2, readdir as readdir2, rename as rename5, rm as rm7, stat as stat4, writeFile as writeFile3 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename5, dirname as dirname6, join as join23, posix as posix3, win32 as win323 } from "path";
+import { basename as basename5, dirname as dirname6, join as join22, posix as posix3, win32 as win323 } from "path";
 import { pathToFileURL } from "url";
 var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : posix3, cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory(env);
@@ -28269,8 +28244,8 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join23(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join23(directory, file)}`, cause)
+      try: () => Bun.write(join22(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join22(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -28287,9 +28262,9 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
 }), importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
-}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join23(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join22(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
-})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join23(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join22(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", fileSystem = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
@@ -28333,8 +28308,8 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
   return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
 }), STALE_AFTER_MS, newestChange = (path) => gen2(function* () {
   const modified = (entry) => tryPromise2(() => lstat5(entry)).pipe(map5((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map5((names) => names.map((name) => join23(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join23(path, "node_modules"))];
+  const children = (folder) => tryPromise2(() => readdir2(folder)).pipe(map5((names) => names.map((name) => join22(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join22(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 }), sweepStale = (directory, uid) => gen2(function* () {
@@ -28343,24 +28318,24 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir2(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join23(parent, name);
+    const path = join22(parent, name);
     const found = yield* tryPromise2(() => lstat5(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
-}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join23(dirname6(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
+}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join22(dirname6(directory), `.${basename5(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join23(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join22(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove), loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join23(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join22(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -28379,9 +28354,9 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join23(directory, TUI_BUNDLE);
+  const target = join22(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join23(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join22(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -28628,7 +28603,7 @@ var init_setup = __esm(() => {
       summary: "Install and configure what HolyAgent needs beside the plugin, skipping every step already done",
       output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
       notes: [
-        "installs ctx7 with the Context7 skill (needs CONTEXT7_API_KEY or a saved login)",
+        "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
         "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
         "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
         "--scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
@@ -28724,7 +28699,7 @@ var init_setup = __esm(() => {
         "--scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
         "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
         "the Pi checks include `ok   pi form:` (headless or normal, detected from the machine as setup does, or named by --form) and one `pi capability <name>` line for each capability the config turns on: `ok` with its form and what applies, `FAIL` naming an unmet system need or a package not listed at its pin, or a `~` line when the form does not offer it (computer-use on a headless machine), which fails nothing; the provider and web kit packages are the `pi base packages` line",
-        "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages"
+        "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages. The ctx7 check verifies CLI availability, not authentication"
       ],
       flags: { scope: "string", fix: "boolean", form: "string" },
       stateless: true,

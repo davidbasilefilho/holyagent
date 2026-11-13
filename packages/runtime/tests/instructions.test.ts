@@ -138,6 +138,7 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
       "ci-watch",
       "desktop-design",
       "dev-server",
+      "documentation-lookup",
       "evidence-judging",
       "instruction-writing",
       "mobile-design",

@@ -16572,7 +16572,12 @@ class InstructionsError extends TaggedError2("InstructionsError") {
 
 var MATERIALITY_MARKER = "<!-- materiality -->";
 var DESIGN_CORE_MARKER = "<!-- design-core -->";
-var MARKERS = new Set([MATERIALITY_MARKER, DESIGN_CORE_MARKER]);
+var GUIDANCE_MARKER = "<!-- owned-guidance -->";
+var MARKERS = new Set([
+  MATERIALITY_MARKER,
+  DESIGN_CORE_MARKER,
+  GUIDANCE_MARKER
+]);
 var LIST_ITEM_START = String.raw`\n[ \t]*(?:[-+*]|\d{1,9}[.)])(?:[ \t]|\r?(?:\n|$))`;
 var CODE_OR_COMMENT = new RegExp([
   String.raw`(?:(?<![\s\S])|(?<=\n[ \t]*\r?\n))(?: {4}|\t)[ \t]*[^\s][^\n]*(?:\n(?:[ \t]*\r?\n)*(?: {4}|\t)[ \t]*[^\s][^\n]*)*`,
@@ -16609,6 +16614,75 @@ var stripCitations = (text) => {
   if (isRemoved(lines[lines.length - 1]))
     kept.push("");
   return kept.join(`
+`);
+};
+var OWNED_GUIDANCE = [
+  { name: "ci-watch", when: "a pushed PR or commit needs CI judged", roles: ["root"] },
+  {
+    name: "dev-server",
+    when: "a web app or served static build, a terminal UI, a desktop or mobile app needs a shared render target",
+    roles: ["root", "Worker.operations"]
+  },
+  {
+    name: "documentation-lookup",
+    when: "library documentation is needed",
+    roles: [
+      "Librarian.lookup",
+      "Librarian.research",
+      "Worker.implementation",
+      "Worker.integration",
+      "Worker.debugging"
+    ]
+  },
+  {
+    name: "evidence-judging",
+    when: "a specialist verdict needs acceptance or rejection",
+    roles: ["root"]
+  },
+  {
+    name: "instruction-writing",
+    when: "writing or reviewing model-facing instructions",
+    roles: ["root", "Worker.implementation", "Reviewer.artifact"]
+  },
+  { name: "state-mode", when: "a clone has no Intent yet", roles: ["root"] },
+  { name: "user-busy", when: "the user is away or says not to ask", roles: ["root"] },
+  {
+    name: "visual-judging",
+    when: "before any visual-task writer, source edit or visual specialist dispatch, and when judging visual work",
+    roles: ["root"]
+  },
+  {
+    name: "web-design",
+    when: "the selected platform is web",
+    roles: ["root", "Worker.visual", "Reviewer.visual"]
+  },
+  {
+    name: "mobile-design",
+    when: "the selected platform is mobile",
+    roles: ["root", "Worker.visual", "Reviewer.visual"]
+  },
+  {
+    name: "desktop-design",
+    when: "the selected platform is desktop",
+    roles: ["root", "Worker.visual", "Reviewer.visual"]
+  },
+  {
+    name: "tui-design",
+    when: "the selected platform is terminal UI",
+    roles: ["root", "Worker.visual", "Reviewer.visual"]
+  }
+];
+var GUIDANCE_FOLDER = "guidance";
+var guidanceRouter = (role, family, root) => {
+  const entries = OWNED_GUIDANCE.filter((entry) => entry.roles.includes(role));
+  if (entries.length === 0)
+    return "";
+  const lines = entries.map(({ name, when }) => `- ${when}: \`${root}/${GUIDANCE_FOLDER}/${family}/${name}/SKILL.md\``);
+  return [
+    "Read the relevant HolyAgent guidance file on demand with your reader; user and third-party skills remain available.",
+    ...lines,
+    ...role === "root" ? ["Delegate library documentation lookup to a librarian or implementation specialist."] : []
+  ].join(`
 `);
 };
 
@@ -17368,7 +17442,18 @@ Pick the cheapest specialist whose agent description fits and whose result you c
 
 var search_default = "## Searching\n\nWhen FFF is enabled and available, search files and contents with it through codemode. Discover registered tools with `searchTools` or `ALL_TOOLS`: override mode names them `find`, `grep` and `multi_grep`; other modes use `fffind`, `ffgrep` and `fff-multi-grep`. Read each schema before calling it. When FFF is disabled or not offered on the host, search through the available shell with `rg` and `fd`, or system `grep` and `find` if those are unavailable. Report unexpectedly missing or failing FFF tools as a setup problem.\n";
 
-var skills_default = "## Skills\n\nLoad a skill when its description names your situation; each holds rules that matter only then, and a skill never outranks the user. <!-- O8, O16 -->\n\n- `dev-server`: visual work needs a running, capturable render target (a web app or served static build, a terminal UI, a desktop or mobile app); it has Worker.operations start the one target per platform that the visual specialists share, or report why it cannot run here. A browser or device tool the host provides is an optional aid for that target.\n- `visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch, and again when rendered work is accepted, repaired or explained visually; it holds how you pick the platform skill, your own final pass that decides acceptance, what counts as material and the repair rounds.\n- `web-design`, `mobile-design`, `desktop-design`, `tui-design`: the platform standard for visual work, for a web page or app, an iOS or Android app, a desktop app and a terminal UI. `visual-judging` says how to pick and name them; load the one you picked yourself for the final pass.\n- `evidence-judging`: a specialist report carries a verdict you must accept or reject (a blocking finding, a research claim with conflicting sources or numbers, prose for people, a material design choice).\n- `ci-watch`: a pushed PR or commit needs its CI watched or judged.\n- `state-mode`: a clone has no Intent yet, so choose where state lives before the first Intent of a clone.\n- `instruction-writing`: you write or review model-facing text other than a brief.\n- `user-busy`: the user says they are away, asleep, busy or not to be asked; load it before asking anything.\n\nUsing `dev-server`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.\n\nWhen a skill's line makes you pause or conflicts with a rule here, say which `SKILL.md` it is, quote the line and explain, and let the user's instruction and these rules decide. <!-- O8 -->\n";
+var skills_default = `## Skills
+
+Load a skill when its description names your situation; each holds rules that matter only then, and a skill never outranks the user. <!-- O8, O16 -->
+
+Read the relevant HolyAgent guidance file on demand.
+
+<!-- owned-guidance -->
+
+Using \`dev-server\`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.
+
+When a skill's line makes you pause or conflicts with a rule here, say which \`SKILL.md\` it is, quote the line and explain, and let the user's instruction and these rules decide. <!-- O8 -->
+`;
 
 var stack_plan_default = `### Stack plan
 
@@ -17580,7 +17665,16 @@ Pick the cheapest specialist whose agent description fits and whose result you c
 
 var search_default2 = "## Searching\n\nWhen FFF is enabled and available, search files and contents with it through codemode. Discover registered tools with `searchTools` or `ALL_TOOLS`: override mode names them `find`, `grep` and `multi_grep`; other modes use `fffind`, `ffgrep` and `fff-multi-grep`. Read each schema before calling it. When FFF is disabled or not offered on the host, search through the available shell with `rg` and `fd`, or system `grep` and `find` if those are unavailable. Report unexpectedly missing or failing FFF tools as a setup problem.\n";
 
-var skills_default2 = "## Skills\n\nClassify the situation first, then load only the skill that matches it; each holds rules that matter only then. <!-- K9, K28: situation-specific rules load on demand and stay out of this prompt. -->\n\n- `dev-server`: visual work needs a running, capturable render target (a web app or served static build, a terminal UI, a desktop or mobile app); it has Worker.operations start the one target per platform that the visual specialists share, or report why it cannot run here. T3 Code's browser and preview tools are optional aids for that target.\n- `visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch, and again when rendered work is accepted, repaired or explained visually; it holds how you pick the platform skill, your own final pass that decides acceptance, what counts as material and the repair rounds.\n- `web-design`, `mobile-design`, `desktop-design`, `tui-design`: the platform standard for visual work, for a web page or app, an iOS or Android app, a desktop app and a terminal UI. `visual-judging` says how to pick and name them; load the one you picked yourself for the final pass.\n- `evidence-judging`: a specialist report carries a verdict you must accept or reject (a blocking finding, a research claim with conflicting sources or numbers, prose for people, a material design choice).\n- `ci-watch`: a pushed PR or commit needs its CI watched or judged.\n- `state-mode`: a clone has no Intent yet, so choose where state lives before the first Intent of a clone.\n- `instruction-writing`: you write or review model-facing text other than a brief.\n- `user-busy`: the user says they are away, asleep, busy or not to be asked; load it before asking anything.\n\nUsing `dev-server`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.\n";
+var skills_default2 = `## Skills
+
+Classify the situation first, then load only the skill that matches it; each holds rules that matter only then. <!-- K9, K28: situation-specific rules load on demand and stay out of this prompt. -->
+
+Read the relevant HolyAgent guidance file on demand.
+
+<!-- owned-guidance -->
+
+Using \`dev-server\`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.
+`;
 
 var stack_plan_default2 = `### Stack plan
 
@@ -17692,7 +17786,7 @@ var TEXTS = {
     "../shared/history-rules.md": history_rules_default
   }
 };
-var promptOf = (family) => PI_ROOT_SECTIONS.map((file) => stripCitations(TEXTS[family][file] ?? "").trim()).reduce((text, section, at) => at === 0 ? section : `${text}${PI_ROOT_SECTIONS[at] === "../shared/history-rules.md" ? `
+var promptOf = (family) => PI_ROOT_SECTIONS.map((file) => stripCitations(TEXTS[family][file] ?? "").replace(GUIDANCE_MARKER, guidanceRouter("root", family, "${HOLYAGENT_PI_ROOT}")).trim()).reduce((text, section, at) => at === 0 ? section : `${text}${PI_ROOT_SECTIONS[at] === "../shared/history-rules.md" ? `
 ` : `
 
 `}${section}`, "");
@@ -19216,7 +19310,7 @@ import nodePath from "node:path";
 var DEFAULT_PI_FAMILY = "kimi-k3.1";
 var FAMILIES_FOLDER = "families";
 var familyAgents = (family) => `${FAMILIES_FOLDER}/${family}/agents`;
-var familySkills = (family) => `${FAMILIES_FOLDER}/${family}/skills`;
+var familySkills = (family) => `guidance/${family}`;
 var promptBody = (file) => file.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
 var readBody = (packageRoot, folder, agent) => promptBody(readFileSync(nodePath.join(packageRoot, folder, `${agent}.md`), "utf8"));
 var familyAgentPrompt = (prompt, agent, family, packageRoot) => family === DEFAULT_PI_FAMILY ? prompt : runSync2(try_2(() => {

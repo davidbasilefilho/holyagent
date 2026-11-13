@@ -1,15 +1,12 @@
-import { join } from "node:path"
-
 import { Effect, Option } from "effect"
 
 import { CAPABILITIES } from "../config/capabilities.ts"
 import { inCloudSession } from "../vcs/identity.ts"
 import { reportBrowserUse } from "./browser-use.ts"
 import { applyCapabilityChoices } from "./capabilities.ts"
-import { type Env, homeDirectory, userFiles } from "./environment.ts"
+import { type Env, homeDirectory } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice } from "./form.ts"
-import { fileExists } from "./json-file.ts"
 import { type CapabilityChoices, piInUse } from "./pi-check.ts"
 import { installPiPackages } from "./pi-install.ts"
 import { installPiToolSettings, undoPiToolSettings } from "./pi-settings.ts"
@@ -67,47 +64,10 @@ const ensureGlobal = Effect.fn("ensureGlobal")(function* (
   return { usable: true, lines }
 })
 
-/** Ctx7 and the Context7 skill; the skill is skipped, with a hint, when no login or key exists. */
+/** Install the Context7 CLI without installing external instructions or accessing credentials. */
 export const installCtx7 = Effect.fn("installCtx7")(function* (env: Env, dryRun: boolean) {
-  const shell = yield* Shell
-  const files = userFiles(env)
-  const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun)
-  if (!global.usable) return global.lines
-
-  const skillReady =
-    (yield* fileExists(join(files.claudeDir, "skills", "find-docs", "SKILL.md"))) &&
-    (yield* fileExists(join(files.claudeDir, "rules", "context7.md")))
-  if (skillReady) return [...global.lines, present("ctx7 skill: already installed")]
-  // An empty variable counts as unset.
-  const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY
-
-  // ctx7 reads CONTEXT7_API_KEY during setup only for self-hosted deployments, so the key has to
-  // go on the command line, where `ps` shows it for the seconds the command runs.
-  const setupArgs = ["setup", "--cli", "--claude", "--yes"]
-  const args =
-    apiKey !== undefined
-      ? [...setupArgs, "--api-key", apiKey]
-      : (yield* fileExists(files.ctx7Credentials))
-        ? setupArgs
-        : undefined
-  if (args === undefined) {
-    return [
-      ...global.lines,
-      skipped(
-        "ctx7 skill: no CONTEXT7_API_KEY and no saved login; run `ctx7 login` or export CONTEXT7_API_KEY, then re-run",
-      ),
-    ]
-  }
-  if (dryRun) {
-    return [...global.lines, added("ctx7 skill: would install with ctx7 setup --cli --claude")]
-  }
-  const result = yield* shell.run("ctx7", args, { cwd: neutralDirectory(env) })
-  return [
-    ...global.lines,
-    result.exitCode === 0
-      ? added("ctx7 skill: installed with ctx7 setup --cli --claude")
-      : failed("ctx7 setup", result),
-  ]
+  const result = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun)
+  return result.lines
 })
 
 /** Turns a step that cannot finish (an unreadable settings file) into a failed line, not an abort. */

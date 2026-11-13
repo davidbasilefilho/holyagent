@@ -5,8 +5,11 @@ import {
   PRECEDENCE_FILE,
   ROOT_CORE_FILES,
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
+import type { Family } from "../../../runtime/src/instructions/families.ts"
 import {
   embedMateriality,
+  GUIDANCE_MARKER,
+  guidanceRouter,
   MATERIALITY_PATH,
   stripCitations,
 } from "../../../runtime/src/instructions/skills.ts"
@@ -307,6 +310,9 @@ interface Shared {
 export interface SpecialistHost {
   /** The instruction sources of the host's model family, relative to the repository root. */
   readonly instructions: string
+  /** Family and package root used to route private guidance. */
+  readonly guidanceFamily: Family
+  readonly guidanceRoot: string
   /** The path of a route's agent file, relative to the repository root. */
   readonly path: (route: Route) => string
   /** The head of a route's agent file, from the folder `source` of its role and its description. */
@@ -337,6 +343,7 @@ const specialist = async (
     ...CONDITIONAL_SECTIONS.filter(({ applies }) => applies(route)).map(
       ({ file }) => shared.conditional[file] ?? "",
     ),
+    ...[guidanceRouter(route.roleTask, host.guidanceFamily, host.guidanceRoot)].filter(Boolean),
     ...(host.appendix === undefined ? [] : [host.appendix(route)]),
   ].join("\n\n")
   return { path: host.path(route), content: `${head}\n\n${body}\n` }
@@ -385,6 +392,9 @@ const rootAgent = async (): Promise<GeneratedFile> => {
   // The history rules continue the bullet list of the version-control rules, so no blank line
   // splits it; every other section is a paragraph of its own.
   const body = (await readSections(source, ROOT_SECTIONS))
+    .map((text) =>
+      text.replace(GUIDANCE_MARKER, guidanceRouter("root", "claude-5.5", "${CLAUDE_PLUGIN_ROOT}")),
+    )
     .map((text, at) =>
       at === 0 ? text : `${ROOT_SECTIONS[at] === HISTORY_RULES_FILE ? "\n" : "\n\n"}${text}`,
     )
@@ -398,6 +408,8 @@ const rootAgent = async (): Promise<GeneratedFile> => {
 /** The specialist prompt's host for the Claude plugin. */
 const CLAUDE_HOST: SpecialistHost = {
   instructions: INSTRUCTIONS_DIRECTORY,
+  guidanceFamily: "claude-5.5",
+  guidanceRoot: "${CLAUDE_PLUGIN_ROOT}",
   path: (route) => `${DIST_DIRECTORY}/agents/${route.agent}.md`,
   head: (route, source, description) =>
     frontmatter(generatedNote(source), [

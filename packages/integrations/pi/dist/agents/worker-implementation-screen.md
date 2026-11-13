@@ -185,3 +185,7 @@ This text owns the severity of those findings. A finding blocks only when the ch
 - leaves a duplicate that already disagrees with its original.
 
 Every other finding is optional, as is anything already on the base.
+
+Read the relevant HolyAgent guidance file on demand with your reader; user and third-party skills remain available.
+- library documentation is needed: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/documentation-lookup/SKILL.md`
+- writing or reviewing model-facing instructions: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/instruction-writing/SKILL.md`
