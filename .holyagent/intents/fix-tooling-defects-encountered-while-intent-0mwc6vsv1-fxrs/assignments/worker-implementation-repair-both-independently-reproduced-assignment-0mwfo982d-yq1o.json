@@ -1,0 +1,58 @@
+{
+  "id": "assignment-0mwfo982d-yq1o",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-both-independently-reproduced",
+  "objective": "Repair both independently reproduced multi-worktree state migration recovery failures without losing sources or weakening journal trust.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core at a90789b1ae640771a491849ab6623540af3ae123. Read /workspace/work/034/core-migration-final-code-review-report.json and /tmp/holyagent-034-cross-source-review.ts and /tmp/holyagent-034-pending-sources-review.ts if present.",
+    "tree.ts must recover clone-wide pending journal from its trusted registered source worktree before caller migration; preserve complete initial source discovery after interruption. Restrict roots to canonical registered worktrees of same clone, never blindly trust journal roots."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Parallel writer owns migration-files.ts and migration-files.test.ts; do not touch those. Own tree.ts and new migration-worktrees.test.ts only. Do not build generated bundles or run full verification until root coordinates both writers terminal; focused source tests are allowed. Report JSON /workspace/work/034/core-migration-worktrees-repair-report.json and diff outside repo."
+  ],
+  "criteria": [
+    {
+      "text": "A retry from any registered worktree recovers the original pending journal and initial interrupted migration includes every eligible source without silent loss",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Real Git regressions reproduce both prior failures and pass after repair while foreign roots and altered journal inputs remain rejected",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Journal locks authority and existing read-only fences remain intact within assigned scope",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/state/tree.ts",
+    "packages/core/src/state/migration-worktrees.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfmy33h-8m9g",
+  "specialist": {
+    "agentId": "/root/migration_index_module",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T00:32:58.645Z"
+  },
+  "createdAt": "2026-11-14T00:32:58.645Z"
+}
