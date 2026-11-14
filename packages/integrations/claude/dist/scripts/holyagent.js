@@ -7357,6 +7357,9 @@ function make6(ast, options) {
 var lambda = (f) => f;
 
 var SchemaErrorTypeId = "~effect/Schema/SchemaError";
+function isSchemaError(u) {
+  return hasProperty(u, SchemaErrorTypeId) && u[SchemaErrorTypeId] === SchemaErrorTypeId;
+}
 
 function declareConstructor() {
   return (typeParameters, run, annotations) => {
@@ -7395,6 +7398,9 @@ class SchemaError extends (/* @__PURE__ */ TaggedError2("SchemaError")) {
     return `SchemaError(${this.message})`;
   }
 }
+function isSchemaError2(u) {
+  return isSchemaError(u);
+}
 function fromIssueEffect(self) {
   if (effectIsExit(self)) {
     return fromIssueExit(self);
@@ -7404,6 +7410,30 @@ function fromIssueEffect(self) {
 function fromIssueExit(exit) {
   return isSuccess3(exit) ? exit : failCause2(map3(exit.cause, (issue) => new SchemaError(issue)));
 }
+function getSchemaErrorOrThrow(cause, message) {
+  let schemaError;
+  for (const reason of cause.reasons) {
+    if (!isFailReason2(reason) || !isSchemaError2(reason.error)) {
+      throw new globalThis.Error(message, {
+        cause
+      });
+    }
+    schemaError ??= reason.error;
+  }
+  if (schemaError === undefined) {
+    throw new globalThis.Error(message, {
+      cause
+    });
+  }
+  return schemaError;
+}
+function runSchemaErrorSync(self) {
+  const exit = runSyncExit2(self);
+  if (isSuccess3(exit)) {
+    return exit.value;
+  }
+  throw getSchemaErrorOrThrow(exit.cause, "Sync adapter can only throw schema errors");
+}
 var is2 = is;
 function decodeUnknownEffect2(schema, options) {
   const parser = decodeUnknownEffect(schema, options);
@@ -7412,6 +7442,12 @@ function decodeUnknownEffect2(schema, options) {
   };
 }
 var decodeUnknownOption2 = decodeUnknownOption;
+function decodeUnknownSync(schema, options) {
+  const parser = decodeUnknownEffect2(schema, options);
+  return (input, options) => {
+    return runSchemaErrorSync(parser(input, options));
+  };
+}
 function encodeUnknownEffect2(schema, options) {
   const parser = encodeUnknownEffect(schema, options);
   return (input, options) => {
@@ -10488,7 +10524,7 @@ var encodeLocal = (directory, change) => gen2(function* () {
     });
   return files;
 });
-import { join as join4, relative as relative2, sep as sep3 } from "path";
+import { join as join7, relative as relative2, sep as sep3 } from "path";
 
 var IntentState = Literals(["Open", "Closed"]);
 var Intent = Struct({
@@ -10733,35 +10769,516 @@ var scanMatching = async (directory, pattern) => {
   return (await visit("", 0)).toSorted();
 };
 
-import { createHash as createHash2 } from "crypto";
+import { createHash as createHash5 } from "crypto";
 import {
-  copyFile,
-  lstat as lstat2,
-  mkdir as mkdir3,
-  readdir as readdir2,
-  readFile as readFile2,
-  realpath,
-  rename as rename3,
-  rm as rm3,
+  lstat as lstat4,
+  mkdir as mkdir4,
+  readdir as readdir3,
+  readFile as readFile3,
+  realpath as realpath3,
+  rm as rm6,
   rmdir,
   stat as stat2,
-  writeFile as writeFile2
+  writeFile as writeFile3
 } from "fs/promises";
-import { basename, dirname as dirname3, join as join3, relative, sep as sep2 } from "path";
+import { basename as basename2, dirname as dirname5, join as join6, relative, sep as sep2 } from "path";
 
-var StateMode = Literals(["branch", "work", "local"]);
-var DEFAULT_STATE_MODE = "branch";
-var STATE_MODE_KEY = "holyagent.stateMode";
-var parseStateMode = (value) => value === undefined || value.trim() === "" ? succeed6(DEFAULT_STATE_MODE) : decodeUnknownEffect2(StateMode)(value.trim()).pipe(mapError2(() => new StateIo({
-  path: STATE_MODE_KEY,
-  cause: `"${value.trim()}" is not a state mode; set ${STATE_MODE_KEY} in git config to branch, work or local`
-})));
+import { createHash as createHash3, randomUUID } from "crypto";
+import { constants as constants2 } from "fs";
+import { link as link4, lstat as lstat3, mkdir as mkdir3, open as open3, realpath as realpath2, rename as rename4, rm as rm4, unlink } from "fs/promises";
+import { dirname as dirname4, isAbsolute as isAbsolute3, join as join4, resolve as resolve4 } from "path";
 
-var definedEnv = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
-var looksLikeAgent = ({
-  name,
-  email
-}) => email.trim().toLowerCase() === "noreply@anthropic.com" || ["claude", "claude code"].includes(name.replace(/\s+/g, " ").trim().toLowerCase());
+import { createHash as createHash2 } from "crypto";
+import { constants } from "fs";
+import { link as link3, lstat as lstat2, open as open2, readdir as readdir2, realpath, rename as rename3, rm as rm3 } from "fs/promises";
+import { basename, dirname as dirname3, isAbsolute as isAbsolute2, join as join3, resolve as resolve3 } from "path";
+var MigrationJournalFile = Struct({
+  path: String4,
+  before: NullOr(String4),
+  after: String4,
+  content: String4,
+  mode: Int
+});
+var MigrationJournalSource = Struct({
+  path: String4,
+  digest: String4,
+  tracked: Boolean3
+});
+var MigrationJournalPhase = Literals([
+  "prepared",
+  "ref-published",
+  "target-published",
+  "source-cleaned"
+]);
+var MigrationJournal = Struct({
+  version: Literal2(1),
+  transaction: String4,
+  sourceRoot: String4,
+  targetRoot: String4,
+  branch: String4,
+  parent: String4,
+  commit: String4,
+  tree: String4,
+  indexBefore: String4,
+  indexAfter: String4,
+  files: ArraySchema(MigrationJournalFile),
+  source: ArraySchema(MigrationJournalSource),
+  phase: MigrationJournalPhase
+});
+
+class MigrationJournalError extends TaggedError2("MigrationJournalError") {
+  get message() {
+    return `Migration recovery journal at ${this.path}: ${this.reason}`;
+  }
+}
+var MAX_BYTES = 16 * 1024 * 1024;
+var OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+var FINGERPRINT = /^[0-9a-f]{64}$/;
+var PHASES = [
+  "prepared",
+  "ref-published",
+  "target-published",
+  "source-cleaned"
+];
+var decode3 = decodeUnknownSync(MigrationJournal, { onExcessProperty: "error" });
+var invalid3 = (location, reason) => new MigrationJournalError({ path: location.path, reason });
+var canonicalAbsolute = (path) => isAbsolute2(path) && resolve3(path) === path;
+var isMissing = (cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT";
+var validate2 = (location, value) => {
+  let record;
+  try {
+    record = decode3(value);
+  } catch {
+    throw invalid3(location, "invalid or unsupported journal; inspect it before retrying");
+  }
+  const validBranch = record.branch.length > 0 && !record.branch.startsWith("-") && !record.branch.startsWith("/") && !record.branch.endsWith("/") && !record.branch.endsWith(".") && !record.branch.includes("..") && !record.branch.includes("@{") && !Array.from(record.branch).some((char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127) && !["~", "^", ":", "?", "*", "[", "\\"].some((char) => record.branch.includes(char)) && record.branch.split("/").every((part) => part !== "" && !part.startsWith(".") && !part.endsWith(".lock"));
+  const validContent = (content) => /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(content) && Buffer.from(content, "base64").toString("base64") === content;
+  const matchesBlob = (file) => {
+    const bytes = Buffer.from(file.content, "base64");
+    return createHash2(file.after.length === 40 ? "sha1" : "sha256").update(`blob ${bytes.length}\x00`).update(bytes).digest("hex") === file.after;
+  };
+  const filePaths = record.files.map((file) => file.path);
+  const sourcePaths = record.source.map((file) => file.path);
+  const unique = (paths) => paths.every((path, i) => pathProblem(path) === undefined && !paths.slice(0, i).some((prior) => pathsOverlap(prior, path)));
+  if (!canonicalAbsolute(record.sourceRoot) || !canonicalAbsolute(record.targetRoot) || record.sourceRoot !== location.sourceRoot || record.targetRoot !== location.targetRoot || !/^[A-Za-z0-9_-]{1,128}$/.test(record.transaction) || !validBranch || ![record.parent, record.commit, record.tree].every((oid) => OID.test(oid)) || ![record.indexBefore, record.indexAfter].every((hash) => FINGERPRINT.test(hash)) || !unique(filePaths) || !unique(sourcePaths) || !record.files.every((file) => (file.before === null || OID.test(file.before)) && OID.test(file.after) && (file.mode === 33188 || file.mode === 33261) && validContent(file.content) && matchesBlob(file)) || !record.source.every((file) => OID.test(file.digest)))
+    throw invalid3(location, "invalid journal fields or root binding; inspect it before retrying");
+  return record;
+};
+var owner = (info) => (typeof process.getuid !== "function" || info.uid === process.getuid()) && (info.mode & 18) === 0;
+var temporaryAlias = async (location, info) => {
+  const prefix = `${basename(location.path)}.`;
+  const names = await readdir2(dirname3(location.path));
+  const candidates = names.filter((name) => name.startsWith(prefix) && /^[0-9a-f-]{36}\.tmp$/.test(name.slice(prefix.length)));
+  const aliases = [];
+  for (const name of candidates) {
+    const path = join3(dirname3(location.path), name);
+    try {
+      const entry = await lstat2(path);
+      if (entry.isFile() && !entry.isSymbolicLink() && entry.dev === info.dev && entry.ino === info.ino)
+        aliases.push(path);
+    } catch (cause) {
+      if (!isMissing(cause))
+        throw cause;
+    }
+  }
+  return aliases;
+};
+var removeTemporaryAlias = async (location) => {
+  const info = await lstat2(location.path);
+  if (info.nlink === 2) {
+    const aliases = await temporaryAlias(location, info);
+    if (aliases.length !== 1)
+      throw invalid3(location, "journal has an unexpected hard link");
+    await rm3(aliases[0]);
+  }
+};
+var checkLocation = async (location) => {
+  if (![location.path, location.sourceRoot, location.targetRoot].every(canonicalAbsolute))
+    throw invalid3(location, "journal path and trusted roots must be canonical absolute paths");
+  try {
+    const parent = dirname3(location.path);
+    const [directory, actualParent, source, target, sourceInfo, targetInfo] = await Promise.all([
+      lstat2(parent),
+      realpath(parent),
+      realpath(location.sourceRoot),
+      realpath(location.targetRoot),
+      lstat2(location.sourceRoot),
+      lstat2(location.targetRoot)
+    ]);
+    if (!directory.isDirectory() || directory.isSymbolicLink() || !owner(directory) || actualParent !== parent || !sourceInfo.isDirectory() || !targetInfo.isDirectory() || source !== location.sourceRoot || target !== location.targetRoot)
+      throw invalid3(location, "journal parent or trusted roots are not private canonical directories");
+  } catch (cause) {
+    if (cause instanceof MigrationJournalError)
+      throw cause;
+    throw invalid3(location, "cannot verify journal parent and trusted roots");
+  }
+};
+var read = async (location) => {
+  await checkLocation(location);
+  let handle;
+  try {
+    handle = await open2(location.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  } catch (cause) {
+    if (isMissing(cause))
+      return;
+    throw invalid3(location, "cannot safely open journal; inspect it before retrying");
+  }
+  try {
+    const [info, pathInfo] = await Promise.all([handle.stat(), lstat2(location.path)]);
+    if (!info.isFile() || !pathInfo.isFile() || pathInfo.isSymbolicLink() || !owner(info) || (info.mode & 63) !== 0 || info.dev !== pathInfo.dev || info.ino !== pathInfo.ino || info.size > MAX_BYTES)
+      throw invalid3(location, "journal is not an owned private regular file");
+    if (info.nlink !== 1 && !(info.nlink === 2 && (await temporaryAlias(location, info)).length === 1))
+      throw invalid3(location, "journal has an unexpected hard link");
+    const text = await handle.readFile("utf8");
+    if (Buffer.byteLength(text) > MAX_BYTES)
+      throw invalid3(location, "journal exceeds size limit");
+    let value;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      throw invalid3(location, "journal is corrupt; inspect it before retrying");
+    }
+    return validate2(location, value);
+  } finally {
+    await handle.close();
+  }
+};
+var syncDirectory = async (location) => {
+  if (process.platform === "win32")
+    return;
+  const directory = await open2(dirname3(location.path), "r");
+  try {
+    await directory.sync();
+  } finally {
+    await directory.close();
+  }
+};
+var encoded = (location, record) => {
+  validate2(location, record);
+  const contents = `${JSON.stringify(record)}
+`;
+  if (Buffer.byteLength(contents) > MAX_BYTES)
+    throw invalid3(location, "journal exceeds size limit");
+  return contents;
+};
+var write = async (location, record, create) => {
+  const contents = encoded(location, record);
+  const temporary = `${location.path}.${crypto.randomUUID()}.tmp`;
+  let handle;
+  try {
+    handle = await open2(temporary, "wx", 384);
+    await handle.writeFile(contents, "utf8");
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    if (create) {
+      await link3(temporary, location.path);
+      await rm3(temporary);
+    } else
+      await rename3(temporary, location.path);
+    await syncDirectory(location);
+  } finally {
+    await handle?.close().catch(() => {});
+    await rm3(temporary, { force: true }).catch(() => {});
+  }
+};
+var operation = (location, run) => tryPromise2({
+  try: run,
+  catch: (cause) => cause instanceof MigrationJournalError ? cause : invalid3(location, "journal I/O failed; inspect it before retrying")
+});
+var readMigrationJournal = (location) => operation(location, () => read(location));
+var beginMigrationJournal = (location, record, authorize) => gen2(function* () {
+  if (record.phase !== "prepared")
+    return yield* invalid3(location, "a new journal must be prepared");
+  yield* operation(location, async () => {
+    await checkLocation(location);
+    encoded(location, record);
+    if (await read(location) !== undefined)
+      throw invalid3(location, "a journal already exists; recover it first");
+  });
+  yield* authorize;
+  yield* uninterruptible2(operation(location, () => write(location, record, true)));
+});
+var advanceMigrationJournal = (location, transaction, expected, next, authorize) => gen2(function* () {
+  if (PHASES.indexOf(next) !== PHASES.indexOf(expected) + 1)
+    return yield* invalid3(location, "invalid journal phase transition");
+  const current = yield* operation(location, () => read(location));
+  if (current === undefined || current.transaction !== transaction || current.phase !== expected)
+    return yield* invalid3(location, "journal changed or is missing; reload recovery state");
+  yield* authorize;
+  return yield* uninterruptible2(operation(location, async () => {
+    const latest = await read(location);
+    if (latest === undefined || JSON.stringify(latest) !== JSON.stringify(current))
+      throw invalid3(location, "journal changed during authorization; reload recovery state");
+    await removeTemporaryAlias(location);
+    const updated = { ...current, phase: next };
+    await write(location, updated, false);
+    return updated;
+  }));
+});
+var finishMigrationJournal = (location, transaction, authorize) => gen2(function* () {
+  const current = yield* operation(location, () => read(location));
+  if (current === undefined || current.transaction !== transaction || current.phase !== "source-cleaned")
+    return yield* invalid3(location, "journal is missing, changed, or not complete");
+  yield* authorize;
+  yield* uninterruptible2(operation(location, async () => {
+    const latest = await read(location);
+    if (latest === undefined || JSON.stringify(latest) !== JSON.stringify(current))
+      throw invalid3(location, "journal changed during authorization; reload recovery state");
+    await removeTemporaryAlias(location);
+    await rm3(location.path);
+    await syncDirectory(location);
+  }));
+});
+
+class MigrationFilesError extends TaggedError2("MigrationFilesError") {
+  get message() {
+    return `Migration file ${this.path}: ${this.reason}`;
+  }
+}
+var fail6 = (path, reason) => new MigrationFilesError({ path, reason });
+var oid = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+var blob = (bytes, id) => createHash3(id.length === 40 ? "sha1" : "sha256").update(`blob ${bytes.length}\x00`).update(bytes).digest("hex");
+var operation2 = (path, run) => tryPromise2({
+  try: run,
+  catch: (cause) => cause instanceof MigrationFilesError ? cause : fail6(path, "filesystem operation failed; inspect and retry")
+});
+var sameIdentity = (a, b) => a.dev === b.dev && a.ino === b.ino;
+var missing2 = (cause) => hasCode(cause, "ENOENT");
+var infoOrMissing = async (path) => {
+  try {
+    return await lstat3(path);
+  } catch (cause) {
+    if (missing2(cause))
+      return;
+    throw cause;
+  }
+};
+var validatePaths = (root, paths) => {
+  if (!isAbsolute3(root) || resolve4(root) !== root)
+    throw fail6(root, "root must be canonical and absolute");
+  for (const [i, path] of paths.entries())
+    if (pathProblem(path) !== undefined || paths.slice(0, i).some((other) => pathsOverlap(path, other)))
+      throw fail6(path, "invalid or overlapping path");
+};
+var validateFiles = (root, input) => {
+  let files;
+  try {
+    files = decodeUnknownSync(ArraySchema(MigrationJournalFile), {
+      onExcessProperty: "error"
+    })(input);
+  } catch {
+    throw fail6(root, "invalid file records");
+  }
+  validatePaths(root, files.map((file) => file.path));
+  for (const file of files) {
+    const bytes = Buffer.from(file.content, "base64");
+    if (!oid.test(file.after) || file.before !== null && !oid.test(file.before) || file.mode !== 33188 && file.mode !== 33261 || bytes.toString("base64") !== file.content || blob(bytes, file.after) !== file.after)
+      throw fail6(file.path, "invalid file postimage");
+  }
+  return files;
+};
+var validateSources = (root, input) => {
+  let source;
+  try {
+    source = decodeUnknownSync(ArraySchema(MigrationJournalSource), {
+      onExcessProperty: "error"
+    })(input);
+  } catch {
+    throw fail6(root, "invalid source records");
+  }
+  validatePaths(root, source.map((file) => file.path));
+  for (const file of source)
+    if (!oid.test(file.digest))
+      throw fail6(file.path, "invalid source digest");
+  return source;
+};
+var parents = async (root, path) => {
+  const rootInfo = await lstat3(root);
+  if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || await realpath2(root) !== root)
+    throw fail6(root, "root is not a canonical directory");
+  const checked = [{ path: root, info: rootInfo }];
+  let current = root;
+  for (const part of path.split("/").slice(0, -1)) {
+    current = join4(current, part);
+    const info = await infoOrMissing(current);
+    if (info === undefined)
+      break;
+    if (!info.isDirectory() || info.isSymbolicLink() || await realpath2(current) !== current)
+      throw fail6(path, "parent is not a canonical directory");
+    checked.push({ path: current, info });
+  }
+  return checked;
+};
+var recheck = async (checked, path) => {
+  for (const entry of checked) {
+    const latest = await lstat3(entry.path);
+    if (!latest.isDirectory() || latest.isSymbolicLink() || !sameIdentity(entry.info, latest) || await realpath2(entry.path) !== entry.path)
+      throw fail6(path, "parent changed");
+  }
+};
+var readRegular = async (path) => {
+  const before = await infoOrMissing(path);
+  if (before === undefined)
+    return;
+  if (!before.isFile() || before.isSymbolicLink())
+    throw fail6(path, "path is not a regular file");
+  const handle = await open3(path, constants2.O_RDONLY | (constants2.O_NOFOLLOW ?? 0));
+  try {
+    const info = await handle.stat();
+    const latest = await lstat3(path);
+    if (!info.isFile() || !latest.isFile() || latest.isSymbolicLink() || !sameIdentity(before, info) || !sameIdentity(info, latest))
+      throw fail6(path, "file changed while reading");
+    return { bytes: await handle.readFile(), info };
+  } finally {
+    await handle.close();
+  }
+};
+var matchesMode = (mode, expected) => process.platform === "win32" || (mode & 73) === (expected & 73);
+var publishMigrationFiles = (options) => gen2(function* () {
+  const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
+  for (const file of files) {
+    const path = join4(options.root, file.path);
+    let checked = yield* operation2(path, () => parents(options.root, file.path));
+    const existing = yield* operation2(path, () => readRegular(path));
+    if (existing !== undefined) {
+      if (blob(existing.bytes, file.after) === file.after && matchesMode(existing.info.mode, file.mode)) {
+        yield* operation2(path, () => recheck(checked, path));
+        continue;
+      }
+      if (file.before === null || blob(existing.bytes, file.before) !== file.before || !matchesMode(existing.info.mode, file.mode))
+        return yield* fail6(file.path, "existing file differs from preimage");
+    } else if (file.before !== null)
+      return yield* fail6(file.path, "preexisting file was deleted");
+    const components = file.path.split("/").slice(0, -1);
+    for (let i = checked.length - 1;i < components.length; i++) {
+      const dir = join4(options.root, ...components.slice(0, i + 1));
+      yield* options.authorize;
+      yield* operation2(dir, async () => {
+        await recheck(checked, path);
+        try {
+          await mkdir3(dir);
+        } catch (cause) {
+          if (!hasCode(cause, "EEXIST"))
+            throw cause;
+        }
+        checked = await parents(options.root, file.path);
+      }).pipe(uninterruptible2);
+    }
+    yield* options.authorize;
+    yield* operation2(path, async () => {
+      await recheck(checked, path);
+      const temporary = join4(dirname4(path), `.holyagent-migration-${randomUUID()}.tmp`);
+      let handle;
+      try {
+        handle = await open3(temporary, "wx", file.mode & 511);
+        await handle.writeFile(Buffer.from(file.content, "base64"));
+        if (process.platform !== "win32")
+          await handle.chmod(file.mode & 511);
+        await handle.sync();
+        await handle.close();
+        handle = undefined;
+        await recheck(checked, path);
+        if (existing === undefined)
+          await link4(temporary, path);
+        else {
+          const latest = await readRegular(path);
+          if (latest === undefined || !sameIdentity(existing.info, latest.info) || file.before === null || blob(latest.bytes, file.before) !== file.before || !matchesMode(latest.info.mode, file.mode))
+            throw fail6(file.path, "preexisting file changed during publication");
+          await rename4(temporary, path);
+        }
+      } finally {
+        await handle?.close().catch(() => {});
+        await rm4(temporary, { force: true }).catch(() => {});
+      }
+    }).pipe(uninterruptible2);
+  }
+});
+var cleanupMigrationSources = (options) => gen2(function* () {
+  const source = yield* operation2(options.root, () => Promise.resolve().then(() => validateSources(options.root, options.source)));
+  const removed = [];
+  const retained = [];
+  for (const file of source) {
+    const path = join4(options.root, file.path);
+    const checked = yield* operation2(path, () => parents(options.root, file.path));
+    const current = yield* operation2(path, () => readRegular(path));
+    if (current === undefined)
+      continue;
+    if (file.tracked || options.isTracked === undefined || (yield* options.isTracked(file.path))) {
+      retained.push({ path: file.path, reason: "tracked or tracking unknown" });
+      continue;
+    }
+    if (blob(current.bytes, file.digest) !== file.digest) {
+      retained.push({ path: file.path, reason: "changed" });
+      continue;
+    }
+    yield* options.authorize;
+    if (yield* options.isTracked(file.path)) {
+      retained.push({ path: file.path, reason: "tracked" });
+      continue;
+    }
+    yield* options.authorize;
+    const deleted = yield* operation2(path, async () => {
+      await recheck(checked, path);
+      const latest = await readRegular(path);
+      if (latest === undefined)
+        return true;
+      if (!sameIdentity(current.info, latest.info) || blob(latest.bytes, file.digest) !== file.digest)
+        return false;
+      await unlink(path);
+      return true;
+    }).pipe(uninterruptible2);
+    if (deleted)
+      removed.push(file.path);
+    else
+      retained.push({ path: file.path, reason: "changed" });
+  }
+  return { removed, retained };
+});
+var verifyMigrationFiles = (options) => gen2(function* () {
+  const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
+  for (const file of files) {
+    const path = join4(options.root, file.path);
+    yield* operation2(path, async () => {
+      const checked = await parents(options.root, file.path);
+      const actual = await readRegular(path);
+      if (actual === undefined || blob(actual.bytes, file.after) !== file.after || !matchesMode(actual.info.mode, file.mode))
+        throw fail6(file.path, "file does not match postimage");
+      await recheck(checked, path);
+    });
+  }
+});
+var verifyMigrationFilePreimages = (options) => gen2(function* () {
+  const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
+  for (const file of files) {
+    const path = join4(options.root, file.path);
+    yield* operation2(path, async () => {
+      const checked = await parents(options.root, file.path);
+      const actual = await readRegular(path);
+      if (actual === undefined ? file.before !== null : file.before === null || !matchesMode(actual.info.mode, file.mode) || blob(actual.bytes, file.before) !== file.before)
+        throw fail6(file.path, "file does not match a recorded migration preimage");
+      await recheck(checked, path);
+    });
+  }
+});
+var readMigrationSource = (options) => operation2(options.root, async () => {
+  validatePaths(options.root, [options.path]);
+  const checked = await parents(options.root, options.path);
+  const value = await readRegular(join4(options.root, options.path));
+  if (value === undefined)
+    throw fail6(options.path, "source disappeared during preparation");
+  await recheck(checked, options.path);
+  return {
+    bytes: value.bytes,
+    mode: process.platform !== "win32" && (value.info.mode & 73) !== 0 ? 33261 : 33188
+  };
+});
+
+import { createHash as createHash4, randomUUID as randomUUID2 } from "crypto";
+import { constants as constants3 } from "fs";
+import { copyFile, mkdtemp, open as open4, readFile as readFile2, rename as rename5, rm as rm5, writeFile as writeFile2 } from "fs/promises";
+import { tmpdir } from "os";
+import { isAbsolute as isAbsolute4, join as join5, resolve as resolve5 } from "path";
 
 import { spawn as spawnChild } from "child_process";
 var spawn = (program, args, options) => callback2((resume) => {
@@ -10818,6 +11335,372 @@ var spawn = (program, args, options) => callback2((resume) => {
   });
 });
 
+var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env, stdin }).pipe(catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause }))));
+var repositoryVariables = new Set([
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_PREFIX",
+  "GIT_COMMON_DIR",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_NAMESPACE",
+  "GIT_QUARANTINE_PATH"
+]);
+var fail7 = (path, cause) => new StateIo({ path, cause });
+var validPath = (path) => path !== "" && !isAbsolute4(path) && !path.includes("\\") && !path.includes("\x00") && path.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+var oidPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+var validContent = (content) => Buffer.from(content, "base64").toString("base64") === content;
+var validMode = (mode) => mode === 33188 || mode === 33261;
+var validate3 = (cwd, files) => {
+  const seen = new Set;
+  for (const file of files) {
+    if (!validPath(file.path) || seen.has(file.path) || !validMode(file.mode) || !validContent(file.content))
+      return fail7(cwd, `invalid or duplicate migration path, mode, or content: ${file.path}`);
+    if ([...seen].some((other) => other.startsWith(`${file.path}/`) || file.path.startsWith(`${other}/`)))
+      return fail7(cwd, `overlapping migration paths: ${file.path}`);
+    seen.add(file.path);
+  }
+  return;
+};
+var environment = (env, index) => {
+  const result = {};
+  for (const [key, value] of Object.entries({ ...process.env, ...env }))
+    if (value !== undefined && !repositoryVariables.has(key))
+      result[key] = value;
+  if (index !== undefined)
+    result.GIT_INDEX_FILE = index;
+  result.GIT_NO_REPLACE_OBJECTS = "1";
+  return result;
+};
+var git = (options, args, index, stdin) => (options.runGit ?? defaultRunner)({
+  cwd: options.cwd,
+  args,
+  env: environment(options.env, index),
+  ...stdin === undefined ? {} : { stdin }
+}).pipe(flatMap2((result) => result.code === 0 ? try_2({
+  try: () => new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }).decode(result.stdout),
+  catch: () => fail7(options.cwd, "git returned output that is not valid UTF-8")
+}) : fail5(fail7(options.cwd, `git ${args[0]} exited ${result.code}: ${result.stderr.trim()}`))));
+var entries = (options, index, readOnly = false) => git(options, [...readOnly ? ["-c", "core.fsmonitor=false"] : [], "ls-files", "--stage", "-z"], index).pipe(flatMap2((output) => {
+  const found = new Map;
+  for (const record of output.split("\x00")) {
+    if (record === "")
+      continue;
+    const match = /^(\d+) ([0-9a-f]+) ([0-3])\t([\s\S]+)$/.exec(record);
+    if (match === null || !oidPattern.test(match[2]))
+      return fail5(fail7(options.cwd, "git returned an invalid index entry"));
+    const path = match[4];
+    const list = found.get(path) ?? [];
+    list.push({ mode: Number.parseInt(match[1], 8), oid: match[2], stage: Number(match[3]) });
+    found.set(path, list);
+  }
+  return succeed6(found);
+}));
+var same = (actual, oid, mode) => oid === null ? actual === undefined : actual?.length === 1 && actual[0]?.stage === 0 && actual[0].oid === oid && actual[0].mode === mode;
+var conflictingPath = (entries, path) => [...entries.keys()].some((other) => other !== path && (other.startsWith(`${path}/`) || path.startsWith(`${other}/`)));
+var fingerprint = (files, after) => createHash4("sha256").update(JSON.stringify([...files].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0).map((file) => [
+  file.path,
+  after ? file.after : file.before,
+  after || file.before !== null ? file.mode : null
+]))).digest("hex");
+var temporary = (options, use) => acquireUseRelease2(options.authorize.pipe(andThen2(io(tmpdir(), () => mkdtemp(join5(tmpdir(), "holyagent-migration-"))))), use, (dir) => io(dir, () => rm5(dir, { recursive: true, force: true })).pipe(ignore2));
+var prepareMigrationCommit = (options) => gen2(function* () {
+  const invalid = validate3(options.cwd, options.files);
+  if (invalid !== undefined)
+    return yield* invalid;
+  return yield* temporary(options, (dir) => gen2(function* () {
+    const index = join5(dir, "index");
+    const parent = (yield* git(options, ["rev-parse", "--verify", "HEAD"])).trim();
+    if (!oidPattern.test(parent))
+      return yield* fail7(options.cwd, "invalid HEAD object id");
+    yield* options.authorize;
+    yield* git(options, ["read-tree", parent], index);
+    const base = yield* entries(options, index);
+    const live = yield* entries(options);
+    const files = [];
+    for (const file of options.files) {
+      const contentPath = join5(dir, randomUUID2());
+      yield* options.authorize;
+      yield* io(contentPath, () => writeFile2(contentPath, Buffer.from(file.content, "base64")));
+      yield* options.authorize;
+      const after = (yield* git(options, [
+        "hash-object",
+        "-w",
+        "--no-filters",
+        "--",
+        contentPath
+      ])).trim();
+      if (!oidPattern.test(after))
+        return yield* fail7(options.cwd, "invalid blob object id");
+      if (conflictingPath(base, file.path) || conflictingPath(live, file.path))
+        return yield* fail7(file.path, "migration target conflicts with another index path");
+      const prior = base.get(file.path);
+      if (prior !== undefined && (prior.length !== 1 || prior[0]?.stage !== 0 || prior[0].mode !== file.mode))
+        return yield* fail7(file.path, "migration target has an incompatible committed mode");
+      const before = prior === undefined ? null : prior[0].oid;
+      if (!same(live.get(file.path), before, file.mode))
+        return yield* fail7(file.path, "migration target has an unexpected index entry");
+      files.push({ ...file, before, after });
+    }
+    if (files.length > 0) {
+      yield* options.authorize;
+      yield* git(options, ["update-index", "-z", "--index-info"], index, files.map((file) => `${file.mode.toString(8)} ${file.after}	${file.path}\x00`).join(""));
+    }
+    yield* options.authorize;
+    const tree = (yield* git(options, ["write-tree"], index)).trim();
+    yield* options.authorize;
+    const commit = (yield* git(options, [
+      "-c",
+      "commit.gpgsign=false",
+      "commit-tree",
+      tree,
+      "-p",
+      parent,
+      "-m",
+      options.message
+    ])).trim();
+    if (!oidPattern.test(tree) || !oidPattern.test(commit))
+      return yield* fail7(options.cwd, "invalid tree or commit object id");
+    return {
+      parent,
+      tree,
+      commit,
+      indexBefore: fingerprint(files, false),
+      indexAfter: fingerprint(files, true),
+      files
+    };
+  }));
+});
+var publishMigrationIndex = (options) => gen2(function* () {
+  const invalid = validate3(options.cwd, options.files);
+  if (invalid !== undefined)
+    return yield* invalid;
+  for (const file of options.files)
+    if (!oidPattern.test(file.after) || file.before !== null && !oidPattern.test(file.before))
+      return yield* fail7(file.path, "invalid migration index preimage");
+  const name = (yield* git(options, [
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-path",
+    "index"
+  ])).trim();
+  if (!isAbsolute4(name))
+    return yield* fail7(options.cwd, "git returned a relative index path");
+  const index = resolve5(name);
+  const lock = `${index}.lock`;
+  let published = false;
+  return yield* acquireUseRelease2(options.authorize.pipe(andThen2(tryPromise2({
+    try: () => open4(lock, constants3.O_WRONLY | constants3.O_CREAT | constants3.O_EXCL | (constants3.O_NOFOLLOW ?? 0), 438),
+    catch: (cause) => hasCode(cause, "EEXIST") ? new StateLocked({ lockFile: lock }) : new StateIo({ path: lock, cause })
+  }))), (handle) => temporary(options, (dir) => gen2(function* () {
+    const copy = join5(dir, "index");
+    yield* options.authorize;
+    const copied = yield* io(index, () => copyFile(index, copy)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+    if (!copied) {
+      yield* options.authorize;
+      yield* git(options, ["read-tree", "--empty"], copy);
+    }
+    const live = yield* entries(options, copy);
+    for (const file of options.files) {
+      if (conflictingPath(live, file.path) || !same(live.get(file.path), file.before, file.mode) && !same(live.get(file.path), file.after, file.mode))
+        return yield* fail7(file.path, "migration index entry changed; inspect and retry");
+    }
+    if (options.files.length > 0) {
+      yield* options.authorize;
+      yield* git(options, ["update-index", "-z", "--index-info"], copy, options.files.map((file) => `${file.mode.toString(8)} ${file.after}	${file.path}\x00`).join(""));
+    }
+    const bytes = yield* io(copy, () => readFile2(copy));
+    yield* options.authorize;
+    yield* io(lock, async () => {
+      await handle.writeFile(bytes);
+      await handle.sync();
+      await handle.close();
+    });
+    yield* options.authorize;
+    yield* io(index, async () => {
+      await rename5(lock, index);
+      published = true;
+    }).pipe(uninterruptible2);
+  })), (handle) => io(lock, () => handle.close()).pipe(ignore2, andThen2(suspend2(() => published ? void_3 : io(lock, () => rm5(lock, { force: true })).pipe(ignore2)))));
+});
+var treeEntries = (options, tree) => git(options, ["ls-tree", "-r", "-t", "-z", "--full-tree", tree]).pipe(flatMap2((output) => {
+  const found = new Map;
+  for (const record of output.split("\x00")) {
+    if (record === "")
+      continue;
+    const match = /^([0-7]{6}) (blob|tree|commit) ([0-9a-f]+)\t([\s\S]+)$/.exec(record);
+    if (match === null || !oidPattern.test(match[3]) || found.has(match[4]))
+      return fail5(fail7(options.cwd, "git returned an invalid tree entry"));
+    found.set(match[4], {
+      mode: Number.parseInt(match[1], 8),
+      type: match[2],
+      oid: match[3]
+    });
+  }
+  return succeed6(found);
+}));
+var sameTreeEntry = (left, right) => left === undefined ? right === undefined : right !== undefined && left.mode === right.mode && left.type === right.type && left.oid === right.oid;
+var validateRecordedFiles = (cwd, files) => {
+  if (validate3(cwd, files) !== undefined)
+    return fail7(cwd, "invalid recorded migration files");
+  for (const file of files) {
+    if (!oidPattern.test(file.after) || file.before !== null && !oidPattern.test(file.before))
+      return fail7(cwd, "invalid recorded migration object id");
+    const bytes = Buffer.from(file.content, "base64");
+    const actual = createHash4(file.after.length === 40 ? "sha1" : "sha256").update(`blob ${bytes.length}\x00`).update(bytes).digest("hex");
+    if (actual !== file.after)
+      return fail7(cwd, "recorded migration content does not match its blob");
+  }
+  return;
+};
+var verifyMigrationIndex = (options) => gen2(function* () {
+  const invalid = validateRecordedFiles(options.cwd, options.files);
+  if (invalid !== undefined)
+    return yield* invalid;
+  const readOnly = { ...options, env: { ...options.env, GIT_OPTIONAL_LOCKS: "0" } };
+  const live = yield* entries(readOnly, undefined, true);
+  for (const file of options.files)
+    if (conflictingPath(live, file.path) || !same(live.get(file.path), file.after, file.mode))
+      return yield* fail7(options.cwd, "migration index postimage differs; inspect the index before retrying");
+});
+var verifyMigrationCommit = (options) => gen2(function* () {
+  const invalid = validateRecordedFiles(options.cwd, options.files);
+  if (invalid !== undefined)
+    return yield* invalid;
+  if (![options.parent, options.tree, options.commit].every((oid) => oidPattern.test(oid)))
+    return yield* fail7(options.cwd, "invalid recorded migration commit object id");
+  const readOnly = { ...options, env: { ...options.env, GIT_OPTIONAL_LOCKS: "0" } };
+  const kind = (yield* git(readOnly, ["cat-file", "-t", options.commit])).trim();
+  if (kind !== "commit")
+    return yield* fail7(options.cwd, "recorded migration object is not a commit");
+  const header = (yield* git(readOnly, ["cat-file", "-p", options.commit])).split(`
+
+`, 1)[0] ?? "";
+  const lines = header.split(`
+`);
+  const trees = lines.filter((line) => line.startsWith("tree "));
+  const parents = lines.filter((line) => line.startsWith("parent "));
+  if (trees.length !== 1 || trees[0] !== `tree ${options.tree}` || parents.length !== 1 || parents[0] !== `parent ${options.parent}`)
+    return yield* fail7(options.cwd, "migration commit parent or tree differs from the journal");
+  const before = yield* treeEntries(readOnly, options.parent);
+  const after = yield* treeEntries(readOnly, options.tree);
+  const owned = new Map(options.files.map((file) => [file.path, file]));
+  for (const file of options.files) {
+    const preimage = before.get(file.path);
+    const postimage = after.get(file.path);
+    if ((file.before === null ? preimage !== undefined : preimage?.type !== "blob" || preimage.mode !== file.mode || preimage.oid !== file.before) || postimage?.type !== "blob" || postimage.mode !== file.mode || postimage.oid !== file.after)
+      return yield* fail7(options.cwd, "migration commit owned file differs from the journal");
+  }
+  for (const path of new Set([...before.keys(), ...after.keys()])) {
+    const prior = before.get(path);
+    const current = after.get(path);
+    if (sameTreeEntry(prior, current) || owned.has(path))
+      continue;
+    const ancestor = options.files.some((file) => file.path.startsWith(`${path}/`));
+    if (ancestor && (prior === undefined || prior.type === "tree") && (current === undefined || current.type === "tree"))
+      continue;
+    return yield* fail7(options.cwd, "migration commit contains an unrelated tree change");
+  }
+});
+
+import { randomUUID as randomUUID3 } from "crypto";
+class MigrationRunnerConflict extends TaggedError2("MigrationRunnerConflict") {
+  get message() {
+    return `Migration needs recovery: ${this.reason}`;
+  }
+}
+var runMigrationTransaction = (options) => gen2(function* () {
+  const { location, branch, authorize, services } = options;
+  let journal = yield* readMigrationJournal(location);
+  if (journal === undefined) {
+    yield* authorize;
+    const prepared = yield* services.prepare(authorize);
+    journal = {
+      version: 1,
+      transaction: randomUUID3(),
+      sourceRoot: location.sourceRoot,
+      targetRoot: location.targetRoot,
+      branch,
+      parent: prepared.parent,
+      commit: prepared.commit,
+      tree: prepared.tree,
+      indexBefore: prepared.indexBefore,
+      indexAfter: prepared.indexAfter,
+      files: prepared.files,
+      source: prepared.source,
+      phase: "prepared"
+    };
+    yield* beginMigrationJournal(location, journal, authorize);
+  }
+  if (journal.branch !== branch)
+    return yield* new MigrationRunnerConflict({
+      reason: "journal names another state branch; inspect it before retrying"
+    });
+  yield* services.verifyCommit(journal);
+  const checkCommitted = (record) => services.readRef(branch).pipe(flatMap2((actual) => actual === record.commit ? void_3 : fail5(new MigrationRunnerConflict({
+    reason: "state branch changed during migration; inspect it before retrying"
+  }))));
+  if (journal.phase === "prepared") {
+    const actual = yield* services.readRef(branch);
+    if (actual !== journal.commit) {
+      if (actual !== journal.parent)
+        return yield* new MigrationRunnerConflict({
+          reason: "state branch is neither the recorded parent nor migration commit"
+        });
+      yield* authorize;
+      const record = journal;
+      yield* services.compareAndSwapRef(branch, record.parent, record.commit, authorize).pipe(catch_2((error) => services.readRef(branch).pipe(flatMap2((after) => after === record.commit ? void_3 : after === record.parent ? fail5(error) : fail5(new MigrationRunnerConflict({
+        reason: "state branch changed while publishing the ref"
+      }))))));
+    }
+    yield* checkCommitted(journal);
+    journal = yield* advanceMigrationJournal(location, journal.transaction, "prepared", "ref-published", authorize);
+  }
+  if (journal.phase === "ref-published") {
+    yield* checkCommitted(journal);
+    yield* authorize;
+    yield* services.publishFiles(journal, authorize);
+    yield* checkCommitted(journal);
+    yield* authorize;
+    yield* services.publishIndex(journal, authorize);
+    yield* checkCommitted(journal);
+    yield* services.verifyTarget(journal);
+    yield* checkCommitted(journal);
+    journal = yield* advanceMigrationJournal(location, journal.transaction, "ref-published", "target-published", authorize);
+  }
+  if (journal.phase === "target-published") {
+    yield* checkCommitted(journal);
+    yield* services.verifyTarget(journal);
+    yield* checkCommitted(journal);
+    yield* authorize;
+    yield* services.cleanupSource(journal, authorize);
+    yield* checkCommitted(journal);
+    yield* services.verifyTarget(journal);
+    journal = yield* advanceMigrationJournal(location, journal.transaction, "target-published", "source-cleaned", authorize);
+  }
+  if (journal.phase === "source-cleaned") {
+    yield* checkCommitted(journal);
+    yield* services.verifyTarget(journal);
+    yield* checkCommitted(journal);
+    yield* finishMigrationJournal(location, journal.transaction, authorize);
+  }
+});
+
+var StateMode = Literals(["branch", "work", "local"]);
+var DEFAULT_STATE_MODE = "branch";
+var STATE_MODE_KEY = "holyagent.stateMode";
+var parseStateMode = (value) => value === undefined || value.trim() === "" ? succeed6(DEFAULT_STATE_MODE) : decodeUnknownEffect2(StateMode)(value.trim()).pipe(mapError2(() => new StateIo({
+  path: STATE_MODE_KEY,
+  cause: `"${value.trim()}" is not a state mode; set ${STATE_MODE_KEY} in git config to branch, work or local`
+})));
+
+var definedEnv = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
+var looksLikeAgent = ({
+  name,
+  email
+}) => email.trim().toLowerCase() === "noreply@anthropic.com" || ["claude", "claude code"].includes(name.replace(/\s+/g, " ").trim().toLowerCase());
+
 var DEFAULT_STATE_BRANCH = "holyagent/state";
 var BRANCH_KEY = "holyagent.stateBranch";
 var REPOSITORY_VARIABLES = new Set([
@@ -10832,7 +11715,7 @@ var REPOSITORY_VARIABLES = new Set([
   "GIT_QUARANTINE_PATH"
 ]);
 var gitEnvironment = (env) => definedEnv({ ...process.env, ...env }, REPOSITORY_VARIABLES);
-var git = (cwd, env, args, input) => spawn("git", process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args, {
+var git2 = (cwd, env, args, input) => spawn("git", process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args, {
   cwd,
   env: gitEnvironment(env),
   stdin: input
@@ -10848,11 +11731,11 @@ ${ran.stdout}`.trim().split(`
 `).slice(-10).join(`
 `)}`
 });
-var gitText = (cwd, env, args, input) => git(cwd, env, args, input).pipe(flatMap2((ran) => ran.code === 0 ? succeed6(ran.stdout.trim()) : fail5(failed(cwd, args, ran))));
-var gitSucceeds = (cwd, env, args) => git(cwd, env, args).pipe(map4((ran) => ran.code === 0));
+var gitText = (cwd, env, args, input) => git2(cwd, env, args, input).pipe(flatMap2((ran) => ran.code === 0 ? succeed6(ran.stdout.trim()) : fail5(failed(cwd, args, ran))));
+var gitSucceeds = (cwd, env, args) => git2(cwd, env, args).pipe(map4((ran) => ran.code === 0));
 var BOOKKEEPING = ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false"];
 var NOT_A_REPOSITORY = /not a git repository|command not found/i;
-var stateModeOf = (top, env) => git(top, env, ["config", "--get", STATE_MODE_KEY]).pipe(flatMap2((ran) => parseStateMode(ran.code === 0 ? ran.stdout : undefined)));
+var stateModeOf = (top, env) => git2(top, env, ["config", "--get", STATE_MODE_KEY]).pipe(flatMap2((ran) => parseStateMode(ran.code === 0 ? ran.stdout : undefined)));
 var EXCLUDE_LINE = `/${STATE_DIRECTORY}/`;
 var EXCLUDE_MARK = "# added by holyagent (state mode local)";
 var gitPattern = (line) => line.replace(/\r$/, "").replace(/ +$/, "");
@@ -10877,7 +11760,7 @@ var editExclude = (top, common, env, edit, done, patience = WORKTREE_PATIENCE, a
   const path = yield* excludePath(top, env);
   if (done?.(linesOf(yield* readText(path))) === true)
     return;
-  yield* withFileLock(join3(common, "holyagent", "exclude.lock"), gen2(function* () {
+  yield* withFileLock(join6(common, "holyagent", "exclude.lock"), gen2(function* () {
     const before = linesOf(yield* readText(path));
     const lines = yield* edit(before);
     if (lines.join(`
@@ -10896,7 +11779,7 @@ var excludeState = (top, common, env) => editExclude(top, common, env, (lines) =
 var unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withoutMarked(lines)));
 var isDirectory = (path) => io(path, () => stat2(path)).pipe(map4((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var stateBranch = (top, env) => gen2(function* () {
-  const configured = yield* git(top, env, ["config", "--get", BRANCH_KEY]);
+  const configured = yield* git2(top, env, ["config", "--get", BRANCH_KEY]);
   const fromGit = configured.code === 0 ? configured.stdout.trim() : "";
   const branch = fromGit !== "" ? fromGit : DEFAULT_STATE_BRANCH;
   const valid = !branch.startsWith("-") && (yield* gitSucceeds(top, env, ["check-ref-format", `refs/heads/${branch}`]));
@@ -10918,7 +11801,7 @@ var listWorktrees = (cwd, env) => gitText(cwd, env, ["worktree", "list", "--porc
     prunable: lines.some((line) => line === "prunable" || line.startsWith("prunable "))
   };
 }).filter((entry) => entry.path !== "")));
-var operationalWorktrees = (cwd, env) => git(cwd, env, ["worktree", "list", "--porcelain", "-z"]).pipe(flatMap2((result) => {
+var operationalWorktrees = (cwd, env) => git2(cwd, env, ["worktree", "list", "--porcelain", "-z"]).pipe(flatMap2((result) => {
   if (result.code !== 0)
     return /not a git repository/i.test(result.stderr) ? succeed6([cwd]) : fail5(failed(cwd, ["worktree", "list", "--porcelain", "-z"], result));
   const roots = result.stdout.split("\x00").filter((field) => field.startsWith("worktree ")).map((field) => fromGitPath(field.slice(9)));
@@ -10937,14 +11820,14 @@ var NEUTRAL_IDENTITY = {
   GIT_COMMITTER_NAME: "holyagent",
   GIT_COMMITTER_EMAIL: "holyagent@localhost"
 };
-var committing = (cwd, env) => git(cwd, env, ["var", "GIT_COMMITTER_IDENT"]).pipe(map4((ran) => {
+var committing = (cwd, env) => git2(cwd, env, ["var", "GIT_COMMITTER_IDENT"]).pipe(map4((ran) => {
   const ident = /^(.*) <(.*)> \d+ [+-]\d{4}$/.exec(ran.stdout.trim());
   return ran.code === 0 && ident !== null && !looksLikeAgent({ name: ident[1] ?? "", email: ident[2] ?? "" }) ? env : { ...env, ...NEUTRAL_IDENTITY };
 }));
 var baseStart = (top, env) => gen2(function* () {
-  const head = yield* git(top, env, ["symbolic-ref", "-q", "refs/remotes/origin/HEAD"]);
+  const head = yield* git2(top, env, ["symbolic-ref", "-q", "refs/remotes/origin/HEAD"]);
   const named = head.code === 0 ? head.stdout.trim().replace("refs/remotes/origin/", "") : "";
-  const initial = yield* git(top, env, ["config", "--get", "init.defaultBranch"]);
+  const initial = yield* git2(top, env, ["config", "--get", "init.defaultBranch"]);
   const configured = initial.code === 0 ? initial.stdout.trim() : "";
   for (const name of [named, configured, "main", "master"]) {
     if (name === "")
@@ -10964,7 +11847,7 @@ var holdsRecords = (top, listed) => gen2(function* () {
     const folder = stateDirectory(entry);
     if (!(yield* isDirectory(folder)))
       continue;
-    const names = yield* io(folder, () => readdir2(folder));
+    const names = yield* io(folder, () => readdir3(folder));
     if (names.some((name) => name !== CONFIG_FILE))
       return true;
   }
@@ -10975,8 +11858,8 @@ var keepsState = (top, env, branch, listed) => gen2(function* () {
     return true;
   return yield* holdsRecords(top, listed);
 });
-var worktreeFolder = (branch) => `${branch.replace(/[^\w.-]+/g, "-").slice(0, 40)}-${createHash2("sha1").update(branch).digest("hex").slice(0, 10)}`;
-var canonical = (path) => io(path, () => realpath(path)).pipe(orElseSucceed2(() => path));
+var worktreeFolder = (branch) => `${branch.replace(/[^\w.-]+/g, "-").slice(0, 40)}-${createHash5("sha1").update(branch).digest("hex").slice(0, 10)}`;
+var canonical = (path) => io(path, () => realpath3(path)).pipe(orElseSucceed2(() => path));
 var samePath = (a, b) => all2([canonical(a), canonical(b)]).pipe(map4(([left, right]) => left === right));
 var requireFree = (listed, path, branch) => gen2(function* () {
   for (const entry of listed) {
@@ -11016,7 +11899,7 @@ var killGroup = (child, platform = process.platform) => {
   }).pipe(ignore2);
 };
 var gitBounded = (cwd, env, args, timeout) => spawn("git", args, { cwd, env, discard: true }).pipe(map4((result) => result.code), catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause }))), timeoutOption2(timeout), map4((code) => code._tag === "Some" ? code.value : -1));
-var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS, authorize = void_3) => git(top, env, ["config", "--get", "core.sshCommand"]).pipe(map4((ran) => ran.code === 0 ? ran.stdout.trim() : ""), flatMap2((configured) => authorize.pipe(andThen2(gitBounded(top, fetchEnvironment(env, configured === "" ? undefined : configured), [
+var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS, authorize = void_3) => git2(top, env, ["config", "--get", "core.sshCommand"]).pipe(map4((ran) => ran.code === 0 ? ran.stdout.trim() : ""), flatMap2((configured) => authorize.pipe(andThen2(gitBounded(top, fetchEnvironment(env, configured === "" ? undefined : configured), [
   "-c",
   "core.askPass=",
   "fetch",
@@ -11026,14 +11909,14 @@ var fetchRemoteBranch = (top, env, branch, timeout = FETCH_TIMEOUT_MS, authorize
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
 ], timeout)))), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false)));
 var readyMarker = (path) => `${path}.ready`;
-var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join3(common, "holyagent", "worktree.lock"), gen2(function* () {
+var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join6(common, "holyagent", "worktree.lock"), gen2(function* () {
   yield* authorize;
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
   if (again !== undefined) {
     if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready))) {
       yield* authorize;
-      yield* io(ready, () => mkdir3(dirname3(ready), { recursive: true }).then(() => writeFile2(ready, "")));
+      yield* io(ready, () => mkdir4(dirname5(ready), { recursive: true }).then(() => writeFile3(ready, "")));
     }
     return { kind: "ready", path: again, created: false };
   }
@@ -11042,7 +11925,7 @@ var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTR
   if ((yield* stateModeOf(top, env)) !== "branch")
     return { kind: "deferred" };
   yield* authorize;
-  yield* git(top, env, ["worktree", "prune"]);
+  yield* git2(top, env, ["worktree", "prune"]);
   yield* requireFree(yield* listWorktrees(top, env), path, branch);
   const add = [...BOOKKEEPING, "worktree", "add", "-q"];
   const local = yield* refExists(top, env, `refs/heads/${branch}`);
@@ -11054,38 +11937,38 @@ var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTR
   if (target === undefined)
     return { kind: "deferred" };
   yield* authorize;
-  yield* io(ready, () => rm3(ready, { force: true }));
+  yield* io(ready, () => rm6(ready, { force: true }));
   yield* authorize;
-  yield* io(path, () => rm3(path, { recursive: true, force: true }));
+  yield* io(path, () => rm6(path, { recursive: true, force: true }));
   yield* authorize;
-  yield* io(path, () => mkdir3(dirname3(path), { recursive: true }));
+  yield* io(path, () => mkdir4(dirname5(path), { recursive: true }));
   yield* authorize;
   yield* gitText(top, env, [...add, ...target]);
-  yield* uninterruptible2(io(ready, () => mkdir3(dirname3(ready), { recursive: true }).then(() => writeFile2(ready, ""))));
+  yield* uninterruptible2(io(ready, () => mkdir4(dirname5(ready), { recursive: true }).then(() => writeFile3(ready, ""))));
   return { kind: "ready", path, created: true };
 }), patience, authorize);
 var LOCAL_FILES = new Set(["local/specialists.json"]);
-var sameBytes = (a, b) => all2([io(a, () => readFile2(a)), io(b, () => readFile2(b))]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
+var sameBytes = (a, b) => all2([io(a, () => readFile3(a)), io(b, () => readFile3(b))]).pipe(map4(([left, right]) => Buffer.from(left).equals(Buffer.from(right))));
 var fileExists = (path) => io(path, () => stat2(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
-var kindAt = (path) => io(path, () => lstat2(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
-var realStateFolder = (root) => canonical(dirname3(root)).pipe(map4((parent) => join3(parent, basename(root))));
+var kindAt = (path) => io(path, () => lstat4(path)).pipe(map4((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined)));
+var realStateFolder = (root) => canonical(dirname5(root)).pipe(map4((parent) => join6(parent, basename2(root))));
 var requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
   path: root,
   cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`
 }))));
 var isPlainFile = (root, relative) => gen2(function* () {
-  const path = join3(root, relative);
+  const path = join6(root, relative);
   if ((yield* kindAt(root)) !== "directory" || (yield* kindAt(path)) !== "file")
     return false;
   const [real, base] = yield* all2([canonical(path), realStateFolder(root)]);
-  return real === join3(base, relative);
+  return real === join6(base, relative);
 });
 var requirePlainTarget = (root, relative) => gen2(function* () {
   yield* requireStateFolder(root);
   const parts = relative.split("/");
   let current = root;
   for (const [index, part] of parts.entries()) {
-    current = join3(current, part);
+    current = join6(current, part);
     const kind = yield* kindAt(current);
     if (kind === undefined)
       return;
@@ -11096,24 +11979,13 @@ var requirePlainTarget = (root, relative) => gen2(function* () {
       });
   }
 });
-var copyInto = (root, relative, from, begin) => gen2(function* () {
-  yield* requirePlainTarget(root, relative);
-  const to = join3(root, relative);
-  yield* begin;
-  yield* io(to, () => mkdir3(dirname3(to), { recursive: true }));
-  const [folder, base] = yield* all2([canonical(dirname3(to)), realStateFolder(root)]);
-  if (folder !== base && !folder.startsWith(`${base}${sep2}`))
-    return yield* new StateIo({ path: to, cause: `${folder} is outside the state worktree` });
-  const temporary = `${to}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  yield* io(to, () => copyFile(from, temporary)).pipe(andThen2(io(to, () => rename3(temporary, to))), tapError2(() => io(temporary, () => rm3(temporary, { force: true })).pipe(ignore2)));
-});
 var workTreeEntries = (top, env) => gen2(function* () {
   const folder = stateDirectory(top);
   if (!(yield* isDirectory(folder)))
     return [];
   const files = yield* io(folder, () => scanFiles(folder)).pipe(map4((paths) => paths.map((path) => toPosix(path))));
   const status = new Map;
-  const listing = yield* git(top, env, [
+  const listing = yield* git2(top, env, [
     "status",
     "--porcelain=v1",
     "-z",
@@ -11121,6 +11993,8 @@ var workTreeEntries = (top, env) => gen2(function* () {
     "--",
     STATE_DIRECTORY
   ]);
+  if (listing.code !== 0)
+    return yield* failed(top, ["status"], listing);
   const parts = listing.stdout.split("\x00");
   for (let index = 0;index < parts.length; index++) {
     const part = parts[index] ?? "";
@@ -11133,82 +12007,182 @@ var workTreeEntries = (top, env) => gen2(function* () {
   }
   return files.filter((path) => path !== CONFIG_FILE).filter((path) => !path.startsWith("local/") || LOCAL_FILES.has(path)).toSorted().map((path) => ({ path, status: status.get(path) }));
 });
-var pruneEmpty = (folder, from) => gen2(function* () {
-  let current = from;
-  while (current.startsWith(`${folder}${sep2}`)) {
-    const names = yield* io(current, () => readdir2(current)).pipe(orElseSucceed2(() => ["still here"]));
-    if (names.length > 0)
-      return;
-    yield* io(current, () => rmdir(current)).pipe(ignore2);
-    current = dirname3(current);
-  }
-});
-var migrationMarker = (common, top) => io(top, () => realpath(top)).pipe(map4((real) => join3(common, "holyagent", "migrated", createHash2("sha1").update(real).digest("hex").slice(0, 16))));
-var migrateWorkTree = (top, common, worktree, env, commit, patience = STATE_PATIENCE, authorize = void_3) => {
+var migrationMarker = (common, top) => io(top, () => realpath3(top)).pipe(map4((real) => join6(common, "holyagent", "migrated", createHash5("sha1").update(real).digest("hex").slice(0, 16))));
+var migrationJournalPath = (common) => join6(common, "holyagent", "migration", "journal.json");
+var pendingMigration = (common) => kindAt(migrationJournalPath(common)).pipe(map4((kind) => kind !== undefined));
+var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATIENCE, authorize = void_3) => gen2(function* () {
   const source = stateDirectory(top);
   const target = stateDirectory(worktree);
-  return migrationMarker(common, top).pipe(flatMap2((marker) => fileExists(marker).pipe(flatMap2((done) => done ? void_3 : requireStateFolder(target).pipe(andThen2(kindAt(source)), flatMap2((kind) => kind !== undefined && kind !== "directory" ? void_3 : withStateLock(target, gen2(function* () {
-    yield* authorize;
-    if (yield* fileExists(marker))
+  const marker = yield* migrationMarker(common, top);
+  if (!(yield* pendingMigration(common)) && (yield* fileExists(marker)))
+    return;
+  yield* requireStateFolder(target);
+  const sourceKind = yield* kindAt(source);
+  if (sourceKind !== undefined && sourceKind !== "directory") {
+    if (yield* pendingMigration(common))
+      return yield* new StateIo({
+        path: source,
+        cause: "migration source is no longer a real directory; inspect it before recovery"
+      });
+    return;
+  }
+  yield* withStateLock(target, gen2(function* () {
+    if (!(yield* pendingMigration(common)) && (yield* fileExists(marker)))
       return;
-    const entries = yield* workTreeEntries(top, env);
-    const moved = [];
-    const copies = [];
-    for (const entry of entries) {
-      if (!(yield* isPlainFile(source, entry.path)))
-        continue;
-      const to = join3(target, entry.path);
-      yield* requirePlainTarget(target, entry.path);
-      const dirty = entry.status !== undefined && !entry.status.includes("D");
-      const there = (yield* kindAt(to)) !== undefined;
-      const wanted = !there || dirty && !(yield* sameBytes(join3(source, entry.path), to));
-      if (wanted)
-        copies.push(entry);
-      if (dirty && !entry.path.startsWith("local/"))
-        moved.push(entry);
+    if (!(yield* pendingMigration(common)) && (yield* workTreeEntries(top, env)).length === 0) {
+      yield* authorize;
+      yield* io(marker, () => mkdir4(dirname5(marker), { recursive: true }).then(() => writeFile3(marker, "")));
+      return;
     }
-    let started = false;
-    const begin = suspend2(() => started ? void_3 : authorize.pipe(tap2(() => sync2(() => {
-      started = true;
-    }))));
-    yield* uninterruptible2(gen2(function* () {
-      for (const entry of copies)
-        yield* copyInto(target, entry.path, join3(source, entry.path), begin);
-      yield* commit("chore(state): migrate the state found in a work tree", begin);
-      for (const entry of moved) {
-        const from = join3(source, entry.path);
-        if (!(yield* sameBytes(from, join3(target, entry.path))))
-          continue;
-        const status = entry.status ?? "";
-        yield* begin;
-        if (status === "??")
-          yield* io(from, () => rm3(from, { force: true }));
-        else if (status.startsWith("A"))
-          yield* gitText(top, env, [
-            "rm",
-            "-f",
-            "-q",
-            "--",
-            `${STATE_DIRECTORY}/${entry.path}`
-          ]);
-        else
-          yield* gitText(top, env, [
-            "--literal-pathspecs",
-            "restore",
-            "--source=HEAD",
-            "--staged",
-            "--worktree",
-            "--",
-            `${STATE_DIRECTORY}/${entry.path}`
-          ]);
-        yield* pruneEmpty(source, dirname3(from));
+    const sourceRoot = yield* io(top, () => realpath3(top));
+    const targetRoot = yield* io(worktree, () => realpath3(worktree));
+    const journalPath = migrationJournalPath(common);
+    const commonRoot = yield* io(common, () => realpath3(common));
+    const privateRoot = join6(commonRoot, "holyagent");
+    for (const directory of [privateRoot, join6(privateRoot, "migration")]) {
+      yield* authorize;
+      yield* io(directory, () => mkdir4(directory, { mode: 448 })).pipe(catchIf2((error) => hasCode(error.cause, "EEXIST"), () => void_3));
+      const info = yield* io(directory, () => lstat4(directory));
+      const actual = yield* io(directory, () => realpath3(directory));
+      if (!info.isDirectory() || info.isSymbolicLink() || actual !== directory)
+        return yield* new StateIo({
+          path: directory,
+          cause: "migration journal parent is not a canonical directory"
+        });
+    }
+    const location = {
+      path: join6(commonRoot, "holyagent", "migration", "journal.json"),
+      sourceRoot,
+      targetRoot
+    };
+    const identity = yield* committing(targetRoot, env);
+    const local = (path) => path.startsWith(`${STATE_DIRECTORY}/local/`);
+    const indexFiles = (files) => files.filter((file) => !local(file.path));
+    const run = runMigrationTransaction({
+      location,
+      branch,
+      authorize,
+      services: {
+        prepare: (begin) => gen2(function* () {
+          const entries = yield* workTreeEntries(sourceRoot, env);
+          const trackedText = yield* gitText(sourceRoot, { ...env, GIT_OPTIONAL_LOCKS: "0" }, ["ls-files", "-z", "--", STATE_DIRECTORY]);
+          const tracked = new Set(trackedText.split("\x00"));
+          const algorithm = (yield* gitText(targetRoot, env, [
+            "rev-parse",
+            "--show-object-format"
+          ])).trim();
+          if (algorithm !== "sha1" && algorithm !== "sha256")
+            return yield* new StateIo({
+              path: targetRoot,
+              cause: "unsupported Git object format"
+            });
+          const files = [];
+          const sourceFiles = [];
+          for (const entry of entries) {
+            if (!(yield* isPlainFile(source, entry.path)))
+              continue;
+            yield* requirePlainTarget(target, entry.path);
+            const path = `${STATE_DIRECTORY}/${entry.path}`;
+            const to = join6(target, entry.path);
+            const there = (yield* kindAt(to)) !== undefined;
+            const dirty = entry.status !== undefined && !entry.status.includes("D");
+            if (local(path) && there)
+              continue;
+            if (there && !dirty)
+              continue;
+            const { bytes, mode } = yield* readMigrationSource({ root: sourceRoot, path });
+            files.push({ path, content: bytes.toString("base64"), mode });
+            if (dirty && !local(path))
+              sourceFiles.push({
+                path,
+                digest: createHash5(algorithm).update(`blob ${bytes.length}\x00`).update(bytes).digest("hex"),
+                tracked: tracked.has(path)
+              });
+          }
+          const prepared = yield* prepareMigrationCommit({
+            cwd: targetRoot,
+            env: identity,
+            files: indexFiles(files),
+            message: "chore(state): migrate the state found in a work tree",
+            authorize: begin
+          });
+          const localFiles = files.filter((file) => local(file.path)).map((file) => {
+            const bytes = Buffer.from(file.content, "base64");
+            return {
+              ...file,
+              before: null,
+              after: createHash5(algorithm).update(`blob ${bytes.length}\x00`).update(bytes).digest("hex")
+            };
+          });
+          const planned = [...prepared.files, ...localFiles];
+          yield* verifyMigrationFilePreimages({ root: targetRoot, files: planned });
+          return { ...prepared, files: planned, source: sourceFiles };
+        }),
+        readRef: (name) => gitText(targetRoot, env, ["rev-parse", "--verify", `refs/heads/${name}`]),
+        compareAndSwapRef: (name, parent, commit, begin) => begin.pipe(andThen2(gitText(targetRoot, env, ["update-ref", `refs/heads/${name}`, commit, parent])), asVoid2),
+        verifyCommit: (journal) => gen2(function* () {
+          const planned = new Map(journal.files.map((file) => [file.path, file]));
+          const allowed = (path) => path.startsWith(`${STATE_DIRECTORY}/`) && path !== `${STATE_DIRECTORY}/${CONFIG_FILE}` && (!local(path) || path === `${STATE_DIRECTORY}/local/specialists.json`);
+          if (journal.files.some((file) => !allowed(file.path)) || journal.source.some((file) => !allowed(file.path) || local(file.path) || planned.get(file.path)?.after !== file.digest))
+            return yield* new StateIo({
+              path: journalPath,
+              cause: "migration journal contains unowned or inconsistent paths; inspect it before recovery"
+            });
+          yield* verifyMigrationCommit({
+            cwd: targetRoot,
+            env,
+            parent: journal.parent,
+            tree: journal.tree,
+            commit: journal.commit,
+            files: indexFiles(journal.files)
+          });
+        }),
+        publishFiles: (journal, begin) => publishMigrationFiles({ root: targetRoot, files: journal.files, authorize: begin }),
+        publishIndex: (journal, begin) => publishMigrationIndex({
+          cwd: targetRoot,
+          env,
+          files: indexFiles(journal.files),
+          authorize: begin
+        }),
+        verifyTarget: (journal) => verifyMigrationFiles({ root: targetRoot, files: journal.files }).pipe(andThen2(verifyMigrationIndex({ cwd: targetRoot, env, files: indexFiles(journal.files) }))),
+        cleanupSource: (journal, begin) => gen2(function* () {
+          const cleaned = yield* cleanupMigrationSources({
+            root: sourceRoot,
+            source: journal.source,
+            authorize: begin,
+            isTracked: (path) => git2(sourceRoot, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
+              "--literal-pathspecs",
+              "ls-files",
+              "--error-unmatch",
+              "--",
+              path
+            ]).pipe(flatMap2((result) => result.code === 0 ? succeed6(true) : result.code === 1 ? succeed6(false) : fail5(failed(sourceRoot, ["ls-files"], result))))
+          });
+          if (cleaned.retained.some((file) => file.reason === "changed"))
+            return yield* new StateIo({
+              path: sourceRoot,
+              cause: "source state changed during migration; inspect and retry"
+            });
+          for (const path of cleaned.removed) {
+            let folder = dirname5(join6(sourceRoot, path));
+            while (folder.startsWith(`${source}${sep2}`)) {
+              yield* begin;
+              const removed = yield* io(folder, () => rmdir(folder)).pipe(as2(true), orElseSucceed2(() => false));
+              if (!removed)
+                break;
+              folder = dirname5(folder);
+            }
+          }
+          yield* begin;
+          yield* io(source, () => rmdir(source)).pipe(ignore2);
+          yield* begin;
+          yield* io(marker, () => mkdir4(dirname5(marker), { recursive: true }).then(() => writeFile3(marker, "")));
+        })
       }
-      yield* begin;
-      yield* io(source, () => rmdir(source)).pipe(ignore2);
-      yield* io(marker, () => mkdir3(dirname3(marker), { recursive: true }).then(() => writeFile2(marker, "")));
-    }));
-  }), patience, authorize)))))));
-};
+    });
+    yield* run.pipe(mapError2((error) => error instanceof MigrationJournalError || error instanceof MigrationRunnerConflict || error instanceof MigrationFilesError ? new StateIo({ path: journalPath, cause: error.message }) : error));
+  }), patience, authorize);
+});
 var STATE_FILE = /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json|resume-notes\.md|notes\/(?:.+\/)?[^/]+(?<!\.tmp)))$/;
 var stageState = (worktree, env, copied, begin) => gen2(function* () {
   const tracked = [STATE_DIRECTORY, `:(exclude)${STATE_DIRECTORY}/local`];
@@ -11231,15 +12205,15 @@ var stageState = (worktree, env, copied, begin) => gen2(function* () {
   }
 });
 var commitState = (directory, env, message, copied = [], resolved, begin = void_3) => gen2(function* () {
-  const worktree = dirname3(directory);
+  const worktree = dirname5(directory);
   if (!(yield* isDirectory(worktree)))
     return false;
-  const top = yield* git(worktree, env, ["rev-parse", "--show-toplevel"]);
+  const top = yield* git2(worktree, env, ["rev-parse", "--show-toplevel"]);
   if (top.code !== 0)
     return false;
   const own = yield* all2([
-    io(worktree, () => realpath(worktree)),
-    io(worktree, () => realpath(fromGitPath(top.stdout.trim())))
+    io(worktree, () => realpath3(worktree)),
+    io(worktree, () => realpath3(fromGitPath(top.stdout.trim())))
   ]).pipe(map4(([a, b]) => a === b));
   if (!own)
     return false;
@@ -11248,7 +12222,7 @@ var commitState = (directory, env, message, copied = [], resolved, begin = void_
   };
   if (known.mode !== "branch")
     return false;
-  const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"]);
+  const current = yield* git2(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"]);
   const branch = "branch" in known ? known.branch : yield* stateBranch(worktree, env);
   if (current.code !== 0 || current.stdout.trim() !== branch)
     return false;
@@ -11270,7 +12244,7 @@ var commitState = (directory, env, message, copied = [], resolved, begin = void_
   return true;
 });
 var locate = (cwd, env) => gen2(function* () {
-  const located = yield* git(cwd, env, [
+  const located = yield* git2(cwd, env, [
     "rev-parse",
     "--path-format=absolute",
     "--show-toplevel",
@@ -11282,9 +12256,33 @@ var locate = (cwd, env) => gen2(function* () {
       return;
     return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` });
   }
-  const [top = cwd, common = join3(cwd, ".git")] = located.stdout.trim().split(`
+  const [top = cwd, common = join6(cwd, ".git")] = located.stdout.trim().split(`
 `).map((path) => fromGitPath(path));
   return { top, common };
+});
+var migrationReadCheckpoint = (cwd, env, branch) => gen2(function* () {
+  const repository = yield* locate(cwd, env);
+  if (repository === undefined)
+    return yield* new StateIo({
+      path: cwd,
+      cause: "the state repository disappeared during a read"
+    });
+  const journal = migrationJournalPath(repository.common);
+  const requireComplete = pendingMigration(repository.common).pipe(flatMap2((pending) => pending ? fail5(new StateIo({
+    path: journal,
+    cause: "state migration is incomplete; run an authorized state command to recover it"
+  })) : void_3));
+  yield* requireComplete;
+  const ref = yield* git2(repository.top, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
+    "rev-parse",
+    "--verify",
+    "-q",
+    `refs/heads/${branch}`
+  ]);
+  if (ref.code !== 0 && ref.code !== 1)
+    return yield* failed(repository.top, ["rev-parse"], ref);
+  yield* requireComplete;
+  return { common: repository.common, head: ref.code === 0 ? ref.stdout.trim() : null };
 });
 var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_3) => gen2(function* () {
   const repository = yield* locate(cwd, env);
@@ -11300,10 +12298,15 @@ var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_
     return { root: top, directory: stateDirectory(top), resolved: { mode } };
   }
   const branch = yield* stateBranch(top, env);
+  if (ensure === "peek" && (yield* pendingMigration(common)))
+    return yield* new StateIo({
+      path: migrationJournalPath(common),
+      cause: "state migration is incomplete; run an authorized state command to recover it"
+    });
   const resolved = { mode, branch };
   const listed = yield* listWorktrees(top, env);
   const found = yield* checkedOut(listed, branch);
-  const standard = join3(common, "holyagent", worktreeFolder(branch));
+  const standard = join6(common, "holyagent", worktreeFolder(branch));
   const settled = found !== undefined && (!(yield* samePath(found, standard)) || (yield* fileExists(readyMarker(standard))));
   if (ensure === "peek" && found !== undefined && !settled)
     return yield* new StateIo({
@@ -11325,7 +12328,7 @@ var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_
   const worktree = ensured.path;
   const directory = stateDirectory(worktree);
   if (ensure !== "peek") {
-    const own = join3(common, "holyagent");
+    const own = join6(common, "holyagent");
     const sources = ensured.created ? [
       top,
       ...listed.filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}${sep2}`)).map((entry) => entry.path)
@@ -11333,7 +12336,7 @@ var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_
     for (const source of new Set(sources))
       if (source !== worktree && (yield* isDirectory(source))) {
         yield* authorize;
-        yield* migrateWorkTree(source, common, worktree, env, (message, begin) => commitState(directory, env, message, [], resolved, begin), patience, authorize);
+        yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize);
       }
   }
   return { root: top, directory, resolved };
@@ -11351,13 +12354,13 @@ var requireHandoffState = (cwd, env, directory) => gen2(function* () {
       path: directory,
       cause: `the recorded state branch ${branch} is not checked out; run a state command to make it available, then retry handoff`
     });
-  const own = join3(common, "holyagent");
+  const own = join6(common, "holyagent");
   for (const entry of listed) {
     if (entry.prunable || stateWorktree !== undefined && (yield* samePath(entry.path, stateWorktree)) || entry.path.startsWith(`${own}${sep2}`))
       continue;
     const source = stateDirectory(entry.path);
     yield* requireStateFolder(source);
-    const records = join3(source, "intents");
+    const records = join6(source, "intents");
     const kind = yield* kindAt(records);
     if (kind === undefined)
       continue;
@@ -11373,7 +12376,7 @@ var requireHandoffState = (cwd, env, directory) => gen2(function* () {
         cause: "recorded state awaits migration; run a state command from this worktree, then retry handoff"
       });
     const entries = yield* workTreeEntries(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" });
-    const trackedResult = yield* git(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
+    const trackedResult = yield* git2(entry.path, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
       "ls-files",
       "--cached",
       "-z",
@@ -11384,8 +12387,8 @@ var requireHandoffState = (cwd, env, directory) => gen2(function* () {
       return yield* failed(entry.path, ["ls-files", "--cached", "-z", "--", `${STATE_DIRECTORY}/intents`], trackedResult);
     const tracked = new Set(trackedResult.stdout.split("\x00").map((path) => path.slice(STATE_DIRECTORY.length + 1)));
     for (const file of entries.filter((item) => item.path.startsWith("intents/"))) {
-      const target = join3(directory, file.path);
-      if (!(yield* isPlainFile(source, file.path)) || !(yield* isPlainFile(directory, file.path)) || (file.status !== undefined || !tracked.has(file.path)) && !(yield* sameBytes(join3(source, file.path), target)))
+      const target = join6(directory, file.path);
+      if (!(yield* isPlainFile(source, file.path)) || !(yield* isPlainFile(directory, file.path)) || (file.status !== undefined || !tracked.has(file.path)) && !(yield* sameBytes(join6(source, file.path), target)))
         return yield* new StateIo({
           path: source,
           cause: "recorded state differs from the shared state; inspect and reconcile this worktree before retrying handoff"
@@ -11407,7 +12410,7 @@ var readStateMode = (cwd, env) => gen2(function* () {
 var modeRestore = (top, env, previous) => gitSucceeds(top, env, ["config", "--local", "--get", STATE_MODE_KEY]).pipe(map4((configured) => configured ? gitText(top, env, ["config", "--local", STATE_MODE_KEY, previous]) : gitText(top, env, ["config", "--local", "--unset", STATE_MODE_KEY])));
 var setStateMode = (cwd, env, mode) => gen2(function* () {
   const { top, common } = yield* requireRepository(cwd, env);
-  return yield* withFileLock(join3(common, "holyagent", "worktree.lock"), gen2(function* () {
+  return yield* withFileLock(join6(common, "holyagent", "worktree.lock"), gen2(function* () {
     const previous = yield* stateModeOf(top, env);
     if (previous === "branch" && mode !== "branch") {
       const branch = yield* stateBranch(top, env);
@@ -11446,7 +12449,7 @@ var requireLocation = (path, expected) => path === expected ? void_3 : fail5(new
 var READ_CONCURRENCY = 16;
 var loadIntents = (directory) => gen2(function* () {
   const read = yield* forEach2(yield* scan(directory, "intents/*/intent.json"), (file) => gen2(function* () {
-    const path = join4(directory, file);
+    const path = join7(directory, file);
     const intent = yield* readJson(Intent, path);
     if (intent === undefined)
       return [];
@@ -11457,7 +12460,7 @@ var loadIntents = (directory) => gen2(function* () {
 });
 var loadAssignments = (directory, relatives, intents) => gen2(function* () {
   const read = yield* forEach2(relatives, (file) => gen2(function* () {
-    const path = join4(directory, file);
+    const path = join7(directory, file);
     const assignment = yield* readJson(Assignment, path);
     if (assignment === undefined)
       return [];
@@ -11479,7 +12482,7 @@ var loadLinks = (directory, intents) => gen2(function* () {
     const folder = intentFolder(directory, intent);
     const prefix = relative2(directory, folder);
     for (const file of yield* scan(directory, globBelow(prefix, "branches/*.json"))) {
-      const path = join4(directory, file);
+      const path = join7(directory, file);
       const record = yield* readJson(BranchRecord, path);
       if (record === undefined)
         continue;
@@ -11489,7 +12492,7 @@ var loadLinks = (directory, intents) => gen2(function* () {
       branches.push(record);
     }
     for (const file of yield* scan(directory, globBelow(prefix, "pulls/*.json"))) {
-      const path = join4(directory, file);
+      const path = join7(directory, file);
       const record = yield* readJson(PullRecord, path);
       if (record === undefined)
         continue;
@@ -11628,18 +12631,18 @@ var updateState = (directory, transition, env = {}, patience = STATE_PATIENCE, r
 var {$ } = globalThis.Bun;
 
 import { homedir } from "os";
-import { join as join5 } from "path";
+import { join as join8 } from "path";
 var firstNonEmpty = (...values) => values.find((value) => value !== undefined && value !== "");
 var definedEnv2 = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0])));
 var homeDirectory = (env, fallback = homedir) => firstNonEmpty(env.HOME, env.USERPROFILE) ?? fallback();
-var claudeConfigDirectory = (env, home = homedir) => firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join5(homeDirectory(env, home), ".claude");
+var claudeConfigDirectory = (env, home = homedir) => firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join8(homeDirectory(env, home), ".claude");
 var userFiles = (env) => {
   const home = homeDirectory(env);
   const claudeDir = claudeConfigDirectory(env, () => home);
   return {
     claudeDir,
-    settings: join5(claudeDir, "settings.json"),
-    ctx7Credentials: join5(home, ".config", "context7", "credentials.json")
+    settings: join8(claudeDir, "settings.json"),
+    ctx7Credentials: join8(home, ".config", "context7", "credentials.json")
   };
 };
 
@@ -11666,9 +12669,9 @@ var tail = (result) => `${result.stderr}
 ${result.stdout}`.trim().split(`
 `).slice(-20).join(`
 `);
-var git2 = (args, env) => Git.use((service) => service.run(args, env)).pipe(filterOrFail2(({ code }) => code === 0, (result) => new GitFailed({ args, code: result.code, output: tail(result) })), map4(({ stdout }) => stdout.trim()));
+var git3 = (args, env) => Git.use((service) => service.run(args, env)).pipe(filterOrFail2(({ code }) => code === 0, (result) => new GitFailed({ args, code: result.code, output: tail(result) })), map4(({ stdout }) => stdout.trim()));
 var gitMaybe = (args) => Git.use((service) => service.run(args)).pipe(map4(({ code, stdout }) => code === 0 ? stdout.trim() : undefined));
-var gitPaths = (args, paths) => git2(["--literal-pathspecs", ...args, "--", ...paths]);
+var gitPaths = (args, paths) => git3(["--literal-pathspecs", ...args, "--", ...paths]);
 var validBranch = (name) => gen2(function* () {
   const plain = !name.startsWith("-") && !name.startsWith("+");
   if (plain && (yield* gitMaybe(["check-ref-format", "--branch", name])) === name)
@@ -11883,8 +12886,8 @@ var setAuthor = (request) => gen2(function* () {
     return yield* refuse("--email needs an email address such as 1234+login@users.noreply.github.com");
   if (looksLikeAgent2({ name, email }))
     return yield* refuse(`${name} <${email}> is the agent's own identity, not the user's`);
-  yield* git2(["config", "--local", "author.name", name]);
-  yield* git2(["config", "--local", "author.email", email]);
+  yield* git3(["config", "--local", "author.name", name]);
+  yield* git3(["config", "--local", "author.email", email]);
   return { name, email };
 });
 
@@ -11913,7 +12916,7 @@ var requireOwnAuthor = gen2(function* () {
   if (author.name === "" || author.email === "" || looksLikeAgent2(author))
     return yield* new CloudAuthor({ author: `${author.name} <${author.email}>` });
 });
-var stagedPaths = git2(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(map4((names) => names.split("\x00").filter((path) => path !== "")));
+var stagedPaths = git3(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(map4((names) => names.split("\x00").filter((path) => path !== "")));
 var inStateFolder = (path, foldCase) => {
   const folded = foldCase ? path.toLowerCase() : path;
   return folded === STATE_DIRECTORY || folded.startsWith(`${STATE_DIRECTORY}/`);
@@ -12001,13 +13004,13 @@ var commit = (request) => gen2(function* () {
   if (files === 0)
     return yield* new NothingToCommit({ paths: scope });
   const branch = yield* currentBranch;
-  yield* git2([
+  yield* git3([
     "commit",
     "-m",
     message.headline,
     ...message.body === undefined ? [] : ["-m", message.body]
   ]);
-  const sha = yield* git2(["rev-parse", "HEAD"]);
+  const sha = yield* git3(["rev-parse", "HEAD"]);
   return { branch, commit: sha, files };
 });
 
@@ -12069,9 +13072,9 @@ var prepareMessage = (parts, allowed) => checkedText(parts.join(`
   })) : succeed6({ headline: headline.trim(), ...body === "" ? {} : { body } });
 }));
 
-import { constants } from "fs";
-import { open as open2, realpath as realpath4 } from "fs/promises";
-import { join as join12, relative as relative4, sep as sep6 } from "path";
+import { constants as constants4 } from "fs";
+import { open as open5, realpath as realpath6 } from "fs/promises";
+import { join as join15, relative as relative4, sep as sep6 } from "path";
 var nowIso = currentTimeMillis2.pipe(map4((millis) => new Date(millis).toISOString()));
 var readReport = (host) => host.stdin.pipe(filterOrFail2((text) => text.trim() !== "", () => new StdinMissing({ reason: "stdin was empty" })));
 var LITERAL_RUN = /(?:"[^"]*" \| ){4,}"[^"]*"/g;
@@ -12097,10 +13100,10 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
 });
 var readInput = (host, schema, inline) => readInputBy(host, () => schema, inline);
 
-import { readFile as readFile3, realpath as realpath3, stat as stat3 } from "fs/promises";
-import { basename as basename4, resolve as resolve5 } from "path";
+import { readFile as readFile4, realpath as realpath5, stat as stat3 } from "fs/promises";
+import { basename as basename5, resolve as resolve8 } from "path";
 
-import { join as join6 } from "path";
+import { join as join9 } from "path";
 
 import { homedir as homedir2 } from "os";
 var firstNonEmpty2 = (...values) => values.find((value) => value !== undefined && value !== "");
@@ -12777,7 +13780,7 @@ var ConfigFile = toEncoded2(Config);
 var defaultConfig = decodeUnknownEffect2(Config)({});
 
 var HOME_VARIABLE = "HOLYAGENT_HOME";
-var userConfigFile = (env) => join6(firstNonEmpty2(env[HOME_VARIABLE]) ?? homeDirectory2(env), STATE_DIRECTORY, CONFIG_FILE);
+var userConfigFile = (env) => join9(firstNonEmpty2(env[HOME_VARIABLE]) ?? homeDirectory2(env), STATE_DIRECTORY, CONFIG_FILE);
 var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var merge3 = (base, override) => isRecord(base) && isRecord(override) ? {
   ...base,
@@ -12819,7 +13822,7 @@ var loadConfigWithSource = ({ projectDirectories, env = process.env }) => gen2(f
   let project;
   let projectPath;
   for (const directory of projectDirectories) {
-    const path = join6(directory, CONFIG_FILE);
+    const path = join9(directory, CONFIG_FILE);
     project = yield* readConfigFile(path);
     if (project !== undefined) {
       projectPath = path;
@@ -13200,26 +14203,26 @@ var selectConfiguredRoute = (config, written, host, role, screen, profile, now) 
   };
 };
 
-import { lstat as lstat3, realpath as realpath2 } from "fs/promises";
-import { basename as basename2, dirname as dirname4, isAbsolute as isAbsolute2, join as join7, resolve as resolve3, sep as sep5 } from "path";
-var canonical2 = (path) => io(path, () => realpath2(path)).pipe(catch_2((error) => {
+import { lstat as lstat5, realpath as realpath4 } from "fs/promises";
+import { basename as basename3, dirname as dirname6, isAbsolute as isAbsolute5, join as join10, resolve as resolve6, sep as sep5 } from "path";
+var canonical2 = (path) => io(path, () => realpath4(path)).pipe(catch_2((error) => {
   if (!hasCode(error.cause, "ENOENT"))
     return fail5(new InvalidDraft({
       message: `Cannot resolve operational target ${path}: ${error.message}`
     }));
-  return io(path, () => lstat3(path)).pipe(flatMap2(() => fail5(new InvalidDraft({
+  return io(path, () => lstat5(path)).pipe(flatMap2(() => fail5(new InvalidDraft({
     message: `Cannot resolve operational target ${path}: dangling symlink or inaccessible path`
   }))), catch_2((problem) => {
     if (problem instanceof InvalidDraft)
       return fail5(problem);
-    if (!hasCode(problem.cause, "ENOENT") || dirname4(path) === path)
+    if (!hasCode(problem.cause, "ENOENT") || dirname6(path) === path)
       return fail5(new InvalidDraft({
         message: `Cannot inspect operational target ${path}: ${problem.message}`
       }));
-    return canonical2(dirname4(path)).pipe(map4((parent) => join7(parent, basename2(path))));
+    return canonical2(dirname6(path)).pipe(map4((parent) => join10(parent, basename3(path))));
   }));
 }));
-var comparable = (path) => resolve3(path).split(sep5).join("/").toLowerCase();
+var comparable = (path) => resolve6(path).split(sep5).join("/").toLowerCase();
 var contains = (parent, child) => child === parent || child.startsWith(parent.endsWith("/") ? parent : `${parent}/`);
 var overlaps = (a, b) => contains(a, b) || contains(b, a);
 var validateOperationalResources = (resources, worktrees) => gen2(function* () {
@@ -13228,7 +14231,7 @@ var validateOperationalResources = (resources, worktrees) => gen2(function* () {
   const roots = yield* forEach2(worktrees, (root) => canonical2(root));
   for (const resource of resources) {
     const { target } = resource;
-    if (!isAbsolute2(target) || target.split(/[\\/]/).some((part) => part === "." || part === ".."))
+    if (!isAbsolute5(target) || target.split(/[\\/]/).some((part) => part === "." || part === ".."))
       return yield* new InvalidDraft({
         message: `Operational target must be an absolute path without . or .. segments: ${target}`
       });
@@ -13240,13 +14243,13 @@ var validateOperationalResources = (resources, worktrees) => gen2(function* () {
   }
 });
 
-import { isAbsolute as isAbsolute3, join as join8, resolve as resolve4 } from "path";
+import { isAbsolute as isAbsolute6, join as join11, resolve as resolve7 } from "path";
 var artifactFile = (context, root, directory, kind, id) => spawn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
   cwd: root,
   env: gitEnvironment(context.env)
 }).pipe(catchDefect2(() => succeed6({ code: -1, stdout: new Uint8Array, stderr: "" })), map4(({ code, stdout }) => {
   const common = new TextDecoder().decode(stdout).trim();
-  return code === 0 && isAbsolute3(common) ? join8(resolve4(common), "holyagent", kind, `${id}.md`) : localFile(directory, `${kind}/${id}.md`);
+  return code === 0 && isAbsolute6(common) ? join11(resolve7(common), "holyagent", kind, `${id}.md`) : localFile(directory, `${kind}/${id}.md`);
 }));
 
 class Unauthorized extends TaggedError2("Unauthorized") {
@@ -13258,7 +14261,7 @@ class NoActiveIntent2 extends TaggedError2("NoActiveIntent") {
     return this.open.length === 0 ? "No Intent is open" : `${this.open.length} Intents are open and none is in use: ${this.open.map(({ id, objective }) => `${id} (${objective})`).join("; ")}`;
   }
 }
-var decode3 = (schema, input) => decodeInput(schema, input);
+var decode4 = (schema, input) => decodeInput(schema, input);
 var withState = (context, capability, ensure, use) => gen2(function* () {
   if (context.authorize(capability) !== true)
     return yield* new Unauthorized({ capability });
@@ -13278,7 +14281,9 @@ var withState = (context, capability, ensure, use) => gen2(function* () {
     return yield* new Unauthorized({ capability: "state.initialize" });
   const authorizeInitialization = requireCapability(context, capability).pipe(andThen2(requireCapability(context, "state.initialize")));
   const state = yield* resolveState(context.cwd, context.env, canInitialize ? ensure : "peek", capability !== "handoff", undefined, authorizeInitialization);
-  return yield* use({
+  const branch = readOnly && state.resolved?.mode === "branch" ? state.resolved.branch : undefined;
+  const before = branch === undefined ? undefined : yield* migrationReadCheckpoint(state.root, context.env, branch);
+  const result = yield* use({
     root: state.root,
     directory: state.directory,
     read: readState,
@@ -13290,6 +14295,15 @@ var withState = (context, capability, ensure, use) => gen2(function* () {
       return result;
     }), context.env, undefined, state.resolved, after, authorizeInitialization)
   }).pipe(provideService2(WorkTree, state.root));
+  if (branch !== undefined && before !== undefined) {
+    const after = yield* migrationReadCheckpoint(state.root, context.env, branch);
+    if (before.common !== after.common || before.head !== after.head)
+      return yield* new StateIo({
+        path: state.directory,
+        cause: "state changed during the read; retry"
+      });
+  }
+  return result;
 });
 var resolveIntent = (snapshot) => {
   const open = snapshot.project.intents.filter((item) => item.state === "Open").toSorted((a, b) => a.id.localeCompare(b.id));
@@ -13323,11 +14337,11 @@ var renderJsonReport = (report) => [
 ].join(`
 `);
 
-import { basename as basename3 } from "path";
+import { basename as basename4 } from "path";
 
-import { createHash as createHash3 } from "crypto";
+import { createHash as createHash6 } from "crypto";
 var KEY_LENGTH = 32;
-var journalKey = (input) => createHash3("sha256").update(JSON.stringify([
+var journalKey = (input) => createHash6("sha256").update(JSON.stringify([
   input.prompt,
   input.label ?? null,
   input.model ?? null,
@@ -13693,7 +14707,7 @@ var dispatchedCall = (assignment, agent, briefPath, launch, form = "normal") => 
 var refused = (_hint) => (error) => new InvalidDraft({ message: error.message });
 var piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map4((entries) => {
   const { reports, notReported } = matchJournal(entries, calls);
-  const run = basename3(source).replace(/\.workflow\.jsonl$/, "");
+  const run = basename4(source).replace(/\.workflow\.jsonl$/, "");
   return {
     reports: reports.map(({ id, report }) => ({ id, report })),
     notAssignmentIds: notReported.map(({ id, index, reason }) => ({
@@ -13765,7 +14779,7 @@ var complete = (snapshot, input) => gen2(function* () {
 });
 var validateResources = (context, root, assignment) => assignment.operationalResources?.length ? operationalWorktrees(root, context.env).pipe(flatMap2((roots) => validateOperationalResources(assignment.operationalResources ?? [], roots))) : void_3;
 var create2 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas.create, input);
+  const request = yield* decode4(schemas.create, input);
   const id = yield* newId("assignment");
   const at = yield* now;
   return yield* withState(context, "assignment.create", "ifPresent", ({ root, update }) => update((snapshot) => gen2(function* () {
@@ -13775,12 +14789,12 @@ var create2 = (context, input) => gen2(function* () {
   })).pipe(map4(({ assignment }) => assignment)));
 });
 var dispatch2 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas.dispatch, input);
+  const request = yield* decode4(schemas.dispatch, input);
   const generated = yield* newId("assignment");
   const at = yield* now;
   return yield* withState(context, "assignment.dispatch", "ifPresent", ({ root, directory, update }) => gen2(function* () {
     const rawProfile = context.env.HOLYAGENT_ROUTING_PROFILE?.trim();
-    const requested = rawProfile === undefined || rawProfile === "" ? undefined : yield* decode3(Literals(["normal", "fast"]), rawProfile);
+    const requested = rawProfile === undefined || rawProfile === "" ? undefined : yield* decode4(Literals(["normal", "fast"]), rawProfile);
     const source = context.host === "pi" || requested !== undefined ? yield* loadConfigWithSource({
       projectDirectories: [stateDirectory(root)],
       env: context.env
@@ -13843,7 +14857,7 @@ var dispatch2 = (context, input) => gen2(function* () {
   }));
 });
 var record3 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas.record, input);
+  const request = yield* decode4(schemas.record, input);
   return yield* withState(context, "assignment.record", "ifPresent", ({ update }) => update((snapshot) => gen2(function* () {
     const found = yield* findAssignment(snapshot.project, request.id);
     const route = routeFor(found.roleTask);
@@ -13860,7 +14874,7 @@ var record3 = (context, input) => gen2(function* () {
   })).pipe(map4(({ assignment }) => assignment)));
 });
 var close2 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas.close, input);
+  const request = yield* decode4(schemas.close, input);
   if (request.report !== undefined && request.reportJson !== undefined)
     return yield* new InvalidDraft({ message: "Provide report or reportJson, not both" });
   if (request.accept !== undefined && (request.outcome !== "success" || request.reportJson !== undefined && request.reportJson.status !== "done"))
@@ -13879,7 +14893,7 @@ var close2 = (context, input) => gen2(function* () {
   })).pipe(map4(({ assignment }) => assignment)));
 });
 var accept2 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas.accept, input);
+  const request = yield* decode4(schemas.accept, input);
   const at = yield* now;
   return yield* withState(context, "assignment.accept", "ifPresent", ({ update }) => update((snapshot) => gen2(function* () {
     const found = yield* findAssignment(snapshot.project, request.id);
@@ -13888,11 +14902,11 @@ var accept2 = (context, input) => gen2(function* () {
   })).pipe(map4(({ assignment }) => assignment)));
 });
 var show = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas.show, input);
+  const request = yield* decode4(schemas.show, input);
   return yield* withState(context, "assignment.show", "ifPresent", ({ directory, read }) => read(directory).pipe(flatMap2(({ project }) => findAssignment(project, request.id))));
 });
 var list = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas.list, input);
+  const request = yield* decode4(schemas.list, input);
   return yield* withState(context, "assignment.list", "ifPresent", ({ directory, read }) => gen2(function* () {
     const snapshot = yield* read(directory);
     const id = request.all ? undefined : (yield* resolveIntent(snapshot)).id;
@@ -13900,15 +14914,15 @@ var list = (context, input) => gen2(function* () {
   }));
 });
 var reports = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas.reports, input);
+  const request = yield* decode4(schemas.reports, input);
   if (request.source.trim() === "" || request.source.includes("\x00") || /^[a-z][a-z0-9+.-]*:\/\//i.test(request.source))
     return yield* new InvalidDraft({ message: "Report source must name a local file" });
   return yield* withState(context, "assignment.reports", "peek", ({ root, directory, read }) => gen2(function* () {
-    const path = resolve5(context.cwd, request.source);
-    const source = yield* io(path, () => realpath3(path));
+    const path = resolve8(context.cwd, request.source);
+    const source = yield* io(path, () => realpath5(path));
     if (!(yield* io(source, () => stat3(source))).isFile())
       return yield* new InvalidDraft({ message: "Report source must be a regular local file" });
-    const text = yield* io(source, () => readFile3(source, "utf8"));
+    const text = yield* io(source, () => readFile4(source, "utf8"));
     const snapshot = yield* read(directory);
     let found;
     if (context.host === "claude") {
@@ -13925,7 +14939,7 @@ var reports = (context, input) => gen2(function* () {
         reports: [...selected].map(([id, report]) => ({ id, report })),
         notAssignmentIds: rejected
       };
-    } else if (!basename4(source).endsWith(".workflow.jsonl")) {
+    } else if (!basename5(source).endsWith(".workflow.jsonl")) {
       found = yield* piRecordReports(text, source, snapshot.project.assignments.flatMap(({ id, specialist }) => specialist?.agentId !== undefined && (specialist.agentId.startsWith("pi:") || specialist.agentId.startsWith("pi-workflow:")) ? [{ id, agentId: specialist.agentId }] : []));
     } else {
       const settings = yield* loadConfigWithSource({
@@ -13955,7 +14969,7 @@ var reports = (context, input) => gen2(function* () {
     }));
   }));
 });
-import { rm as rm4 } from "fs/promises";
+import { rm as rm7 } from "fs/promises";
 var schemas2 = {
   create: Struct({
     objective: IntentDraft.fields.objective,
@@ -13970,13 +14984,13 @@ var schemas2 = {
 };
 var now2 = currentTimeMillis2.pipe(map4((millis) => new Date(millis).toISOString()));
 var create3 = (context, input) => gen2(function* () {
-  const draft = yield* decode3(schemas2.create, input);
+  const draft = yield* decode4(schemas2.create, input);
   const id = yield* newId("intent");
   const at = yield* now2;
   return yield* withState(context, "intent.create", "create", ({ update }) => update(({ project }) => createIntent(project, { ...draft, id, now: at }).pipe(map4((change) => ({ ...change, activeIntent: id })))).pipe(map4(({ intent }) => intent)));
 });
 var show2 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas2.show, input);
+  const request = yield* decode4(schemas2.show, input);
   return yield* withState(context, "intent.show", "ifPresent", ({ read, directory }) => gen2(function* () {
     const snapshot = yield* read(directory);
     const found = request.id === undefined ? yield* resolveIntent(snapshot) : yield* findIntent(snapshot.project, request.id);
@@ -13984,7 +14998,7 @@ var show2 = (context, input) => gen2(function* () {
   }));
 });
 var list2 = (context, input) => gen2(function* () {
-  yield* decode3(schemas2.list, input);
+  yield* decode4(schemas2.list, input);
   return yield* withState(context, "intent.list", "ifPresent", ({ read, directory }) => read(directory).pipe(flatMap2((snapshot) => resolveIntent(snapshot).pipe(map4((current) => ({
     intents: snapshot.project.intents,
     activeIntent: current.id
@@ -13994,28 +15008,28 @@ var list2 = (context, input) => gen2(function* () {
   }))))));
 });
 var update2 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas2.update, input);
+  const request = yield* decode4(schemas2.update, input);
   return yield* withState(context, "intent.update", "ifPresent", ({ update: apply }) => apply((snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => updateIntent(snapshot.project, current.id, {
     ...request,
     material: request.material ?? false
   })))).pipe(map4(({ intent }) => intent)));
 });
 var close3 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas2.close, input);
+  const request = yield* decode4(schemas2.close, input);
   const at = yield* now2;
   return yield* withState(context, "intent.close", "ifPresent", ({ root, directory, update: apply }) => gen2(function* () {
     const unremoved = [];
     const change = yield* apply((snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => closeIntent(snapshot.project, snapshot.specialists, current.id, request, at).pipe(map4((closed) => ({
       ...closed,
       owned: snapshot.project.assignments.filter((row) => row.intentId === current.id).map((row) => row.id)
-    }))))), (closed) => forEach2(closed.owned, (id) => forEach2(["briefs", "reports"], (kind) => artifactFile(context, root, directory, kind, id).pipe(flatMap2((path) => io(path, () => rm4(path, { force: true })).pipe(catch_2((error) => sync2(() => {
+    }))))), (closed) => forEach2(closed.owned, (id) => forEach2(["briefs", "reports"], (kind) => artifactFile(context, root, directory, kind, id).pipe(flatMap2((path) => io(path, () => rm7(path, { force: true })).pipe(catch_2((error) => sync2(() => {
       unremoved.push(error.message);
     }))))))).pipe(asVoid2));
     return { ...change, unremoved };
   }));
 });
 var reopen = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas2.reopen, input);
+  const request = yield* decode4(schemas2.reopen, input);
   return yield* withState(context, "intent.reopen", "ifPresent", ({ update: apply }) => apply((snapshot) => gen2(function* () {
     const id = request.id ?? snapshot.activeIntent;
     if (id === undefined)
@@ -14027,7 +15041,7 @@ var reopen = (context, input) => gen2(function* () {
 class NoReopenTarget extends TaggedError2("NoReopenTarget") {
 }
 var use = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas2.use, input);
+  const request = yield* decode4(schemas2.use, input);
   return yield* withState(context, "intent.use", "ifPresent", ({ update: apply }) => apply(({ project }) => gen2(function* () {
     const found = yield* findIntent(project, request.id);
     yield* requireOpen(found);
@@ -14143,13 +15157,13 @@ var schemas3 = {
   stateMode: Struct({ mode: optionalKey2(StateMode) })
 };
 var plan = (context, input) => gen2(function* () {
-  yield* decode3(schemas3.plan, input);
+  yield* decode4(schemas3.plan, input);
   return yield* withState(context, "plan", "ifPresent", ({ root, directory }) => gen2(function* () {
     const snapshot = yield* readOpenState(directory);
     const intent = yield* resolveIntent(snapshot);
     const at = new Date(yield* currentTimeMillis2).toISOString();
     const raw = context.env.HOLYAGENT_ROUTING_PROFILE?.trim();
-    const requested = raw === undefined || raw === "" ? undefined : yield* decode3(Literals(["normal", "fast"]), raw);
+    const requested = raw === undefined || raw === "" ? undefined : yield* decode4(Literals(["normal", "fast"]), raw);
     const source = context.host === "pi" ? yield* loadConfigWithSource({
       projectDirectories: [stateDirectory(root)],
       env: context.env
@@ -14167,15 +15181,15 @@ var plan = (context, input) => gen2(function* () {
   }));
 });
 var status = (context, input) => gen2(function* () {
-  yield* decode3(schemas3.status, input);
+  yield* decode4(schemas3.status, input);
   return yield* withState(context, "status", "ifPresent", ({ directory }) => readOpenState(directory));
 });
 var reconcile = (context, input) => gen2(function* () {
-  yield* decode3(schemas3.reconcile, input);
+  yield* decode4(schemas3.reconcile, input);
   return yield* withState(context, "reconcile", "ifPresent", ({ directory }) => readOpenState(directory).pipe(map4(({ project }) => project.assignments.filter((row) => row.state === "Running"))));
 });
 var handoff = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas3.handoff, input);
+  const request = yield* decode4(schemas3.handoff, input);
   return yield* withState(context, "handoff", "peek", ({ directory }) => gen2(function* () {
     yield* requireHandoffState(context.cwd, context.env, directory);
     const snapshot = yield* readOpenState(directory);
@@ -14192,17 +15206,17 @@ var handoff = (context, input) => gen2(function* () {
   }));
 });
 var stateMode2 = (context, input) => gen2(function* () {
-  const request = yield* decode3(schemas3.stateMode, input);
+  const request = yield* decode4(schemas3.stateMode, input);
   return yield* withState(context, request.mode === undefined ? "stateMode.read" : "stateMode.write", "peek", () => gen2(function* () {
     if (request.mode === undefined)
       return yield* readStateMode(context.cwd, context.env);
     return yield* setStateMode(context.cwd, context.env, request.mode);
   }));
 });
-import { copyFile as copyFile2, lstat as lstat4, mkdir as mkdir4, readdir as readdir3 } from "fs/promises";
-import { dirname as dirname5, join as join10, relative as relative3 } from "path";
+import { copyFile as copyFile2, lstat as lstat6, mkdir as mkdir5, readdir as readdir4 } from "fs/promises";
+import { dirname as dirname7, join as join13, relative as relative3 } from "path";
 
-import { join as join9 } from "path";
+import { join as join12 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -14358,7 +15372,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join9(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join12(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -14479,13 +15493,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join9(root, folderName);
+  const legacy = join12(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join9(legacy, "intents", folder);
+    const base = join12(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -14493,7 +15507,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join9(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join12(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -14504,10 +15518,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join9(base, path), to: join9(target, path) });
+      state.notes.push({ from: join12(base, path), to: join12(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join9(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join12(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -14609,13 +15623,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join9(root, folderName);
+  const legacy = join12(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join9(legacy, folder);
+    const base = join12(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -14629,7 +15643,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join9(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join12(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -14640,10 +15654,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join9(base, path), to: join9(target, path) });
+      state.notes.push({ from: join12(base, path), to: join12(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join9(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join12(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -14705,7 +15719,7 @@ class MigrationUnverified extends TaggedError2("MigrationUnverified") {
     return `The records were written but reloading .holyagent/ failed: ${this.detail}. Delete the files written by this run (git status lists them) before trying again`;
   }
 }
-var exists = (path) => io(path, () => lstat4(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+var exists = (path) => io(path, () => lstat6(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var countsOf = (gathered) => ({
   intents: gathered.records.filter((record) => record.kind === "intent").length,
   assignments: gathered.records.filter((record) => record.kind === "assignment").length,
@@ -14744,7 +15758,7 @@ var writeAll = (found) => gen2(function* () {
       yield* commitFile(record.file.path, record.file.content);
   const notes = found.flatMap((gathered) => gathered.notes);
   for (const note of notes) {
-    yield* io(note.to, () => mkdir4(dirname5(note.to), { recursive: true }));
+    yield* io(note.to, () => mkdir5(dirname7(note.to), { recursive: true }));
     yield* io(note.to, () => copyFile2(note.from, note.to));
   }
   return { records, copied: notes.map((note) => note.to) };
@@ -14769,10 +15783,10 @@ var mentionsOf = (root, folders) => gen2(function* () {
   if (output.code === 0 || output.code === 1)
     return new TextDecoder().decode(output.stdout).split(`
 `).filter((line) => line !== "").toSorted();
-  const names = yield* io(root, () => readdir3(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
+  const names = yield* io(root, () => readdir4(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join10(root, name));
+    const text = yield* readText(join13(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -14780,7 +15794,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
 });
 var schema = Struct({ dryRun: optionalKey2(Boolean3) });
 var migrate = (context, input) => gen2(function* () {
-  const request = yield* decode3(schema, input);
+  const request = yield* decode4(schema, input);
   return yield* withState(context, "migrate", request.dryRun ? "ifPresent" : "create", ({ directory, root }) => gen2(function* () {
     const found = yield* gatherLegacy(root, directory);
     if (found.length === 0)
@@ -14814,7 +15828,7 @@ var migrate = (context, input) => gen2(function* () {
     }));
   }));
 });
-import { join as join11 } from "path";
+import { join as join14 } from "path";
 var setting = (raw) => raw?.trim() || undefined;
 var WorkflowSettings = Struct({
   disableWorkflows: optionalKey2(Boolean3),
@@ -14840,11 +15854,11 @@ var workflowAvailability = (options, root) => gen2(function* () {
     return options.workflowsAvailable;
   if (host === "pi" || env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return false;
-  const claudeDir = firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? join11(homeDirectory2(env), ".claude");
+  const claudeDir = firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? join14(homeDirectory2(env), ".claude");
   return !(yield* forEach2([
-    join11(claudeDir, "settings.json"),
-    join11(root, ".claude", "settings.json"),
-    join11(root, ".claude", "settings.local.json")
+    join14(claudeDir, "settings.json"),
+    join14(root, ".claude", "settings.json"),
+    join14(root, ".claude", "settings.local.json")
   ], disables)).includes(true);
 });
 var executionConfig = (options, root) => gen2(function* () {
@@ -15517,10 +16531,10 @@ var readBodyFile = (root, file) => {
       return yield* refuse(`is not a project path (${problem})`);
     if (hasGitSegment(file))
       return yield* refuse("is inside .git");
-    const path = join12(root, toPosix(file));
-    const resolve = io(path, () => realpath4(path));
+    const path = join15(root, toPosix(file));
+    const resolve = io(path, () => realpath6(path));
     const real = yield* resolve.pipe(catchIf2((error) => hasCode(error.cause, "ENOENT"), () => fail5(refuse("does not exist"))));
-    const base = yield* io(root, () => realpath4(root));
+    const base = yield* io(root, () => realpath6(root));
     if (real !== base && !real.startsWith(`${base}${sep6}`))
       return yield* refuse("resolves to a path outside the project");
     const inside = toPosix(relative4(base, real));
@@ -15535,7 +16549,7 @@ var readBodyFile = (root, file) => {
         code: ignored.code,
         output: ignored.stderr.trim()
       });
-    const text = yield* acquireUseRelease2(io(real, () => open2(real, constants.O_RDONLY | constants.O_NOFOLLOW)), (handle) => gen2(function* () {
+    const text = yield* acquireUseRelease2(io(real, () => open5(real, constants4.O_RDONLY | constants4.O_NOFOLLOW)), (handle) => gen2(function* () {
       const info = yield* io(real, () => handle.stat());
       if (!info.isFile())
         return yield* refuse("is not a regular file");
@@ -15845,9 +16859,9 @@ var ASSIGNMENT_COMMANDS = [
   }
 ];
 
-import { mkdir as mkdir5, mkdtemp, rm as rm5 } from "fs/promises";
-import { tmpdir } from "os";
-import { join as join13 } from "path";
+import { mkdir as mkdir6, mkdtemp as mkdtemp2, rm as rm8 } from "fs/promises";
+import { tmpdir as tmpdir2 } from "os";
+import { join as join16 } from "path";
 class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
   get message() {
     return this.reason;
@@ -15939,9 +16953,9 @@ var launch = (host, options) => scoped2(gen2(function* () {
     return yield* failed2(`no Chromium was found; ${options.chromiumFix}`);
   const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
   const folders = {
-    profile: join13(base, FOLDERS.profile),
-    config: join13(base, FOLDERS.config),
-    harness: join13(base, FOLDERS.harness)
+    profile: join16(base, FOLDERS.profile),
+    config: join16(base, FOLDERS.config),
+    harness: join16(base, FOLDERS.harness)
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
@@ -16006,19 +17020,19 @@ var liveHost = {
     },
     catch: (cause) => failed2(`cannot start ${spec.command}: ${reason(cause)}`)
   }),
-  devToolsPort: (profile) => tryPromise2(() => Bun.file(join13(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
+  devToolsPort: (profile) => tryPromise2(() => Bun.file(join16(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
     return;
   })),
   answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map4((response) => response.ok), orElseSucceed2(() => false)),
   temporaryDirectory: (prefix) => tryPromise2({
-    try: () => mkdtemp(join13(tmpdir(), prefix)),
+    try: () => mkdtemp2(join16(tmpdir2(), prefix)),
     catch: (cause) => failed2(`cannot create a temporary directory: ${reason(cause)}`)
   }),
   makeDirectory: (path) => tryPromise2({
-    try: () => mkdir5(path, { recursive: true }),
+    try: () => mkdir6(path, { recursive: true }),
     catch: (cause) => failed2(`cannot create ${path}: ${reason(cause)}`)
   }).pipe(asVoid2),
-  removeDirectory: (path) => tryPromise2(() => rm5(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
+  removeDirectory: (path) => tryPromise2(() => rm8(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
   signals: acquireRelease2(sync2(() => {
     const received = makeUnsafe2();
     const handlers = SIGNALS.map(([name, code]) => {
@@ -16037,7 +17051,7 @@ var liveHost = {
 import { existsSync, readdirSync } from "fs";
 import { posix as posix2, win32 as win322 } from "path";
 
-import { delimiter, join as join14, posix, win32 } from "path";
+import { delimiter, join as join17, posix, win32 } from "path";
 var {$: $2 } = globalThis.Bun;
 var pathKey = (env, insensitive = process.platform === "win32") => {
   if (!insensitive || env.PATH !== undefined)
@@ -16046,8 +17060,8 @@ var pathKey = (env, insensitive = process.platform === "win32") => {
 };
 var pathWithBunBin = (env, options) => {
   const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join14(options.home, ".bun");
-  const bunBin = join14(root, "bin");
+  const root = options.bunInstall ? options.bunInstall : join17(options.home, ".bun");
+  const bunBin = join17(root, "bin");
   return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
 };
 var isInside = (api, parent, path) => {
@@ -16068,7 +17082,7 @@ var findCommand = (env, command, options) => {
   const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
   return fromNullishOr(options?.strict === undefined ? Bun.which(command, { PATH: path }) : strictWhich(command, path, options.strict));
 };
-var EMPTY_BUNFIG = join14(import.meta.dir, "empty-bunfig.toml");
+var EMPTY_BUNFIG = join17(import.meta.dir, "empty-bunfig.toml");
 
 class Shell extends Service()("holyagent/Shell") {
   static live = (env) => {
@@ -16208,14 +17222,14 @@ var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--
 
 var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 
-import { lstat as lstat5, realpath as realpath6 } from "fs/promises";
-import { dirname as dirname7, isAbsolute as isAbsolute4, join as join17, relative as relative5, resolve as resolve7, sep as sep7 } from "path";
+import { lstat as lstat7, realpath as realpath8 } from "fs/promises";
+import { dirname as dirname9, isAbsolute as isAbsolute7, join as join20, relative as relative5, resolve as resolve10, sep as sep7 } from "path";
 
 class SetupFailure extends TaggedError2("SetupFailure") {
 }
 
-import { chmod, mkdir as mkdir6, realpath as realpath5, rename as rename4, rm as rm6, writeFile as writeFile3 } from "fs/promises";
-import { basename as basename5, dirname as dirname6, join as join15 } from "path";
+import { chmod, mkdir as mkdir7, realpath as realpath7, rename as rename6, rm as rm9, writeFile as writeFile4 } from "fs/promises";
+import { basename as basename6, dirname as dirname8, join as join18 } from "path";
 var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
   space: 2
 });
@@ -16248,35 +17262,35 @@ var removeFileIfUnchanged = (path, unchangedSince) => gen2(function* () {
     return unchangedSince === undefined;
   if (text !== unchangedSince)
     return false;
-  yield* fileOperation(path, "remove", () => rm6(path, { force: true }));
+  yield* fileOperation(path, "remove", () => rm9(path, { force: true }));
   return true;
 });
 var writeJsonObject = (path, value, options) => replaceJsonObject(path, value, options).pipe(asVoid2);
 var writeJsonObjectIfUnchanged = (path, value, unchangedSince, options) => replaceJsonObject(path, value, options, unchangedSince);
 var replaceJsonObject = (path, value, options, unchangedSince) => gen2(function* () {
   const exists = yield* fileOperation(path, "write", () => Bun.file(path).exists());
-  const target = exists ? yield* fileOperation(path, "write", () => realpath5(path)) : path;
+  const target = exists ? yield* fileOperation(path, "write", () => realpath7(path)) : path;
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => Bun.file(target).stat())).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict3).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join15(dirname6(target), `.${basename5(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname6(target), "write", () => mkdir6(dirname6(target), { recursive: true }));
+  const temporary = join18(dirname8(target), `.${basename6(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname8(target), "write", () => mkdir7(dirname8(target), { recursive: true }));
   yield* tryPromise2({
-    try: () => writeFile3(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
+    try: () => writeFile4(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
-  }).pipe(catch_2((error) => (error.code === "EEXIST" ? void_3 : ignore2(fileOperation(temporary, "remove", () => rm6(temporary, { force: true })))).pipe(andThen2(fail5(new SetupFailure({
+  }).pipe(catch_2((error) => (error.code === "EEXIST" ? void_3 : ignore2(fileOperation(temporary, "remove", () => rm9(temporary, { force: true })))).pipe(andThen2(fail5(new SetupFailure({
     message: `cannot write ${temporary}: ${error instanceof Error ? error.message : String(error)}`
   }))))));
   return yield* gen2(function* () {
     if (mode !== undefined)
       yield* fileOperation(temporary, "write", () => chmod(temporary, mode));
     if (unchangedSince !== undefined && (yield* fileOperation(target, "read", () => Bun.file(target).text())) !== unchangedSince) {
-      yield* fileOperation(temporary, "remove", () => rm6(temporary, { force: true }));
+      yield* fileOperation(temporary, "remove", () => rm9(temporary, { force: true }));
       return false;
     }
-    yield* fileOperation(target, "write", () => rename4(temporary, target));
+    yield* fileOperation(target, "write", () => rename6(temporary, target));
     return true;
-  }).pipe(onError2(() => ignore2(fileOperation(temporary, "remove", () => rm6(temporary, { force: true })))));
+  }).pipe(onError2(() => ignore2(fileOperation(temporary, "remove", () => rm9(temporary, { force: true })))));
 });
 var place = (node, path, depth, wanted) => {
   const key = path[depth];
@@ -16310,7 +17324,7 @@ var applyDefaults = (existing, defaults) => {
   return { merged, entries: [...entries.values()] };
 };
 
-import { join as join16, resolve as resolve6 } from "path";
+import { join as join19, resolve as resolve9 } from "path";
 var RecordedKey = Struct({
   path: NonEmptyArray(String4),
   value: Unknown2
@@ -16318,8 +17332,8 @@ var RecordedKey = Struct({
 var RecordFile = Struct({
   files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
 });
-var recordPath = (env) => join16(userFiles(env).claudeDir, "holyagent", "setup-records.json");
-var keyOf = (file) => resolve6(file);
+var recordPath = (env) => join19(userFiles(env).claudeDir, "holyagent", "setup-records.json");
+var keyOf = (file) => resolve9(file);
 var load2 = (env) => gen2(function* () {
   const path = recordPath(env);
   const raw = yield* readJsonObject(path);
@@ -16384,7 +17398,7 @@ var failed3 = (what, result) => {
 };
 var show3 = (value) => JSON.stringify(value) ?? String(value);
 var pass = (name, detail) => `ok   ${name}: ${detail}`;
-var fail6 = (name, detail) => `FAIL ${name}: ${detail}`;
+var fail8 = (name, detail) => `FAIL ${name}: ${detail}`;
 
 var MARKETPLACE = { name: "holyagent", repo: "davidbasilefilho/holyagent" };
 var PLUGIN_ID = `${MARKETPLACE.name}@${MARKETPLACE.name}`;
@@ -16529,17 +17543,17 @@ var missingSettingKeys = fn2("missingSettingKeys")(function* (file) {
 var SCOPES = ["user", "project", "local"];
 var within = (parent, child) => {
   const path = relative5(parent, child);
-  return path === "" || path !== ".." && !path.startsWith(`..${sep7}`) && !isAbsolute4(path);
+  return path === "" || path !== ".." && !path.startsWith(`..${sep7}`) && !isAbsolute7(path);
 };
-var real = (path) => tryPromise2(() => realpath6(path)).pipe(orElseSucceed2(() => {
+var real = (path) => tryPromise2(() => realpath8(path)).pipe(orElseSucceed2(() => {
   return;
 }));
-var present4 = (path) => tryPromise2(() => lstat5(path)).pipe(as2(true), orElseSucceed2(() => false));
-var identity2 = (path) => tryPromise2(() => lstat5(path, { bigint: true })).pipe(map4((stats) => `${stats.dev}:${stats.ino}`), orElseSucceed2(() => {
+var present4 = (path) => tryPromise2(() => lstat7(path)).pipe(as2(true), orElseSucceed2(() => false));
+var identity2 = (path) => tryPromise2(() => lstat7(path, { bigint: true })).pipe(map4((stats) => `${stats.dev}:${stats.ino}`), orElseSucceed2(() => {
   return;
 }));
 var isSymlink = (path) => tryPromise2({
-  try: () => lstat5(path),
+  try: () => lstat7(path),
   catch: (cause) => cause
 }).pipe(map4((stats) => stats.isSymbolicLink()), catch_2((error) => error.code === "ENOENT" || error.code === "ENOTDIR" ? succeed6(false) : fail5(new SetupFailure({ message: `cannot inspect ${path}: ${error.message}` }))));
 var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action) {
@@ -16547,7 +17561,7 @@ var refuseLinks = fn2("refuseProjectLinks")(function* (cwd, scope, file, action)
     return;
   const parts = relative5(cwd, file).split(sep7);
   for (let depth = 1;depth <= parts.length; depth++) {
-    const path = join17(cwd, ...parts.slice(0, depth));
+    const path = join20(cwd, ...parts.slice(0, depth));
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
         message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
@@ -16559,20 +17573,20 @@ var claudeFolder = fn2("claudeFolder")(function* (cwd) {
   const shell = yield* Shell;
   const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
   const line = top.stdout.trim();
-  const named = top.exitCode === 0 && line !== "" ? resolve7(line) : undefined;
+  const named = top.exitCode === 0 && line !== "" ? resolve10(line) : undefined;
   const realTop = named === undefined ? undefined : yield* real(named);
   const realCwd = yield* real(cwd);
-  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present4(join17(named, ".git")));
+  const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present4(join20(named, ".git")));
   const root = trusted ? named : cwd;
   const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-  return { folder: join17(root, ".claude"), root, trusted, notice };
+  return { folder: join20(root, ".claude"), root, trusted, notice };
 });
 var fileName = (scope) => scope === "project" ? "settings.json" : "settings.local.json";
 var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   if (scope === "user")
     return { file: userFiles(env).settings };
   const { folder, notice } = yield* claudeFolder(cwd);
-  const file = join17(folder, fileName(scope));
+  const file = join20(folder, fileName(scope));
   for (const path of [folder, file]) {
     if (yield* isSymlink(path)) {
       return yield* new SetupFailure({
@@ -16583,19 +17597,19 @@ var settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
   return { file, ...notice === undefined ? {} : { notice } };
 });
 var projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
-  const roots = [resolve7(cwd)];
-  for (let folder = resolve7(cwd);; folder = dirname7(folder)) {
-    if (yield* present4(join17(folder, ".git"))) {
+  const roots = [resolve10(cwd)];
+  for (let folder = resolve10(cwd);; folder = dirname9(folder)) {
+    if (yield* present4(join20(folder, ".git"))) {
       if (folder !== roots[0])
         roots.push(folder);
       break;
     }
-    if (dirname7(folder) === folder)
+    if (dirname9(folder) === folder)
       break;
   }
   return roots.flatMap((root) => [
-    join17(root, ".claude", "settings.json"),
-    join17(root, ".claude", "settings.local.json")
+    join20(root, ".claude", "settings.json"),
+    join20(root, ".claude", "settings.local.json")
   ]);
 });
 var enablement = fn2("enablement")(function* (folder, file) {
@@ -16626,7 +17640,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
   const own = yield* identity2(file);
   if (own !== undefined) {
     for (const entry of tracked) {
-      if ((yield* identity2(join17(root, entry))) === own)
+      if ((yield* identity2(join20(root, entry))) === own)
         return "git tracks it";
     }
   }
@@ -16638,7 +17652,7 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
       if (component === folderName || seen.has(component))
         continue;
       seen.add(component);
-      if ((yield* identity2(join17(root, component))) === home)
+      if ((yield* identity2(join20(root, component))) === home)
         return `git tracks ${component} as ${folderName}`;
     }
   }
@@ -16651,8 +17665,8 @@ var repositoryControl = fn2("repositoryControl")(function* (root, folder, file) 
 });
 var installedScope = fn2("installedScope")(function* (cwd) {
   const { folder, root, trusted } = yield* claudeFolder(cwd);
-  const local = join17(folder, fileName("local"));
-  const project = join17(folder, fileName("project"));
+  const local = join20(folder, fileName("local"));
+  const project = join20(folder, fileName("project"));
   const notices = [];
   const found = yield* enablement(folder, local);
   if (found === "enabled") {
@@ -16706,22 +17720,22 @@ var setupNotice = (env, cwd) => {
   }));
 };
 
-import { lstat as lstat6, mkdir as mkdir7, open as open3 } from "fs/promises";
-import { tmpdir as tmpdir2, userInfo } from "os";
-import { join as join18 } from "path";
+import { lstat as lstat8, mkdir as mkdir8, open as open6 } from "fs/promises";
+import { tmpdir as tmpdir3, userInfo } from "os";
+import { join as join21 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join18(tmpdir2(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join18(markers(), sessionId);
+var markers = () => join21(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join21(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir7(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat6(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir8(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat8(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
 };
-var create4 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId), () => open3(markerOf(sessionId), "wx").then((file) => file.close()))), as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false)));
+var create4 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId), () => open6(markerOf(sessionId), "wx").then((file) => file.close()))), as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false)));
 var markRulesDelivered = (sessionId) => create4(sessionId).pipe(asVoid2);
 var claimRulesDelivery = create4;
 var SEPARATORS = new Set([";", "&", "|", `
@@ -24475,7 +25489,7 @@ var MIGRATE_COMMANDS = [
   }
 ];
 
-import { join as join20 } from "path";
+import { join as join23 } from "path";
 
 var WEB_KIT_PACKAGE = "pi-web-kit";
 var piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
@@ -24492,7 +25506,7 @@ var piPackages = (config, profile = providerProfile(config), form = "normal", de
   ];
   return names.map((name) => piPackageSource(name));
 };
-import { isAbsolute as isAbsolute5, join as join19 } from "path";
+import { isAbsolute as isAbsolute8, join as join22 } from "path";
 var BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE];
 var BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
 var BROWSE_PAIR_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page when no browser has it and pairs the browser (\`${BROWSE_COMMAND} pair\` prints a code to enter in the extension's options instead)`;
@@ -24502,9 +25516,9 @@ var browseDataDirectory = (env) => {
   if (home !== undefined)
     return home;
   const data = firstNonEmpty(env["XDG_DATA_HOME"]);
-  return join19(data !== undefined && isAbsolute5(data) ? data : join19(homeDirectory(env), ".local", "share"), "browse");
+  return join22(data !== undefined && isAbsolute8(data) ? data : join22(homeDirectory(env), ".local", "share"), "browse");
 };
-var browsePairingFile = (env) => join19(browseDataDirectory(env), "browser-tokens.json");
+var browsePairingFile = (env) => join22(browseDataDirectory(env), "browser-tokens.json");
 var Open = Record(String4, Unknown2);
 var Pairing = StructWithRest(Struct({
   token: String4.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
@@ -24543,7 +25557,7 @@ var BROWSE_EXTENSION_IDS = [
 var browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory(env);
   if (platform === "darwin") {
-    const support = join19(home, "Library", "Application Support");
+    const support = join22(home, "Library", "Application Support");
     return [
       ["Google Chrome", "Google/Chrome"],
       ["Google Chrome Beta", "Google/Chrome Beta"],
@@ -24554,21 +25568,21 @@ var browserDirectories = (env, platform = process.platform) => {
       ["Opera", "com.operasoftware.Opera"],
       ["Vivaldi", "Vivaldi"],
       ["Arc", "Arc/User Data"]
-    ].map(([name = "", folder = ""]) => ({ name, directory: join19(support, folder) }));
+    ].map(([name = "", folder = ""]) => ({ name, directory: join22(support, folder) }));
   }
   if (platform === "win32") {
-    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join19(home, "AppData", "Local");
-    const roaming = firstNonEmpty(env["APPDATA"]) ?? join19(home, "AppData", "Roaming");
+    const local = firstNonEmpty(env["LOCALAPPDATA"]) ?? join22(home, "AppData", "Local");
+    const roaming = firstNonEmpty(env["APPDATA"]) ?? join22(home, "AppData", "Roaming");
     return [
-      { name: "Google Chrome", directory: join19(local, "Google", "Chrome", "User Data") },
-      { name: "Microsoft Edge", directory: join19(local, "Microsoft", "Edge", "User Data") },
-      { name: "Brave", directory: join19(local, "BraveSoftware", "Brave-Browser", "User Data") },
-      { name: "Vivaldi", directory: join19(local, "Vivaldi", "User Data") },
-      { name: "Opera", directory: join19(roaming, "Opera Software", "Opera Stable") }
+      { name: "Google Chrome", directory: join22(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join22(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join22(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join22(local, "Vivaldi", "User Data") },
+      { name: "Opera", directory: join22(roaming, "Opera Software", "Opera Stable") }
     ];
   }
   const configured = firstNonEmpty(env["XDG_CONFIG_HOME"]);
-  const config = configured !== undefined && isAbsolute5(configured) ? configured : join19(home, ".config");
+  const config = configured !== undefined && isAbsolute8(configured) ? configured : join22(home, ".config");
   return [
     ["Google Chrome", "google-chrome"],
     ["Google Chrome Beta", "google-chrome-beta"],
@@ -24578,7 +25592,7 @@ var browserDirectories = (env, platform = process.platform) => {
     ["Brave", "BraveSoftware/Brave-Browser"],
     ["Opera", "opera"],
     ["Vivaldi", "vivaldi"]
-  ].map(([name = "", folder = ""]) => ({ name, directory: join19(config, folder) }));
+  ].map(([name = "", folder = ""]) => ({ name, directory: join22(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
   profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String4, Open)) }), [Open]))
@@ -24594,12 +25608,12 @@ var isDisabled = (setting) => {
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 };
 var findBrowseExtension = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
-  const state = yield* readOptional(join19(directory, "Local State"));
+  const state = yield* readOptional(join22(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
-    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join19(directory, profile, file)).pipe(map4((text) => {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join22(directory, profile, file)).pipe(map4((text) => {
       const parsed = text === undefined ? undefined : decodeUnknownOption2(Preferences)(text, {
         onExcessProperty: "error"
       });
@@ -24653,16 +25667,16 @@ var checkVersioned = (env, name, command, texts) => gen2(function* () {
   const shell = yield* Shell;
   const found = yield* shell.which(command);
   if (isNone2(found))
-    return fail6(name, `not found on PATH; ${texts.fix}`);
+    return fail8(name, `not found on PATH; ${texts.fix}`);
   const result = yield* shell.run(command, ["--version"], { cwd: homeDirectory(env) });
   const output = `${result.stdout}
 ${result.stderr}`;
   const release = result.exitCode === 0 ? releaseIn(output) : undefined;
   if (release === undefined)
-    return fail6(name, `${found.value} did not report a version for --version (exit ${result.exitCode}); ${texts.fix}`);
+    return fail8(name, `${found.value} did not report a version for --version (exit ${result.exitCode}); ${texts.fix}`);
   const shown = release.join(".");
   const verdict = texts.judge(release, shown, found.value);
-  return verdict.ok ? pass(name, verdict.detail) : fail6(name, verdict.detail);
+  return verdict.ok ? pass(name, verdict.detail) : fail8(name, verdict.detail);
 });
 var checkPi = (env) => checkVersioned(env, "pi", "pi", {
   fix: PI_FIX,
@@ -24704,8 +25718,8 @@ var piAgentDirectory = (env) => {
   const home = homeDirectory(env);
   const set = firstNonEmpty(env["PI_CODING_AGENT_DIR"]);
   if (set === undefined)
-    return join20(home, ".pi", "agent");
-  return set === "~" ? home : /^~[/\\]/.test(set) ? join20(home, set.slice(2)) : set;
+    return join23(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join23(home, set.slice(2)) : set;
 };
 var piSettingsSources = (file) => gen2(function* () {
   const exists = yield* fileOperation(file, "read", () => Bun.file(file).exists());
@@ -24719,7 +25733,7 @@ var piSettingsSources = (file) => gen2(function* () {
   }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
   return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
 });
-var piSettingsFiles = (env, cwd) => [join20(piAgentDirectory(env), "settings.json"), join20(cwd, ".pi", "settings.json")];
+var piSettingsFiles = (env, cwd) => [join23(piAgentDirectory(env), "settings.json"), join23(cwd, ".pi", "settings.json")];
 var piPresenceFiles = (env, cwd, scope) => {
   const [globalFile, projectFile] = piSettingsFiles(env, cwd);
   return scope === "user" ? [globalFile] : [globalFile, projectFile];
@@ -24758,7 +25772,7 @@ var checkPackage = (env, cwd, scope) => gen2(function* () {
   if (found !== undefined)
     return pass("pi package", `listed in ${found.file}`);
   const problems = outcomes.flatMap((outcome) => outcome.problem === undefined ? [] : [outcome.problem]);
-  return fail6("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${packageFix(scope)}` : `not in the packages of ${files.join(" or ")}; ${packageFix(scope)}`);
+  return fail8("pi package", problems.length > 0 ? `${problems.join("; ")}; fix the file, or ${packageFix(scope)}` : `not in the packages of ${files.join(" or ")}; ${packageFix(scope)}`);
 });
 var listedSources = (files) => forEach2(files, (file) => piSettingsSources(file).pipe(orElseSucceed2(() => []))).pipe(map4((lists) => lists.flat()));
 var installFix = (source, scope) => `install it with \`pi install ${source}\`${scope === "user" ? "" : " (add -l for this project only)"}, or re-run \`holyagent setup\``;
@@ -24767,7 +25781,7 @@ var checkBasePackages = (files, scope, config, listed) => {
   const missing = wanted.filter((source) => !listsAtPin(listed, source));
   if (missing.length === 0)
     return [pass("pi base packages", `${wanted.length} packages listed at their pins`)];
-  return missing.map((source) => fail6(`pi base package ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`));
+  return missing.map((source) => fail8(`pi base package ${parseNpmSource(source)?.name ?? source}`, `not listed at ${source} in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`));
 };
 var unmetNeed = (env, need, platform = process.platform) => gen2(function* () {
   if (need.kind === "display")
@@ -24813,7 +25827,7 @@ var checkCapability = (env, scope, capability, form, listed, files, platform) =>
       problems.push(`${source} is not listed in the packages of ${files.join(" or ")}; ${installFix(source, scope)}`);
   }
   if (problems.length > 0)
-    return fail6(name, problems.join("; "));
+    return fail8(name, problems.join("; "));
   const count = sources.length === 1 ? "1 package" : `${sources.length} packages`;
   const what = sources.length === 0 ? "nothing to install" : capability.health.includes("packages") ? `${count} listed at ${sources.length === 1 ? "its pin" : "their pins"}` : `${count}, not checked`;
   return pass(name, `${form} form, ${capability.applicability}, ${what}`);
@@ -24826,7 +25840,7 @@ var checkPairing = (env, capability, form, platform) => gen2(function* () {
   const name = `pi capability ${capability.name} pairing`;
   const found = yield* readBrowseState(env, platform).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
   if (found instanceof SetupFailure)
-    return [fail6(name, found.message)];
+    return [fail8(name, found.message)];
   const { text, fix } = describeBrowseState(found);
   return found.state === "paired" ? [pass(name, text)] : [hint(`${name}: ${text}${fix === undefined ? "" : `; ${fix}`}`)];
 });
@@ -24851,7 +25865,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function*
       hint("pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped")
     ];
   return yield* loadPiConfig(env, cwd, scope).pipe(matchEffect3({
-    onFailure: (error) => succeed6([fail6("pi config", error.message)]),
+    onFailure: (error) => succeed6([fail8("pi config", error.message)]),
     onSuccess: (config) => config.pi.enable ? gen2(function* () {
       const files = piPresenceFiles(env, cwd, scope);
       const listed = yield* listedSources(files);
@@ -24871,7 +25885,7 @@ var piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function*
   }));
 });
 
-import { join as join21, resolve as resolve8 } from "path";
+import { join as join24, resolve as resolve11 } from "path";
 var escapeRegExp = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 var patternRegExp = (pattern) => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
 var T3_TOOL = patternRegExp(`${T3_PREFIX}*`);
@@ -24925,21 +25939,21 @@ var locate2 = (env, cwd, scope, logical) => {
       return;
     const explicit = firstNonEmpty(env["BILI_CONFIG_FILE"]);
     if (explicit !== undefined)
-      return resolve8(cwd, explicit);
-    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join21(home, ".config");
-    return join21(base, "billion-context", "billion-context.json");
+      return resolve11(cwd, explicit);
+    const base = firstNonEmpty(env["XDG_CONFIG_HOME"]) ?? join24(home, ".config");
+    return join24(base, "billion-context", "billion-context.json");
   }
   if (logical === PI_FFF_FILE)
-    return project ? undefined : join21(piAgentDirectory(env), "pi-fff.json");
+    return project ? undefined : join24(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
-    return project ? join21(cwd, ".pi", name) : join21(piAgentDirectory(env), name);
+    return project ? join24(cwd, ".pi", name) : join24(piAgentDirectory(env), name);
   }
   if (logical.startsWith(PI_PREFIX)) {
     const name = logical.slice(PI_PREFIX.length);
-    return project ? join21(cwd, ".pi", name) : join21(home, ".pi", name);
+    return project ? join24(cwd, ".pi", name) : join24(home, ".pi", name);
   }
-  return project || !logical.startsWith("~/") ? undefined : join21(home, logical.slice(2));
+  return project || !logical.startsWith("~/") ? undefined : join24(home, logical.slice(2));
 };
 var keyName = ({ path }) => path.join(".");
 var inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf));
@@ -25217,7 +26231,7 @@ var searchToolLines = (cwd, format) => gen2(function* () {
   return yield* forEach2(TOOLS, (tool) => locateTool(tool, cwd, shell.which).pipe(map4((found) => format(tool, found))));
 });
 
-import { join as join24 } from "path";
+import { join as join27 } from "path";
 
 var reportOne = (env, capability, features, options, platform) => gen2(function* () {
   const form = options.form ?? "normal";
@@ -25257,8 +26271,8 @@ var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform
   return lines.flat();
 });
 
-import { join as join22 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join22(stateDirectory(cwd), CONFIG_FILE);
+import { join as join25 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join25(stateDirectory(cwd), CONFIG_FILE);
 var objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
@@ -25400,7 +26414,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
 });
 
 import { stat as stat5 } from "fs/promises";
-import { join as join23 } from "path";
+import { join as join26 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
   browserArtifactsAfterDays: 14,
@@ -25413,21 +26427,21 @@ var restoreSettings = (path, previous, unchangedSince) => previous === undefined
 var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
-var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join23(homeDirectory(env), ".t3");
-var t3SettingsFile = (env) => join23(t3Home(env), "userdata", "settings.json");
+var t3Home = (env) => firstNonEmpty(env["T3CODE_HOME"]) ?? join26(homeDirectory(env), ".t3");
+var t3SettingsFile = (env) => join26(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => tryPromise2(() => stat5(path)).pipe(map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory(env);
   if (platform === "darwin") {
     const developer = firstNonEmpty(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-    const simulator = join23(developer, "Platforms", "iPhoneSimulator.platform");
+    const simulator = join26(developer, "Platforms", "iPhoneSimulator.platform");
     if (yield* isDirectory2(simulator))
       return `Xcode (${developer})`;
   }
   const sdkFolders = [
     firstNonEmpty(env["ANDROID_HOME"]),
     firstNonEmpty(env["ANDROID_SDK_ROOT"]),
-    platform === "darwin" ? join23(home, "Library", "Android", "sdk") : platform === "win32" ? join23(firstNonEmpty(env["LOCALAPPDATA"]) ?? join23(home, "AppData", "Local"), "Android", "Sdk") : join23(home, "Android", "Sdk")
+    platform === "darwin" ? join26(home, "Library", "Android", "sdk") : platform === "win32" ? join26(firstNonEmpty(env["LOCALAPPDATA"]) ?? join26(home, "AppData", "Local"), "Android", "Sdk") : join26(home, "Android", "Sdk")
   ];
   for (const folder of sdkFolders) {
     if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -25748,7 +26762,7 @@ var installCtx7 = fn2("installCtx7")(function* (env, dryRun) {
   const global = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
   if (!global.usable)
     return global.lines;
-  const skillReady = (yield* fileExists2(join24(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join24(files.claudeDir, "rules", "context7.md")));
+  const skillReady = (yield* fileExists2(join27(files.claudeDir, "skills", "find-docs", "SKILL.md"))) && (yield* fileExists2(join27(files.claudeDir, "rules", "context7.md")));
   if (skillReady)
     return [...global.lines, present3("ctx7 skill: already installed")];
   const apiKey = env.CONTEXT7_API_KEY === "" ? undefined : env.CONTEXT7_API_KEY;
@@ -25836,7 +26850,7 @@ var FIX = "run /holyagent:setup, or `holyagent doctor --fix`";
 var checkBun = gen2(function* () {
   const shell = yield* Shell;
   const found = yield* shell.which("bun");
-  return isSome2(found) ? pass("bun", found.value) : fail6("bun", "not found on PATH; install Bun (https://bun.sh), which runs the plugin hooks");
+  return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the plugin hooks");
 });
 var checkCommand = (env, command) => gen2(function* () {
   if (inCloudSession(env))
@@ -25846,10 +26860,10 @@ var checkCommand = (env, command) => gen2(function* () {
   if (isSome2(onPath))
     return pass(command, onPath.value);
   const anywhere = yield* shell.which(command, { includeBunBin: true });
-  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail6(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
+  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
 });
 var fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
-var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail6("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail6("settings", error.message))));
+var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail8("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail8("settings", error.message))));
 var checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]);
 var doctor = fn2("doctor")(function* (env, options) {
   const scope = options.scope ?? "user";
@@ -25865,7 +26879,7 @@ var doctor = fn2("doctor")(function* (env, options) {
     const lines = yield* all2([
       checkBun,
       checkCommand(env, "ctx7"),
-      succeed6(fail6("settings", located.message))
+      succeed6(fail8("settings", located.message))
     ]);
     return {
       lines: [...lines, ...pi, ...yield* searchToolLines(cwd, doctorToolLine)],
@@ -25887,9 +26901,9 @@ var doctor = fn2("doctor")(function* (env, options) {
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
 });
 
-import { lstat as lstat7, mkdir as mkdir8, mkdtemp as mkdtemp2, readdir as readdir4, rename as rename5, rm as rm7, stat as stat6, writeFile as writeFile4 } from "fs/promises";
+import { lstat as lstat9, mkdir as mkdir9, mkdtemp as mkdtemp3, readdir as readdir5, rename as rename7, rm as rm10, stat as stat6, writeFile as writeFile5 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename6, dirname as dirname8, join as join25, posix as posix3, win32 as win323 } from "path";
+import { basename as basename7, dirname as dirname10, join as join28, posix as posix3, win32 as win323 } from "path";
 import { pathToFileURL } from "url";
 
 var TUI_BUNDLE = "setup-tui.js";
@@ -27094,8 +28108,8 @@ var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join25(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join25(directory, file)}`, cause)
+      try: () => Bun.write(join28(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join28(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -27114,11 +28128,11 @@ var importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
 });
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join25(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join28(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
 }));
 var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join25(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join28(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
 }), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
 var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
@@ -27127,9 +28141,9 @@ var STICKY = 512;
 var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined;
 var privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
-    yield* fileSystem(`cannot create ${folder}`, () => mkdir8(folder, { recursive: true, mode: 448 }));
+    yield* fileSystem(`cannot create ${folder}`, () => mkdir9(folder, { recursive: true, mode: 448 }));
   const found = yield* tryPromise2({
-    try: () => lstat7(folder),
+    try: () => lstat9(folder),
     catch: (cause) => cause
   }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
   if (found === undefined || uid === undefined)
@@ -27158,11 +28172,11 @@ var privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined 
   const text = yield* tryPromise2(() => Bun.file(groupFile).text());
   return namesPrivateGroup(text, gid, name);
 }).pipe(orElseSucceed2(() => false));
-var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile4(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename5(temporary, target)))), (temporary) => promise2(() => rm7(temporary, { force: true })));
-var remove = (path) => promise2(() => rm7(path, { recursive: true, force: true }));
+var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem(`cannot write ${target}`, () => writeFile5(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem(`cannot write ${target}`, () => rename7(temporary, target)))), (temporary) => promise2(() => rm10(temporary, { force: true })));
+var remove = (path) => promise2(() => rm10(path, { recursive: true, force: true }));
 var promote = (temporary, directory, packages, lock) => gen2(function* () {
   for (let attempt = 0;attempt < 3; attempt += 1) {
-    const moved = yield* exit2(fileSystem(`cannot move ${temporary}`, () => rename5(temporary, directory)));
+    const moved = yield* exit2(fileSystem(`cannot move ${temporary}`, () => rename7(temporary, directory)));
     if (moved._tag === "Success")
       return;
     if (yield* installed(directory, packages, lock))
@@ -27173,38 +28187,38 @@ var promote = (temporary, directory, packages, lock) => gen2(function* () {
 });
 var STALE_AFTER_MS = 60 * 60 * 1000;
 var newestChange = (path) => gen2(function* () {
-  const modified = (entry) => tryPromise2(() => lstat7(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir4(folder)).pipe(map4((names) => names.map((name) => join25(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join25(path, "node_modules"))];
+  const modified = (entry) => tryPromise2(() => lstat9(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map4((names) => names.map((name) => join28(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join28(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 });
 var sweepStale = (directory, uid) => gen2(function* () {
-  const parent = dirname8(directory);
-  const prefix = `.${basename6(directory)}-`;
+  const parent = dirname10(directory);
+  const prefix = `.${basename7(directory)}-`;
   const cutoff = Date.now() - STALE_AFTER_MS;
-  const names = yield* tryPromise2(() => readdir4(parent));
+  const names = yield* tryPromise2(() => readdir5(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join25(parent, name);
-    const found = yield* tryPromise2(() => lstat7(path));
+    const path = join28(parent, name);
+    const found = yield* tryPromise2(() => lstat9(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
 }).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp2(join25(dirname8(directory), `.${basename6(directory)}-`))))), (temporary) => gen2(function* () {
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem(`cannot create a folder beside ${directory}`, () => mkdtemp3(join28(dirname10(directory), `.${basename7(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join25(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join28(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove);
 var loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join25(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join28(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -27214,7 +28228,7 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
   });
   if (options.directory === undefined)
     yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
-  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname8(directory)])
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname10(directory)])
     yield* privateFolder(folder, uid, true);
   yield* privateFolder(directory, uid, false);
   if (!(yield* installed(directory, packages, lock))) {
@@ -27223,9 +28237,9 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join25(directory, TUI_BUNDLE);
+  const target = join28(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join25(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join28(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -27549,7 +28563,7 @@ var SETUP_COMMANDS = [
     run: ({ args, env, cwd }) => gen2(function* () {
       const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
       if (resolved instanceof SetupFailure) {
-        return printed({ lines: [fail6("scope", resolved.message)], ok: false });
+        return printed({ lines: [fail8("scope", resolved.message)], ok: false });
       }
       const form = yield* formOf(args, env, DOCTOR_USAGE);
       const report = yield* doctor(env, {
@@ -27835,18 +28849,18 @@ for (const stream of [process.stdout, process.stderr])
       process.exit(0);
     throw error;
   });
-var write = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause)));
+var write2 = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause)));
 var main = (interactiveSetup = false) => runPromise2(run2(Bun.argv.slice(2), {
   cwd: process.cwd(),
   env: process.env,
   stdin,
-  emit: (text) => write(process.stdout, text),
+  emit: (text) => write2(process.stdout, text),
   ...interactiveSetup ? {
     terminal: {
       stdin: Boolean(process.stdin.isTTY),
       stdout: Boolean(process.stdout.isTTY)
     }
   } : {}
-}).pipe(tap2((result) => write(process.stdout, result.stdout).pipe(andThen2(write(process.stderr, result.stderr)), andThen2(sync2(() => void (process.exitCode = result.code)))))));
+}).pipe(tap2((result) => write2(process.stdout, result.stdout).pipe(andThen2(write2(process.stderr, result.stderr)), andThen2(sync2(() => void (process.exitCode = result.code)))))));
 
 await main();

@@ -5,9 +5,10 @@ import type { AgentHost } from "../domain/host.ts"
 import { decodeInput } from "../domain/input.ts"
 import type { Intent } from "../domain/intent.ts"
 import type { RoleTask } from "../domain/route.ts"
+import { StateIo } from "../state/errors.ts"
 import { WorkTree } from "../state/local.ts"
 import { readState, type Snapshot, type StateChange, updateState } from "../state/store.ts"
-import { type Ensure, resolveState } from "../state/tree.ts"
+import { type Ensure, migrationReadCheckpoint, resolveState } from "../state/tree.ts"
 
 /** The named action a trusted host must explicitly authorize. */
 export type Capability =
@@ -117,7 +118,12 @@ export const withState = <A, E, R>(
       undefined,
       authorizeInitialization,
     )
-    return yield* use({
+    const branch = readOnly && state.resolved?.mode === "branch" ? state.resolved.branch : undefined
+    const before =
+      branch === undefined
+        ? undefined
+        : yield* migrationReadCheckpoint(state.root, context.env, branch)
+    const result = yield* use({
       root: state.root,
       directory: state.directory,
       read: readState,
@@ -139,6 +145,15 @@ export const withState = <A, E, R>(
           authorizeInitialization,
         ),
     }).pipe(Effect.provideService(WorkTree, state.root))
+    if (branch !== undefined && before !== undefined) {
+      const after = yield* migrationReadCheckpoint(state.root, context.env, branch)
+      if (before.common !== after.common || before.head !== after.head)
+        return yield* new StateIo({
+          path: state.directory,
+          cause: "state changed during the read; retry",
+        })
+    }
+    return result
   })
 
 /** Resolves the active open Intent without guessing among several open records. */
