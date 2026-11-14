@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mwfppehy-vfcg",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "close-the-two-remaining-narrow-terminal",
+  "objective": "Close the two remaining narrow terminal-guard setup and temporary cleanup ownership findings.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core at clean1a17ff36a1a2479b51a07307df5ac179752f1c32. Read core-migration-atomic-code/security-review-report.json and corrected repro paths there.",
+    "Fail custom authority without a trusted terminal guard at the first mutating entry boundary BEFORE checkout, journal/ref publication or other partial state changes. Preserve no-write read-only peek and trusted default CLI compatibility; guard availability must not be postponed to post-CAS file publication. Focus on exact public resolveState fixture and lower helper contract.",
+    "Detached cleanup must remember identity of the owned temporary created by its handle, and preserve any replacement installed at the original pathname while preparation is stalled. Ordinary absent/matching temp cleanup still works; renamed user-owned files are never searched out/deleted. Bound claims to documented same-process/safe-path contract, no universal OS isolation framework. No architecture redesign beyond these two concrete flaws."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Own only source paths/tests/docs previously involved. Add red→green deterministic tests from both reviewers; run build/static/focused migration/CoreNode tests. Do NOT repeat whole full verify here; final integrated full verify after Core+BCF merge covers current sources. Last full3624capturedexit0 remains historical evidence, don't claim unchanged full gate on new source. Report /workspace/work/034/core-migration-cleanup-entry-repair-report.json."
+  ],
+  "criteria": [
+    {
+      "text": "Missing custom terminal authority fails before state setup journal or ref mutation while trusted defaults and pure reads retain compatibility",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Detached cleanup removes only its original temporary and preserves replacement or renamed user files",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Both independent reproductions fail on prior head and current focused build static and Core Node checks pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/state",
+    "packages/core/src/api/context.ts",
+    "packages/core/tests",
+    "docs/core-api.md",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/extensions/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent-public.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfp17ru-uw20",
+  "specialist": {
+    "agentId": "/root/migration_file_module",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T01:13:33.094Z"
+  },
+  "createdAt": "2026-11-14T01:13:33.094Z"
+}
