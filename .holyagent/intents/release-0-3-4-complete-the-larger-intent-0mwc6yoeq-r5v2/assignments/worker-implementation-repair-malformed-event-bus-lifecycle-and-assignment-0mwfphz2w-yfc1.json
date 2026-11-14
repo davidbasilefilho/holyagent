@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-malformed-event-bus-lifecycle-and",
   "objective": "Repair malformed event bus lifecycle and inherited-property alias lookup without broadening workflow completion claims.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-final clean f7a931da6de7bb685b403cc367b5c7e7c4adacd0. Read final-bcf-{code,security,artifact}-review-report.json in/workspace/work/034.",
     "wait-for-agents.ts must handle on throwing or returning invalid unsubscribe without crashing extension registration/shutdown. Safely release already installed handlers, deny wait if required completion signals unavailable, ensure disposing repeatedly/no bus safe; preserve native-root gate/cancellation and ordinaryhostnotifications.",
@@ -62,7 +62,9 @@
     "agentId": "/root/migration_index_module",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T01:07:46.520Z"
+    "startedAt": "2026-11-14T01:07:46.520Z",
+    "finishedAt": "2026-11-14T01:14:49.454Z"
   },
+  "result": "status: done\nchanged:\n- packages/core/src/domain/host.ts\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/src/wait-for-agents.ts\n- packages/integrations/pi/tests/wait-for-agents.test.ts\n- packages/core/tests/pi-tool-names.test.ts\nchecks:\n- focused pre-fix Core/Pi regression tests: 4 failures reproduced -> exit 1\n- mise run build -> exit 0\n- mise run check -> exit 0\n- mise run lint -> exit 0\n- mise run fmt:check -> exit 0\n- focused Core/Pi wait, alias and policy tests -> exit 0\n- Core application, wait, alias, extension, Pi native/bundle, contract and policy tests: 540 passed -> exit 0\n- git diff --check -> exit 0\nnotes:\n- Workflow completion remains unproven: after a workflow call, waits remain conservative until session reset. No arbitrary event or result clears that state.\n- A malformed bus that installs a handler without returning an unsubscribe cannot be forced to remove it; its guarded callback is inert.\n- No full verify was run in this worktree; the root will run the aggregate gate after the Core migration merge. The earlier 3603-pass full run is historical and was not repeated here.\nevidence:\n- Malformed callable event buses cannot crash registration shutdown or leave falsely enabled wait behavior and dispose is idempotent: Malformed or throwing subscriptions release available handles, disable retained callbacks and suppress the wait tool; shutdown and restart tests pass.\n- Unknown tool names preserve exact strings including inherited object keys and known aliases keep canonical permission matching: Own-property lookup preserves constructor, toString, __proto__ and other unknowns; all three known alias permission pairs pass.\n- Focused regressions reproduce reviewed failures then pass alongside build static and relevant integration tests: The red log records four failures; build, static checks and 540 focused Core/Pi tests pass.\n- checks-run: final-bcf-lifecycle-red.log and final-bcf-lifecycle-integration.log; build/check/lint/fmt logs are alongside them.\n- changed-paths: /workspace/work/034/final-bcf-lifecycle-paths.txt; the Pi extension bundle was regenerated.\n- diff-file: /workspace/work/034/final-bcf-lifecycle-repair.diff includes the untracked Core test.",
   "createdAt": "2026-11-14T01:07:46.520Z"
 }
