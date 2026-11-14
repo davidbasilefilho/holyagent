@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mwfoe0lh-gyqs",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "update-the-existing-migration-retry",
+  "objective": "Update the existing migration retry regression to assert semantic partial publication and recovery with the repaired authorization boundaries.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core. Prior repair report /workspace/work/034/core-migration-files-authority-repair-report.json. Existing packages/core/tests/migration-files.test.ts:76-85 currently fails because exactly-one-authorization-per-file assumption is stale."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Own existing packages/core/tests/migration-files.test.ts plus prior owned source/test only if necessary; preserve actual authorization timing protections and assertions. Prefer phase-based semantic assertions to incrementing brittle call count. No build/full gates while tree writer active. Report /workspace/work/034/core-migration-files-retry-test-report.json."
+  ],
+  "criteria": [
+    {
+      "text": "Retry test still proves interrupted partial publication recovers without clobbering changes and does not assume one authorization call per file",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "All migration file tests pass while post-wait revocation and interruption protections remain intact",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/core/tests/migration-files.test.ts",
+    "packages/core/src/state/migration-files.ts",
+    "packages/core/src/state/migration-files.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfo98o0-svb0",
+  "specialist": {
+    "agentId": "/root/migration_file_module",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T00:36:42.245Z"
+  },
+  "createdAt": "2026-11-14T00:36:42.245Z"
+}
