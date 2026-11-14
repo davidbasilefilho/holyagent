@@ -42,6 +42,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/public_archive_smoke",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-14T00:37:26.800Z"
