@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "review-the-committed-final-merge-and",
   "objective": "Review the committed final merge and explicit invalid-guard correction for release0.3.4.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-final clean merge765aa8b22e6288fdd680a564e04389e2a6274462. Immutablefirstparent range099a597d22ab3d719f849b4b9c701595c4a92213...765aa8b22e6288fdd680a564e04389e2a6274462. Second approvedparent f544e6c88270bb8ffc97f236a484c10343d5ce9d. OriginalCorestatecode/securityreviews /workspace/work/034/core-migration-entry-cleanup-{code,security}-review-report.json accepted, allBCF/code/security/artifact accepted on099. Authoraggregate report final-034-aggregate-integration-report.json full3675pass2skip observedexit0.",
     "Review integration seam and newguardfix; verify other incomingmigration source equals independently reviewed f544whereunchanged insteadof re-auditing unchangedentirecodebase. Relative f544 state source diff identifies newexplicitnull/nonfunction/nontrue/throwing terminalguard upfrontcheck andtests. Preserve trusteddefaultwithoutguard/purepeek, reject explicitinvalid/deniedguards beforeanysetup/journal/ref mutation; per-mutationguard retained.",
@@ -48,7 +48,37 @@
     "agentId": "/root/final_bcf_security_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T01:30:57.540Z"
+    "startedAt": "2026-11-14T01:30:57.540Z",
+    "finishedAt": "2026-11-14T01:33:22.088Z"
+  },
+  "result": "status: done\nchecks:\n- git diff --check 099a597d22ab3d719f849b4b9c701595c4a92213...765aa8b22e6288fdd680a564e04389e2a6274462 -> exit 0\n- bunx --no-install mise run test packages/core/src/state/migration-worktrees.test.ts packages/core/tests/migration-files.test.ts packages/core/tests/revocation.test.ts packages/integrations/pi/tests/native-direct.test.ts -> exit 0\nnotes:\n- Trust boundaries: host capability and synchronous guard, source/target file and repository state, journal/ref snapshots, injected filesystem and native tool inputs; execution uses host process privileges. Prior reviewed migration internals and rebuilt bundles were checked through provenance, not fully reaudited.\n- evidence: Final merged Core context and guard correction introduce no blocking security defect and preserve approved parent contracts (behavior): No findings. Explicit invalid, denied or throwing guards fail before setup; absent trusted defaults and peek remain supported. Per-mutation guard checks remain. Context retains host capability union, state.initialize checks and branch read fences. Independent source provenance and focused evidence validate merged authority defaults pure reads and Node native boundaries (tests): Compared both parents: migration state source matches f544 except migration-files.ts, tree.ts and added guard tests; BCF Pi sources, instructions and Core aliases match 099. FileSystem port/export remains. 38 focused isolated tests passed, including malformed guards, read fences, revocation, actual SDK and Node bundle. No live host or Windows test. checks-run: git diff --check first-parent range exit 0; mise run test migration-worktrees, migration-files, revocation and native-direct exit 0: 38 pass. Aggregate author verify reports 3675 pass and 2 skips; not independently rerun. reviewed-range: 099a597d22ab3d719f849b4b9c701595c4a92213...765aa8b22e6288fdd680a564e04389e2a6274462, with migration provenance compared to second parent f544e6c88270bb8ffc97f236a484c10343d5ce9d. Relied on accepted parent security review for unchanged migration internals; no independent full bundle rebuild. findings: No validated or suspected security findings in the merge seam and guard correction.\nevidence:\n- Final merged Core context and guard correction introduce no blocking security defect and preserve approved parent contracts (behavior): No findings. Explicit invalid, denied or throwing guards fail before setup; absent trusted defaults and peek remain supported. Per-mutation guard checks remain. Context retains host capability union, state.initialize checks and branch read fences.\n- Independent source provenance and focused evidence validate merged authority defaults pure reads and Node native boundaries (tests): Compared both parents: migration state source matches f544 except migration-files.ts, tree.ts and added guard tests; BCF Pi sources, instructions and Core aliases match 099. FileSystem port/export remains. 38 focused isolated tests passed, including malformed guards, read fences, revocation, actual SDK and Node bundle. No live host or Windows test.\n- checks-run: git diff --check first-parent range exit 0; mise run test migration-worktrees, migration-files, revocation and native-direct exit 0: 38 pass. Aggregate author verify reports 3675 pass and 2 skips; not independently rerun.\n- reviewed-range: 099a597d22ab3d719f849b4b9c701595c4a92213...765aa8b22e6288fdd680a564e04389e2a6274462, with migration provenance compared to second parent f544e6c88270bb8ffc97f236a484c10343d5ce9d. Relied on accepted parent security review for unchanged migration internals; no independent full bundle rebuild.\n- findings: No validated or suspected security findings in the merge seam and guard correction.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Independent merged authority/sourceprovenance review and38focused tests close final guard/merge concerns with no security findings. Known livehost/Windows limits remain for hostedCI.",
+    "criteria": [
+      {
+        "criterion": "Final merged Core context and guard correction introduce no blocking security defect and preserve approved parent contracts",
+        "support": "No findings. Explicit invalid, denied or throwing guards fail before setup; absent trusted defaults and peek remain supported. Per-mutation guard checks remain. Context retains host capability union, state.initialize checks and branch read fences."
+      },
+      {
+        "criterion": "Independent source provenance and focused evidence validate merged authority defaults pure reads and Node native boundaries",
+        "support": "Compared both parents: migration state source matches f544 except migration-files.ts, tree.ts and added guard tests; BCF Pi sources, instructions and Core aliases match 099. FileSystem port/export remains. 38 focused isolated tests passed, including malformed guards, read fences, revocation, actual SDK and Node bundle. No live host or Windows test."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "git diff --check first-parent range exit 0; mise run test migration-worktrees, migration-files, revocation and native-direct exit 0: 38 pass. Aggregate author verify reports 3675 pass and 2 skips; not independently rerun."
+      },
+      {
+        "label": "reviewed-range",
+        "support": "099a597d22ab3d719f849b4b9c701595c4a92213...765aa8b22e6288fdd680a564e04389e2a6274462, with migration provenance compared to second parent f544e6c88270bb8ffc97f236a484c10343d5ce9d. Relied on accepted parent security review for unchanged migration internals; no independent full bundle rebuild."
+      },
+      {
+        "label": "findings",
+        "support": "No validated or suspected security findings in the merge seam and guard correction."
+      }
+    ]
   },
   "createdAt": "2026-11-14T01:30:57.540Z"
 }
