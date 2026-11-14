@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mwfo9vxl-p8yg",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-review-committed-core-host",
+  "objective": "Independently review committed Core host and routing repairs and close material prior security findings.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core-host, immutable repair range 31a97029a68696b9b137bdee6af03a1409461d82...b8c947edb75c74ba292ff4ea10cbb473c607070c. Read previous core-host-current-security-review-report.json and /workspace/work/034/core-routing-integrated-report.json.",
+    "Finish material original host port source coverage from 5b1b6e2...31a97029a68696b9b137bdee6af03a1409461d82 where earlier partial review left gaps. Read changed source/callers/contracts; generated assets equivalence by build rather than dump minified bundles. No source or VCS writes; isolated outside-repo fixtures permitted.",
+    "Verify relative/empty/project/symlink PATH never executes project code under mismatched host cwd; Core-owned empty Bun config exists and direct Node Shell.live passes; fresh Core policy authorizes real valid routing and refuses stale/unbound role/profile/model calls. Existing scope intentionally DOES NOT add cross-process host/model attestation, live entitlement inference or disable explicit user host definition overrides. Effective host model identity unknown honestly and profile warm reuse disabled."
+  ],
+  "constraints": [
+    "\nFirst pass: security-review.\n\nYou are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from `git diff` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff, then list the trust boundaries it touches: where data enters (requests, files, environment, arguments, stored data, output of tools and models) and what privilege the code runs with.\n2. For each source, follow the data to every sink it reaches: a shell or process call, a query, a file path, a deserializer, rendered output, an outgoing request, an authentication or authorization decision, a secret store or log, a cryptographic call.\n3. Read each check on the path. A check counts only if it covers this source and this sink.\n4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.\n5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.\n6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the source, the sink and the path between them, with files and lines;\n- the precondition;\n- the impact rating;\n- validated or suspected, with what is missing for a suspicion;\n- the label.\n\nExample entry:\n\n- Source `GET /files?name=` in `src/routes/files.ts:18`; sink `readFile` in `src/files.ts:31`; `name` is joined to the upload root with no check for `..`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers `name`. blocker.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Host worktree is clean and no writers active. Build/gates allowed in this worktree only. Use report /workspace/work/034/core-host-repair-security-review-report.json. Distinguish unresolved material findings from unknown optional platform/live-host results."
+  ],
+  "criteria": [
+    {
+      "text": "Earlier material host findings are closed and committed routing repair introduces no blocking security defect",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Material Core host operation and native routing boundaries have independently checked source paths and meaningful focused evidence",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "first-pass",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfm5a9e-89ll"
+  ],
+  "followUpOf": "assignment-0mwfn0kmu-ia4h",
+  "specialist": {
+    "agentId": "/root/core_host_current_security_review",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T00:33:29.578Z"
+  },
+  "createdAt": "2026-11-14T00:33:29.578Z"
+}
