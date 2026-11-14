@@ -1,0 +1,44 @@
+{
+  "id": "assignment-0mwfnk3nj-hehd",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Explorer.map",
+  "slug": "map-the-exact-remaining-b-c-and-f",
+  "objective": "Map the exact remaining B C and F integration seams for the final 0.3.4 Core candidate.",
+  "state": "Running",
+  "scope": [
+    "Read-only repository mapping. Current combined application base31a9702 at /workspace/work/holyagent-034-core-host has a later routing merge being edited; do not read it as immutable final state and do not mutate. Separate /workspace/work/holyagent-034-core is finishing journal migration. Parent will merge that final repair later.",
+    "Compare immutable B78366e7459c144c2f6c77a6075964ced06c433a9, Ce95cb5178a6d33300b8f4f8ec4e8654d092bcba3 and Fb2ac10b2 against31a9702 and their common ancestors. B's delta after Core baseedce18fee6579d591d59a629765225e2e0e955cd is only handoff.test.ts and operational-ownership.test.ts portability fixes. C owns task-start original visual/performance baseline plus post-commit original/previous comparison guidance; G's private role guidance router must add performance-iteration with exact useful roles. F owns event-based wait and snake-case aliases including wildcard repair; Core's native flag/config lifecycle must remain unified.",
+    "Produce a concise file/function integration checklist: which changes already exist canonically in Core, which runtime compatibility exports must not be replaced, source/generator/role-map conflicts to expect, and focused validation commands. Preserve current supported Pi/Claude and all three instruction families; no stale global skill paths or CLAUDE resurrection. Do not propose more PRs or implementation outside current0.3.4.",
+    "Use immutable Git/source reads only, no gates needed. Save /workspace/work/034/final-bcf-integration-map.md and final-bcf-integration-map-report.json. Under350words plus mapping table; distinguish facts from anticipated conflicts. No source/VCS/state/config changes."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Remaining baseline iteration and event alias integrations are mapped accurately to canonical Core source and final validation needs",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "source-map",
+    "integration-checklist",
+    "checks-run"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-14T00:13:26.527Z"
+  },
+  "createdAt": "2026-11-14T00:13:26.527Z"
+}
