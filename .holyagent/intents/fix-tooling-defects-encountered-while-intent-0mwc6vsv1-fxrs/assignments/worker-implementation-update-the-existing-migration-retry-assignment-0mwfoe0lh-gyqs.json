@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "update-the-existing-migration-retry",
   "objective": "Update the existing migration retry regression to assert semantic partial publication and recovery with the repaired authorization boundaries.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-core. Prior repair report /workspace/work/034/core-migration-files-authority-repair-report.json. Existing packages/core/tests/migration-files.test.ts:76-85 currently fails because exactly-one-authorization-per-file assumption is stale."
   ],
@@ -47,7 +47,9 @@
     "agentId": "/root/migration_file_module",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T00:36:42.245Z"
+    "startedAt": "2026-11-14T00:36:42.245Z",
+    "finishedAt": "2026-11-14T00:37:43.655Z"
   },
+  "result": "status: done\nchanged:\n- packages/core/tests/migration-files.test.ts\nchecks:\n- bunx --no-install mise run fmt packages/core/tests/migration-files.test.ts -> exit 0\n- bunx --no-install mise run lint packages/core/tests/migration-files.test.ts packages/core/src/state/migration-files.test.ts packages/core/src/state/migration-files.ts -> exit 0\n- bun check --no-script packages/core/tests/migration-files.test.ts packages/core/src/state/migration-files.test.ts packages/core/src/state/migration-files.ts -> exit 0\n- bun test packages/core/tests/migration-files.test.ts packages/core/src/state/migration-files.test.ts -> exit 0\nnotes:\n- No source implementation changes in this assignment. No full verification while peer edits continue.\nevidence:\n- Retry test still proves interrupted partial publication recovers without clobbering changes and does not assume one authorization call per file: Authorization fails once first postimage exists. The test verifies partial state, preserves an edited first file and user-created second file, then retries successfully.\n- All migration file tests pass while post-wait revocation and interruption protections remain intact: Both migration file test files pass: 10 tests, including four gated post-wait revocation and interruption regressions.\n- checks-run: Focused formatting, lint, typecheck and 10 tests passed.\n- changed-paths: packages/core/tests/migration-files.test.ts\n- diff-file: /workspace/work/034/core-migration-files-retry-test.diff",
   "createdAt": "2026-11-14T00:36:42.245Z"
 }
