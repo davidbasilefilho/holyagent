@@ -14,6 +14,21 @@ const refusal = (...lines: ReadonlyArray<string>) =>
 /** The refusal of a script as it stands. */
 const refusalOf = (script: string) => Effect.runPromise(workflowRefusal(script))
 
+test("both Pi workflow instruction examples pass the literal specialist validator", async () => {
+  for (const family of ["gpt-6", "kimi-k3.1"]) {
+    const text = await Bun.file(
+      `packages/runtime/src/instructions/${family}/root/workflows.md`,
+    ).text()
+    const script = /```js\n([\s\S]*?)\n```/.exec(text)?.[1]
+    expect(script).toBeDefined()
+    expect(
+      await Effect.runPromise(
+        workflowRefusal(script ?? "", new Set(["worker-implementation"]), "pi"),
+      ),
+    ).toBeUndefined()
+  }
+})
+
 describe("the workflow check refuses a function that calls itself", () => {
   test.each<readonly [string, string]>([
     [

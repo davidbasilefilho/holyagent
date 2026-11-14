@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { Schema } from "effect"
 
@@ -45,6 +47,30 @@ describe("createAssignment", () => {
     expect(ok(create({ roleTask: "Reviewer.code", ownershipPaths: [] })).assignment.state).toBe(
       "Ready",
     )
+  })
+
+  test("records explicit operational targets without changing old records", () => {
+    const old = ok(create()).assignment
+    expect(old).not.toHaveProperty("operationalResources")
+    const resources = [{ kind: "local-path", target: join(tmpdir(), "agent") }] as const
+    const operational = ok(
+      create({ ownershipPaths: [], operationalResources: resources }),
+    ).assignment
+    expect(operational.operationalResources).toEqual(resources)
+    expect(
+      Schema.decodeUnknownSync(Assignment, { onExcessProperty: "error" })(operational),
+    ).toEqual(operational)
+    expect(
+      refused(
+        create({ operationalResources: [{ ...resources[0], host: "claimed-host" }] } as never),
+      )._tag,
+    ).toBe("InvalidDraft")
+    expect(refused(create({ ownershipPaths: [], operationalResources: [] }))._tag).toBe(
+      "MissingOwnership",
+    )
+    expect(
+      refused(create({ operationalResources: [{ kind: "local-path", target: "../agent" }] }))._tag,
+    ).toBe("InvalidPath")
   })
 
   test.each(["/abs/path", "../up", "src/../../up"])("refuses the non-portable path %s", (path) => {

@@ -142,3 +142,7 @@ This text owns the severity of those findings. A finding blocks only when the ch
 - leaves a duplicate that already disagrees with its original.
 
 Every other finding is optional, as is anything already on the base.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- writing or reviewing model-facing instructions: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/instruction-writing/SKILL.md`

@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   publish:
-    if: startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected
+    if: github.ref == 'refs/heads/dev' && github.ref_protected
     environment: npm
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -29,7 +29,7 @@ jobs:
           set -euo pipefail
           version="$(jq -r .version package.json)"
           test "$(jq -r .version packages/integrations/pi/dist/package.json)" = "$version"
-          version="$version-dev-${GITHUB_SHA:0:7}"
+          version="$(bash .github/actions/tag-release/dev-version.sh)"
           cd packages/integrations/pi/dist
           jq --arg version "$version" '.version = $version' package.json > "$RUNNER_TEMP/package.json"
           cp "$RUNNER_TEMP/package.json" package.json
@@ -39,10 +39,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          root_version="$(jq -r .version package.json)"
-          [[ "$root_version" =~ ^(0\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))(-[1-9][0-9]*)?$ ]]
-          tag="holyagent-${BASH_REMATCH[1]}-dev-${GITHUB_SHA:0:7}"
-          version="$root_version-dev-${GITHUB_SHA:0:7}"
+          version="$(bash .github/actions/tag-release/dev-version.sh)"
+          tag="holyagent-$version"
           bun scripts/npm-publishing.ts "$RUNNER_TEMP/holyagent-$version.tgz" dev "$tag"
       - name: Transfer published package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -77,5 +75,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          version="$(jq -r .version package.json)-dev-${GITHUB_SHA:0:7}"
+          version="$(bash .github/actions/tag-release/dev-version.sh)"
           gh release upload "holyagent-$version" "$RUNNER_TEMP/holyagent-$version.tgz" --clobber

@@ -41,7 +41,8 @@ const core = Effect.runSync(
 ).trim()
 const run = Effect.runSync
 const skill = (name: string) =>
-  generated.find((file) => file.path.endsWith(`skills/${name}/SKILL.md`))?.content ?? ""
+  generated.find((file) => file.path.endsWith(`guidance/claude-5.5/${name}/SKILL.md`))?.content ??
+  ""
 
 /**
  * Frameworks, libraries, component kits and APIs that a stack-agnostic design skill never names,
@@ -194,8 +195,8 @@ const MATERIALITY_SOURCES = [
 const MATERIALITY_OUTPUTS = [
   "agents/reviewer-visual.md",
   "agents/worker-visual.md",
-  "skills/visual-judging/SKILL.md",
-  ...DESIGN_SKILLS.map((name) => `skills/${name}/SKILL.md`),
+  "guidance/claude-5.5/visual-judging/SKILL.md",
+  ...DESIGN_SKILLS.map((name) => `guidance/claude-5.5/${name}/SKILL.md`),
 ]
 /** Wording that only the definition may hold, so a restatement shows as a second copy. */
 const DEFINITION_MARKERS = [

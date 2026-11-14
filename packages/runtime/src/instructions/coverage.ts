@@ -20,6 +20,36 @@ export type Coverage =
  */
 export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<string, Coverage>>>> = {
   "claude-5.5": {
+    "R-HANDOFF": {
+      section: "skills/state-mode/SKILL.md",
+      phrase: "after each Assignment close and merge",
+    },
+    "R-HANDOFF-ROUTE": {
+      section: "root/skills.md",
+      phrase: "load the state-mode skill for handoff durability",
+    },
+    "R-VISUAL-ITERATION": {
+      section: "skills/visual-judging/SKILL.md",
+      phrase: "After the root creates each source commit",
+    },
+    "R-DESIGN-QUALITY": {
+      section: "design-core/core.md",
+      phrase: "fluid component and route animation",
+    },
+    "R-PERFORMANCE": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ORDER": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "After the root creates each source commit",
+    },
+    "R-SKILLS": {
+      section: "root/skills.md",
+      phrase:
+        "complete and accept baseline collection before dispatching any task source-writing Assignment",
+    },
+    "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
       carriedBy: "scripts/stop-slop-policy.test.ts",
       phrase: "other families remain unchanged",
@@ -83,8 +113,12 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch --input '<json>'`" },
     "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
+    "R-WAIT": { section: "root/dispatch.md", phrase: "A timeout does not guarantee cache reuse" },
     "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
-    "R-WAKE": { section: "root/dispatch.md", phrase: "Only completion notices wake you" },
+    "R-WAKE": {
+      section: "root/dispatch.md",
+      phrase: "respond to completion, submitted input or a supported bounded wait timeout",
+    },
     "R-STOP": {
       section: "root/dispatch.md",
       phrase: "only for conflicting new requirements or information",
@@ -101,6 +135,14 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-VISUAL": {
       section: "skills/visual-judging/SKILL.md",
       phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
+    },
+    "R-OWNEDROUTES": {
+      section: "root/skills.md",
+      phrase: "Read the relevant HolyAgent guidance file on demand",
+    },
+    "R-DOCLOOKUP": {
+      section: "skills/documentation-lookup/SKILL.md",
+      phrase: "Verify the result against the primary source",
     },
     "R-DEVSERVER": {
       section: "root/skills.md",
@@ -278,7 +320,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-CACHE-REUSE": { section: "root/dispatch.md", phrase: "or warm agent" },
     "R-CACHE-WINDOW": {
-      carriedBy: "packages/runtime/src/setup/settings.ts",
+      carriedBy: "packages/core/src/setup/settings.ts",
       phrase: "subagentPromptCacheTtl",
     },
     "R-CACHE-COMPACT": { section: "specialist/report.md", phrase: "End with one compact report" },
@@ -315,6 +357,36 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
   },
   "kimi-k3.1": {
+    "R-HANDOFF": {
+      section: "skills/state-mode/SKILL.md",
+      phrase: "after each Assignment close and merge",
+    },
+    "R-HANDOFF-ROUTE": {
+      section: "root/skills.md",
+      phrase: "load the state-mode skill for handoff durability",
+    },
+    "R-VISUAL-ITERATION": {
+      section: "skills/visual-judging/SKILL.md",
+      phrase: "After the root creates each source commit",
+    },
+    "R-DESIGN-QUALITY": {
+      section: "design-core/core.md",
+      phrase: "fluid component and route animation",
+    },
+    "R-PERFORMANCE": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ORDER": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "After the root creates each source commit",
+    },
+    "R-SKILLS": {
+      section: "root/skills.md",
+      phrase:
+        "complete and accept baseline collection before dispatching any task source-writing Assignment",
+    },
+    "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
       carriedBy: "scripts/stop-slop-policy.test.ts",
       phrase: "other families remain unchanged",
@@ -391,7 +463,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
     "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
-    "R-WAKE": { section: "root/dispatch.md", phrase: "Completion notices are the only wake-ups" },
+    "R-WAKE": {
+      section: "root/dispatch.md",
+      phrase: "respond to completion, submitted input or a supported bounded wait timeout",
+    },
     "R-STOP": {
       section: "root/dispatch.md",
       phrase: "only when a new requirement or new information conflicts with that running work",
@@ -399,7 +474,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
     "R-CACHE-REUSE": {
       section: "root/dispatch.md",
-      phrase: "continues an idle specialist of the same role, model and effort",
+      phrase: "selects an idle specialist of the same role, model and effort",
     },
     "R-COMMIT-PR": {
       section: "root/pr-text.md",
@@ -410,9 +485,17 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/search.md",
       phrase: "search through the available shell with `rg` and `fd`",
     },
+    "R-OWNEDROUTES": {
+      section: "root/skills.md",
+      phrase: "Read the relevant HolyAgent guidance file on demand",
+    },
+    "R-DOCLOOKUP": {
+      section: "skills/documentation-lookup/SKILL.md",
+      phrase: "Verify the result against the primary source",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
-      phrase: "start the one target per platform that the visual specialists share",
+      phrase: "start one render target for visual work",
     },
     "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
     "R-MERGEREVIEW": {
@@ -455,6 +538,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "each commit on a branch is atomic",
     },
     "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
+    "R-WAIT": { section: "root/workflows.md", phrase: "use `wait_for_agents` if available" },
     "R-QUALITY": {
       section: "specialist/code-quality.md",
       phrase: "No duplication: reuse existing code",
@@ -627,6 +711,36 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
   },
   "gpt-6": {
+    "R-HANDOFF": {
+      section: "skills/state-mode/SKILL.md",
+      phrase: "after each Assignment close and merge",
+    },
+    "R-HANDOFF-ROUTE": {
+      section: "root/skills.md",
+      phrase: "load the state-mode skill for handoff durability",
+    },
+    "R-VISUAL-ITERATION": {
+      section: "skills/visual-judging/SKILL.md",
+      phrase: "After the root creates each source commit",
+    },
+    "R-DESIGN-QUALITY": {
+      section: "design-core/core.md",
+      phrase: "fluid component and route animation",
+    },
+    "R-PERFORMANCE": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "immediately previous commit",
+    },
+    "R-PERFORMANCE-ORDER": {
+      section: "skills/performance-iteration/SKILL.md",
+      phrase: "After the root creates each source commit",
+    },
+    "R-SKILLS": {
+      section: "root/skills.md",
+      phrase:
+        "complete and accept baseline collection before dispatching any task source-writing Assignment",
+    },
+    "R-PERFORMANCE-ROUTE": { section: "root/delegating.md", phrase: "performance-iteration" },
     "R-GPT-PROSE": {
       section: "specialist/conduct.md",
       phrase: "For human-facing prose, write directly and specifically",
@@ -703,7 +817,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
     "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
-    "R-WAKE": { section: "root/dispatch.md", phrase: "Completion notices are the only wake-ups" },
+    "R-WAKE": {
+      section: "root/dispatch.md",
+      phrase: "respond to completion, submitted input or a supported bounded wait timeout",
+    },
     "R-STOP": {
       section: "root/dispatch.md",
       phrase: "only when a new requirement or new information conflicts with that running work",
@@ -722,9 +839,17 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/search.md",
       phrase: "search through the available shell with `rg` and `fd`",
     },
+    "R-OWNEDROUTES": {
+      section: "root/skills.md",
+      phrase: "Read the relevant HolyAgent guidance file on demand",
+    },
+    "R-DOCLOOKUP": {
+      section: "skills/documentation-lookup/SKILL.md",
+      phrase: "Verify the result against the primary source",
+    },
     "R-DEVSERVER": {
       section: "root/skills.md",
-      phrase: "start the one target per platform that the visual specialists share",
+      phrase: "start one render target for visual work",
     },
     "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
     "R-MERGEREVIEW": {
@@ -767,6 +892,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "each commit on a branch is atomic",
     },
     "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
+    "R-WAIT": { section: "root/workflows.md", phrase: "use `wait_for_agents` if offered" },
     "R-QUALITY": {
       section: "specialist/code-quality.md",
       phrase: "No duplication: reuse existing code",

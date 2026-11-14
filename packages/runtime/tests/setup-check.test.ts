@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdir, readdir, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
 
 import { Effect } from "effect"
 
@@ -120,11 +120,18 @@ describe("the setup check of the SessionStart hook", () => {
 })
 
 describe("hook session-start with the setup check", () => {
+  // State lookup requires Git. Keep the rest of the test PATH isolated from installed programs.
+  const git = Bun.which("git")
+  if (git === null) throw new Error("Git is required by the state lookup fixture")
+  const stateEnv = (extra: Record<string, string> = {}) => ({
+    ...env(extra),
+    PATH: [project, dirname(git)].join(delimiter),
+  })
   const sessionStart = (extra: Record<string, string>, agent = "holyagent", directory = project) =>
     Effect.runPromise(
       run(["hook", "session-start"], {
         cwd: directory,
-        env: env(extra),
+        env: stateEnv(extra),
         stdin: Effect.succeed(
           JSON.stringify({ hook_event_name: "SessionStart", source: "startup", agent_type: agent }),
         ),
@@ -169,7 +176,7 @@ describe("hook session-start with the setup check", () => {
     const created = await Effect.runPromise(
       run(["intent", "create"], {
         cwd: project,
-        env: env(),
+        env: stateEnv(),
         stdin: Effect.succeed('{"objective":"Ship it"}'),
       }),
     )

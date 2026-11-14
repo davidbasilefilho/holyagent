@@ -1,9 +1,12 @@
 {
   "name": "holyagent",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "description": "HolyAgent: a root agent that plans work as Intents and Assignments and delegates it to specialists.",
   "license": "Apache-2.0",
+  "bin": {
+    "holyagent": "./packages/integrations/pi/dist/scripts/holyagent-public.js"
+  },
   "workspaces": [
     "packages/*",
     "packages/integrations/*"
@@ -38,9 +41,6 @@
     ],
     "prompts": [
       "./packages/integrations/pi/dist/prompts"
-    ],
-    "skills": [
-      "./packages/integrations/pi/dist/skills"
     ],
     "subagents": {
       "agents": [

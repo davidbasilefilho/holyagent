@@ -1,6 +1,6 @@
 {
   "name": "@holyagent/runtime",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "The holyagent runtime shared by every harness: the domain, the state, the vcs commands, the instruction text and the command line.",
   "license": "Apache-2.0",
   "type": "module",
@@ -11,6 +11,7 @@
     "instructions:scaffold": "mise run instructions:scaffold"
   },
   "dependencies": {
+    "@holyagent/core": "workspace:*",
     "@toon-format/toon": "^4.0.0",
     "acorn": "^8.0.0",
     "effect": "^4.0.0",

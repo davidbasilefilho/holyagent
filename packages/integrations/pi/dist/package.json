@@ -1,10 +1,18 @@
 {
   "name": "holyagent",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "HolyAgent for Pi: its skills, its 18 specialists and an extension, built from the shared holyagent runtime.",
   "license": "Apache-2.0",
   "author": "davidbasilefilho",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davidbasilefilho/holyagent",
+    "directory": "packages/integrations/pi/dist"
+  },
   "type": "module",
+  "bin": {
+    "holyagent": "./scripts/holyagent-public.js"
+  },
   "keywords": [
     "pi-package"
   ],
@@ -14,7 +22,7 @@
     "families",
     "prompts",
     "scripts",
-    "skills"
+    "guidance"
   ],
   "pi": {
     "extensions": [
@@ -22,9 +30,6 @@
     ],
     "prompts": [
       "./prompts"
-    ],
-    "skills": [
-      "./skills"
     ],
     "subagents": {
       "agents": [

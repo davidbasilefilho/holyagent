@@ -183,13 +183,13 @@ describe("toolArgs for the root", () => {
         "root",
         profile,
       ).excludeTools
-    expect(exclusions("pi-web-kit")).toEqual(["write", "edit", ...WEB_KIT])
+    expect(exclusions("pi-web-kit")).toEqual(["write", "edit", ...MOONSHOT, ...WEB_KIT])
     expect(exclusions("provider", PROVIDERS["kimi-coding-global"])).toEqual([
       "write",
       "edit",
       ...MOONSHOT,
     ])
-    expect(exclusions("provider", NO_WEB_PROVIDER)).toEqual(["write", "edit", ...WEB_KIT])
+    expect(exclusions("provider", NO_WEB_PROVIDER)).toEqual(["write", "edit", ...MOONSHOT])
     expect(exclusions("off")).toEqual(["write", "edit"])
   })
 
@@ -241,18 +241,23 @@ describe("the web tools of the Librarian roles", () => {
     expect(piPackages(DEFAULT_CONFIG)).not.toContain("npm:pi-web-kit@0.5.0")
   })
 
-  test("a provider without web tools falls back to pi-web-kit, which is then loaded", () => {
+  test("a root provider without native search does not silently select fallback", () => {
     expect(toolArgs(DEFAULT_CONFIG, "Librarian.lookup", NO_WEB_PROVIDER).tools).toEqual([
       ...READ,
-      ...WEB_KIT,
+      ...MOONSHOT,
       "codemode",
     ])
-    expect(piPackages(DEFAULT_CONFIG, NO_WEB_PROVIDER)).toContain("npm:pi-web-kit@0.5.0")
+    expect(piPackages(DEFAULT_CONFIG, NO_WEB_PROVIDER)).not.toContain("npm:pi-web-kit@0.5.0")
   })
 
   test("pi-web-kit selected in config.json is loaded and its tools are named", () => {
     const config = withFeatures({ web: "pi-web-kit" })
-    expect(toolArgs(config, "Librarian.research").tools).toEqual([...READ, ...WEB_KIT, "codemode"])
+    expect(toolArgs(config, "Librarian.research").tools).toEqual([
+      ...READ,
+      ...MOONSHOT,
+      ...WEB_KIT,
+      "codemode",
+    ])
     expect(piPackages(config)).toContain("npm:pi-web-kit@0.5.0")
   })
 
@@ -262,12 +267,15 @@ describe("the web tools of the Librarian roles", () => {
     expect(piPackages(config)).not.toContain("npm:pi-web-kit@0.5.0")
   })
 
-  test("webChoice: off has none, the provider's tools win in provider mode, the kit is the fallback", () => {
+  test("webChoice: off has none, and fallback requires explicit configuration", () => {
     const kimi = PROVIDERS["kimi-coding-global"]
     expect(webChoice(kimi, "off")).toEqual({ source: "off", tools: [] })
     expect(webChoice(kimi, "provider")).toEqual({ source: "provider", tools: MOONSHOT })
-    expect(webChoice(kimi, "pi-web-kit")).toEqual({ source: "pi-web-kit", tools: WEB_KIT })
-    expect(webChoice(NO_WEB_PROVIDER, "provider")).toEqual({ source: "pi-web-kit", tools: WEB_KIT })
+    expect(webChoice(kimi, "pi-web-kit")).toEqual({
+      source: "pi-web-kit",
+      tools: [...MOONSHOT, ...WEB_KIT],
+    })
+    expect(webChoice(NO_WEB_PROVIDER, "provider")).toEqual({ source: "provider", tools: MOONSHOT })
     expect(webChoice(NO_WEB_PROVIDER, "off").source).toBe("off")
   })
 
@@ -360,15 +368,9 @@ describe("the feature switches and the tool arguments", () => {
 })
 
 describe("toolSettings", () => {
-  test("the default config yields the provider tools, subagents, Billion Context and computer-use settings", () => {
+  test("the default config leaves provider settings alone and yields other capability settings", () => {
     expect(toolSettings(DEFAULT_CONFIG)).toEqual([
       { file: PI_SETTINGS_FILE, content: { codemode: { mode: "only" } } },
-      {
-        file: "~/.pi/providers/kimi-coding/config.json",
-        content: {
-          tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: true } },
-        },
-      },
       {
         file: "~/.pi/agent/subagents.json",
         content: { disableDefaultAgents: true, fallbackSubagent: "none" },
@@ -461,11 +463,11 @@ describe("toolSettings", () => {
     ).toEqual([])
   })
 
-  test("the provider's web tools are enabled only in provider mode with a provider that has some", () => {
+  test("no web mode writes the provider's optional tool settings", () => {
     const providerFile = PROVIDERS["kimi-coding-global"].toolsFile ?? ""
     const files = (config: Config, profile?: ProviderProfile) =>
       toolSettings(config, profile).map((patch) => patch.file)
-    expect(files(DEFAULT_CONFIG)).toContain(providerFile)
+    expect(files(DEFAULT_CONFIG)).not.toContain(providerFile)
     expect(files(withFeatures({ web: "pi-web-kit" }))).not.toContain(providerFile)
     expect(files(withFeatures({ web: "off" }))).not.toContain(providerFile)
     expect(files(DEFAULT_CONFIG, NO_WEB_PROVIDER)).not.toContain(providerFile)
@@ -519,6 +521,38 @@ describe("rootActiveTools", () => {
     expect(toolMatches("computer_use_*", "xcomputer_use_click")).toBe(false)
     expect(toolMatches("mcp__t3*code__preview_*", "mcp__t3-code__preview_open")).toBe(true)
     expect(toolMatches("a.b", "axb")).toBe(false)
+  })
+
+  test("literal and wildcard policies match both names of known aliases", () => {
+    for (const [pattern, original, alias] of [
+      ["agent", "Agent", "agent"],
+      ["Agent", "Agent", "agent"],
+      ["agent*", "Agent", "agent"],
+      ["Agent*", "Agent", "agent"],
+      ["subagent_*", "SubagentWorkflow", "subagent_workflow"],
+      ["Subagent*", "SubagentWorkflow", "subagent_workflow"],
+      ["fff_multi_*", "fff-multi-grep", "fff_multi_grep"],
+      ["fff-multi-*", "fff-multi-grep", "fff_multi_grep"],
+    ]) {
+      expect(toolMatches(pattern!, original!)).toBe(true)
+      expect(toolMatches(pattern!, alias!)).toBe(true)
+    }
+    expect(toolMatches("agent*", "AgentOther")).toBe(false)
+    expect(toolMatches("subagent_*", "SubagentOther")).toBe(false)
+    expect(toolMatches("fff_multi_*", "fff-multi-other")).toBe(false)
+  })
+
+  test("alias patterns add and exclude both registered names", () => {
+    const names = ["Agent", "agent", "SubagentWorkflow", "subagent_workflow", "other"]
+    expect(rootActiveTools({ tools: ["+agent*"], excludeTools: [] }, [], names)).toEqual([
+      "Agent",
+      "agent",
+    ])
+    expect(rootActiveTools({ tools: [], excludeTools: ["subagent_*"] }, names, names)).toEqual([
+      "Agent",
+      "agent",
+      "other",
+    ])
   })
 
   test("is the active selection plus the root's tools, minus the excluded ones", () => {

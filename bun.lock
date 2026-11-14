@@ -15,13 +15,24 @@
         "solid-js": "^1.0.0",
       },
     },
+    "packages/core": {
+      "name": "@holyagent/core",
+      "version": "0.3.4",
+      "dependencies": {
+        "@toon-format/toon": "^4.0.0",
+        "effect": "^4.0.0",
+      },
+    },
     "packages/integrations/claude": {
       "name": "@holyagent/claude",
-      "version": "0.3.3",
+      "version": "0.3.4",
     },
     "packages/integrations/pi": {
       "name": "@holyagent/pi",
-      "version": "0.3.3",
+      "version": "0.3.4",
+      "dependencies": {
+        "@holyagent/core": "workspace:*",
+      },
       "devDependencies": {
         "@earendil-works/pi-coding-agent": "^1.0.0",
       },
@@ -35,8 +46,9 @@
     },
     "packages/runtime": {
       "name": "@holyagent/runtime",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "dependencies": {
+        "@holyagent/core": "workspace:*",
         "@toon-format/toon": "^4.0.0",
         "acorn": "^8.0.0",
         "effect": "^4.0.0",
@@ -214,6 +226,8 @@
     "@google/genai": ["@google/genai@2.21.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"], "hasInstallScript": true }, "sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q=="],
 
     "@holyagent/claude": ["@holyagent/claude@workspace:packages/integrations/claude"],
+
+    "@holyagent/core": ["@holyagent/core@workspace:packages/core"],
 
     "@holyagent/pi": ["@holyagent/pi@workspace:packages/integrations/pi"],
 

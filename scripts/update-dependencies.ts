@@ -140,10 +140,10 @@ export const MISE_SOURCES: Record<string, { repository: string; prefix: string }
 }
 
 /** The file that holds the exact version of every Pi package HolyAgent enables. */
-export const PI_PACKAGE_PINS = "packages/runtime/src/config/pi-packages.json"
+export const PI_PACKAGE_PINS = "packages/core/src/config/pi-packages.json"
 
 /** The file that holds the exact version of every PyPI package HolyAgent runs. */
-export const PYPI_PACKAGE_PINS = "packages/runtime/src/config/pypi-packages.json"
+export const PYPI_PACKAGE_PINS = "packages/core/src/config/pypi-packages.json"
 
 const readText = (root: string, file: string) =>
   Effect.tryPromise({
@@ -602,6 +602,12 @@ const parseArguments = (args: ReadonlyArray<string>) => {
     : Effect.succeed({ mode, root: positional[0] ?? join(import.meta.dir, "..") })
 }
 
+/** Refreshes workspace links while retaining the currently locked external package versions. */
+export const refreshWorkspaceLock = (root: string) =>
+  run("bun install --lockfile-only --ignore-scripts", () =>
+    $`bun install --lockfile-only --ignore-scripts`.cwd(root).nothrow(),
+  )
+
 /** The steps of a run that touch the network and the tree, so a test can stand in for them. */
 export interface Steps {
   readonly survey: (root: string) => Effect.Effect<Survey, FileError | SourceError>
@@ -622,6 +628,10 @@ export const execute = (
   steps: Steps = { survey, apply: applySurvey },
 ) =>
   Effect.gen(function* () {
+    if (args[0] === "--workspace-lock-only" && args.length <= 2) {
+      yield* refreshWorkspaceLock(args[1] ?? join(import.meta.dir, ".."))
+      return
+    }
     const { mode, root } = yield* parseArguments(args)
     const found = yield* steps.survey(root)
     const behind = found.pins.filter(isBehind)

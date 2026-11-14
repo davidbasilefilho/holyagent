@@ -1,4 +1,4 @@
-import { encode } from "@toon-format/toon"
+import { encode, escapeString, rawString } from "@toon-format/toon"
 import { Cause, Effect } from "effect"
 
 import { version } from "../../../../package.json" with { type: "json" }
@@ -12,7 +12,7 @@ import { INPUT_FLAG, parseArgs, stringFlag } from "./args.ts"
 import { COMMANDS } from "./commands.ts"
 import { agentHostOf, loadConfig } from "./config.ts"
 import { readInput, readInputBy, readReport } from "./context.ts"
-import { describeFailure, Usage } from "./errors.ts"
+import { describeFailure, plainText, Usage } from "./errors.ts"
 import { type Call, type Command, type Host, Streamed, Verbatim, WithTrailer } from "./types.ts"
 
 /** What one run prints and the exit code it ends with. */
@@ -21,6 +21,26 @@ export interface Result {
   readonly stderr: string
   readonly code: number
 }
+
+/** Encodes TOON without terminal control bytes, preserving the decoded values and keys. */
+export const encodeRecord = (value: unknown): string =>
+  encode(value, {
+    // TOON's encoder quotes keys containing C1 controls, but may leave such values unquoted.
+    // Force only those values into quoted strings so the Unicode escapes decode correctly.
+    replacer: (_key, item) =>
+      typeof item === "string" && /[\u007f-\u009f]/.test(item)
+        ? rawString(`"${escapeString(item)}"`)
+        : item,
+  }).replace(
+    /[\u007f-\u009f]/g,
+    (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  )
+
+/** Renders a structured command result and its optional plain-text trailer. */
+export const renderRecord = (output: unknown): string =>
+  output instanceof WithTrailer
+    ? `${encodeRecord(output.fields)}\n${plainText(output.label)}:\n${plainText(output.text)}\n`
+    : `${encodeRecord(output)}\n`
 
 /** The command with the help text of a host's `words`. */
 const forWords = (command: Command, words: HostWords): Command =>
@@ -44,13 +64,13 @@ const listed = (host: AgentHost): ReadonlyArray<Command> =>
 
 const topHelp = (host: AgentHost, words: HostWords): string =>
   [
-    "holyagent <command> [args]; JSON inline as `--input '<json>'` or on stdin, TOON on stdout; errors go to stderr as `error:` and `hint:` lines",
-    "exit codes: 2 usage, 3 refused by the current state, 4 state or I/O failure; every error's `hint:` says what to do next",
+    "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
+    "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure.",
     ...listed(host).map((command) => {
       const { usage, summary } = forWords(command, words)
       return `${usage}  ${summary}`
     }),
-    "help [command] or <command> --help shows a command's input shape, stdout and rules",
+    "Run holyagent help [command] for details.",
   ].join("\n")
 
 const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Command) =>
@@ -62,11 +82,13 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
         : yield* resolveState(
             host.cwd,
             host.env,
-            typeof command.state === "function"
-              ? command.state(args)
-              : (command.state ?? "ifPresent"),
+            command.core === true
+              ? "peek"
+              : typeof command.state === "function"
+                ? command.state(args)
+                : (command.state ?? "ifPresent"),
             // A hook runs at session start and on every launch, where a network wait is not worth it.
-            command.path[0] !== "hook",
+            command.core !== true && command.path[0] !== "hook",
           )
     const inline = stringFlag(args, INPUT_FLAG)
     return {
@@ -154,17 +176,20 @@ const execute = (given: ReadonlyArray<string>, host: Host) =>
         hint: `Usage: holyagent ${command.usage}`,
       })
     const emitted: Array<string> = []
-    const emit = host.emit ?? ((text: string) => Effect.sync(() => void emitted.push(text)))
+    const write = host.emit ?? ((text: string) => Effect.sync(() => void emitted.push(text)))
+    const emit = (text: string) => write(plainText(text))
     const call = yield* callFor(args, host, emit, command)
     // The Intent in use is kept per work tree: every read and write of the run resolves it from here.
     const output = yield* command.run(call).pipe(Effect.provideService(WorkTree, call.root))
-    if (output instanceof Verbatim) return output
+    if (output instanceof Verbatim)
+      return {
+        stdout: plainText(output.stdout),
+        stderr: plainText(output.stderr),
+        code: output.code,
+      }
     if (output instanceof Streamed)
       return { stdout: emitted.join(""), stderr: "", code: output.code }
-    const stdout =
-      output instanceof WithTrailer
-        ? `${encode(output.fields)}\n${output.label}:\n${output.text}\n`
-        : `${encode(output)}\n`
+    const stdout = renderRecord(output)
     return { stdout, stderr: "", code: 0 }
   })
 

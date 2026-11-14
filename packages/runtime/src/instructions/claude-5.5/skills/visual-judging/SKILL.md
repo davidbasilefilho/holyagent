@@ -9,13 +9,13 @@ Judge rendered work from what renders, not from a passing build or a report's cl
 
 ## Pick the platform skill
 
-- Pick the platform design skill for the work before the first Worker.visual or Reviewer.visual dispatch: `web-design`, `mobile-design`, `desktop-design` or `tui-design`, one for each platform of a multi-platform project. Both specialists keep Read but cannot call Skill, so name each skill's file in their criteria by its literal absolute path, `skills/<name>/SKILL.md` under the plugin folder (as the dispatch rules say), with a blocking criterion to read it and to build and inspect (Worker.visual) or judge (Reviewer.visual) against its checklist and capture list.
+- Pick the platform design skill for the work before the first Worker.visual or Reviewer.visual dispatch: `web-design`, `mobile-design`, `desktop-design` or `tui-design`, one for each platform of a multi-platform project. Both specialists keep Read but cannot call Skill, so name each skill's file in their criteria by its literal absolute path, `guidance/<family>/<name>/SKILL.md` under the plugin folder (as the dispatch rules say), with a blocking criterion to read it and to build and inspect (Worker.visual) or judge (Reviewer.visual) against its checklist and capture list.
 - The platform skill is the only design guidance the two specialists get: the shared core (direction before code, the plan, copy, the quality floor), the platform rules, the refuse list and the capture checklist.
 - Start the render target first, per platform (the `dev-server` skill).
 
 ## Accept
 
-- Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance. Read the final captures Reviewer.visual lists, at each size and variant the criteria and the skill's capture checklist name, against that skill's checklist (load it with Skill), and accept only when they pass. Reviewer.visual's observations (viewport, interaction and visible result for each) inform the decision and do not make it; a Worker.visual report alone, or an inspection reported as blocked, accepts nothing.
+- Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance. Read the final captures Reviewer.visual lists, at each size and variant the criteria and the skill's capture checklist name, against that skill's checklist (read its file), and accept only when they pass. Reviewer.visual's observations (viewport, interaction and visible result for each) inform the decision and do not make it; a Worker.visual report alone, or an inspection reported as blocked, accepts nothing.
 - Keep the pass to those final captures: open none from an earlier round and take none yourself. For a missing size or variant, or a web page that Reviewer.visual inspected live and for which Worker.visual saved no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists; judge nothing you cannot see.
 - A material finding of your pass starts a repair like any other, whether or not the reviewer reported it; say in the final report when your pass overruled the reviewer.
 - Read an image in the main thread only to show it to the user (a path is not delivery) or to settle a concrete doubt about that evidence, besides the final pass; Reviewer.visual and Worker.visual hand over captures and paths so that you do not have to.
@@ -35,3 +35,9 @@ A departure from the platform skill's direction rules that has none of these eff
 ## Explanatory pages
 
 When a visual explanation or chart carries what prose cannot, build one self-contained HTML page. `html_preview` returns a PNG with console output so you can check it first; `html_render` shows the finished page inline in the reply. Such a page illustrates and does not validate a software interface.
+
+## Iteration evidence
+
+Before any task source edits, dispatch a qualified specialist to collect and preserve the immutable original revision, visual evidence and conditions. After the root creates each source commit, dispatch an appropriate existing visual or operations specialist to collect evidence without source edits on that actual commit before independent review, acceptance or push. Compare it with both the original baseline and the immediately previous commit: for the first commit the previous revision is the original; advance the previous revision after each commit and never overwrite the original. Use screenshots and real interaction, plus video when the host supports it. Record revisions, evidence paths and conditions; exploratory precommit checks do not substitute for committed evidence. Mark unavailable comparisons Unknown with a concrete reason and a blocker when the requested target requires them; never substitute the last PR for the original baseline.
+
+Associate reports and artifacts with the commit SHA outside the source commit as needed, and point persisted state and handoff to them. Do not create recursive evidence-only commits. Use this evidence in review and acceptance alongside the final captures.

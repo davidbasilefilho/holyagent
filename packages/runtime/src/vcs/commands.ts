@@ -1,24 +1,25 @@
+import { type Context, vcs } from "@holyagent/core"
 import { Effect } from "effect"
 
 import { type FlagShape, readFlags } from "../cli/args.ts"
 import { Usage } from "../cli/errors.ts"
 import { type Call, type Command } from "../cli/types.ts"
 import { present } from "../cli/views.ts"
-import { stateDirectory } from "../state/layout.ts"
+import { DEFAULT_CONFIG } from "../domain/directive.ts"
 import { requiredValue, valueOf } from "./arguments.ts"
-import { IDENTITY_USAGE, setAuthor } from "./author.ts"
-import { commit } from "./commit.ts"
-import { inCloudSession } from "./identity.ts"
-import { prepareMessage } from "./message.ts"
-import { pullRequest } from "./pr.ts"
-import { recordBranch } from "./record.ts"
-import { readSettings } from "./settings.ts"
+import { IDENTITY_USAGE } from "./author.ts"
 
 /**
  * The folder that holds the config file: `.holyagent` of the work tree. The config file is the
  * project's settings, not state, so it is never read from the state worktree.
  */
-const settingsFolders = (call: Call) => [stateDirectory(call.root)]
+const coreContext = (call: Call): Context => ({
+  cwd: call.cwd,
+  env: call.env,
+  host: "claude",
+  execution: DEFAULT_CONFIG,
+  authorize: () => true,
+})
 
 /** Reads the raw arguments of a command against its flags, refusing more positionals than it takes. */
 const arguments_ = (
@@ -76,18 +77,19 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
               messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
             hint: `Usage: holyagent ${COMMIT_USAGE}`,
           })
-        const settings = yield* readSettings(settingsFolders(call), call.env)
-        const message = yield* prepareMessage(messages, settings.allowWords ?? [])
-        const done = yield* commit({
-          message,
+        const done = yield* vcs.commit(coreContext(call), call.root, call, {
+          messages,
           paths: args.positionals,
-          cloud: inCloudSession(call.env),
         })
         return present({
           branch: done.branch,
           commit: short(done.commit),
           files: done.files,
-          ...(yield* recordBranch(call, done)),
+          ...("intent" in done
+            ? { intent: done.intent }
+            : "unrecorded" in done
+              ? { unrecorded: done.unrecorded }
+              : {}),
         })
       }).pipe(Effect.provide(call.vcs)),
   },
@@ -111,7 +113,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
           { name: { kind: "one" }, email: { kind: "one" } },
           0,
         )
-        const author = yield* setAuthor({
+        const author = yield* vcs.identity(coreContext(call), {
           name: yield* requiredValue(args, "name", IDENTITY_USAGE),
           email: yield* requiredValue(args, "email", IDENTITY_USAGE),
         })
@@ -151,15 +153,14 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
           yield* requiredValue(args, "base", PR_USAGE)
           yield* requiredValue(args, "title", PR_USAGE)
         }
-        const settings = yield* readSettings(settingsFolders(call), call.env)
-        return yield* pullRequest({
-          state: call,
-          root: call.root,
-          base: valueOf(args, "base"),
-          title: valueOf(args, "title"),
-          bodyFile: valueOf(args, "body-file"),
-          update,
-          allowWords: settings.allowWords ?? [],
+        const base = valueOf(args, "base")
+        const title = valueOf(args, "title")
+        const bodyFile = valueOf(args, "body-file")
+        return yield* vcs.pr(coreContext(call), call.root, call, {
+          ...(base === undefined ? {} : { base }),
+          ...(title === undefined ? {} : { title }),
+          ...(bodyFile === undefined ? {} : { bodyFile }),
+          ...(update === undefined ? {} : { update }),
         })
       }).pipe(Effect.provide(call.vcs)),
   },

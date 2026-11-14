@@ -7,7 +7,7 @@ import { agentFor, type Route } from "../../../runtime/src/domain/route.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { instructionsDirectory } from "../../../runtime/src/instructions/skills.ts"
 import { FFF_TOOLS } from "../../../runtime/src/pi/fff/settings.ts"
-import { providerProfile, PROVIDERS, webChoice } from "../../../runtime/src/pi/provider.ts"
+import { PROVIDERS, webChoice } from "../../../runtime/src/pi/provider.ts"
 import {
   CODEMODE_TOOL,
   COMPUTER_USE_TOOLS,
@@ -37,15 +37,16 @@ const BUILTINS: ReadonlySet<string> = new Set([...READ_TOOLS, ...WRITE_TOOLS, ..
 // provider (Kimi's own extension, `pi-web-kit` for a provider with no web tools), so the file is
 // right under each. An entry for an extension the session did not load matches nothing.
 const webEntries = (mode: Config["pi"]["features"]["web"]): ReadonlyArray<string> =>
-  Object.values(PROVIDERS).flatMap((profile) => {
-    const web = webChoice(profile, mode)
-    const extension = extensionName(
-      web.source === "provider" && profile.package !== undefined
-        ? profile.package
-        : WEB_KIT_PACKAGE,
-    )
-    return web.tools.map((tool) => `ext:${extension}/${tool}`)
-  })
+  mode === "off"
+    ? []
+    : [
+        ...PROVIDERS["kimi-coding-global"].webTools.map(
+          (tool) => `ext:pi-provider-kimi-code/${tool}`,
+        ),
+        ...["web_search", "web_fetch"].map(
+          (tool) => `ext:${extensionName(WEB_KIT_PACKAGE)}/${tool}`,
+        ),
+      ]
 
 /**
  * The `tools:` entries of a specialist's agent file, from the tool arguments that decide its tools
@@ -69,7 +70,7 @@ export const agentTools = (
   screen: boolean = false,
   form: CapabilityForm = "normal",
 ): ReadonlyArray<string> => {
-  const profile = providerProfile(config)
+  const profile = PROVIDERS[config.pi.routes[route.roleTask].provider ?? config.pi.provider]
   const web = webChoice(profile, config.pi.features.web)
   const entries = toolArgs(config, route.roleTask, profile, { screen, form }).tools.flatMap(
     (tool) => {
@@ -113,6 +114,8 @@ export const agentFiles = async (
   const variant = (screen: boolean, form: CapabilityForm = "normal") =>
     specialistFiles({
       instructions: instructionsDirectory(family),
+      guidanceFamily: family,
+      guidanceRoot: "${HOLYAGENT_PI_ROOT}",
       path: (route) => `${DIST_DIRECTORY}/${folder}/${agentFor(route, screen, form)}.md`,
       // No `model:` or `thinking:`: the package ranks an agent file above the call's parameters on
       // its `Agent` path, and the route values are per user, so the root passes them on each call.

@@ -16,6 +16,8 @@ Independently assess rendered output against the request's visual and interactio
 
 You have no shell, so for a target other than a web page, review the captures that Worker.visual or Worker.operations saved from the target record in your criteria (terminal frames, or screenshots that Read opens as images) and that the Assignment names; the record tells you the platform, variants and sizes they must cover. Report the inspection as blocked when no captures are supplied, and list any variant the captures lack. List the paths of the final captures you judged from, at each listed size and variant, because the root reads them for its own final pass. For a web page you inspect live, list the paths of the final captures that Worker.visual or Worker.operations saved at those sizes and variants, and report a blocker when there are none. Your observations inform its decision and do not make it.
 
+Review the recorded comparisons with both the immutable original task baseline and the immediately previous commit, including screenshots, real interaction and video when supported. Check revisions and conditions; report missing comparisons as Unknown with the concrete reason, rather than inferring a result.
+
 ## Design guidance
 
 Judge the design quality of a new or reshaped interface against the platform design skill whose file your criteria name: read that file and judge against its checklist, and say in the report when none is named. A departure from the skill's direction rules is a material discrepancy only when it has one of the effects the interface inspection rules list; otherwise it is preference, listed apart as optional.
@@ -92,3 +94,10 @@ Where to look:
 - Tool names differ across T3 versions; confirm a name exists before relying on it.
 
 Stay on the page under test: navigate only to the pages the Assignment names, use `preview_evaluate` only to inspect that page, and upload only files it names. Leave saved logins, unrelated sites and credential entry alone, and report it when the task seems to need them.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- the selected platform is web: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/web-design/SKILL.md`
+- the selected platform is mobile: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/mobile-design/SKILL.md`
+- the selected platform is desktop: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/desktop-design/SKILL.md`
+- the selected platform is terminal UI: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/tui-design/SKILL.md`

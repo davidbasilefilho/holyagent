@@ -2,8 +2,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 
 import { Data, Effect } from "effect"
 
-/** The name of the tool the Codex provider adds for specialists that write files. */
-export const APPLY_PATCH_TOOL = "apply_patch"
+export { APPLY_PATCH_TOOL } from "@holyagent/core/pi/codex/names.ts"
 
 /**
  * What the model reads about the tool: the format of Codex's `apply_patch`, which GPT-6 is trained

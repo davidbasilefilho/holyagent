@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync as createTemp, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -10,10 +10,27 @@ import { InvalidVersion } from "./bump-version.ts"
 import {
   BranchModelViolation,
   checkBranchModel,
+  checkReleaseVersion,
   checkVersionNewer,
+  lookupPublished,
   type PullRequest,
+  RegistryError,
   VersionNotNewer,
 } from "./pr-checks.ts"
+
+// Refuse fixtures under an existing repository, even when the system temp directory is overridden.
+const mkdtempSync = (prefix: string) => {
+  const dir = createTemp(prefix)
+  const probe = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--show-toplevel"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  if (probe.exitCode !== 128) {
+    rmSync(dir, { recursive: true, force: true })
+    throw new Error("Fixture temp directory is inside a Git repository or Git is unavailable")
+  }
+  return dir
+}
 
 const rule = (pr: PullRequest) =>
   Effect.runSync(
@@ -26,10 +43,9 @@ const passes = (pr: PullRequest) =>
 
 describe("checkBranchModel", () => {
   test.each([
-    ["release/0.2.1/integration", "main", "0.2.1"],
-    ["release/0.2.1/ci/release-flow", "release/0.2.1/integration", "0.2.1"],
-    ["release/0.2.1/fix/a", "release/0.2.1/feat/b", "0.2.1"],
-    ["release/0.2.1/integration", "release/0.2.1/ci/x", "0.2.1"],
+    ["dev", "main", "0.2.1"],
+    ["release/0.2.1/fix/publication-repair", "main", "0.2.1"],
+
     ["feature/x", "dev", "0.2.1"],
     ["feature/x", "feature/y", "0.2.1"],
   ])("accepts %s into %s at version %s", (head, base, version) => {
@@ -41,49 +57,9 @@ describe("checkBranchModel", () => {
     ["feature/x", "other branch into main"],
     ["main", "main into main"],
     ["release/0.2.1/integration-2", "a look-alike of the integration branch"],
+    ["release/0.2.1/fix/publication-repair-extra", "a repair look-alike"],
   ])("rejects a pull request into main from %s (%s)", (head) => {
     expect(rule({ base: "main", head, version: "0.2.1" })).toBe("main-base")
-  })
-
-  test("rejects a release branch whose version differs from the head's version", () => {
-    expect(
-      rule({ base: "release/0.2.1/integration", head: "release/0.2.1/fix/a", version: "0.2.0" }),
-    ).toBe("branch-version")
-    expect(rule({ base: "main", head: "release/0.2.0/integration", version: "0.2.1" })).toBe(
-      "branch-version",
-    )
-    expect(rule({ base: "dev", head: "release/0.3.0/fix/a", version: "0.2.0" })).toBe(
-      "branch-version",
-    )
-  })
-
-  test.each([
-    ["feature/x", "a branch outside any release"],
-    ["release/0.2.0/fix/a", "a branch of another release"],
-    ["main", "main"],
-  ])("rejects a pull request into a release branch from %s (%s)", (head) => {
-    expect(rule({ base: "release/0.2.1/integration", head, version: "0.2.0" })).toBe("release-base")
-  })
-
-  test.each([
-    ["release/0.2.1/integration", "0.2.1-1"],
-    ["release/0.2.1-1/integration", "0.2.1"],
-  ])("compares versions, not spellings: %s at %s", (head, version) => {
-    expect(passes({ base: "main", head, version })).toBe(true)
-  })
-
-  test.each([
-    ["release/0.2.01/integration", "0.2.1"],
-    ["release/next/integration", "0.2.1"],
-    ["release/0.2.10/integration", "0.2.1"],
-  ])("rejects the release segment of %s against version %s", (head, version) => {
-    expect(rule({ base: "main", head, version })).toBe("branch-version")
-  })
-
-  test("a malformed head version fails a release branch with InvalidVersion", () => {
-    expect(rule({ base: "main", head: "release/0.2.1/integration", version: "1.0.0" })).toBe(
-      "InvalidVersion",
-    )
   })
 
   test("a failure names the rule, the branches and the reason", () => {
@@ -93,6 +69,64 @@ describe("checkBranchModel", () => {
     expect(error).toBeInstanceOf(BranchModelViolation)
     expect(error.message).toContain("main-base")
     expect(error.message).toContain("feature/x")
+  })
+})
+
+describe("publication repair", () => {
+  const unpublished = () => Effect.succeed(false)
+  const published = () => Effect.succeed(true)
+  const check = (
+    main: string,
+    head: string,
+    ref: string,
+    lookup: (version: string) => Effect.Effect<boolean, RegistryError> = unpublished,
+  ) => Effect.runPromise(Effect.exit(checkReleaseVersion(main, head, ref, lookup)))
+  test("allows only an exact same-version repair when npm confirms it is unpublished", async () => {
+    const ref = "release/0.2.1/fix/publication-repair"
+    expect((await check("0.2.1", "0.2.1", ref))._tag).toBe("Success")
+    expect((await check("0.2.1", "0.2.1", ref, published))._tag).toBe("Failure")
+    for (const [main, head, branch] of [
+      ["0.2.1", "0.2.1", "release/0.2.1/integration"],
+      ["0.2.1", "0.2.1", `${ref}-extra`],
+      ["0.2.1", "0.2.1", "release/0.2.0/fix/publication-repair"],
+      ["0.2.1-1", "0.2.1", ref],
+      ["0.2.2", "0.2.1", ref],
+      ["0.2.0", "0.2.1", ref],
+    ])
+      expect((await check(main!, head!, branch!))._tag).toBe("Failure")
+    expect((await check("0.2.0", "0.2.1", "release/0.2.1/integration"))._tag).toBe("Success")
+    expect(
+      (
+        await check("0.2.1", "0.2.1", ref, () =>
+          Effect.fail(new RegistryError({ detail: "offline" })),
+        )
+      )._tag,
+    ).toBe("Failure")
+  })
+
+  test("validates public registry metadata and fails closed on errors and identity mismatches", async () => {
+    const response =
+      (body: unknown, status = 200) =>
+      () =>
+        Promise.resolve(new Response(JSON.stringify(body), { status }))
+    expect(await Effect.runPromise(lookupPublished("0.2.1", response({}, 404)))).toBe(false)
+    expect(
+      await Effect.runPromise(
+        lookupPublished("0.2.1", response({ name: "holyagent", version: "0.2.1" })),
+      ),
+    ).toBe(true)
+    for (const request of [
+      response({}, 401),
+      response({}, 500),
+      response({ name: "other", version: "0.2.1" }),
+      response({ name: "holyagent", version: "0.2.0" }),
+      response({}),
+      () => Promise.reject(new Error("offline")),
+      () => Promise.resolve(new Response("invalid json")),
+    ])
+      expect((await Effect.runPromise(Effect.exit(lookupPublished("0.2.1", request))))._tag).toBe(
+        "Failure",
+      )
   })
 })
 
@@ -150,7 +184,7 @@ describe("the command line", () => {
   })
 
   test("branch-model exits 0 for a valid release pull request and 1 otherwise", async () => {
-    expect(await run("branch-model", "main", "release/0.2.1/integration", "head")).toBe(0)
+    expect(await run("branch-model", "main", "dev", "head")).toBe(0)
     expect(await run("branch-model", "main", "feature/x", "head")).toBe(1)
   })
 
@@ -158,6 +192,26 @@ describe("the command line", () => {
     expect(await run("version", "main", "head")).toBe(0)
     expect(await run("version", "head", "head")).toBe(1)
     expect(await run("version", "head", "main")).toBe(1)
+  })
+
+  test("version CLI uses the repair head ref and registry result", async () => {
+    writeFileSync(
+      join(root, "mock.ts"),
+      `globalThis.fetch = async (url) => {
+      if (url !== "https://registry.npmjs.org/holyagent/0.2.1") throw new Error("wrong registry");
+      return new Response("", { status: 404 });
+    }`,
+    )
+    const runRepair = async (ref: string) =>
+      (
+        await $`bun --preload ${join(root, "mock.ts")} ${join(import.meta.dir, "pr-checks.ts")} version head head ${ref}`
+          .cwd(root)
+          .quiet()
+          .nothrow()
+      ).exitCode
+    expect(await runRepair("release/0.2.1/fix/publication-repair")).toBe(0)
+    expect(await runRepair("release/0.2.1/integration")).toBe(1)
+    expect(await runRepair("release/0.2.1/fix/publication-repair-extra")).toBe(1)
   })
 
   test("an unknown command exits 1", async () => {

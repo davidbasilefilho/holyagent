@@ -1,0 +1,21 @@
+{
+  "name": "@holyagent/core",
+  "version": "0.3.4",
+  "private": true,
+  "description": "Portable HolyAgent domain and application operations.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./domain/*": "./src/domain/*",
+    "./state/*": "./src/state/*",
+    "./config/*": "./src/config/*",
+    "./pi/*": "./src/pi/*",
+    "./api/*": "./src/api/*",
+    "./routing/*": "./src/routing/*"
+  },
+  "dependencies": {
+    "@toon-format/toon": "^4.0.0",
+    "effect": "^4.0.0"
+  }
+}

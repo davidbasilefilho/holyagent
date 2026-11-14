@@ -89904,7 +89904,6 @@ var cmdExeArguments = (command, args) => {
   return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
 };
 var isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
-
 import { posix as posix3 } from "path";
 var NULL_DEVICE = "/dev/null";
 

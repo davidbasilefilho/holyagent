@@ -435,8 +435,8 @@ describe("report and prompt", () => {
     const gap = await cli(["assignment", "accept", id, "--rationale", "reviewed"])
     expect(gap.code).toBe(3)
     expect(gap.stderr).toContain("error: InsufficientAcceptance:")
-    expect(gap.stderr).toContain("assignment close <id> --outcome success --accept")
-    expect(gap.stderr).toContain("assignment accept <id> --rationale <text> --report")
+    expect(gap.stderr).toContain(`assignment close ${id} --outcome success --accept`)
+    expect(gap.stderr).toContain(`assignment accept ${id} --rationale <text> --report`)
     // A corrected report still short of the evidence stores nothing.
     const still = await cli(
       ["assignment", "close", id, "--outcome", "success", "--accept", "ok"],

@@ -3751,7 +3751,6 @@ var inCi = (env) => {
   const value = env["CI"]?.trim().toLowerCase();
   return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
 };
-
 var TERMINAL_THEME = {
   heading: "#7aa2f7",
   option: "#7dcfff",

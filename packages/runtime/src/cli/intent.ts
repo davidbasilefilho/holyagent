@@ -1,23 +1,11 @@
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 
-import { newId } from "../domain/ids.ts"
-import {
-  closeIntent,
-  createIntent,
-  type Intent,
-  IntentDraft,
-  IntentUpdate,
-  reopenIntent,
-  updateIntent,
-} from "../domain/intent.ts"
-import { findIntent, requireOpen } from "../domain/project.ts"
-import { readState, type Snapshot } from "../state/store.ts"
-import { booleanFlag, requiredFlag, stringFlag } from "./args.ts"
-import { removeFiles } from "./brief.ts"
-import { nowIso } from "./context.ts"
-import { NoActiveIntent, Usage } from "./errors.ts"
+import type { Intent } from "../domain/intent.ts"
+import type { Snapshot } from "../state/store.ts"
+import { coreCommand } from "./core.ts"
+import { NoActiveIntent } from "./errors.ts"
 import type { Command } from "./types.ts"
-import { byId, intentRow, intentView, oneLine, present } from "./views.ts"
+import { byId, oneLine } from "./views.ts"
 
 const openIntents = (snapshot: Snapshot) =>
   byId(snapshot.project.intents.filter((intent) => intent.state === "Open"))
@@ -56,16 +44,6 @@ export const resolveIntent = (snapshot: Snapshot): Effect.Effect<Intent, NoActiv
     : Effect.succeed(chosen)
 }
 
-const IntentInput = Schema.Struct({
-  objective: IntentDraft.fields.objective,
-  requirements: IntentDraft.fields.requirements,
-})
-
-const IntentEdit = Schema.Struct({
-  objective: IntentUpdate.fields.objective,
-  requirements: IntentUpdate.fields.requirements,
-})
-
 /** The `intent` commands. */
 export const INTENT_COMMANDS: ReadonlyArray<Command> = [
   {
@@ -76,18 +54,8 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     flags: { input: "string" },
     positionals: 0,
     state: "create",
-    run: ({ update, input }) =>
-      Effect.gen(function* () {
-        const draft = yield* input(IntentInput)
-        const id = yield* newId("intent")
-        const now = yield* nowIso
-        const { intent } = yield* update(({ project }) =>
-          createIntent(project, { ...draft, id, now }).pipe(
-            Effect.map((change) => ({ ...change, activeIntent: id })),
-          ),
-        )
-        return intentView(intent)
-      }),
+    core: true,
+    run: coreCommand("intent create"),
   },
   {
     path: ["intent", "show"],
@@ -96,16 +64,8 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     flags: {},
     positionals: 1,
     optional: true,
-    run: ({ directory, args }) =>
-      Effect.gen(function* () {
-        const snapshot = yield* readState(directory)
-        const [id] = args.positionals
-        const intent =
-          id === undefined
-            ? yield* resolveIntent(snapshot)
-            : yield* findIntent(snapshot.project, id)
-        return intentView(intent, snapshot.links)
-      }),
+    core: true,
+    run: coreCommand("intent show"),
   },
   {
     path: ["intent", "list"],
@@ -113,15 +73,8 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     summary: "List every Intent",
     flags: {},
     positionals: 0,
-    run: ({ directory }) =>
-      readState(directory).pipe(
-        Effect.map((snapshot) => {
-          const inUse = intentInUse(snapshot)
-          return {
-            intents: byId(snapshot.project.intents).map((i) => intentRow(i, i.id === inUse)),
-          }
-        }),
-      ),
+    core: true,
+    run: coreCommand("intent list"),
   },
   {
     path: ["intent", "update"],
@@ -133,21 +86,8 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     ],
     flags: { input: "string", material: "boolean" },
     positionals: 0,
-    run: ({ update, args, input }) =>
-      Effect.gen(function* () {
-        const edit = yield* input(IntentEdit)
-        const { intent } = yield* update((snapshot) =>
-          resolveIntent(snapshot).pipe(
-            Effect.flatMap((current) =>
-              updateIntent(snapshot.project, current.id, {
-                ...edit,
-                material: booleanFlag(args, "material"),
-              }),
-            ),
-          ),
-        )
-        return intentView(intent)
-      }),
+    core: true,
+    run: coreCommand("intent update"),
   },
   {
     path: ["intent", "close"],
@@ -156,40 +96,8 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     notes: ["pull before closing: another clone may hold work this one cannot see"],
     flags: { reason: "string", drop: "string" },
     positionals: 0,
-    run: (call) =>
-      Effect.gen(function* () {
-        const { update, args } = call
-        const reason = yield* requiredFlag(args, "reason", "intent close --reason <text>")
-        const drop = stringFlag(args, "drop")
-        const now = yield* nowIso
-        const closed = yield* update((snapshot) =>
-          resolveIntent(snapshot).pipe(
-            Effect.flatMap((current) =>
-              closeIntent(
-                snapshot.project,
-                snapshot.specialists,
-                current.id,
-                { reason, ...(drop === undefined ? {} : { drop }) },
-                now,
-              ).pipe(
-                Effect.map((change) => ({
-                  ...change,
-                  owned: snapshot.project.assignments
-                    .filter((row) => row.intentId === current.id)
-                    .map((row) => row.id),
-                })),
-              ),
-            ),
-          ),
-        )
-        // The briefs and reports stay while the Intent is open, so a later brief can cite them.
-        const unremoved = yield* removeFiles(call, closed.owned)
-        return present({
-          ...intentView(closed.intent),
-          dropped: closed.assignments.map((assignment) => assignment.id),
-          unremoved,
-        })
-      }),
+    core: true,
+    run: coreCommand("intent close"),
   },
   {
     path: ["intent", "reopen"],
@@ -198,22 +106,8 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     flags: {},
     positionals: 1,
     optional: true,
-    run: ({ update, args }) =>
-      Effect.gen(function* () {
-        const { intent } = yield* update((snapshot) =>
-          Effect.gen(function* () {
-            const id = args.positionals[0] ?? snapshot.activeIntent
-            if (id === undefined)
-              return yield* new Usage({
-                message: "No id given and no Intent is in use",
-                hint: "Usage: holyagent intent reopen <id>",
-              })
-            const change = yield* reopenIntent(snapshot.project, id)
-            return { ...change, activeIntent: id }
-          }),
-        )
-        return intentView(intent)
-      }),
+    core: true,
+    run: coreCommand("intent reopen"),
   },
   {
     path: ["intent", "use"],
@@ -221,16 +115,7 @@ export const INTENT_COMMANDS: ReadonlyArray<Command> = [
     summary: "Put an open Intent in use in this work tree",
     flags: {},
     positionals: 1,
-    run: ({ update, args }) =>
-      Effect.gen(function* () {
-        const { intent } = yield* update(({ project }) =>
-          Effect.gen(function* () {
-            const found = yield* findIntent(project, args.positionals[0] ?? "")
-            yield* requireOpen(found)
-            return { intent: found, activeIntent: found.id }
-          }),
-        )
-        return intentView(intent)
-      }),
+    core: true,
+    run: coreCommand("intent use"),
   },
 ]

@@ -90,6 +90,7 @@ export const VERSION_SOURCE = "package.json"
  * the CLI's `--version` reads the root manifest.
  */
 export const VERSION_COPIES: ReadonlyArray<string> = [
+  "packages/core/package.json",
   "packages/runtime/package.json",
   "packages/integrations/claude/package.json",
   "packages/integrations/pi/package.json",

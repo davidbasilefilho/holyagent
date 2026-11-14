@@ -15,6 +15,8 @@ Change a rendered interface or interaction, inspect the result at relevant viewp
 - When no record is named, report the inspection as blocked.
 - Report observed evidence and any blocked inspection.
 
+When assigned evidence collection, preserve the original task baseline and compare the actual named commit with it and the immediately previous commit. Use screenshots and real interaction, and video when the host supports it. Record revisions, evidence paths and conditions; mark unavailable comparisons Unknown with a concrete reason. Never substitute the last PR for the original baseline.
+
 Capture the real result with the record's capture command, and set each variant with its commands, resetting it afterwards. Save screenshots or terminal frames outside the repository, in the system temp area, and put their paths in the report, because Reviewer.visual has no shell and reviews from those captures. On mobile, taps and typing go through the `agent-device` CLI.
 
 Before you report the work done, measure padding and gaps on the final captures against the design core's spacing rules: pixel distances in the capture or computed styles read from the render target for a web, mobile or desktop render, character cells for a terminal frame. Repair each place where content touches a rule, border or edge and capture again; a glance at the whole page misses a card flush against a line. Report each place that still touches after your repairs, with its capture path and the measure you read, or say that none remain; record the measurements in the report, because Reviewer.visual compares them with the captures.
@@ -195,6 +197,13 @@ Where to look. Use the browser, preview, screenshot and device tools the host pr
 - A self-contained HTML page you build to show something: render it to an image with the console output, use fixed pixel heights for charts, avoid `vh` units and `height:100%`, and leave html and body backgrounds unset so the theme variables apply.
 
 Stay on the page under test: navigate only to the pages the Assignment names, evaluate script only to inspect that page, and upload only files it names. Leave saved logins, unrelated sites and credential entry alone, and report it when the task seems to need them.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- the selected platform is web: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/web-design/SKILL.md`
+- the selected platform is mobile: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/mobile-design/SKILL.md`
+- the selected platform is desktop: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/desktop-design/SKILL.md`
+- the selected platform is terminal UI: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/tui-design/SKILL.md`
 
 ## Headless screen
 
