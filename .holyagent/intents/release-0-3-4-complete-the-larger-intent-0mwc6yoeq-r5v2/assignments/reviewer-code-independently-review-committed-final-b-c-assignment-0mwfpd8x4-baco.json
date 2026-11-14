@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mwfpd8x4-baco",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-committed-final-b-c",
+  "objective": "Independently review committed final B C F integration for correctness and preservation of authority and guidance contracts.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-final, clean immutable b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0. Author report /workspace/work/034/final-bcf-integration-report.json; incremental diff /workspace/work/034/final-bcf-integration-incremental.diff. Complete120paths including generated assets. Fullauthor3603pass2skip,898focused+169targeted.",
+    "Core canonical alias matching, Pi native/wait/alias lifecycle shares one explicit root launch flag and does not elevate children or unknown hosts; cancellation/disable/shutdown safely dispose waits and aliases, missing/malformed event bus safe, no fabricated workflow completion; wildcard aliases literal suffix matching preserve allowlists.",
+    "Visual/performance original task baseline before first source-writing dispatch; per-commit original+previous evidence before review/acceptance/push, realinteraction and screenshot/video when supported, projectdesignsystem composition/alignment/contrast/layout/position/size and animation/routes/transitions; perf asks optimization goal at taskstart and controlled complete measures. All instruction families preservemeaning and private owned performance guidance root,Worker.operations,Worker.validation. User/thirdparty unowned skills retained.",
+    "B onlytwofixture changes. Keep canonicalCore/directnative/APIs/routing/CLIpublic-internal separation and established approval/authority prose; unchanged9,400 contextbudget/allrequirements tests. No need rereview unrelatedb8existingCore extraction."
+  ],
+  "constraints": [
+    "\nFirst pass: code-review.\n\nYou are the first pass of a code review. Find defects in the committed range and prove each one. The review is read-only: write no comments and no fixes, and change no file, branch or index.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other, and leave the uncommitted changes of the shared tree out. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve, say which one and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff of the range with `git diff`, quoting the ref names for the shell.\n2. Read the code around each change: the callers, the callees and the tests that cover it. A change is judged in its context, not alone.\n3. List candidate defects the change introduces or exposes. Look at wrong results, regressions of existing behavior, unhandled error and failure paths, empty, null and boundary input, ordering and concurrency, leaked resources, broken compatibility of an interface or stored data, and tests that cannot fail.\n4. Trace each candidate to a realistic failure: the input or state, the path through the code, and the wrong result a user or caller sees. Drop a candidate you cannot trace to one.\n5. Label each remaining finding.\n   - blocker: a realistic failure in normal use, data loss, or a break of existing behavior.\n   - optional: a real but unlikely or minor failure.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one, then reviews on its own and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the file, the line and the symbol;\n- the failure, in one or two sentences, as input, path and result;\n- the label;\n- how you know: what you read, or the command you ran and its result.\n\nExample entry:\n\n- `src/cart.ts:42`, `total`: an empty cart divides by `items.length`, so `checkout` shows \"NaN\" as the price. blocker. Read `total` and its caller `checkout`; `bun test cart` with an empty cart fails.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered. Leave style, naming and taste out.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Read-only committed review, no shared generated rebuild during other tests; isolated snapshot if needed. For artifact: read GPT instruction-writing SKILL, .claude/skills/requirements/SKILL and each family guide BEFORE review. Author truthfully disclosed GPT skill read after initial edits; evaluate resulting semantics independently, do not fabricate historical compliance or demand pointless rewrite. Source prompt prose evidence should cite short excerpts. Report /workspace/work/034/final-bcf-code-review-report.json."
+  ],
+  "criteria": [
+    {
+      "text": "Committed B C F integration preserves required behavior and has no blocking code finding",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Changed guidance and lifecycle contracts have independent evidence without weakening tests authority or context limits",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfocaa8-dvqh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T01:04:05.992Z"
+  },
+  "createdAt": "2026-11-14T01:04:05.992Z"
+}
