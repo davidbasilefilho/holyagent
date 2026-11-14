@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "close-known-final-bcf-alias-event",
   "objective": "Close known final BCF alias/event lifecycle findings and finish bounded material source review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-final clean immutablef7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213. Prior final-bcf-security-review-report.json and repair final-bcf-lifecycle-repair-report.json under/workspace/work/034. Repair5paths, fullinstructions unchanged; build/static540focusedtests passed. Aggregate full verify planned after final migration merge.",
     "Close malformed callable event bus on throw/invalidoff, safe partialcleanup/dispose/reload, inerteventcallbacks ifAPIcan'tunsubscribe, preserve nativeauthorization. Unknown canonicaltoolnames constructor/toString/__proto__ stay exact, knownaliases and toolMatchespermissions unchanged.",
@@ -49,7 +49,37 @@
     "agentId": "/root/final_bcf_security_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T01:15:51.306Z"
+    "startedAt": "2026-11-14T01:15:51.306Z",
+    "finishedAt": "2026-11-14T01:17:27.525Z"
+  },
+  "result": "status: done\nchecks:\n- git diff --check f7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213 -> exit 0\n- bunx --no-install mise run test packages/core/tests/pi-tool-names.test.ts packages/integrations/pi/tests/wait-for-agents.test.ts packages/integrations/pi/tests/tool-aliases.test.ts packages/integrations/pi/tests/native-direct.test.ts -> exit 0\nnotes:\n- Trust boundaries: host event subscriptions, configuration and root flags, model-supplied tool names and arguments, registered extension metadata, nested host tool calls and model-facing output. Code runs with Pi session privileges. No full rebuild equivalence independently performed.\n- evidence: Event bus and unknown alias findings are closed without introduced blocking security defects (behavior): No findings. Own-property lookup preserves unknown names; malformed subscriptions are caught, prior handles released, retained callbacks made inert, and disposal is idempotent. The changed bundle mirrors these source changes. Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit (tests): Traced Core matching, Pi configuration/root flag, alias source/schema/callability and nested hooks, exclusion/profile/auto-review gates, wait shutdown and restart. 25 independent focused tests pass, including real SDK fixtures; no live Pi or paid service used. Workflow completion has no proven event and remains conservatively unavailable. Guidance unchanged in repair: visual requires \"screenshots and real interaction\"; performance compares \"original baseline and the immediately previous commit\". checks-run: git diff --check repair range exit 0; mise run test on pi-tool-names, wait-for-agents, tool-aliases and native-direct: exit 0, 25 pass. Author reports 540 focused pass and build/static success; full post-repair verify pending. reviewed-range: f7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213 entire repair diff, plus bounded original material source b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0 as assigned. findings: No validated or suspected security findings in the assigned material scope. Original malformed callable bus and inherited-key canonicalization concerns closed.\nevidence:\n- Event bus and unknown alias findings are closed without introduced blocking security defects (behavior): No findings. Own-property lookup preserves unknown names; malformed subscriptions are caught, prior handles released, retained callbacks made inert, and disposal is idempotent. The changed bundle mirrors these source changes.\n- Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit (tests): Traced Core matching, Pi configuration/root flag, alias source/schema/callability and nested hooks, exclusion/profile/auto-review gates, wait shutdown and restart. 25 independent focused tests pass, including real SDK fixtures; no live Pi or paid service used. Workflow completion has no proven event and remains conservatively unavailable. Guidance unchanged in repair: visual requires \"screenshots and real interaction\"; performance compares \"original baseline and the immediately previous commit\".\n- checks-run: git diff --check repair range exit 0; mise run test on pi-tool-names, wait-for-agents, tool-aliases and native-direct: exit 0, 25 pass. Author reports 540 focused pass and build/static success; full post-repair verify pending.\n- reviewed-range: f7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213 entire repair diff, plus bounded original material source b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0 as assigned.\n- findings: No validated or suspected security findings in the assigned material scope. Original malformed callable bus and inherited-key canonicalization concerns closed.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Independent complete bounded source tracing closes bus/alias findings,25focused tests pass, no validated or suspected security finding; known workflow/live-host limits documented.",
+    "criteria": [
+      {
+        "criterion": "Event bus and unknown alias findings are closed without introduced blocking security defects",
+        "support": "No findings. Own-property lookup preserves unknown names; malformed subscriptions are caught, prior handles released, retained callbacks made inert, and disposal is idempotent. The changed bundle mirrors these source changes."
+      },
+      {
+        "criterion": "Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit",
+        "support": "Traced Core matching, Pi configuration/root flag, alias source/schema/callability and nested hooks, exclusion/profile/auto-review gates, wait shutdown and restart. 25 independent focused tests pass, including real SDK fixtures; no live Pi or paid service used. Workflow completion has no proven event and remains conservatively unavailable. Guidance unchanged in repair: visual requires \"screenshots and real interaction\"; performance compares \"original baseline and the immediately previous commit\"."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "git diff --check repair range exit 0; mise run test on pi-tool-names, wait-for-agents, tool-aliases and native-direct: exit 0, 25 pass. Author reports 540 focused pass and build/static success; full post-repair verify pending."
+      },
+      {
+        "label": "reviewed-range",
+        "support": "f7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213 entire repair diff, plus bounded original material source b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0 as assigned."
+      },
+      {
+        "label": "findings",
+        "support": "No validated or suspected security findings in the assigned material scope. Original malformed callable bus and inherited-key canonicalization concerns closed."
+      }
+    ]
   },
   "createdAt": "2026-11-14T01:15:51.306Z"
 }
