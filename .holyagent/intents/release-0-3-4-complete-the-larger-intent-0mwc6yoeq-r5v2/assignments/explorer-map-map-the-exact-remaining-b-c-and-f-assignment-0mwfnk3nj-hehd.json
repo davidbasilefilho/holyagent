@@ -5,7 +5,7 @@
   "roleTask": "Explorer.map",
   "slug": "map-the-exact-remaining-b-c-and-f",
   "objective": "Map the exact remaining B C and F integration seams for the final 0.3.4 Core candidate.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only repository mapping. Current combined application base31a9702 at /workspace/work/holyagent-034-core-host has a later routing merge being edited; do not read it as immutable final state and do not mutate. Separate /workspace/work/holyagent-034-core is finishing journal migration. Parent will merge that final repair later.",
     "Compare immutable B78366e7459c144c2f6c77a6075964ced06c433a9, Ce95cb5178a6d33300b8f4f8ec4e8654d092bcba3 and Fb2ac10b2 against31a9702 and their common ancestors. B's delta after Core baseedce18fee6579d591d59a629765225e2e0e955cd is only handoff.test.ts and operational-ownership.test.ts portability fixes. C owns task-start original visual/performance baseline plus post-commit original/previous comparison guidance; G's private role guidance router must add performance-iteration with exact useful roles. F owns event-based wait and snake-case aliases including wildcard repair; Core's native flag/config lifecycle must remain unified.",
@@ -39,7 +39,33 @@
     "agentId": "/root/final_bcf_integration_map",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-14T00:13:26.527Z"
+    "startedAt": "2026-11-14T00:13:26.527Z",
+    "finishedAt": "2026-11-14T00:23:26.798Z"
+  },
+  "result": "status: done\nchanged:\n- /workspace/work/034/final-bcf-integration-map.md\n- /workspace/work/034/final-bcf-integration-map-report.json\nchecks:\n- read-only git diff/show/grep and instruction reads -> exit 0\nnotes:\n- No tests or gates run; mapping is based on immutable commits.\nevidence:\n- source-map: Immutable owner deltas and Core canonical paths in map.\n- integration-checklist: Mapping table and anticipated conflicts in map.\n- checks-run: Read-only Git and instruction inspection; gates not run.\n- Remaining baseline iteration and event alias integrations are mapped accurately to canonical Core source and final validation needs: Mapping table and focused validation commands.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Immutable B/C/F source comparison identifies late fixtures, canonical Core alias/lifecycle integration and exact owned performance guidance roles; no unsupported test or completed-integration claim.",
+    "criteria": [
+      {
+        "criterion": "Remaining baseline iteration and event alias integrations are mapped accurately to canonical Core source and final validation needs",
+        "support": "Mapping table and focused validation commands."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "source-map",
+        "support": "Immutable owner deltas and Core canonical paths in map."
+      },
+      {
+        "label": "integration-checklist",
+        "support": "Mapping table and anticipated conflicts in map."
+      },
+      {
+        "label": "checks-run",
+        "support": "Read-only Git and instruction inspection; gates not run."
+      }
+    ]
   },
   "createdAt": "2026-11-14T00:13:26.527Z"
 }
