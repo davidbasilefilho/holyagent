@@ -1,0 +1,69 @@
+{
+  "id": "assignment-0mwfpzdo8-8adi",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Worker.integration",
+  "slug": "finish-the-local-core-migration-merge",
+  "objective": "Finish the local Core migration merge and validate the complete 0.3.4 source tree and generated integrations.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-final. Root has performed noncommitted merge f544e6c88270bb8ffc97f236a484c10343d5ce9d into099a597d22ab3d719f849b4b9c701595c4a92213. All source merged automatically; ONLY4generatedbundles have content conflicts. Root ownsindex/commit; rebuild fromsource, no generatedhandedits.",
+    "Inspect auto-merged Core/api/context.ts to preserve union of host setup/doctor/VCS capabilities, Filesystem injection and migration state.initialize/terminalguard/readfences. Preserve BCFwait/aliases/privateguidance, Core-backedrouting/PATHsecurity/config fixes, CLIplain/publicbin source. No oldCLIbridge.",
+    "One final optional code finding to repair: /workspace/work/034/core-migration-entry-cleanup-code-review-report.json and /tmp/holyagent-034-malformed-guard-review.ts. Explicit malformed guard with trusteddefaultEffect.void currently fallsbacktrue. Distinguish truly absent guard from explicitly supplied invalid value; validate missing/custom terminal authority and initial guard eligibility BEFORE mutating setup, preserve legitimate default/trustedCLI and no-writepeek. Tests include null/nonfunction and nontrue-returning guard alongside trusteddefault, no refs/journal/source mutation; preserve per-mutation rechecks. Only this scoped state guard edge, no redesign.",
+    "Build allgeneratedbundles toresolve conflicts, run allstatic/focusednativeNode/profile/wait/alias/migration tests and complete supervised aggregateverify with realexit recorded. No source/build mutationsduringgates. Ifanotherfailure arises reportbeforewideningsourcechanges."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "No Git/index/VCS/state/config writes. Root alreadymadeGitmerge; unresolvedindexclearedbyrootCLIcommit afteryourgates. Generatedconflictsresolvebybuildonly. PrivateCore remainsprivate/noextraNPMPublisher. ReadonlySDKfixturesoutsideactualrepo; no paid/livePi. Sourceinstructiontextunchanged. Fullgate via supervisor and capture exitin externalfile, no gratuitousrepeat ifcapturedclean. Report /workspace/work/034/final-034-aggregate-integration-report.json and diff/pathinventory; note sourceparents and exactmergedsourcehashes. Archive/bin smoke afterrootcommitwillbeseparatelyexecuted."
+  ],
+  "criteria": [
+    {
+      "text": "Merged source preserves host Core native routing guidance and migration contracts with generated bundles rebuilt from source",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Explicit invalid or denied terminal guards never default to trusted authority or mutate setup while absent trusted defaults and pure reads remain compatible",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Complete aggregate build static focused Node and supervised verification gates pass with observed exit status",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "source-parents"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/state/tree.ts",
+    "packages/core/src/state/migration-files.ts",
+    "packages/core/src/state/migration-worktrees.test.ts",
+    "packages/core/src/state/migration-files.test.ts",
+    "packages/core/tests",
+    "docs/core-api.md",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/extensions/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent-public.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfocaa8-dvqh",
+  "specialist": {
+    "agentId": "/root/core_routing_integration",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-14T01:21:18.584Z"
+  },
+  "createdAt": "2026-11-14T01:21:18.584Z"
+}
