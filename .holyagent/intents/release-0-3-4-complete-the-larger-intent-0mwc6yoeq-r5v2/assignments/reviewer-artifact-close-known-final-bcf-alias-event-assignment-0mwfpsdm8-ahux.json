@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.artifact",
   "slug": "close-known-final-bcf-alias-event",
   "objective": "Close known final BCF alias/event lifecycle findings and finish bounded material source review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-final clean immutablef7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213. Prior final-bcf-artifact-review-report.json and repair final-bcf-lifecycle-repair-report.json under/workspace/work/034. Repair5paths, fullinstructions unchanged; build/static540focusedtests passed. Aggregate full verify planned after final migration merge.",
     "Close malformed callable event bus on throw/invalidoff, safe partialcleanup/dispose/reload, inerteventcallbacks ifAPIcan'tunsubscribe, preserve nativeauthorization. Unknown canonicaltoolnames constructor/toString/__proto__ stay exact, knownaliases and toolMatchespermissions unchanged.",
@@ -48,7 +48,37 @@
     "agentId": "/root/final_bcf_artifact_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T01:15:51.920Z"
+    "startedAt": "2026-11-14T01:15:51.920Z",
+    "finishedAt": "2026-11-14T01:18:21.979Z"
+  },
+  "result": "status: done\nchecks:\n- mise run test -- packages/core/tests/pi-tool-names.test.ts packages/integrations/pi/tests/wait-for-agents.test.ts packages/integrations/pi/tests/tool-aliases.test.ts -> exit 0\n- mise run test -- packages/integrations/pi/tests/extension.test.ts packages/integrations/pi/tests/native-direct.test.ts packages/runtime/tests/pi/tools.test.ts -> exit 0\n- git status --short; git rev-parse HEAD; git diff --check f7a931da 099a597d -> exit 0\nnotes:\n- Prior review read GPT instruction-writing, requirements and family guides. Author reports earlier full verify 3603 pass and 2 skips; it predates repair.\n- evidence: Event bus and unknown alias findings are closed without introduced blocking artifact defects (behavior): Met. Own-property lookup preserves inherited-key names. Failed subscriptions release available handles and guard retained callbacks; disposal is idempotent and authorization remains root-flag gated. No blocking finding in bounded review. Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit (repo-standards): Met for bounded source and tests: canonical matching, permission hooks, native flag, lifecycle, aliases, and wait were inspected; 469 focused tests passed. Existing guidance says “Before any task source edits” and “original and immediately previous commit.” Workflow completion event remains unproven; post-workflow wait is conservative. Live paid Pi/provider and real accounts were not exercised. checks-run: mise test Core names, Pi wait/aliases: 20 pass; mise test Pi extension/native and Core tools: 449 pass; git diff --check and clean status exit 0. Author reports generated build, static checks and 540 tests passed; aggregate full verify remains pending. No independent rebuild. reviewed-range: Repair f7a931da6de7bb685b403cc367b5c7e7c4adacd0..099a597d22ab3d719f849b4b9c701595c4a92213; original bounded BCF source b8c947edb75c74ba292ff4ea10cbb473c607070c..f7a931da6de7bb685b403cc367b5c7e7c4adacd0. HEAD clean at repair tip. findings: No blocking findings. Previous malformed-bus and inherited-name failures closed. Workflow completion remains deliberately unavailable without a proven event; no claim of live host behavior or independently verified generated-byte equivalence.\nevidence:\n- Event bus and unknown alias findings are closed without introduced blocking artifact defects (behavior): Met. Own-property lookup preserves inherited-key names. Failed subscriptions release available handles and guard retained callbacks; disposal is idempotent and authorization remains root-flag gated. No blocking finding in bounded review.\n- Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit (repo-standards): Met for bounded source and tests: canonical matching, permission hooks, native flag, lifecycle, aliases, and wait were inspected; 469 focused tests passed. Existing guidance says “Before any task source edits” and “original and immediately previous commit.” Workflow completion event remains unproven; post-workflow wait is conservative. Live paid Pi/provider and real accounts were not exercised.\n- checks-run: mise test Core names, Pi wait/aliases: 20 pass; mise test Pi extension/native and Core tools: 449 pass; git diff --check and clean status exit 0. Author reports generated build, static checks and 540 tests passed; aggregate full verify remains pending. No independent rebuild.\n- reviewed-range: Repair f7a931da6de7bb685b403cc367b5c7e7c4adacd0..099a597d22ab3d719f849b4b9c701595c4a92213; original bounded BCF source b8c947edb75c74ba292ff4ea10cbb473c607070c..f7a931da6de7bb685b403cc367b5c7e7c4adacd0. HEAD clean at repair tip.\n- findings: No blocking findings. Previous malformed-bus and inherited-name failures closed. Workflow completion remains deliberately unavailable without a proven event; no claim of live host behavior or independently verified generated-byte equivalence.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Artifact review closes both reproduced bus/alias findings with469focused tests; unchanged all-family guidance semantics retained, unknownworkflow/livehost limits explicit. Finalaggregatefull andbyte-equivalence remain separately required.",
+    "criteria": [
+      {
+        "criterion": "Event bus and unknown alias findings are closed without introduced blocking artifact defects",
+        "support": "Met. Own-property lookup preserves inherited-key names. Failed subscriptions release available handles and guard retained callbacks; disposal is idempotent and authorization remains root-flag gated. No blocking finding in bounded review."
+      },
+      {
+        "criterion": "Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit",
+        "support": "Met for bounded source and tests: canonical matching, permission hooks, native flag, lifecycle, aliases, and wait were inspected; 469 focused tests passed. Existing guidance says “Before any task source edits” and “original and immediately previous commit.” Workflow completion event remains unproven; post-workflow wait is conservative. Live paid Pi/provider and real accounts were not exercised."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "mise test Core names, Pi wait/aliases: 20 pass; mise test Pi extension/native and Core tools: 449 pass; git diff --check and clean status exit 0. Author reports generated build, static checks and 540 tests passed; aggregate full verify remains pending. No independent rebuild."
+      },
+      {
+        "label": "reviewed-range",
+        "support": "Repair f7a931da6de7bb685b403cc367b5c7e7c4adacd0..099a597d22ab3d719f849b4b9c701595c4a92213; original bounded BCF source b8c947edb75c74ba292ff4ea10cbb473c607070c..f7a931da6de7bb685b403cc367b5c7e7c4adacd0. HEAD clean at repair tip."
+      },
+      {
+        "label": "findings",
+        "support": "No blocking findings. Previous malformed-bus and inherited-name failures closed. Workflow completion remains deliberately unavailable without a proven event; no claim of live host behavior or independently verified generated-byte equivalence."
+      }
+    ]
   },
   "createdAt": "2026-11-14T01:15:51.920Z"
 }
