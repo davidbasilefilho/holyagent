@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mwfo1ej2-il0e",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-the-completed",
+  "objective": "Independently review the completed journaled migration repair and its real Git regression coverage.",
+  "state": "Running",
+  "scope": [
+    "Immutable6ebdf1e...a90789b1ae640771a491849ab6623540af3ae123 in /workspace/work/holyagent-034-core. All writers terminal and tree clean. Read actual material source in tree.ts, api/context.ts and migration-{journal,index,files,runner}.ts plus tests, not huge generated dumps. Authorreport /workspace/work/034/core-migration-tree-adapter-report.json, incremental.diff and final verifylog show3605pass2skip,41focused and original3-failure red log preserved.",
+    "Review private tree/commit planning, durable phases before qualified CAS, ambiguous success recovery, foreign staged/unstaged preservation, source retention and cleanup, target preimage/ref/index checks, safe paths and nofollow behavior, pure reader fences, operation/state.initialize authority after waits, lock order and cancellation. Tests must exercise actual new CAS boundary and recovered success, not merely fail-closed refusal. Check SHA and replacement-ref handling and platform assumptions.",
+    "Run bounded independent Core/helper/revocation/Node checks through mise on current immutable head; no need repeat the whole suite without a new concern. Identify all material correctness or data-integrity findings with reproduction/trace. Actual Windows/Mac remains for hosted integration. Save /workspace/work/034/core-migration-final-code-review-report.json. No source/VCS/state writes."
+  ],
+  "constraints": [
+    "\nFirst pass: code-review.\n\nYou are the first pass of a code review. Find defects in the committed range and prove each one. The review is read-only: write no comments and no fixes, and change no file, branch or index.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other, and leave the uncommitted changes of the shared tree out. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve, say which one and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff of the range with `git diff`, quoting the ref names for the shell.\n2. Read the code around each change: the callers, the callees and the tests that cover it. A change is judged in its context, not alone.\n3. List candidate defects the change introduces or exposes. Look at wrong results, regressions of existing behavior, unhandled error and failure paths, empty, null and boundary input, ordering and concurrency, leaked resources, broken compatibility of an interface or stored data, and tests that cannot fail.\n4. Trace each candidate to a realistic failure: the input or state, the path through the code, and the wrong result a user or caller sees. Drop a candidate you cannot trace to one.\n5. Label each remaining finding.\n   - blocker: a realistic failure in normal use, data loss, or a break of existing behavior.\n   - optional: a real but unlikely or minor failure.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one, then reviews on its own and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the file, the line and the symbol;\n- the failure, in one or two sentences, as input, path and result;\n- the label;\n- how you know: what you read, or the command you ran and its result.\n\nExample entry:\n\n- `src/cart.ts:42`, `total`: an empty cart divides by `items.length`, so `checkout` shows \"NaN\" as the price. blocker. Read `total` and its caller `checkout`; `bun test cart` with an empty cart fails.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered. Leave style, naming and taste out.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034."
+  ],
+  "criteria": [
+    {
+      "text": "Journaled migration repair preserves correct state source index and cancellation recovery without blocking legitimate migrations or hiding reader races",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Independent current head real Git helper and Node checks verify the actual recovery paths",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "first-pass",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfmy33h-8m9g",
+    "assignment-0mwfkltrw-umzd",
+    "assignment-0mwfklua4-yv6b",
+    "assignment-0mwflze5o-3bdd",
+    "assignment-0mwflzeqm-vjqg"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T00:26:53.774Z"
+  },
+  "createdAt": "2026-11-14T00:26:53.774Z"
+}
