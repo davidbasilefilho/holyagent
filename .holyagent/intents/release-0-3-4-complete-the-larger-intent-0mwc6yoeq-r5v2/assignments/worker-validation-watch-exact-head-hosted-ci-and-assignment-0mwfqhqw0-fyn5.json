@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mwfqhqw0-fyn5",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Worker.validation",
+  "slug": "watch-exact-head-hosted-ci-and",
+  "objective": "Watch exact-head hosted CI and mergeability for final0.3.4 ready PR130 and report actionable failures.",
+  "state": "Running",
+  "scope": [
+    "PRhttps://github.com/davidbasilefilho/holyagent/pull/130 head765aa8b22e6288fdd680a564e04389e2a6274462, baseDev. Worktree /workspace/work/holyagent-034-final. Read GPTci-watchskill, run gh pr checks130 --watch once using backgroundtool/session, waitonthatprocessnotloopnewAPIs. Captureexitandexacthead; ifchecksnotregistered initialreadrunlistonce toidentifycurrentheadworkflowthenwatchonce ready.",
+    "Report Linuxcheck,macos,windows,installers,branch-model outcomes forbothbranchpush andPRopened runswherepresent; skippedversion/publish notcountasvalidation. Readcurrentattemptlogfailedonfailure, extractconcretefile/assertion/errors no sourcechanges. ReadmergeStateStatus/reviewDecision/isDraft/unresolvedreviewthreads for exacthead atcompletion. No merges/reruns/comments/repositorysettingswrites.",
+    "Localaggregate3675pass2skip observedexit0 independentcode/security/artifact plusarchive144filefreshinstall/bin/rebuildbyte-identicalaccepted. CInewsourceWindowsunverifieduntilthisrun, no broadclaimgreenfromoldA/Hruns. Userauthorizedrelease/merge butmanualDevstrictprotection/npmDevallowlist andprecise44→460baseFFapprovalstillpending, do notperformthem."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Read-onlyCI/GitHub/Git. No source/generated/state/VCSwrites, no testskip/timeoutrelaxation. Report /workspace/work/034/final-034-pr130-ci-report.json. Backgroundwatchmaytakeseveralminutes, keepcompactprogressandfinalactualresult."
+  ],
+  "criteria": [
+    {
+      "text": "Hosted Linux macOS Windows installers and branch-model current-head validation results are all observed or failures precisely reported",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Exact-head merge state ready status and unresolved threads are reported without treating pending skipped or unknown as passed",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "head-and-runs",
+    "failures",
+    "merge-state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-14T01:35:35.521Z"
+  },
+  "createdAt": "2026-11-14T01:35:35.521Z"
+}
