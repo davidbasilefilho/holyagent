@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "prove-the-0-3-4-public-package",
   "objective": "Prove the 0.3.4 public package executable works from an isolated packed archive and identify concrete release blockers.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read clean committed /workspace/work/holyagent-034-core-host at b8c947edb75c74ba292ff4ea10cbb473c607070c. Work exclusively in isolated /tmp snapshot/install/cache outside repository ancestry; do not modify shared worktrees. Public0.3.3 lacked bin and bunx could not determine executable;0.3.4must fix actual packed package.",
     "Build/install according to existing development/release scripts and frozen dependencies using env. Package archive from intended publication package, install freshly, invoke bin help/version and bunx tarball if supported, run non-mutating setup/help parsing for harnesses currently supported. Verify emitted bin target executable/file exists, packaging includes generated runtime assets, internal CLI plain and public interactive separation. No real user setup or live provider requests, no npm publication.",
@@ -45,7 +45,41 @@
     "agentId": "/root/public_archive_smoke",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-14T00:37:26.800Z"
+    "startedAt": "2026-11-14T00:37:26.800Z",
+    "finishedAt": "2026-11-14T00:39:59.538Z"
+  },
+  "result": "status: done\nchecks:\n- git archive b8c947edb75c74ba292ff4ea10cbb473c607070c; reject enclosing Git root -> exit 0\n- bun install --frozen-lockfile --cache-dir <temp> -> exit 0\n- bunx --no-install mise run build -> exit 0\n- bun pm pack --destination <temp> from packages/integrations/pi/dist -> exit 0\n- npm install --ignore-scripts --legacy-peer-deps --no-audit --no-fund --cache <temp> --userconfig <temp> <archive> -> exit 0\n- installed holyagent --help; --version; setup --help with HOLYAGENT_HOST=pi and claude; internal scripts/holyagent --help -> exit 0\n- bunx <absolute-tarball> --help -> exit 1\n- bunx --ignore-scripts -p file:<absolute-tarball> holyagent --version and --help -> exit 0\nnotes:\n- Direct bunx tarball syntax failed with ENOENT; -p file: syntax succeeds from an empty directory. No publication, interactive setup, provider requests, full verify, or Codex setup exercised. Interactive separation verified statically, not in a TTY. Re-test if packaged source changes.\n- Logs and inventory: /tmp/holyagent-034-smoke.AxXDLg/; archive-paths.txt, hashes.txt, install.log, build.log, pack.log, npm-install.log, smoke.log, bunx-file.log, bunx-help.log, pi-help.log, claude-help.log.\nevidence:\n- Fresh packed public0.3.4 installs with a resolvable holyagent executable and help/version run successfully without invoking real setup: Fresh npm install resolves executable; help and 0.3.4 version exit 0; bunx -p file: help/version exit 0.\n- Archive contains required executable assets and smoke evidence uses isolated fresh installs with exact committed source identity: Commit b8c947edb75c74ba292ff4ea10cbb473c607070c; tree ff339746c8b3c3757b74e462734c4c52b393dc43; archive 142 files including executable public and internal scripts, setup-tui, just-bash, extension, families and guidance.\n- checks-run: Frozen install, build, pack, fresh npm installation, executable help/version, Pi/Claude host setup help, internal help and bunx file package selector passed.\n- archive-identity: source tar SHA256 77e184c0b973562507c1c30e2dfc8d51b9b7bcfb4284f13a201b5708db36431a; package SHA256 10816ff7100df0c6f044ab10814c67c6362e54f9984d88dcc4f1f734b564e47e; installed public script SHA256 7f161fb03306f60363fa83769f24071995d076f77eccd2fbbc1ae6ac7ee42b16.\n- failures: bunx <absolute-tarball> --help exits 1: error: ENOENT extracting tarball from @/tmp/holyagent-034-smoke.AxXDLg/pack/holyagent-0.3.4.tgz. Package-selector file: form succeeds.\n- remaining-release-blockers: None found within archive smoke scope; full verification and interactive behavior not assessed.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Fresh isolated npm archive installation and bunx package selector resolve bin/help/version from exactb8c947e source with inventory/hash evidence. Direct tarball shorthand is unsupported; final integrated archive identity remains required after source integration.",
+    "criteria": [
+      {
+        "criterion": "Fresh packed public0.3.4 installs with a resolvable holyagent executable and help/version run successfully without invoking real setup",
+        "support": "Fresh npm install resolves executable; help and 0.3.4 version exit 0; bunx -p file: help/version exit 0."
+      },
+      {
+        "criterion": "Archive contains required executable assets and smoke evidence uses isolated fresh installs with exact committed source identity",
+        "support": "Commit b8c947edb75c74ba292ff4ea10cbb473c607070c; tree ff339746c8b3c3757b74e462734c4c52b393dc43; archive 142 files including executable public and internal scripts, setup-tui, just-bash, extension, families and guidance."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Frozen install, build, pack, fresh npm installation, executable help/version, Pi/Claude host setup help, internal help and bunx file package selector passed."
+      },
+      {
+        "label": "archive-identity",
+        "support": "source tar SHA256 77e184c0b973562507c1c30e2dfc8d51b9b7bcfb4284f13a201b5708db36431a; package SHA256 10816ff7100df0c6f044ab10814c67c6362e54f9984d88dcc4f1f734b564e47e; installed public script SHA256 7f161fb03306f60363fa83769f24071995d076f77eccd2fbbc1ae6ac7ee42b16."
+      },
+      {
+        "label": "failures",
+        "support": "bunx <absolute-tarball> --help exits 1: error: ENOENT extracting tarball from @/tmp/holyagent-034-smoke.AxXDLg/pack/holyagent-0.3.4.tgz. Package-selector file: form succeeds."
+      },
+      {
+        "label": "remaining-release-blockers",
+        "support": "None found within archive smoke scope; full verification and interactive behavior not assessed."
+      }
+    ]
   },
   "createdAt": "2026-11-14T00:37:26.800Z"
 }
