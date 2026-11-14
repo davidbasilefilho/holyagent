@@ -45,6 +45,7 @@
     "assignment-0mwfocaa8-dvqh"
   ],
   "specialist": {
+    "agentId": "/root/final_bcf_code_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-14T01:04:05.992Z"
