@@ -1,7 +1,7 @@
 import { expect, spyOn, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -321,4 +321,42 @@ test("source edit during asynchronous authorization is retained", async () =>
     )
     expect(result.retained.map((item) => item.path)).toEqual(["record"])
     expect(await readFile(path, "utf8")).toBe("user edit")
+  }))
+
+test("detached cleanup preserves a replacement at its old temporary pathname", async () =>
+  fixture(async (root) => {
+    const proto = await prototype(root)
+    const original = Object.getOwnPropertyDescriptor(proto, "sync")!.value as typeof proto.sync
+    const blocked = gate()
+    const finished = gate()
+    const spy = spyOn(proto, "sync").mockImplementation(async function (this: typeof proto) {
+      blocked.signal()
+      await blocked.wait
+      try {
+        return await original.call(this)
+      } finally {
+        finished.signal()
+      }
+    })
+    try {
+      const fiber = Effect.runFork(
+        publishMigrationFiles({ root, files: [postimage], authorize: Effect.void }),
+      )
+      await blocked.entered
+      await Effect.runPromise(Fiber.interrupt(fiber))
+      const name = (await readdir(root)).find((value) => value.startsWith(".holyagent-migration-"))
+      if (name === undefined) throw new Error("temporary was not created")
+      const temporary = join(root, name)
+      await rename(temporary, join(root, "saved"))
+      await writeFile(temporary, "user replacement")
+      blocked.release()
+      await finished.entered
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(await readFile(temporary, "utf8")).toBe("user replacement")
+      expect(await readFile(join(root, "saved"), "utf8")).toBe("new")
+      expect((await readdir(root)).includes("record")).toBe(false)
+    } finally {
+      blocked.release()
+      spy.mockRestore()
+    }
   }))

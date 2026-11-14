@@ -1434,9 +1434,12 @@ export const resolveState = <E = never>(
   online: boolean = true,
   patience?: Patience,
   authorize: Effect.Effect<void, E> = Effect.void,
-  terminalAuthorize: () => boolean = () => authorize === Effect.void,
+  terminalAuthorize?: () => boolean,
 ) =>
   Effect.gen(function* () {
+    if (ensure !== "peek" && authorize !== Effect.void && typeof terminalAuthorize !== "function")
+      return yield* new StateIo({ path: cwd, cause: "terminal migration authority is required" })
+    const guard = typeof terminalAuthorize === "function" ? terminalAuthorize : () => true
     const repository = yield* locate(cwd, env)
     if (repository === undefined)
       return { root: cwd, directory: stateDirectory(cwd) } satisfies StateTree
@@ -1532,7 +1535,7 @@ export const resolveState = <E = never>(
                 branch,
                 patience,
                 authorize,
-                terminalAuthorize,
+                guard,
               )
             return
           }
@@ -1607,7 +1610,7 @@ export const resolveState = <E = never>(
               branch,
               patience,
               authorize,
-              terminalAuthorize,
+              guard,
             )
           }
           for (const source of candidates)
@@ -1619,9 +1622,9 @@ export const resolveState = <E = never>(
               branch,
               patience,
               authorize,
-              terminalAuthorize,
+              guard,
             )
-          yield* finishMigrationSweep(common, branch, authorize, terminalAuthorize)
+          yield* finishMigrationSweep(common, branch, authorize, guard)
         }),
         patience,
         authorize,

@@ -175,6 +175,8 @@ export const publishMigrationFiles = <E, R>(options: {
   readonly terminalAuthorize?: () => boolean
 }) =>
   Effect.gen(function* () {
+    if (typeof options.terminalAuthorize !== "function" && options.authorize !== Effect.void)
+      return yield* fail(options.root, "terminal migration authority is required")
     const files = yield* operation(options.root, () =>
       Promise.resolve().then(() => validateFiles(options.root, options.files)),
     )
@@ -216,14 +218,15 @@ export const publishMigrationFiles = <E, R>(options: {
       yield* operation(path, () => recheck(checked, path))
       const temporary = join(dirname(path), `.holyagent-migration-${randomUUID()}.tmp`)
       // Preparation can outlive interruption. Its finalizer schedules cleanup after it settles.
-      let created = false
+      let identity: { dev: number; ino: number } | undefined
       yield* Effect.acquireUseRelease(
         Effect.sync(() => {
           const preparation = (async () => {
             terminal(path, options.authorize, options.terminalAuthorize)
             const handle = await open(temporary, "wx", file.mode & 0o777)
-            created = true
             try {
+              const info = await handle.stat()
+              identity = { dev: info.dev, ino: info.ino }
               await handle.writeFile(Buffer.from(file.content, "base64"))
               if (process.platform !== "win32") await handle.chmod(file.mode & 0o777)
               await handle.sync()
@@ -261,7 +264,14 @@ export const publishMigrationFiles = <E, R>(options: {
             void preparation
               .catch(() => {})
               .then(async () => {
-                if (created) await rm(temporary, { force: true }).catch(() => {})
+                if (identity === undefined) return
+                const current = await infoOrMissing(temporary).catch(() => undefined)
+                if (
+                  current?.isFile() &&
+                  !current.isSymbolicLink() &&
+                  sameIdentity(identity, current)
+                )
+                  await rm(temporary, { force: true }).catch(() => {})
               })
           }),
       )
@@ -281,6 +291,8 @@ export const cleanupMigrationSources = <E, R, E2 = never, R2 = never>(options: {
   readonly isTracked?: (path: string) => Effect.Effect<boolean, E2, R2>
 }) =>
   Effect.gen(function* () {
+    if (typeof options.terminalAuthorize !== "function" && options.authorize !== Effect.void)
+      return yield* fail(options.root, "terminal migration authority is required")
     const source = yield* operation(options.root, () =>
       Promise.resolve().then(() => validateSources(options.root, options.source)),
     )

@@ -423,3 +423,41 @@ test("terminal sweep authority retains the marker after revocation", async () =>
     await f.close()
   }
 })
+
+test("missing custom terminal guard fails before state setup and leaves peek read-only", async () => {
+  const f = await fixture(false)
+  try {
+    await f.source(f.root, "first")
+    const before = f.git("for-each-ref", "--format=%(refname):%(objectname)")
+    const authorize = Effect.sync(() => {})
+    expect(
+      (await Effect.runPromiseExit(resolveState(f.root, f.env, "peek", true, undefined, authorize)))
+        ._tag,
+    ).toBe("Success")
+    expect(
+      (
+        await Effect.runPromiseExit(
+          resolveState(f.root, f.env, "create", true, undefined, authorize),
+        )
+      )._tag,
+    ).toBe("Failure")
+    const malformed = null as unknown as () => boolean
+    expect(
+      (
+        await Effect.runPromiseExit(
+          resolveState(f.root, f.env, "create", true, undefined, authorize, malformed),
+        )
+      )._tag,
+    ).toBe("Failure")
+    expect(f.git("for-each-ref", "--format=%(refname):%(objectname)")).toBe(before)
+    expect(
+      await Bun.file(join(f.root, ".git", "holyagent", "migration", "journal.json")).exists(),
+    ).toBe(false)
+    expect(await readdir(join(f.root, ".git", "holyagent")).catch(() => [])).toEqual([])
+    expect(await readFile(join(f.root, ".holyagent", "first"), "utf8")).toBe("first")
+    const state = await Effect.runPromise(resolveState(f.root, f.env, "create"))
+    expect(await readFile(join(state.directory, "first"), "utf8")).toBe("first")
+  } finally {
+    await f.close()
+  }
+})

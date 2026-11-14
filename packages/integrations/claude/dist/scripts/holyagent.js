@@ -11141,6 +11141,8 @@ var terminal = (path, authorize, guard) => {
 };
 var matchesMode = (mode, expected) => process.platform === "win32" || (mode & 73) === (expected & 73);
 var publishMigrationFiles = (options) => gen2(function* () {
+  if (typeof options.terminalAuthorize !== "function" && options.authorize !== void_3)
+    return yield* fail6(options.root, "terminal migration authority is required");
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
   for (const file of files) {
     const path = join4(options.root, file.path);
@@ -11174,13 +11176,14 @@ var publishMigrationFiles = (options) => gen2(function* () {
     yield* options.authorize;
     yield* operation2(path, () => recheck(checked, path));
     const temporary = join4(dirname4(path), `.holyagent-migration-${randomUUID()}.tmp`);
-    let created = false;
+    let identity;
     yield* acquireUseRelease2(sync2(() => {
       const preparation = (async () => {
         terminal(path, options.authorize, options.terminalAuthorize);
         const handle = await open3(temporary, "wx", file.mode & 511);
-        created = true;
         try {
+          const info = await handle.stat();
+          identity = { dev: info.dev, ino: info.ino };
           await handle.writeFile(Buffer.from(file.content, "base64"));
           if (process.platform !== "win32")
             await handle.chmod(file.mode & 511);
@@ -11206,13 +11209,20 @@ var publishMigrationFiles = (options) => gen2(function* () {
       }).pipe(uninterruptible2);
     }), (preparation) => sync2(() => {
       preparation.catch(() => {}).then(async () => {
-        if (created)
+        if (identity === undefined)
+          return;
+        const current = await infoOrMissing(temporary).catch(() => {
+          return;
+        });
+        if (current?.isFile() && !current.isSymbolicLink() && sameIdentity(identity, current))
           await rm4(temporary, { force: true }).catch(() => {});
       });
     }));
   }
 });
 var cleanupMigrationSources = (options) => gen2(function* () {
+  if (typeof options.terminalAuthorize !== "function" && options.authorize !== void_3)
+    return yield* fail6(options.root, "terminal migration authority is required");
   const source = yield* operation2(options.root, () => Promise.resolve().then(() => validateSources(options.root, options.source)));
   const removed = [];
   const retained = [];
@@ -12387,7 +12397,10 @@ var migrationReadCheckpoint = (cwd, env, branch) => gen2(function* () {
   yield* requireComplete;
   return { common: repository.common, head: ref.code === 0 ? ref.stdout.trim() : null };
 });
-var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_3, terminalAuthorize = () => authorize === void_3) => gen2(function* () {
+var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_3, terminalAuthorize) => gen2(function* () {
+  if (ensure !== "peek" && authorize !== void_3 && typeof terminalAuthorize !== "function")
+    return yield* new StateIo({ path: cwd, cause: "terminal migration authority is required" });
+  const guard = typeof terminalAuthorize === "function" ? terminalAuthorize : () => true;
   const repository = yield* locate(cwd, env);
   if (repository === undefined)
     return { root: cwd, directory: stateDirectory(cwd) };
@@ -12442,7 +12455,7 @@ var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_
       if (!pending && !sweeping) {
         const source = yield* io(top, () => realpath3(top));
         if (source !== targetRoot)
-          yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize, terminalAuthorize);
+          yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize, guard);
         return;
       }
       const sweepPath = migrationSweepPath(common, branch);
@@ -12508,11 +12521,11 @@ var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_
             path: migrationJournalPath(common),
             cause: "migration journal does not match a registered worktree of this clone; inspect it before recovery"
           });
-        yield* migrateWorkTree(recorded, common, worktree, env, branch, patience, authorize, terminalAuthorize);
+        yield* migrateWorkTree(recorded, common, worktree, env, branch, patience, authorize, guard);
       }
       for (const source of candidates)
-        yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize, terminalAuthorize);
-      yield* finishMigrationSweep(common, branch, authorize, terminalAuthorize);
+        yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize, guard);
+      yield* finishMigrationSweep(common, branch, authorize, guard);
     }), patience, authorize);
   }
   return { root: top, directory, resolved };
