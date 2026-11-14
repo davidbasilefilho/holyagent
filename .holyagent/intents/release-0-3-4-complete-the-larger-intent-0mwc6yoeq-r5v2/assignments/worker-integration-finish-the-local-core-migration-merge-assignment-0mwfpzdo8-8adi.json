@@ -67,5 +67,41 @@
     "finishedAt": "2026-11-14T01:29:37.593Z"
   },
   "result": "status: done\nchanged:\n- docs/core-api.md\n- packages/core/src/api/context.ts\n- packages/core/src/state/local.ts\n- packages/core/src/state/lock.ts\n- packages/core/src/state/migration-files.test.ts\n- packages/core/src/state/migration-files.ts\n- packages/core/src/state/migration-index.ts\n- packages/core/src/state/migration-journal.ts\n- packages/core/src/state/migration-runner.ts\n- packages/core/src/state/migration-worktrees.test.ts\n- packages/core/src/state/store.ts\n- packages/core/src/state/tree.ts\n- packages/core/tests/migration-files.test.ts\n- packages/core/tests/migration-index.test.ts\n- packages/core/tests/migration-journal.test.ts\n- packages/core/tests/migration-runner.test.ts\n- packages/core/tests/revocation.test.ts\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent-public.js\n- packages/integrations/pi/dist/scripts/holyagent.js\n- packages/runtime/tests/state-branch.test.ts\nchecks:\n- new guard regression before repair -> exit 1\n- new guard regression after repair -> exit 0\n- bunx --no-install mise run build -> exit 0\n- bunx --no-install mise run check -> exit 0\n- bunx --no-install mise run lint -> exit 0\n- bunx --no-install mise run fmt:check -> exit 0\n- focused migration/native Node/routing/wait/alias/CLI tests -> exit 0\n- git diff --check first parent -> exit 0\n- git apply --check on extracted first parent -> exit 0\n- python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify -> exit 0\nnotes:\n- No manual Git index, config or real repository-state writes; isolated fixtures create their own temporary repositories. No live Pi, provider, account or paid-model operations. Archive/bin smoke is deferred until the root commits.\n- evidence: Merged source preserves host Core native routing guidance and migration contracts with generated bundles rebuilt from source (behavior): Core context retains host capability union, injectable FileSystem ports, initialization/terminal checks and migration read fences; four generated conflicts rebuilt without markers. Explicit invalid or denied terminal guards never default to trusted authority or mutate setup while absent trusted defaults and pure reads remain compatible (regressions): Real isolated Git and file tests cover explicit undefined/null/nonfunctions, nontrue/throwing guards, missing custom guard, denied initial authority, trusted default and peek; no ref, journal or source mutation. Complete aggregate build static focused Node and supervised verification gates pass with observed exit status (tests): Build, static checks and 557 focused tests pass; supervised aggregate 3675 pass, 2 environment skips, 0 fail; captured exit file is 0. checks-run: Guard red exit 1 and green exit 0; build, check, lint, format, focused and supervised verify exit 0. Logs final-034-*.log. changed-paths: 22 changes against first parent, including merged source and rebuilt bundles: /workspace/work/034/final-034-aggregate-integration-paths.txt. Index remains unmerged for root. diff-file: /workspace/work/034/final-034-aggregate-integration-incremental.diff; apply-check exit 0 against extracted first parent. source-parents: 099a597d22ab3d719f849b4b9c701595c4a92213 + f544e6c88270bb8ffc97f236a484c10343d5ce9d; noncommitted merge, no commit made.\nevidence:\n- Merged source preserves host Core native routing guidance and migration contracts with generated bundles rebuilt from source (behavior): Core context retains host capability union, injectable FileSystem ports, initialization/terminal checks and migration read fences; four generated conflicts rebuilt without markers.\n- Explicit invalid or denied terminal guards never default to trusted authority or mutate setup while absent trusted defaults and pure reads remain compatible (regressions): Real isolated Git and file tests cover explicit undefined/null/nonfunctions, nontrue/throwing guards, missing custom guard, denied initial authority, trusted default and peek; no ref, journal or source mutation.\n- Complete aggregate build static focused Node and supervised verification gates pass with observed exit status (tests): Build, static checks and 557 focused tests pass; supervised aggregate 3675 pass, 2 environment skips, 0 fail; captured exit file is 0.\n- checks-run: Guard red exit 1 and green exit 0; build, check, lint, format, focused and supervised verify exit 0. Logs final-034-*.log.\n- changed-paths: 22 changes against first parent, including merged source and rebuilt bundles: /workspace/work/034/final-034-aggregate-integration-paths.txt. Index remains unmerged for root.\n- diff-file: /workspace/work/034/final-034-aggregate-integration-incremental.diff; apply-check exit 0 against extracted first parent.\n- source-parents: 099a597d22ab3d719f849b4b9c701595c4a92213 + f544e6c88270bb8ffc97f236a484c10343d5ce9d; noncommitted merge, no commit made.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Exact765aa8b committed merge passed fullaggregate3675tests2skip exit0, independent code/security merge reviews accepted, guardtestsred→green and isolated144filearchive/rebuildbyte-equivalence accepted. Required merge contracts and observed gates hold.",
+    "criteria": [
+      {
+        "criterion": "Merged source preserves host Core native routing guidance and migration contracts with generated bundles rebuilt from source",
+        "support": "Core context retains host capability union, injectable FileSystem ports, initialization/terminal checks and migration read fences; four generated conflicts rebuilt without markers."
+      },
+      {
+        "criterion": "Explicit invalid or denied terminal guards never default to trusted authority or mutate setup while absent trusted defaults and pure reads remain compatible",
+        "support": "Real isolated Git and file tests cover explicit undefined/null/nonfunctions, nontrue/throwing guards, missing custom guard, denied initial authority, trusted default and peek; no ref, journal or source mutation."
+      },
+      {
+        "criterion": "Complete aggregate build static focused Node and supervised verification gates pass with observed exit status",
+        "support": "Build, static checks and 557 focused tests pass; supervised aggregate 3675 pass, 2 environment skips, 0 fail; captured exit file is 0."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Guard red exit 1 and green exit 0; build, check, lint, format, focused and supervised verify exit 0. Logs final-034-*.log."
+      },
+      {
+        "label": "changed-paths",
+        "support": "22 changes against first parent, including merged source and rebuilt bundles: /workspace/work/034/final-034-aggregate-integration-paths.txt. Index remains unmerged for root."
+      },
+      {
+        "label": "diff-file",
+        "support": "/workspace/work/034/final-034-aggregate-integration-incremental.diff; apply-check exit 0 against extracted first parent."
+      },
+      {
+        "label": "source-parents",
+        "support": "099a597d22ab3d719f849b4b9c701595c4a92213 + f544e6c88270bb8ffc97f236a484c10343d5ce9d; noncommitted merge, no commit made."
+      }
+    ]
+  },
   "createdAt": "2026-11-14T01:21:18.584Z"
 }
