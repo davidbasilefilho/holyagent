@@ -71,7 +71,6 @@ export const codexSettings = (config: Config): CodexSettings | undefined => {
     contextManagement: contextManagementOn(config),
     lunaReserve: config.pi.features.lunaReserve,
     applyPatchAgents: RoleTask.literals.flatMap((roleTask) =>
-      (config.pi.routes[roleTask].provider ?? config.pi.provider) === "openai-codex" &&
       toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL)
         ? [
             agentFor(routeFor(roleTask), false),

@@ -80,6 +80,14 @@ import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { familyAgentPrompt, familySkillPaths } from "./families.ts"
 import { registerNativeTools } from "./native-tools.ts"
 import {
+  checkProfileLaunch,
+  currentProfileRouting,
+  currentUserDisabled,
+  isManagedProfileAgent,
+  refuseProfileLaunch,
+} from "./profile-gate.ts"
+export { refuseProfileLaunch } from "./profile-gate.ts"
+import {
   isScreenAgent,
   refuseT3PreviewOutsideT3,
   registerScreenServers,
@@ -646,48 +654,6 @@ const settingsFor = (
         }
       : {}),
   }
-}
-
-/** Refuse fuzzy provider fallback on profile launches; workflows lack a per-child veto. */
-export const refuseProfileLaunch = (
-  event: { readonly toolName: string; readonly input: Readonly<Record<string, unknown>> },
-  active: boolean,
-  registry:
-    | {
-        readonly getAvailable: () => ReadonlyArray<{
-          readonly provider: string
-          readonly id: string
-        }>
-      }
-    | undefined,
-): ToolCallEventResult | undefined => {
-  if (!active) return undefined
-  if (event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow")
-    return {
-      block: true,
-      reason:
-        "Profile routing requires direct Agent calls: this workflow host may substitute a different provider. Run plan and use its direct-agent fallback.",
-    }
-  if (event.toolName !== "Agent" && event.toolName !== "agent") return undefined
-  const model = event.input["model"]
-  if (typeof model !== "string" || !model.includes("/"))
-    return {
-      block: true,
-      reason:
-        "Profile routing requires the exact provider/model from assignment dispatch; no inherited or fuzzy model is allowed.",
-    }
-  const slash = model.indexOf("/")
-  const provider = model.slice(0, slash)
-  const id = model.slice(slash + 1)
-  const available = Effect.runSync(
-    Effect.try(() => registry?.getAvailable()).pipe(Effect.orElseSucceed(() => undefined)),
-  )
-  if (!available?.some((entry) => entry.provider === provider && entry.id === id))
-    return {
-      block: true,
-      reason: `Exact model ${model} is not available with configured authentication. Check the provider, model and login; entitlement remains unverified.`,
-    }
-  return undefined
 }
 
 /**
@@ -1811,40 +1777,76 @@ export const createExtension =
 
     // The gates stand down only for the user's own `pi.enable: false`; a project's cannot lift them,
     // nor take an exclusion away. The root's excluded tools are refused first, whatever else the call is.
-    pi.on("tool_call", (event, ctx) =>
-      held?.gatesOff === true
-        ? undefined
-        : ((held?.profileRouting === true
-            ? refuseProfileLaunch(
-                event,
-                true,
-                event.toolName === "Agent" || event.toolName === "agent"
-                  ? Effect.runSync(
-                      Effect.try(() => ctx.modelRegistry).pipe(
-                        Effect.orElseSucceed(() => undefined),
-                      ),
-                    )
-                  : undefined,
-              )
-            : undefined) ??
-          refuseExcludedTool(event, held?.excluded ?? []) ??
-          (isChild()
-            ? (refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ??
-              refusePrematureWebFallback(
-                event,
-                held?.webMode,
-                pi.getAllTools().map(({ name }) => name),
-                pi.getActiveTools(),
-              ))
-            : undefined) ??
-          (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
-          refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ??
-          Effect.runPromise(
-            refuseNonSpecialistWorkflow(event).pipe(
-              Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),
-            ),
-          )),
-    )
+    pi.on("tool_call", (event, ctx) => {
+      const gate = () =>
+        refuseExcludedTool(event, held?.excluded ?? []) ??
+        (isChild()
+          ? (refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ??
+            refusePrematureWebFallback(
+              event,
+              held?.webMode,
+              pi.getAllTools().map(({ name }) => name),
+              pi.getActiveTools(),
+            ))
+          : undefined) ??
+        (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
+        refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ??
+        Effect.runPromise(
+          Effect.gen(function* () {
+            const agent = event.toolName === "Agent" || event.toolName === "agent"
+            const workflow =
+              event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow"
+            const type = agent ? event.input["subagent_type"] : undefined
+            const managed = agent && isManagedProfileAgent(type)
+            const resume =
+              agent && typeof event.input["resume"] === "string" && event.input["resume"] !== ""
+            const current =
+              managed || workflow || resume ? yield* currentProfileRouting(ctx.cwd, env) : false
+            if (current === undefined && held?.profileRouting !== true)
+              return {
+                block: true,
+                reason:
+                  "Current routing configuration is unavailable. Restore it and redispatch the Assignment.",
+              } satisfies ToolCallEventResult
+            const active = current ?? held?.profileRouting ?? false
+            const registry =
+              active && agent
+                ? yield* Effect.try(() => ctx.modelRegistry).pipe(
+                    Effect.orElseSucceed(() => undefined),
+                  )
+                : undefined
+            const refusal = refuseProfileLaunch(event, active, registry)
+            if (refusal !== undefined) return refusal
+            if (active && managed) {
+              const reason = yield* checkProfileLaunch(event.input, ctx.cwd, env)
+              if (reason !== undefined) return { block: true, reason } satisfies ToolCallEventResult
+            }
+            return refuseNonSpecialist(event) ?? (yield* refuseNonSpecialistWorkflow(event))
+          }),
+        )
+      const agent = event.toolName === "Agent" || event.toolName === "agent"
+      const managed = agent && isManagedProfileAgent(event.input["subagent_type"])
+      const resume =
+        agent && typeof event.input["resume"] === "string" && event.input["resume"] !== ""
+      const workflow =
+        event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow"
+      if (!managed && !resume && !workflow) return held?.gatesOff === true ? undefined : gate()
+      return Effect.runPromise(
+        currentUserDisabled(env).pipe(
+          Effect.flatMap((disabled): Effect.Effect<ToolCallEventResult | undefined> =>
+            disabled === true
+              ? Effect.succeed(undefined)
+              : disabled === false
+                ? Effect.promise(() => Promise.resolve(gate()))
+                : Effect.succeed({
+                    block: true,
+                    reason:
+                      "Current user configuration is unavailable. Restore it and redispatch the Assignment.",
+                  } satisfies ToolCallEventResult),
+          ),
+        ),
+      )
+    })
 
     // Pi finishes the shutdown when the handler's promise settles, and the folder may be removed
     // then: it settles only after every child has exited or its stop grace (STOP_GRACE_MS, 2 s,

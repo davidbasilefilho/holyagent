@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
-import { chmod, mkdir, mkdtemp } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -11,6 +12,7 @@ import type {
   ToolRendererResolver,
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent"
+import { assignment, intent, makeContext } from "@holyagent/core"
 import { Effect, Exit, Schema } from "effect"
 
 import { PLUGIN_NAMESPACE } from "../../../runtime/src/cli/assignment.ts"
@@ -2341,27 +2343,33 @@ describe("the Agent tool", () => {
   })
 
   test("the tool_call handler blocks, and leaves model and thinking as given", async () => {
-    const api = fakeApi(healthy("/missing"))
-    createExtension({
-      packageRoot: PACKAGE_ROOT,
-      env: {},
-      platform: "linux",
-      bunSearch: BUN_SEARCH,
-    })(api.pi)
-    const input = {
-      subagent_type: "reviewer-code",
-      model: "kimi-coding/kimi-k3.1",
-      thinking: "high",
-      prompt: "x",
+    const cwd = await mkdtemp(join(tmpdir(), "holyagent-legacy-gate-"))
+    expect(spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+    try {
+      const api = fakeApi(healthy("/missing"), undefined, cwd)
+      createExtension({
+        packageRoot: PACKAGE_ROOT,
+        env: { HOME: cwd },
+        platform: "linux",
+        bunSearch: BUN_SEARCH,
+      })(api.pi)
+      const input = {
+        subagent_type: "reviewer-code",
+        model: "kimi-coding/kimi-k3.1",
+        thinking: "high",
+        prompt: "x",
+      }
+      const before = structuredClone(input)
+      expect(await api.emit("tool_call", { toolName: AGENT_TOOL, input })).toEqual([undefined])
+      expect(input).toEqual(before)
+      const blocked = await api.emit("tool_call", {
+        toolName: AGENT_TOOL,
+        input: { ...input, subagent_type: "general-purpose" },
+      })
+      expect(blocked).toEqual([expect.objectContaining({ block: true })])
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
     }
-    const before = structuredClone(input)
-    expect(await api.emit("tool_call", { toolName: AGENT_TOOL, input })).toEqual([undefined])
-    expect(input).toEqual(before)
-    const blocked = await api.emit("tool_call", {
-      toolName: AGENT_TOOL,
-      input: { ...input, subagent_type: "general-purpose" },
-    })
-    expect(blocked).toEqual([expect.objectContaining({ block: true })])
   })
 })
 
@@ -2475,26 +2483,32 @@ describe("the SubagentWorkflow tool", () => {
   })
 
   test("the tool_call handler blocks without asking, and lets a specialist script through", async () => {
-    const api = fakeApi(healthy("/missing"))
-    createExtension({
-      packageRoot: PACKAGE_ROOT,
-      env: {},
-      platform: "linux",
-      bunSearch: BUN_SEARCH,
-    })(api.pi)
-    expect(
-      await api.emit("tool_call", {
+    const cwd = await mkdtemp(join(tmpdir(), "holyagent-legacy-gate-"))
+    expect(spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+    try {
+      const api = fakeApi(healthy("/missing"), undefined, cwd)
+      createExtension({
+        packageRoot: PACKAGE_ROOT,
+        env: { HOME: cwd },
+        platform: "linux",
+        bunSearch: BUN_SEARCH,
+      })(api.pi)
+      expect(
+        await api.emit("tool_call", {
+          toolName: WORKFLOW_TOOL,
+          input: { script: workflowScript("reviewer-code") },
+        }),
+      ).toEqual([undefined])
+      const [blocked] = await api.emit("tool_call", {
         toolName: WORKFLOW_TOOL,
-        input: { script: workflowScript("reviewer-code") },
-      }),
-    ).toEqual([undefined])
-    const [blocked] = await api.emit("tool_call", {
-      toolName: WORKFLOW_TOOL,
-      input: { script: workflowScript(undefined) },
-    })
-    expect(blocked).toMatchObject({ block: true })
-    expect(typeof (blocked as { reason: unknown }).reason).toBe("string")
-    expect(api.touched).toEqual([])
+        input: { script: workflowScript(undefined) },
+      })
+      expect(blocked).toMatchObject({ block: true })
+      expect(typeof (blocked as { reason: unknown }).reason).toBe("string")
+      expect(api.touched).toEqual([])
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
+    }
   })
 })
 
@@ -2504,9 +2518,26 @@ describe("the gates and pi.enable", () => {
     { toolName: WORKFLOW_TOOL, input: { script: workflowScript(undefined) } },
   ]
 
+  const withUserOff = async (use: (cwd: string) => Promise<void>) => {
+    const cwd = await mkdtemp(join(tmpdir(), "holyagent-user-off-"))
+    try {
+      expect(spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      await mkdir(join(cwd, ".holyagent"))
+      await writeFile(join(cwd, ".holyagent", "config.json"), DISABLED)
+      await use(cwd)
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
+    }
+  }
+
   test("with pi.enable off neither tool is refused", async () => {
-    const { api } = await run(healthy("/missing", { config: { stdout: `${DISABLED}\n` } }))
-    for (const event of refusing) expect(await api.emit("tool_call", event)).toEqual([undefined])
+    await withUserOff(async (cwd) => {
+      const { api } = await run(healthy("/missing", { config: { stdout: `${DISABLED}\n` } }), {
+        cwd,
+        env: { HOME: cwd },
+      })
+      for (const event of refusing) expect(await api.emit("tool_call", event)).toEqual([undefined])
+    })
   })
 
   test("with pi.enable on both tools are refused", async () => {
@@ -2528,10 +2559,14 @@ describe("the gates and pi.enable", () => {
   })
 
   test("pi.enable off in the user's config lifts the gates", async () => {
-    const { api } = await run((call, runtime) =>
-      runtime[0] === "config" ? { stdout: DISABLED } : healthy("/missing")(call, runtime),
-    )
-    for (const event of refusing) expect(await api.emit("tool_call", event)).toEqual([undefined])
+    await withUserOff(async (cwd) => {
+      const { api } = await run(
+        (call, runtime) =>
+          runtime[0] === "config" ? { stdout: DISABLED } : healthy("/missing")(call, runtime),
+        { cwd, env: { HOME: cwd } },
+      )
+      for (const event of refusing) expect(await api.emit("tool_call", event)).toEqual([undefined])
+    })
   })
 
   test("a user config that cannot be read leaves the gates on under a project that says off", async () => {
@@ -4460,7 +4495,12 @@ describe("profile routing host gate", () => {
       members: { modelRegistry: registry },
     })
     for (const tool of ["Agent", "agent"]) {
-      expect(await api.emit("tool_call", call(tool))).toEqual([undefined])
+      expect(await api.emit("tool_call", call(tool))).toEqual([
+        expect.objectContaining({
+          block: true,
+          reason: "The Agent prompt does not identify a dispatched Assignment. Redispatch it.",
+        }),
+      ])
       expect(await api.emit("tool_call", call(tool, "kimi-coding/gpt-6.1-sol"))).toEqual([
         expect.objectContaining({ block: true }),
       ])
@@ -4469,10 +4509,154 @@ describe("profile routing host gate", () => {
       expect(await api.emit("tool_call", { toolName, input: {} })).toEqual([
         expect.objectContaining({ block: true }),
       ])
-    const legacy = await run(healthy("/missing"))
-    expect(await legacy.api.emit("tool_call", call("Agent", "kimi-coding/gpt-6.1-sol"))).toEqual([
-      undefined,
-    ])
+    const legacyCwd = await mkdtemp(join(tmpdir(), "holyagent-legacy-profile-"))
+    try {
+      expect(spawnSync("git", ["-C", legacyCwd, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      const legacy = await run(healthy("/missing"), { cwd: legacyCwd, env: { HOME: legacyCwd } })
+      expect(await legacy.api.emit("tool_call", call("Agent", "kimi-coding/gpt-6.1-sol"))).toEqual([
+        undefined,
+      ])
+    } finally {
+      await rm(legacyCwd, { recursive: true, force: true })
+    }
+  })
+
+  test("a profile activated after session start binds launches to current Core state", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "holyagent-fresh-profile-"))
+    try {
+      expect(spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      const env = { HOME: cwd }
+      const context = await Effect.runPromise(
+        makeContext({ cwd, env, host: "pi", authorize: () => true, deferRouting: true }),
+      )
+      await Effect.runPromise(intent.create(context, { objective: "fresh profile" }))
+      const { api } = await run(healthy(cwd), {
+        cwd,
+        env,
+        members: {
+          modelRegistry: {
+            getAvailable: () => [
+              { provider: "openai-codex", id: "gpt-6.1-terra" },
+              { provider: "openai-codex", id: "gpt-6.1-sol" },
+            ],
+          },
+        },
+      })
+      expect(await api.emit("tool_call", call("Agent"))).toEqual([undefined])
+      await writeFile(
+        join(cwd, ".holyagent", "config.json"),
+        JSON.stringify({ pi: { provider: "openai-codex", profile: "fast" } }),
+      )
+      expect(await api.emit("tool_call", call("Agent"))).toEqual([
+        expect.objectContaining({ block: true }),
+      ])
+      const started = await Effect.runPromise(
+        assignment.dispatch(context, {
+          roleTask: "Reviewer.testing",
+          objective: "fresh",
+          criteria: [{ text: "works", blocking: true, dimension: "behavior" }],
+        }),
+      )
+      const launch = started.assignment.specialist?.intendedLaunch
+      if (launch === undefined) throw new Error("profiled launch missing")
+      const input = {
+        prompt: started.prompt,
+        subagent_type: started.agent,
+        model: launch.model,
+        thinking: launch.effort,
+      }
+      expect(await api.emit("tool_call", { toolName: "Agent", input })).toEqual([undefined])
+      expect(
+        await api.emit("tool_call", {
+          toolName: "agent",
+          input: { ...input, model: "openai-codex/gpt-6.1-sol" },
+        }),
+      ).toEqual([expect.objectContaining({ block: true })])
+      expect(
+        await api.emit("tool_call", {
+          toolName: "agent",
+          input: { ...input, subagent_type: " REVIEWER-TESTING " },
+        }),
+      ).toEqual([expect.objectContaining({ block: true })])
+      await writeFile(join(cwd, ".holyagent", "config.json"), "{bad")
+      expect((await api.emit("tool_call", { toolName: "Agent", input }))[0]).toMatchObject({
+        block: true,
+        reason:
+          "Current user configuration is unavailable. Restore it and redispatch the Assignment.",
+      })
+      await writeFile(
+        join(cwd, ".holyagent", "config.json"),
+        JSON.stringify({ pi: { enable: false } }),
+      )
+      expect(
+        (
+          await api.emit("tool_call", { toolName: "Agent", input: { ...input, model: "wrong" } })
+        ).every((result) => result === undefined),
+      ).toBe(true)
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
+    }
+  })
+
+  test("user re-enablement activates a profile without waiting for recollection", async () => {
+    const root = await mkdtemp(join(tmpdir(), "holyagent-user-reenabled-"))
+    try {
+      expect(spawnSync("git", ["-C", root, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      const home = join(root, "home")
+      const cwd = join(root, "project")
+      await mkdir(join(home, ".holyagent"), { recursive: true })
+      await mkdir(cwd)
+      const config = join(home, ".holyagent", "config.json")
+      await writeFile(config, JSON.stringify({ pi: { enable: false } }))
+      const env = { HOME: home }
+      const context = await Effect.runPromise(
+        makeContext({ cwd, env, host: "pi", authorize: () => true, deferRouting: true }),
+      )
+      await Effect.runPromise(intent.create(context, { objective: "reenabled" }))
+      const { api } = await run(healthy(cwd, { config: { stdout: DISABLED } }), {
+        cwd,
+        env,
+        members: {
+          modelRegistry: {
+            getAvailable: () => [{ provider: "openai-codex", id: "gpt-6.1-terra" }],
+          },
+        },
+      })
+      expect(await api.emit("tool_call", call("Agent"))).toEqual([undefined])
+      await writeFile(
+        config,
+        JSON.stringify({ pi: { enable: true, provider: "openai-codex", profile: "fast" } }),
+      )
+      expect(await api.emit("tool_call", call("Agent"))).toEqual([
+        expect.objectContaining({ block: true }),
+      ])
+      const started = await Effect.runPromise(
+        assignment.dispatch(context, {
+          roleTask: "Reviewer.testing",
+          objective: "allowed",
+          criteria: [{ text: "works", blocking: true, dimension: "behavior" }],
+        }),
+      )
+      const launch = started.assignment.specialist?.intendedLaunch
+      if (launch === undefined) throw new Error("profiled launch missing")
+      const input = {
+        prompt: started.prompt,
+        subagent_type: started.agent,
+        model: launch.model,
+        thinking: launch.effort,
+      }
+      expect(await api.emit("tool_call", { toolName: "Agent", input })).toEqual([undefined])
+      await writeFile(config, "{bad")
+      expect(await api.emit("tool_call", { toolName: "Agent", input })).toEqual([
+        expect.objectContaining({
+          block: true,
+          reason:
+            "Current user configuration is unavailable. Restore it and redispatch the Assignment.",
+        }),
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   test("explicit profile stays fail-closed if configuration cannot be read", async () => {

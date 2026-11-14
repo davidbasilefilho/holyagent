@@ -1,4 +1,4 @@
-import { constants } from "node:fs"
+import { constants, realpathSync } from "node:fs"
 import { delimiter, dirname, join, posix, win32 } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -113,12 +113,34 @@ const strictWhich = (
 ): string | null => {
   const windows = (strict.platform ?? process.platform) === "win32"
   const api = windows ? win32 : posix
+  if (!api.isAbsolute(strict.cwd)) return null
   const trusted = path
     .split(windows ? ";" : ":")
     .filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry))
-  const found = (strict.which ?? lookup)(command, { PATH: trusted.join(windows ? ";" : ":") })
-  if (found === null || isInside(api, strict.cwd, found)) return null
-  return windows && !found.toLowerCase().endsWith(".exe") ? null : found
+  if (trusted.length === 0) return null
+  const acceptable = (found: string | null): found is string => {
+    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found)) return false
+    if (windows && !found.toLowerCase().endsWith(".exe")) return false
+    // Injected lookups model non-native platform paths in tests. Real lookups must also reject
+    // aliases whose resolved executable lives inside the project or cannot be proven.
+    if (strict.which === undefined) {
+      try {
+        if (isInside(api, realpathSync(strict.cwd), realpathSync(found))) return false
+      } catch {
+        return false
+      }
+    }
+    return true
+  }
+  if (strict.which !== undefined) {
+    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") })
+    return acceptable(found) ? found : null
+  }
+  for (const directory of trusted) {
+    const found = lookup(command, { PATH: directory })
+    if (acceptable(found)) return found
+  }
+  return null
 }
 
 /**

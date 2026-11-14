@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -126,7 +127,7 @@ const CATALOG = [
 type Ran = Array<string>
 
 /** An extension on a stub Pi API that answers the wrapper's commands as a healthy install does. */
-const start = (directory: string, sessionName?: string) => {
+const start = (directory: string, sessionName?: string, cwd = "/work/project/src") => {
   const ran: Ran = []
   const handlers = new Map<string, Array<(event: object, ctx: ExtensionContext) => unknown>>()
   const answer = (command: string, args: ReadonlyArray<string>): Partial<ExecResult> => {
@@ -182,7 +183,7 @@ const start = (directory: string, sessionName?: string) => {
   }
   // Only `cwd` of the context is read; any other member, the TUI's `ui` included, fails the test.
   const context = new Proxy(
-    { cwd: "/work/project/src" },
+    { cwd },
     {
       get: (target, key) => {
         if (key === "cwd") return target.cwd
@@ -195,7 +196,7 @@ const start = (directory: string, sessionName?: string) => {
   // A POSIX machine, whatever the platform the tests run on.
   createExtension({
     packageRoot: PACKAGE_ROOT,
-    env: {},
+    env: { HOME: cwd },
     platform: "linux",
     bunSearch: BUN_SEARCH,
     coreServices: {
@@ -335,16 +336,19 @@ describe("the extension's handlers on the recorded extension events", () => {
       "call-bash": false,
     }
     expect([...calls.keys()].toSorted()).toEqual(Object.keys(expected).toSorted())
-    const { deliver } = start("/missing")
-    for (const [id, blocked] of Object.entries(expected)) {
-      const [result] = (await deliver(calls.get(id) ?? {})) as Array<
-        { block?: boolean; reason?: string } | undefined
-      >
-      if (blocked) {
-        expect(result?.block).toBe(true)
-        expect(typeof result?.reason).toBe("string")
-      } else expect(result).toBeUndefined()
-    }
+    await withDirectory(async (directory) => {
+      expect(spawnSync("git", ["-C", directory, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      const { deliver } = start(directory, undefined, directory)
+      for (const [id, blocked] of Object.entries(expected)) {
+        const [result] = (await deliver(calls.get(id) ?? {})) as Array<
+          { block?: boolean; reason?: string } | undefined
+        >
+        if (blocked) {
+          expect(result?.block).toBe(true)
+          expect(typeof result?.reason).toBe("string")
+        } else expect(result).toBeUndefined()
+      }
+    })
   })
 })
 

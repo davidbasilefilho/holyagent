@@ -12331,6 +12331,9 @@ var acceptanceFrom = (assignment, report, rationale, carryForward) => {
   });
 };
 var section2 = (heading, items) => items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `- ${item}`)];
+var PROMPT_LINE = /^Role: \S+ \(\S+\)\. Assignment: (assignment-[a-z0-9]+(?:-[a-z0-9]+)*)\.$/;
+var dispatchedAssignment = (prompt) => PROMPT_LINE.exec(prompt.split(`
+`, 1)[0] ?? "")?.[1];
 var SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine has a graphical session: you have computer use, browser use (the mcp__browse__* tools) and, where T3 hosts the session, T3's preview tools. Report a tool that is missing instead of working around it.";
 var HEADLESS_SCREEN_LINE = "Screen capability: this Assignment carries it, and this machine is headless: you have a headless browser (outside T3 the mcp__browser_use__browser_exec and mcp__browser_use__browser_screenshot tools, a temporary profile; where T3 hosts the session, T3's preview tools, and browser-use is not available) and no desktop, so computer use and the user's real browser are not available. Report a tool that is missing instead of working around it.";
 var renderPrompt = (assignment, agent) => [
@@ -13269,7 +13272,7 @@ var describeBrowseState = (state) => {
 import { existsSync as existsSync2, readdirSync as readdirSync2 } from "node:fs";
 import { posix as posix2, win32 as win322 } from "node:path";
 
-import { constants } from "node:fs";
+import { constants, realpathSync } from "node:fs";
 import { delimiter, dirname as dirname6, join as join12, posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13325,11 +13328,36 @@ var isInside = (api, parent, path) => {
 var strictWhich = (command, path, strict, lookup = which) => {
   const windows = (strict.platform ?? process.platform) === "win32";
   const api = windows ? win32 : posix;
-  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
-  const found = (strict.which ?? lookup)(command, { PATH: trusted.join(windows ? ";" : ":") });
-  if (found === null || isInside(api, strict.cwd, found))
+  if (!api.isAbsolute(strict.cwd))
     return null;
-  return windows && !found.toLowerCase().endsWith(".exe") ? null : found;
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
+  if (trusted.length === 0)
+    return null;
+  const acceptable = (found) => {
+    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
+      return false;
+    if (windows && !found.toLowerCase().endsWith(".exe"))
+      return false;
+    if (strict.which === undefined) {
+      try {
+        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
+          return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (strict.which !== undefined) {
+    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
+    return acceptable(found) ? found : null;
+  }
+  for (const directory of trusted) {
+    const found = lookup(command, { PATH: directory });
+    if (acceptable(found))
+      return found;
+  }
+  return null;
 };
 var findCommand = (env, command, options, lookup = which) => {
   const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
@@ -26272,7 +26300,7 @@ var PI_ROOT_PROMPTS = {
   "gpt-6": promptOf("gpt-6")
 };
 var PI_ROOT_PROMPT = PI_ROOT_PROMPTS["kimi-k3.1"];
-import { lstatSync, realpathSync } from "node:fs";
+import { lstatSync, realpathSync as realpathSync2 } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { posix as posix3, win32 as win323 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -26704,7 +26732,7 @@ var throughLinks = (path, host) => {
   const tail = [];
   let current = path;
   for (;; ) {
-    const real = probe(() => realpathSync(current));
+    const real = probe(() => realpathSync2(current));
     if (real.found)
       return paths.join(real.value, ...tail);
     if (real.code !== "ENOENT")
@@ -27546,7 +27574,7 @@ var codexSettings = (config) => {
     family: profile.family,
     contextManagement: contextManagementOn(config),
     lunaReserve: config.pi.features.lunaReserve,
-    applyPatchAgents: RoleTask.literals.flatMap((roleTask) => (config.pi.routes[roleTask].provider ?? config.pi.provider) === "openai-codex" && toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL) ? [
+    applyPatchAgents: RoleTask.literals.flatMap((roleTask) => toolArgs(config, roleTask, profile).tools.includes(APPLY_PATCH_TOOL) ? [
       agentFor(routeFor(roleTask), false),
       agentFor(routeFor(roleTask), true, "normal"),
       agentFor(routeFor(roleTask), true, "headless")
@@ -27974,6 +28002,89 @@ var SCREEN_SPECIALIST_NAMES = ROUTES.flatMap((route) => [
 ]);
 var AGENT_TYPES = [...SPECIALIST_NAMES, ...SCREEN_SPECIALIST_NAMES];
 
+var isManagedProfileAgent = (value) => typeof value === "string" && AGENT_TYPES.includes(value.trim().toLowerCase());
+var refuseProfileLaunch = (event, active, registry) => {
+  if (!active)
+    return;
+  if (event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow")
+    return {
+      block: true,
+      reason: "Profile routing requires direct Agent calls: this workflow host may substitute a different provider. Run plan and use its direct-agent fallback."
+    };
+  if (event.toolName !== "Agent" && event.toolName !== "agent")
+    return;
+  if (typeof event.input["resume"] === "string" && event.input["resume"] !== "")
+    return {
+      block: true,
+      reason: "Profile routing cannot verify a resumed Agent. Redispatch the Assignment."
+    };
+  if (!isManagedProfileAgent(event.input["subagent_type"]))
+    return;
+  const model = event.input["model"];
+  if (typeof model !== "string" || !model.includes("/"))
+    return {
+      block: true,
+      reason: "Profile routing requires the exact provider/model from assignment dispatch; no inherited or fuzzy model is allowed."
+    };
+  const slash = model.indexOf("/");
+  const provider = model.slice(0, slash);
+  const id = model.slice(slash + 1);
+  const available = runSync2(try_2(() => registry?.getAvailable()).pipe(orElseSucceed2(() => {
+    return;
+  })));
+  if (!available?.some((entry) => entry.provider === provider && entry.id === id))
+    return {
+      block: true,
+      reason: `Exact model ${model} is not available with configured authentication. Check the provider, model and login; entitlement remains unverified.`
+    };
+  return;
+};
+var currentUserDisabled = (env) => loadConfigWithSource({ projectDirectories: [], env }).pipe(map4(({ config }) => !config.pi.enable), catch_2(() => succeed6(undefined)));
+var currentProfileRouting = (cwd, env) => gen2(function* () {
+  if (env.HOLYAGENT_ROUTING_PROFILE?.trim())
+    return true;
+  const { root } = yield* resolveState(cwd, env, "peek", false);
+  const { config } = yield* loadConfigWithSource({
+    projectDirectories: [stateDirectory(root)],
+    env
+  });
+  return config.pi.profile !== undefined;
+}).pipe(catch_2(() => succeed6(undefined)));
+var checkProfileLaunch = (input, cwd, env) => gen2(function* () {
+  const prompt = input["prompt"];
+  const id = typeof prompt === "string" ? dispatchedAssignment(prompt) : undefined;
+  if (id === undefined)
+    return "The Agent prompt does not identify a dispatched Assignment. Redispatch it.";
+  const context = yield* makeContext({
+    cwd,
+    env,
+    host: "pi",
+    authorize: (capability) => capability === "assignment.show",
+    deferRouting: true
+  });
+  const found = yield* show(context, { id });
+  if (found.state !== "Running" || found.specialist?.intendedLaunch === undefined)
+    return "The Assignment has no current profiled dispatch. Redispatch it.";
+  const form = context.execution.screenForm;
+  if (input["subagent_type"] !== agentFor(routeFor(found.roleTask), found.screen, form))
+    return "The Agent role or screen capability does not match the current Assignment. Redispatch it.";
+  const { root } = yield* resolveState(cwd, env, "peek", false);
+  const { config, written } = yield* loadConfigWithSource({
+    projectDirectories: [stateDirectory(root)],
+    env
+  });
+  const raw = env.HOLYAGENT_ROUTING_PROFILE?.trim();
+  const profile = raw ? raw : config.pi.profile;
+  if (profile !== "normal" && profile !== "fast" || !config.pi.enable)
+    return "The current routing profile is unavailable. Redispatch the Assignment.";
+  const selected = selectConfiguredRoute(config, written, "pi", found.roleTask, found.screen === true, profile, new Date().toISOString());
+  const saved = found.specialist.intendedLaunch;
+  if (selected.error !== undefined || saved.host !== "pi" || saved.provider !== selected.provider || saved.model !== selected.model || saved.effort !== selected.effort || saved.profile !== selected.profile || saved.evidenceRevision !== selected.evidenceRevision)
+    return "The Assignment routing selection is stale or conflicts with current configuration. Redispatch it.";
+  if (input["model"] !== saved.model || input["thinking"] !== saved.effort)
+    return "The Agent model or thinking does not match the trusted Assignment selection. Redispatch it.";
+  return;
+}).pipe(catch_2(() => succeed6("Trusted Assignment routing state is unavailable. Redispatch the Assignment and retry.")));
 var isScreenAgent = (agent) => agent !== undefined && SCREEN_SPECIALIST_NAMES.includes(agent);
 var screenFormOf = (agent) => isHeadlessScreenAgent(agent) ? "headless" : "normal";
 var screenServers = (config, form) => config.pi.features.mcp ? enabledCapabilities(config.pi.features, { form, provider: config.pi.provider }).flatMap((capability) => formContent(capability, form)?.mcpServers ?? []) : [];
@@ -28195,35 +28306,6 @@ var settingsFor = (config, role, bound = [], form = "normal") => {
       }
     } : {}
   };
-};
-var refuseProfileLaunch = (event, active, registry) => {
-  if (!active)
-    return;
-  if (event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow")
-    return {
-      block: true,
-      reason: "Profile routing requires direct Agent calls: this workflow host may substitute a different provider. Run plan and use its direct-agent fallback."
-    };
-  if (event.toolName !== "Agent" && event.toolName !== "agent")
-    return;
-  const model = event.input["model"];
-  if (typeof model !== "string" || !model.includes("/"))
-    return {
-      block: true,
-      reason: "Profile routing requires the exact provider/model from assignment dispatch; no inherited or fuzzy model is allowed."
-    };
-  const slash = model.indexOf("/");
-  const provider = model.slice(0, slash);
-  const id = model.slice(slash + 1);
-  const available = runSync2(try_2(() => registry?.getAvailable()).pipe(orElseSucceed2(() => {
-    return;
-  })));
-  if (!available?.some((entry) => entry.provider === provider && entry.id === id))
-    return {
-      block: true,
-      reason: `Exact model ${model} is not available with configured authentication. Check the provider, model and login; entitlement remains unverified.`
-    };
-  return;
 };
 var refuseExcludedTool = (event, excluded) => excluded.some((pattern) => toolMatches(pattern, event.toolName)) ? {
   block: true,
@@ -28766,9 +28848,44 @@ ${event.systemPrompt}` : undefined;
     return message === undefined ? undefined : { message };
   });
   pi.registerToolRenderer(workflowRenderers);
-  pi.on("tool_call", (event, ctx) => held?.gatesOff === true ? undefined : (held?.profileRouting === true ? refuseProfileLaunch(event, true, event.toolName === "Agent" || event.toolName === "agent" ? runSync2(try_2(() => ctx.modelRegistry).pipe(orElseSucceed2(() => {
-    return;
-  }))) : undefined) : undefined) ?? refuseExcludedTool(event, held?.excluded ?? []) ?? (isChild() ? refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ?? refusePrematureWebFallback(event, held?.webMode, pi.getAllTools().map(({ name }) => name), pi.getActiveTools()) : undefined) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ?? runPromise2(refuseNonSpecialistWorkflow(event).pipe(map4((refusal) => refuseNonSpecialist(event) ?? refusal))));
+  pi.on("tool_call", (event, ctx) => {
+    const gate = () => refuseExcludedTool(event, held?.excluded ?? []) ?? (isChild() ? refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ?? refusePrematureWebFallback(event, held?.webMode, pi.getAllTools().map(({ name }) => name), pi.getActiveTools()) : undefined) ?? (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ?? refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ?? runPromise2(gen2(function* () {
+      const agent = event.toolName === "Agent" || event.toolName === "agent";
+      const workflow = event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow";
+      const type = agent ? event.input["subagent_type"] : undefined;
+      const managed = agent && isManagedProfileAgent(type);
+      const resume = agent && typeof event.input["resume"] === "string" && event.input["resume"] !== "";
+      const current = managed || workflow || resume ? yield* currentProfileRouting(ctx.cwd, env) : false;
+      if (current === undefined && held?.profileRouting !== true)
+        return {
+          block: true,
+          reason: "Current routing configuration is unavailable. Restore it and redispatch the Assignment."
+        };
+      const active = current ?? held?.profileRouting ?? false;
+      const registry = active && agent ? yield* try_2(() => ctx.modelRegistry).pipe(orElseSucceed2(() => {
+        return;
+      })) : undefined;
+      const refusal = refuseProfileLaunch(event, active, registry);
+      if (refusal !== undefined)
+        return refusal;
+      if (active && managed) {
+        const reason = yield* checkProfileLaunch(event.input, ctx.cwd, env);
+        if (reason !== undefined)
+          return { block: true, reason };
+      }
+      return refuseNonSpecialist(event) ?? (yield* refuseNonSpecialistWorkflow(event));
+    }));
+    const agent = event.toolName === "Agent" || event.toolName === "agent";
+    const managed = agent && isManagedProfileAgent(event.input["subagent_type"]);
+    const resume = agent && typeof event.input["resume"] === "string" && event.input["resume"] !== "";
+    const workflow = event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow";
+    if (!managed && !resume && !workflow)
+      return held?.gatesOff === true ? undefined : gate();
+    return runPromise2(currentUserDisabled(env).pipe(flatMap2((disabled) => disabled === true ? succeed6(undefined) : disabled === false ? promise2(() => Promise.resolve(gate())) : succeed6({
+      block: true,
+      reason: "Current user configuration is unavailable. Restore it and redispatch the Assignment."
+    }))));
+  });
   pi.on("session_shutdown", () => release());
   registerCodex(pi, {
     settings: () => held?.codex,
