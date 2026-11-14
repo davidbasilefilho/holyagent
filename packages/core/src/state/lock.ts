@@ -67,7 +67,7 @@ const putBack = (taken: string, file: string) =>
  * loses its lock; a plain read followed by a removal left that open for the whole gap between the
  * two. Never fails.
  */
-const breakIfStale = (file: string) =>
+const breakIfStale = <E, R>(file: string, authorize: Effect.Effect<void, E, R>) =>
   Effect.gen(function* () {
     const owner = yield* readOwner(file)
     const stale = owner
@@ -79,6 +79,7 @@ const breakIfStale = (file: string) =>
           )) >
         UNREADABLE_STALE_MS
     if (!stale) return
+    yield* authorize
     const taken = `${file}.stale-${crypto.randomUUID()}`
     const moved = yield* io(file, () => rename(file, taken)).pipe(
       Effect.as(true),
@@ -88,7 +89,7 @@ const breakIfStale = (file: string) =>
     const claimedMeanwhile = (yield* readOwner(taken))?.token !== owner?.token
     if (claimedMeanwhile) yield* putBack(taken, file)
     yield* io(taken, () => rm(taken, { force: true }))
-  }).pipe(Effect.ignore)
+  }).pipe(Effect.catchTag("StateIo", () => Effect.void))
 
 /**
  * Codes a create-exclusive open can fail with, besides EEXIST, while a lock file is in the way. On
@@ -126,7 +127,7 @@ const create = (
   )
 
 /** Creates the lock file, which must not exist yet. Resolves to the owner's token. */
-const claim = (file: string) =>
+const claim = <E, R>(file: string, authorize: Effect.Effect<void, E, R>) =>
   Effect.gen(function* () {
     const owner: LockOwner = {
       pid: process.pid,
@@ -134,6 +135,7 @@ const claim = (file: string) =>
       acquiredAt: yield* Clock.currentTimeMillis,
     }
     const content = yield* encodeJson(LockOwner, owner).pipe(Effect.orDie)
+    yield* authorize
     const handle = yield* create(file)
     // An empty lock would look unreadable until it ages out, so a failed write removes it.
     yield* io(file, () => handle.writeFile(content)).pipe(
@@ -203,19 +205,23 @@ const holderBusy = (file: string, limit: number) =>
     return owner === undefined || (yield* Clock.currentTimeMillis) - owner.acquiredAt < limit
   })
 
-const acquire = (file: string, patience: Patience) => {
+const acquire = <E, R>(file: string, patience: Patience, authorize: Effect.Effect<void, E, R>) => {
   const named = typeof patience === "string"
   const { delay, limit, stuck } = named ? WAITS[patience] : DEADLINE_WAIT
-  return claim(file).pipe(
+  return authorize.pipe(
+    Effect.andThen(claim(file, authorize)),
     Effect.catchTag("StateLocked", (locked) =>
-      breakIfStale(file).pipe(Effect.andThen(Effect.fail(locked))),
+      authorize.pipe(
+        Effect.andThen(breakIfStale(file, authorize)),
+        Effect.andThen(Effect.fail(locked)),
+      ),
     ),
     Effect.retry({
       schedule: Schedule.spaced(delay),
       ...(named ? { times: limit / delay } : {}),
       while: (error) =>
         Effect.gen(function* () {
-          if (error._tag !== "StateLocked") return false
+          if (!(error instanceof StateLocked)) return false
           if (!named && (yield* Clock.currentTimeMillis) >= patience.until) return false
           return stuck ? yield* holderBusy(file, limit) : true
         }),
@@ -243,14 +249,16 @@ const release = (file: string, token: string) =>
  * since its holder is stuck; `"long"` never does and waits the whole limit. The folder of the file
  * is made when it is missing.
  */
-export const withFileLock = <A, E, R>(
+export const withFileLock = <A, E, R, F = never, G = never>(
   file: string,
   use: Effect.Effect<A, E, R>,
   patience: Patience = STATE_PATIENCE,
+  authorize: Effect.Effect<void, F, G> = Effect.void,
 ) =>
   Effect.acquireUseRelease(
-    io(file, () => mkdir(dirname(file), { recursive: true })).pipe(
-      Effect.andThen(acquire(file, patience)),
+    authorize.pipe(
+      Effect.andThen(io(file, () => mkdir(dirname(file), { recursive: true }))),
+      Effect.andThen(acquire(file, patience, authorize)),
     ),
     () => use,
     (token) => release(file, token),
@@ -260,14 +268,15 @@ export const withFileLock = <A, E, R>(
  * Runs `use` while holding the state lock (`local/lock` of the state folder), so two processes
  * never interleave their reads and writes. `patience` is as for {@link withFileLock}.
  */
-export const withStateLock = <A, E, R>(
+export const withStateLock = <A, E, R, F = never>(
   directory: string,
   use: Effect.Effect<A, E, R>,
   patience: Patience = STATE_PATIENCE,
+  authorize: Effect.Effect<void, F> = Effect.void,
 ) =>
   Effect.acquireUseRelease(
-    ensureLocalDirectory(directory).pipe(
-      Effect.andThen(acquire(localFile(directory, "lock"), patience)),
+    ensureLocalDirectory(directory, authorize).pipe(
+      Effect.andThen(acquire(localFile(directory, "lock"), patience, authorize)),
     ),
     () => use,
     (token) => release(localFile(directory, "lock"), token),

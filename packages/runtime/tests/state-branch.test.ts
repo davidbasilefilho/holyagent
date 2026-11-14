@@ -1208,7 +1208,10 @@ describe("moving the state found in a work tree", () => {
     const shown = toon(await holy(dir, ["intent", "show", id]))
 
     expect(shown["objective"]).toBe("Ship the parser v2")
-    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toContain(` M ${record}`)
+    expect(JSON.parse(await readFile(join(dir, record), "utf8"))).toMatchObject({
+      objective: "Ship the parser v2",
+    })
     expect(JSON.parse(await sh(dir, ["git", "show", `${STATE}:${record}`]))).toMatchObject({
       objective: "Ship the parser v2",
     })

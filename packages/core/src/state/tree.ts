@@ -1,12 +1,11 @@
 import { createHash } from "node:crypto"
 import {
-  copyFile,
   lstat,
   mkdir,
+  open,
   readdir,
   readFile,
   realpath,
-  rename,
   rm,
   rmdir,
   stat,
@@ -17,7 +16,7 @@ import { basename, dirname, join, relative, sep } from "node:path"
 import { Effect, type Exit } from "effect"
 
 import { fromGitPath, toPosix } from "../domain/paths.ts"
-import { StateIo, StateModeRefused } from "./errors.ts"
+import { StateIo, type StateLocked, StateModeRefused } from "./errors.ts"
 import { commitFile, hasCode, io, readText } from "./files.ts"
 import { CONFIG_FILE, STATE_DIRECTORY, stateDirectory, TRACKED_STATE_PATHSPEC } from "./layout.ts"
 import {
@@ -27,6 +26,22 @@ import {
   withStateLock,
   WORKTREE_PATIENCE,
 } from "./lock.ts"
+import {
+  cleanupMigrationSources,
+  MigrationFilesError,
+  publishMigrationFiles,
+  readMigrationSource,
+  verifyMigrationFilePreimages,
+  verifyMigrationFiles,
+} from "./migration-files.ts"
+import {
+  prepareMigrationCommit,
+  publishMigrationIndex,
+  verifyMigrationCommit,
+  verifyMigrationIndex,
+} from "./migration-index.ts"
+import { MigrationJournalError, readMigrationJournal } from "./migration-journal.ts"
+import { MigrationRunnerConflict, runMigrationTransaction } from "./migration-runner.ts"
 import { parseStateMode, STATE_MODE_KEY, type StateMode } from "./mode.ts"
 import { definedEnv, looksLikeAgent } from "./portable.ts"
 import { spawn } from "./process.ts"
@@ -214,6 +229,7 @@ const editExclude = <E, R>(
   edit: (lines: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<string>, E, R>,
   done?: (lines: ReadonlyArray<string>) => boolean,
   patience: Patience = WORKTREE_PATIENCE,
+  authorize: Effect.Effect<void, E, R> = Effect.void,
 ) =>
   Effect.gen(function* () {
     const path = yield* excludePath(top, env)
@@ -225,9 +241,11 @@ const editExclude = <E, R>(
         const lines = yield* edit(before)
         if (lines.join("\n") === before.join("\n")) return
         const body = lines.length === 0 ? "" : `${lines.join("\n")}\n`
+        yield* authorize
         yield* commitFile(path, body)
       }),
       patience,
+      authorize,
     )
   })
 
@@ -254,6 +272,7 @@ const ensureExcluded = <E>(
       ),
     hasEntry,
     patience,
+    authorize,
   )
 
 /**
@@ -308,11 +327,11 @@ interface Listed {
 }
 
 const listWorktrees = (cwd: string, env: Environment) =>
-  gitText(cwd, env, ["worktree", "list", "--porcelain"]).pipe(
+  gitText(cwd, env, ["worktree", "list", "--porcelain", "-z"]).pipe(
     Effect.map((text) =>
       text
-        .split("\n\n")
-        .map((block) => block.split("\n"))
+        .split("\0\0")
+        .map((block) => block.split("\0"))
         .map((lines): Listed => {
           const field = (name: string) =>
             lines.find((line) => line.startsWith(`${name} `))?.slice(name.length + 1)
@@ -572,34 +591,130 @@ const gitBounded = (
  * `timeout` milliseconds; an offline, slow, missing or empty remote only means the branch starts
  * from the base.
  */
-export const fetchRemoteBranch = (
+export const fetchRemoteBranch = <E = never>(
   top: string,
   env: Environment,
   branch: string,
   timeout: number = FETCH_TIMEOUT_MS,
+  authorize: Effect.Effect<void, E> = Effect.void,
 ) =>
   git(top, env, ["config", "--get", "core.sshCommand"]).pipe(
     Effect.map((ran) => (ran.code === 0 ? ran.stdout.trim() : "")),
     Effect.flatMap((configured) =>
-      gitBounded(
-        top,
-        fetchEnvironment(env, configured === "" ? undefined : configured),
-        [
-          "-c",
-          "core.askPass=",
-          "fetch",
-          "-q",
-          "--no-tags",
-          "origin",
-          `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
-        ],
-        timeout,
+      authorize.pipe(
+        Effect.andThen(
+          gitBounded(
+            top,
+            fetchEnvironment(env, configured === "" ? undefined : configured),
+            [
+              "-c",
+              "core.askPass=",
+              "fetch",
+              "-q",
+              "--no-tags",
+              "origin",
+              `+refs/heads/${branch}:refs/remotes/origin/${branch}`,
+            ],
+            timeout,
+          ),
+        ),
       ),
     ),
     Effect.flatMap((code) =>
       code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : Effect.succeed(false),
     ),
   )
+
+/** A durable per-branch marker keeps the first worktree sweep recoverable. */
+const migrationSweepPath = (common: string, branch: string) =>
+  join(common, "holyagent", `${worktreeFolder(branch)}.migration-sweep`)
+
+const checkSweepFile = (
+  path: string,
+  info: { isFile(): boolean; isSymbolicLink(): boolean; nlink: number; mode: number; uid: number },
+) => {
+  if (
+    !info.isFile() ||
+    info.isSymbolicLink() ||
+    info.nlink !== 1 ||
+    (process.platform !== "win32" &&
+      ((info.mode & 0o077) !== 0 ||
+        (typeof process.getuid === "function" && info.uid !== process.getuid())))
+  )
+    throw new Error(`unsafe migration sweep marker: ${path}`)
+}
+
+/** Syncing the marker and its directory makes the initial enumeration survive interruption. */
+const syncSweepDirectory = async (path: string) => {
+  if (process.platform === "win32") return
+  const dir = await open(dirname(path), "r")
+  try {
+    await dir.sync()
+  } finally {
+    await dir.close()
+  }
+}
+
+const beginMigrationSweep = <E>(
+  common: string,
+  branch: string,
+  authorize: Effect.Effect<void, E>,
+) =>
+  Effect.gen(function* () {
+    const path = migrationSweepPath(common, branch)
+    const parent = dirname(path)
+    const commonRoot = yield* io(common, () => realpath(common))
+    const info = yield* io(parent, () => lstat(parent))
+    const actual = yield* io(parent, () => realpath(parent))
+    if (!info.isDirectory() || info.isSymbolicLink() || actual !== join(commonRoot, "holyagent"))
+      return yield* new StateIo({
+        path: parent,
+        cause: "migration marker parent is not a canonical directory",
+      })
+    yield* authorize
+    yield* io(path, async () => {
+      let handle
+      try {
+        try {
+          handle = await open(path, "wx", 0o600)
+        } catch (cause) {
+          if (!hasCode(cause, "EEXIST")) throw cause
+        }
+        if (handle !== undefined) await handle.sync()
+        const marker = await lstat(path)
+        checkSweepFile(path, marker)
+      } finally {
+        await handle?.close()
+      }
+      await syncSweepDirectory(path)
+    }).pipe(Effect.uninterruptible)
+  })
+
+const finishMigrationSweep = <E>(
+  common: string,
+  branch: string,
+  authorize: Effect.Effect<void, E>,
+  terminalAuthorize: () => boolean,
+) =>
+  Effect.gen(function* () {
+    const path = migrationSweepPath(common, branch)
+    const before = yield* io(path, async () => {
+      const info = await lstat(path)
+      checkSweepFile(path, info)
+      return { dev: info.dev, ino: info.ino }
+    })
+    yield* authorize
+    yield* io(path, async () => {
+      const current = await lstat(path)
+      checkSweepFile(path, current)
+      if (current.dev !== before.dev || current.ino !== before.ino)
+        throw new Error("migration sweep marker changed during authorization")
+      if (terminalAuthorize() !== true)
+        throw new Error("terminal migration authority is unavailable or revoked")
+      await rm(path)
+      await syncSweepDirectory(path)
+    }).pipe(Effect.uninterruptible)
+  })
 
 /** The file whose presence says the state worktree at `path` is fully checked out. */
 const readyMarker = (path: string) => `${path}.ready`
@@ -636,22 +751,29 @@ const ensureWorktree = <E>(
       const ready = readyMarker(path)
       const again = yield* checkedOut(yield* listWorktrees(top, env), branch)
       if (again !== undefined) {
-        if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready)))
+        if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready))) {
+          yield* authorize
           yield* io(ready, () =>
             mkdir(dirname(ready), { recursive: true }).then(() => writeFile(ready, "")),
           )
+        }
         return { kind: "ready", path: again, created: false } satisfies Ensured
       }
       if (!options.make) return { kind: "absent" } satisfies Ensured
       // A mode change made while this command waited for the lock leaves no state branch to make.
       if ((yield* stateModeOf(top, env)) !== "branch") return { kind: "deferred" } satisfies Ensured
+      yield* authorize
       yield* git(top, env, ["worktree", "prune"])
       yield* requireFree(yield* listWorktrees(top, env), path, branch)
       const add = [...BOOKKEEPING, "worktree", "add", "-q"]
       const local = yield* refExists(top, env, `refs/heads/${branch}`)
       const remote =
         (yield* refExists(top, env, `refs/remotes/origin/${branch}`)) ||
-        (!local && options.online && (yield* fetchRemoteBranch(top, env, branch)))
+        (!local &&
+          options.online &&
+          (yield* authorize.pipe(
+            Effect.andThen(fetchRemoteBranch(top, env, branch, undefined, authorize)),
+          )))
       // Without the network the remote copy is unknown, so the branch is left for a command that
       // may fetch it; starting it from the base here would shadow the remote one for good.
       if (!local && !remote && !options.online) return { kind: "absent" } satisfies Ensured
@@ -664,18 +786,28 @@ const ensureWorktree = <E>(
             ? undefined
             : ["--no-track", "-b", branch, path, start]
       if (target === undefined) return { kind: "deferred" } satisfies Ensured
+      // Keep the initial source sweep discoverable even if checkout or migration is interrupted.
+      yield* beginMigrationSweep(common, branch, authorize)
       // The folder is ours (under the git directory) and no work tree is registered at it, so what
       // is there is a leftover.
+      yield* authorize
       yield* io(ready, () => rm(ready, { force: true }))
+      yield* authorize
       yield* io(path, () => rm(path, { recursive: true, force: true }))
+      yield* authorize
       yield* io(path, () => mkdir(dirname(path), { recursive: true }))
+      yield* authorize
       yield* gitText(top, env, [...add, ...target])
-      yield* io(ready, () =>
-        mkdir(dirname(ready), { recursive: true }).then(() => writeFile(ready, "")),
+      // Finish marking a completed checkout; an interrupted checkout is recovered on the next run.
+      yield* Effect.uninterruptible(
+        io(ready, () =>
+          mkdir(dirname(ready), { recursive: true }).then(() => writeFile(ready, "")),
+        ),
       )
       return { kind: "ready", path, created: true } satisfies Ensured
     }),
     patience,
+    authorize,
   )
 
 interface Entry {
@@ -780,28 +912,6 @@ const requirePlainTarget = (root: string, relative: string) =>
     }
   })
 
-/**
- * Copies a plain file into the state worktree through a temporary neighbour and a rename, after
- * checking that the folders it lands in are plain folders inside the worktree. The rename never
- * follows a link at the destination.
- */
-const copyInto = (root: string, relative: string, from: string) =>
-  Effect.gen(function* () {
-    yield* requirePlainTarget(root, relative)
-    const to = join(root, relative)
-    yield* io(to, () => mkdir(dirname(to), { recursive: true }))
-    const [folder, base] = yield* Effect.all([canonical(dirname(to)), realStateFolder(root)])
-    if (folder !== base && !folder.startsWith(`${base}${sep}`))
-      return yield* new StateIo({ path: to, cause: `${folder} is outside the state worktree` })
-    const temporary = `${to}.${process.pid}.${crypto.randomUUID()}.tmp`
-    yield* io(to, () => copyFile(from, temporary)).pipe(
-      Effect.andThen(io(to, () => rename(temporary, to))),
-      Effect.tapError(() =>
-        io(temporary, () => rm(temporary, { force: true })).pipe(Effect.ignore),
-      ),
-    )
-  })
-
 /** The files under a work tree's state folder, each with its git status when it is not clean. */
 const workTreeEntries = (top: string, env: Environment) =>
   Effect.gen(function* () {
@@ -819,6 +929,7 @@ const workTreeEntries = (top: string, env: Environment) =>
       "--",
       STATE_DIRECTORY,
     ])
+    if (listing.code !== 0) return yield* failed(top, ["status"], listing)
     const parts = listing.stdout.split("\0")
     for (let index = 0; index < parts.length; index++) {
       const part = parts[index] ?? ""
@@ -835,20 +946,6 @@ const workTreeEntries = (top: string, env: Environment) =>
       .map((path): Entry => ({ path, status: status.get(path) }))
   })
 
-/** Removes the folders a cleanup emptied, from the file's folder up to the state folder. */
-const pruneEmpty = (folder: string, from: string) =>
-  Effect.gen(function* () {
-    let current = from
-    while (current.startsWith(`${folder}${sep}`)) {
-      const names = yield* io(current, () => readdir(current)).pipe(
-        Effect.orElseSucceed(() => ["still here"]),
-      )
-      if (names.length > 0) return
-      yield* io(current, () => rmdir(current)).pipe(Effect.ignore)
-      current = dirname(current)
-    }
-  })
-
 const migrationMarker = (common: string, top: string) =>
   io(top, () => realpath(top)).pipe(
     Effect.map((real) =>
@@ -861,104 +958,280 @@ const migrationMarker = (common: string, top: string) =>
     ),
   )
 
-/**
- * Moves the state found in a work tree into the state worktree, once per work tree. A file the
- * state worktree lacks is copied; one it has is replaced only by a work-tree file that is
- * uncommitted, since an uncommitted edit is newer than any commit and a committed copy may be an
- * older one than the state branch holds. Copies are committed on the state branch, and then the
- * uncommitted originals are removed from the work tree (untracked ones deleted, modified ones
- * restored), so the work tree is left without uncommitted state. The per-clone files are copied
- * only when the state worktree has none. `patience` is how long the state lock is waited for.
- */
+/** One clone-wide journal protects readers from an incomplete migration. */
+const migrationJournalPath = (common: string) =>
+  join(common, "holyagent", "migration", "journal.json")
+const pendingMigration = (common: string) =>
+  kindAt(migrationJournalPath(common)).pipe(Effect.map((kind) => kind !== undefined))
+
+const pendingReadMigration = (common: string, branch: string) =>
+  Effect.gen(function* () {
+    if (yield* pendingMigration(common)) return true
+    return (yield* kindAt(migrationSweepPath(common, branch))) !== undefined
+  })
+
+/** Run or recover the migration while holding the shared state lock. */
 const migrateWorkTree = <E>(
   top: string,
   common: string,
   worktree: string,
   env: Environment,
-  commit: (message: string) => Effect.Effect<boolean, StateIo>,
+  branch: string,
   patience: Patience = STATE_PATIENCE,
   authorize: Effect.Effect<void, E> = Effect.void,
-) => {
-  const source = stateDirectory(top)
-  const target = stateDirectory(worktree)
-  return migrationMarker(common, top).pipe(
-    Effect.flatMap((marker) =>
-      fileExists(marker).pipe(
-        Effect.flatMap((done) =>
-          done
-            ? Effect.void
-            : // Checked before the lock, which writes under the target: a link or other non-folder
-              // in place of either state folder is never read or written through. A work tree
-              // whose folder is one has no state to move.
-              requireStateFolder(target).pipe(
-                Effect.andThen(kindAt(source)),
-                Effect.flatMap((kind) =>
-                  kind !== undefined && kind !== "directory"
-                    ? Effect.void
-                    : withStateLock(
-                        target,
-                        Effect.gen(function* () {
-                          yield* authorize
-                          if (yield* fileExists(marker)) return
-                          const entries = yield* workTreeEntries(top, env)
-                          const moved: Array<Entry> = []
-                          for (const entry of entries) {
-                            // A link, device or socket in the work tree is not state.
-                            if (!(yield* isPlainFile(source, entry.path))) continue
-                            const to = join(target, entry.path)
-                            yield* requirePlainTarget(target, entry.path)
-                            const dirty = entry.status !== undefined && !entry.status.includes("D")
-                            const there = (yield* kindAt(to)) !== undefined
-                            const wanted =
-                              !there || (dirty && !(yield* sameBytes(join(source, entry.path), to)))
-                            if (wanted)
-                              yield* copyInto(target, entry.path, join(source, entry.path))
-                            if (dirty && !entry.path.startsWith("local/")) moved.push(entry)
-                          }
-                          yield* commit("chore(state): migrate the state found in a work tree")
-                          // Only what the state worktree now holds byte for byte leaves the work tree.
-                          for (const entry of moved) {
-                            const from = join(source, entry.path)
-                            if (!(yield* sameBytes(from, join(target, entry.path)))) continue
-                            const status = entry.status ?? ""
-                            if (status === "??") yield* io(from, () => rm(from, { force: true }))
-                            else if (status.startsWith("A"))
-                              yield* gitText(top, env, [
-                                "rm",
-                                "-f",
-                                "-q",
-                                "--",
-                                `${STATE_DIRECTORY}/${entry.path}`,
-                              ])
-                            else
-                              yield* gitText(top, env, [
-                                "--literal-pathspecs",
-                                "restore",
-                                "--source=HEAD",
-                                "--staged",
-                                "--worktree",
-                                "--",
-                                `${STATE_DIRECTORY}/${entry.path}`,
-                              ])
-                            yield* pruneEmpty(source, dirname(from))
-                          }
-                          // The folder goes too when only its emptied husk is left; one with `local/` stays.
-                          yield* io(source, () => rmdir(source)).pipe(Effect.ignore)
-                          yield* io(marker, () =>
-                            mkdir(dirname(marker), { recursive: true }).then(() =>
-                              writeFile(marker, ""),
-                            ),
-                          )
-                        }),
-                        patience,
-                      ),
+  terminalAuthorize: () => boolean = () => false,
+) =>
+  Effect.gen(function* () {
+    const source = stateDirectory(top)
+    const target = stateDirectory(worktree)
+    const marker = yield* migrationMarker(common, top)
+    if (!(yield* pendingMigration(common)) && (yield* fileExists(marker))) return
+    yield* requireStateFolder(target)
+    const sourceKind = yield* kindAt(source)
+    if (sourceKind !== undefined && sourceKind !== "directory") {
+      if (yield* pendingMigration(common))
+        return yield* new StateIo({
+          path: source,
+          cause: "migration source is no longer a real directory; inspect it before recovery",
+        })
+      return
+    }
+    yield* withStateLock(
+      target,
+      Effect.gen(function* () {
+        if (!(yield* pendingMigration(common)) && (yield* fileExists(marker))) return
+        if (!(yield* pendingMigration(common)) && (yield* workTreeEntries(top, env)).length === 0) {
+          yield* authorize
+          yield* io(marker, () =>
+            mkdir(dirname(marker), { recursive: true }).then(() => writeFile(marker, "")),
+          )
+          return
+        }
+        const sourceRoot = yield* io(top, () => realpath(top))
+        const targetRoot = yield* io(worktree, () => realpath(worktree))
+        const journalPath = migrationJournalPath(common)
+        const commonRoot = yield* io(common, () => realpath(common))
+        const privateRoot = join(commonRoot, "holyagent")
+        for (const directory of [privateRoot, join(privateRoot, "migration")]) {
+          yield* authorize
+          yield* io(directory, () => mkdir(directory, { mode: 0o700 })).pipe(
+            Effect.catchIf(
+              (error) => hasCode(error.cause, "EEXIST"),
+              () => Effect.void,
+            ),
+          )
+          const info = yield* io(directory, () => lstat(directory))
+          const actual = yield* io(directory, () => realpath(directory))
+          if (!info.isDirectory() || info.isSymbolicLink() || actual !== directory)
+            return yield* new StateIo({
+              path: directory,
+              cause: "migration journal parent is not a canonical directory",
+            })
+        }
+        const location = {
+          path: join(commonRoot, "holyagent", "migration", "journal.json"),
+          sourceRoot,
+          targetRoot,
+        }
+        const identity = yield* committing(targetRoot, env)
+        const local = (path: string) => path.startsWith(`${STATE_DIRECTORY}/local/`)
+        const indexFiles = <T extends { readonly path: string }>(files: ReadonlyArray<T>) =>
+          files.filter((file) => !local(file.path))
+        const run = runMigrationTransaction<StateIo | StateLocked | MigrationFilesError, E, never>({
+          location,
+          branch,
+          authorize,
+          services: {
+            prepare: (begin) =>
+              Effect.gen(function* () {
+                const entries = yield* workTreeEntries(sourceRoot, env)
+                const trackedText = yield* gitText(
+                  sourceRoot,
+                  { ...env, GIT_OPTIONAL_LOCKS: "0" },
+                  ["ls-files", "-z", "--", STATE_DIRECTORY],
+                )
+                const tracked = new Set(trackedText.split("\0"))
+                const algorithm = (yield* gitText(targetRoot, env, [
+                  "rev-parse",
+                  "--show-object-format",
+                ])).trim()
+                if (algorithm !== "sha1" && algorithm !== "sha256")
+                  return yield* new StateIo({
+                    path: targetRoot,
+                    cause: "unsupported Git object format",
+                  })
+                const files: Array<{ path: string; content: string; mode: number }> = []
+                const sourceFiles: Array<{ path: string; digest: string; tracked: boolean }> = []
+                for (const entry of entries) {
+                  if (!(yield* isPlainFile(source, entry.path))) continue
+                  yield* requirePlainTarget(target, entry.path)
+                  const path = `${STATE_DIRECTORY}/${entry.path}`
+                  const to = join(target, entry.path)
+                  const there = (yield* kindAt(to)) !== undefined
+                  const dirty = entry.status !== undefined && !entry.status.includes("D")
+                  if (local(path) && there) continue
+                  if (there && !dirty) continue
+                  const { bytes, mode } = yield* readMigrationSource({ root: sourceRoot, path })
+                  files.push({ path, content: bytes.toString("base64"), mode })
+                  if (dirty && !local(path))
+                    sourceFiles.push({
+                      path,
+                      digest: createHash(algorithm)
+                        .update(`blob ${bytes.length}\0`)
+                        .update(bytes)
+                        .digest("hex"),
+                      tracked: tracked.has(path),
+                    })
+                }
+                const prepared = yield* prepareMigrationCommit({
+                  cwd: targetRoot,
+                  env: identity,
+                  files: indexFiles(files),
+                  message: "chore(state): migrate the state found in a work tree",
+                  authorize: begin,
+                })
+                const localFiles = files
+                  .filter((file) => local(file.path))
+                  .map((file) => {
+                    const bytes = Buffer.from(file.content, "base64")
+                    return {
+                      ...file,
+                      before: null,
+                      after: createHash(algorithm)
+                        .update(`blob ${bytes.length}\0`)
+                        .update(bytes)
+                        .digest("hex"),
+                    }
+                  })
+                const planned = [...prepared.files, ...localFiles]
+                yield* verifyMigrationFilePreimages({ root: targetRoot, files: planned })
+                return { ...prepared, files: planned, source: sourceFiles }
+              }),
+            readRef: (name) =>
+              gitText(targetRoot, env, ["rev-parse", "--verify", `refs/heads/${name}`]),
+            compareAndSwapRef: (name, parent, commit, begin) =>
+              begin.pipe(
+                Effect.andThen(
+                  gitText(targetRoot, env, ["update-ref", `refs/heads/${name}`, commit, parent]),
+                ),
+                Effect.asVoid,
+              ),
+            verifyCommit: (journal) =>
+              Effect.gen(function* () {
+                // Roots come from the caller, and recovery may only touch paths the migration
+                // planner owns. A source deletion must be tied to its published postimage.
+                const planned = new Map(journal.files.map((file) => [file.path, file]))
+                const allowed = (path: string) =>
+                  path.startsWith(`${STATE_DIRECTORY}/`) &&
+                  path !== `${STATE_DIRECTORY}/${CONFIG_FILE}` &&
+                  (!local(path) || path === `${STATE_DIRECTORY}/local/specialists.json`)
+                if (
+                  journal.files.some((file) => !allowed(file.path)) ||
+                  journal.source.some(
+                    (file) =>
+                      !allowed(file.path) ||
+                      local(file.path) ||
+                      planned.get(file.path)?.after !== file.digest,
+                  )
+                )
+                  return yield* new StateIo({
+                    path: journalPath,
+                    cause:
+                      "migration journal contains unowned or inconsistent paths; inspect it before recovery",
+                  })
+                yield* verifyMigrationCommit({
+                  cwd: targetRoot,
+                  env,
+                  parent: journal.parent,
+                  tree: journal.tree,
+                  commit: journal.commit,
+                  files: indexFiles(journal.files),
+                })
+              }),
+            publishFiles: (journal, begin) =>
+              publishMigrationFiles({
+                root: targetRoot,
+                files: journal.files,
+                authorize: begin,
+                terminalAuthorize,
+              }),
+            publishIndex: (journal, begin) =>
+              publishMigrationIndex({
+                cwd: targetRoot,
+                env,
+                files: indexFiles(journal.files),
+                authorize: begin,
+              }),
+            verifyTarget: (journal) =>
+              verifyMigrationFiles({ root: targetRoot, files: journal.files }).pipe(
+                Effect.andThen(
+                  verifyMigrationIndex({ cwd: targetRoot, env, files: indexFiles(journal.files) }),
                 ),
               ),
-        ),
-      ),
-    ),
-  )
-}
+            cleanupSource: (journal, begin) =>
+              Effect.gen(function* () {
+                const cleaned = yield* cleanupMigrationSources({
+                  root: sourceRoot,
+                  source: journal.source,
+                  authorize: begin,
+                  terminalAuthorize,
+                  isTracked: (path) =>
+                    git(sourceRoot, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
+                      "--literal-pathspecs",
+                      "ls-files",
+                      "--error-unmatch",
+                      "--",
+                      path,
+                    ]).pipe(
+                      Effect.flatMap((result) =>
+                        result.code === 0
+                          ? Effect.succeed(true)
+                          : result.code === 1
+                            ? Effect.succeed(false)
+                            : Effect.fail(failed(sourceRoot, ["ls-files"], result)),
+                      ),
+                    ),
+                })
+                if (cleaned.retained.some((file) => file.reason === "changed"))
+                  return yield* new StateIo({
+                    path: sourceRoot,
+                    cause: "source state changed during migration; inspect and retry",
+                  })
+                for (const path of cleaned.removed) {
+                  let folder = dirname(join(sourceRoot, path))
+                  while (folder.startsWith(`${source}${sep}`)) {
+                    yield* begin
+                    const removed = yield* io(folder, () => rmdir(folder)).pipe(
+                      Effect.as(true),
+                      Effect.orElseSucceed(() => false),
+                    )
+                    if (!removed) break
+                    folder = dirname(folder)
+                  }
+                }
+                yield* begin
+                yield* io(source, () => rmdir(source)).pipe(Effect.ignore)
+                yield* begin
+                yield* io(marker, () =>
+                  mkdir(dirname(marker), { recursive: true }).then(() => writeFile(marker, "")),
+                )
+              }),
+          },
+        })
+        yield* run.pipe(
+          Effect.mapError((error) =>
+            error instanceof MigrationJournalError ||
+            error instanceof MigrationRunnerConflict ||
+            error instanceof MigrationFilesError
+              ? new StateIo({ path: journalPath, cause: error.message })
+              : error,
+          ),
+        )
+      }),
+      patience,
+      authorize,
+    )
+  })
 
 /**
  * The files HolyAgent writes under the state folder, relative to it: the settings, the records and
@@ -977,13 +1250,20 @@ const STATE_FILE =
  * `copied` files a command wrote itself (absolute paths; one outside the state folder or in
  * `local/` is ignored).
  */
-const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<string>) =>
+const stageState = <E>(
+  worktree: string,
+  env: Environment,
+  copied: ReadonlyArray<string>,
+  begin: Effect.Effect<void, E>,
+) =>
   Effect.gen(function* () {
     // Newer git rejects `add -u` for a pathspec that matches nothing git tracks, as on the first
     // state commit, so only update what is tracked.
     const tracked = [STATE_DIRECTORY, `:(exclude)${STATE_DIRECTORY}/local`]
-    if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "")
+    if ((yield* gitText(worktree, env, ["ls-files", "--", ...tracked])) !== "") {
+      yield* begin
       yield* gitText(worktree, env, ["add", "-u", "--", ...tracked])
+    }
     const folder = stateDirectory(worktree)
     const files = yield* io(folder, () => scanFiles(folder))
     const named = copied
@@ -997,13 +1277,15 @@ const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<st
     ].map((path) => `${STATE_DIRECTORY}/${path}`)
     // The names go to git on its standard input, NUL-separated: on the command line they would
     // outgrow the operating system's limit as the history grows (about 200 files on Windows).
-    if (wanted.length > 0)
+    if (wanted.length > 0) {
+      yield* begin
       yield* gitText(
         worktree,
         env,
         ["--literal-pathspecs", "add", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"],
         wanted.map((path) => `${path}\0`).join(""),
       )
+    }
   })
 
 /**
@@ -1016,12 +1298,13 @@ const stageState = (worktree: string, env: Environment, copied: ReadonlyArray<st
  * branch that {@link resolveState} found, which save reading them from git config again; without it
  * they are read. Call it under the state lock.
  */
-export const commitState = (
+export const commitState = <E = never>(
   directory: string,
   env: Environment,
   message: string,
   copied: ReadonlyArray<string> = [],
   resolved?: Resolved,
+  begin: Effect.Effect<void, E> = Effect.void,
 ) =>
   Effect.gen(function* () {
     const worktree = dirname(directory)
@@ -1042,10 +1325,12 @@ export const commitState = (
     const current = yield* git(worktree, env, ["symbolic-ref", "--short", "-q", "HEAD"])
     const branch = "branch" in known ? known.branch : yield* stateBranch(worktree, env)
     if (current.code !== 0 || current.stdout.trim() !== branch) return false
-    yield* stageState(worktree, env, copied)
+    yield* stageState(worktree, env, copied, begin)
     if (yield* gitSucceeds(worktree, env, ["diff", "--cached", "--quiet", "--", STATE_DIRECTORY]))
       return false
-    yield* gitText(worktree, yield* committing(worktree, env), [
+    const identity = yield* committing(worktree, env)
+    yield* begin
+    yield* gitText(worktree, identity, [
       ...BOOKKEEPING,
       "commit",
       "-q",
@@ -1061,24 +1346,68 @@ export const commitState = (
 /** The top-level folder and git directory of the repository `cwd` is in; undefined outside one. */
 const locate = (cwd: string, env: Environment) =>
   Effect.gen(function* () {
-    const located = yield* git(cwd, env, [
-      "rev-parse",
-      "--path-format=absolute",
-      "--show-toplevel",
-      "--git-common-dir",
-    ])
+    const located = yield* git(cwd, env, ["rev-parse", "--path-format=absolute", "--show-toplevel"])
     if (located.code !== 0) {
       const complaint = located.stderr.trim()
       if (NOT_A_REPOSITORY.test(complaint)) return undefined
       return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` })
     }
-    // Git prints `/`-separated paths even on Windows (`C:/repo`); the rest of this file compares
-    // them with `join()` and `realpath()` results, so they are converted once, here.
-    const [top = cwd, common = join(cwd, ".git")] = located.stdout
-      .trim()
-      .split("\n")
-      .map((path) => fromGitPath(path))
+    const commonResult = yield* git(cwd, env, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ])
+    if (commonResult.code !== 0) return yield* failed(cwd, ["rev-parse"], commonResult)
+    // Each command emits one path followed by a newline; embedded and trailing whitespace in
+    // worktree names is part of that path, not a separator between multiple results.
+    const gitPath = (text: string) => {
+      const ending =
+        process.platform === "win32" && text.endsWith("\r\n") ? 2 : text.endsWith("\n") ? 1 : 0
+      return fromGitPath(ending === 0 ? text : text.slice(0, -ending))
+    }
+    const top = gitPath(located.stdout)
+    const common = gitPath(commonResult.stdout)
+    if (top === "" || common === "")
+      return yield* new StateIo({ path: cwd, cause: "git returned an empty repository path" })
     return { top, common }
+  })
+
+/**
+ * Read a branch migration fence without writing. A caller compares checkpoints before and after a
+ * read: a pending journal or changed ref means the read may have crossed publication.
+ */
+export const migrationReadCheckpoint = (cwd: string, env: Environment, branch: string) =>
+  Effect.gen(function* () {
+    const repository = yield* locate(cwd, env)
+    if (repository === undefined)
+      return yield* new StateIo({
+        path: cwd,
+        cause: "the state repository disappeared during a read",
+      })
+    const journal = migrationJournalPath(repository.common)
+    const requireComplete = pendingReadMigration(repository.common, branch).pipe(
+      Effect.flatMap((pending) =>
+        pending
+          ? Effect.fail(
+              new StateIo({
+                path: journal,
+                cause:
+                  "state migration is incomplete; run an authorized state command to recover it",
+              }),
+            )
+          : Effect.void,
+      ),
+    )
+    yield* requireComplete
+    const ref = yield* git(repository.top, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
+      "rev-parse",
+      "--verify",
+      "-q",
+      `refs/heads/${branch}`,
+    ])
+    if (ref.code !== 0 && ref.code !== 1) return yield* failed(repository.top, ["rev-parse"], ref)
+    yield* requireComplete
+    return { common: repository.common, head: ref.code === 0 ? ref.stdout.trim() : null }
   })
 
 /**
@@ -1098,15 +1427,39 @@ const locate = (cwd: string, env: Environment) =>
  * for that long at most, so a plugin hook passes one deadline (see {@link deadlineIn}) to give up
  * inside the host's hook timeout; without it each lock keeps the wait its holder needs.
  */
-export const resolveState = <E = never>(
+export function resolveState<E = never>(
   cwd: string,
   env: Environment,
   ensure: Ensure,
   online: boolean = true,
   patience?: Patience,
   authorize: Effect.Effect<void, E> = Effect.void,
-) =>
-  Effect.gen(function* () {
+  terminalAuthorize?: () => boolean,
+) {
+  const guardSupplied = arguments.length >= 7
+  return Effect.gen(function* () {
+    if (
+      ensure !== "peek" &&
+      ((guardSupplied && typeof terminalAuthorize !== "function") ||
+        (!guardSupplied && authorize !== Effect.void))
+    )
+      return yield* new StateIo({ path: cwd, cause: "terminal migration authority is required" })
+    const guard = typeof terminalAuthorize === "function" ? terminalAuthorize : () => true
+    if (ensure !== "peek") {
+      const allowed = yield* Effect.try({
+        try: guard,
+        catch: () =>
+          new StateIo({
+            path: cwd,
+            cause: "terminal migration authority is unavailable or revoked",
+          }),
+      })
+      if (allowed !== true)
+        return yield* new StateIo({
+          path: cwd,
+          cause: "terminal migration authority is unavailable or revoked",
+        })
+    }
     const repository = yield* locate(cwd, env)
     if (repository === undefined)
       return { root: cwd, directory: stateDirectory(cwd) } satisfies StateTree
@@ -1120,6 +1473,11 @@ export const resolveState = <E = never>(
       return { root: top, directory: stateDirectory(top), resolved: { mode } } satisfies StateTree
     }
     const branch = yield* stateBranch(top, env)
+    if (ensure === "peek" && (yield* pendingReadMigration(common, branch)))
+      return yield* new StateIo({
+        path: migrationJournalPath(common),
+        cause: "state migration is incomplete; run an authorized state command to recover it",
+      })
     const resolved: Resolved = { mode, branch }
     const listed = yield* listWorktrees(top, env)
     const found = yield* checkedOut(listed, branch)
@@ -1137,7 +1495,9 @@ export const resolveState = <E = never>(
       })
     const make =
       ensure === "create" ||
-      (ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed)))
+      (ensure === "ifPresent" &&
+        ((yield* pendingReadMigration(common, branch)) ||
+          (yield* keepsState(top, env, branch, listed))))
     const ensured: Ensured =
       found !== undefined && settled
         ? { kind: "ready", path: found, created: false }
@@ -1170,33 +1530,129 @@ export const resolveState = <E = never>(
     const worktree = ensured.path
     const directory = stateDirectory(worktree)
     if (ensure !== "peek") {
-      // A new state worktree takes in the state of every work tree of the clone, not just this one.
-      // The state worktrees of other state branches are not work trees.
-      const own = join(common, "holyagent")
-      const sources = ensured.created
-        ? [
-            top,
-            ...listed
-              .filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}${sep}`))
-              .map((entry) => entry.path),
-          ]
-        : [top]
-      for (const source of new Set(sources))
-        if (source !== worktree && (yield* isDirectory(source))) {
-          yield* authorize
-          yield* migrateWorkTree(
-            source,
-            common,
-            worktree,
-            env,
-            (message) => commitState(directory, env, message, [], resolved),
-            patience,
-            authorize,
-          )
-        }
+      // Resolve a clone-wide journal against Git-registered roots, never against the caller by
+      // assumption or a root supplied by the journal. Serialize whole sweeps before state locks.
+      yield* withFileLock(
+        join(common, "holyagent", "migration-sweep.lock"),
+        Effect.gen(function* () {
+          const pending = yield* pendingMigration(common)
+          let sweeping = (yield* kindAt(migrationSweepPath(common, branch))) !== undefined
+          // Journals made by an older version did not have a sweep marker. Persist one before
+          // recovering so a second interruption cannot lose the remaining registered sources.
+          if (pending && !sweeping) {
+            yield* beginMigrationSweep(common, branch, authorize)
+            sweeping = true
+          }
+          const targetRoot = yield* io(worktree, () => realpath(worktree))
+          if (!pending && !sweeping) {
+            const source = yield* io(top, () => realpath(top))
+            if (source !== targetRoot)
+              yield* migrateWorkTree(
+                source,
+                common,
+                worktree,
+                env,
+                branch,
+                patience,
+                authorize,
+                guard,
+              )
+            return
+          }
+          const sweepPath = migrationSweepPath(common, branch)
+          yield* io(sweepPath, async () => checkSweepFile(sweepPath, await lstat(sweepPath)))
+          const registered = yield* listWorktrees(top, env)
+          const own = join(yield* io(common, () => realpath(common)), "holyagent")
+          const commonRoot = yield* io(common, () => realpath(common))
+          const candidates: string[] = []
+          for (const entry of registered) {
+            if (entry.prunable || entry.path.startsWith(`${own}${sep}`)) continue
+            const kind = yield* kindAt(entry.path)
+            if (kind !== "directory")
+              return yield* new StateIo({
+                path: entry.path,
+                cause: "a registered worktree is not a real directory; inspect it before migration",
+              })
+            const sourceRoot = yield* io(entry.path, () => realpath(entry.path))
+            if (sourceRoot === targetRoot) continue
+            const sourceRepo = yield* locate(sourceRoot, env)
+            if (sourceRepo === undefined)
+              return yield* new StateIo({
+                path: entry.path,
+                cause: "a registered worktree no longer belongs to this clone",
+              })
+            const [sourceTop, sourceCommon] = yield* Effect.all([
+              io(sourceRepo.top, () => realpath(sourceRepo.top)),
+              io(sourceRepo.common, () => realpath(sourceRepo.common)),
+            ])
+            if (sourceTop !== sourceRoot || sourceCommon !== commonRoot)
+              return yield* new StateIo({
+                path: entry.path,
+                cause: "a registered worktree no longer belongs to this clone",
+              })
+            if (!candidates.includes(sourceRoot)) candidates.push(sourceRoot)
+          }
+          const primary = yield* io(top, () => realpath(top))
+          const primaryIndex = candidates.indexOf(primary)
+          if (primaryIndex > 0) {
+            candidates.splice(primaryIndex, 1)
+            candidates.unshift(primary)
+          }
+          if (pending) {
+            let recorded: string | undefined
+            for (const sourceRoot of candidates) {
+              const matches = yield* readMigrationJournal({
+                path: join(commonRoot, "holyagent", "migration", "journal.json"),
+                sourceRoot,
+                targetRoot,
+              }).pipe(
+                Effect.match({
+                  onFailure: () => false,
+                  onSuccess: (journal) => journal !== undefined,
+                }),
+              )
+              if (matches) {
+                recorded = sourceRoot
+                break
+              }
+            }
+            if (recorded === undefined)
+              return yield* new StateIo({
+                path: migrationJournalPath(common),
+                cause:
+                  "migration journal does not match a registered worktree of this clone; inspect it before recovery",
+              })
+            yield* migrateWorkTree(
+              recorded,
+              common,
+              worktree,
+              env,
+              branch,
+              patience,
+              authorize,
+              guard,
+            )
+          }
+          for (const source of candidates)
+            yield* migrateWorkTree(
+              source,
+              common,
+              worktree,
+              env,
+              branch,
+              patience,
+              authorize,
+              guard,
+            )
+          yield* finishMigrationSweep(common, branch, authorize, guard)
+        }),
+        patience,
+        authorize,
+      )
     }
     return { root: top, directory, resolved } satisfies StateTree
   })
+}
 
 /** Refuses a handoff when branch-mode records cannot be represented by its read-only snapshot. */
 export const requireHandoffState = (cwd: string, env: Environment, directory: string) =>

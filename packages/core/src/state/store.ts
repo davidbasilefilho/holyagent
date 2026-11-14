@@ -331,6 +331,7 @@ export const updateState = <A extends StateChange, E>(
   patience: Patience = STATE_PATIENCE,
   resolved?: Resolved,
   after?: (result: A) => Effect.Effect<void>,
+  authorize: Effect.Effect<void, E> = Effect.void,
 ) =>
   withStateLock(
     directory,
@@ -353,4 +354,5 @@ export const updateState = <A extends StateChange, E>(
       return result
     }),
     patience,
+    authorize,
   )
