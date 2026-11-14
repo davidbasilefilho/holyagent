@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "independently-review-committed-core-host",
   "objective": "Independently review committed Core host and routing repairs and close material prior security findings.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-core-host, immutable repair range 31a97029a68696b9b137bdee6af03a1409461d82...b8c947edb75c74ba292ff4ea10cbb473c607070c. Read previous core-host-current-security-review-report.json and /workspace/work/034/core-routing-integrated-report.json.",
     "Finish material original host port source coverage from 5b1b6e2...31a97029a68696b9b137bdee6af03a1409461d82 where earlier partial review left gaps. Read changed source/callers/contracts; generated assets equivalence by build rather than dump minified bundles. No source or VCS writes; isolated outside-repo fixtures permitted.",
@@ -49,7 +49,41 @@
     "agentId": "/root/core_host_current_security_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T00:33:29.578Z"
+    "startedAt": "2026-11-14T00:33:29.578Z",
+    "finishedAt": "2026-11-14T00:37:26.177Z"
+  },
+  "result": "status: done\nchecks:\n- git rev-parse 31a97029a68696b9b137bdee6af03a1409461d82 b8c947edb75c74ba292ff4ea10cbb473c607070c 5b1b6e2 -> exit 0\n- git diff 31a9702...b8c947e excluding generated assets -> exit 0\n- bun test packages/core/tests/shell.test.ts packages/integrations/pi/tests/routing.test.ts -> exit 0\n- bun test packages/integrations/pi/tests/extension.test.ts -t 'profile routing host gate' -> exit 0\n- bun test packages/core/tests/host-application.test.ts packages/runtime/tests/setup.test.ts packages/runtime/tests/setup-pi-settings.test.ts packages/runtime/tests/setup-t3-settings.test.ts -> exit 0\nnotes:\n- No findings in the repair range. Strict lookup now rejects empty, relative, project and symlink-alias paths and requires absolute proven resolved paths. The prior mismatched-cwd executable finding is closed for the reviewed Linux implementation; the Node Shell fixture also verifies the Core-owned Bun config suppresses project preload.\n- Reviewed strict API schemas and capabilities, setup project links, recorded undo ownership, preservation of existing Pi/T3/third-party settings and race checks, VCS Git argv, identity, PR body descriptor and GitHub transport, and native catalog denial of setup, doctor, VCS and state-mode writes. Routing preflight rechecks current user enablement, assignment, role, screen, selection, exact registry model and effort; resumes and workflows fail closed when profiled.\n- The code reviewer independently rebuilt both integrations from an isolated b8c947e archive and reported diff -qr of both full dist directories against the committed archive clean. No live provider, credentials, paid sessions or real shared-state writes. Windows execution and actual host model identity remain unverified; provider entitlement and cross-process attestation are outside scope. State initialization/migration remains separate known baseline work.\nevidence:\n- Earlier material host findings are closed and committed routing repair introduces no blocking security defect: Prior PATH and missing-config defects repaired; no new blocking finding identified in the repair range.\n- Material Core host operation and native routing boundaries have independently checked source paths and meaningful focused evidence: Source paths above and 150 focused tests passed: 9 shell/routing, 4 profile gate and 137 host/setup tests; Linux fixtures isolated outside Git ancestry.\n- checks-run: All five listed checks exit 0; separate code reviewer reports isolated build and generated-directory equivalence exit 0. No independent full verify run.\n- reviewed-range: Repair 31a97029a68696b9b137bdee6af03a1409461d82...b8c947edb75c74ba292ff4ea10cbb473c607070c; prior host source coverage 5b1b6e2...31a9702.\n- first-pass: security-review first pass covered repair non-generated diff and security-sensitive original migration paths; generated equivalence independently built by code reviewer.\n- findings: No introduced or worsened blocking security findings in the repair range; platform and live-host limits above remain unknown.",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Independent security review closed prior PATH/config findings, checked source boundaries and150 focused tests without new blocking findings; Windows/live host verification remains separate.",
+    "criteria": [
+      {
+        "criterion": "Earlier material host findings are closed and committed routing repair introduces no blocking security defect",
+        "support": "Prior PATH and missing-config defects repaired; no new blocking finding identified in the repair range."
+      },
+      {
+        "criterion": "Material Core host operation and native routing boundaries have independently checked source paths and meaningful focused evidence",
+        "support": "Source paths above and 150 focused tests passed: 9 shell/routing, 4 profile gate and 137 host/setup tests; Linux fixtures isolated outside Git ancestry."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "All five listed checks exit 0; separate code reviewer reports isolated build and generated-directory equivalence exit 0. No independent full verify run."
+      },
+      {
+        "label": "reviewed-range",
+        "support": "Repair 31a97029a68696b9b137bdee6af03a1409461d82...b8c947edb75c74ba292ff4ea10cbb473c607070c; prior host source coverage 5b1b6e2...31a9702."
+      },
+      {
+        "label": "first-pass",
+        "support": "security-review first pass covered repair non-generated diff and security-sensitive original migration paths; generated equivalence independently built by code reviewer."
+      },
+      {
+        "label": "findings",
+        "support": "No introduced or worsened blocking security findings in the repair range; platform and live-host limits above remain unknown."
+      }
+    ]
   },
   "createdAt": "2026-11-14T00:33:29.578Z"
 }
