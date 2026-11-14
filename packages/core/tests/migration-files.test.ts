@@ -40,7 +40,9 @@ const file = (
   mode: 0o100644,
 })
 const publish = (root: string, files: ReturnType<typeof file>[], authorize = Effect.void) =>
-  Effect.runPromise(publishMigrationFiles({ root, files, authorize }))
+  Effect.runPromise(
+    publishMigrationFiles({ root, files, authorize, terminalAuthorize: () => true }),
+  )
 const verify = (root: string, files: ReturnType<typeof file>[]) =>
   Effect.runPromise(verifyMigrationFiles({ root, files }))
 
@@ -83,7 +85,9 @@ test("retry resumes partial publication after authorization fails", async () =>
       existsSync(first) ? Effect.fail(new Error("interrupted")) : Effect.void,
     )
     await expect(
-      Effect.runPromise(publishMigrationFiles({ root, files, authorize })),
+      Effect.runPromise(
+        publishMigrationFiles({ root, files, authorize, terminalAuthorize: () => true }),
+      ),
     ).rejects.toThrow("interrupted")
     expect(await readFile(first, "utf8")).toBe("data\n")
     expect(existsSync(second)).toBe(false)

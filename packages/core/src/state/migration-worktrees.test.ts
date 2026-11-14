@@ -244,6 +244,7 @@ test.skipIf(process.platform === "win32")(
           true,
           undefined,
           authorize,
+          () => allowed,
         ),
       )
       await f.wait()
@@ -257,7 +258,7 @@ test.skipIf(process.platform === "win32")(
       expect(await readFile(join(f.root, ".holyagent", "first"), "utf8")).toBe("first")
       allowed = true
       const state = await Effect.runPromise(
-        resolveState(f.other, f.env, "create", true, undefined, authorize),
+        resolveState(f.other, f.env, "create", true, undefined, authorize, () => allowed),
       )
       expect(await readFile(join(state.directory, "first"), "utf8")).toBe("first")
       expect(await readFile(join(state.directory, "second"), "utf8")).toBe("second")
@@ -358,7 +359,7 @@ test.skipIf(process.platform === "win32")(
         }
       })
       const exit = await Effect.runPromiseExit(
-        resolveState(f.root, f.env, "create", true, undefined, authorize),
+        resolveState(f.root, f.env, "create", true, undefined, authorize, () => true),
       )
       expect(replaced).toBe(true)
       expect(exit._tag).toBe("Failure")
@@ -391,3 +392,34 @@ test.skipIf(process.platform === "win32")(
     }
   },
 )
+
+test("terminal sweep authority retains the marker after revocation", async () => {
+  const f = await fixture(false)
+  try {
+    await f.source(f.root, "first")
+    const parent = join(f.root, ".git", "holyagent")
+    let allowed = true
+    const authorize = Effect.promise(async () => {
+      const names = await readdir(parent).catch(() => [] as string[])
+      const name = names.find((item) => item.endsWith(".migration-sweep"))
+      if (name === undefined) return
+      const marker = join(parent, name)
+      const tree = marker.slice(0, -".migration-sweep".length)
+      if (
+        (await Bun.file(join(tree, ".holyagent", "first")).exists()) &&
+        !(await Bun.file(join(parent, "migration", "journal.json")).exists())
+      )
+        allowed = false
+    })
+    const exit = await Effect.runPromiseExit(
+      resolveState(f.root, f.env, "create", true, undefined, authorize, () => allowed),
+    )
+    expect(allowed).toBe(false)
+    expect(exit._tag).toBe("Failure")
+    expect(await Bun.file(await sweepMarker(f.root)).exists()).toBe(true)
+    const state = await Effect.runPromise(resolveState(f.root, f.env, "create"))
+    expect(await readFile(join(state.directory, "first"), "utf8")).toBe("first")
+  } finally {
+    await f.close()
+  }
+})

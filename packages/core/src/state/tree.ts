@@ -694,6 +694,7 @@ const finishMigrationSweep = <E>(
   common: string,
   branch: string,
   authorize: Effect.Effect<void, E>,
+  terminalAuthorize: () => boolean,
 ) =>
   Effect.gen(function* () {
     const path = migrationSweepPath(common, branch)
@@ -708,6 +709,8 @@ const finishMigrationSweep = <E>(
       checkSweepFile(path, current)
       if (current.dev !== before.dev || current.ino !== before.ino)
         throw new Error("migration sweep marker changed during authorization")
+      if (terminalAuthorize() !== true)
+        throw new Error("terminal migration authority is unavailable or revoked")
       await rm(path)
       await syncSweepDirectory(path)
     }).pipe(Effect.uninterruptible)
@@ -976,6 +979,7 @@ const migrateWorkTree = <E>(
   branch: string,
   patience: Patience = STATE_PATIENCE,
   authorize: Effect.Effect<void, E> = Effect.void,
+  terminalAuthorize: () => boolean = () => false,
 ) =>
   Effect.gen(function* () {
     const source = stateDirectory(top)
@@ -1145,7 +1149,12 @@ const migrateWorkTree = <E>(
                 })
               }),
             publishFiles: (journal, begin) =>
-              publishMigrationFiles({ root: targetRoot, files: journal.files, authorize: begin }),
+              publishMigrationFiles({
+                root: targetRoot,
+                files: journal.files,
+                authorize: begin,
+                terminalAuthorize,
+              }),
             publishIndex: (journal, begin) =>
               publishMigrationIndex({
                 cwd: targetRoot,
@@ -1165,6 +1174,7 @@ const migrateWorkTree = <E>(
                   root: sourceRoot,
                   source: journal.source,
                   authorize: begin,
+                  terminalAuthorize,
                   isTracked: (path) =>
                     git(sourceRoot, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
                       "--literal-pathspecs",
@@ -1424,6 +1434,7 @@ export const resolveState = <E = never>(
   online: boolean = true,
   patience?: Patience,
   authorize: Effect.Effect<void, E> = Effect.void,
+  terminalAuthorize: () => boolean = () => authorize === Effect.void,
 ) =>
   Effect.gen(function* () {
     const repository = yield* locate(cwd, env)
@@ -1513,7 +1524,16 @@ export const resolveState = <E = never>(
           if (!pending && !sweeping) {
             const source = yield* io(top, () => realpath(top))
             if (source !== targetRoot)
-              yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize)
+              yield* migrateWorkTree(
+                source,
+                common,
+                worktree,
+                env,
+                branch,
+                patience,
+                authorize,
+                terminalAuthorize,
+              )
             return
           }
           const sweepPath = migrationSweepPath(common, branch)
@@ -1579,11 +1599,29 @@ export const resolveState = <E = never>(
                 cause:
                   "migration journal does not match a registered worktree of this clone; inspect it before recovery",
               })
-            yield* migrateWorkTree(recorded, common, worktree, env, branch, patience, authorize)
+            yield* migrateWorkTree(
+              recorded,
+              common,
+              worktree,
+              env,
+              branch,
+              patience,
+              authorize,
+              terminalAuthorize,
+            )
           }
           for (const source of candidates)
-            yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize)
-          yield* finishMigrationSweep(common, branch, authorize)
+            yield* migrateWorkTree(
+              source,
+              common,
+              worktree,
+              env,
+              branch,
+              patience,
+              authorize,
+              terminalAuthorize,
+            )
+          yield* finishMigrationSweep(common, branch, authorize, terminalAuthorize)
         }),
         patience,
         authorize,

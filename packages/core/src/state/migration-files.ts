@@ -154,14 +154,25 @@ const readRegular = async (path: string) => {
     await handle.close()
   }
 }
+// Custom effect authorities must supply a synchronous, side-effect-free terminal guard.
+const terminal = (path: string, authorize: unknown, guard: (() => boolean) | undefined) => {
+  if (guard === undefined ? authorize !== Effect.void : guard() !== true)
+    throw fail(path, "terminal migration authority is unavailable or revoked")
+}
+
 const matchesMode = (mode: number, expected: number) =>
   process.platform === "win32" || (mode & 0o111) === (expected & 0o111)
 
-/** Publish absent postimages with an exclusive hard link; existing matching files are unchanged. */
+/**
+ * Publish absent postimages with an exclusive hard link; existing matching files are unchanged.
+ * Custom effect authority requires a trusted, synchronous, side-effect-free terminal guard. The
+ * Effect.void default is reserved for fully trusted callers.
+ */
 export const publishMigrationFiles = <E, R>(options: {
   readonly root: string
   readonly files: readonly MigrationJournalFile[]
   readonly authorize: Effect.Effect<void, E, R>
+  readonly terminalAuthorize?: () => boolean
 }) =>
   Effect.gen(function* () {
     const files = yield* operation(options.root, () =>
@@ -189,9 +200,10 @@ export const publishMigrationFiles = <E, R>(options: {
       const components = file.path.split("/").slice(0, -1)
       for (let i = checked.length - 1; i < components.length; i++) {
         const dir = join(options.root, ...components.slice(0, i + 1))
-        yield* operation(dir, () => recheck(checked, path))
         yield* options.authorize
+        yield* operation(dir, () => recheck(checked, path))
         yield* operation(dir, async () => {
+          terminal(dir, options.authorize, options.terminalAuthorize)
           try {
             await mkdir(dir)
           } catch (cause) {
@@ -200,15 +212,15 @@ export const publishMigrationFiles = <E, R>(options: {
         }).pipe(Effect.uninterruptible)
         checked = yield* operation(dir, () => parents(options.root, file.path))
       }
-      yield* operation(path, () => recheck(checked, path))
       yield* options.authorize
+      yield* operation(path, () => recheck(checked, path))
       const temporary = join(dirname(path), `.holyagent-migration-${randomUUID()}.tmp`)
-      // The finalizer waits for a cancelled preparation to settle before removing its temporary.
-      // Its only uninterruptible part before publication is creating the promise itself.
+      // Preparation can outlive interruption. Its finalizer schedules cleanup after it settles.
       let created = false
       yield* Effect.acquireUseRelease(
         Effect.sync(() => {
           const preparation = (async () => {
+            terminal(path, options.authorize, options.terminalAuthorize)
             const handle = await open(temporary, "wx", file.mode & 0o777)
             created = true
             try {
@@ -226,6 +238,7 @@ export const publishMigrationFiles = <E, R>(options: {
         (preparation) =>
           Effect.gen(function* () {
             yield* operation(path, () => preparation)
+            yield* options.authorize
             yield* operation(path, () => recheck(checked, path))
             if (existing !== undefined) {
               const latest = yield* operation(path, () => readRegular(path))
@@ -238,15 +251,18 @@ export const publishMigrationFiles = <E, R>(options: {
               )
                 return yield* fail(file.path, "preexisting file changed during publication")
             }
-            yield* options.authorize
-            yield* operation(path, () =>
-              existing === undefined ? link(temporary, path) : rename(temporary, path),
-            ).pipe(Effect.uninterruptible)
+            yield* operation(path, () => {
+              terminal(path, options.authorize, options.terminalAuthorize)
+              return existing === undefined ? link(temporary, path) : rename(temporary, path)
+            }).pipe(Effect.uninterruptible)
           }),
         (preparation) =>
-          Effect.promise(async () => {
-            await preparation.catch(() => {})
-            if (created) await rm(temporary, { force: true }).catch(() => {})
+          Effect.sync(() => {
+            void preparation
+              .catch(() => {})
+              .then(async () => {
+                if (created) await rm(temporary, { force: true }).catch(() => {})
+              })
           }),
       )
     }
@@ -254,12 +270,14 @@ export const publishMigrationFiles = <E, R>(options: {
 
 /**
  * Caller verifies target publication first. Tracking must be checked against the current trusted
- * index.
+ * index. Custom effect authority also requires the synchronous terminal guard used for
+ * publication.
  */
 export const cleanupMigrationSources = <E, R, E2 = never, R2 = never>(options: {
   readonly root: string
   readonly source: readonly MigrationJournalSource[]
   readonly authorize: Effect.Effect<void, E, R>
+  readonly terminalAuthorize?: () => boolean
   readonly isTracked?: (path: string) => Effect.Effect<boolean, E2, R2>
 }) =>
   Effect.gen(function* () {
@@ -290,6 +308,7 @@ export const cleanupMigrationSources = <E, R, E2 = never, R2 = never>(options: {
         retained.push({ path: file.path, reason: "tracked" })
         continue
       }
+      yield* options.authorize
       const latest = yield* operation(path, async () => {
         await recheck(checked, path)
         return readRegular(path)
@@ -302,8 +321,10 @@ export const cleanupMigrationSources = <E, R, E2 = never, R2 = never>(options: {
         retained.push({ path: file.path, reason: "changed" })
         continue
       }
-      yield* options.authorize
-      yield* operation(path, () => unlink(path)).pipe(Effect.uninterruptible)
+      yield* operation(path, () => {
+        terminal(path, options.authorize, options.terminalAuthorize)
+        return unlink(path)
+      }).pipe(Effect.uninterruptible)
       removed.push(file.path)
     }
     return { removed, retained }

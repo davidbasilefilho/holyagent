@@ -11135,6 +11135,10 @@ var readRegular = async (path) => {
     await handle.close();
   }
 };
+var terminal = (path, authorize, guard) => {
+  if (guard === undefined ? authorize !== void_3 : guard() !== true)
+    throw fail6(path, "terminal migration authority is unavailable or revoked");
+};
 var matchesMode = (mode, expected) => process.platform === "win32" || (mode & 73) === (expected & 73);
 var publishMigrationFiles = (options) => gen2(function* () {
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
@@ -11154,9 +11158,10 @@ var publishMigrationFiles = (options) => gen2(function* () {
     const components = file.path.split("/").slice(0, -1);
     for (let i = checked.length - 1;i < components.length; i++) {
       const dir = join4(options.root, ...components.slice(0, i + 1));
-      yield* operation2(dir, () => recheck(checked, path));
       yield* options.authorize;
+      yield* operation2(dir, () => recheck(checked, path));
       yield* operation2(dir, async () => {
+        terminal(dir, options.authorize, options.terminalAuthorize);
         try {
           await mkdir3(dir);
         } catch (cause) {
@@ -11166,12 +11171,13 @@ var publishMigrationFiles = (options) => gen2(function* () {
       }).pipe(uninterruptible2);
       checked = yield* operation2(dir, () => parents(options.root, file.path));
     }
-    yield* operation2(path, () => recheck(checked, path));
     yield* options.authorize;
+    yield* operation2(path, () => recheck(checked, path));
     const temporary = join4(dirname4(path), `.holyagent-migration-${randomUUID()}.tmp`);
     let created = false;
     yield* acquireUseRelease2(sync2(() => {
       const preparation = (async () => {
+        terminal(path, options.authorize, options.terminalAuthorize);
         const handle = await open3(temporary, "wx", file.mode & 511);
         created = true;
         try {
@@ -11187,18 +11193,22 @@ var publishMigrationFiles = (options) => gen2(function* () {
       return preparation;
     }), (preparation) => gen2(function* () {
       yield* operation2(path, () => preparation);
+      yield* options.authorize;
       yield* operation2(path, () => recheck(checked, path));
       if (existing !== undefined) {
         const latest = yield* operation2(path, () => readRegular(path));
         if (latest === undefined || !sameIdentity(existing.info, latest.info) || file.before === null || blob(latest.bytes, file.before) !== file.before || !matchesMode(latest.info.mode, file.mode))
           return yield* fail6(file.path, "preexisting file changed during publication");
       }
-      yield* options.authorize;
-      yield* operation2(path, () => existing === undefined ? link4(temporary, path) : rename4(temporary, path)).pipe(uninterruptible2);
-    }), (preparation) => promise2(async () => {
-      await preparation.catch(() => {});
-      if (created)
-        await rm4(temporary, { force: true }).catch(() => {});
+      yield* operation2(path, () => {
+        terminal(path, options.authorize, options.terminalAuthorize);
+        return existing === undefined ? link4(temporary, path) : rename4(temporary, path);
+      }).pipe(uninterruptible2);
+    }), (preparation) => sync2(() => {
+      preparation.catch(() => {}).then(async () => {
+        if (created)
+          await rm4(temporary, { force: true }).catch(() => {});
+      });
     }));
   }
 });
@@ -11225,6 +11235,7 @@ var cleanupMigrationSources = (options) => gen2(function* () {
       retained.push({ path: file.path, reason: "tracked" });
       continue;
     }
+    yield* options.authorize;
     const latest = yield* operation2(path, async () => {
       await recheck(checked, path);
       return readRegular(path);
@@ -11235,8 +11246,10 @@ var cleanupMigrationSources = (options) => gen2(function* () {
       retained.push({ path: file.path, reason: "changed" });
       continue;
     }
-    yield* options.authorize;
-    yield* operation2(path, () => unlink(path)).pipe(uninterruptible2);
+    yield* operation2(path, () => {
+      terminal(path, options.authorize, options.terminalAuthorize);
+      return unlink(path);
+    }).pipe(uninterruptible2);
     removed.push(file.path);
   }
   return { removed, retained };
@@ -11957,7 +11970,7 @@ var beginMigrationSweep = (common, branch, authorize) => gen2(function* () {
     await syncSweepDirectory(path);
   }).pipe(uninterruptible2);
 });
-var finishMigrationSweep = (common, branch, authorize) => gen2(function* () {
+var finishMigrationSweep = (common, branch, authorize, terminalAuthorize) => gen2(function* () {
   const path = migrationSweepPath(common, branch);
   const before = yield* io(path, async () => {
     const info = await lstat4(path);
@@ -11970,6 +11983,8 @@ var finishMigrationSweep = (common, branch, authorize) => gen2(function* () {
     checkSweepFile(path, current);
     if (current.dev !== before.dev || current.ino !== before.ino)
       throw new Error("migration sweep marker changed during authorization");
+    if (terminalAuthorize() !== true)
+      throw new Error("terminal migration authority is unavailable or revoked");
     await rm6(path);
     await syncSweepDirectory(path);
   }).pipe(uninterruptible2);
@@ -12082,7 +12097,7 @@ var pendingReadMigration = (common, branch) => gen2(function* () {
     return true;
   return (yield* kindAt(migrationSweepPath(common, branch))) !== undefined;
 });
-var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATIENCE, authorize = void_3) => gen2(function* () {
+var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATIENCE, authorize = void_3, terminalAuthorize = () => false) => gen2(function* () {
   const source = stateDirectory(top);
   const target = stateDirectory(worktree);
   const marker = yield* migrationMarker(common, top);
@@ -12209,7 +12224,12 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
             files: indexFiles(journal.files)
           });
         }),
-        publishFiles: (journal, begin) => publishMigrationFiles({ root: targetRoot, files: journal.files, authorize: begin }),
+        publishFiles: (journal, begin) => publishMigrationFiles({
+          root: targetRoot,
+          files: journal.files,
+          authorize: begin,
+          terminalAuthorize
+        }),
         publishIndex: (journal, begin) => publishMigrationIndex({
           cwd: targetRoot,
           env,
@@ -12222,6 +12242,7 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
             root: sourceRoot,
             source: journal.source,
             authorize: begin,
+            terminalAuthorize,
             isTracked: (path) => git2(sourceRoot, { ...env, GIT_OPTIONAL_LOCKS: "0" }, [
               "--literal-pathspecs",
               "ls-files",
@@ -12366,7 +12387,7 @@ var migrationReadCheckpoint = (cwd, env, branch) => gen2(function* () {
   yield* requireComplete;
   return { common: repository.common, head: ref.code === 0 ? ref.stdout.trim() : null };
 });
-var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_3) => gen2(function* () {
+var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_3, terminalAuthorize = () => authorize === void_3) => gen2(function* () {
   const repository = yield* locate(cwd, env);
   if (repository === undefined)
     return { root: cwd, directory: stateDirectory(cwd) };
@@ -12421,7 +12442,7 @@ var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_
       if (!pending && !sweeping) {
         const source = yield* io(top, () => realpath3(top));
         if (source !== targetRoot)
-          yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize);
+          yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize, terminalAuthorize);
         return;
       }
       const sweepPath = migrationSweepPath(common, branch);
@@ -12487,11 +12508,11 @@ var resolveState = (cwd, env, ensure, online = true, patience, authorize = void_
             path: migrationJournalPath(common),
             cause: "migration journal does not match a registered worktree of this clone; inspect it before recovery"
           });
-        yield* migrateWorkTree(recorded, common, worktree, env, branch, patience, authorize);
+        yield* migrateWorkTree(recorded, common, worktree, env, branch, patience, authorize, terminalAuthorize);
       }
       for (const source of candidates)
-        yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize);
-      yield* finishMigrationSweep(common, branch, authorize);
+        yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize, terminalAuthorize);
+      yield* finishMigrationSweep(common, branch, authorize, terminalAuthorize);
     }), patience, authorize);
   }
   return { root: top, directory, resolved };
@@ -14435,7 +14456,7 @@ var withState = (context, capability, ensure, use) => gen2(function* () {
   if (!canInitialize && !readOnly && ensure !== "peek")
     return yield* new Unauthorized({ capability: "state.initialize" });
   const authorizeInitialization = requireCapability(context, capability).pipe(andThen2(requireCapability(context, "state.initialize")));
-  const state = yield* resolveState(context.cwd, context.env, canInitialize ? ensure : "peek", capability !== "handoff", undefined, authorizeInitialization);
+  const state = yield* resolveState(context.cwd, context.env, canInitialize ? ensure : "peek", capability !== "handoff", undefined, authorizeInitialization, () => context.authorize(capability) === true && context.authorize("state.initialize") === true);
   const branch = readOnly && state.resolved?.mode === "branch" ? state.resolved.branch : undefined;
   const before = branch === undefined ? undefined : yield* migrationReadCheckpoint(state.root, context.env, branch);
   const result = yield* use({

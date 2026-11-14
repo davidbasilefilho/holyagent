@@ -117,6 +117,8 @@ export const withState = <A, E, R>(
       capability !== "handoff",
       undefined,
       authorizeInitialization,
+      () =>
+        context.authorize(capability) === true && context.authorize("state.initialize") === true,
     )
     const branch = readOnly && state.resolved?.mode === "branch" ? state.resolved.branch : undefined
     const before =
