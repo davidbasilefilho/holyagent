@@ -4,4 +4,8 @@ Read the relevant HolyAgent guidance file on demand.
 
 <!-- owned-guidance -->
 
+On resume and before state changes, load the state-mode skill for handoff durability.
+
+For visual-judging, load it at visual task start; complete and accept baseline collection before dispatching any task source-writing Assignment (the baseline collector may be dispatched first).
+
 Using `dev-server`, have Worker.operations start the one target per platform that the visual specialists share. Keep its platform, stack, start, probe, address, capture command, variants, owner and stop in the task list and hand it to both visual specialists. Restart it when down; accept a blocked report and judge from the closest honest substitute while saying so, and have the owner stop it when visual work ends.

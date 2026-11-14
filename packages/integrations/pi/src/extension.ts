@@ -31,7 +31,7 @@ import {
   type McpServer,
 } from "../../../runtime/src/config/capabilities.ts"
 import { type Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
-import { wordsFor } from "../../../runtime/src/domain/host.ts"
+import { canonicalPiToolName, wordsFor } from "../../../runtime/src/domain/host.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
 import { agentFor, ROUTES } from "../../../runtime/src/domain/route.ts"
 import {
@@ -78,7 +78,7 @@ import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { familyAgentPrompt, familySkillPaths } from "./families.ts"
-import { registerNativeTools } from "./native-tools.ts"
+import { NATIVE_ROOT_FLAG, registerNativeTools } from "./native-tools.ts"
 import {
   checkProfileLaunch,
   currentProfileRouting,
@@ -104,6 +104,8 @@ import {
   T3_ACCESS_STATUS,
   T3_STATUS_KEY,
 } from "./t3.ts"
+import { registerToolAliases } from "./tool-aliases.ts"
+import { registerAgentWait } from "./wait-for-agents.ts"
 
 /** The launch flag that tells the extension what the session is for: root, specialist or session. */
 export const ROLE_FLAG = "holyagent-role"
@@ -181,7 +183,10 @@ export const hostEnvironment = (
 ): Readonly<Record<string, string>> => ({
   [HOST_ENV]: "pi",
   [WORKFLOWS_ENV]:
-    activeTools.includes(WORKFLOW_TOOL) && activeTools.includes(CODEMODE_TOOL_NAME) ? "1" : "0",
+    activeTools.some((name) => canonicalPiToolName(name) === WORKFLOW_TOOL) &&
+    activeTools.includes(CODEMODE_TOOL_NAME)
+      ? "1"
+      : "0",
 })
 
 /**
@@ -241,7 +246,7 @@ export const refuseNonSpecialist = (event: {
   readonly toolName: string
   readonly input: Readonly<Record<string, unknown>>
 }): ToolCallEventResult | undefined => {
-  if (event.toolName !== AGENT_TOOL) return undefined
+  if (canonicalPiToolName(event.toolName) !== AGENT_TOOL) return undefined
   const { resume, subagent_type: type } = event.input
   if (typeof resume === "string" && resume.trim() !== "") return undefined
   const requested = typeof type === "string" ? type.trim() : ""
@@ -276,7 +281,7 @@ export const refuseNonSpecialistWorkflow = (event: {
   readonly toolName: string
   readonly input: Readonly<Record<string, unknown>>
 }): Effect.Effect<ToolCallEventResult | undefined> => {
-  if (event.toolName !== WORKFLOW_TOOL) return Effect.succeed(undefined)
+  if (canonicalPiToolName(event.toolName) !== WORKFLOW_TOOL) return Effect.succeed(undefined)
   const { script, scriptPath, name } = event.input
   const refuse = (reason: string): ToolCallEventResult => ({
     block: true,
@@ -473,6 +478,8 @@ interface Delivery {
 
 /** What one collection yields: what the next run is told, and the settings the config decides. */
 interface Collected {
+  /** Alias eligibility requires successful user and project configuration reads. */
+  readonly aliases?: true
   /**
    * False once the config is read and `pi.enable` is off, which adds no context and no settings;
    * only the root's prompt and exclusions remain, unless the user's own config is off.
@@ -1156,6 +1163,27 @@ export const createExtension =
     }).pipe(Effect.orDie)
 
     const native = registerNativeTools(pi, { env })
+    const agentWait = registerAgentWait(pi, false)
+    let aliasesAllowed = false
+    let ownedAliases: ReadonlyArray<string> = []
+    let suppressedAliases: ReadonlyArray<string> = []
+    const suspendAliases = () => {
+      aliasesAllowed = false
+      Effect.runSync(
+        Effect.try(() => {
+          const active = pi.getActiveTools()
+          const removed = active.filter((name) => ownedAliases.includes(name))
+          if (removed.length > 0) {
+            suppressedAliases = [...new Set([...suppressedAliases, ...removed])]
+            pi.setActiveTools(active.filter((name) => !removed.includes(name)))
+          }
+        }).pipe(Effect.orElseSucceed(() => undefined)),
+      )
+    }
+    const disableAgentWait = () =>
+      Effect.runSync(
+        Effect.try(() => agentWait.disable()).pipe(Effect.orElseSucceed(() => undefined)),
+      )
 
     const collect = (cwd: string, signal: AbortSignal, reason: Reason) => {
       // What the config decided, kept once known so a later failure of the collection (the status
@@ -1235,6 +1263,8 @@ export const createExtension =
           const [config, folder] = yield* Effect.fromResult(attempt)
           read = config
           const bound = boundConfigs(yield* defaultConfig, user)
+          if (user !== undefined && !user.pi.enable)
+            return { enabled: false, gatesOff: true } satisfies Collected
           if (!config.pi.enable) {
             if (user !== undefined && !user.pi.enable)
               return { enabled: false, gatesOff: true } satisfies Collected
@@ -1287,7 +1317,11 @@ export const createExtension =
           const content = piContext(role, root, state)
           // The provider is checked only after a collection that ended well: a failed one already
           // carries a notice, and the checks would start commands after its deadline.
-          const ended = { ...configured, ...(role === "root" ? { config } : {}) }
+          const ended = {
+            ...configured,
+            ...(user?.pi.enable === true ? { aliases: true as const } : {}),
+            ...(role === "root" ? { config } : {}),
+          }
           return content === undefined
             ? ({ ...ended } satisfies Collected)
             : ({
@@ -1317,6 +1351,8 @@ export const createExtension =
     // started has ended, the ones of an older start or compaction included, and every child they
     // started has exited or its stop grace (STOP_GRACE_MS, the graceMs option) has passed.
     const release = (): Promise<void> => {
+      suspendAliases()
+      disableAgentWait()
       native.setEnabled(false)
       const taken = held
       held = undefined
@@ -1540,6 +1576,8 @@ export const createExtension =
     // the tools since, and one that stopped the start's collection must not skip them. The provider's
     // variables are applied before the checks start, since the checks inherit the environment.
     const gather = (taken: Held, ctx: ExtensionContext, reason: Reason): Promise<void> => {
+      suspendAliases()
+      disableAgentWait()
       native.setEnabled(false)
       taken.current?.abort()
       const own = new AbortController()
@@ -1552,6 +1590,24 @@ export const createExtension =
       void ended.then(() => running.delete(ended))
       taken.pending = collected.then((result) => {
         if (own.signal.aborted) return undefined
+        aliasesAllowed = result?.aliases === true
+        if (aliasesAllowed && suppressedAliases.length > 0) {
+          pi.setActiveTools([...new Set([...pi.getActiveTools(), ...suppressedAliases])])
+          suppressedAliases = []
+        }
+        if (aliasesAllowed)
+          ownedAliases = [
+            ...new Set([...ownedAliases, ...registerToolAliases(pi, () => aliasesAllowed)]),
+          ]
+        if (coreServices === undefined && result?.aliases === true) agentWait.enable()
+        else {
+          disableAgentWait()
+          if (result?.enabled !== false && pi.getFlag(NATIVE_ROOT_FLAG) === true)
+            taken.setupNotice = joinNotices(
+              taken.setupNotice,
+              notice("wait_for_agents unavailable: enabled Pi configuration could not be verified"),
+            )
+        }
         native.setEnabled(coreServices === undefined && result?.nativeEnabled === true)
         taken.gatesOff = result?.gatesOff === true
         if (result?.enabled === false) taken.profileRouting = false
@@ -1617,7 +1673,7 @@ export const createExtension =
             const notApplied = applyRootTools(result.tools, taken.t3)
             taken.t3Gate = taken.t3
             taken.t3Root = taken.t3 && notApplied === undefined
-            taken.setupNotice = notApplied
+            taken.setupNotice = joinOptional(taken.setupNotice, notApplied)
             if (taken.t3 && belowFullAccess(env))
               taken.setupNotice = joinNotices(taken.setupNotice, warnBelowFullAccess(ctx))
           }

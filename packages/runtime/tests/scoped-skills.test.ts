@@ -34,6 +34,13 @@ describe("owned guidance routing", () => {
     expect(guidanceRouter("root", family, "/package")).toContain(
       "Delegate library documentation lookup",
     )
+    for (const role of ["root", "Worker.operations", "Worker.validation"])
+      expect(guidanceRouter(role, family, "/package")).toContain(
+        `/guidance/${family}/performance-iteration/SKILL.md`,
+      )
+    expect(guidanceRouter("Worker.visual", family, "/package")).not.toContain(
+      `/guidance/${family}/performance-iteration/SKILL.md`,
+    )
   })
 
   test("rejects an unmapped skill and a missing mapped skill", async () => {

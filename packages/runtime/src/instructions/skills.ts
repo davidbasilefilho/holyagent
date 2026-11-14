@@ -267,6 +267,11 @@ export const OWNED_GUIDANCE: ReadonlyArray<{
     when: "writing or reviewing model-facing instructions",
     roles: ["root", "Worker.implementation", "Reviewer.artifact"],
   },
+  {
+    name: "performance-iteration",
+    when: "a task aims to improve measurable performance",
+    roles: ["root", "Worker.operations", "Worker.validation"],
+  },
   { name: "state-mode", when: "a clone has no Intent yet", roles: ["root"] },
   { name: "user-busy", when: "the user is away or says not to ask", roles: ["root"] },
   {

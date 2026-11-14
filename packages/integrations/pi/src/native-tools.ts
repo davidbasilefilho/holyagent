@@ -3,6 +3,7 @@ import { makeContext } from "@holyagent/core"
 import { Cause, Effect, Schema } from "effect"
 import { type TSchema, Type } from "typebox"
 
+import { canonicalPiToolName } from "../../../runtime/src/domain/host.ts"
 import { CAPABILITIES, executeNative, inventory } from "../../../runtime/src/native/catalog.ts"
 import { firstPassPrompt } from "../../../runtime/src/prompts/index.ts"
 
@@ -83,7 +84,9 @@ export const registerNativeTools = (pi: ExtensionAPI, host: NativeHost): NativeT
                   ? {}
                   : { deferRouting: true as const }),
                 workflowsAvailable:
-                  pi.getActiveTools().includes("SubagentWorkflow") &&
+                  pi
+                    .getActiveTools()
+                    .some((name) => canonicalPiToolName(name) === "SubagentWorkflow") &&
                   pi.getActiveTools().includes("codemode"),
                 firstPass: {
                   "Reviewer.code": firstPassPrompt("Reviewer.code") ?? "",

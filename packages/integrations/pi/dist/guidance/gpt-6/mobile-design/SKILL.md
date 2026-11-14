@@ -86,6 +86,10 @@ Models tend to ship cramped or misaligned spacing that a glance at the whole pag
 - Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content.
 - The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render; under reduced motion, movement becomes a fade or nothing.
 
+### Iteration quality
+
+Assess the design system, composition, alignment, contrast, distribution, placement and sizing, and responsiveness. Exercise fluid component and route animation and transitions, including reduced motion. For each interactive element check hover where applicable, press or tap, keyboard focus and disabled appearance where relevant. Follow platform conventions while preserving creative latitude.
+
 ## Shared mobile rules
 
 - Adapt to the window size class, never the device, and name layout variants by class, not "tablet". Panes take the width they are given; extra width adds context and does not stretch content.

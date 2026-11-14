@@ -19,6 +19,7 @@ import {
 import { REQUIREMENT_COVERAGE } from "../../../runtime/src/instructions/coverage.ts"
 import { parseRequirements } from "../../../runtime/src/instructions/requirements.ts"
 import {
+  DESIGN_SKILLS,
   embedMateriality,
   GUIDANCE_MARKER,
   guidanceRouter,
@@ -67,6 +68,7 @@ const SKILLS = [
   "evidence-judging",
   "instruction-writing",
   "mobile-design",
+  "performance-iteration",
   "state-mode",
   "tui-design",
   "user-busy",
@@ -669,6 +671,7 @@ describe("agents", () => {
       ...SPECIALIST_SECTIONS.map((name) => toPosix(normalize(`specialist/${name}`))),
       ...CONDITIONAL_SECTIONS.map(({ file }) => `specialist/${file}`),
       "shared/materiality.md",
+      "design-core/core.md",
       ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
         names.map((name) => `roles/${role}/${name}`),
       ),
@@ -681,6 +684,19 @@ describe("agents", () => {
       expect({ id, assembled: assembled.includes(section) }).toEqual({ id, assembled: true })
       expect({ id, holds: read(CLAUDE, section).includes(phrase) }).toEqual({ id, holds: true })
       const conditional = CONDITIONAL_SECTIONS.find(({ file }) => section === `specialist/${file}`)
+      if (section === "design-core/core.md") {
+        for (const name of DESIGN_SKILLS) {
+          const skill = generated.find((file) =>
+            file.path.endsWith(`guidance/claude-5.5/${name}/SKILL.md`),
+          )
+          expect({ id, name, reaches: skill?.content.includes(phrase) }).toEqual({
+            id,
+            name,
+            reaches: true,
+          })
+        }
+        continue
+      }
       if (section.startsWith("skills/")) {
         const skill = generated.find((file) =>
           file.path.endsWith(section.replace("skills/", "guidance/claude-5.5/")),

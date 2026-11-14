@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import {
   createAgentSessionFromServices,
@@ -21,6 +21,10 @@ import { CAPABILITIES, inventory } from "../../../runtime/src/native/catalog.ts"
 import { createExtension } from "../src/extension.ts"
 import { NATIVE_ROOT_FLAG, type NativeTools, registerNativeTools } from "../src/native-tools.ts"
 
+const assertOutsideGit = (cwd: string) => {
+  expect(spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+}
+
 describe("direct native operation boundaries", () => {
   test("the complete CLI inventory is explicitly classified", () => {
     for (const command of COMMANDS) expect(CAPABILITIES[command.path.join(" ")]).toBeDefined()
@@ -31,6 +35,7 @@ describe("direct native operation boundaries", () => {
   test("actual SDK and codemode invoke direct core, revoke, and deny child flags", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "holyagent-native-sdk-"))
     try {
+      assertOutsideGit(cwd)
       let rootTools: NativeTools | undefined
       const build = async (root: boolean) => {
         const services = await createAgentSessionServices({
@@ -151,6 +156,8 @@ describe("direct native operation boundaries", () => {
     const left = await mkdtemp(join(tmpdir(), "holyagent-parity-cli-"))
     const right = await mkdtemp(join(tmpdir(), "holyagent-parity-native-"))
     try {
+      assertOutsideGit(left)
+      assertOutsideGit(right)
       const tools = new Map<string, ToolDefinition>()
       const pi = {
         registerFlag: () => undefined,
@@ -219,9 +226,28 @@ describe("direct native operation boundaries", () => {
   })
 
   test("Node bundle executes direct and codemode tools without spawning the CLI", async () => {
-    const local = await mkdtemp(join(import.meta.dir, "../.native-node-"))
+    const local = await mkdtemp(join(tmpdir(), "holyagent-native-node-host-"))
     const project = await mkdtemp(join(tmpdir(), "holyagent-native-node-project-"))
     try {
+      assertOutsideGit(local)
+      assertOutsideGit(project)
+      for (const peer of [
+        "@holyagent/core",
+        "@earendil-works/pi-coding-agent",
+        "effect",
+        "typebox",
+      ]) {
+        const directory = join(local, "node_modules", peer)
+        await mkdir(directory, { recursive: true })
+        await writeFile(
+          join(directory, "package.json"),
+          JSON.stringify({ type: "module", exports: "./index.js" }),
+        )
+        const target = pathToFileURL(Bun.resolveSync(peer, import.meta.dir)).href
+        await writeFile(join(directory, "index.js"), `export * from ${JSON.stringify(target)}\n`)
+      }
+      const runner = join(local, "fixture.mjs")
+      await copyFile(join(import.meta.dir, "node-native-fixture.mjs"), runner)
       const built = await Bun.build({
         entrypoints: [fileURLToPath(new URL("../src/native-tools.ts", import.meta.url))],
         target: "node",
@@ -232,11 +258,10 @@ describe("direct native operation boundaries", () => {
         throw new Error(JSON.stringify(built.logs))
       const bundle = join(local, "native.mjs")
       await writeFile(bundle, await built.outputs[0].text())
-      const result = spawnSync(
-        "node",
-        [join(import.meta.dir, "node-native-fixture.mjs"), bundle, project],
-        { encoding: "utf8", env: { ...process.env, HOME: project, HOLYAGENT_HOME: project } },
-      )
+      const result = spawnSync("node", [runner, bundle, project], {
+        encoding: "utf8",
+        env: { ...process.env, HOME: project, HOLYAGENT_HOME: project },
+      })
       if (result.status !== 0) throw new Error(result.stderr || result.stdout)
       expect(result.status).toBe(0)
       expect(result.stderr).toBe("")
@@ -250,6 +275,7 @@ describe("direct native operation boundaries", () => {
   test("session registration requires both readable enabled configurations", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "holyagent-native-config-"))
     try {
+      assertOutsideGit(cwd)
       const project = join(cwd, "project")
       const home = join(cwd, "home")
       const userConfig = join(home, ".holyagent", "config.json")

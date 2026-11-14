@@ -523,6 +523,38 @@ describe("rootActiveTools", () => {
     expect(toolMatches("a.b", "axb")).toBe(false)
   })
 
+  test("literal and wildcard policies match both names of known aliases", () => {
+    for (const [pattern, original, alias] of [
+      ["agent", "Agent", "agent"],
+      ["Agent", "Agent", "agent"],
+      ["agent*", "Agent", "agent"],
+      ["Agent*", "Agent", "agent"],
+      ["subagent_*", "SubagentWorkflow", "subagent_workflow"],
+      ["Subagent*", "SubagentWorkflow", "subagent_workflow"],
+      ["fff_multi_*", "fff-multi-grep", "fff_multi_grep"],
+      ["fff-multi-*", "fff-multi-grep", "fff_multi_grep"],
+    ]) {
+      expect(toolMatches(pattern!, original!)).toBe(true)
+      expect(toolMatches(pattern!, alias!)).toBe(true)
+    }
+    expect(toolMatches("agent*", "AgentOther")).toBe(false)
+    expect(toolMatches("subagent_*", "SubagentOther")).toBe(false)
+    expect(toolMatches("fff_multi_*", "fff-multi-other")).toBe(false)
+  })
+
+  test("alias patterns add and exclude both registered names", () => {
+    const names = ["Agent", "agent", "SubagentWorkflow", "subagent_workflow", "other"]
+    expect(rootActiveTools({ tools: ["+agent*"], excludeTools: [] }, [], names)).toEqual([
+      "Agent",
+      "agent",
+    ])
+    expect(rootActiveTools({ tools: [], excludeTools: ["subagent_*"] }, names, names)).toEqual([
+      "Agent",
+      "agent",
+      "other",
+    ])
+  })
+
   test("is the active selection plus the root's tools, minus the excluded ones", () => {
     expect(
       rootActiveTools(

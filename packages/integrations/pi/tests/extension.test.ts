@@ -5,6 +5,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
+import { createEventBus, type ToolDefinition } from "@earendil-works/pi-coding-agent"
 import type {
   ExecResult,
   ExtensionAPI,
@@ -302,6 +303,7 @@ const fakeApi = (
     readonly activeTools?: ReadonlyArray<string>
     /** Every registered tool; the active ones by default. */
     readonly allTools?: ReadonlyArray<string>
+    readonly toolInfo?: ReadonlyArray<object>
     /**
      * What the `pi` probes (`pi auth check`, `pi --list-models`) answer; a ready provider by
      * default.
@@ -321,6 +323,8 @@ const fakeApi = (
     readonly members?: Readonly<Record<string, unknown>>
     /** Makes `registerMcpServer` throw this. */
     readonly mcpFail?: Error
+    readonly events?: ReturnType<typeof createEventBus>
+    readonly flagValues?: Readonly<Record<string, string | boolean>>
   } = {},
 ) => {
   const flags = new Map<string, { type: string; default?: string }>()
@@ -343,7 +347,8 @@ const fakeApi = (
   const api = {
     registerFlag: (name: string, options: { type: string; default?: string }) =>
       void flags.set(name, options),
-    getFlag: (name: string) => value ?? flags.get(name)?.default,
+    getFlag: (name: string) => session.flagValues?.[name] ?? value ?? flags.get(name)?.default,
+    events: session.events,
     registerToolRenderer: (resolver: ToolRendererResolver) => void renderers.push(resolver),
     registerTool: (tool: { readonly name: string }) => void tools.push(tool),
     registerCommand: () => undefined,
@@ -353,7 +358,7 @@ const fakeApi = (
     },
     getSessionName: () => session.name,
     getActiveTools: () => [...active],
-    getAllTools: () => (session.allTools ?? active).map((name) => ({ name })),
+    getAllTools: () => session.toolInfo ?? (session.allTools ?? active).map((name) => ({ name })),
     setActiveTools: (names: ReadonlyArray<string>) => {
       if (session.toolsFail !== undefined) throw session.toolsFail
       if (session.toolsFailOnce !== undefined && !failedOnce) {
@@ -446,6 +451,7 @@ const run = async (
     sessionName?: string
     activeTools?: ReadonlyArray<string>
     allTools?: ReadonlyArray<string>
+    toolInfo?: ReadonlyArray<object>
     pi?: PiProbe
     toolsFail?: Error
     toolsFailOnce?: Error
@@ -471,6 +477,7 @@ const run = async (
     ...(options.sessionName === undefined ? {} : { name: options.sessionName }),
     ...(options.activeTools === undefined ? {} : { activeTools: options.activeTools }),
     ...(options.allTools === undefined ? {} : { allTools: options.allTools }),
+    ...(options.toolInfo === undefined ? {} : { toolInfo: options.toolInfo }),
     ...(options.pi === undefined ? {} : { pi: options.pi }),
     ...(options.toolsFail === undefined ? {} : { toolsFail: options.toolsFail }),
     ...(options.toolsFailOnce === undefined ? {} : { toolsFailOnce: options.toolsFailOnce }),
@@ -3193,6 +3200,30 @@ describe("the root's excluded tools", () => {
   const featuresOf = (features: object) =>
     project({ features: { ...DEFAULTS.pi.features, ...features } })
 
+  test("a user-level Pi off suppresses aliases even if the merged project says on", async () => {
+    const options = {
+      activeTools: ["Agent"],
+      toolInfo: [
+        {
+          name: "Agent",
+          exposure: "direct",
+          description: "fixture",
+          parameters: { type: "object" },
+          sourceInfo: {
+            path: "fixture",
+            source: "npm:@tintinweb/pi-subagents@0.23.2",
+            scope: "temporary",
+            origin: "package",
+          },
+        },
+      ],
+    }
+    const enabled = await run(configs(CONFIG, CONFIG), options)
+    expect(enabled.api.tools.some((tool) => tool.name === "agent")).toBe(true)
+    const disabled = await run(configs(CONFIG, DISABLED), options)
+    expect(disabled.api.tools.some((tool) => tool.name === "agent")).toBe(false)
+  })
+
   test("a project's pi.enable false keeps the exclusions, the gate and the root prompt", async () => {
     const { api, delivered } = await run(configs(project({ enable: false })))
     expect(delivered?.message).toBeUndefined()
@@ -4480,6 +4511,73 @@ describe("auto-review under the extension", () => {
     )
     expect(await reviewed(otherModel.api)).toBeUndefined()
   })
+})
+
+test("real Core configuration coordinates native tools, aliases and pending wait cancellation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "holyagent-native-wait-"))
+  try {
+    expect(spawnSync("git", ["-C", root, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+    const home = join(root, "home")
+    const cwd = join(root, "project")
+    await mkdir(join(home, ".holyagent"), { recursive: true })
+    await mkdir(cwd)
+    await writeFile(
+      join(home, ".holyagent", "config.json"),
+      JSON.stringify({ pi: { enable: true } }),
+    )
+    const bus = createEventBus()
+    const active = ["Agent", "codemode"]
+    const api = fakeApi(
+      (call) =>
+        call.command === "git"
+          ? {
+              code: 128,
+              stderr: "fatal: not a git repository (or any of the parent directories): .git",
+            }
+          : { code: 0 },
+      undefined,
+      cwd,
+      {
+        events: bus,
+        flagValues: { "holyagent-native-root": true },
+        activeTools: active,
+        toolInfo: [
+          {
+            name: "Agent",
+            exposure: "direct",
+            description: "fixture",
+            parameters: { type: "object" },
+            sourceInfo: {
+              path: "fixture",
+              source: "npm:@tintinweb/pi-subagents@0.23.2",
+              scope: "temporary",
+              origin: "package",
+            },
+          },
+        ],
+      },
+    )
+    actualCreateExtension({
+      packageRoot: PACKAGE_ROOT,
+      env: { HOME: home },
+      bunSearch: BUN_SEARCH,
+    })(api.pi)
+    await api.emit("session_start", { reason: "startup" })
+    await api.emit("before_agent_start", { prompt: "start", systemPrompt: "test" })
+    expect(api.tools.some((tool) => tool.name === "holyagent_intent_list")).toBe(true)
+    expect(api.tools.some((tool) => tool.name === "agent")).toBe(true)
+    const wait = api.tools.find((tool) => tool.name === "wait_for_agents") as
+      ToolDefinition | undefined
+    expect(wait).toBeDefined()
+    bus.emit("subagents:ready", {})
+    bus.emit("subagents:started", { id: "fixture" })
+    const pending = wait!.execute("wait", { timeout_ms: 10000 }, undefined, undefined, {} as never)
+    await api.emit("session_compact", {})
+    expect((await pending).details).toMatchObject({ reason: "cancelled" })
+    await api.emit("session_shutdown", {})
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 describe("profile routing host gate", () => {

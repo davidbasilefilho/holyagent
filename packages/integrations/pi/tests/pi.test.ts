@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { readFileSync, statSync } from "node:fs"
-import { mkdtemp } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -30,7 +31,7 @@ import {
   familySkills,
   promptBody,
 } from "../src/families.ts"
-import { DIST_DIRECTORY, PACKAGE_DIRECTORY, REPOSITORY } from "../src/files.ts"
+import { DIST_DIRECTORY, REPOSITORY } from "../src/files.ts"
 import {
   bundleExtension,
   DESCRIPTION,
@@ -610,17 +611,35 @@ describe("the extension", () => {
   const extension = generated.find((file) => file.path.endsWith(EXTENSION_OUTPUT))
 
   test("is a default-exported factory that registers the role flag and handlers and starts nothing", async () => {
-    // Inside the package, so the host peers resolve by the plain walk up to its node_modules, as
-    // they do for the built extension. A temp folder linked to that node_modules with a junction
-    // made Bun on Windows fail with "Cannot find module" for the peer.
-    const root = await mkdtemp(join(REPOSITORY, PACKAGE_DIRECTORY, "extension-test-"))
+    const root = await mkdtemp(join(tmpdir(), "holyagent-pi-extension-"))
     const path = join(root, "extension.mjs")
     try {
+      expect(spawnSync("git", ["-C", root, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      for (const peer of ["@earendil-works/pi-coding-agent", "@earendil-works/pi-tui", "typebox"]) {
+        const directory = join(root, "node_modules", peer)
+        await mkdir(directory, { recursive: true })
+        await writeFile(
+          join(directory, "package.json"),
+          JSON.stringify({ type: "module", exports: "./index.js" }),
+        )
+        const target = pathToFileURL(Bun.resolveSync(peer, import.meta.dir)).href
+        await writeFile(join(directory, "index.js"), `export * from ${JSON.stringify(target)}\n`)
+      }
       await Bun.write(path, extension?.content ?? "")
       const loaded = (await import(path)) as { default: (pi: unknown) => unknown }
       const used: Array<string> = []
+      const flags = new Map<string, { type: string; default?: unknown }>()
       const api = {
-        registerFlag: (name: string) => void used.push(`registerFlag ${name}`),
+        registerFlag: (name: string, options: { type: string; default?: unknown }) => {
+          flags.set(name, options)
+          used.push(`registerFlag ${name}`)
+        },
+        events: {
+          on: (event: string) => {
+            used.push(`events.on ${event}`)
+            return () => {}
+          },
+        },
         on: (event: string) => void used.push(`on ${event}`),
         registerToolRenderer: () => void used.push("registerToolRenderer"),
         registerTool: (tool: { name: string }) => void used.push(`registerTool ${tool.name}`),
@@ -628,7 +647,16 @@ describe("the extension", () => {
       }
       expect(typeof loaded.default).toBe("function")
       expect(loaded.default(api)).toBeUndefined()
+      expect(used.filter((entry) => entry === "registerFlag holyagent-native-root")).toHaveLength(1)
+      expect(flags.get("holyagent-native-root")).toMatchObject({ type: "boolean" })
+      expect(flags.get("holyagent-native-root")).not.toHaveProperty("default")
       expect(used.toSorted()).toEqual([
+        "events.on subagents:completed",
+        "events.on subagents:created",
+        "events.on subagents:disposed",
+        "events.on subagents:failed",
+        "events.on subagents:ready",
+        "events.on subagents:started",
         "on agent_start",
         "on before_agent_start",
         "on before_agent_start",
@@ -637,17 +665,21 @@ describe("the extension", () => {
         "on before_agent_start",
         "on before_agent_start",
         "on before_provider_request",
+        "on input",
         "on message_end",
         "on message_end",
         "on provider_stream_event",
         "on session_compact",
         "on session_compact",
         "on session_shutdown",
+        "on session_shutdown",
+        "on session_start",
         "on session_start",
         "on session_start",
         "on session_start",
         "on session_tree",
         "on session_tree",
+        "on tool_call",
         "on tool_call",
         "on tool_call",
         "registerCommand approve",

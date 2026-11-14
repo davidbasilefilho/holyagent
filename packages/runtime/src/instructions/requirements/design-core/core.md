@@ -1,1 +1,2 @@
 - See: R-MATERIAL
+- R-DESIGN-QUALITY: Assess the design system, composition, alignment, contrast, distribution, placement and sizing, responsiveness, fluid component and route animation and transitions, and reduced motion; exercise per-element hover where applicable, press or tap, keyboard focus and disabled states where relevant. Apply platform conventions and preserve creative latitude.

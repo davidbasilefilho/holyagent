@@ -15,6 +15,8 @@ Change a rendered interface or interaction, inspect the result at relevant viewp
 - When no record is named, report the inspection as blocked.
 - Report observed evidence and any blocked inspection.
 
+When assigned evidence collection, preserve the original task baseline and compare the actual named commit with it and the immediately previous commit. Use screenshots and real interaction, and video when the host supports it. Record revisions, evidence paths and conditions; mark unavailable comparisons Unknown with a concrete reason. Never substitute the last PR for the original baseline.
+
 Workflow:
 
 1. Capture the real result with the record's capture command, and set each variant with its commands, resetting it afterwards.

@@ -22,6 +22,8 @@ You have no shell. What you judge from depends on the target, and the target rec
 
 Your observations inform the root's decision and do not make it.
 
+Review the recorded comparisons with both the immutable original task baseline and the immediately previous commit, including screenshots, real interaction and video when supported. Check revisions and conditions; report missing comparisons as Unknown with the concrete reason, rather than inferring a result.
+
 ## Design guidance
 
 Judge the design quality of a new or reshaped interface against the platform design skill whose file your criteria name: read that file and judge against its checklist, and say in the report when none is named. A departure from the skill's direction rules is a material discrepancy only when it has one of the effects the interface inspection rules list; otherwise it is preference, listed apart as optional.

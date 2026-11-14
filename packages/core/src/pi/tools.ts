@@ -13,6 +13,7 @@ import {
   T3_VISUAL_TOOLS,
 } from "../config/capabilities.ts"
 import type { Config, RouteKey } from "../config/schema.ts"
+import { canonicalPiToolName, PI_TOOL_ALIASES } from "../domain/host.ts"
 import { type Capability, routeFor } from "../domain/route.ts"
 import { justBashEnvironment } from "./bash/settings.ts"
 import { FFF_TOOLS } from "./fff/settings.ts"
@@ -223,8 +224,17 @@ export const toolArgs = (
  * Whether a tool name matches a `--tools` or `--exclude-tools` entry: an exact name, or a pattern
  * whose `*` stands for any run of characters (`computer_use_*`).
  */
-export const toolMatches = (pattern: string, name: string): boolean =>
-  patternRegExp(pattern).test(name)
+export const toolMatches = (pattern: string, name: string): boolean => {
+  const original = canonicalPiToolName(name)
+  const matches = patternRegExp(pattern)
+  return (
+    matches.test(original) ||
+    matches.test(name) ||
+    Object.entries(PI_TOOL_ALIASES).some(
+      ([alias, target]) => target === original && matches.test(alias),
+    )
+  )
+}
 
 /**
  * The tools the root has active, for `pi.setActiveTools`, which takes names only: Pi's current

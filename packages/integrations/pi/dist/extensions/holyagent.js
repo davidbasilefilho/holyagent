@@ -10382,6 +10382,12 @@ var directiveFor = (assignment, registry, now, config) => {
   };
 };
 
+var PI_TOOL_ALIASES = {
+  agent: "Agent",
+  subagent_workflow: "SubagentWorkflow",
+  fff_multi_grep: "fff-multi-grep"
+};
+var canonicalPiToolName = (name) => PI_TOOL_ALIASES[name] ?? name;
 var CLAUDE_WORDS = {
   workflowTool: "Workflow",
   agentTool: "Agent",
@@ -13769,7 +13775,11 @@ var toolArgs = (config, key, profile = PROVIDERS[config.pi.routes[key].provider 
   const unique = [...new Set(tools)];
   return build([...unique, CODEMODE_TOOL], [...WRITE_TOOLS, ...profile.writeTools].filter((tool) => !unique.includes(tool)), noMcp, env);
 };
-var toolMatches = (pattern, name) => patternRegExp(pattern).test(name);
+var toolMatches = (pattern, name) => {
+  const original = canonicalPiToolName(name);
+  const matches = patternRegExp(pattern);
+  return matches.test(original) || matches.test(name) || Object.entries(PI_TOOL_ALIASES).some(([alias, target]) => target === original && matches.test(alias));
+};
 var rootActiveTools = (args, active, registered) => {
   const added = args.tools.flatMap((entry) => {
     const name = entry.startsWith("+") ? entry.slice(1) : entry;
@@ -25101,9 +25111,11 @@ If a specialist agent type does not resolve, stop and report it; general-purpose
 ## Calling tools
 
 Pi runs your tools through codemode: write JavaScript that calls \`tools.<name>(args)\` and return only what you need, for example \`await tools.bash({ command: "\${HOLYAGENT_PI_ROOT}/scripts/holyagent status" })\`. Run independent calls together with \`Promise.allSettled\`, so one failed call does not hide the results of the others. <!-- K34 --> \`ask_user_question\` is the exception: call it directly. Argument details are in each tool's own description and in \`holyagent help [command]\`; do not guess them. <!-- K28, K36: argument constraints stay in the schema and the CLI help, not in this text. -->
+
+At optimization start, load \`performance-iteration\`; accept the collected baseline before any task source-writing dispatch. Require specialists to read its absolute path.
 `;
 
-var dispatch_default = "## Dispatch\n\n`holyagent <command>` is `${HOLYAGENT_PI_ROOT}/scripts/holyagent <command>`, run through bash, the only interface to Intents and Assignments (`holyagent help [command]`). The extension fills `${HOLYAGENT_PI_ROOT}` with the absolute path of the installed HolyAgent package when it builds the root and specialist prompts; skill files and briefs hold no placeholder. <!-- K28, K36: command arguments are read from the CLI help, not restated here. -->\n\nDispatch every Assignment in these steps: <!-- K5 -->\n\n1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief. A brief that names a package file (a skill to read) gives its literal absolute path under the package folder, the directory above `scripts/` in the CLI path above.\n2. Run the prompt as an `agent()` in your inline `SubagentWorkflow` script (one Assignment is a one-entry workflow); without that tool, launch it with the `Agent` tool in the background. The launcher records an `Agent` launch of a dispatched Assignment and says so in its tool result. Otherwise, for a continued agent and for a workflow's agents, run `assignment record <id> --agent <agent-id>` right after the launch (`--failed` when the launch failed): `pi:<agent-id>` for an `Agent` launch, with the id the tool returns, and `pi-workflow:<run-id>/<id>` for a workflow's agent, with the run id the tool returns.\n3. On its completion notice, `assignment close <id> --outcome <o>` passes the report verbatim on stdin, never retyped or summarized; add `--accept \"<rationale>\"` once its evidence holds.\n\nSend an evidence gap back to the same specialist through the `Agent` tool's `resume` (its `pi:` agent id), then close again; a workflow agent cannot be resumed, so its gap is a new draft with `followUpOf`.\n\n## Reuse\n\nReuse is the CLI's decision: `assignment dispatch` prints either `continue` with a warm agent id and the text to send, or a spawn. For `continue`, call the `Agent` tool with `resume` set to that id and send the text. The CLI continues an idle specialist of the same role, model and effort inside the cache window whose context is relevant, and never one a review must be independent from. You only obey.\n\n## Waiting\n\nStart all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling (`get_subagent_result` waits, scheduled check-ins, sleep or wait loops) and no steering (`steer_subagent`) of running specialists; a wake that changes nothing gets one short line.\n\nStop a running agent or workflow with the host's stop control only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`.\n\nAfter a resume or compaction, `reconcile` is in context: close a Running Assignment as `interrupted` only once its agent is confirmed gone (`get_subagent_result` or the transcript; an exited parent session proves nothing).\n";
+var dispatch_default = "## Dispatch\n\n`holyagent <command>` is `${HOLYAGENT_PI_ROOT}/scripts/holyagent <command>`, run through bash, the only interface to Intents and Assignments (`holyagent help [command]`). The extension fills `${HOLYAGENT_PI_ROOT}` with the installed package path in prompts; skills and briefs hold no placeholder. <!-- K28, K36: command arguments are read from the CLI help, not restated here. -->\n\nDispatch every Assignment in these steps: <!-- K5 -->\n\n1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief and prints agent, model, effort or warm agent, and a two-line prompt. Use it as printed; never open or re-emit the brief. Name package files in briefs by literal absolute path under the package folder above `scripts/`.\n2. Run the prompt as an `agent()` in your inline `SubagentWorkflow` script (one Assignment is a one-entry workflow); without that tool, launch it with the `Agent` tool in the background. The launcher records an `Agent` launch of a dispatched Assignment and says so in its tool result. Otherwise, for a continued agent and for a workflow's agents, run `assignment record <id> --agent <agent-id>` right after the launch (`--failed` when the launch failed): `pi:<agent-id>` for an `Agent` launch, with the id the tool returns, and `pi-workflow:<run-id>/<id>` for a workflow's agent, with the run id the tool returns.\n3. On its completion notice, `assignment close <id> --outcome <o>` passes the report verbatim on stdin, never retyped or summarized; add `--accept \"<rationale>\"` once its evidence holds.\n\nSend an evidence gap back to the same specialist through the `Agent` tool's `resume` (its `pi:` agent id), then close again; a workflow agent cannot be resumed, so its gap is a new draft with `followUpOf`.\n\n## Reuse\n\nReuse is the CLI's decision: `assignment dispatch` prints `continue` with a warm agent id and text, or a spawn. For `continue`, send the text with `Agent` `resume`. The CLI selects an idle specialist of the same role, model and effort with relevant context inside the cache window, never one a review must be independent from.\n\n## Waiting\n\nStart ready independent work together. After ready root work, respond to completion, submitted input or a supported bounded wait timeout. Return to workflow notices when no completion event exists; no polling, steering, scheduled check-ins or wait loops. A wake changing nothing gets one short line.\n\nStop a running agent or workflow with the host's stop control only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`.\n\nAfter a resume or compaction, `reconcile` is in context: close a Running Assignment as `interrupted` only once its agent is confirmed gone (`get_subagent_result` or the transcript; an exited parent session proves nothing).\n";
 
 var identity_default = `# HolyAgent root
 
@@ -25244,6 +25256,11 @@ var OWNED_GUIDANCE = [
     name: "instruction-writing",
     when: "writing or reviewing model-facing instructions",
     roles: ["root", "Worker.implementation", "Reviewer.artifact"]
+  },
+  {
+    name: "performance-iteration",
+    when: "a task aims to improve measurable performance",
+    roles: ["root", "Worker.operations", "Worker.validation"]
   },
   { name: "state-mode", when: "a clone has no Intent yet", roles: ["root"] },
   { name: "user-busy", when: "the user is away or says not to ask", roles: ["root"] },
@@ -25882,9 +25899,11 @@ If a specialist agent type does not resolve, stop and report it; general-purpose
 ## Calling tools
 
 Run independent reads, searches and CLI calls together and dependent ones in order. Run each shell command alone, quote its text as code and put no echo separators between commands. Argument details are in each tool's own description and in \`holyagent help [command]\`; do not guess them. <!-- O19 -->
+
+At optimization start, load \`performance-iteration\`; accept the collected baseline before any task source-writing dispatch. Require specialists to read its absolute path.
 `;
 
-var dispatch_default2 = "## Dispatch\n\n`holyagent <command>` runs the HolyAgent CLI through the shell, the only interface to Intents and Assignments (`holyagent help [command]`). Read command arguments from the help.\n\nEvery Assignment goes through the CLI: <!-- O2: three outcome steps, since their order is fixed. -->\n\n1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief. A brief that names a package file (a skill to read) gives its literal absolute path.\n2. Run the prompt as an `agent()` in your inline workflow script (one Assignment is a one-entry workflow); without a workflow tool, launch it with the host's agent tool in the background. Record the agent that runs it with `assignment record <id> --agent <agent-id>` right after the launch (`--failed` when the launch failed), unless the launcher already recorded it and says so.\n3. On its completion notice (for a workflow, after `assignment reports` wrote the report files), `assignment close <id> --outcome <o>` passes the report verbatim on stdin from its report file, never retyped or summarized; add `--accept \"<rationale>\"` once its evidence holds.\n\nSend an evidence gap back to the same specialist through the host's resume control, then close again; a workflow agent cannot be resumed, so its gap is a new draft with `followUpOf`.\n\n## Reuse\n\nReuse is the CLI's decision: `assignment dispatch` prints either `continue` with a warm agent id and the text to send, or a spawn. For `continue`, resume that agent and send the text. The CLI continues an idle specialist of the same role, model and effort inside the cache window whose context is relevant, and never one a review must be independent from. You only obey.\n\n## Waiting\n\nStart all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling (notification reads, scheduled check-ins, sleep or wait loops) and no steering of running specialists; a wake that changes nothing gets one short line. <!-- O19: no blocking waits. -->\n\nStop a running agent or workflow with the host's stop control only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`.\n\nAfter a resume or compaction, `reconcile` is in context: continue from it, and close a Running Assignment as `interrupted` only once its agent is confirmed gone (the agent's status or its transcript; an exited parent session proves nothing). <!-- O22 -->\n";
+var dispatch_default2 = "## Dispatch\n\n`holyagent <command>` runs the HolyAgent CLI through the shell, the only interface to Intents and Assignments (`holyagent help [command]`). Read command arguments from the help.\n\nEvery Assignment goes through the CLI: <!-- O2: three outcome steps, since their order is fixed. -->\n\n1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief. A brief that names a package file (a skill to read) gives its literal absolute path.\n2. Run the prompt as an `agent()` in your inline workflow script (one Assignment is a one-entry workflow); without a workflow tool, launch it with the host's agent tool in the background. Record the agent that runs it with `assignment record <id> --agent <agent-id>` right after the launch (`--failed` when the launch failed), unless the launcher already recorded it and says so.\n3. On its completion notice (for a workflow, after `assignment reports` wrote the report files), `assignment close <id> --outcome <o>` passes the report verbatim on stdin from its report file, never retyped or summarized; add `--accept \"<rationale>\"` once its evidence holds.\n\nSend an evidence gap back to the same specialist through the host's resume control, then close again; a workflow agent cannot be resumed, so its gap is a new draft with `followUpOf`.\n\n## Reuse\n\nReuse is the CLI's decision: `assignment dispatch` prints either `continue` with a warm agent id and the text to send, or a spawn. For `continue`, resume that agent and send the text. The CLI continues an idle specialist of the same role, model and effort inside the cache window whose context is relevant, and never one a review must be independent from. You only obey.\n\n## Waiting\n\nStart ready independent work together. After ready root work, respond to completion, submitted input or a supported bounded wait timeout. Return to workflow notices when no completion event exists; no polling, steering, scheduled check-ins or wait loops. A wake changing nothing gets one short line.\n\nStop a running agent or workflow with the host's stop control only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`.\n\nAfter a resume or compaction, `reconcile` is in context: continue from it, and close a Running Assignment as `interrupted` only once its agent is confirmed gone (the agent's status or its transcript; an exited parent session proves nothing). <!-- O22 -->\n";
 
 var identity_default2 = `# HolyAgent root
 
@@ -25945,7 +25964,7 @@ Pick the cheapest specialist whose agent description fits and whose result you c
 - With several Intents open and none in use, choose one through the structured question tool.
 `;
 
-var search_default = "## Searching\n\nWhen FFF is enabled and available, search files and contents with it through codemode. Discover registered tools with `searchTools` or `ALL_TOOLS`: override mode names them `find`, `grep` and `multi_grep`; other modes use `fffind`, `ffgrep` and `fff-multi-grep`. Read each schema before calling it. When FFF is disabled or not offered on the host, search through the available shell with `rg` and `fd`, or system `grep` and `find` if those are unavailable. Report unexpectedly missing or failing FFF tools as a setup problem.\n";
+var search_default = "## Searching\n\nWhen FFF is enabled and available, search files and contents with it through codemode. Discover registered tools with `searchTools` or `ALL_TOOLS`: override mode names them `find`, `grep` and `multi_grep`; other modes use `fffind`, `ffgrep` and `fff_multi_grep` when its alias is available, otherwise `fff-multi-grep`. Read each schema before calling it. When FFF is disabled or not offered on the host, search through the available shell with `rg` and `fd`, or system `grep` and `find` if those are unavailable. Report unexpectedly missing or failing FFF tools as a setup problem.\n";
 
 var skills_default = `## Skills
 
@@ -25954,6 +25973,10 @@ Load a skill when its description names your situation; each holds rules that ma
 Read the relevant HolyAgent guidance file on demand.
 
 <!-- owned-guidance -->
+
+On resume and before state changes, load the state-mode skill for handoff durability.
+
+For visual-judging, load it at visual task start; complete and accept baseline collection before dispatching any task source-writing Assignment (the baseline collector may be dispatched first).
 
 Using \`dev-server\`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.
 
@@ -26017,7 +26040,7 @@ What you write to the user (a decision, a blocker, the final report) states only
 
 var version_control_default = '## Version control\n\nVersion control and state records are yours alone: specialists share one tree, so a stray commit, checkout or state edit corrupts the others\' work. `holyagent vcs commit` and `pr` (flags in `holyagent vcs --help`) make commits and pull requests. Nothing blocks a raw git or gh write or an edit under `.git/` or `.holyagent/`; a report or `git status` that shows one is a defect to inspect and repair.\n\n### Commit and PR text\n\nCommits and PR text read as the account owner wrote them, in English and the target repository\'s format unless its convention says otherwise. They name no agent, model or tool, Assignment, review round or "the user", and carry no attribution trailer, `Co-Authored-By`, session or "generated with" line. The history describes the change, not the process that made it, and the owner is accountable for it.\n\n`vcs commit` cleans and checks the message, stages exactly the paths given (name only the paths of the Assignments being committed, and keep unrelated work apart) and refuses a path under `.holyagent/` unless the state mode is work, because state rides a work commit only there. In the branch and local state modes Intent state never rides a work commit.\n\nThe target repository\'s conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its branch and PR history) come first (Precedence): its language, headline format (for example Conventional Commits), body style and PR template. Without a convention, write an imperative headline under about 72 characters and a short body saying why when the headline does not.\n\n### With plain Git\n\n- Identity: commits use the configured git identity, which must be the user\'s own, and the author is never an agent. `vcs commit` refuses an agent\'s identity, and its error says how to fix it.\n- Branches: start each from the open stack\'s top or the base with `git switch -c <name> <start>` outside a cloud session (inside one, the next bullet), named as the stack plan sets, and use a git worktree for parallel branches. `git remote -v` and `gh repo view` supply only the remote and the default branch, so the base (see the identity rules) comes from the conventions or the user first. Work on a branch of your own as the identity rules say, and never work around a refused push.\n- In a cloud session leave the primary checkout on the assigned branch at its start commit, with no commits and no other checkout there: create each branch, work and check out commits for review in a git worktree (`git worktree add -b <name> <path> <start>`), since the session panel shows the primary checkout\'s diff.\n- Commits and merges: each commit on a branch is atomic (one logical change that builds and passes the gates on its own, generated files included) and a Conventional Commit, so review and bisect stay readable. PRs merge by squash by default, with the PR title as the Conventional summary, so the base keeps one commit per PR. Branch protection, merge settings and conventions decide first (Precedence), because the PR must be mergeable.\n- Push: `git push -u origin <branch>…` at the push step of the order in Assignments and acceptance (a user instruction to the contrary outranks it); in the branch state mode push `holyagent/state` in the same step so the records reach the remote with the work. The force-push and protected-branch rules in the identity rules apply, and a rewrite of published history goes to the user.\n- Before a commit: read `git status` and `git diff` of the paths so the commit holds what the Assignments produced, and check them for secrets (`.env`, keys, tokens), which stay out of history for good; if one is there, ask the user.\n- Git config: leave it unchanged; if `vcs commit` refuses the identity, follow its error and report it, since a config edit made to pass would defeat the check.\n- Non-interactive: run git without `-i` or an editor (`-m`, `GIT_EDITOR=true`), because nobody is there to answer a prompt. Treat the command text as code and quote it.\n- A failed hook means the commit did not happen: fix the cause, re-stage and run `vcs commit` again; `--amend` would rewrite the previous commit instead.\n\n### Merging\n\nWhen reviewed PRs are green, do not ask whether to merge or how; report them in the final report as ready to merge and wait, since merging needs the user to name it. On that word, merge at once without asking the method, choosing in this order: the repository\'s convention (merge settings, CONTRIBUTING, the history of merged PRs), else the method the user chose earlier, else the holyagent default (squash, as above). Merge a stack bottom-up, merging forward as the stack plan says. <!-- O6: the merge is the approval-last step, and the user\'s word is the approval. -->\n\n### Branch deletion\n\nDelete a branch, local or remote, merged or not, only when the user asks. Branches are the user\'s to remove: they keep history and references after a merge, and deleting is destructive. Keep every branch otherwise. After a merge, leave the merged branches alone: do not pass `--delete-branch` (or the API equivalent) when merging, leave a repository\'s own auto-delete-on-merge setting as it is, and do not propose deleting them, offer deletion as a question option, or list kept branches as remaining work or cleanup in a report.\n';
 
-var workflows_default = "## Workflows\n\nWorkflows run all new work, in parallel or in sequence. Choosing this agent is the user's opt-in to the host's workflow tool, and its launch asks for no confirmation. `assignment create` each Assignment, run `plan`, then write the script inline, in the script argument of the workflow call: each workflow is composed for the work at hand and no prebuilt script exists. <!-- O5 --> The script is plain JavaScript with this shape:\n\n- It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.\n- It calls `agent()` once per Assignment with the prompt `assignment dispatch` printed and `{ agentType, model, effort, label: \"<Assignment id>\" }`, the `agentType`, model and effort as printed. Model and effort are identical within a phase. It passes no `schema`, so the call returns the specialist's own report.\n- It runs the Assignments through `pipeline()`, which has no barrier; use `parallel()` only where a stage needs every earlier result. A review stage follows the writers it reviews, as `plan` pairs them.\n- It uses nothing that could hang or exhaust memory.\n- It returns only `{ done: [ids] }`, the Assignments whose agent returned a report; the reports stay out of the workflow result and your context.\n\n```js\nexport const meta = { name: \"ready-work\", description: \"Run the ready Assignments\" }\nconst entries = [\n  {\n    id: \"<id>\",\n    agentType: \"<agent>\",\n    model: \"<model>\",\n    effort: \"<effort>\",\n    prompt: \"<dispatch prompt>\",\n  },\n]\nconst done = []\nawait pipeline(entries, async (e) => {\n  const report = await agent(e.prompt, {\n    agentType: e.agentType,\n    model: e.model,\n    effort: e.effort,\n    label: e.id,\n  })\n  if (report) done.push(e.id)\n})\nreturn { done }\n```\n\nRight after launch, take the run id from the workflow tool's result and record each entry with `assignment record <id> --agent <run-id>/<id>` in the form `holyagent help assignment` gives for this host (`workflow:` or `pi-workflow:` first): the run id exists only once the launch has returned, so you record them. When the run completes, `holyagent assignment reports <journal>` writes each report to a file by label and prints id, path and words (`holyagent help assignment` names the journal file for this host); close each Assignment from its file. An Assignment it does not list returned no result; a workflow agent cannot be resumed, so close it with `--outcome errored` once the run has completed, without further confirmation.\n\nUse direct subagents only when the workflow tool is disabled or unavailable: launch the `fallback` writers together with the host's agent tool and each review once the writers it depends on are terminal; their reports arrive in their completion notices. Work that continues a warm specialist (`plan` lists it as `continues`) goes through the host's resume control beside the workflow; take reuse as printed. Independent agents launch together, so work that can run in parallel does. <!-- O18 -->\n";
+var workflows_default = "## Workflows\n\nWorkflows run all new work; choosing this agent opts in to the host's workflow tool without confirmation. `assignment create` each Assignment, run `plan`, then write the script inline: no prebuilt script exists. <!-- O5 --> The script is plain JavaScript:\n\n- It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.\n- It calls `agent()` once per Assignment with the prompt `assignment dispatch` printed and `{ agentType, model, effort, label: \"<Assignment id>\" }`, the `agentType`, model and effort as printed. Model and effort are identical within a phase. It passes no `schema`, so the call returns the specialist's own report.\n- It runs the Assignments through `pipeline()`, which has no barrier; use `parallel()` only where a stage needs every earlier result. A review stage follows the writers it reviews, as `plan` pairs them.\n- It uses nothing that could hang or exhaust memory.\n- It returns only `{ done: [ids] }`, the Assignments whose agent returned a report; the reports stay out of the workflow result and your context.\n\n```js\nexport const meta = { name: \"ready-work\", description: \"Run the ready Assignments\" }\nconst entries = [\n  {\n    id: \"<id>\",\n    model: \"<model>\",\n    effort: \"<effort>\",\n    prompt: \"<dispatch prompt>\",\n  },\n]\nconst done = []\nawait pipeline(entries, async (e) => {\n  const report = await agent(e.prompt, {\n    agentType: \"worker-implementation\",\n    model: e.model,\n    effort: e.effort,\n    label: e.id,\n  })\n  if (report) done.push(e.id)\n})\nreturn { done }\n```\n\nAfter launch, record each entry as `assignment record <id> --agent <run-id>/<id>` with the host prefix from `holyagent help assignment`. The completion notice identifies the journal; `assignment reports <journal>` writes reports by label. Close from each file. Once the run completes, an Assignment it does not list returned no result and has no running agent; close it errored without further confirmation because workflow agents cannot be resumed.\n\nUse direct subagents only when the workflow tool is disabled or unavailable: launch the `fallback` writers together with the host's agent tool and each review once the writers it depends on are terminal; their reports arrive in their completion notices. Work that continues a warm specialist (`plan` lists it as `continues`) goes through the host's resume control beside the workflow; take reuse as printed. Independent agents launch together, so work that can run in parallel does. <!-- O18 -->\n\nThe example's literal agent type is for a worker-implementation Assignment; write the actual specialist as a literal in each call. In Pi use `agent` and `subagent_workflow` when offered, else their original names. After ready root work, use `wait_for_agents` if offered for top-level agents or submitted input. Its timeout has unknown cache retention. Workflow completion has no public wait event: return to host notifications. When wait is unavailable, use host notifications.\n";
 
 var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--no-gpg-sign`, `-c commit.gpgsign=false`) unless the user asks, because they carry the repository's checks.\n- Amend only your own unpushed commit; never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval, since others build on that history.\n";
 
@@ -26168,7 +26191,7 @@ Pick the cheapest specialist whose agent description fits and whose result you c
 - With several Intents open and none in use, choose one through \`ask_user_question\`.
 `;
 
-var search_default2 = "## Searching\n\nWhen FFF is enabled and available, search files and contents with it through codemode. Discover registered tools with `searchTools` or `ALL_TOOLS`: override mode names them `find`, `grep` and `multi_grep`; other modes use `fffind`, `ffgrep` and `fff-multi-grep`. Read each schema before calling it. When FFF is disabled or not offered on the host, search through the available shell with `rg` and `fd`, or system `grep` and `find` if those are unavailable. Report unexpectedly missing or failing FFF tools as a setup problem.\n";
+var search_default2 = "## Searching\n\nWhen FFF is enabled and available, search files and contents with it through codemode. Discover registered tools with `searchTools` or `ALL_TOOLS`: override mode names them `find`, `grep` and `multi_grep`; other modes use `fffind`, `ffgrep` and `fff_multi_grep` when its alias is available, otherwise `fff-multi-grep`. Read each schema before calling it. When FFF is disabled or not offered on the host, search through the available shell with `rg` and `fd`, or system `grep` and `find` if those are unavailable. Report unexpectedly missing or failing FFF tools as a setup problem.\n";
 
 var skills_default2 = `## Skills
 
@@ -26177,6 +26200,10 @@ Classify the situation first, then load only the skill that matches it; each hol
 Read the relevant HolyAgent guidance file on demand.
 
 <!-- owned-guidance -->
+
+On resume and before state changes, load the state-mode skill for handoff durability.
+
+For visual-judging, load it at visual task start; complete and accept baseline collection before dispatching any task source-writing Assignment (the baseline collector may be dispatched first).
 
 Using \`dev-server\`, have Worker.operations detect the platform and start one render target for visual work. Keep its target record (platform, detected stack, start, probe, address, capture command, variants, owner and stop) in the task list and hand it to Worker.visual and Reviewer.visual so they share it. Restart the target when it is down. Accept a blocked report and judge from the closest honest substitute while saying so. Have the owner stop the target when the visual work ends.
 `;
@@ -26225,7 +26252,7 @@ What you write to the user (a decision, a blocker, the final report) states only
 
 var version_control_default2 = '## Version control\n\nVersion control and state records are yours alone: specialists share one tree, so a stray commit, checkout or state edit corrupts the others\' work. `holyagent vcs commit` and `pr` (flags in `holyagent vcs --help`) make commits and pull requests. Nothing blocks a raw git or gh write or an edit under `.git/` or `.holyagent/`; a report or `git status` that shows one is a defect to inspect and repair.\n\n### Commit and PR text\n\nCommits and PR text read as the account owner wrote them, in English and the target repository\'s format unless its convention says otherwise. They name no agent, model or tool (Kimi, pi, Claude), Assignment, review round or "the user", and carry no attribution trailer, `Co-Authored-By`, session or "generated with" line. The history describes the change, not the process that made it, and the owner is accountable for it.\n\n`vcs commit` cleans and checks the message, stages exactly the paths given (name only the paths of the Assignments being committed, and keep unrelated work apart) and refuses a path under `.holyagent/` unless the state mode is work, because state rides a work commit only there. In the branch and local state modes Intent state never rides a work commit.\n\nThe target repository\'s conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, its branch and PR history) come first (Precedence): its language, headline format (for example Conventional Commits), body style and PR template. Without a convention, write an imperative headline under about 72 characters and a short body saying why when the headline does not.\n\n### With plain Git\n\n- Identity: commits use the configured git identity, which must be the user\'s own, and the author is never an agent. `vcs commit` refuses an agent\'s identity, and its error says how to fix it.\n- Branches: start each from the open stack\'s top or the base with `git switch -c <name> <start>` outside a cloud session (inside one, the next bullet), named as the stack plan sets, and use a git worktree for parallel branches. `git remote -v` and `gh repo view` supply only the remote and the default branch, so the base (see the identity rules) comes from the conventions or the user first. Work on a branch of your own as the identity rules say, and never work around a refused push.\n- In a cloud session leave the primary checkout on the assigned branch at its start commit, with no commits and no other checkout there: create each branch, work and check out commits for review in a git worktree (`git worktree add -b <name> <path> <start>`), since the session panel shows the primary checkout\'s diff.\n- Commits and merges: each commit on a branch is atomic (one logical change that builds and passes the gates on its own, generated files included) and a Conventional Commit, so review and bisect stay readable. PRs merge by squash by default, with the PR title as the Conventional summary, so the base keeps one commit per PR. Branch protection, merge settings and conventions decide first (Precedence), because the PR must be mergeable.\n- Push: `git push -u origin <branch>…` at the push step of the order in Assignments and acceptance (a user instruction to the contrary outranks it); in the branch state mode push `holyagent/state` in the same step so the records reach the remote with the work. The force-push and protected-branch rules in the identity rules apply, and a rewrite of published history goes to the user.\n- Before a commit: read `git status` and `git diff` of the paths so the commit holds what the Assignments produced, and check them for secrets (`.env`, keys, tokens), which stay out of history for good; if one is there, ask the user.\n- Git config: leave it unchanged; if `vcs commit` refuses the identity, follow its error and report it, since a config edit made to pass would defeat the check.\n- Non-interactive: run git without `-i` or an editor (`-m`, `GIT_EDITOR=true`), because nobody is there to answer a prompt.\n- A failed hook means the commit did not happen: fix the cause, re-stage and run `vcs commit` again; `--amend` would rewrite the previous commit instead.\n\n### Merging\n\nWhen reviewed PRs are green, do not ask whether to merge or how; report them in the final report as ready to merge and wait, since merging needs the user to name it. On that word, merge at once without asking the method, choosing in this order: the repository\'s convention (merge settings, CONTRIBUTING, the history of merged PRs), else the method the user chose earlier, else the holyagent default (squash, as above). Merge a stack bottom-up, merging forward as the stack plan says.\n\n### Branch deletion\n\nDelete a branch, local or remote, merged or not, only when the user asks. Branches are the user\'s to remove: they keep history and references after a merge, and deleting is destructive. Keep every branch otherwise. After a merge, leave the merged branches alone: do not pass `--delete-branch` (or the API equivalent) when merging, leave a repository\'s own auto-delete-on-merge setting as it is, and do not propose deleting them, offer deletion as an `ask_user_question` option, or list kept branches as remaining work or cleanup in a report.\n';
 
-var workflows_default2 = "## Workflows\n\nWorkflows run all new work, in parallel or in sequence. Choosing this agent is the user's opt-in to the `SubagentWorkflow` tool, and its launch asks for no confirmation. `assignment create` each Assignment, run `plan`, then write the script inline, in the `script` argument of the `SubagentWorkflow` call: each workflow is composed for the work at hand and no prebuilt script exists. The script is plain JavaScript:\n\n- It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.\n- It calls `agent()` once per Assignment with the prompt `assignment dispatch` printed and `{ agentType, model, effort, label: \"<Assignment id>\" }`, the `agentType`, model and effort as printed. Model and effort are identical within a phase. It passes no `schema`, so the call returns the specialist's own report.\n- It runs the Assignments through `pipeline()`, which has no barrier; use `parallel()` only where a stage needs every earlier result. A review stage follows the writers it reviews, as `plan` pairs them.\n- It uses nothing that could hang or exhaust memory.\n- It returns each Assignment's id with the report its agent returned: `assignment reports` reads Claude's workflow journal and this tool's journal has another shape, so the reports travel in the result and you close each Assignment from its own report.\n\n<!-- K6: one short example of the script shape; the placeholders are filled from the printed dispatch. -->\n\n```js\nexport const meta = { name: \"ready-work\", description: \"Run the ready Assignments\" }\nconst entries = [\n  {\n    id: \"<id>\",\n    agentType: \"<agent>\",\n    model: \"<model>\",\n    effort: \"<effort>\",\n    prompt: \"<dispatch prompt>\",\n  },\n]\nreturn await pipeline(entries, async (e) => ({\n  id: e.id,\n  report: await agent(e.prompt, {\n    agentType: e.agentType,\n    model: e.model,\n    effort: e.effort,\n    label: e.id,\n  }),\n}))\n```\n\nRight after launch, take the run id from the `SubagentWorkflow` result and record each entry with `assignment record <id> --agent pi-workflow:<run-id>/<id>`: the run id exists only once the launch has returned, so you record them. When the run completes, close each Assignment from its own report. An Assignment whose agent returned no report returned no result; a workflow agent cannot be resumed, so close it with `--outcome errored` once the run has completed, without further confirmation.\n\nUse direct subagents only when `SubagentWorkflow` is disabled or unavailable: launch the `fallback` writers together with the `Agent` tool and each review once the writers it depends on are terminal; their reports arrive in their completion notices. Work that continues a warm specialist (`plan` lists it as `continues`) goes through the `Agent` tool's `resume` beside the workflow; take reuse as printed.\n";
+var workflows_default2 = '## Workflows\n\nWorkflows run all new work; choosing this agent opts in to `SubagentWorkflow` without confirmation. `assignment create` each Assignment, run `plan`, then write the script inline: no prebuilt script exists. The script is plain JavaScript:\n\n- It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.\n- It calls `agent()` once per Assignment with the prompt `assignment dispatch` printed and `{ agentType, model, effort, label: "<Assignment id>" }`, the `agentType`, model and effort as printed. Model and effort are identical within a phase. It passes no `schema`, so the call returns the specialist\'s own report.\n- It runs the Assignments through `pipeline()`, which has no barrier; use `parallel()` only where a stage needs every earlier result. A review stage follows the writers it reviews, as `plan` pairs them.\n- It uses nothing that could hang or exhaust memory.\n- It returns only `{ done: [ids] }`; `assignment reports` reads the completed Pi workflow journal and writes each report to a file.\n\n<!-- K6: one short example of the script shape; the placeholders are filled from the printed dispatch. -->\n\n```js\nexport const meta = { name: "ready-work", description: "Run the ready Assignments" }\nconst entries = [\n  {\n    id: "<id>",\n    model: "<model>",\n    effort: "<effort>",\n    prompt: "<dispatch prompt>",\n  },\n]\nconst done = []\nawait pipeline(entries, async (e) => {\n  const report = await agent(e.prompt, {\n    agentType: "worker-implementation",\n    model: e.model,\n    effort: e.effort,\n    label: e.id,\n  })\n  if (report) done.push(e.id)\n})\nreturn { done }\n```\n\nRight after launch, take the run id from the `SubagentWorkflow` result and record each entry with `assignment record <id> --agent pi-workflow:<run-id>/<id>`. The completion notice identifies the journal; `assignment reports <journal>` writes reports by label. Close from each file. Once the run completes, an Assignment it does not list returned no result and has no running agent; close it errored without further confirmation because workflow agents cannot be resumed.\n\nIf `SubagentWorkflow` is unavailable, launch `fallback` writers together and each review after its writers are terminal; reports arrive in completion notices. For a warm specialist, use the `Agent` tool\'s `resume` as `plan` prints.\n\nThe example\'s literal type is for worker-implementation; put the dispatched specialist\'s name as a literal in each call. Use `agent` and `subagent_workflow` when offered, else their original names. After ready root work, use `wait_for_agents` if available for top-level agents or submitted input. Its timeout has unknown cache retention. Workflow completion has no public wait event: return to host notifications. When wait is unavailable, use host notifications.\n';
 
 var history_rules_default2 = "- Never bypass hooks or signing (`--no-verify`, `--no-gpg-sign`, `-c commit.gpgsign=false`) unless the user asks, because they carry the repository's checks.\n- Amend only your own unpushed commit; never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval, since others build on that history.\n";
 
@@ -27329,7 +27356,7 @@ var registerAutoReview = (pi, host) => {
       return;
     const info = pi.getAllTools().find((tool) => tool.name === event.toolName);
     const result = await runPromise2(gate({
-      call: { toolName: event.toolName, input: event.input },
+      call: { toolName: canonicalPiToolName(event.toolName), input: event.input },
       cwd: ctx.cwd,
       traits: toolTraits(info),
       entries: sync2(() => entriesFromMessages(ctx.sessionManager.getBranch().flatMap((entry) => entry.type === "message" ? [entry.message] : []))),
@@ -27952,7 +27979,7 @@ var registerNativeTools = (pi, host) => {
                 host: "pi",
                 authorize: () => allowed(),
                 ...["assignment dispatch", "plan"].includes(command) ? {} : { deferRouting: true },
-                workflowsAvailable: pi.getActiveTools().includes("SubagentWorkflow") && pi.getActiveTools().includes("codemode"),
+                workflowsAvailable: pi.getActiveTools().some((name) => canonicalPiToolName(name) === "SubagentWorkflow") && pi.getActiveTools().includes("codemode"),
                 firstPass: {
                   "Reviewer.code": firstPassPrompt("Reviewer.code") ?? "",
                   "Reviewer.security": firstPassPrompt("Reviewer.security") ?? ""
@@ -28141,6 +28168,266 @@ var refuseDeactivatedT3Tool = (event) => isDeactivatedT3Tool(event.toolName) ? {
   reason: `The root may not use ${event.toolName}: HolyAgent keeps T3 Code's orchestration, thread and schedule tools off and delegates through its own specialists.`
 } : undefined;
 
+import { VERSION as VERSION3 } from "@earendil-works/pi-coding-agent";
+var PINNED_SOURCES = {
+  Agent: piPackageSource("@tintinweb/pi-subagents"),
+  SubagentWorkflow: piPackageSource("@tintinweb/pi-subagents"),
+  "fff-multi-grep": piPackageSource("@ff-labs/pi-fff")
+};
+var isPinnedAliasTarget = (target) => target.sourceInfo?.origin === "package" && target.sourceInfo.source === PINNED_SOURCES[target.name];
+var aliasTargetCallable = (target, active) => target.exposure === "direct" ? active.includes(target.name) : target.exposure === "codemode" || target.exposure === "deferred";
+var registerToolAliases = (pi, allowed = () => true, isSupported = isPinnedAliasTarget, hostVersion = VERSION3) => {
+  if (hostVersion !== "1.5.0")
+    return [];
+  const registered = [];
+  for (const [alias, original] of Object.entries(PI_TOOL_ALIASES)) {
+    const tools = pi.getAllTools();
+    const target = tools.find((tool) => tool.name === original);
+    if (target === undefined || tools.some((tool) => tool.name === alias) || !isSupported(target) || !aliasTargetCallable(target, pi.getActiveTools()))
+      continue;
+    const schema = JSON.stringify(target.parameters);
+    registered.push(alias);
+    pi.registerTool({
+      name: alias,
+      label: alias,
+      description: target.description,
+      parameters: target.parameters,
+      exposure: target.exposure,
+      defaultActive: pi.getActiveTools().includes(original),
+      ...target.promptGuidelines === undefined ? {} : { promptGuidelines: target.promptGuidelines },
+      ...target.annotations === undefined ? {} : { annotations: target.annotations },
+      prepareLoadout: () => ({ hiddenDeclarations: [original] }),
+      execute: async (_id, args, signal, onUpdate, ctx) => {
+        if (!allowed())
+          return {
+            content: [
+              { type: "text", text: "HolyAgent's Pi configuration is disabled or unavailable." }
+            ],
+            details: {},
+            isError: true
+          };
+        const current = pi.getAllTools().find((tool) => tool.name === original);
+        if (current === undefined || !isSupported(current) || current.sourceInfo.path !== target.sourceInfo.path || current.sourceInfo.source !== target.sourceInfo.source || !aliasTargetCallable(current, pi.getActiveTools()) || JSON.stringify(current.parameters) !== schema)
+          return {
+            content: [
+              {
+                type: "text",
+                text: `The target ${original} is no longer callable with its registered schema.`
+              }
+            ],
+            details: {},
+            isError: true
+          };
+        const result = await ctx.executeTool(original, args, {
+          ...signal === undefined ? {} : { signal },
+          ...onUpdate === undefined ? {} : { onUpdate }
+        });
+        return { ...result.result, isError: result.isError || result.result.isError === true };
+      }
+    });
+  }
+  return registered;
+};
+
+import { VERSION as VERSION4 } from "@earendil-works/pi-coding-agent";
+import { Type as Type3 } from "typebox";
+var createAgentWait = (bus) => {
+  const active = new Set;
+  const completed = [];
+  let pendingInput = false;
+  let cancelled = false;
+  let ready = false;
+  let disposed = false;
+  let wake;
+  const idOf = (value) => typeof value === "object" && value !== null && ("id" in value) && typeof value.id === "string" ? value.id : undefined;
+  const start = (value) => {
+    const id = idOf(value);
+    if (id !== undefined)
+      active.add(id);
+  };
+  const finish = (status) => (value) => {
+    const id = idOf(value);
+    if (id === undefined)
+      return;
+    active.delete(id);
+    completed.push({ reason: "agent", id, status });
+    wake?.();
+  };
+  const unsubscribe = [
+    bus.on("subagents:ready", () => {
+      ready = true;
+      wake?.();
+    }),
+    bus.on("subagents:created", start),
+    bus.on("subagents:started", start),
+    bus.on("subagents:completed", finish("completed")),
+    bus.on("subagents:failed", finish("failed")),
+    bus.on("subagents:disposed", () => {
+      disposed = true;
+      wake?.();
+    })
+  ];
+  const next = () => {
+    if (disposed)
+      return { reason: "cancelled", detail: "session disposed" };
+    if (cancelled) {
+      cancelled = false;
+      return { reason: "cancelled", detail: "Pi configuration is unavailable" };
+    }
+    const agent = completed.shift();
+    if (agent !== undefined)
+      return agent;
+    if (pendingInput) {
+      pendingInput = false;
+      return { reason: "input" };
+    }
+    return;
+  };
+  return {
+    cancel() {
+      if (wake !== undefined) {
+        cancelled = true;
+        wake();
+      }
+    },
+    input(source) {
+      if (source !== "interactive" && source !== "rpc")
+        return;
+      pendingInput = true;
+      wake?.();
+    },
+    wait(options) {
+      if (options.signal?.aborted === true)
+        return Promise.resolve({ reason: "cancelled" });
+      const immediate = next();
+      if (immediate !== undefined)
+        return Promise.resolve(immediate);
+      if (options.workflowPending === true)
+        return Promise.resolve({
+          reason: "unavailable",
+          detail: "workflow completion has no public wait event; return to host notifications"
+        });
+      if (!ready || active.size === 0)
+        return Promise.resolve({
+          reason: "unavailable",
+          detail: !ready ? "agent lifecycle events unavailable" : "no observed top-level agent is running"
+        });
+      if (wake !== undefined)
+        return Promise.resolve({ reason: "unavailable", detail: "a wait is already pending" });
+      const timeoutMs = Math.max(1, Math.min(options.timeoutMs, 60000));
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => finishWait({ reason: "timeout", timeoutMs, cache: "unknown" }), timeoutMs);
+        const finishWait = (result) => {
+          clearTimeout(timer);
+          options.signal?.removeEventListener("abort", abort);
+          wake = undefined;
+          resolve(result);
+        };
+        const abort = () => finishWait({ reason: "cancelled" });
+        wake = () => {
+          const result = next();
+          if (result !== undefined)
+            finishWait(result);
+        };
+        options.signal?.addEventListener("abort", abort, { once: true });
+        if (options.signal?.aborted === true)
+          abort();
+        else
+          wake();
+      });
+    },
+    dispose() {
+      disposed = true;
+      wake?.();
+      for (const off of unsubscribe)
+        off();
+    }
+  };
+};
+var registerAgentWait = (pi, registerRootFlag = true, hostVersion = VERSION4) => {
+  if (registerRootFlag)
+    pi.registerFlag("holyagent-native-root", {
+      type: "boolean",
+      description: "Enable root-only HolyAgent tools"
+    });
+  if (hostVersion !== "1.5.0" || typeof pi.events?.on !== "function")
+    return { enable: () => {}, disable: () => {} };
+  let waiting = createAgentWait(pi.events);
+  let closed = false;
+  let registered = false;
+  let permitted = false;
+  let suppressed = false;
+  let workflowPending = false;
+  pi.on("session_start", () => {
+    if (closed) {
+      waiting = createAgentWait(pi.events);
+      closed = false;
+      workflowPending = false;
+    }
+    permitted = false;
+  });
+  const enable = () => {
+    if (pi.getFlag("holyagent-native-root") !== true)
+      return;
+    if (registered) {
+      permitted = true;
+      if (suppressed)
+        pi.setActiveTools([...new Set([...pi.getActiveTools(), "wait_for_agents"])]);
+      suppressed = false;
+      return;
+    }
+    if (pi.getAllTools().some((tool) => tool.name === "wait_for_agents"))
+      return;
+    registered = true;
+    permitted = true;
+    pi.registerTool({
+      name: "wait_for_agents",
+      label: "Wait for agents or input",
+      description: "Wait for an observed top-level agent completion or submitted input. Workflows have no supported completion event: pass workflow_pending and return to host notifications. The timeout uses an explicit fallback, not a known cache TTL.",
+      parameters: Type3.Object({
+        timeout_ms: Type3.Optional(Type3.Integer({ minimum: 1, maximum: 60000 })),
+        workflow_pending: Type3.Optional(Type3.Boolean())
+      }),
+      execute: async (_id, args, signal) => {
+        const result = permitted && pi.getFlag("holyagent-native-root") === true ? await waiting.wait({
+          timeoutMs: args.timeout_ms ?? 30000,
+          ...signal === undefined ? {} : { signal },
+          workflowPending: workflowPending || args.workflow_pending === true
+        }) : {
+          reason: "unavailable",
+          detail: "root capability or enabled Pi configuration is unavailable"
+        };
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      }
+    });
+  };
+  pi.on("tool_call", (event) => {
+    if (canonicalPiToolName(event.toolName) === "SubagentWorkflow")
+      workflowPending = true;
+  });
+  pi.on("input", (event) => {
+    if (event.streamingBehavior !== undefined)
+      waiting.input(event.source);
+    return { action: "continue" };
+  });
+  pi.on("session_shutdown", () => {
+    waiting.dispose();
+    closed = true;
+    permitted = false;
+  });
+  return {
+    enable,
+    disable: () => {
+      permitted = false;
+      waiting.cancel();
+      if (registered && pi.getActiveTools().includes("wait_for_agents")) {
+        suppressed = true;
+        pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "wait_for_agents"));
+      }
+    }
+  };
+};
+
 var ROLE_FLAG = "holyagent-role";
 var CONTEXT_MESSAGE = "holyagent-context";
 var NOTICE_MESSAGE = "holyagent-notice";
@@ -28161,7 +28448,7 @@ var childAgent = (sessionName) => {
 var SPECIALIST_CHOICES = `${SPECIALIST_NAMES.join(", ")} (each also as <name>-screen, or <name>-headless-screen on a headless machine)`;
 var hostEnvironment = (activeTools) => ({
   [HOST_ENV]: "pi",
-  [WORKFLOWS_ENV]: activeTools.includes(WORKFLOW_TOOL) && activeTools.includes(CODEMODE_TOOL_NAME) ? "1" : "0"
+  [WORKFLOWS_ENV]: activeTools.some((name) => canonicalPiToolName(name) === WORKFLOW_TOOL) && activeTools.includes(CODEMODE_TOOL_NAME) ? "1" : "0"
 });
 var applyEnvironment = (target, values, keep) => {
   for (const [name, value] of Object.entries(values))
@@ -28175,7 +28462,7 @@ var fillPackageRoot = (prompt, packageRoot, platformPath = nodePath2) => {
   return prompt.replaceAll(/`holyagent (?=[^`])/g, () => "`" + command + " ").replaceAll(PI_ROOT_PLACEHOLDER + "/scripts/holyagent", () => command).replaceAll(PI_ROOT_PLACEHOLDER, () => root);
 };
 var refuseNonSpecialist = (event) => {
-  if (event.toolName !== AGENT_TOOL)
+  if (canonicalPiToolName(event.toolName) !== AGENT_TOOL)
     return;
   const { resume, subagent_type: type } = event.input;
   if (typeof resume === "string" && resume.trim() !== "")
@@ -28192,7 +28479,7 @@ var WORKFLOW_SPECIALISTS = new Set(AGENT_TYPES);
 var INLINE_WORKFLOW_INPUTS = new Set(["script", "args"]);
 var present5 = (value) => typeof value === "string" && value.trim() !== "";
 var refuseNonSpecialistWorkflow = (event) => {
-  if (event.toolName !== WORKFLOW_TOOL)
+  if (canonicalPiToolName(event.toolName) !== WORKFLOW_TOOL)
     return succeed6(undefined);
   const { script, scriptPath, name } = event.input;
   const refuse = (reason) => ({
@@ -28510,6 +28797,26 @@ var createExtension = ({
     return role === "root" ? rootExclusions([yield* defaultConfig]) : [];
   }).pipe(orDie2);
   const native = registerNativeTools(pi, { env });
+  const agentWait = registerAgentWait(pi, false);
+  let aliasesAllowed = false;
+  let ownedAliases = [];
+  let suppressedAliases = [];
+  const suspendAliases = () => {
+    aliasesAllowed = false;
+    runSync2(try_2(() => {
+      const active = pi.getActiveTools();
+      const removed = active.filter((name) => ownedAliases.includes(name));
+      if (removed.length > 0) {
+        suppressedAliases = [...new Set([...suppressedAliases, ...removed])];
+        pi.setActiveTools(active.filter((name) => !removed.includes(name)));
+      }
+    }).pipe(orElseSucceed2(() => {
+      return;
+    })));
+  };
+  const disableAgentWait = () => runSync2(try_2(() => agentWait.disable()).pipe(orElseSucceed2(() => {
+    return;
+  })));
   const collect = (cwd, signal, reason) => {
     let configured;
     let read;
@@ -28543,6 +28850,8 @@ var createExtension = ({
         const [config, folder] = yield* fromResult2(attempt);
         read = config;
         const bound = boundConfigs(yield* defaultConfig, user);
+        if (user !== undefined && !user.pi.enable)
+          return { enabled: false, gatesOff: true };
         if (!config.pi.enable) {
           if (user !== undefined && !user.pi.enable)
             return { enabled: false, gatesOff: true };
@@ -28571,7 +28880,11 @@ var createExtension = ({
         const directory = yield* fromResult2(folder);
         const state = typeof directory === "string" && (yield* hasStateFolder(directory)) ? { status: status2, ...reconcile2 === undefined ? {} : { reconcile: reconcile2 } } : undefined;
         const content = piContext(role, root, state);
-        const ended = { ...configured, ...role === "root" ? { config } : {} };
+        const ended = {
+          ...configured,
+          ...user?.pi.enable === true ? { aliases: true } : {},
+          ...role === "root" ? { config } : {}
+        };
         return content === undefined ? { ...ended } : {
           ...ended,
           delivery: { customType: CONTEXT_MESSAGE, content, display: false }
@@ -28585,6 +28898,8 @@ var createExtension = ({
     });
   };
   const release = () => {
+    suspendAliases();
+    disableAgentWait();
     native.setEnabled(false);
     const taken = held;
     held = undefined;
@@ -28686,6 +29001,8 @@ var createExtension = ({
     return { command: isShim(found.program) ? "cmd.exe" : found.program, args: launch.args };
   };
   const gather = (taken, ctx, reason) => {
+    suspendAliases();
+    disableAgentWait();
     native.setEnabled(false);
     taken.current?.abort();
     const own = new AbortController;
@@ -28703,6 +29020,22 @@ var createExtension = ({
     taken.pending = collected.then((result) => {
       if (own.signal.aborted)
         return;
+      aliasesAllowed = result?.aliases === true;
+      if (aliasesAllowed && suppressedAliases.length > 0) {
+        pi.setActiveTools([...new Set([...pi.getActiveTools(), ...suppressedAliases])]);
+        suppressedAliases = [];
+      }
+      if (aliasesAllowed)
+        ownedAliases = [
+          ...new Set([...ownedAliases, ...registerToolAliases(pi, () => aliasesAllowed)])
+        ];
+      if (coreServices === undefined && result?.aliases === true)
+        agentWait.enable();
+      else {
+        disableAgentWait();
+        if (result?.enabled !== false && pi.getFlag(NATIVE_ROOT_FLAG) === true)
+          taken.setupNotice = joinNotices(taken.setupNotice, notice("wait_for_agents unavailable: enabled Pi configuration could not be verified"));
+      }
       native.setEnabled(coreServices === undefined && result?.nativeEnabled === true);
       taken.gatesOff = result?.gatesOff === true;
       if (result?.enabled === false)
@@ -28751,7 +29084,7 @@ var createExtension = ({
           const notApplied = applyRootTools(result.tools, taken.t3);
           taken.t3Gate = taken.t3;
           taken.t3Root = taken.t3 && notApplied === undefined;
-          taken.setupNotice = notApplied;
+          taken.setupNotice = joinOptional(taken.setupNotice, notApplied);
           if (taken.t3 && belowFullAccess(env))
             taken.setupNotice = joinNotices(taken.setupNotice, warnBelowFullAccess(ctx));
         }

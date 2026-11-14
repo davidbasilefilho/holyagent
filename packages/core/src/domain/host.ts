@@ -9,6 +9,16 @@ export const AGENT_HOSTS = ["claude", "pi"] as const
 /** The agent host a command runs under. */
 export type AgentHost = (typeof AGENT_HOSTS)[number]
 
+/** The known external Pi names and their optional snake_case aliases. */
+export const PI_TOOL_ALIASES: Readonly<Record<string, string>> = {
+  agent: "Agent",
+  subagent_workflow: "SubagentWorkflow",
+  fff_multi_grep: "fff-multi-grep",
+}
+
+/** Return the original name for a known alias, preserving every other name. */
+export const canonicalPiToolName = (name: string): string => PI_TOOL_ALIASES[name] ?? name
+
 /**
  * What the output names that depends on the host: its tools and the way it reaches a warm
  * specialist. Every sentence of the help, `plan` and `assignment dispatch` that names one is built

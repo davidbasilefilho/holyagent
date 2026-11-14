@@ -45,3 +45,9 @@ Repair a material finding without asking when the repair keeps the user's requir
 ## Explanatory pages
 
 When a visual explanation or chart carries what prose cannot, build one self-contained HTML page. Such a page illustrates and does not validate a software interface. If the host offers an HTML preview or render tool, use it to check the page as an image with its console output and to show the finished page inline. Without one, save the page as a file, check it as far as the environment allows and give the user its path, naming what you could not check.
+
+## Iteration evidence
+
+Before any task source edits, dispatch a qualified specialist to collect and preserve the immutable original revision, visual evidence and conditions. After the root creates each source commit, dispatch an appropriate existing visual or operations specialist to collect evidence without source edits on that actual commit before independent review, acceptance or push. Compare it with both the original baseline and the immediately previous commit: for the first commit the previous revision is the original; advance the previous revision after each commit and never overwrite the original. Use screenshots and real interaction, plus video when the host supports it. Record revisions, evidence paths and conditions; exploratory precommit checks do not substitute for committed evidence. Mark unavailable comparisons Unknown with a concrete reason and a blocker when the requested target requires them; never substitute the last PR for the original baseline.
+
+Associate reports and artifacts with the commit SHA outside the source commit as needed, and point persisted state and handoff to them. Do not create recursive evidence-only commits. Use this evidence in review and acceptance alongside the final captures.

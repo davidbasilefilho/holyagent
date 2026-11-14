@@ -74,3 +74,4 @@ The `evidence:` block comes last, with one line for each blocking criterion and 
 User and third-party skills remain available.
 Read the relevant guidance when its situation applies.
 - a web app or served static build, a terminal UI, a desktop or mobile app needs a shared render target: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/dev-server/SKILL.md`
+- a task aims to improve measurable performance: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/performance-iteration/SKILL.md`

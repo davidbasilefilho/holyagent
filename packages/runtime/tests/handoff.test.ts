@@ -106,6 +106,7 @@ test("handoff dispatches a complete recorded summary, filters it, and leaves sta
 
 test("branch-mode handoff refuses pending state and an unavailable state branch without writing", async () => {
   root = await mkdtemp(join(tmpdir(), "holyagent-handoff-git-"))
+  expect(Bun.spawnSync(["git", "-C", root, "rev-parse", "--show-toplevel"]).exitCode).not.toBe(0)
   const git = (...args: string[]) => {
     const result = Bun.spawnSync(["git", ...args], {
       cwd: root,
@@ -115,6 +116,10 @@ test("branch-mode handoff refuses pending state and an unavailable state branch 
     return result.stdout.toString()
   }
   git("init", "-b", "main")
+  // A detached automatic maintenance process can outlive the fixture commit and
+  // remove its lock after the no-write snapshot is taken.
+  git("config", "--local", "gc.auto", "0")
+  git("config", "--local", "maintenance.auto", "false")
   git(
     "-c",
     "user.name=Fixture",
