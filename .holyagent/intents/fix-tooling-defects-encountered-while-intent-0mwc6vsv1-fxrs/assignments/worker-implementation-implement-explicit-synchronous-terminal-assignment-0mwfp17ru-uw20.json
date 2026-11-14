@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mwfp17ru-uw20",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-explicit-synchronous-terminal",
+  "objective": "Implement explicit synchronous terminal authority and cancellation-safe migration preparation to close all last review findings.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core at6c09e387566839a2dd157b206644e0550cd1ba89. Read /workspace/work/034/core-migration-repair-code-review-report.json and security report when present. Repro /tmp/holyagent-034-auth-race-review.ts edits source/target during final asynchronous authorize: then old source is deleted or target overwritten.",
+    "Public Core Context.authorize is explicitly synchronous boolean; helpers currently generic Effect authority may suspend. Evaluate explicit synchronous terminal guard/authority contract vs bounded final preimage verification approach, minimizing contract/code footprint, fail closed if unsupported. No new cross-process attestation/approval framework, external dependency or broad FS rewrite.",
+    "Current private random temp preparation may finish after cancellation only if it can never publish target/remove source or retain operation locks, and owned temp resources are safely finalized when OS request settles. Preserve all source data, journal recovery, root/no-follow constraints and previous worktree fixes. Source tests must fail on current committed implementation. Build+full supervised verify after root choice and source done.",
+    "Root design decision: option1 explicit synchronous terminal authorization callback from trusted Context.authorize immediately after async path/preimage checks and immediately before metadata mutation, with async authority checks retained earlier. Fail closed if custom authority has no trusted terminal guard; retain documented fully trusted legacy/default call behavior without granting Core callers a bypass. No runSync of arbitrary authorization Effects, no synchronous file reads, no new framework. Wire through Context/state APIs and document helper boundary. Detached self-cleaning temp preparation on cancel must promptly release call and locks and never later publish/unlink real data. Security reviewer terminal, may edit now."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Own only expanded relevant Core state/API/tests, runtime state-branch fixture, Core docs and generated bundles. Source/build edits only with no active own gates. Do not alter actual Worktree recovery algorithm except scoped authority plumbing/marker mutation boundary. JSON report /workspace/work/034/core-migration-final-atomic-repair-report.json. Preserve2priorfullgreenruns and all failed repro reports, add red→green proof for new flaws."
+  ],
+  "criteria": [
+    {
+      "text": "Async authorization cannot cause source deletion or target overwrite after user data changes and async file waits cannot bypass revocation",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Interrupted preparation promptly releases caller and locks while eventual temporary cleanup cannot publish or delete user data",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Deterministic prior-head red tests prove both check-order races and blocked-preparation cancellation and current focused/full gates pass",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file",
+    "design-decision"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/state",
+    "packages/core/src/api/context.ts",
+    "packages/core/tests",
+    "packages/runtime/tests/state-branch.test.ts",
+    "docs/core-api.md",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/extensions/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent-public.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfoyndl-2dej",
+  "specialist": {
+    "agentId": "/root/migration_file_module",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T00:54:44.634Z"
+  },
+  "createdAt": "2026-11-14T00:54:44.634Z"
+}
