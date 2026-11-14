@@ -1,0 +1,67 @@
+{
+  "id": "assignment-0mwfocaa8-dvqh",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Worker.integration",
+  "slug": "integrate-remaining-reviewed-0-3-4-state",
+  "objective": "Integrate remaining reviewed 0.3.4 state fixtures visual/performance guidance and event aliases into canonical Core architecture.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-final at b8c947ed. Read /workspace/work/034/final-bcf-integration-map.md; incorporate B edce18fee6579d591d59a629765225e2e0e955cd..78366e7459c144c2f6c77a6075964ced06c433a9 only two fixture deltas; C e95cb5178a6d33300b8f4f8ec4e8654d092bcba3; F b2ac10b2.",
+    "Read exact source commits and apply semantic differences (Git read only). Preserve A G E H already merged; no old D CLI bridge or runtime implementation duplicates.",
+    "C original visual/performance baseline before first source-writing dispatch; each actual commit compares task original and previous commit, screenshots and real interactions/video when harness supports, project design-system alignment/contrast/composition/layout/position/size plus animation/routes/transitions. Performance asks user for measurable target at task start and controlled comprehensive measurements.",
+    "F aliases canonical Core domain/host.ts and matching Core pi/tools.ts; runtime reexports. One root flag coordinated with native-tools, preserve nativeEnabled/disable/shutdown wait cancellation and wildcard literal alias matching. Unknown workflow completion has no invented wait, unknown host version retains original names.",
+    "Keep private owned guidance on demand and add performance-iteration exact roles root Worker.operations Worker.validation; shared changes across all families via requirements-first. No global catalog/preload or CLAUDE.md."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "No other writers here. Frozen install, source integration then generated build, focused and full supervised gates. Do not edit migration tree/journal/files implementation (parallel repair later merged). Before instruction text read applicable GPT instruction-writing skill and .claude/skills/requirements/SKILL.md. Report /workspace/work/034/final-bcf-integration-report.json with external diff/path inventory."
+  ],
+  "criteria": [
+    {
+      "text": "Remaining B C and F behavior is integrated using canonical Core helpers and private owned guidance across instruction families",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Native root flag lifecycle wait cancellation aliases and unknown-host fallbacks preserve reviewed guarantees",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Requirements coverage generated assets and meaningful focused and full repository gates pass without test weakening",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope preserves actual Core API native Pi operations routing authority and public internal CLI separation",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages",
+    "docs",
+    "scripts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfnk3nj-hehd",
+  "specialist": {
+    "agentId": "/root/core_routing_integration",
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-14T00:35:21.488Z"
+  },
+  "createdAt": "2026-11-14T00:35:21.488Z"
+}
