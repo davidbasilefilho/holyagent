@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "independently-review-committed-core-host",
   "objective": "Independently review committed Core host and routing repairs and close material prior code findings.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-core-host, immutable repair range 31a97029a68696b9b137bdee6af03a1409461d82...b8c947edb75c74ba292ff4ea10cbb473c607070c. Read previous core-host-current-code-review-report.json and /workspace/work/034/core-routing-integrated-report.json.",
     "Finish material original host port source coverage from 5b1b6e2...31a97029a68696b9b137bdee6af03a1409461d82 where earlier partial review left gaps. Read changed source/callers/contracts; generated assets equivalence by build rather than dump minified bundles. No source or VCS writes; isolated outside-repo fixtures permitted.",
@@ -49,7 +49,41 @@
     "agentId": "/root/core_host_current_code_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T00:33:28.946Z"
+    "startedAt": "2026-11-14T00:33:28.946Z",
+    "finishedAt": "2026-11-14T00:36:41.566Z"
+  },
+  "result": "status: done\nchecks:\n- git diff 31a97029...b8c947ed > /tmp/core-host-repair.diff -> exit 0\n- isolated bunx --no-install mise run build -> exit 0\n- diff -qr both generated dist directories against fresh b8c947ed archive -> exit 0\n- isolated post-build Core/Pi routing, host and file safety tests -> exit 0\n- isolated runtime setup and VCS tests plus Core Node host tests -> exit 0\nnotes:\n- Immutable archive snapshot /tmp/host-repair-review-ZRSog4; package-local cached dependency links restored without changing worktree. No live services used. Earlier first test batch overlapped isolated build; repeated after build with 408 passing.\n- evidence: Earlier material host findings are closed and committed routing repair introduces no blocking code defect: The Core Bun config exists and real Node Shell.live test passes; strict PATH checks reject relative, empty, project and symlink aliases. No blocking defect found in repair. Material Core host operation and native routing boundaries have independently checked source paths and meaningful focused evidence: Compared moved setup/VCS source changes and callers; inspected typed operations, filesystem, Git, shell, policy gate and tests. 408 post-build focused and 690 setup/VCS tests pass (overlapping suites). checks-run: See checks and /tmp/host-repair-review-{tests-postbuild,broad,build}.log. Isolated build reproduces both full committed distribution trees. reviewed-range: 31a97029a68696b9b137bdee6af03a1409461d82...b8c947edb75c74ba292ff4ea10cbb473c607070c; original extraction source compared 5b1b6e2...31a9702. first-pass: Read repair diff and traced changed source, callers and tests; prior Bun config finding verified closed. findings: No findings. Linux snapshot only; Windows and live-host/model entitlement remain unverified.\nevidence:\n- Earlier material host findings are closed and committed routing repair introduces no blocking code defect: The Core Bun config exists and real Node Shell.live test passes; strict PATH checks reject relative, empty, project and symlink aliases. No blocking defect found in repair.\n- Material Core host operation and native routing boundaries have independently checked source paths and meaningful focused evidence: Compared moved setup/VCS source changes and callers; inspected typed operations, filesystem, Git, shell, policy gate and tests. 408 post-build focused and 690 setup/VCS tests pass (overlapping suites).\n- checks-run: See checks and /tmp/host-repair-review-{tests-postbuild,broad,build}.log. Isolated build reproduces both full committed distribution trees.\n- reviewed-range: 31a97029a68696b9b137bdee6af03a1409461d82...b8c947edb75c74ba292ff4ea10cbb473c607070c; original extraction source compared 5b1b6e2...31a9702.\n- first-pass: Read repair diff and traced changed source, callers and tests; prior Bun config finding verified closed.\n- findings: No findings. Linux snapshot only; Windows and live-host/model entitlement remain unverified.",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Independent review closed prior findings, tested committed source and reproduced generated distributions exactly; no new material findings.",
+    "criteria": [
+      {
+        "criterion": "Earlier material host findings are closed and committed routing repair introduces no blocking code defect",
+        "support": "The Core Bun config exists and real Node Shell.live test passes; strict PATH checks reject relative, empty, project and symlink aliases. No blocking defect found in repair."
+      },
+      {
+        "criterion": "Material Core host operation and native routing boundaries have independently checked source paths and meaningful focused evidence",
+        "support": "Compared moved setup/VCS source changes and callers; inspected typed operations, filesystem, Git, shell, policy gate and tests. 408 post-build focused and 690 setup/VCS tests pass (overlapping suites)."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "See checks and /tmp/host-repair-review-{tests-postbuild,broad,build}.log. Isolated build reproduces both full committed distribution trees."
+      },
+      {
+        "label": "reviewed-range",
+        "support": "31a97029a68696b9b137bdee6af03a1409461d82...b8c947edb75c74ba292ff4ea10cbb473c607070c; original extraction source compared 5b1b6e2...31a9702."
+      },
+      {
+        "label": "first-pass",
+        "support": "Read repair diff and traced changed source, callers and tests; prior Bun config finding verified closed."
+      },
+      {
+        "label": "findings",
+        "support": "No findings. Linux snapshot only; Windows and live-host/model entitlement remain unverified."
+      }
+    ]
   },
   "createdAt": "2026-11-14T00:33:28.946Z"
 }
