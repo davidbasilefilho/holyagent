@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mwfqbsec-l31d",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.security",
+  "slug": "review-the-committed-final-merge-and",
+  "objective": "Review the committed final merge and explicit invalid-guard correction for release0.3.4.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-final clean merge765aa8b22e6288fdd680a564e04389e2a6274462. Immutablefirstparent range099a597d22ab3d719f849b4b9c701595c4a92213...765aa8b22e6288fdd680a564e04389e2a6274462. Second approvedparent f544e6c88270bb8ffc97f236a484c10343d5ce9d. OriginalCorestatecode/securityreviews /workspace/work/034/core-migration-entry-cleanup-{code,security}-review-report.json accepted, allBCF/code/security/artifact accepted on099. Authoraggregate report final-034-aggregate-integration-report.json full3675pass2skip observedexit0.",
+    "Review integration seam and newguardfix; verify other incomingmigration source equals independently reviewed f544whereunchanged insteadof re-auditing unchangedentirecodebase. Relative f544 state source diff identifies newexplicitnull/nonfunction/nontrue/throwing terminalguard upfrontcheck andtests. Preserve trusteddefaultwithoutguard/purepeek, reject explicitinvalid/deniedguards beforeanysetup/journal/ref mutation; per-mutationguard retained.",
+    "Auto-merged api/context.ts must preserve hostcapabilities/Filesystemserviceinjection plus state.initialize/terminalguard/readfences, no runtimebackcycle/noCLIbridge. Generated4bundles were onlyGitconflicts andrebuiltfromsource. SourceofBCF/guidance/routingunchanged approved099; verify provenance and newguard boundary. TestsisolatedoutsideGit, no actualsharedstate/userPC/livehost writes. Finalarchive/installsmoke separateworker."
+  ],
+  "constraints": [
+    "\nFirst pass: security-review.\n\nYou are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from `git diff` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff, then list the trust boundaries it touches: where data enters (requests, files, environment, arguments, stored data, output of tools and models) and what privilege the code runs with.\n2. For each source, follow the data to every sink it reaches: a shell or process call, a query, a file path, a deserializer, rendered output, an outgoing request, an authentication or authorization decision, a secret store or log, a cryptographic call.\n3. Read each check on the path. A check counts only if it covers this source and this sink.\n4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.\n5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.\n6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the source, the sink and the path between them, with files and lines;\n- the precondition;\n- the impact rating;\n- validated or suspected, with what is missing for a suspicion;\n- the label.\n\nExample entry:\n\n- Source `GET /files?name=` in `src/routes/files.ts:18`; sink `readFile` in `src/files.ts:31`; `name` is joined to the upload root with no check for `..`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers `name`. blocker.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Read-only review in sharedworktree; isolated snapshot ifindependentbuildneeded. Build/static/fullwereobservedgreenonexactcommittedsource; do not rerun full unnecessarily, independently focusedNode/guard/state tests and sourceprovenance checks suffice. No broaderunrelatedscan. Report /workspace/work/034/final-034-merge-security-review-report.json."
+  ],
+  "criteria": [
+    {
+      "text": "Final merged Core context and guard correction introduce no blocking security defect and preserve approved parent contracts",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Independent source provenance and focused evidence validate merged authority defaults pure reads and Node native boundaries",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfpzdo8-8adi"
+  ],
+  "followUpOf": "assignment-0mwfpsd56-5njb",
+  "specialist": {
+    "agentId": "/root/final_bcf_security_review",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T01:30:57.540Z"
+  },
+  "createdAt": "2026-11-14T01:30:57.540Z"
+}
