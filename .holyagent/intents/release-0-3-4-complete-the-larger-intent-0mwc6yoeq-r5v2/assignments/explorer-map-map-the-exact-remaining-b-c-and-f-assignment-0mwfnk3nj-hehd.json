@@ -36,6 +36,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "/root/final_bcf_integration_map",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-14T00:13:26.527Z"
