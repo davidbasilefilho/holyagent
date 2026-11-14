@@ -1,0 +1,54 @@
+{
+  "id": "assignment-0mwfpsdm8-ahux",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.artifact",
+  "slug": "close-known-final-bcf-alias-event",
+  "objective": "Close known final BCF alias/event lifecycle findings and finish bounded material source review.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-final clean immutablef7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213. Prior final-bcf-artifact-review-report.json and repair final-bcf-lifecycle-repair-report.json under/workspace/work/034. Repair5paths, fullinstructions unchanged; build/static540focusedtests passed. Aggregate full verify planned after final migration merge.",
+    "Close malformed callable event bus on throw/invalidoff, safe partialcleanup/dispose/reload, inerteventcallbacks ifAPIcan'tunsubscribe, preserve nativeauthorization. Unknown canonicaltoolnames constructor/toString/__proto__ stay exact, knownaliases and toolMatchespermissions unchanged.",
+    "Finish any material prior sourcecoverage fromb8...f7 (bounded host.ts,pi/tools.ts,auto-review.ts,extension.ts,native-tools.ts,wait-for-agents.ts,tool-aliases.ts and changedtests; generatedassetfullrebuildequivalence bysnapshotifneeded, no huge minifieddump). Modeltextalreadyindependentlyartifact-reviewed: no new guidance prose inthisrepair.",
+    "Existing accepted F boundary: workflowcompletionAPI unproven; after workflowinvocation wait conservatively unavailable rather than inventing completion from tool_result/arbitraryevents. This known unsupportedworkflow limitation is intentional, not automatically a defect. Reclassify earlier workflowPendingcandidate accordingly unless you reproduce violation of a proven supportedcontract; do not demand unrequestedworkflowcompletionfeature. Directtop-levelagentwaitbeforeunknownworkflow remainssupported andtested."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Read-only; no shared builds/sourcewrites. Artifact should use previously read GPT instruction-writing/requirements/family guides, close exactprovenbus/protofindings and carry forwardunchangedguidancesemantics with shortexcerpts. Security complete materiallistedsourceboundaries andreportactualcoverage/unknownlivehost separately, avoid partialverdictsolelybecausegenerateddiffsize. Report /workspace/work/034/final-bcf-repair-artifact-review-report.json."
+  ],
+  "criteria": [
+    {
+      "text": "Event bus and unknown alias findings are closed without introduced blocking artifact defects",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfphz2w-yfc1"
+  ],
+  "followUpOf": "assignment-0mwfpda5d-1bc4",
+  "specialist": {
+    "agentId": "/root/final_bcf_artifact_review",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T01:15:51.920Z"
+  },
+  "createdAt": "2026-11-14T01:15:51.920Z"
+}
