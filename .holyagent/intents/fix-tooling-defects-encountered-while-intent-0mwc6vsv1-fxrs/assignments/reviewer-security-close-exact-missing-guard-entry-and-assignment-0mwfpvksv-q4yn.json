@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "close-exact-missing-guard-entry-and",
   "objective": "Close exact missing-guard entry and detached temporary ownership findings on the bounded repair.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-core clean immutable1a17ff36a1a2479b51a07307df5ac179752f1c32...f544e6c88270bb8ffc97f236a484c10343d5ce9d. Prior core-migration-atomic-security-review-report.json; repair core-migration-cleanup-entry-repair-report.json in/workspace/work/034.",
     "Only9paths, narrowtreeentryguard/migrationfilecleanup+tests/docs+generatedbundles. Close precise prior realGit missing-guard journal/ref partial mutation and temporaryreplacementcleanup fixtures. Preserve old authorized/defaultCLI compatibility, purepeek and per-mutationauthority. Check missing/malformed custom guard fails before mutating setup/publication; trusted Context boolean guard remainspercall. Do not invent broader OS isolation or re-audit unrelated previous sources; metadata comparison catches sequential replacement not arbitrary kernel atomicity.",
@@ -49,7 +49,41 @@
     "agentId": "/root/core_migration_final_security_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T01:18:21.200Z"
+    "startedAt": "2026-11-14T01:18:21.200Z",
+    "finishedAt": "2026-11-14T01:21:17.847Z"
+  },
+  "result": "status: done\nchecks:\n- git rev-parse range and git diff --check -> exit 0\n- mise run test focused migration files, worktree and revocation suites -> exit 0\n- independent /tmp missing-guard and detached replacement probes -> exit 0\n- check guard appears in four generated integration bundles -> exit 0\nnotes:\n- No findings. Trust boundaries reviewed: host custom/default authority, untrusted source and target paths, opened temporary identity, and delayed filesystem cleanup. Ref and journal remain unchanged when a custom authority lacks a guard; sequential replacement remains untouched.\n- The identity comparison does not isolate lstat and removal from concurrent external filesystem changes; this is documented and outside the assigned guarantee. No Windows or independent full/bundle-rebuild run. Author full verify 3624/2 predates this repair; final aggregate full verification remains outstanding.\n- evidence: Missing-guard entry and temporary replacement findings are closed without introduced blocking security defects: Met for scoped changes: entry rejects missing/nonfunction guard with custom authority before setup; cleanup compares opened-file identity before removing a temporary. No introduced blocking finding identified. Focused independent evidence checks fail-closed setup and cleanup ownership while preserving read-only and trusted defaults: 40 focused tests and two independent prior-repro adaptations pass; tests cover pure peek, malformed custom guard, default retry, lock release and replacement preservation. checks-run: Resolved refs, diff --check, 40 focused tests and 2 independent /tmp probes passed; logs in /workspace/work/034/core-migration-entry-cleanup-security-{focused,probes}.log. reviewed-range: 1a17ff36a1a2479b51a07307df5ac179752f1c32...f544e6c88270bb8ffc97f236a484c10343d5ce9d. first-pass: security-review traced trusted/default and custom authority at state entry, target preparation and detached cleanup; reviewed all changed source/tests/docs and corresponding bundle snippets. findings: No findings in scoped repair; both earlier validated blockers closed.\nevidence:\n- Missing-guard entry and temporary replacement findings are closed without introduced blocking security defects: Met for scoped changes: entry rejects missing/nonfunction guard with custom authority before setup; cleanup compares opened-file identity before removing a temporary. No introduced blocking finding identified.\n- Focused independent evidence checks fail-closed setup and cleanup ownership while preserving read-only and trusted defaults: 40 focused tests and two independent prior-repro adaptations pass; tests cover pure peek, malformed custom guard, default retry, lock release and replacement preservation.\n- checks-run: Resolved refs, diff --check, 40 focused tests and 2 independent /tmp probes passed; logs in /workspace/work/034/core-migration-entry-cleanup-security-{focused,probes}.log.\n- reviewed-range: 1a17ff36a1a2479b51a07307df5ac179752f1c32...f544e6c88270bb8ffc97f236a484c10343d5ce9d.\n- first-pass: security-review traced trusted/default and custom authority at state entry, target preparation and detached cleanup; reviewed all changed source/tests/docs and corresponding bundle snippets.\n- findings: No findings in scoped repair; both earlier validated blockers closed.",
+  "acceptance": {
+    "revision": 9,
+    "rationale": "Independent40focused tests and two exact repros close missing-guard and replacement cleanup findings; no new scoped security finding. Final aggregate verification separate.",
+    "criteria": [
+      {
+        "criterion": "Missing-guard entry and temporary replacement findings are closed without introduced blocking security defects",
+        "support": "Met for scoped changes: entry rejects missing/nonfunction guard with custom authority before setup; cleanup compares opened-file identity before removing a temporary. No introduced blocking finding identified."
+      },
+      {
+        "criterion": "Focused independent evidence checks fail-closed setup and cleanup ownership while preserving read-only and trusted defaults",
+        "support": "40 focused tests and two independent prior-repro adaptations pass; tests cover pure peek, malformed custom guard, default retry, lock release and replacement preservation."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Resolved refs, diff --check, 40 focused tests and 2 independent /tmp probes passed; logs in /workspace/work/034/core-migration-entry-cleanup-security-{focused,probes}.log."
+      },
+      {
+        "label": "reviewed-range",
+        "support": "1a17ff36a1a2479b51a07307df5ac179752f1c32...f544e6c88270bb8ffc97f236a484c10343d5ce9d."
+      },
+      {
+        "label": "first-pass",
+        "support": "security-review traced trusted/default and custom authority at state entry, target preparation and detached cleanup; reviewed all changed source/tests/docs and corresponding bundle snippets."
+      },
+      {
+        "label": "findings",
+        "support": "No findings in scoped repair; both earlier validated blockers closed."
+      }
+    ]
   },
   "createdAt": "2026-11-14T01:18:21.200Z"
 }
