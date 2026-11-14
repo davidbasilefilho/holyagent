@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "close-known-final-bcf-alias-event",
   "objective": "Close known final BCF alias/event lifecycle findings and finish bounded material source review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-final clean immutablef7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213. Prior final-bcf-code-review-report.json and repair final-bcf-lifecycle-repair-report.json under/workspace/work/034. Repair5paths, fullinstructions unchanged; build/static540focusedtests passed. Aggregate full verify planned after final migration merge.",
     "Close malformed callable event bus on throw/invalidoff, safe partialcleanup/dispose/reload, inerteventcallbacks ifAPIcan'tunsubscribe, preserve nativeauthorization. Unknown canonicaltoolnames constructor/toString/__proto__ stay exact, knownaliases and toolMatchespermissions unchanged.",
@@ -49,7 +49,37 @@
     "agentId": "/root/final_bcf_code_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T01:15:50.676Z"
+    "startedAt": "2026-11-14T01:15:50.676Z",
+    "finishedAt": "2026-11-14T01:17:00.565Z"
+  },
+  "result": "status: done\nchecks:\n- git diff f7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213 -> exit 0\n- git diff b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0 -- bounded sources -> exit 0\nnotes:\n- Read-only; generated extension diff compared against source changes, no independent rebuild.\n- evidence: Event bus and unknown alias findings are closed without introduced blocking code defects (behavior): No findings. Subscription exceptions and invalid unsubscribe handles disable the ledger and release acquired handles; retained callbacks are guarded and disposal is idempotent. Own-property alias lookup preserves inherited-key names and known aliases. Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit (tests): Reviewed original bounded host, tools, auto-review, extension, native, alias and wait changes and relevant tests; repair diff and tests reviewed. Prior workflowPending finding retracted: unproven workflow completion intentionally leaves wait unavailable until session reset; already observed top-level completions still return. No live host tested. Family guidance unchanged in repair: “Before any task source edits” and “before independent review, acceptance or push”. Author reports 540 focused tests and static/build passed, full aggregate verify pending. checks-run: git diff of repair range exit 0; read original bounded source diff, surrounding code and tests, and repair report. No tests independently run. reviewed-range: f7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213; additional bounded original source review b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0. findings: No findings. Earlier malformed bus blocker closed; workflowPending reclassified as accepted unknown workflow boundary, not a proven defect. Unknown inherited keys fixed.\nevidence:\n- Event bus and unknown alias findings are closed without introduced blocking code defects (behavior): No findings. Subscription exceptions and invalid unsubscribe handles disable the ledger and release acquired handles; retained callbacks are guarded and disposal is idempotent. Own-property alias lookup preserves inherited-key names and known aliases.\n- Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit (tests): Reviewed original bounded host, tools, auto-review, extension, native, alias and wait changes and relevant tests; repair diff and tests reviewed. Prior workflowPending finding retracted: unproven workflow completion intentionally leaves wait unavailable until session reset; already observed top-level completions still return. No live host tested. Family guidance unchanged in repair: “Before any task source edits” and “before independent review, acceptance or push”. Author reports 540 focused tests and static/build passed, full aggregate verify pending.\n- checks-run: git diff of repair range exit 0; read original bounded source diff, surrounding code and tests, and repair report. No tests independently run.\n- reviewed-range: f7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213; additional bounded original source review b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0.\n- findings: No findings. Earlier malformed bus blocker closed; workflowPending reclassified as accepted unknown workflow boundary, not a proven defect. Unknown inherited keys fixed.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Independent committed source review closes event-bus and prototype alias findings; documented unknown-workflow limitation is intentional. No new blocking findings; author focused540pass and final aggregate verification remain distinct evidence.",
+    "criteria": [
+      {
+        "criterion": "Event bus and unknown alias findings are closed without introduced blocking code defects",
+        "support": "No findings. Subscription exceptions and invalid unsubscribe handles disable the ledger and release acquired handles; retained callbacks are guarded and disposal is idempotent. Own-property alias lookup preserves inherited-key names and known aliases."
+      },
+      {
+        "criterion": "Material original and repaired BCF contracts have complete bounded independent evidence with unknown workflow and live host limits explicit",
+        "support": "Reviewed original bounded host, tools, auto-review, extension, native, alias and wait changes and relevant tests; repair diff and tests reviewed. Prior workflowPending finding retracted: unproven workflow completion intentionally leaves wait unavailable until session reset; already observed top-level completions still return. No live host tested. Family guidance unchanged in repair: “Before any task source edits” and “before independent review, acceptance or push”. Author reports 540 focused tests and static/build passed, full aggregate verify pending."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "git diff of repair range exit 0; read original bounded source diff, surrounding code and tests, and repair report. No tests independently run."
+      },
+      {
+        "label": "reviewed-range",
+        "support": "f7a931da6de7bb685b403cc367b5c7e7c4adacd0...099a597d22ab3d719f849b4b9c701595c4a92213; additional bounded original source review b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0."
+      },
+      {
+        "label": "findings",
+        "support": "No findings. Earlier malformed bus blocker closed; workflowPending reclassified as accepted unknown workflow boundary, not a proven defect. Unknown inherited keys fixed."
+      }
+    ]
   },
   "createdAt": "2026-11-14T01:15:50.676Z"
 }
