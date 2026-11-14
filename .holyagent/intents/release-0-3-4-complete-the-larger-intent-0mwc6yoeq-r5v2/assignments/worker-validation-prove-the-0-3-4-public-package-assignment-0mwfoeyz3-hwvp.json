@@ -1,0 +1,50 @@
+{
+  "id": "assignment-0mwfoeyz3-hwvp",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Worker.validation",
+  "slug": "prove-the-0-3-4-public-package",
+  "objective": "Prove the 0.3.4 public package executable works from an isolated packed archive and identify concrete release blockers.",
+  "state": "Running",
+  "scope": [
+    "Read clean committed /workspace/work/holyagent-034-core-host at b8c947edb75c74ba292ff4ea10cbb473c607070c. Work exclusively in isolated /tmp snapshot/install/cache outside repository ancestry; do not modify shared worktrees. Public0.3.3 lacked bin and bunx could not determine executable;0.3.4must fix actual packed package.",
+    "Build/install according to existing development/release scripts and frozen dependencies using env. Package archive from intended publication package, install freshly, invoke bin help/version and bunx tarball if supported, run non-mutating setup/help parsing for harnesses currently supported. Verify emitted bin target executable/file exists, packaging includes generated runtime assets, internal CLI plain and public interactive separation. No real user setup or live provider requests, no npm publication.",
+    "Do not claim current scope includes Codex setup or all04features. Report baseline archive/source hashes; later aggregate retest may be needed only if packaged source changes. Record real failure and minimal fix suggestion rather than changing source."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Read-only committed repository. No .git/.holyagent/config writes, dependencies/pins changes, public registry writes, external account operations or user home installation. All caches/config HOME-like settings task-scoped under /tmp but never repurpose HOME; pass package-manager explicit cache/prefix/config flags. Report /workspace/work/034/public-034-archive-smoke-report.json and paths/hash manifest."
+  ],
+  "criteria": [
+    {
+      "text": "Fresh packed public0.3.4 installs with a resolvable holyagent executable and help/version run successfully without invoking real setup",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Archive contains required executable assets and smoke evidence uses isolated fresh installs with exact committed source identity",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "archive-identity",
+    "failures",
+    "remaining-release-blockers"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-14T00:37:26.800Z"
+  },
+  "createdAt": "2026-11-14T00:37:26.800Z"
+}
