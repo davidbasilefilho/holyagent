@@ -1,0 +1,55 @@
+{
+  "id": "assignment-0mwfpvksv-q4yn",
+  "intentId": "intent-0mwc6vsv1-fxrs",
+  "intentRevision": 9,
+  "roleTask": "Reviewer.security",
+  "slug": "close-exact-missing-guard-entry-and",
+  "objective": "Close exact missing-guard entry and detached temporary ownership findings on the bounded repair.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-core clean immutable1a17ff36a1a2479b51a07307df5ac179752f1c32...f544e6c88270bb8ffc97f236a484c10343d5ce9d. Prior core-migration-atomic-security-review-report.json; repair core-migration-cleanup-entry-repair-report.json in/workspace/work/034.",
+    "Only9paths, narrowtreeentryguard/migrationfilecleanup+tests/docs+generatedbundles. Close precise prior realGit missing-guard journal/ref partial mutation and temporaryreplacementcleanup fixtures. Preserve old authorized/defaultCLI compatibility, purepeek and per-mutationauthority. Check missing/malformed custom guard fails before mutating setup/publication; trusted Context boolean guard remainspercall. Do not invent broader OS isolation or re-audit unrelated previous sources; metadata comparison catches sequential replacement not arbitrary kernel atomicity.",
+    "73focused tests includingCoreNode pass, build/staticgreen. Previousfull3624capturedexit0 historical; finalaggregatefullafterCore+BCFmerge remains mandatory. Independent focused check/repro expected; no generatedsharedbuild whilepeer tests."
+  ],
+  "constraints": [
+    "\nFirst pass: security-review.\n\nYou are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from `git diff` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff, then list the trust boundaries it touches: where data enters (requests, files, environment, arguments, stored data, output of tools and models) and what privilege the code runs with.\n2. For each source, follow the data to every sink it reaches: a shell or process call, a query, a file path, a deserializer, rendered output, an outgoing request, an authentication or authorization decision, a secret store or log, a cryptographic call.\n3. Read each check on the path. A check counts only if it covers this source and this sink.\n4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.\n5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.\n6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the source, the sink and the path between them, with files and lines;\n- the precondition;\n- the impact rating;\n- validated or suspected, with what is missing for a suspicion;\n- the label.\n\nExample entry:\n\n- Source `GET /files?name=` in `src/routes/files.ts:18`; sink `readFile` in `src/files.ts:31`; `name` is joined to the upload root with no check for `..`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers `name`. blocker.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Read-only review source/index; optional isolatedsnapshotbuildifneeded. Report /workspace/work/034/core-migration-entry-cleanup-security-review-report.json. Return exactfindingclosure/limits; no scanningunrelatedpreexistingcode."
+  ],
+  "criteria": [
+    {
+      "text": "Missing-guard entry and temporary replacement findings are closed without introduced blocking security defects",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Focused independent evidence checks fail-closed setup and cleanup ownership while preserving read-only and trusted defaults",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "first-pass",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfppehy-vfcg"
+  ],
+  "followUpOf": "assignment-0mwfpkss6-duou",
+  "specialist": {
+    "agentId": "/root/core_migration_final_security_review",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T01:18:21.200Z"
+  },
+  "createdAt": "2026-11-14T01:18:21.200Z"
+}
