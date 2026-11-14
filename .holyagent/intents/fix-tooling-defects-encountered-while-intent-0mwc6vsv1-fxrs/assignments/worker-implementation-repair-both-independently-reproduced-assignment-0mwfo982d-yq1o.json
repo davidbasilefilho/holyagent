@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-both-independently-reproduced",
   "objective": "Repair both independently reproduced multi-worktree state migration recovery failures without losing sources or weakening journal trust.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-core at a90789b1ae640771a491849ab6623540af3ae123. Read /workspace/work/034/core-migration-final-code-review-report.json and /tmp/holyagent-034-cross-source-review.ts and /tmp/holyagent-034-pending-sources-review.ts if present.",
     "tree.ts must recover clone-wide pending journal from its trusted registered source worktree before caller migration; preserve complete initial source discovery after interruption. Restrict roots to canonical registered worktrees of same clone, never blindly trust journal roots."
@@ -52,7 +52,9 @@
     "agentId": "/root/migration_index_module",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T00:32:58.645Z"
+    "startedAt": "2026-11-14T00:32:58.645Z",
+    "finishedAt": "2026-11-14T00:47:54.025Z"
   },
+  "result": "status: done\nchanged:\n- packages/core/src/state/migration-files.ts\n- packages/core/src/state/tree.ts\n- packages/core/tests/migration-files.test.ts\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent-public.js\n- packages/integrations/pi/dist/scripts/holyagent.js\n- packages/core/src/state/migration-files.test.ts\n- packages/core/src/state/migration-worktrees.test.ts\nchecks:\n- initial four regression tests before correcting fixture; included a fixture timeout -> exit 1\n- corrected pre-fix real-Git regressions: three failures reproduced -> exit 1\n- final focused worktree, revocation and colleague file tests: 27 passed -> exit 0\n- mise run check -> exit 0\n- mise run lint -> exit 0\n- mise run build, combined candidate -> exit 0\n- supervised mise run verify, combined candidate: 3619 passed, 2 skipped -> exit 0\n- git diff --check -> exit 0\nnotes:\n- Worker-owned source: tree.ts and migration-worktrees.test.ts. Colleague-owned source: migration-files.ts and its two test files. Four integration bundles were regenerated from both changes. Windows-specific behavior was not run on Linux.\n- Initial red test run included a fixture timeout; the corrected red run reproduces the intended failures. Both logs are retained.\nevidence:\n- A retry from any registered worktree recovers the original pending journal and initial interrupted migration includes every eligible source without silent loss: Durable sweep marker precedes checkout; recovery matches the journal against verified same-clone registered roots, resumes that source, then completes the sweep.\n- Real Git regressions reproduce both prior failures and pass after repair while foreign roots and altered journal inputs remain rejected: Corrected pre-fix run has three failures; final focused run passes cross-source, two interrupted-sweep cases, old-journal second interruption, and foreign/linked-root rejection.\n- Journal locks authority and existing read-only fences remain intact within assigned scope: A clone-wide sweep lock precedes state locks; marker changes require live authority and identity checks. Tests cover revocation, linked/replaced markers, pending read fences, and recovery.\n- checks-run: core-migration-worktrees-focused2.log and core-migration-worktrees-verify.log; 3619 pass, 2 environment-specific skips, 0 fail.\n- changed-paths: core-migration-worktrees-paths.txt lists worker source, colleague source, tests and generated bundles; ownership is distinguished in notes.\n- diff-file: /workspace/work/034/core-migration-worktrees-combined.diff contains the combined candidate; core-migration-worktrees-repair.diff is this worker’s source and test only.",
   "createdAt": "2026-11-14T00:32:58.645Z"
 }
