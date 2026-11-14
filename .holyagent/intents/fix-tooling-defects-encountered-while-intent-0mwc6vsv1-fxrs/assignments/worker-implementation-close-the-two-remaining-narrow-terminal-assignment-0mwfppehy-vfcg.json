@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "close-the-two-remaining-narrow-terminal",
   "objective": "Close the two remaining narrow terminal-guard setup and temporary cleanup ownership findings.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Worktree /workspace/work/holyagent-034-core at clean1a17ff36a1a2479b51a07307df5ac179752f1c32. Read core-migration-atomic-code/security-review-report.json and corrected repro paths there.",
     "Fail custom authority without a trusted terminal guard at the first mutating entry boundary BEFORE checkout, journal/ref publication or other partial state changes. Preserve no-write read-only peek and trusted default CLI compatibility; guard availability must not be postponed to post-CAS file publication. Focus on exact public resolveState fixture and lower helper contract.",
@@ -59,7 +59,9 @@
     "agentId": "/root/migration_file_module",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-14T01:13:33.094Z"
+    "startedAt": "2026-11-14T01:13:33.094Z",
+    "finishedAt": "2026-11-14T01:17:19.055Z"
   },
+  "result": "status: done\nchanged:\n- docs/core-api.md\n- packages/core/src/state/migration-files.ts\n- packages/core/src/state/migration-files.test.ts\n- packages/core/src/state/tree.ts\n- packages/core/src/state/migration-worktrees.test.ts\n- packages/integrations/claude/dist/scripts/holyagent.js\n- packages/integrations/pi/dist/extensions/holyagent.js\n- packages/integrations/pi/dist/scripts/holyagent-public.js\n- packages/integrations/pi/dist/scripts/holyagent.js\nchecks:\n- bunx --no-install mise run test new regressions against prior head -> exit 1\n- bunx --no-install mise run fmt scoped source/tests/docs -> exit 0\n- bunx --no-install mise run lint scoped source/tests -> exit 0\n- bun check --no-script scoped source/tests -> exit 0\n- bunx --no-install mise run build -> exit 0\n- bunx --no-install mise run test migration, revocation and application suites -> exit 0\n- mise exec -- bun /tmp/holyagent-034-detached-cleanup-review.ts -> exit 0\n- git diff --check -> exit 0\nnotes:\n- Replacement protection compares the created handle identity to the path before removal; filesystem calls are not isolated against concurrent external replacement. Unknown identity is retained.\n- No full verification was run for this follow-up; the prior 3624-pass full run is historical and integrated verification remains for root.\nevidence:\n- Missing custom terminal authority fails before state setup journal or ref mutation while trusted defaults and pure reads retain compatibility: Public resolveState regression checks unchanged refs, absence of setup/journal, pure peek, malformed guard rejection and successful default retry.\n- Detached cleanup removes only its original temporary and preserves replacement or renamed user files: Gated sync regression renames the temporary and installs replacement; both survive while no target appears. Existing tests verify normal cleanup.\n- Both independent reproductions fail on prior head and current focused build static and Core Node checks pass: Prior-head regression log has both failures; final focused run has 73 pass including Node lifecycle. Independent cleanup repro preserves replacement; build, lint and typecheck pass.\n- checks-run: Commands listed above; /workspace/work/034/core-migration-cleanup-entry-red.log and core-migration-cleanup-entry-focused-final.log.\n- changed-paths: Nine paths listed in changed_paths; bundles regenerated from source.\n- diff-file: /workspace/work/034/core-migration-cleanup-entry-repair.diff",
   "createdAt": "2026-11-14T01:13:33.094Z"
 }
