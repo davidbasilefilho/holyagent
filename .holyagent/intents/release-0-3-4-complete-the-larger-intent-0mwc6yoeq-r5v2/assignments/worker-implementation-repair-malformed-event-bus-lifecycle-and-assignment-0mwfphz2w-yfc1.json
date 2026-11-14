@@ -1,0 +1,68 @@
+{
+  "id": "assignment-0mwfphz2w-yfc1",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-malformed-event-bus-lifecycle-and",
+  "objective": "Repair malformed event bus lifecycle and inherited-property alias lookup without broadening workflow completion claims.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-final clean f7a931da6de7bb685b403cc367b5c7e7c4adacd0. Read final-bcf-{code,security,artifact}-review-report.json in/workspace/work/034.",
+    "wait-for-agents.ts must handle on throwing or returning invalid unsubscribe without crashing extension registration/shutdown. Safely release already installed handlers, deny wait if required completion signals unavailable, ensure disposing repeatedly/no bus safe; preserve native-root gate/cancellation and ordinaryhostnotifications.",
+    "Core domain/host.ts canonicalPiToolName must preserve every unknown name including constructor,toString,__proto__; own-property lookup or prototype-free map, same alias/canonical permissions and actual knownaliases. Add red→green tests for both findings.",
+    "Workflow completion remains explicitly unproven: don't infer a workflow completed from untrusted/arbitrary event or tool result. Existing conservative unavailable-after-workflow condition is a known F limitation; do not change unless reviewer supplies proven trustworthy refused/completed-launch contract and root accepts. Document unknown honestly; avoid unrequested feature or new tracking framework."
+  ],
+  "constraints": [
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "No instruction-text edits. Preserve f7 guidance unchanged. Run build/static and focused relevant Core/Pi/wait/alias/extension/native tests; DO NOT full verify here, because final aggregate full verify after Core migration merge will cover current sources, and Core full gate is running now. Preserve previous full3603 history separately, report newly run checks precisely. Report /workspace/work/034/final-bcf-lifecycle-repair-report.json with diff/inventory."
+  ],
+  "criteria": [
+    {
+      "text": "Malformed callable event buses cannot crash registration shutdown or leave falsely enabled wait behavior and dispose is idempotent",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Unknown tool names preserve exact strings including inherited object keys and known aliases keep canonical permission matching",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Focused regressions reproduce reviewed failures then pass alongside build static and relevant integration tests",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/core/src/domain/host.ts",
+    "packages/core/tests",
+    "packages/integrations/pi/src/wait-for-agents.ts",
+    "packages/integrations/pi/src/extension.ts",
+    "packages/integrations/pi/tests",
+    "packages/runtime/tests/pi/tools.test.ts",
+    "packages/integrations/claude/dist/scripts/holyagent.js",
+    "packages/integrations/pi/dist/extensions/holyagent.js",
+    "packages/integrations/pi/dist/scripts/holyagent-public.js",
+    "packages/integrations/pi/dist/scripts/holyagent.js"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwfocaa8-dvqh",
+  "specialist": {
+    "agentId": "/root/migration_index_module",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T01:07:46.520Z"
+  },
+  "createdAt": "2026-11-14T01:07:46.520Z"
+}
