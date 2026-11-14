@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "prove-the-final-integrated0-3-4-archive",
   "objective": "Prove the final integrated0.3.4 archive executable and generated artifact reproducibility from the exact release candidate commit.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Committedfinal /workspace/work/holyagent-034-final at765aa8b22e6288fdd680a564e04389e2a6274462. Repeat previous acceptedarchiveproof /workspace/work/034/public-034-archive-smoke-report.json in isolatedfreshsnapshot/install/cache outsideactualGit.",
     "Build from this immutable source, compare completebuilt Pi/Claude dist trees byte-for-byte tocommittedgeneratedassets, pack intendedpublicnpm package, verifymanifestbin/assets, freshnpm installandbunx package-selectorfile archivehelp/version/supportedsetuphelp. No realsetup/paidcalls. ExactarchiveSHA512/SHA256 inventorysourcecommit and packageversion0.3.4; no newpublisherCoreprivate. Testsinitialcacheisolated taskscopedpaths/prefix/config, neverrepurposeHOME.",
@@ -46,7 +46,41 @@
     "agentId": "/root/public_archive_smoke",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-14T01:30:58.247Z"
+    "startedAt": "2026-11-14T01:30:58.247Z",
+    "finishedAt": "2026-11-14T01:33:22.495Z"
+  },
+  "result": "status: done\nchecks:\n- git archive 765aa8b22e6288fdd680a564e04389e2a6274462; reject enclosing Git root -> exit 0\n- bun install --frozen-lockfile --cache-dir <temp> -> exit 0\n- bunx --no-install mise run build -> exit 0\n- diff -qr original/pi rebuilt/pi; diff -qr original/claude rebuilt/claude -> exit 0\n- bun pm pack --destination <temp> from packages/integrations/pi/dist -> exit 0\n- npm install --ignore-scripts --legacy-peer-deps --no-audit --no-fund --cache <temp> --userconfig <temp> <archive> -> exit 0\n- installed holyagent --help, --version, setup --help; setup --help with HOLYAGENT_HOST=pi and claude; internal scripts/holyagent --help -> exit 0\n- bunx --ignore-scripts -p file:<archive> holyagent --help, --version, setup --help -> exit 0\n- bunx --ignore-scripts <absolute-tarball> --help -> exit 1\nnotes:\n- Direct tarball shorthand is unsupported by this bunx invocation; package-selector syntax succeeds. No publication, real setup, TTY interaction, provider requests or full verify exercised. Internal/public interactive separation checked statically.\n- Logs, archive inventory and hashes: /tmp/holyagent-034-final.fRlJtQ/; source.tar, archive-paths.txt, hashes.txt, install.log, build.log, pi-diff.log, claude-diff.log, pack.log, npm-install.log, npm-* logs, pi-help.log, claude-help.log, internal-help.log and bunx-* logs.\nevidence:\n- Fresh packed public0.3.4 installs with a resolvable holyagent executable and help/version run successfully without invoking real setup: Fresh npm install resolves executable; help, version 0.3.4, Pi/Claude setup help exit 0; bunx -p file: help/version/setup help exit 0.\n- Archive contains required executable assets and smoke evidence uses isolated fresh installs with exact committed source identity: Exact commit 765aa8b22e6288fdd680a564e04389e2a6274462, tree b55c647ff0b3c258bfaff0bd6163af9197885662. Pi/Claude generated trees byte-identical after build; package has 144 files, including executable bin, internal CLI, setup-tui, just-bash, extension, families and guidance.\n- checks-run: Frozen install, build, recursive byte comparison, pack, fresh npm installation, bin/help/version, Pi/Claude help and bunx file selector passed.\n- archive-identity: Source tar SHA256 87ff0ec0cbc4859bc8706ac5939b0304148bc731df02c1898f5b3f1fef878efd; package SHA256 45fa6ceb943877d43b1a6568c3157449fa0285c8b4da39640f513edf4eebe073; SHA512 14a761a72fd1e83301e83463ff2ad4555d80538c6df599f2bf78363855b20e33739c5f04a8d0499ce59d9da942f331f116dca38568cbef0700471b930ad75ad1.\n- failures: Direct bunx absolute tarball shorthand exits 1: error: ENOENT extracting tarball from @/tmp/holyagent-034-final.fRlJtQ/pack/holyagent-0.3.4.tgz. Supported package-selector file: syntax passes; not attributed to HolyAgent.\n- remaining-release-blockers: None found within archive smoke scope; full verify and interactive TTY behavior were outside this check.",
+  "acceptance": {
+    "revision": 20,
+    "rationale": "Exact committed765aa8b isolated144filearchive freshnpm/bunx package-selector install/bin/help/version succeeds and independent sourcebuild reproduces completePi/Claude distbytes. No finalarchiveblocker.",
+    "criteria": [
+      {
+        "criterion": "Fresh packed public0.3.4 installs with a resolvable holyagent executable and help/version run successfully without invoking real setup",
+        "support": "Fresh npm install resolves executable; help, version 0.3.4, Pi/Claude setup help exit 0; bunx -p file: help/version/setup help exit 0."
+      },
+      {
+        "criterion": "Archive contains required executable assets and smoke evidence uses isolated fresh installs with exact committed source identity",
+        "support": "Exact commit 765aa8b22e6288fdd680a564e04389e2a6274462, tree b55c647ff0b3c258bfaff0bd6163af9197885662. Pi/Claude generated trees byte-identical after build; package has 144 files, including executable bin, internal CLI, setup-tui, just-bash, extension, families and guidance."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "checks-run",
+        "support": "Frozen install, build, recursive byte comparison, pack, fresh npm installation, bin/help/version, Pi/Claude help and bunx file selector passed."
+      },
+      {
+        "label": "archive-identity",
+        "support": "Source tar SHA256 87ff0ec0cbc4859bc8706ac5939b0304148bc731df02c1898f5b3f1fef878efd; package SHA256 45fa6ceb943877d43b1a6568c3157449fa0285c8b4da39640f513edf4eebe073; SHA512 14a761a72fd1e83301e83463ff2ad4555d80538c6df599f2bf78363855b20e33739c5f04a8d0499ce59d9da942f331f116dca38568cbef0700471b930ad75ad1."
+      },
+      {
+        "label": "failures",
+        "support": "Direct bunx absolute tarball shorthand exits 1: error: ENOENT extracting tarball from @/tmp/holyagent-034-final.fRlJtQ/pack/holyagent-0.3.4.tgz. Supported package-selector file: syntax passes; not attributed to HolyAgent."
+      },
+      {
+        "label": "remaining-release-blockers",
+        "support": "None found within archive smoke scope; full verify and interactive TTY behavior were outside this check."
+      }
+    ]
   },
   "createdAt": "2026-11-14T01:30:58.247Z"
 }
