@@ -17,7 +17,8 @@ export const PI_TOOL_ALIASES: Readonly<Record<string, string>> = {
 }
 
 /** Return the original name for a known alias, preserving every other name. */
-export const canonicalPiToolName = (name: string): string => PI_TOOL_ALIASES[name] ?? name
+export const canonicalPiToolName = (name: string): string =>
+  Object.hasOwn(PI_TOOL_ALIASES, name) ? PI_TOOL_ALIASES[name]! : name
 
 /**
  * What the output names that depends on the host: its tools and the way it reaches a warm

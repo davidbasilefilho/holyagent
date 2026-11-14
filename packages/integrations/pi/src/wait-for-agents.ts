@@ -15,13 +15,14 @@ export interface WaitBus {
 }
 
 /** The per-session ledger; it never consumes a host completion notification or user text. */
-export const createAgentWait = (bus: WaitBus) => {
+export const createAgentWait = (bus: WaitBus | undefined) => {
   const active = new Set<string>()
   const completed: Array<Extract<WaitResult, { reason: "agent" }>> = []
   let pendingInput = false
   let cancelled = false
   let ready = false
   let disposed = false
+  let healthy = bus !== undefined
   let wake: (() => void) | undefined
   const idOf = (value: unknown): string | undefined =>
     typeof value === "object" && value !== null && "id" in value && typeof value.id === "string"
@@ -38,20 +39,52 @@ export const createAgentWait = (bus: WaitBus) => {
     completed.push({ reason: "agent", id, status })
     wake?.()
   }
-  const unsubscribe = [
-    bus.on("subagents:ready", () => {
-      ready = true
-      wake?.()
-    }),
-    bus.on("subagents:created", start),
-    bus.on("subagents:started", start),
-    bus.on("subagents:completed", finish("completed")),
-    bus.on("subagents:failed", finish("failed")),
-    bus.on("subagents:disposed", () => {
-      disposed = true
-      wake?.()
-    }),
+  const unsubscribe: Array<() => void> = []
+  const release = () => {
+    // Clear first, so a throwing or reentrant unsubscribe cannot prevent the others running twice.
+    for (const off of unsubscribe.splice(0)) {
+      try {
+        off()
+      } catch {
+        /* A broken host must not prevent the remaining cleanup. */
+      }
+    }
+  }
+  const subscriptions: ReadonlyArray<readonly [string, (payload: unknown) => void]> = [
+    [
+      "subagents:ready",
+      () => {
+        ready = true
+        wake?.()
+      },
+    ],
+    ["subagents:created", start],
+    ["subagents:started", start],
+    ["subagents:completed", finish("completed")],
+    ["subagents:failed", finish("failed")],
+    [
+      "subagents:disposed",
+      () => {
+        disposed = true
+        wake?.()
+      },
+    ],
   ]
+  for (const [channel, handler] of subscriptions) {
+    if (bus === undefined) break
+    try {
+      const off: unknown = bus.on(channel, (payload) => {
+        // A broken bus may retain a handler for which it gave no unsubscribe.
+        if (healthy && !disposed) handler(payload)
+      })
+      if (typeof off !== "function") throw new Error("event subscription has no unsubscribe")
+      unsubscribe.push(off as () => void)
+    } catch {
+      healthy = false
+      release()
+      break
+    }
+  }
   const next = (): WaitResult | undefined => {
     if (disposed) return { reason: "cancelled", detail: "session disposed" }
     if (cancelled) {
@@ -67,6 +100,10 @@ export const createAgentWait = (bus: WaitBus) => {
     return undefined
   }
   return {
+    /** Whether all required subscriptions are installed and the session remains live. */
+    available(): boolean {
+      return healthy && !disposed
+    },
     /** Cancel a pending wait if the integration is disabled or cannot verify its config. */
     cancel(): void {
       if (wake !== undefined) {
@@ -76,7 +113,7 @@ export const createAgentWait = (bus: WaitBus) => {
     },
     /** Record submitted interactive/RPC input without taking or returning the text. */
     input(source: string): void {
-      if (source !== "interactive" && source !== "rpc") return
+      if (!healthy || disposed || (source !== "interactive" && source !== "rpc")) return
       pendingInput = true
       wake?.()
     },
@@ -87,6 +124,12 @@ export const createAgentWait = (bus: WaitBus) => {
       readonly workflowPending?: boolean
     }): Promise<WaitResult> {
       if (options.signal?.aborted === true) return Promise.resolve({ reason: "cancelled" })
+      if (disposed) return Promise.resolve({ reason: "cancelled", detail: "session disposed" })
+      if (!healthy)
+        return Promise.resolve({
+          reason: "unavailable",
+          detail: "agent lifecycle events unavailable",
+        })
       const immediate = next()
       if (immediate !== undefined) return Promise.resolve(immediate)
       if (options.workflowPending === true)
@@ -129,7 +172,7 @@ export const createAgentWait = (bus: WaitBus) => {
     dispose(): void {
       disposed = true
       wake?.()
-      for (const off of unsubscribe) off()
+      release()
     },
   }
 }
@@ -144,9 +187,18 @@ export const registerAgentWait = (
       type: "boolean",
       description: "Enable root-only HolyAgent tools",
     })
-  if (hostVersion !== "1.5.0" || typeof pi.events?.on !== "function")
+  const eventBus = (): WaitBus | undefined => {
+    try {
+      const bus = pi.events
+      return typeof bus?.on === "function" ? bus : undefined
+    } catch {
+      return undefined
+    }
+  }
+  const initialBus = eventBus()
+  if (hostVersion !== "1.5.0" || initialBus === undefined)
     return { enable: () => {}, disable: () => {} }
-  let waiting = createAgentWait(pi.events)
+  let waiting = createAgentWait(initialBus)
   let closed = false
   let registered = false
   let permitted = false
@@ -154,14 +206,26 @@ export const registerAgentWait = (
   let workflowPending = false
   pi.on("session_start", () => {
     if (closed) {
-      waiting = createAgentWait(pi.events)
+      waiting = createAgentWait(eventBus())
       closed = false
       workflowPending = false
     }
     permitted = false
   })
+  const disable = () => {
+    permitted = false
+    waiting.cancel()
+    if (registered && pi.getActiveTools().includes("wait_for_agents")) {
+      suppressed = true
+      pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "wait_for_agents"))
+    }
+  }
   const enable = () => {
     if (pi.getFlag("holyagent-native-root") !== true) return
+    if (!waiting.available()) {
+      disable()
+      return
+    }
     if (registered) {
       permitted = true
       if (suppressed) pi.setActiveTools([...new Set([...pi.getActiveTools(), "wait_for_agents"])])
@@ -208,15 +272,5 @@ export const registerAgentWait = (
     closed = true
     permitted = false
   })
-  return {
-    enable,
-    disable: () => {
-      permitted = false
-      waiting.cancel()
-      if (registered && pi.getActiveTools().includes("wait_for_agents")) {
-        suppressed = true
-        pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "wait_for_agents"))
-      }
-    },
-  }
+  return { enable, disable }
 }

@@ -10387,7 +10387,7 @@ var PI_TOOL_ALIASES = {
   subagent_workflow: "SubagentWorkflow",
   fff_multi_grep: "fff-multi-grep"
 };
-var canonicalPiToolName = (name) => PI_TOOL_ALIASES[name] ?? name;
+var canonicalPiToolName = (name) => Object.hasOwn(PI_TOOL_ALIASES, name) ? PI_TOOL_ALIASES[name] : name;
 var CLAUDE_WORDS = {
   workflowTool: "Workflow",
   agentTool: "Agent",
@@ -28238,6 +28238,7 @@ var createAgentWait = (bus) => {
   let cancelled = false;
   let ready = false;
   let disposed = false;
+  let healthy = bus !== undefined;
   let wake;
   const idOf = (value) => typeof value === "object" && value !== null && ("id" in value) && typeof value.id === "string" ? value.id : undefined;
   const start = (value) => {
@@ -28253,20 +28254,51 @@ var createAgentWait = (bus) => {
     completed.push({ reason: "agent", id, status });
     wake?.();
   };
-  const unsubscribe = [
-    bus.on("subagents:ready", () => {
-      ready = true;
-      wake?.();
-    }),
-    bus.on("subagents:created", start),
-    bus.on("subagents:started", start),
-    bus.on("subagents:completed", finish("completed")),
-    bus.on("subagents:failed", finish("failed")),
-    bus.on("subagents:disposed", () => {
-      disposed = true;
-      wake?.();
-    })
+  const unsubscribe = [];
+  const release = () => {
+    for (const off of unsubscribe.splice(0)) {
+      try {
+        off();
+      } catch {}
+    }
+  };
+  const subscriptions = [
+    [
+      "subagents:ready",
+      () => {
+        ready = true;
+        wake?.();
+      }
+    ],
+    ["subagents:created", start],
+    ["subagents:started", start],
+    ["subagents:completed", finish("completed")],
+    ["subagents:failed", finish("failed")],
+    [
+      "subagents:disposed",
+      () => {
+        disposed = true;
+        wake?.();
+      }
+    ]
   ];
+  for (const [channel, handler] of subscriptions) {
+    if (bus === undefined)
+      break;
+    try {
+      const off = bus.on(channel, (payload) => {
+        if (healthy && !disposed)
+          handler(payload);
+      });
+      if (typeof off !== "function")
+        throw new Error("event subscription has no unsubscribe");
+      unsubscribe.push(off);
+    } catch {
+      healthy = false;
+      release();
+      break;
+    }
+  }
   const next = () => {
     if (disposed)
       return { reason: "cancelled", detail: "session disposed" };
@@ -28284,6 +28316,9 @@ var createAgentWait = (bus) => {
     return;
   };
   return {
+    available() {
+      return healthy && !disposed;
+    },
     cancel() {
       if (wake !== undefined) {
         cancelled = true;
@@ -28291,7 +28326,7 @@ var createAgentWait = (bus) => {
       }
     },
     input(source) {
-      if (source !== "interactive" && source !== "rpc")
+      if (!healthy || disposed || source !== "interactive" && source !== "rpc")
         return;
       pendingInput = true;
       wake?.();
@@ -28299,6 +28334,13 @@ var createAgentWait = (bus) => {
     wait(options) {
       if (options.signal?.aborted === true)
         return Promise.resolve({ reason: "cancelled" });
+      if (disposed)
+        return Promise.resolve({ reason: "cancelled", detail: "session disposed" });
+      if (!healthy)
+        return Promise.resolve({
+          reason: "unavailable",
+          detail: "agent lifecycle events unavailable"
+        });
       const immediate = next();
       if (immediate !== undefined)
         return Promise.resolve(immediate);
@@ -28339,8 +28381,7 @@ var createAgentWait = (bus) => {
     dispose() {
       disposed = true;
       wake?.();
-      for (const off of unsubscribe)
-        off();
+      release();
     }
   };
 };
@@ -28350,9 +28391,18 @@ var registerAgentWait = (pi, registerRootFlag = true, hostVersion = VERSION4) =>
       type: "boolean",
       description: "Enable root-only HolyAgent tools"
     });
-  if (hostVersion !== "1.5.0" || typeof pi.events?.on !== "function")
+  const eventBus = () => {
+    try {
+      const bus = pi.events;
+      return typeof bus?.on === "function" ? bus : undefined;
+    } catch {
+      return;
+    }
+  };
+  const initialBus = eventBus();
+  if (hostVersion !== "1.5.0" || initialBus === undefined)
     return { enable: () => {}, disable: () => {} };
-  let waiting = createAgentWait(pi.events);
+  let waiting = createAgentWait(initialBus);
   let closed = false;
   let registered = false;
   let permitted = false;
@@ -28360,15 +28410,27 @@ var registerAgentWait = (pi, registerRootFlag = true, hostVersion = VERSION4) =>
   let workflowPending = false;
   pi.on("session_start", () => {
     if (closed) {
-      waiting = createAgentWait(pi.events);
+      waiting = createAgentWait(eventBus());
       closed = false;
       workflowPending = false;
     }
     permitted = false;
   });
+  const disable = () => {
+    permitted = false;
+    waiting.cancel();
+    if (registered && pi.getActiveTools().includes("wait_for_agents")) {
+      suppressed = true;
+      pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "wait_for_agents"));
+    }
+  };
   const enable = () => {
     if (pi.getFlag("holyagent-native-root") !== true)
       return;
+    if (!waiting.available()) {
+      disable();
+      return;
+    }
     if (registered) {
       permitted = true;
       if (suppressed)
@@ -28415,17 +28477,7 @@ var registerAgentWait = (pi, registerRootFlag = true, hostVersion = VERSION4) =>
     closed = true;
     permitted = false;
   });
-  return {
-    enable,
-    disable: () => {
-      permitted = false;
-      waiting.cancel();
-      if (registered && pi.getActiveTools().includes("wait_for_agents")) {
-        suppressed = true;
-        pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "wait_for_agents"));
-      }
-    }
-  };
+  return { enable, disable };
 };
 
 var ROLE_FLAG = "holyagent-role";

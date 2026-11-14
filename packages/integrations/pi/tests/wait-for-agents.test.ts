@@ -274,3 +274,224 @@ test("real Pi SDK queues RPC input while the wait tool is executing", async () =
   unsubscribe()
   session.dispose()
 })
+
+test("malformed event subscriptions release installed handlers and cannot produce a successful wait", async () => {
+  for (const broken of ["throw", "undefined", "object"] as const) {
+    const handlers = new Map<string, (payload: unknown) => void>()
+    const removed: string[] = []
+    const bus = {
+      on(channel: string, handler: (payload: unknown) => void) {
+        handlers.set(channel, handler)
+        if (channel === "subagents:started") {
+          if (broken === "throw") throw new Error("broken bus")
+          return broken === "undefined" ? undefined : {}
+        }
+        return () => {
+          removed.push(channel)
+          handlers.delete(channel)
+        }
+      },
+    }
+    const wait = createAgentWait(bus as unknown as Parameters<typeof createAgentWait>[0])
+    expect(removed).toEqual(["subagents:ready", "subagents:created"])
+    handlers.get("subagents:ready")?.({})
+    handlers.get("subagents:started")?.({ id: "ignored" })
+    wait.input("rpc")
+    expect(await wait.wait({ timeoutMs: 10 })).toMatchObject({ reason: "unavailable" })
+    expect(() => {
+      wait.dispose()
+      wait.dispose()
+    }).not.toThrow()
+    expect(removed).toEqual(["subagents:ready", "subagents:created"])
+  }
+})
+
+test("throwing unsubscribe callbacks cannot stop cleanup or make disposal non-idempotent", async () => {
+  const attempted: string[] = []
+  const wait = createAgentWait({
+    on(channel) {
+      return () => {
+        attempted.push(channel)
+        if (channel === "subagents:created") throw new Error("broken unsubscribe")
+      }
+    },
+  })
+  expect(() => {
+    wait.dispose()
+    wait.dispose()
+  }).not.toThrow()
+  expect(attempted).toEqual([
+    "subagents:ready",
+    "subagents:created",
+    "subagents:started",
+    "subagents:completed",
+    "subagents:failed",
+    "subagents:disposed",
+  ])
+  expect(await wait.wait({ timeoutMs: 10 })).toMatchObject({ reason: "cancelled" })
+})
+
+test("malformed callable buses cannot crash registration or repeated session shutdown", async () => {
+  for (const failure of ["throw", "invalid"] as const) {
+    const handlers = new Map<string, () => void>()
+    let tool:
+      | { execute: (id: string, args: { timeout_ms?: number }) => Promise<{ details: unknown }> }
+      | undefined
+    const pi = {
+      events: {
+        on: () => {
+          if (failure === "throw") throw new Error("broken bus")
+          return undefined
+        },
+      },
+      on: (name: string, handler: () => void) => handlers.set(name, handler),
+      getFlag: () => true,
+      getAllTools: () => [],
+      getActiveTools: () => [],
+      setActiveTools: () => {},
+      registerTool: (value: typeof tool) => {
+        tool = value
+      },
+    } as unknown as ExtensionAPI
+    const guard = registerAgentWait(pi, false, "1.5.0")
+    guard.enable()
+    expect(tool).toBeUndefined()
+    if (tool !== undefined)
+      expect((await tool.execute("1", { timeout_ms: 10 })).details).toMatchObject({
+        reason: "unavailable",
+      })
+    expect(() => {
+      handlers.get("session_shutdown")?.()
+      handlers.get("session_shutdown")?.()
+      guard.disable()
+      handlers.get("session_start")?.()
+      guard.enable()
+      handlers.get("session_shutdown")?.()
+    }).not.toThrow()
+  }
+})
+
+test("absent or unreadable event buses remain unavailable and safe to dispose", async () => {
+  const wait = createAgentWait(undefined)
+  wait.input("rpc")
+  expect(await wait.wait({ timeoutMs: 10 })).toMatchObject({ reason: "unavailable" })
+  expect(() => {
+    wait.dispose()
+    wait.dispose()
+  }).not.toThrow()
+  for (const events of [
+    undefined,
+    {
+      get on() {
+        throw new Error("unreadable bus")
+      },
+    },
+  ]) {
+    const pi = { events } as unknown as ExtensionAPI
+    expect(() => {
+      const guard = registerAgentWait(pi, false, "1.5.0")
+      guard.enable()
+      guard.disable()
+      guard.disable()
+    }).not.toThrow()
+  }
+})
+
+test("a restarted session suppresses a registered wait when its bus breaks and restores it when healthy", async () => {
+  const handlers = new Map<string, () => void>()
+  let bus: unknown = createEventBus()
+  let active: string[] = []
+  let tool:
+    | { execute: (id: string, args: { timeout_ms?: number }) => Promise<{ details: unknown }> }
+    | undefined
+  const pi = {
+    get events() {
+      return bus
+    },
+    on: (name: string, handler: () => void) => handlers.set(name, handler),
+    getFlag: () => true,
+    getAllTools: () => [],
+    getActiveTools: () => active,
+    setActiveTools: (names: string[]) => {
+      active = names
+    },
+    registerTool: (value: typeof tool) => {
+      tool = value
+      active.push("wait_for_agents")
+    },
+  } as unknown as ExtensionAPI
+  const guard = registerAgentWait(pi, false, "1.5.0")
+  guard.enable()
+  expect(active).toContain("wait_for_agents")
+  handlers.get("session_shutdown")?.()
+  bus = { on: () => undefined }
+  handlers.get("session_start")?.()
+  guard.enable()
+  expect(active).not.toContain("wait_for_agents")
+  expect((await tool!.execute("1", { timeout_ms: 10 })).details).toMatchObject({
+    reason: "unavailable",
+  })
+  handlers.get("session_shutdown")?.()
+  bus = undefined
+  handlers.get("session_start")?.()
+  guard.enable()
+  expect(active).not.toContain("wait_for_agents")
+  expect((await tool!.execute("missing", { timeout_ms: 10 })).details).toMatchObject({
+    reason: "unavailable",
+  })
+  handlers.get("session_shutdown")?.()
+  const restored = createEventBus()
+  bus = restored
+  handlers.get("session_start")?.()
+  guard.enable()
+  expect(active).toContain("wait_for_agents")
+  restored.emit("subagents:ready", {})
+  restored.emit("subagents:started", { id: "a" })
+  restored.emit("subagents:completed", { id: "a" })
+  expect((await tool!.execute("2", { timeout_ms: 10 })).details).toMatchObject({
+    reason: "agent",
+    id: "a",
+  })
+  handlers.get("session_shutdown")?.()
+})
+
+test("untrusted workflow events do not establish workflow completion", async () => {
+  const bus = createEventBus()
+  const handlers = new Map<string, (event: { toolName: string }) => void>()
+  let tool:
+    | { execute: (id: string, args: { timeout_ms?: number }) => Promise<{ details: unknown }> }
+    | undefined
+  const pi = {
+    events: bus,
+    on: (name: string, handler: (event: { toolName: string }) => void) =>
+      handlers.set(name, handler),
+    getFlag: () => true,
+    getAllTools: () => [],
+    getActiveTools: () => [],
+    registerTool: (value: typeof tool) => {
+      tool = value
+    },
+  } as unknown as ExtensionAPI
+  const guard = registerAgentWait(pi, false, "1.5.0")
+  guard.enable()
+  bus.emit("subagents:ready", {})
+  bus.emit("subagents:started", { id: "top-level" })
+  handlers.get("tool_call")?.({ toolName: "subagent_workflow" })
+  expect((await tool!.execute("1", { timeout_ms: 10 })).details).toMatchObject({
+    reason: "unavailable",
+  })
+  bus.emit("subagents:workflow:completed", { id: "anything" })
+  handlers.get("tool_result")?.({ toolName: "subagent_workflow" })
+  expect((await tool!.execute("2", { timeout_ms: 10 })).details).toMatchObject({
+    reason: "unavailable",
+  })
+  bus.emit("subagents:completed", { id: "top-level" })
+  expect((await tool!.execute("3", { timeout_ms: 10 })).details).toMatchObject({
+    reason: "agent",
+    id: "top-level",
+  })
+  expect((await tool!.execute("4", { timeout_ms: 10 })).details).toMatchObject({
+    reason: "unavailable",
+  })
+  handlers.get("session_shutdown")?.({ toolName: "" })
+})
