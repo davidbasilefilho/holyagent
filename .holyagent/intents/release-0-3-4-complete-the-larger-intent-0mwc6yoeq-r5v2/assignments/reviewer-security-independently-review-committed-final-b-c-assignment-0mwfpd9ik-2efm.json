@@ -1,0 +1,53 @@
+{
+  "id": "assignment-0mwfpd9ik-2efm",
+  "intentId": "intent-0mwc6yoeq-r5v2",
+  "intentRevision": 20,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-review-committed-final-b-c",
+  "objective": "Independently review committed final B C F integration for correctness and preservation of authority and guidance contracts.",
+  "state": "Running",
+  "scope": [
+    "Worktree /workspace/work/holyagent-034-final, clean immutable b8c947edb75c74ba292ff4ea10cbb473c607070c...f7a931da6de7bb685b403cc367b5c7e7c4adacd0. Author report /workspace/work/034/final-bcf-integration-report.json; incremental diff /workspace/work/034/final-bcf-integration-incremental.diff. Complete120paths including generated assets. Fullauthor3603pass2skip,898focused+169targeted.",
+    "Core canonical alias matching, Pi native/wait/alias lifecycle shares one explicit root launch flag and does not elevate children or unknown hosts; cancellation/disable/shutdown safely dispose waits and aliases, missing/malformed event bus safe, no fabricated workflow completion; wildcard aliases literal suffix matching preserve allowlists.",
+    "Visual/performance original task baseline before first source-writing dispatch; per-commit original+previous evidence before review/acceptance/push, realinteraction and screenshot/video when supported, projectdesignsystem composition/alignment/contrast/layout/position/size and animation/routes/transitions; perf asks optimization goal at taskstart and controlled complete measures. All instruction families preservemeaning and private owned performance guidance root,Worker.operations,Worker.validation. User/thirdparty unowned skills retained.",
+    "B onlytwofixture changes. Keep canonicalCore/directnative/APIs/routing/CLIpublic-internal separation and established approval/authority prose; unchanged9,400 contextbudget/allrequirements tests. No need rereview unrelatedb8existingCore extraction."
+  ],
+  "constraints": [
+    "\nFirst pass: security-review.\n\nYou are the first pass of a security review. Find vulnerabilities the committed range introduces or worsens, and separate the ones you validated from the ones you only suspect. The review is read-only: change no file, branch or index, write no comments and no fixes, run no exploit against a live system, and keep every secret you meet out of the report.\n\nRange: ${@:-the refs the Assignment below names}. A range is two refs joined by `...`, such as `main...my-branch`: the target of the pull request and the head, or for a re-review the reviewed commit and the repaired one. Review that range and no other. Take its diff from `git diff` when you have a shell, otherwise from the diff file the Assignment names. If no Assignment follows and the range names no refs, ask which range to review and stop. If a ref does not resolve or neither source gives you the diff, say so and stop. A guessed range reviews the wrong code.\n\nSteps:\n\n1. Read the whole diff, then list the trust boundaries it touches: where data enters (requests, files, environment, arguments, stored data, output of tools and models) and what privilege the code runs with.\n2. For each source, follow the data to every sink it reaches: a shell or process call, a query, a file path, a deserializer, rendered output, an outgoing request, an authentication or authorization decision, a secret store or log, a cryptographic call.\n3. Read each check on the path. A check counts only if it covers this source and this sink.\n4. Validate. A finding is validated when you read the whole path, the attacker controls the source, and their precondition can hold. It is suspected when one link of the path is unread or depends on something you could not see.\n5. Rate each finding by impact, given the precondition: critical, high, medium or low. Name the precondition the attacker needs.\n6. Label each finding. A validated finding the range introduced or worsened is a blocker; a suspected one is optional.\n\nYour findings are working input to the next step, not a final report: a reviewer role that runs this prompt verifies each one and reports. When you run it alone, the list is the result.\n\nList one entry per finding:\n\n- the source, the sink and the path between them, with files and lines;\n- the precondition;\n- the impact rating;\n- validated or suspected, with what is missing for a suspicion;\n- the label.\n\nExample entry:\n\n- Source `GET /files?name=` in `src/routes/files.ts:18`; sink `readFile` in `src/files.ts:31`; `name` is joined to the upload root with no check for `..`. Precondition: any signed-in user. Impact: high, reads any file the service can read. Validated: read the whole path, and no check covers `name`. blocker.\n\nThen list what you checked and found sound, in one line. With no finding, say \"No findings\" and what the review covered.\n",
+    "User authorizes development/release0.3.4 then automatically0.4only afteractual0.3.4publication. Stable0.3.3isactuallypublished; persistentpublicbinerrorbelongs0.3.4, no03republish. UserrequiresGPT6.1Terraagentslow–xhigh.",
+    "ReadapplicableAGENTS andGPT6directives underpackages/runtime/src/instructions/gpt-6/roles. Youaredelegatedspecialist; rootownsallacceptance/state/VCS. NoVCSwrites/commits/merges/Gitindex/config/.git/.holyagentedits; read-onlyGit allowed. Nolivepaidmodel/Pi sessions, realaccount/PCoperationsorpublishing. Preserveexistingauthoredcheckpointanduntrackedfiles.",
+    "AllfixturesoutsideactualGitancestry via/tmp/mkdtemp andindependenthostmoduleresolution; rejectanenclosingGitroot. Nevermutaterealsharedstateinaprobetest.",
+    "Toolchainenv: MISE_DATA_DIR=/workspace/work/tools/mise/data MISE_CACHE_DIR=/workspace/work/tools/mise/cache MISE_STATE_DIR=/workspace/work/tools/mise/state MISE_CONFIG_DIR=/workspace/work/tools/mise/config PATH=/workspace/work/tools/mise/bin:/workspace/work/tools/bun/bin:$PATH. Gates via bunx --no-install mise run. ALLfullLinuxverify: python3 /workspace/work/cancel-supervisor.py mise exec -- bunx --no-install mise run verify (PID1tailcannotreaporphans). No deadline/assertionrelaxationtohidefailures. No source/buildmutationswhilegatesongoing.",
+    "Buildgeneratedassetsfromsource, nodirectgeneratededits. Preserveexternalpins; nohandlockchanges/dependencyupdates. ExistingpackagepreparehookinstallationviafrozeninstallispermittedperAGENTS, nomanualGitconfig/hookwrites.",
+    "ReportJSONschema {status:done|partial|blocked,changed_paths:[],checks:[{command,exit:number}],blockers:[],notes:[],evidence:[{key,support}]}; answercriterion/evidencelabelsexactly. Preservefailed/Unknownandpartialreports; nofabricatedpasses. Reportunder400wordspluspathinventory/logsoutside/workspace/work/034.",
+    "Read-only committed review, no shared generated rebuild during other tests; isolated snapshot if needed. For artifact: read GPT instruction-writing SKILL, .claude/skills/requirements/SKILL and each family guide BEFORE review. Author truthfully disclosed GPT skill read after initial edits; evaluate resulting semantics independently, do not fabricate historical compliance or demand pointless rewrite. Source prompt prose evidence should cite short excerpts. Report /workspace/work/034/final-bcf-security-review-report.json."
+  ],
+  "criteria": [
+    {
+      "text": "Committed B C F integration preserves required behavior and has no blocking security finding",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Changed guidance and lifecycle contracts have independent evidence without weakening tests authority or context limits",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [
+    "checks-run",
+    "reviewed-range",
+    "findings"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwfocaa8-dvqh"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-14T01:04:06.765Z"
+  },
+  "createdAt": "2026-11-14T01:04:06.765Z"
+}
