@@ -43,6 +43,7 @@
     "assignment-0mwflzeqm-vjqg"
   ],
   "specialist": {
+    "agentId": "/root/core_migration_final_security_review",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-14T00:26:54.556Z"
