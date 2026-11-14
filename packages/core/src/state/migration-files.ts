@@ -189,48 +189,66 @@ export const publishMigrationFiles = <E, R>(options: {
       const components = file.path.split("/").slice(0, -1)
       for (let i = checked.length - 1; i < components.length; i++) {
         const dir = join(options.root, ...components.slice(0, i + 1))
+        yield* operation(dir, () => recheck(checked, path))
         yield* options.authorize
         yield* operation(dir, async () => {
-          await recheck(checked, path)
           try {
             await mkdir(dir)
           } catch (cause) {
             if (!hasCode(cause, "EEXIST")) throw cause
           }
-          checked = await parents(options.root, file.path)
         }).pipe(Effect.uninterruptible)
+        checked = yield* operation(dir, () => parents(options.root, file.path))
       }
+      yield* operation(path, () => recheck(checked, path))
       yield* options.authorize
-      yield* operation(path, async () => {
-        await recheck(checked, path)
-        const temporary = join(dirname(path), `.holyagent-migration-${randomUUID()}.tmp`)
-        let handle
-        try {
-          handle = await open(temporary, "wx", file.mode & 0o777)
-          await handle.writeFile(Buffer.from(file.content, "base64"))
-          if (process.platform !== "win32") await handle.chmod(file.mode & 0o777)
-          await handle.sync()
-          await handle.close()
-          handle = undefined
-          await recheck(checked, path)
-          if (existing === undefined) await link(temporary, path)
-          else {
-            const latest = await readRegular(path)
-            if (
-              latest === undefined ||
-              !sameIdentity(existing.info, latest.info) ||
-              file.before === null ||
-              blob(latest.bytes, file.before) !== file.before ||
-              !matchesMode(latest.info.mode, file.mode)
-            )
-              throw fail(file.path, "preexisting file changed during publication")
-            await rename(temporary, path)
-          }
-        } finally {
-          await handle?.close().catch(() => {})
-          await rm(temporary, { force: true }).catch(() => {})
-        }
-      }).pipe(Effect.uninterruptible)
+      const temporary = join(dirname(path), `.holyagent-migration-${randomUUID()}.tmp`)
+      // The finalizer waits for a cancelled preparation to settle before removing its temporary.
+      // Its only uninterruptible part before publication is creating the promise itself.
+      let created = false
+      yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          const preparation = (async () => {
+            const handle = await open(temporary, "wx", file.mode & 0o777)
+            created = true
+            try {
+              await handle.writeFile(Buffer.from(file.content, "base64"))
+              if (process.platform !== "win32") await handle.chmod(file.mode & 0o777)
+              await handle.sync()
+            } finally {
+              await handle.close()
+            }
+          })()
+          // Install a rejection handler even if interruption wins the race with preparation.
+          void preparation.catch(() => {})
+          return preparation
+        }),
+        (preparation) =>
+          Effect.gen(function* () {
+            yield* operation(path, () => preparation)
+            yield* operation(path, () => recheck(checked, path))
+            if (existing !== undefined) {
+              const latest = yield* operation(path, () => readRegular(path))
+              if (
+                latest === undefined ||
+                !sameIdentity(existing.info, latest.info) ||
+                file.before === null ||
+                blob(latest.bytes, file.before) !== file.before ||
+                !matchesMode(latest.info.mode, file.mode)
+              )
+                return yield* fail(file.path, "preexisting file changed during publication")
+            }
+            yield* options.authorize
+            yield* operation(path, () =>
+              existing === undefined ? link(temporary, path) : rename(temporary, path),
+            ).pipe(Effect.uninterruptible)
+          }),
+        (preparation) =>
+          Effect.promise(async () => {
+            await preparation.catch(() => {})
+            if (created) await rm(temporary, { force: true }).catch(() => {})
+          }),
+      )
     }
   })
 
@@ -272,21 +290,21 @@ export const cleanupMigrationSources = <E, R, E2 = never, R2 = never>(options: {
         retained.push({ path: file.path, reason: "tracked" })
         continue
       }
-      yield* options.authorize
-      const deleted = yield* operation(path, async () => {
+      const latest = yield* operation(path, async () => {
         await recheck(checked, path)
-        const latest = await readRegular(path)
-        if (latest === undefined) return true
-        if (
-          !sameIdentity(current.info, latest.info) ||
-          blob(latest.bytes, file.digest) !== file.digest
-        )
-          return false
-        await unlink(path)
-        return true
-      }).pipe(Effect.uninterruptible)
-      if (deleted) removed.push(file.path)
-      else retained.push({ path: file.path, reason: "changed" })
+        return readRegular(path)
+      })
+      if (latest === undefined) continue
+      if (
+        !sameIdentity(current.info, latest.info) ||
+        blob(latest.bytes, file.digest) !== file.digest
+      ) {
+        retained.push({ path: file.path, reason: "changed" })
+        continue
+      }
+      yield* options.authorize
+      yield* operation(path, () => unlink(path)).pipe(Effect.uninterruptible)
+      removed.push(file.path)
     }
     return { removed, retained }
   })

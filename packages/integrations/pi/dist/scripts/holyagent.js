@@ -14032,45 +14032,52 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
     const components = file.path.split("/").slice(0, -1);
     for (let i = checked.length - 1;i < components.length; i++) {
       const dir = join5(options.root, ...components.slice(0, i + 1));
+      yield* operation2(dir, () => recheck(checked, path));
       yield* options.authorize;
       yield* operation2(dir, async () => {
-        await recheck(checked, path);
         try {
           await mkdir3(dir);
         } catch (cause) {
           if (!hasCode(cause, "EEXIST"))
             throw cause;
         }
-        checked = await parents(options.root, file.path);
       }).pipe(uninterruptible2);
+      checked = yield* operation2(dir, () => parents(options.root, file.path));
     }
+    yield* operation2(path, () => recheck(checked, path));
     yield* options.authorize;
-    yield* operation2(path, async () => {
-      await recheck(checked, path);
-      const temporary = join5(dirname4(path), `.holyagent-migration-${randomUUID()}.tmp`);
-      let handle;
-      try {
-        handle = await open3(temporary, "wx", file.mode & 511);
-        await handle.writeFile(Buffer.from(file.content, "base64"));
-        if (process.platform !== "win32")
-          await handle.chmod(file.mode & 511);
-        await handle.sync();
-        await handle.close();
-        handle = undefined;
-        await recheck(checked, path);
-        if (existing === undefined)
-          await link4(temporary, path);
-        else {
-          const latest = await readRegular(path);
-          if (latest === undefined || !sameIdentity(existing.info, latest.info) || file.before === null || blob(latest.bytes, file.before) !== file.before || !matchesMode(latest.info.mode, file.mode))
-            throw fail6(file.path, "preexisting file changed during publication");
-          await rename4(temporary, path);
+    const temporary = join5(dirname4(path), `.holyagent-migration-${randomUUID()}.tmp`);
+    let created = false;
+    yield* acquireUseRelease2(sync2(() => {
+      const preparation = (async () => {
+        const handle = await open3(temporary, "wx", file.mode & 511);
+        created = true;
+        try {
+          await handle.writeFile(Buffer.from(file.content, "base64"));
+          if (process.platform !== "win32")
+            await handle.chmod(file.mode & 511);
+          await handle.sync();
+        } finally {
+          await handle.close();
         }
-      } finally {
-        await handle?.close().catch(() => {});
-        await rm4(temporary, { force: true }).catch(() => {});
+      })();
+      preparation.catch(() => {});
+      return preparation;
+    }), (preparation) => gen2(function* () {
+      yield* operation2(path, () => preparation);
+      yield* operation2(path, () => recheck(checked, path));
+      if (existing !== undefined) {
+        const latest = yield* operation2(path, () => readRegular(path));
+        if (latest === undefined || !sameIdentity(existing.info, latest.info) || file.before === null || blob(latest.bytes, file.before) !== file.before || !matchesMode(latest.info.mode, file.mode))
+          return yield* fail6(file.path, "preexisting file changed during publication");
       }
-    }).pipe(uninterruptible2);
+      yield* options.authorize;
+      yield* operation2(path, () => existing === undefined ? link4(temporary, path) : rename4(temporary, path)).pipe(uninterruptible2);
+    }), (preparation) => promise2(async () => {
+      await preparation.catch(() => {});
+      if (created)
+        await rm4(temporary, { force: true }).catch(() => {});
+    }));
   }
 }), cleanupMigrationSources = (options) => gen2(function* () {
   const source = yield* operation2(options.root, () => Promise.resolve().then(() => validateSources(options.root, options.source)));
@@ -14095,21 +14102,19 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
       retained.push({ path: file.path, reason: "tracked" });
       continue;
     }
-    yield* options.authorize;
-    const deleted = yield* operation2(path, async () => {
+    const latest = yield* operation2(path, async () => {
       await recheck(checked, path);
-      const latest = await readRegular(path);
-      if (latest === undefined)
-        return true;
-      if (!sameIdentity(current.info, latest.info) || blob(latest.bytes, file.digest) !== file.digest)
-        return false;
-      await unlink(path);
-      return true;
-    }).pipe(uninterruptible2);
-    if (deleted)
-      removed.push(file.path);
-    else
+      return readRegular(path);
+    });
+    if (latest === undefined)
+      continue;
+    if (!sameIdentity(current.info, latest.info) || blob(latest.bytes, file.digest) !== file.digest) {
       retained.push({ path: file.path, reason: "changed" });
+      continue;
+    }
+    yield* options.authorize;
+    yield* operation2(path, () => unlink(path)).pipe(uninterruptible2);
+    removed.push(file.path);
   }
   return { removed, retained };
 }), verifyMigrationFiles = (options) => gen2(function* () {
@@ -14586,6 +14591,7 @@ import { createHash as createHash5 } from "crypto";
 import {
   lstat as lstat4,
   mkdir as mkdir4,
+  open as open5,
   readdir as readdir3,
   readFile as readFile3,
   realpath as realpath3,
@@ -14647,10 +14653,7 @@ ${ran.stdout}`.trim().split(`
       cause: `"${branch}" is not a branch name; set ${BRANCH_KEY} in git config to one`
     });
   return branch;
-}), listWorktrees = (cwd, env) => gitText(cwd, env, ["worktree", "list", "--porcelain"]).pipe(map5((text) => text.split(`
-
-`).map((block) => block.split(`
-`)).map((lines) => {
+}), listWorktrees = (cwd, env) => gitText(cwd, env, ["worktree", "list", "--porcelain", "-z"]).pipe(map5((text) => text.split("\x00\x00").map((block) => block.split("\x00")).map((lines) => {
   const field = (name) => lines.find((line) => line.startsWith(`${name} `))?.slice(name.length + 1);
   return {
     path: fromGitPath(field("worktree") ?? ""),
@@ -14740,7 +14743,65 @@ ${ran.stdout}`.trim().split(`
   "--no-tags",
   "origin",
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
-], timeout)))), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false))), readyMarker = (path) => `${path}.ready`, ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join7(common, "holyagent", "worktree.lock"), gen2(function* () {
+], timeout)))), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false))), migrationSweepPath = (common, branch) => join7(common, "holyagent", `${worktreeFolder(branch)}.migration-sweep`), checkSweepFile = (path, info) => {
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || process.platform !== "win32" && ((info.mode & 63) !== 0 || typeof process.getuid === "function" && info.uid !== process.getuid()))
+    throw new Error(`unsafe migration sweep marker: ${path}`);
+}, syncSweepDirectory = async (path) => {
+  if (process.platform === "win32")
+    return;
+  const dir = await open5(dirname5(path), "r");
+  try {
+    await dir.sync();
+  } finally {
+    await dir.close();
+  }
+}, beginMigrationSweep = (common, branch, authorize) => gen2(function* () {
+  const path = migrationSweepPath(common, branch);
+  const parent = dirname5(path);
+  const commonRoot = yield* io(common, () => realpath3(common));
+  const info = yield* io(parent, () => lstat4(parent));
+  const actual = yield* io(parent, () => realpath3(parent));
+  if (!info.isDirectory() || info.isSymbolicLink() || actual !== join7(commonRoot, "holyagent"))
+    return yield* new StateIo({
+      path: parent,
+      cause: "migration marker parent is not a canonical directory"
+    });
+  yield* authorize;
+  yield* io(path, async () => {
+    let handle;
+    try {
+      try {
+        handle = await open5(path, "wx", 384);
+      } catch (cause) {
+        if (!hasCode(cause, "EEXIST"))
+          throw cause;
+      }
+      if (handle !== undefined)
+        await handle.sync();
+      const marker = await lstat4(path);
+      checkSweepFile(path, marker);
+    } finally {
+      await handle?.close();
+    }
+    await syncSweepDirectory(path);
+  }).pipe(uninterruptible2);
+}), finishMigrationSweep = (common, branch, authorize) => gen2(function* () {
+  const path = migrationSweepPath(common, branch);
+  const before = yield* io(path, async () => {
+    const info = await lstat4(path);
+    checkSweepFile(path, info);
+    return { dev: info.dev, ino: info.ino };
+  });
+  yield* authorize;
+  yield* io(path, async () => {
+    const current = await lstat4(path);
+    checkSweepFile(path, current);
+    if (current.dev !== before.dev || current.ino !== before.ino)
+      throw new Error("migration sweep marker changed during authorization");
+    await rm6(path);
+    await syncSweepDirectory(path);
+  }).pipe(uninterruptible2);
+}), readyMarker = (path) => `${path}.ready`, ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join7(common, "holyagent", "worktree.lock"), gen2(function* () {
   yield* authorize;
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
@@ -14767,6 +14828,7 @@ ${ran.stdout}`.trim().split(`
   const target = local ? [path, branch] : remote ? ["--track", "-b", branch, path, `origin/${branch}`] : start === undefined ? undefined : ["--no-track", "-b", branch, path, start];
   if (target === undefined)
     return { kind: "deferred" };
+  yield* beginMigrationSweep(common, branch, authorize);
   yield* authorize;
   yield* io(ready, () => rm6(ready, { force: true }));
   yield* authorize;
@@ -14828,7 +14890,11 @@ ${ran.stdout}`.trim().split(`
       index++;
   }
   return files.filter((path) => path !== CONFIG_FILE).filter((path) => !path.startsWith("local/") || LOCAL_FILES.has(path)).toSorted().map((path) => ({ path, status: status.get(path) }));
-}), migrationMarker = (common, top) => io(top, () => realpath3(top)).pipe(map5((real) => join7(common, "holyagent", "migrated", createHash5("sha1").update(real).digest("hex").slice(0, 16)))), migrationJournalPath = (common) => join7(common, "holyagent", "migration", "journal.json"), pendingMigration = (common) => kindAt(migrationJournalPath(common)).pipe(map5((kind) => kind !== undefined)), migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATIENCE, authorize = void_3) => gen2(function* () {
+}), migrationMarker = (common, top) => io(top, () => realpath3(top)).pipe(map5((real) => join7(common, "holyagent", "migrated", createHash5("sha1").update(real).digest("hex").slice(0, 16)))), migrationJournalPath = (common) => join7(common, "holyagent", "migration", "journal.json"), pendingMigration = (common) => kindAt(migrationJournalPath(common)).pipe(map5((kind) => kind !== undefined)), pendingReadMigration = (common, branch) => gen2(function* () {
+  if (yield* pendingMigration(common))
+    return true;
+  return (yield* kindAt(migrationSweepPath(common, branch))) !== undefined;
+}), migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATIENCE, authorize = void_3) => gen2(function* () {
   const source = stateDirectory(top);
   const target = stateDirectory(worktree);
   const marker = yield* migrationMarker(common, top);
@@ -15058,20 +15124,30 @@ ${ran.stdout}`.trim().split(`
   ]);
   return true;
 }), locate = (cwd, env) => gen2(function* () {
-  const located = yield* git2(cwd, env, [
-    "rev-parse",
-    "--path-format=absolute",
-    "--show-toplevel",
-    "--git-common-dir"
-  ]);
+  const located = yield* git2(cwd, env, ["rev-parse", "--path-format=absolute", "--show-toplevel"]);
   if (located.code !== 0) {
     const complaint = located.stderr.trim();
     if (NOT_A_REPOSITORY.test(complaint))
       return;
     return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` });
   }
-  const [top = cwd, common = join7(cwd, ".git")] = located.stdout.trim().split(`
-`).map((path) => fromGitPath(path));
+  const commonResult = yield* git2(cwd, env, [
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-common-dir"
+  ]);
+  if (commonResult.code !== 0)
+    return yield* failed(cwd, ["rev-parse"], commonResult);
+  const gitPath = (text) => {
+    const ending = process.platform === "win32" && text.endsWith(`\r
+`) ? 2 : text.endsWith(`
+`) ? 1 : 0;
+    return fromGitPath(ending === 0 ? text : text.slice(0, -ending));
+  };
+  const top = gitPath(located.stdout);
+  const common = gitPath(commonResult.stdout);
+  if (top === "" || common === "")
+    return yield* new StateIo({ path: cwd, cause: "git returned an empty repository path" });
   return { top, common };
 }), migrationReadCheckpoint = (cwd, env, branch) => gen2(function* () {
   const repository = yield* locate(cwd, env);
@@ -15081,7 +15157,7 @@ ${ran.stdout}`.trim().split(`
       cause: "the state repository disappeared during a read"
     });
   const journal = migrationJournalPath(repository.common);
-  const requireComplete = pendingMigration(repository.common).pipe(flatMap2((pending) => pending ? fail5(new StateIo({
+  const requireComplete = pendingReadMigration(repository.common, branch).pipe(flatMap2((pending) => pending ? fail5(new StateIo({
     path: journal,
     cause: "state migration is incomplete; run an authorized state command to recover it"
   })) : void_3));
@@ -15110,7 +15186,7 @@ ${ran.stdout}`.trim().split(`
     return { root: top, directory: stateDirectory(top), resolved: { mode } };
   }
   const branch = yield* stateBranch(top, env);
-  if (ensure === "peek" && (yield* pendingMigration(common)))
+  if (ensure === "peek" && (yield* pendingReadMigration(common, branch)))
     return yield* new StateIo({
       path: migrationJournalPath(common),
       cause: "state migration is incomplete; run an authorized state command to recover it"
@@ -15125,7 +15201,7 @@ ${ran.stdout}`.trim().split(`
       path: found,
       cause: "the state worktree is not ready; wait for its checkout to finish and retry"
     });
-  const make = ensure === "create" || ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed));
+  const make = ensure === "create" || ensure === "ifPresent" && ((yield* pendingReadMigration(common, branch)) || (yield* keepsState(top, env, branch, listed)));
   const ensured = found !== undefined && settled ? { kind: "ready", path: found, created: false } : found === undefined && !make ? { kind: "absent" } : yield* authorize.pipe(andThen2(ensureWorktree(top, common, env, branch, standard, {
     make,
     peek: ensure === "peek",
@@ -15140,16 +15216,89 @@ ${ran.stdout}`.trim().split(`
   const worktree = ensured.path;
   const directory = stateDirectory(worktree);
   if (ensure !== "peek") {
-    const own = join7(common, "holyagent");
-    const sources = ensured.created ? [
-      top,
-      ...listed.filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}${sep2}`)).map((entry) => entry.path)
-    ] : [top];
-    for (const source of new Set(sources))
-      if (source !== worktree && (yield* isDirectory(source))) {
-        yield* authorize;
-        yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize);
+    yield* withFileLock(join7(common, "holyagent", "migration-sweep.lock"), gen2(function* () {
+      const pending = yield* pendingMigration(common);
+      let sweeping = (yield* kindAt(migrationSweepPath(common, branch))) !== undefined;
+      if (pending && !sweeping) {
+        yield* beginMigrationSweep(common, branch, authorize);
+        sweeping = true;
       }
+      const targetRoot = yield* io(worktree, () => realpath3(worktree));
+      if (!pending && !sweeping) {
+        const source = yield* io(top, () => realpath3(top));
+        if (source !== targetRoot)
+          yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize);
+        return;
+      }
+      const sweepPath = migrationSweepPath(common, branch);
+      yield* io(sweepPath, async () => checkSweepFile(sweepPath, await lstat4(sweepPath)));
+      const registered = yield* listWorktrees(top, env);
+      const own = join7(yield* io(common, () => realpath3(common)), "holyagent");
+      const commonRoot = yield* io(common, () => realpath3(common));
+      const candidates = [];
+      for (const entry of registered) {
+        if (entry.prunable || entry.path.startsWith(`${own}${sep2}`))
+          continue;
+        const kind = yield* kindAt(entry.path);
+        if (kind !== "directory")
+          return yield* new StateIo({
+            path: entry.path,
+            cause: "a registered worktree is not a real directory; inspect it before migration"
+          });
+        const sourceRoot = yield* io(entry.path, () => realpath3(entry.path));
+        if (sourceRoot === targetRoot)
+          continue;
+        const sourceRepo = yield* locate(sourceRoot, env);
+        if (sourceRepo === undefined)
+          return yield* new StateIo({
+            path: entry.path,
+            cause: "a registered worktree no longer belongs to this clone"
+          });
+        const [sourceTop, sourceCommon] = yield* all2([
+          io(sourceRepo.top, () => realpath3(sourceRepo.top)),
+          io(sourceRepo.common, () => realpath3(sourceRepo.common))
+        ]);
+        if (sourceTop !== sourceRoot || sourceCommon !== commonRoot)
+          return yield* new StateIo({
+            path: entry.path,
+            cause: "a registered worktree no longer belongs to this clone"
+          });
+        if (!candidates.includes(sourceRoot))
+          candidates.push(sourceRoot);
+      }
+      const primary = yield* io(top, () => realpath3(top));
+      const primaryIndex = candidates.indexOf(primary);
+      if (primaryIndex > 0) {
+        candidates.splice(primaryIndex, 1);
+        candidates.unshift(primary);
+      }
+      if (pending) {
+        let recorded;
+        for (const sourceRoot of candidates) {
+          const matches = yield* readMigrationJournal({
+            path: join7(commonRoot, "holyagent", "migration", "journal.json"),
+            sourceRoot,
+            targetRoot
+          }).pipe(match4({
+            onFailure: () => false,
+            onSuccess: (journal) => journal !== undefined
+          }));
+          if (matches) {
+            recorded = sourceRoot;
+            break;
+          }
+        }
+        if (recorded === undefined)
+          return yield* new StateIo({
+            path: migrationJournalPath(common),
+            cause: "migration journal does not match a registered worktree of this clone; inspect it before recovery"
+          });
+        yield* migrateWorkTree(recorded, common, worktree, env, branch, patience, authorize);
+      }
+      for (const source of candidates)
+        yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize);
+      yield* finishMigrationSweep(common, branch, authorize);
+    }), patience, authorize);
   }
   return { root: top, directory, resolved };
 }), requireHandoffState = (cwd, env, directory) => gen2(function* () {
@@ -18772,7 +18921,7 @@ var init_record = __esm(() => {
 });
 
 import { constants as constants4 } from "fs";
-import { open as open5, realpath as realpath6 } from "fs/promises";
+import { open as open6, realpath as realpath6 } from "fs/promises";
 import { join as join15, relative as relative4, sep as sep6 } from "path";
 var Created, MAX_BODY_BYTES, hasGitSegment = (path) => path.split(/[\\/]/).some((segment) => segment.toLowerCase() === ".git"), readBodyFile = (root, file) => {
   const refuse = (why) => new Usage({
@@ -18803,7 +18952,7 @@ var Created, MAX_BODY_BYTES, hasGitSegment = (path) => path.split(/[\\/]/).some(
         code: ignored.code,
         output: ignored.stderr.trim()
       });
-    const text = yield* acquireUseRelease2(io(real, () => open5(real, constants4.O_RDONLY | constants4.O_NOFOLLOW)), (handle) => gen2(function* () {
+    const text = yield* acquireUseRelease2(io(real, () => open6(real, constants4.O_RDONLY | constants4.O_NOFOLLOW)), (handle) => gen2(function* () {
       const info = yield* io(real, () => handle.stat());
       if (!info.isFile())
         return yield* refuse("is not a regular file");
@@ -20030,7 +20179,7 @@ var init_check = __esm(() => {
   init_shell();
 });
 
-import { lstat as lstat8, mkdir as mkdir8, open as open6 } from "fs/promises";
+import { lstat as lstat8, mkdir as mkdir8, open as open7 } from "fs/promises";
 import { tmpdir as tmpdir3, userInfo } from "os";
 import { join as join21 } from "path";
 var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id), markers = () => join21(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`), markerOf = (sessionId) => join21(markers(), sessionId), ensureMarkers = () => {
@@ -20040,7 +20189,7 @@ var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
-}, create4 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId), () => open6(markerOf(sessionId), "wx").then((file) => file.close()))), as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false))), markRulesDelivered = (sessionId) => create4(sessionId).pipe(asVoid2), claimRulesDelivery;
+}, create4 = (sessionId) => ensureMarkers().pipe(andThen2(io(markerOf(sessionId), () => open7(markerOf(sessionId), "wx").then((file) => file.close()))), as2(true), catchIf2((error) => error.path === markerOf(sessionId) && hasCode(error.cause, "EEXIST"), () => succeed6(false))), markRulesDelivered = (sessionId) => create4(sessionId).pipe(asVoid2), claimRulesDelivery;
 var init_delivery = __esm(() => {
   init_dist();
   init_errors4();

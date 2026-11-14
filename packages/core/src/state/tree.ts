@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 import {
   lstat,
   mkdir,
+  open,
   readdir,
   readFile,
   realpath,
@@ -39,7 +40,7 @@ import {
   verifyMigrationCommit,
   verifyMigrationIndex,
 } from "./migration-index.ts"
-import { MigrationJournalError } from "./migration-journal.ts"
+import { MigrationJournalError, readMigrationJournal } from "./migration-journal.ts"
 import { MigrationRunnerConflict, runMigrationTransaction } from "./migration-runner.ts"
 import { parseStateMode, STATE_MODE_KEY, type StateMode } from "./mode.ts"
 import { definedEnv, looksLikeAgent } from "./portable.ts"
@@ -326,11 +327,11 @@ interface Listed {
 }
 
 const listWorktrees = (cwd: string, env: Environment) =>
-  gitText(cwd, env, ["worktree", "list", "--porcelain"]).pipe(
+  gitText(cwd, env, ["worktree", "list", "--porcelain", "-z"]).pipe(
     Effect.map((text) =>
       text
-        .split("\n\n")
-        .map((block) => block.split("\n"))
+        .split("\0\0")
+        .map((block) => block.split("\0"))
         .map((lines): Listed => {
           const field = (name: string) =>
             lines.find((line) => line.startsWith(`${name} `))?.slice(name.length + 1)
@@ -624,6 +625,94 @@ export const fetchRemoteBranch = <E = never>(
     ),
   )
 
+/** A durable per-branch marker keeps the first worktree sweep recoverable. */
+const migrationSweepPath = (common: string, branch: string) =>
+  join(common, "holyagent", `${worktreeFolder(branch)}.migration-sweep`)
+
+const checkSweepFile = (
+  path: string,
+  info: { isFile(): boolean; isSymbolicLink(): boolean; nlink: number; mode: number; uid: number },
+) => {
+  if (
+    !info.isFile() ||
+    info.isSymbolicLink() ||
+    info.nlink !== 1 ||
+    (process.platform !== "win32" &&
+      ((info.mode & 0o077) !== 0 ||
+        (typeof process.getuid === "function" && info.uid !== process.getuid())))
+  )
+    throw new Error(`unsafe migration sweep marker: ${path}`)
+}
+
+/** Syncing the marker and its directory makes the initial enumeration survive interruption. */
+const syncSweepDirectory = async (path: string) => {
+  if (process.platform === "win32") return
+  const dir = await open(dirname(path), "r")
+  try {
+    await dir.sync()
+  } finally {
+    await dir.close()
+  }
+}
+
+const beginMigrationSweep = <E>(
+  common: string,
+  branch: string,
+  authorize: Effect.Effect<void, E>,
+) =>
+  Effect.gen(function* () {
+    const path = migrationSweepPath(common, branch)
+    const parent = dirname(path)
+    const commonRoot = yield* io(common, () => realpath(common))
+    const info = yield* io(parent, () => lstat(parent))
+    const actual = yield* io(parent, () => realpath(parent))
+    if (!info.isDirectory() || info.isSymbolicLink() || actual !== join(commonRoot, "holyagent"))
+      return yield* new StateIo({
+        path: parent,
+        cause: "migration marker parent is not a canonical directory",
+      })
+    yield* authorize
+    yield* io(path, async () => {
+      let handle
+      try {
+        try {
+          handle = await open(path, "wx", 0o600)
+        } catch (cause) {
+          if (!hasCode(cause, "EEXIST")) throw cause
+        }
+        if (handle !== undefined) await handle.sync()
+        const marker = await lstat(path)
+        checkSweepFile(path, marker)
+      } finally {
+        await handle?.close()
+      }
+      await syncSweepDirectory(path)
+    }).pipe(Effect.uninterruptible)
+  })
+
+const finishMigrationSweep = <E>(
+  common: string,
+  branch: string,
+  authorize: Effect.Effect<void, E>,
+) =>
+  Effect.gen(function* () {
+    const path = migrationSweepPath(common, branch)
+    const before = yield* io(path, async () => {
+      const info = await lstat(path)
+      checkSweepFile(path, info)
+      return { dev: info.dev, ino: info.ino }
+    })
+    yield* authorize
+    yield* io(path, async () => {
+      const current = await lstat(path)
+      checkSweepFile(path, current)
+      if (current.dev !== before.dev || current.ino !== before.ino)
+        throw new Error("migration sweep marker changed during authorization")
+      await rm(path)
+      await syncSweepDirectory(path)
+    }).pipe(Effect.uninterruptible)
+  })
+
 /** The file whose presence says the state worktree at `path` is fully checked out. */
 const readyMarker = (path: string) => `${path}.ready`
 
@@ -694,6 +783,8 @@ const ensureWorktree = <E>(
             ? undefined
             : ["--no-track", "-b", branch, path, start]
       if (target === undefined) return { kind: "deferred" } satisfies Ensured
+      // Keep the initial source sweep discoverable even if checkout or migration is interrupted.
+      yield* beginMigrationSweep(common, branch, authorize)
       // The folder is ours (under the git directory) and no work tree is registered at it, so what
       // is there is a leftover.
       yield* authorize
@@ -869,6 +960,12 @@ const migrationJournalPath = (common: string) =>
   join(common, "holyagent", "migration", "journal.json")
 const pendingMigration = (common: string) =>
   kindAt(migrationJournalPath(common)).pipe(Effect.map((kind) => kind !== undefined))
+
+const pendingReadMigration = (common: string, branch: string) =>
+  Effect.gen(function* () {
+    if (yield* pendingMigration(common)) return true
+    return (yield* kindAt(migrationSweepPath(common, branch))) !== undefined
+  })
 
 /** Run or recover the migration while holding the shared state lock. */
 const migrateWorkTree = <E>(
@@ -1239,23 +1336,29 @@ export const commitState = <E = never>(
 /** The top-level folder and git directory of the repository `cwd` is in; undefined outside one. */
 const locate = (cwd: string, env: Environment) =>
   Effect.gen(function* () {
-    const located = yield* git(cwd, env, [
-      "rev-parse",
-      "--path-format=absolute",
-      "--show-toplevel",
-      "--git-common-dir",
-    ])
+    const located = yield* git(cwd, env, ["rev-parse", "--path-format=absolute", "--show-toplevel"])
     if (located.code !== 0) {
       const complaint = located.stderr.trim()
       if (NOT_A_REPOSITORY.test(complaint)) return undefined
       return yield* new StateIo({ path: cwd, cause: `git: ${complaint}` })
     }
-    // Git prints `/`-separated paths even on Windows (`C:/repo`); the rest of this file compares
-    // them with `join()` and `realpath()` results, so they are converted once, here.
-    const [top = cwd, common = join(cwd, ".git")] = located.stdout
-      .trim()
-      .split("\n")
-      .map((path) => fromGitPath(path))
+    const commonResult = yield* git(cwd, env, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ])
+    if (commonResult.code !== 0) return yield* failed(cwd, ["rev-parse"], commonResult)
+    // Each command emits one path followed by a newline; embedded and trailing whitespace in
+    // worktree names is part of that path, not a separator between multiple results.
+    const gitPath = (text: string) => {
+      const ending =
+        process.platform === "win32" && text.endsWith("\r\n") ? 2 : text.endsWith("\n") ? 1 : 0
+      return fromGitPath(ending === 0 ? text : text.slice(0, -ending))
+    }
+    const top = gitPath(located.stdout)
+    const common = gitPath(commonResult.stdout)
+    if (top === "" || common === "")
+      return yield* new StateIo({ path: cwd, cause: "git returned an empty repository path" })
     return { top, common }
   })
 
@@ -1272,7 +1375,7 @@ export const migrationReadCheckpoint = (cwd: string, env: Environment, branch: s
         cause: "the state repository disappeared during a read",
       })
     const journal = migrationJournalPath(repository.common)
-    const requireComplete = pendingMigration(repository.common).pipe(
+    const requireComplete = pendingReadMigration(repository.common, branch).pipe(
       Effect.flatMap((pending) =>
         pending
           ? Effect.fail(
@@ -1336,7 +1439,7 @@ export const resolveState = <E = never>(
       return { root: top, directory: stateDirectory(top), resolved: { mode } } satisfies StateTree
     }
     const branch = yield* stateBranch(top, env)
-    if (ensure === "peek" && (yield* pendingMigration(common)))
+    if (ensure === "peek" && (yield* pendingReadMigration(common, branch)))
       return yield* new StateIo({
         path: migrationJournalPath(common),
         cause: "state migration is incomplete; run an authorized state command to recover it",
@@ -1358,7 +1461,9 @@ export const resolveState = <E = never>(
       })
     const make =
       ensure === "create" ||
-      (ensure === "ifPresent" && (yield* keepsState(top, env, branch, listed)))
+      (ensure === "ifPresent" &&
+        ((yield* pendingReadMigration(common, branch)) ||
+          (yield* keepsState(top, env, branch, listed))))
     const ensured: Ensured =
       found !== undefined && settled
         ? { kind: "ready", path: found, created: false }
@@ -1391,22 +1496,98 @@ export const resolveState = <E = never>(
     const worktree = ensured.path
     const directory = stateDirectory(worktree)
     if (ensure !== "peek") {
-      // A new state worktree takes in the state of every work tree of the clone, not just this one.
-      // The state worktrees of other state branches are not work trees.
-      const own = join(common, "holyagent")
-      const sources = ensured.created
-        ? [
-            top,
-            ...listed
-              .filter((entry) => !entry.prunable && !entry.path.startsWith(`${own}${sep}`))
-              .map((entry) => entry.path),
-          ]
-        : [top]
-      for (const source of new Set(sources))
-        if (source !== worktree && (yield* isDirectory(source))) {
-          yield* authorize
-          yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize)
-        }
+      // Resolve a clone-wide journal against Git-registered roots, never against the caller by
+      // assumption or a root supplied by the journal. Serialize whole sweeps before state locks.
+      yield* withFileLock(
+        join(common, "holyagent", "migration-sweep.lock"),
+        Effect.gen(function* () {
+          const pending = yield* pendingMigration(common)
+          let sweeping = (yield* kindAt(migrationSweepPath(common, branch))) !== undefined
+          // Journals made by an older version did not have a sweep marker. Persist one before
+          // recovering so a second interruption cannot lose the remaining registered sources.
+          if (pending && !sweeping) {
+            yield* beginMigrationSweep(common, branch, authorize)
+            sweeping = true
+          }
+          const targetRoot = yield* io(worktree, () => realpath(worktree))
+          if (!pending && !sweeping) {
+            const source = yield* io(top, () => realpath(top))
+            if (source !== targetRoot)
+              yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize)
+            return
+          }
+          const sweepPath = migrationSweepPath(common, branch)
+          yield* io(sweepPath, async () => checkSweepFile(sweepPath, await lstat(sweepPath)))
+          const registered = yield* listWorktrees(top, env)
+          const own = join(yield* io(common, () => realpath(common)), "holyagent")
+          const commonRoot = yield* io(common, () => realpath(common))
+          const candidates: string[] = []
+          for (const entry of registered) {
+            if (entry.prunable || entry.path.startsWith(`${own}${sep}`)) continue
+            const kind = yield* kindAt(entry.path)
+            if (kind !== "directory")
+              return yield* new StateIo({
+                path: entry.path,
+                cause: "a registered worktree is not a real directory; inspect it before migration",
+              })
+            const sourceRoot = yield* io(entry.path, () => realpath(entry.path))
+            if (sourceRoot === targetRoot) continue
+            const sourceRepo = yield* locate(sourceRoot, env)
+            if (sourceRepo === undefined)
+              return yield* new StateIo({
+                path: entry.path,
+                cause: "a registered worktree no longer belongs to this clone",
+              })
+            const [sourceTop, sourceCommon] = yield* Effect.all([
+              io(sourceRepo.top, () => realpath(sourceRepo.top)),
+              io(sourceRepo.common, () => realpath(sourceRepo.common)),
+            ])
+            if (sourceTop !== sourceRoot || sourceCommon !== commonRoot)
+              return yield* new StateIo({
+                path: entry.path,
+                cause: "a registered worktree no longer belongs to this clone",
+              })
+            if (!candidates.includes(sourceRoot)) candidates.push(sourceRoot)
+          }
+          const primary = yield* io(top, () => realpath(top))
+          const primaryIndex = candidates.indexOf(primary)
+          if (primaryIndex > 0) {
+            candidates.splice(primaryIndex, 1)
+            candidates.unshift(primary)
+          }
+          if (pending) {
+            let recorded: string | undefined
+            for (const sourceRoot of candidates) {
+              const matches = yield* readMigrationJournal({
+                path: join(commonRoot, "holyagent", "migration", "journal.json"),
+                sourceRoot,
+                targetRoot,
+              }).pipe(
+                Effect.match({
+                  onFailure: () => false,
+                  onSuccess: (journal) => journal !== undefined,
+                }),
+              )
+              if (matches) {
+                recorded = sourceRoot
+                break
+              }
+            }
+            if (recorded === undefined)
+              return yield* new StateIo({
+                path: migrationJournalPath(common),
+                cause:
+                  "migration journal does not match a registered worktree of this clone; inspect it before recovery",
+              })
+            yield* migrateWorkTree(recorded, common, worktree, env, branch, patience, authorize)
+          }
+          for (const source of candidates)
+            yield* migrateWorkTree(source, common, worktree, env, branch, patience, authorize)
+          yield* finishMigrationSweep(common, branch, authorize)
+        }),
+        patience,
+        authorize,
+      )
     }
     return { root: top, directory, resolved } satisfies StateTree
   })

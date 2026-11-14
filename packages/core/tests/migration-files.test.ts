@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
+import { existsSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -75,14 +76,26 @@ test("preserves a destination created during authorization and rejects links", a
 test("retry resumes partial publication after authorization fails", async () =>
   fixture(async (root) => {
     const files = [file("first"), file("second")]
-    let calls = 0
+    const first = join(root, "first")
+    const second = join(root, "second")
+    // Revoke after the first postimage is visible, regardless of authorization call count.
     const authorize = Effect.suspend(() =>
-      ++calls === 2 ? Effect.fail(new Error("interrupted")) : Effect.void,
+      existsSync(first) ? Effect.fail(new Error("interrupted")) : Effect.void,
     )
     await expect(
       Effect.runPromise(publishMigrationFiles({ root, files, authorize })),
-    ).rejects.toThrow()
-    expect(await readFile(join(root, "first"), "utf8")).toBe("data\n")
+    ).rejects.toThrow("interrupted")
+    expect(await readFile(first, "utf8")).toBe("data\n")
+    expect(existsSync(second)).toBe(false)
+    await writeFile(first, "user edit")
+    await expect(publish(root, files)).rejects.toThrow()
+    expect(await readFile(first, "utf8")).toBe("user edit")
+    expect(existsSync(second)).toBe(false)
+    await writeFile(first, "data\n")
+    await writeFile(second, "user created")
+    await expect(publish(root, files)).rejects.toThrow()
+    expect(await readFile(second, "utf8")).toBe("user created")
+    await rm(second)
     await publish(root, files)
     await verify(root, files)
   }))
