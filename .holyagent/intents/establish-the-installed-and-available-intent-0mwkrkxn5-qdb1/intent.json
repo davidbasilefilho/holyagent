@@ -9,9 +9,10 @@
     "Perform HolyAgent state migration if needed, without losing existing Intents, Assignments or user configuration.",
     "Keep the main checkout on main and perform branch work in a separate git worktree.",
     "Use kimi-coding/kimi-for-coding for delegated Pi runs.",
-    "Validate and independently review the dependency update before completion."
+    "Validate and independently review the dependency update before completion.",
+    "Create a ready-for-review pull request for this dependency-update work with gh, based on PR #130 branch release/0.3.4/feat/final-guidance-events; do not create a separate migration PR because no migration was needed."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-17T14:04:54.737Z"
 }
