@@ -1,0 +1,16 @@
+{
+  "id": "intent-0mwkrkxn5-qdb1",
+  "slug": "establish-the-installed-and-available",
+  "objective": "Establish the installed and available HolyAgent versions, update repository dependencies through the documented updater and caret formats, perform any required migration, and validate the result.",
+  "requirements": [
+    "Explain whether a later HolyAgent version is available and distinguish the user-level Pi installation from the repository checkout.",
+    "Update dependencies in this repository only through mise run deps:update, preserving the documented ^X.0.0, ^0.X.0 and ^0.0.X caret-range formats at their line boundaries.",
+    "Perform HolyAgent state migration if needed, without losing existing Intents, Assignments or user configuration.",
+    "Keep the main checkout on main and perform branch work in a separate git worktree.",
+    "Use kimi-coding/kimi-for-coding for delegated Pi runs.",
+    "Validate and independently review the dependency update before completion."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-17T14:04:54.737Z"
+}
