@@ -1,0 +1,70 @@
+{
+  "id": "assignment-0mwks1qag-exsv",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-dependency-update-so-every",
+  "objective": "Repair the dependency update so every package.json dependency range uses the required caret line boundary, and correct the change evidence before review.",
+  "state": "Running",
+  "scope": [
+    "Continue in C:/Users/david.basile/dev/holyagent-deps-0.3.4 on the existing uncommitted dependency update.",
+    "Fix the updater path if needed so packages/runtime/package.json just-bash is ^3.0.0 rather than exact 3.6.1, with bun.lock and generated outputs refreshed by repository commands.",
+    "Add a focused regression test for any updater-code repair and correct the changed-path/count report."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Do not hand-edit package.json dependency ranges or bun.lock. The actual bunx --no-install mise run deps:update command must write the caret range after any necessary updater-code fix.",
+    "The required format for just-bash 3.x is ^3.0.0; other ranges must remain ^X.0.0, ^0.X.0 or ^0.0.X, or workspace:*.",
+    "Explain why the existing range test missed the exact just-bash range and add coverage that fails for an exact runtime dependency range.",
+    "Preserve all legitimate updates from the previous run and the 0.3.4 version. Rebuild generated outputs after the repair.",
+    "Run deps:check and focused dependency tests. Do not run full final verify, commit, push, open a PR or change user-level installation/state.",
+    "Regenerate the external unified diff after the repair. Report exact changed paths and counts in under 350 words; logs outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "Caret repair: packages/runtime/package.json uses just-bash ^3.0.0 and every other dependency range satisfies the documented caret or workspace format, with the change produced through deps:update rather than a hand edit.",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Regression coverage: a focused test proves an exact runtime dependency range is rejected or normalized by the updater, and all focused dependency tests plus deps:check pass.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Generated outputs: bun.lock and required dist outputs are refreshed through repository commands and the version remains 0.3.4.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Evidence: exact changed-path count and list match git status, and the regenerated external diff contains the complete final change.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Caret repair",
+    "Regression coverage",
+    "Generated outputs",
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "packages",
+    "scripts",
+    ".github"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwkrsp5r-0dla",
+  "specialist": {
+    "agentId": "pi:assignment-0mwkrsp5r-0dla",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T14:17:58.360Z"
+  },
+  "createdAt": "2026-11-17T14:17:58.360Z"
+}
