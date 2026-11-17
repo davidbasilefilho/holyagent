@@ -1,0 +1,59 @@
+{
+  "id": "assignment-0mwkrl9o8-sdzt",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 1,
+  "roleTask": "Explorer.lookup",
+  "slug": "establish-holyagent-version-and",
+  "objective": "Establish HolyAgent version and installation facts, the correct dependency-update base branch, and whether state migration is required before updating dependencies.",
+  "state": "Running",
+  "scope": [
+    "Read-only investigation of the user-level Pi installation, this repository, open PRs and released versions using gh and package metadata.",
+    "Inspect dependency updater documentation and migration status without modifying files or state."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Use gh for GitHub release and PR facts. Distinguish published stable npm versions, GitHub releases and unreleased PR heads.",
+    "Identify the exact user-level installed source/version/location and the repository main version/location.",
+    "Apply AGENTS.md release-branch and dependency-updater rules. Recommend a concrete work-branch start from the actual open owner PR stack and its PR base; do not infer from branch names alone.",
+    "Determine whether holyagent migrate --dry-run reports legacy state requiring migration; do not run a real migration.",
+    "Do not edit files, switch branches, install updates or write version-control state.",
+    "Report in under 400 words with exact versions, refs, paths and commands."
+  ],
+  "criteria": [
+    {
+      "text": "Versions: identify installed HolyAgent source/version/location, repository version, latest published stable version and any later unreleased PR version, with gh or package evidence.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Update plan: identify the documented updater and caret-format checks plus the correct branch start and PR base under the active repository conventions and open stack.",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Migration: establish whether migration is needed using read-only evidence and name the safe command if it is.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Scope: make no changes to either checkout, user installation or state.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Versions",
+    "Update plan",
+    "Migration",
+    "Scope"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-17T14:05:10.328Z"
+  },
+  "createdAt": "2026-11-17T14:05:10.328Z"
+}
