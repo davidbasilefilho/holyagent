@@ -1,0 +1,52 @@
+{
+  "id": "assignment-0mwkurlxj-dp89",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 2,
+  "roleTask": "Worker.validation",
+  "slug": "run-final-full-verification-on-the",
+  "objective": "Run final full verification on the reviewed and repaired dependency-update head.",
+  "state": "Running",
+  "scope": [
+    "Work only in C:/Users/david.basile/dev/holyagent-deps-0.3.4 at commit 01b8c031 on release/0.3.4/chore/dependency-updates.",
+    "Run full verify and final dependency freshness checks without edits."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Run bunx --no-install mise run verify on 01b8c031; require type-check, lint with zero warnings, format check and the complete test suite to pass.",
+    "Run bunx --no-install mise run deps:check afterward and confirm HEAD and clean worktree.",
+    "Do not repair failures, edit files, commit, push or open a PR. Report exact failure steps if any.",
+    "Report under 200 words with long logs outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "Verify: bunx --no-install mise run verify exits 0 on 01b8c031 with type-check, zero-warning lint, format check and all tests passing.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Freshness: bunx --no-install mise run deps:check exits 0 with the Solid compatibility cap respected.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Clean state: HEAD remains 01b8c031 and validation leaves no modified or untracked repository files.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Verify",
+    "Freshness",
+    "Clean state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwkslknm-riv2",
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-17T15:34:04.999Z"
+  },
+  "createdAt": "2026-11-17T15:34:04.999Z"
+}
