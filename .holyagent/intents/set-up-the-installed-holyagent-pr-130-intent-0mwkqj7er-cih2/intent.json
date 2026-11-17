@@ -1,0 +1,14 @@
+{
+  "id": "intent-0mwkqj7er-cih2",
+  "slug": "set-up-the-installed-holyagent-pr-130",
+  "objective": "Set up the installed HolyAgent PR #130 package for Pi with the Kimi provider and verify the resulting configuration.",
+  "requirements": [
+    "Configure the requested kimi-for-coding model through the registered Pi provider ID kimi-coding.",
+    "Run the user-level HolyAgent setup needed for the installed Pi integration.",
+    "Preserve unrelated repository files, branches and user configuration.",
+    "Use kimi-coding/kimi-for-coding for delegated Pi runs."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-17T13:35:34.469Z"
+}
