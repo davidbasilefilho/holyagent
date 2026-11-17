@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mwksf0md-btgp",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.security",
+  "slug": "independently-review-the-committed",
+  "objective": "Independently review the committed dependency update for supply-chain and privileged-workflow security regressions.",
+  "state": "Running",
+  "scope": [
+    "Review commit range 765aa8b2..aefd20ab using C:/Users/david.basile/dev/holyagent-deps-0.3.4-final.diff and read-only source files in C:/Users/david.basile/dev/holyagent-deps-0.3.4.",
+    "Focus on GitHub Actions pin changes, dependency and tool pin updates, lockfile metadata and generated executable bundles.",
+    "Do not modify files, run installation or write version-control state."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Judge the committed diff rather than writer claims. This is a read-only security review.",
+    "Verify every changed external action remains pinned to a full commit SHA with its version comment and that permissions, job names and publishing triggers are unchanged.",
+    "Check dependency source/registry changes, lockfile URLs or integrity metadata for unexpected hosts, credentials or unversioned references; distinguish generated bundle noise from executable source changes.",
+    "Do not claim to have audited all third-party package internals from a lockfile diff; state the review boundary.",
+    "Report validated findings with severity and exact evidence. If none, say so explicitly. Do not repair findings or start other reviews.",
+    "Report in under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Workflow security: action updates retain full immutable SHAs and version comments, with no permission, trigger or required-job weakening.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Dependency provenance: registry and lockfile changes introduce no unexpected hosts, credentials, mutable action references or suspicious source overrides.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Scope and limits: generated executable changes correspond to the declared dependency updates and the report states any unaudited third-party internals.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Workflow security",
+    "Dependency provenance",
+    "Scope and limits"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwks1qag-exsv"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T14:28:18.277Z"
+  },
+  "createdAt": "2026-11-17T14:28:18.277Z"
+}
