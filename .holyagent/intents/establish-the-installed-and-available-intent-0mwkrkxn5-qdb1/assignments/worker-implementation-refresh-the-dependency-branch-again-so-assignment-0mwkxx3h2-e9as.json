@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mwkxx3h2-e9as",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "refresh-the-dependency-branch-again-so",
+  "objective": "Refresh the dependency branch again so all pins, including the newly published Browse release, are current on the final candidate.",
+  "state": "Running",
+  "scope": [
+    "Work only in C:/Users/david.basile/dev/holyagent-deps-0.3.4 at 01b8c031.",
+    "Run the documented updater and required generated build, preserving the Solid compatibility cap and all caret formats.",
+    "Make no unrelated source changes."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Run bunx --no-install mise run deps:update, not manual pin or lockfile edits. It must at least move @opencode/browse from 0.1.1 to 0.1.3 and may include any other newly published stable compatible updates.",
+    "If the browser-use snapshot or other updater-owned expectation changes, update only that direct expectation and explain it. Do not alter test behavior.",
+    "Run mise build if outputs change, then deps:check and focused dependency/workflow tests. Do not run full verify in this assignment.",
+    "Do not commit, push, open a PR or touch state/user installation.",
+    "Regenerate the external complete diff relative to 765aa8b2 and a refresh-only diff relative to 01b8c031. Report under 250 words with exact paths and checks."
+  ],
+  "criteria": [
+    {
+      "text": "Refresh: deps:update exits 0 and produces the newest compatible stable pins, including @opencode/browse 0.1.3 or newer, without manual manifest or lockfile edits.",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Checks: generated build, deps:check and focused dependency/workflow tests pass, with Solid capped at ^1.0.0 and all caret formats intact.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope and evidence: only updater/build outputs and direct pin expectations change; exact paths and complete/refresh diffs are reported.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Refresh",
+    "Checks",
+    "Scope and evidence",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "packages",
+    "scripts",
+    ".github",
+    "mise.toml"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwkt5wn5-9pfu",
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T17:02:19.863Z"
+  },
+  "createdAt": "2026-11-17T17:02:19.863Z"
+}
