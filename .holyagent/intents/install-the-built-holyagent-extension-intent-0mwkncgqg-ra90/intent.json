@@ -9,6 +9,7 @@
     "Do not replace or remove unrelated files, including the existing untracked packages/integrations/pi/dist/extensions/.pi/ path, without establishing ownership."
   ],
   "revision": 3,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "Installed PR #130 globally in Pi, verified the exact built extension blob and successful loading with kimi-coding/kimi-for-coding, and preserved repository state.",
   "createdAt": "2026-11-17T12:06:21.114Z"
 }
