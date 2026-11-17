@@ -5,7 +5,7 @@
   "roleTask": "Worker.debugging",
   "slug": "classify-the-full-verification-test",
   "objective": "Classify the full-verification test failures as PR #130 baseline or dependency-update regressions by comparing identical focused tests on base and final heads.",
-  "state": "Running",
+  "state": "Cancelled",
   "scope": [
     "Compare detached baseline C:/Users/david.basile/dev/holyagent-pr130-baseline at 765aa8b2 with dependency worktree C:/Users/david.basile/dev/holyagent-deps-0.3.4 at 1f36606.",
     "Use the failure log C:/Users/david.basile/dev/verify-01b8c031.log to select representative failing classes: Pi extension, journal/state privacy, built CLI environment and process timeouts.",
@@ -57,7 +57,9 @@
     "agentId": "pi:assignment-0mwky375s-xoxy",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-17T17:07:04.576Z"
+    "startedAt": "2026-11-17T17:07:04.576Z",
+    "finishedAt": "2026-11-17T17:54:42.264Z"
   },
+  "result": "stopped",
   "createdAt": "2026-11-17T17:07:04.576Z"
 }
