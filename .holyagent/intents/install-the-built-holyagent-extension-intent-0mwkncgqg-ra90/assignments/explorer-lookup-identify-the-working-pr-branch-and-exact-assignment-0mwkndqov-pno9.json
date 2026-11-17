@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mwkndqov-pno9",
+  "intentId": "intent-0mwkncgqg-ra90",
+  "intentRevision": 1,
+  "roleTask": "Explorer.lookup",
+  "slug": "identify-the-working-pr-branch-and-exact",
+  "objective": "Identify the working PR branch and exact built Pi extension source and install destination for the user-requested installation.",
+  "state": "Running",
+  "scope": [
+    "Read-only investigation of the local checkout, PRs #125 and #130 through gh, and relevant Pi installation/configuration files.",
+    "Do not modify files, install anything, switch branches, or write version-control state."
+  ],
+  "constraints": [
+    "Use gh to inspect PR branches and their file contents, because the user explicitly requested it.",
+    "Establish what packages/integrations/pi/dist/extensions/.pi/ contains and whether it is the built extension to install, the destination, or an unrelated artifact.",
+    "Determine the exact install command or copy destination from repository documentation and Pi configuration; do not guess.",
+    "Keep working until the source, destination and verification command are established; stop only if a required fact cannot be obtained.",
+    "Report in under 300 words with exact paths and commands."
+  ],
+  "criteria": [
+    {
+      "text": "PR selection: identify whether PR #125, PR #130, or another PR supplies the working built Pi extension, citing gh evidence and check status.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Install paths: identify the exact built extension source and Pi destination, including what the existing untracked .pi path represents.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Verification: give a non-destructive command that proves the extension is installed and loadable.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: make no changes and preserve all existing files.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "PR selection",
+    "Install paths",
+    "Verification"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-17T12:07:20.672Z"
+  },
+  "createdAt": "2026-11-17T12:07:20.672Z"
+}
