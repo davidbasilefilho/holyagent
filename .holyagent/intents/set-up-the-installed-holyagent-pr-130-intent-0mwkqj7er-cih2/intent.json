@@ -5,10 +5,11 @@
   "requirements": [
     "Configure the requested kimi-for-coding model through the registered Pi provider ID kimi-coding.",
     "Run the user-level HolyAgent setup needed for the installed Pi integration.",
+    "Enable and set up all capabilities available in HolyAgent on this Windows system, including optional integrations; report any unsupported capability without weakening the others.",
     "Preserve unrelated repository files, branches and user configuration.",
     "Use kimi-coding/kimi-for-coding for delegated Pi runs."
   ],
-  "revision": 1,
+  "revision": 2,
   "state": "Open",
   "createdAt": "2026-11-17T13:35:34.469Z"
 }
