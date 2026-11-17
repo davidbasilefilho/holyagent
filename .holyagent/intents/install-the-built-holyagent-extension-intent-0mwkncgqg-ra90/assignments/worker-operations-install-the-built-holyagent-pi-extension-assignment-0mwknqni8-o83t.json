@@ -5,7 +5,7 @@
   "roleTask": "Worker.operations",
   "slug": "install-the-built-holyagent-pi-extension",
   "objective": "Install the built HolyAgent Pi extension from working PR #130 and verify Pi recognizes and loads it.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Install from PR branch release/0.3.4/feat/final-guidance-events using the documented Pi package install path.",
     "Operate on the user-level Pi installation and settings only; do not change repository files or branches.",
@@ -52,7 +52,41 @@
     "agentId": "pi:assignment-0mwknqni8-o83t",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-17T12:17:23.072Z"
+    "startedAt": "2026-11-17T12:17:23.072Z",
+    "finishedAt": "2026-11-17T12:21:16.789Z"
+  },
+  "result": "Installation and verification complete.\n\n**What I did**\n- Confirmed PR #130 (`release/0.3.4/feat/final-guidance-events`, head `765aa8b`) carries a `pi` manifest in its root `package.json` pointing at `packages/integrations/pi/dist`, so the documented git route applies directly.\n- Installed user-level: `pi install git:github.com/davidbasilefilho/holyagent@release/0.3.4/feat/final-guidance-events` → exit 0; clone at `C:\\Users\\david.basile\\.pi\\agent\\git\\github.com\\davidbasilefilho\\holyagent`, checked out at `765aa8b`.\n- `pi list` → exit 0, shows the PR source.\n- Provenance: `git hash-object` of the installed `packages/integrations/pi/dist/extensions/holyagent.js` = `6ecaf410728410807d2d40fc6a836bcb9f1339de`, exactly the GitHub blob sha of that file at PR head `765aa8b` — the newer built extension, not main's 0.3.3 bundle (main is not referenced by any Pi settings).\n- Headless load: `pi auth check --provider kimi-coding` → `ready` (OAuth); `kimi-for-coding` is in the catalog. From a neutral directory (`%TEMP%`, so only user-level settings load): `pi -p \"...\" --provider kimi-coding --model kimi-for-coding` → exit 0. To prove the installed extension itself loaded, a second run passed `--holyagent-role bogus`: the flag was accepted (it is registered by the extension) and the session emitted the extension's fail-closed notice verbatim — \"holyagent: unknown --holyagent-role value \"bogus\": use root, specialist, session; no HolyAgent context was added…\", exit 0.\n- Scope: repository still on `main` at `460f9453`, no commits, no file changes; the untracked `packages/integrations/pi/dist/extensions/.pi/` is preserved; only `~/.pi/agent/settings.json` changed (its `packages` list now holds the PR source).\n\nLogs (outside the repository): `%TEMP%\\pi-install-pr130.log`, `pi-list-pr130.log`, `pi-headless-load-pr130.log`, `pi-headless-roleflag-pr130.log`.\n\nevidence:\n- Installation: user-level `pi install git:github.com/davidbasilefilho/holyagent@release/0.3.4/feat/final-guidance-events` exited 0; installed extension blob `6ecaf41…` byte-matches PR #130 head `765aa8b`.\n- Verification: `pi list` exited 0 showing the PR source; headless `pi -p` with kimi-coding/kimi-for-coding exited 0 and the loaded extension answered `--holyagent-role bogus` with its fail-closed notice.\n- Scope: repo unchanged on `main` (`460f9453`), no commits or branch moves, `dist/extensions/.pi/` preserved, only `~/.pi/agent/settings.json` `packages` changed.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "The install command and pi list both exited 0; the installed extension blob exactly matches PR #130, and two headless runs on kimi-coding/kimi-for-coding prove both model access and extension loading while preserving repository state.",
+    "criteria": [
+      {
+        "criterion": "Installation: the user-level Pi configuration installs the HolyAgent package from PR #130 and contains the newer built extension.",
+        "support": "user-level `pi install git:github.com/davidbasilefilho/holyagent@release/0.3.4/feat/final-guidance-events` exited 0; installed extension blob `6ecaf41…` byte-matches PR #130 head `765aa8b`."
+      },
+      {
+        "criterion": "Verification: pi list exits 0 and shows the installed PR source, and a headless Pi invocation with provider kimi-coding and model kimi-for-coding loads the installed extension successfully.",
+        "support": "`pi list` exited 0 showing the PR source; headless `pi -p` with kimi-coding/kimi-for-coding exited 0 and the loaded extension answered `--holyagent-role bogus` with its fail-closed notice."
+      },
+      {
+        "criterion": "Scope: no repository files, branches, commits or unrelated Pi settings are changed, and the existing dist/extensions/.pi path is preserved.",
+        "support": "repo unchanged on `main` (`460f9453`), no commits or branch moves, `dist/extensions/.pi/` preserved, only `~/.pi/agent/settings.json` `packages` changed."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "Installation",
+        "support": "user-level `pi install git:github.com/davidbasilefilho/holyagent@release/0.3.4/feat/final-guidance-events` exited 0; installed extension blob `6ecaf41…` byte-matches PR #130 head `765aa8b`."
+      },
+      {
+        "label": "Verification",
+        "support": "`pi list` exited 0 showing the PR source; headless `pi -p` with kimi-coding/kimi-for-coding exited 0 and the loaded extension answered `--holyagent-role bogus` with its fail-closed notice."
+      },
+      {
+        "label": "Scope",
+        "support": "repo unchanged on `main` (`460f9453`), no commits or branch moves, `dist/extensions/.pi/` preserved, only `~/.pi/agent/settings.json` `packages` changed."
+      }
+    ]
   },
   "createdAt": "2026-11-17T12:17:23.072Z"
 }
