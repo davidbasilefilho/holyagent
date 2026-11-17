@@ -5,7 +5,7 @@
   "roleTask": "Worker.validation",
   "slug": "run-final-full-verification-on-the",
   "objective": "Run final full verification on the reviewed and repaired dependency-update head.",
-  "state": "Running",
+  "state": "Failed",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-deps-0.3.4 at commit 01b8c031 on release/0.3.4/chore/dependency-updates.",
     "Run full verify and final dependency freshness checks without edits."
@@ -47,7 +47,9 @@
     "agentId": "pi:assignment-0mwkurlxj-dp89",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-17T15:34:04.999Z"
+    "startedAt": "2026-11-17T15:34:04.999Z",
+    "finishedAt": "2026-11-17T17:02:03.915Z"
   },
+  "result": "failure: All checks are done. Final report:\n\n**Verify: FAIL (exit 1)** on 01b8c031. type-check ✓ (456 files, no errors), lint ✓ (462 files, zero warnings), fmt:check ✓ (896 files) — all pass. Test suite: **150 fail / 3457 pass / 78 skip** across 142 files (3685 total). Failures are reproducible on this head: `extension.test.ts` alone fails 103/356 on the worktree. Dominant classes: built-package tests where the spawned `holyagent` CLI reports \"Bun was not found on PATH or in BUN_INSTALL/bin or ~/.bun/bin (neither BUN_INSTALL nor the home folder is set)\" (~15 tests); journal/state tests failing with \"journal parent or trusted roots are not private canonical directories\" and \"State I/O failed\" (~20 tests); many process-spawning integration tests timing out at ~5000 ms. Full log: `C:\\Users\\david.basile\\dev\\verify-01b8c031.log`. Earlier confusion cleared: standalone runs that passed were accidentally on `main`, not this head — on this head they fail.\n\n**deps:check: FAIL (exit 1)** — 1 pin behind: `@opencode/browse` 0.1.1 → 0.1.3 (`packages/core/src/config/pi-packages.json`). Log: `C:\\Users\\david.basile\\dev\\deps-check-01b8c031.log`.\n\n**No repairs made** (per brief). A test-run artifact left on the main checkout was removed; the worktree is clean.\n\nevidence:\nVerify: `bunx --no-install mise run verify` exited 1 on 01b8c031; check/lint/fmt:check pass, 150 of 3685 tests fail (log at C:\\Users\\david.basile\\dev\\verify-01b8c031.log)\nFreshness: `bunx --no-install mise run deps:check` exited 1, 1 pin behind (@opencode/browse 0.1.1 -> 0.1.3)\nClean state: HEAD remains 01b8c03123bf78533d3374fa53e5295cbcc6748a; `git status --porcelain` empty on release/0.3.4/chore/dependency-updates\n",
   "createdAt": "2026-11-17T15:34:04.999Z"
 }
