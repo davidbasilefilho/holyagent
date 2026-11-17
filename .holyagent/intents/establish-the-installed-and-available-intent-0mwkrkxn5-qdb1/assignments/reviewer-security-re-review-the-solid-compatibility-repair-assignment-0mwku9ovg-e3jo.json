@@ -1,0 +1,56 @@
+{
+  "id": "assignment-0mwku9ovg-e3jo",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.security",
+  "slug": "re-review-the-solid-compatibility-repair",
+  "objective": "Re-review the Solid compatibility repair for dependency provenance and privileged-surface security regressions.",
+  "state": "Running",
+  "scope": [
+    "Review only aefd20ab..01b8c03 using C:/Users/david.basile/dev/holyagent-deps-0.3.4-repair-final.diff and read-only files in C:/Users/david.basile/dev/holyagent-deps-0.3.4.",
+    "Do not modify files or version-control state."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Confirm the repair changes no workflow, permission, trigger, registry host, credential or external action reference.",
+    "Review Solid lockfile provenance and integrity metadata and the compatibility-cap updater path for unsafe URL or version handling.",
+    "Keep the previous review boundary: third-party package internals are not audited.",
+    "Report validated findings with severity and evidence; if none, say so. Do not repair or launch other reviews.",
+    "Report under 250 words."
+  ],
+  "criteria": [
+    {
+      "text": "Repair workflow security: no privileged workflow, permission, trigger or action reference changes occur in the repair.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Repair provenance: Solid and lockfile changes retain expected registry provenance and integrity with no new hosts, credentials or mutable source overrides.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Repair review limits: generated changes correspond to Solid 1.9.19 and unaudited third-party internals remain explicitly bounded.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Repair workflow security",
+    "Repair provenance",
+    "Repair review limits"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwkt5wn5-9pfu"
+  ],
+  "followUpOf": "assignment-0mwksf0md-btgp",
+  "specialist": {
+    "agentId": "pi:assignment-0mwksf0md-btgp",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T15:20:09.004Z"
+  },
+  "createdAt": "2026-11-17T15:20:09.004Z"
+}
