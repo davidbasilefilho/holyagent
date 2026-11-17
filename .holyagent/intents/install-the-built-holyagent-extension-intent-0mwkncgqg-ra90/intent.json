@@ -5,10 +5,10 @@
   "requirements": [
     "Install the built extension file in pi dist.",
     "There might be a PR branch that is working; use gh to find and use it.",
-    "Use the kimi-for-coding model in the kimi-for-coding provider for delegated Pi runs.",
+    "Use the requested kimi-for-coding model through the registered Pi provider ID kimi-coding for delegated Pi runs.",
     "Do not replace or remove unrelated files, including the existing untracked packages/integrations/pi/dist/extensions/.pi/ path, without establishing ownership."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-17T12:06:21.114Z"
 }
