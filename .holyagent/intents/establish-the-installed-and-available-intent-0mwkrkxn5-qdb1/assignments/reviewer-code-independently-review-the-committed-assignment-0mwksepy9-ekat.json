@@ -54,6 +54,7 @@
     "assignment-0mwks1qag-exsv"
   ],
   "specialist": {
+    "agentId": "pi:assignment-0mwksepy9-ekat",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-17T14:28:04.450Z"
