@@ -11107,7 +11107,7 @@ var init_pi_packages = __esm(() => {
     "@amaster.ai/pi-computer-use": "0.1.38",
     "pi-web-kit": "0.5.0",
     "@ff-labs/pi-fff": "0.11.0",
-    "@opencode/browse": "0.1.1"
+    "@opencode/browse": "0.1.3"
   };
 });
 
