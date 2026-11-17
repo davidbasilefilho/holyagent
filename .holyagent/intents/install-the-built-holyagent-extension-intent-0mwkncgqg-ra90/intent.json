@@ -1,0 +1,13 @@
+{
+  "id": "intent-0mwkncgqg-ra90",
+  "slug": "install-the-built-holyagent-extension",
+  "objective": "Install the built HolyAgent extension file into Pi dist, using a working PR branch if one contains it, and verify the installed result.",
+  "requirements": [
+    "Install the built extension file in pi dist.",
+    "There might be a PR branch that is working; use gh to find and use it.",
+    "Do not replace or remove unrelated files, including the existing untracked packages/integrations/pi/dist/extensions/.pi/ path, without establishing ownership."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-17T12:06:21.114Z"
+}
