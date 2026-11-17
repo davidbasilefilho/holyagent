@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "re-review-the-solid-compatibility-repair",
   "objective": "Re-review the Solid compatibility repair and confirm it resolves the lint and runtime failures without introducing updater regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review only repair commit aefd20ab..01b8c03 in C:/Users/david.basile/dev/holyagent-deps-0.3.4, in the context of the previously reviewed dependency commit.",
     "Use C:/Users/david.basile/dev/holyagent-deps-0.3.4-repair-final.diff.",
@@ -57,7 +57,49 @@
     "agentId": "pi:assignment-0mwksepy9-ekat",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-17T15:19:55.749Z"
+    "startedAt": "2026-11-17T15:19:55.749Z",
+    "finishedAt": "2026-11-17T15:33:39.794Z"
+  },
+  "result": "Lint passes cleanly across all 462 files. All evidence gathered — writing the report.\n\n**Re-review: Solid compatibility repair aefd20ab..01b8c031 — no findings.**\n\n- **Repair correctness**: The fix is pure dependency correction with no suppressions or shims — zero source-file changes in the commit. `MAJOR_CAP = { \"solid-js\": 1 }` (`scripts/dependency-pins.ts:307`) and the cap branch in `nextPackageRange` (`scripts/dependency-pins.ts:317-323`) move a manifest already on `^2.0.0` down to the caret range of the capped release; `releaseOf` (`scripts/update-dependencies.ts:211-221`) filters the packument to `parsed.major <= cap` before `newestAllowedRelease`, so registry selection and range computation use the same cap, and `deps:check` (`mise.toml:96`, `bun scripts/update-dependencies.ts --check`) shares it via the same code path. Uncapped never-down behavior is untouched (`scripts/dependency-pins.ts:69-75`). Live smoke test: `solid-js@1.9.19` + `@opentui/solid@0.9.2` import resolves `onMount` as a function (51 keys).\n- **Repair coverage**: New tests prove capped registry selection against a real `latest: 2.0.0` packument picking 1.9.19, uncapped selection ignoring a 5.0.0-rc.1, recovery from `^2.0.0` → `^1.0.0`, capped never-down, and cap-table isolation for effect (`scripts/dependency-pins.test.ts:130-149`, `scripts/update-dependencies.test.ts:189-233`). 119 tests pass across the three changed script files.\n- **Repair outputs**: `package.json:36` is `^1.0.0`; `bun.lock` resolves `solid-js@1.9.19` with `csstype`, drops `@solidjs/signals@2.0.0`, and downgrades `seroval` 1.8.x → `~1.6.11` as required by 1.9.19; all four dist bundles consistently show `^1.0.0`/`1.9.19`. No shim file exists (source grep finds only unrelated mise/bun shim mentions). Previously failing setup-TUI tests now pass (91 pass, 0 fail, 3 files); `mise run lint` reports \"No problems in 462 files\", resolving the six unsafe-type warnings through the 1.x typings.\n- **Repair scope**: 10 files — the two updater modules, their tests, `package.json`, `bun.lock` and regenerated dist. No version bump, no unrelated edits.\n\nevidence:\n- Repair correctness: capped selection in scripts/update-dependencies.ts:211-221 and capped range recovery in scripts/dependency-pins.ts:317-323 share MAJOR_CAP; deps:check uses the same releaseOf path (mise.toml:96); runtime import smoke test resolves onMount under solid-js 1.9.19.\n- Repair coverage: tests at scripts/update-dependencies.test.ts:189-233 (capped/uncapped registry selection) and scripts/dependency-pins.test.ts:130-149 (cap table, ^2.0.0 recovery, never-down); 119 pass, 0 fail.\n- Repair outputs: package.json:36 `^1.0.0`, bun.lock resolves solid-js@1.9.19 and removes @solidjs/signals; all four dist bundles carry ^1.0.0/1.9.19; no shim present; setup-TUI tests 91 pass and `mise run lint` clean (462 files).\n- Repair scope: diff touches only scripts/dependency-pins.ts, scripts/update-dependencies.ts(+tests), package.json, bun.lock and regenerated dist bundles; version 0.3.4 unchanged.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Independent re-review found no repair issues: capped selection and recovery are tested, Solid 1.9.19 imports correctly, previous TUI and lint failures are resolved, outputs are synchronized and scope remains limited.",
+    "criteria": [
+      {
+        "criterion": "Repair correctness: Solid 2 incompatibility and all six lint warnings are resolved by compatible dependencies rather than suppressions or shims, with no updater behavior regression.",
+        "support": "capped selection in scripts/update-dependencies.ts:211-221 and capped range recovery in scripts/dependency-pins.ts:317-323 share MAJOR_CAP; deps:check uses the same releaseOf path (mise.toml:96); runtime import smoke test resolves onMount under solid-js 1.9.19."
+      },
+      {
+        "criterion": "Repair coverage: regression tests prove capped and uncapped release selection and range behavior, including recovery from an existing ^2.0.0 range.",
+        "support": "tests at scripts/update-dependencies.test.ts:189-233 (capped/uncapped registry selection) and scripts/dependency-pins.test.ts:130-149 (cap table, ^2.0.0 recovery, never-down); 119 pass, 0 fail."
+      },
+      {
+        "criterion": "Repair outputs: manifest, lockfile and generated bundles consistently use solid-js ^1.0.0 resolving to 1.9.19; no temporary adapter remains.",
+        "support": "package.json:36 `^1.0.0`, bun.lock resolves solid-js@1.9.19 and removes @solidjs/signals; all four dist bundles carry ^1.0.0/1.9.19; no shim present; setup-TUI tests 91 pass and `mise run lint` clean (462 files)."
+      },
+      {
+        "criterion": "Repair scope: only the compatibility updater, tests, manifests/lockfile and affected generated outputs change.",
+        "support": "diff touches only scripts/dependency-pins.ts, scripts/update-dependencies.ts(+tests), package.json, bun.lock and regenerated dist bundles; version 0.3.4 unchanged."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "Repair correctness",
+        "support": "capped selection in scripts/update-dependencies.ts:211-221 and capped range recovery in scripts/dependency-pins.ts:317-323 share MAJOR_CAP; deps:check uses the same releaseOf path (mise.toml:96); runtime import smoke test resolves onMount under solid-js 1.9.19."
+      },
+      {
+        "label": "Repair coverage",
+        "support": "tests at scripts/update-dependencies.test.ts:189-233 (capped/uncapped registry selection) and scripts/dependency-pins.test.ts:130-149 (cap table, ^2.0.0 recovery, never-down); 119 pass, 0 fail."
+      },
+      {
+        "label": "Repair outputs",
+        "support": "package.json:36 `^1.0.0`, bun.lock resolves solid-js@1.9.19 and removes @solidjs/signals; all four dist bundles carry ^1.0.0/1.9.19; no shim present; setup-TUI tests 91 pass and `mise run lint` clean (462 files)."
+      },
+      {
+        "label": "Repair scope",
+        "support": "diff touches only scripts/dependency-pins.ts, scripts/update-dependencies.ts(+tests), package.json, bun.lock and regenerated dist bundles; version 0.3.4 unchanged."
+      }
+    ]
   },
   "createdAt": "2026-11-17T15:19:55.749Z"
 }
