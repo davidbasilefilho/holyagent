@@ -48,6 +48,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "pi:assignment-0mwkndqov-pno9-kimi",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-17T12:08:16.075Z"
