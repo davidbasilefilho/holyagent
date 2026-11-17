@@ -55,6 +55,7 @@
   "independentFrom": [],
   "followUpOf": "assignment-0mwkt5wn5-9pfu",
   "specialist": {
+    "agentId": "pi:assignment-0mwkxx3h2-e9as",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-17T17:02:19.863Z"
