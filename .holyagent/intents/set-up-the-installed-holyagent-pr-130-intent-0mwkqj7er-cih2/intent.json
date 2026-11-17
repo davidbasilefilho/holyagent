@@ -10,6 +10,7 @@
     "Use kimi-coding/kimi-for-coding for delegated Pi runs."
   ],
   "revision": 2,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "Configured the installed HolyAgent package with kimi-coding/kimi-for-coding, enabled every applicable capability, installed and verified the required packages, and passed user-scope doctor. Browser extension pairing remains a manual desktop action; processes is unsupported on Windows, Codex-only capabilities do not apply, and mobile device access lacks platform SDKs.",
   "createdAt": "2026-11-17T13:35:34.469Z"
 }
