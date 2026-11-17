@@ -1,0 +1,73 @@
+{
+  "id": "assignment-0mwkrsp5r-0dla",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "update-all-repository-dependencies-on",
+  "objective": "Update all repository dependencies on the 0.3.4 dependency-update worktree using only the documented updater and produce a validated, reviewable change.",
+  "state": "Running",
+  "scope": [
+    "Work only in C:/Users/david.basile/dev/holyagent-deps-0.3.4 on branch release/0.3.4/chore/dependency-updates, based on PR #130 head 765aa8b2.",
+    "Run the dependency updater and any generated build needed for its changes.",
+    "Own dependency manifests, lockfile, updater-managed pins and generated outputs changed by the updater/build; make no unrelated edits."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Run bun install --frozen-lockfile in the new worktree first because node_modules is not shared; its prepare hook is expected.",
+    "Run the real updater through bunx --no-install mise run deps:update. Do not hand-edit dependency pins, package ranges or bun.lock; the updater alone must produce those changes.",
+    "Preserve the documented ^X.0.0, ^0.X.0 and ^0.0.X caret-range formats at their line boundaries and workspace:* ranges. Let scripts/update-dependencies.ts and its tests enforce them.",
+    "Do not change the HolyAgent version: this branch builds on an existing 0.3.4 release branch, so no version bump is requested.",
+    "Run mise build if the updater changes sources or generated outputs require it, using bunx --no-install mise run build.",
+    "Run deps:check and focused dependency range/pin tests now. Do not run the full final verify yet; final-head validation follows independent review.",
+    "No migration is needed: dry-run already established NothingToMigrate in both relevant locations.",
+    "Do not commit, push, open a PR, switch the main checkout, edit .git or .holyagent state, or change the user-level Pi installation.",
+    "If the updater fails, diagnose within the allowed updater path and repair only updater defects with regression tests; do not bypass it with manual dependency edits.",
+    "Write a unified diff of the final uncommitted changes to a file outside the repository for review. Report exact commands, exit codes, update counts, changed paths and diff-file path in under 400 words; put logs outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "Updater: bun install --frozen-lockfile and bunx --no-install mise run deps:update complete successfully in the designated worktree, with all dependency changes produced by the updater.",
+      "blocking": true,
+      "dimension": "repo-standards"
+    },
+    {
+      "text": "Ranges: every dependency range remains caret-based at the documented X.0.0, 0.X.0 or 0.0.X line boundary, or workspace:*; deps:check and focused range/pin tests pass.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: changes are limited to updater/build outputs, the HolyAgent version remains 0.3.4, and no unrelated feature or refactor is added.",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Evidence: report changed paths, update counts, commands with exit codes and a readable diff-file for independent review.",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "Updater",
+    "Ranges",
+    "Scope",
+    "checks-run",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "package.json",
+    "bun.lock",
+    "mise.toml",
+    "packages",
+    "scripts",
+    ".github"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T14:10:56.991Z"
+  },
+  "createdAt": "2026-11-17T14:10:56.991Z"
+}
