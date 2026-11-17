@@ -1,0 +1,65 @@
+{
+  "id": "assignment-0mwkqk519-l3yz",
+  "intentId": "intent-0mwkqj7er-cih2",
+  "intentRevision": 2,
+  "roleTask": "Worker.operations",
+  "slug": "run-the-installed-holyagent-user-level",
+  "objective": "Run the installed HolyAgent user-level setup for Pi with Kimi and every capability available on this Windows system, then verify the complete result.",
+  "state": "Running",
+  "scope": [
+    "Use the HolyAgent installation from PR #130 at C:/Users/david.basile/.pi/agent/git/github.com/davidbasilefilho/holyagent, not the older main-checkout implementation, for installed-setup behavior.",
+    "Inspect the installed setup help and capability documentation first, then run the real user-scope setup with every supported capability enabled.",
+    "Configure the default Pi provider/model as kimi-coding/kimi-for-coding in the correct user-level HolyAgent configuration.",
+    "Modify only HolyAgent and Pi user-level configuration and dependencies required by the requested setup; leave the repository checkout unchanged."
+  ],
+  "constraints": [
+    "The user explicitly approved setup with Kimi and all HolyAgent capabilities, including optional integrations and their required user-level settings changes and dependency installation.",
+    "Use provider kimi-coding and model kimi-for-coding for every Pi model invocation; Pi has no provider ID kimi-for-coding.",
+    "Do not stop at --dry-run: run the actual setup after determining the correct flags. Enable every available capability explicitly where setup exposes on/off flags, including device access and optional visual, browser, search, workflow and integration capabilities supported by the installed version.",
+    "If a capability is unavailable on native Windows, establish that from the installed documentation or a concrete command result, keep every other capability enabled, and report the limitation precisely.",
+    "Preserve unrelated existing user settings by merging only required HolyAgent keys; do not reset Pi or HolyAgent configuration to defaults.",
+    "Do not switch branches, edit the repository, commit, push, open PRs or change protected settings outside the requested setup.",
+    "Verify with the installed doctor at user scope, Pi package/provider checks, and a headless extension load using kimi-coding/kimi-for-coding. Include a capability-by-capability result.",
+    "Keep working until setup and verification are complete; stop only for a concrete unresolvable dependency or platform error. Do not start extra reviews or unrelated work.",
+    "Report in under 500 words; put long logs outside the repository and give their paths."
+  ],
+  "criteria": [
+    {
+      "text": "Setup: the installed PR #130 HolyAgent user-scope setup runs successfully with every capability available on this Windows system enabled and configured.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Kimi: the effective HolyAgent Pi configuration selects provider kimi-coding and model kimi-for-coding without replacing unrelated settings.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Verification: installed doctor, Pi package and provider checks, and a headless extension load with the requested Kimi model succeed; every capability is individually reported as working or concretely unsupported.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: repository files and branches remain unchanged, and unrelated user configuration is preserved.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Setup",
+    "Kimi",
+    "Verification",
+    "Scope"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-17T13:36:18.045Z"
+  },
+  "createdAt": "2026-11-17T13:36:18.045Z"
+}
