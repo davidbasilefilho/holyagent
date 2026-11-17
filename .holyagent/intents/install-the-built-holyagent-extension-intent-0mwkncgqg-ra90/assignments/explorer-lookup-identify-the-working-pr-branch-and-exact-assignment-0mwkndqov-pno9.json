@@ -5,7 +5,7 @@
   "roleTask": "Explorer.lookup",
   "slug": "identify-the-working-pr-branch-and-exact",
   "objective": "Identify the working PR branch and exact built Pi extension source and install destination for the user-requested installation.",
-  "state": "Running",
+  "state": "Ready",
   "scope": [
     "Read-only investigation of the local checkout, PRs #125 and #130 through gh, and relevant Pi installation/configuration files.",
     "Do not modify files, install anything, switch branches, or write version-control state."
@@ -47,11 +47,5 @@
   "ownershipPaths": [],
   "dependencies": [],
   "independentFrom": [],
-  "specialist": {
-    "agentId": "pi:assignment-0mwkndqov-pno9-kimi",
-    "model": "haiku",
-    "effort": "medium",
-    "startedAt": "2026-11-17T12:08:16.075Z"
-  },
   "createdAt": "2026-11-17T12:07:20.672Z"
 }
