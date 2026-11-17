@@ -1,0 +1,51 @@
+{
+  "id": "assignment-0mwkslknm-riv2",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 1,
+  "roleTask": "Worker.validation",
+  "slug": "run-final-validation-on-the-reviewed",
+  "objective": "Run final validation on the reviewed dependency-update commit and confirm the worktree remains clean.",
+  "state": "Running",
+  "scope": [
+    "Work only in C:/Users/david.basile/dev/holyagent-deps-0.3.4 at commit aefd20ab on release/0.3.4/chore/dependency-updates.",
+    "Run the complete repository verification and dependency freshness check; make no edits."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Run bunx --no-install mise run verify on the current committed head; this is the required type-check, lint, format-check and test gate.",
+    "Run bunx --no-install mise run deps:check after verify and confirm the git worktree is clean and HEAD remains aefd20ab.",
+    "Do not repair failures, edit files, commit, push or open a PR. Report any failure with its exact failing step and relevant counts.",
+    "Report in under 200 words; write long logs outside the repository and provide their paths."
+  ],
+  "criteria": [
+    {
+      "text": "Verify: bunx --no-install mise run verify exits 0 on aefd20ab, with type-check, lint, format check and all tests executed.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Freshness: bunx --no-install mise run deps:check exits 0 on the final head.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Clean state: HEAD remains aefd20ab and the worktree has no modified or untracked repository files after validation.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Verify",
+    "Freshness",
+    "Clean state"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-17T14:33:24.178Z"
+  },
+  "createdAt": "2026-11-17T14:33:24.178Z"
+}
