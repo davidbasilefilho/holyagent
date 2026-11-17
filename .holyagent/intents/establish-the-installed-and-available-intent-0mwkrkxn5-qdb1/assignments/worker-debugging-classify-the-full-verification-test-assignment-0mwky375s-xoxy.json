@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mwky375s-xoxy",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 3,
+  "roleTask": "Worker.debugging",
+  "slug": "classify-the-full-verification-test",
+  "objective": "Classify the full-verification test failures as PR #130 baseline or dependency-update regressions by comparing identical focused tests on base and final heads.",
+  "state": "Running",
+  "scope": [
+    "Compare detached baseline C:/Users/david.basile/dev/holyagent-pr130-baseline at 765aa8b2 with dependency worktree C:/Users/david.basile/dev/holyagent-deps-0.3.4 at 1f36606.",
+    "Use the failure log C:/Users/david.basile/dev/verify-01b8c031.log to select representative failing classes: Pi extension, journal/state privacy, built CLI environment and process timeouts.",
+    "Run focused comparisons only; do not edit source or state."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Run bun install --frozen-lockfile in the baseline worktree before testing; its prepare hook is expected.",
+    "Run the same test files with equivalent environment, working-directory isolation and adequate timeouts on both heads. Set required HOME and BUN_INSTALL/PATH values consistently so spawned Bun processes can run; do not patch source or tests.",
+    "Compare failure counts and signatures, not claims from previous reports. Distinguish baseline PR #130 failures from failures introduced only by dependency commits aefd20ab..1f36606.",
+    "If a failure is introduced by the update, reduce it to the smallest dependency-related cause and name the repair and regression test needed. If it is baseline, prove it fails equivalently at 765aa8b2.",
+    "Do not run another full verify, modify files, commit, push, open PRs or remove worktrees.",
+    "Report under 450 words with per-file counts and logs outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "Baseline classification: every dominant verification failure class is evidenced as equivalent on PR #130 base 765aa8b2 or introduced by the dependency update.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Dependency regressions: any update-only failure has a concrete cause, reproduction and repair/test recommendation.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Comparison validity: both heads run identical focused tests under equivalent environments, with exact pass/fail/skip counts and no accidental main-checkout runs.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: no source, state or version-control modifications.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Baseline classification",
+    "Dependency regressions",
+    "Comparison validity",
+    "Scope"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/tests/extension.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T17:07:04.576Z"
+  },
+  "createdAt": "2026-11-17T17:07:04.576Z"
+}
