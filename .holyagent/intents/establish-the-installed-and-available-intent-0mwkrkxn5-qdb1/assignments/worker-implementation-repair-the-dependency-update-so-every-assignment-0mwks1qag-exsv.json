@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-dependency-update-so-every",
   "objective": "Repair the dependency update so every package.json dependency range uses the required caret line boundary, and correct the change evidence before review.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Continue in C:/Users/david.basile/dev/holyagent-deps-0.3.4 on the existing uncommitted dependency update.",
     "Fix the updater path if needed so packages/runtime/package.json just-bash is ^3.0.0 rather than exact 3.6.1, with bun.lock and generated outputs refreshed by repository commands.",
@@ -64,7 +64,57 @@
     "agentId": "pi:assignment-0mwkrsp5r-0dla",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-17T14:17:58.360Z"
+    "startedAt": "2026-11-17T14:17:58.360Z",
+    "finishedAt": "2026-11-17T14:26:12.620Z"
+  },
+  "result": "All green. Final report:\n\n## Summary\n\nRepaired the dependency update so every `package.json` range is a caret range at its line boundary, with the fix produced by the updater itself.\n\n**Root cause:** `scripts/dependency-pins.ts` declared `EXACT_PACKAGES = [\"just-bash\"]`, so the updater wrote just-bash as an exact version (`3.6.1`) and the range test explicitly allowed it — `scripts/dependency-ranges.test.ts` had a test asserting an exact just-bash range is fine and `^3.0.0` is a problem. That exception is what the previous run's exact pin slipped through.\n\n**Repair (all through repository commands):**\n1. `scripts/dependency-pins.ts` — emptied `EXACT_PACKAGES` (mechanism kept for future deliberate pins, JSDoc updated); `nextPackageRange` now writes the caret range for just-bash too.\n2. `scripts/dependency-ranges.test.ts` — flipped \"an exact version is allowed for just-bash only\" to \"refused everywhere, just-bash included\" (`^3.0.0` now required); added a regression test that loads the real `packages/runtime/package.json` and fails on any exact dependency range. Verified it **fails** against the on-disk exact `3.6.1` before the updater re-ran.\n3. `scripts/dependency-pins.test.ts` — updated exact-pin tests: `EXACT_PACKAGES` is `[]`, `isExactPin(\"just-bash\", …)` is false, `nextPackageRange(\"just-bash\", \"3.6.0\", \"3.6.1\")` is `\"^3.0.0\"`.\n4. Re-ran `bunx --no-install mise run deps:update` — exit 0; it logged `just-bash (dependencies) (packages/runtime/package.json): 3.6.1 -> ^3.0.0` and wrote the range itself (no hand edit of any manifest or `bun.lock`). All prior legitimate updates preserved; version stays 0.3.4.\n5. `bunx --no-install mise run build` — exit 0; regenerated dist bundles (lockfile now resolves just-bash 3.6.1 under `^3.0.0`, so the bundled `just-bash.js` moved with it).\n\n**Checks:** `deps:check` exit 0 (\"every pin is on the newest stable release\"); focused tests `update-dependencies`, `dependency-ranges`, `dependency-pins`, `bump-version`, `workflows` — exit 0, **196 pass / 0 fail**. Full verify not run, per brief.\n\n**Changed paths (19, all uncommitted):** `.github/workflows/{dev,stable,validation}.yml`, `bun.lock`, `package.json`, `packages/core/src/config/{pi,pypi}-packages.json`, `packages/runtime/package.json`, 6 regenerated files under `packages/integrations/{claude,pi}/dist/`, and 4 updater/test files under `scripts/` (`dependency-pins.ts`, `dependency-pins.test.ts`, `dependency-ranges.test.ts`, `update-dependencies.test.ts` — the last is the precedented browser-use pin snapshot).\n\n**Review files (outside the repository):**\n- Diff: `C:/Users/david.basile/dev/holyagent-deps-0.3.4-review.diff` (45,491 lines, 19 file diffs, regenerated after the repair)\n- Logs: `...-updater-rerun.log`, `...-build-rerun.log`, `...-deps-tests.log` (same directory)\n\nevidence:\n- Caret repair: `packages/runtime/package.json` now has `\"just-bash\": \"^3.0.0\"`, written by `mise run deps:update` (exit 0, log line `3.6.1 -> ^3.0.0`), not by hand; repo-wide range test passes.\n- Regression coverage: new test \"the runtime manifest holds no exact dependency range\" fails on an exact just-bash pin (verified pre-repair) and passes after; flipped unit test refuses exact ranges everywhere; 196/196 focused tests pass, deps:check exit 0.\n- Generated outputs: bun.lock refreshed by the updater (just-bash resolves to 3.6.1 under `^3.0.0`); `mise run build` exit 0 regenerated the 6 dist bundles; version remains 0.3.4 (bump-version test passes).\n- Evidence: git status --short exactly matches the 19 reported paths, and C:/Users/david.basile/dev/holyagent-deps-0.3.4-review.diff was regenerated after the repair and contains all 19 file diffs.\n- checks-run: deps:check exit 0; focused suite exit 0, 196 pass / 0 fail.\n- changed-paths: 19 paths, exactly matching `git status --short` (3 workflows, bun.lock, 2 package manifests, 2 pin configs, 6 dist bundles, 4 scripts files).\n- diff-file: C:/Users/david.basile/dev/holyagent-deps-0.3.4-review.diff regenerated after the repair and contains all 19 file diffs.\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "The updater itself now writes just-bash as ^3.0.0, exact ranges are covered by regression tests, deps:check and 196 focused tests pass, and git status confirms exactly 19 changed paths with all generated outputs included.",
+    "criteria": [
+      {
+        "criterion": "Caret repair: packages/runtime/package.json uses just-bash ^3.0.0 and every other dependency range satisfies the documented caret or workspace format, with the change produced through deps:update rather than a hand edit.",
+        "support": "`packages/runtime/package.json` now has `\"just-bash\": \"^3.0.0\"`, written by `mise run deps:update` (exit 0, log line `3.6.1 -> ^3.0.0`), not by hand; repo-wide range test passes."
+      },
+      {
+        "criterion": "Regression coverage: a focused test proves an exact runtime dependency range is rejected or normalized by the updater, and all focused dependency tests plus deps:check pass.",
+        "support": "new test \"the runtime manifest holds no exact dependency range\" fails on an exact just-bash pin (verified pre-repair) and passes after; flipped unit test refuses exact ranges everywhere; 196/196 focused tests pass, deps:check exit 0."
+      },
+      {
+        "criterion": "Generated outputs: bun.lock and required dist outputs are refreshed through repository commands and the version remains 0.3.4.",
+        "support": "bun.lock refreshed by the updater (just-bash resolves to 3.6.1 under `^3.0.0`); `mise run build` exit 0 regenerated the 6 dist bundles; version remains 0.3.4 (bump-version test passes)."
+      },
+      {
+        "criterion": "Evidence: exact changed-path count and list match git status, and the regenerated external diff contains the complete final change.",
+        "support": "git status --short exactly matches the 19 reported paths, and C:/Users/david.basile/dev/holyagent-deps-0.3.4-review.diff was regenerated after the repair and contains all 19 file diffs."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "Caret repair",
+        "support": "`packages/runtime/package.json` now has `\"just-bash\": \"^3.0.0\"`, written by `mise run deps:update` (exit 0, log line `3.6.1 -> ^3.0.0`), not by hand; repo-wide range test passes."
+      },
+      {
+        "label": "Regression coverage",
+        "support": "new test \"the runtime manifest holds no exact dependency range\" fails on an exact just-bash pin (verified pre-repair) and passes after; flipped unit test refuses exact ranges everywhere; 196/196 focused tests pass, deps:check exit 0."
+      },
+      {
+        "label": "Generated outputs",
+        "support": "bun.lock refreshed by the updater (just-bash resolves to 3.6.1 under `^3.0.0`); `mise run build` exit 0 regenerated the 6 dist bundles; version remains 0.3.4 (bump-version test passes)."
+      },
+      {
+        "label": "checks-run",
+        "support": "deps:check exit 0; focused suite exit 0, 196 pass / 0 fail."
+      },
+      {
+        "label": "changed-paths",
+        "support": "19 paths, exactly matching `git status --short` (3 workflows, bun.lock, 2 package manifests, 2 pin configs, 6 dist bundles, 4 scripts files)."
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/dev/holyagent-deps-0.3.4-review.diff regenerated after the repair and contains all 19 file diffs."
+      }
+    ]
   },
   "createdAt": "2026-11-17T14:17:58.360Z"
 }
