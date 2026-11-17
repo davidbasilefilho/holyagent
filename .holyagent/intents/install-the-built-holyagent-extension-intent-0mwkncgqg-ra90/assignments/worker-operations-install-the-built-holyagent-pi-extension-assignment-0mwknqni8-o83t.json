@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mwknqni8-o83t",
+  "intentId": "intent-0mwkncgqg-ra90",
+  "intentRevision": 3,
+  "roleTask": "Worker.operations",
+  "slug": "install-the-built-holyagent-pi-extension",
+  "objective": "Install the built HolyAgent Pi extension from working PR #130 and verify Pi recognizes and loads it.",
+  "state": "Running",
+  "scope": [
+    "Install from PR branch release/0.3.4/feat/final-guidance-events using the documented Pi package install path.",
+    "Operate on the user-level Pi installation and settings only; do not change repository files or branches.",
+    "Run installation and verification now and report exact commands, exit codes and installed source."
+  ],
+  "constraints": [
+    "The user explicitly requested installation, so the global pi install and its settings change are approved.",
+    "Use gh if further PR metadata is needed; PR #130 head 765aa8b22e6288fdd680a564e04389e2a6274462 is the selected source because it alone carries the newer built extensions/holyagent.js.",
+    "Prefer the documented command: pi install git:github.com/davidbasilefilho/holyagent@release/0.3.4/feat/final-guidance-events. If that source shape is rejected, inspect the documented package-root syntax and use the equivalent PR-branch dist package source; do not switch the repository checkout.",
+    "Use provider kimi-coding and model kimi-for-coding for every Pi model invocation.",
+    "Preserve packages/integrations/pi/dist/extensions/.pi/ and every unrelated repository or user file.",
+    "Verify with pi list and a headless extension load using the requested model. Ensure the load check exercises the installed PR #130 extension rather than only the older main-checkout bundle.",
+    "Keep working until installation and verification are complete; stop only for an unresolvable install error. Do not commit, push, open PRs, or start extra work.",
+    "Report in under 300 words; put long logs outside the repository and give their paths."
+  ],
+  "criteria": [
+    {
+      "text": "Installation: the user-level Pi configuration installs the HolyAgent package from PR #130 and contains the newer built extension.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Verification: pi list exits 0 and shows the installed PR source, and a headless Pi invocation with provider kimi-coding and model kimi-for-coding loads the installed extension successfully.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: no repository files, branches, commits or unrelated Pi settings are changed, and the existing dist/extensions/.pi path is preserved.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Installation",
+    "Verification",
+    "Scope"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-17T12:17:23.072Z"
+  },
+  "createdAt": "2026-11-17T12:17:23.072Z"
+}
