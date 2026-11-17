@@ -1,0 +1,63 @@
+{
+  "id": "assignment-0mwku9en9-bi3c",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 2,
+  "roleTask": "Reviewer.code",
+  "slug": "re-review-the-solid-compatibility-repair",
+  "objective": "Re-review the Solid compatibility repair and confirm it resolves the lint and runtime failures without introducing updater regressions.",
+  "state": "Running",
+  "scope": [
+    "Review only repair commit aefd20ab..01b8c03 in C:/Users/david.basile/dev/holyagent-deps-0.3.4, in the context of the previously reviewed dependency commit.",
+    "Use C:/Users/david.basile/dev/holyagent-deps-0.3.4-repair-final.diff.",
+    "Do not modify files or version-control state."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Previous open issues: six unsafe-type lint warnings from Solid 2 typings and five setup-TUI failures because @opentui/solid 0.9.2 requires Solid 1.x and imports removed onMount.",
+    "Verify the MAJOR_CAP and releaseOf changes correctly choose newest compatible 1.x, restore ^1.0.0 through the updater, preserve never-down behavior for uncapped packages, and make deps:check use the same cap.",
+    "Review test quality, generated outputs and absence of the temporary JSX shim. Run focused read-only checks if useful; final full verify follows.",
+    "Report findings with severity and exact evidence; if none, say so. Do not repair or launch other reviews.",
+    "Report under 350 words."
+  ],
+  "criteria": [
+    {
+      "text": "Repair correctness: Solid 2 incompatibility and all six lint warnings are resolved by compatible dependencies rather than suppressions or shims, with no updater behavior regression.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Repair coverage: regression tests prove capped and uncapped release selection and range behavior, including recovery from an existing ^2.0.0 range.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Repair outputs: manifest, lockfile and generated bundles consistently use solid-js ^1.0.0 resolving to 1.9.19; no temporary adapter remains.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Repair scope: only the compatibility updater, tests, manifests/lockfile and affected generated outputs change.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Repair correctness",
+    "Repair coverage",
+    "Repair outputs",
+    "Repair scope"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwkt5wn5-9pfu"
+  ],
+  "followUpOf": "assignment-0mwksepy9-ekat",
+  "specialist": {
+    "agentId": "pi:assignment-0mwksepy9-ekat",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T15:19:55.749Z"
+  },
+  "createdAt": "2026-11-17T15:19:55.749Z"
+}
