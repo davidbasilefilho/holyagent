@@ -1,0 +1,66 @@
+{
+  "id": "assignment-0mwkso2yk-pvbo",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "repair-the-six-setup-tui-lint-warnings",
+  "objective": "Repair the six setup-TUI lint warnings exposed by the dependency update without changing unrelated behavior or dependency versions.",
+  "state": "Running",
+  "scope": [
+    "Work only in C:/Users/david.basile/dev/holyagent-deps-0.3.4 on release/0.3.4/chore/dependency-updates at aefd20ab.",
+    "Fix packages/runtime/src/setup/tui/app.tsx, packages/runtime/src/setup/tui/entry.tsx and packages/runtime/tests/setup-tui-harness.ts as needed for the updated OpenTUI/Solid typings.",
+    "Keep the existing dependency update and caret-format changes intact."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Reproduce the current lint failure first and inspect the exact six warning locations and updated library types.",
+    "Use precise, type-safe adapters or annotations at the boundary; do not suppress lint rules, broaden to any, weaken tests or change runtime behavior merely to silence warnings.",
+    "Follow Effect and Effect Schema rules at data boundaries and preserve existing public APIs.",
+    "Do not change dependency versions, manifests, lockfile, workflows or unrelated source. Do not run full verify after the repair; focused lint/type/test checks only, then independent re-review and final validation.",
+    "Do not commit, push, open a PR or edit version-control/state files.",
+    "Generate an external diff of only this repair relative to aefd20ab for re-review. Report commands, exit codes, warning/test counts, changed paths and diff-file under 300 words."
+  ],
+  "criteria": [
+    {
+      "text": "Lint repair: the six reported no-unsafe warnings are eliminated with type-safe code and no suppressions or any escape hatches.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regression checks: focused setup-TUI tests, type-check and lint checks covering the changed files pass after the repair.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Scope: only the three named TUI/test files change if all need repair; dependencies, behavior and public APIs remain unchanged.",
+      "blocking": true,
+      "dimension": "scope"
+    },
+    {
+      "text": "Review evidence: provide exact changed paths and an external diff relative to aefd20ab.",
+      "blocking": true,
+      "dimension": "repo-standards"
+    }
+  ],
+  "evidence": [
+    "Lint repair",
+    "Regression checks",
+    "Scope",
+    "Review evidence",
+    "changed-paths",
+    "diff-file"
+  ],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/tui",
+    "packages/runtime/tests/setup-tui-harness.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "agentId": "pi:assignment-0mwkrsp5r-0dla",
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T14:35:21.212Z"
+  },
+  "createdAt": "2026-11-17T14:35:21.212Z"
+}
