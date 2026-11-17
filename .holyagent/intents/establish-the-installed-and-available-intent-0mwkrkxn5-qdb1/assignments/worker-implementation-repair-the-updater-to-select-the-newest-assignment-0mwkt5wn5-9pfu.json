@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "repair-the-updater-to-select-the-newest",
   "objective": "Repair the updater to select the newest compatible Solid line, remove the incompatible Solid 2 update and temporary shim, and restore all TUI checks.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Continue in C:/Users/david.basile/dev/holyagent-deps-0.3.4 with committed aefd20ab plus the uncommitted solid-js-jsx.d.ts shim.",
     "Encode the @opentui/solid peer compatibility constraint in the dependency updater and its freshness check with focused regression tests.",
@@ -68,7 +68,57 @@
     "agentId": "pi:assignment-0mwkrsp5r-0dla",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-17T14:49:12.834Z"
+    "startedAt": "2026-11-17T14:49:12.834Z",
+    "finishedAt": "2026-11-17T15:19:01.728Z"
+  },
+  "result": "All checks green and both diffs regenerated. Final report:\n\n## Summary\n\nEncoded the Solid 1.x peer cap in the dependency updater, restored `solid-js ^1.0.0`, removed the temporary JSX shim, and regenerated dist — every gate now passes.\n\n**Updater repair (smallest explicit cap):**\n- `scripts/dependency-pins.ts` — added `MAJOR_CAP: Readonly<Record<string, number>> = { \"solid-js\": 1 }`, documented with the reason (`@opentui/solid` 0.9.2 peers `solid-js ^1.9.12`; Solid 2.0 fails at import, `onMount` removed). `nextPackageRange` now moves a package whose current range is above its cap down to the capped line's caret range, overriding the never-down rule.\n- `scripts/update-dependencies.ts` — `releaseOf` filters eligible versions to the capped major before `newestAllowedRelease`, so an incompatible newer line is never selected; the freshness check (`deps:check`) uses the same path and accepts the capped range.\n\n**Regression coverage:** `dependency-pins.test.ts` (cap table shape; `^2.0.0`→`^1.0.0` move-down; never-down within line; uncapped unaffected) and `update-dependencies.test.ts` (a capped package with `latest` 2.0.0 resolves to newest 1.x; an uncapped package still resolves to `latest`). These failed against Solid 2.0 selection before the fix by construction.\n\n**Updater-produced outputs:** re-ran `mise run deps:update` — it logged `solid-js ^2.0.0 -> ^1.0.0` and wrote the manifest and lockfile itself (no hand edits). `bun.lock` now resolves `solid-js@1.9.19`. Deleted `solid-js-jsx.d.ts` (Solid 1.x supplies its own JSX namespace; the shim would conflict). `mise run build` regenerated 4 dist bundles. Version stays 0.3.4; all other compatible updates and caret formats intact.\n\n**Checks (all exit 0):** `deps:check`; focused dependency tests 202 pass / 0 fail; type-check 456 files; lint 462 files / 0 problems; focused setup-TUI suite 184 pass / 0 fail / 13 Windows-only skips.\n\n**Changed paths (10, uncommitted):** `bun.lock`, `package.json`, 4 dist bundles under `packages/integrations/{claude,pi}/dist/`, and 4 updater/test files under `scripts/`.\n\n**Diffs:** complete vs `765aa8b2` — `C:/Users/david.basile/dev/holyagent-deps-0.3.4-review.diff` (45,435 lines); repair-only vs `aefd20ab` — `C:/Users/david.basile/dev/holyagent-deps-0.3.4-tui-repair.diff` (563 lines).\n\nevidence:\n- Compatibility updater: `MAJOR_CAP` holds `solid-js` at major 1 in `dependency-pins.ts`; `releaseOf` selects newest 1.x despite `latest` 2.0.0; `nextPackageRange` moves `^2.0.0` down to `^1.0.0`; new tests in both test files prove Solid 2.0 is not selected.\n- Updater-produced outputs: `mise run deps:update` exit 0 wrote `solid-js ^1.0.0` and refreshed `bun.lock` to 1.9.19; shim absent; `mise run build` exit 0 regenerated 4 dist files; version 0.3.4; caret formats and other updates intact.\n- Checks: `deps:check` exit 0; dependency tests 202/0; type-check exit 0 (456 files); lint exit 0 (462 files, 0 warnings); setup-TUI 184 pass / 0 fail / 13 skip.\n- Review evidence: 10 changed paths listed match `git status --short`; complete and repair-only diffs at the paths above.\n- changed-paths: bun.lock, package.json, 4 dist bundles, scripts/dependency-pins.ts, scripts/dependency-pins.test.ts, scripts/update-dependencies.ts, scripts/update-dependencies.test.ts (10 total).\n- diff-file: C:/Users/david.basile/dev/holyagent-deps-0.3.4-review.diff (complete, vs 765aa8b2) and C:/Users/david.basile/dev/holyagent-deps-0.3.4-tui-repair.diff (repair-only, vs aefd20ab).\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "The updater now caps Solid at its compatible 1.x line with regression tests, deps:update itself restored ^1.0.0 and lockfile 1.9.19, the shim is gone, and dependency, type, lint and TUI checks all pass.",
+    "criteria": [
+      {
+        "criterion": "Compatibility updater: the updater and deps:check encode the Solid 1.x peer constraint, select solid-js ^1.0.0 on the newest compatible 1.x release, and include regression coverage against selecting Solid 2.0.",
+        "support": "`MAJOR_CAP` holds `solid-js` at major 1 in `dependency-pins.ts`; `releaseOf` selects newest 1.x despite `latest` 2.0.0; `nextPackageRange` moves `^2.0.0` down to `^1.0.0`; new tests in both test files prove Solid 2.0 is not selected."
+      },
+      {
+        "criterion": "Updater-produced outputs: deps:update writes the manifest and lockfile, the temporary JSX shim is absent, build regenerates dist, and all other compatible updates and caret formats remain intact.",
+        "support": "`mise run deps:update` exit 0 wrote `solid-js ^1.0.0` and refreshed `bun.lock` to 1.9.19; shim absent; `mise run build` exit 0 regenerated 4 dist files; version 0.3.4; caret formats and other updates intact."
+      },
+      {
+        "criterion": "Checks: deps:check, focused dependency tests, type-check, lint and focused setup-TUI tests all pass with zero lint warnings and zero unexpected test failures.",
+        "support": "`deps:check` exit 0; dependency tests 202/0; type-check exit 0 (456 files); lint exit 0 (462 files, 0 warnings); setup-TUI 184 pass / 0 fail / 13 skip."
+      },
+      {
+        "criterion": "Review evidence: exact final changed paths plus complete and repair-only external diffs are reported for independent re-review.",
+        "support": "10 changed paths listed match `git status --short`; complete and repair-only diffs at the paths above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "Compatibility updater",
+        "support": "`MAJOR_CAP` holds `solid-js` at major 1 in `dependency-pins.ts`; `releaseOf` selects newest 1.x despite `latest` 2.0.0; `nextPackageRange` moves `^2.0.0` down to `^1.0.0`; new tests in both test files prove Solid 2.0 is not selected."
+      },
+      {
+        "label": "Updater-produced outputs",
+        "support": "`mise run deps:update` exit 0 wrote `solid-js ^1.0.0` and refreshed `bun.lock` to 1.9.19; shim absent; `mise run build` exit 0 regenerated 4 dist files; version 0.3.4; caret formats and other updates intact."
+      },
+      {
+        "label": "Checks",
+        "support": "`deps:check` exit 0; dependency tests 202/0; type-check exit 0 (456 files); lint exit 0 (462 files, 0 warnings); setup-TUI 184 pass / 0 fail / 13 skip."
+      },
+      {
+        "label": "Review evidence",
+        "support": "10 changed paths listed match `git status --short`; complete and repair-only diffs at the paths above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "bun.lock, package.json, 4 dist bundles, scripts/dependency-pins.ts, scripts/dependency-pins.test.ts, scripts/update-dependencies.ts, scripts/update-dependencies.test.ts (10 total)."
+      },
+      {
+        "label": "diff-file",
+        "support": "C:/Users/david.basile/dev/holyagent-deps-0.3.4-review.diff (complete, vs 765aa8b2) and C:/Users/david.basile/dev/holyagent-deps-0.3.4-tui-repair.diff (repair-only, vs aefd20ab)."
+      }
+    ]
   },
   "createdAt": "2026-11-17T14:49:12.834Z"
 }
