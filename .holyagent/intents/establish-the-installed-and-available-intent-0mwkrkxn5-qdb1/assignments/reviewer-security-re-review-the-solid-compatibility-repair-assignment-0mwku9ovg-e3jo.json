@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.security",
   "slug": "re-review-the-solid-compatibility-repair",
   "objective": "Re-review the Solid compatibility repair for dependency provenance and privileged-surface security regressions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Review only aefd20ab..01b8c03 using C:/Users/david.basile/dev/holyagent-deps-0.3.4-repair-final.diff and read-only files in C:/Users/david.basile/dev/holyagent-deps-0.3.4.",
     "Do not modify files or version-control state."
@@ -50,7 +50,41 @@
     "agentId": "pi:assignment-0mwksf0md-btgp",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-17T15:20:09.004Z"
+    "startedAt": "2026-11-17T15:20:09.004Z",
+    "finishedAt": "2026-11-17T15:33:52.679Z"
+  },
+  "result": "The repair diff is 567 lines and I've now read it in full. All checks follow.\n\n## Security re-review: Solid compatibility repair aefd20ab..01b8c03\n\n**Repair workflow security — no findings.** The diff touches 10 files: `bun.lock`, root `package.json`, four generated bundles (`packages/integrations/claude/dist/scripts/holyagent.js`, `packages/integrations/pi/dist/extensions/holyagent.js`, `pi/dist/scripts/holyagent-public.js`, `pi/dist/scripts/holyagent.js`), and four updater sources/tests (`scripts/dependency-pins.ts`, `scripts/update-dependencies.ts`, plus their tests). No workflow, hook, CI, installer or action file appears; no permission, trigger or external-action reference is touched.\n\n**Repair provenance — no findings.** The solid-js downgrade is registry-clean: `solid-js@1.9.19`, `csstype@3.2.4`, `seroval@1.6.12`, `seroval-plugins@1.6.12` all carry sha512 integrity in bun.lock, and 1.9.19's dependency set (`csstype ^3.1.0`, `seroval ~1.6.11`, `seroval-plugins ~1.6.8`) matches the genuine 1.x package layout — the `@solidjs/signals` entry (a solid-js 2.x-only dep) is removed. No URLs, hosts, credentials, git/tarball overrides or unversioned refs appear; embedded `TUI_LOCK` integrity values are byte-identical to bun.lock. The updater's `MAJOR_CAP` is a hardcoded literal table; the cap filter in `releaseOf` only filters packument versions by parsed major — no new network endpoints, URL construction or credential handling (tests use a loopback `Bun.serve`, test-only). `nextPackageRange`'s new cap branch reuses the existing `caretRange`/`parseRelease` helpers.\n\n**Scope — no findings.** Generated-bundle changes are limited to the embedded root manifest (`solid-js: ^1.0.0`) and the TUI package/lock strings now reading `1.9.19` with matching integrity — consistent with the declared Solid 1.9.19 repair. Third-party package internals remain unaudited (boundary as before; integrity enforced by lockfile sha512).\n\nevidence:\nRepair workflow security: full 567-line diff read; zero workflow/hook/CI files; no permission, trigger or action reference changed.\nRepair provenance: solid-js 1.9.19/csstype 3.2.4/seroval(-plugins) 1.6.12 in bun.lock with sha512, no hosts or overrides; MAJOR_CAP is a literal and releaseOf's cap filter adds no URL or credential handling.\nRepair review limits: bundle diffs show only `^1.0.0` and TUI entries at 1.9.19 with integrity identical to bun.lock; third-party internals bounded as unaudited.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "Security re-review read the full repair diff and found no privileged-surface, provenance or generated-output issues; registry integrity remains present and third-party audit limits are explicit.",
+    "criteria": [
+      {
+        "criterion": "Repair workflow security: no privileged workflow, permission, trigger or action reference changes occur in the repair.",
+        "support": "full 567-line diff read; zero workflow/hook/CI files; no permission, trigger or action reference changed."
+      },
+      {
+        "criterion": "Repair provenance: Solid and lockfile changes retain expected registry provenance and integrity with no new hosts, credentials or mutable source overrides.",
+        "support": "solid-js 1.9.19/csstype 3.2.4/seroval(-plugins) 1.6.12 in bun.lock with sha512, no hosts or overrides; MAJOR_CAP is a literal and releaseOf's cap filter adds no URL or credential handling."
+      },
+      {
+        "criterion": "Repair review limits: generated changes correspond to Solid 1.9.19 and unaudited third-party internals remain explicitly bounded.",
+        "support": "bundle diffs show only `^1.0.0` and TUI entries at 1.9.19 with integrity identical to bun.lock; third-party internals bounded as unaudited."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "Repair workflow security",
+        "support": "full 567-line diff read; zero workflow/hook/CI files; no permission, trigger or action reference changed."
+      },
+      {
+        "label": "Repair provenance",
+        "support": "solid-js 1.9.19/csstype 3.2.4/seroval(-plugins) 1.6.12 in bun.lock with sha512, no hosts or overrides; MAJOR_CAP is a literal and releaseOf's cap filter adds no URL or credential handling."
+      },
+      {
+        "label": "Repair review limits",
+        "support": "bundle diffs show only `^1.0.0` and TUI entries at 1.9.19 with integrity identical to bun.lock; third-party internals bounded as unaudited."
+      }
+    ]
   },
   "createdAt": "2026-11-17T15:20:09.004Z"
 }
