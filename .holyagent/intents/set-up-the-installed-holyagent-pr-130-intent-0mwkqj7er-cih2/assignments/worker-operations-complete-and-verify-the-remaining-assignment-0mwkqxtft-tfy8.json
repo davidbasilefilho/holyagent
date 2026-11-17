@@ -1,0 +1,57 @@
+{
+  "id": "assignment-0mwkqxtft-tfy8",
+  "intentId": "intent-0mwkqj7er-cih2",
+  "intentRevision": 2,
+  "roleTask": "Worker.operations",
+  "slug": "complete-and-verify-the-remaining",
+  "objective": "Complete and verify the remaining HolyAgent browser-use pairing on this Windows desktop without disturbing the completed Kimi and other-capability setup.",
+  "state": "Running",
+  "scope": [
+    "Continue only the browser-use limitation from the preceding setup report.",
+    "Use the installed @opencode/browse pairing flow and desktop session if needed.",
+    "Leave Kimi configuration, all other capabilities, repository files and unrelated browser settings unchanged."
+  ],
+  "constraints": [
+    "The user requested all available HolyAgent capabilities, approving the browser extension pairing and its normal browser configuration changes.",
+    "Use provider kimi-coding and model kimi-for-coding for the Pi run.",
+    "Run npx -y @opencode/browse@0.0.16 install in the desktop session and follow its supported non-interactive pairing flow.",
+    "Do not install a new browser, create accounts, change browser defaults, or disable browser security features. If pairing needs one of those external actions or native GUI interaction unavailable to this run, stop and identify the exact prerequisite.",
+    "Verify pairing with the installed doctor or browser MCP connection check, not merely installer exit 0.",
+    "Report in under 250 words; put long logs outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "Browser pairing: pair and verify the HolyAgent browser-use extension in a supported browser, or establish a concrete external prerequisite that cannot be completed without further user action.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Regression check: Kimi and the other configured HolyAgent capabilities remain unchanged and doctor still exits 0.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Scope: no repository changes, new browser installation, account creation or unrelated browser changes.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Browser pairing",
+    "Regression check",
+    "Scope"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/dist"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "followUpOf": "assignment-0mwkqk519-l3yz",
+  "specialist": {
+    "agentId": "pi:assignment-0mwkqk519-l3yz",
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-17T13:46:56.201Z"
+  },
+  "createdAt": "2026-11-17T13:46:56.201Z"
+}
