@@ -186,6 +186,53 @@ describe("releaseOf", () => {
   })
 })
 
+describe("releaseOf major cap", () => {
+  /** The registry's answer for one package, with versions and a latest tag. */
+  const packument = (latest: string, versions: ReadonlyArray<string>) =>
+    JSON.stringify({
+      "dist-tags": { latest },
+      versions: Object.fromEntries(versions.map((version) => [version, {}])),
+    })
+
+  const registry = (answers: Record<string, string>) =>
+    Bun.serve({
+      port: 0,
+      fetch: (request) => {
+        const answer = answers[new URL(request.url).pathname.slice(1)]
+        return answer === undefined ? new Response("", { status: 404 }) : new Response(answer)
+      },
+    })
+
+  test("a capped package moves to the newest release within the capped line, not the newer line", async () => {
+    // solid-js is capped at major 1: even though latest is 2.0.0, the newest 1.x is selected.
+    const server = registry({
+      "solid-js": packument("2.0.0", ["1.9.18", "1.9.19", "2.0.0"]),
+    })
+    try {
+      const release = await Effect.runPromise(
+        releaseOf("solid-js", `http://127.0.0.1:${server.port}`),
+      )
+      expect(release).toBe("1.9.19")
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("an uncapped package still moves to the newest release at or below latest", async () => {
+    const server = registry({
+      effect: packument("4.2.0", ["4.1.0", "4.2.0", "5.0.0-rc.1"]),
+    })
+    try {
+      const release = await Effect.runPromise(
+        releaseOf("effect", `http://127.0.0.1:${server.port}`),
+      )
+      expect(release).toBe("4.2.0")
+    } finally {
+      await server.stop(true)
+    }
+  })
+})
+
 describe("Pi package pins", () => {
   const write = (file: string, text: string) => Bun.write(join(root, file), text)
 

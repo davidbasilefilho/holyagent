@@ -14236,7 +14236,7 @@ var package_default = {
     effect: "^4.0.0",
     "eslint-plugin-jsdoc": "^65.0.0",
     lefthook: "^2.0.0",
-    "solid-js": "^2.0.0"
+    "solid-js": "^1.0.0"
   },
   pi: {
     extensions: [

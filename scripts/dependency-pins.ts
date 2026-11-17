@@ -295,12 +295,28 @@ export const isExactPin = (name: string, range: unknown): boolean =>
   EXACT_PACKAGES.includes(name) && typeof range === "string" && parseRelease(range) !== undefined
 
 /**
- * The version specifier a package dependency moves to: the exact release for an
- * {@link EXACT_PACKAGES} entry (never down, like a Pi package pin), else the caret range of
- * {@link nextRange}.
+ * The newest release line (by major version) a registry package may move to. solid-js is held at
+ * major 1: the newest @opentui/solid (0.9.2) declares a peer dependency on solid-js ^1.9.12, and
+ * solid-js 2.0 fails at import time (it removed onMount), so 1.x is the newest usable line. The cap
+ * applies both when the registry release is selected and when the range is computed, so a manifest
+ * already on a capped-out line moves back down to the capped line.
  */
-export const nextPackageRange = (name: string, current: string, release: string): string =>
-  EXACT_PACKAGES.includes(name) ? nextPiVersion(current, release) : nextRange(current, release)
+export const MAJOR_CAP: Readonly<Record<string, number>> = { "solid-js": 1 }
+
+/**
+ * The version specifier a package dependency moves to: the exact release for an
+ * {@link EXACT_PACKAGES} entry (never down, like a Pi package pin); otherwise the caret range of
+ * {@link nextRange}, except that a package with a {@link MAJOR_CAP} whose current range is on a
+ * higher line moves down to the caret range of the capped release.
+ */
+export const nextPackageRange = (name: string, current: string, release: string): string => {
+  const cap = MAJOR_CAP[name]
+  const from = parseRelease(current.startsWith("^") ? current.slice(1) : "")
+  if (cap !== undefined && from !== undefined && from.major > cap) return caretRange(release)
+  return EXACT_PACKAGES.includes(name)
+    ? nextPiVersion(current, release)
+    : nextRange(current, release)
+}
 
 /** The dependency fields of a `package.json` whose values are version ranges by package name. */
 export const DEPENDENCY_FIELDS: ReadonlyArray<string> = [

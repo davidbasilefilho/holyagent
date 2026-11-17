@@ -4,6 +4,7 @@ import {
   caretRange,
   EXACT_PACKAGES,
   isExactPin,
+  MAJOR_CAP,
   newestAllowedRelease,
   newestPypiRelease,
   newestRelease,
@@ -122,6 +123,26 @@ describe("exact package pins", () => {
     expect(nextPackageRange("just-bash", "3.6.0", "3.6.1")).toBe("^3.0.0")
     expect(nextPackageRange("just-bash", "^3.0.0", "3.6.0")).toBe("^3.0.0")
     expect(nextPackageRange("just-bash", "^4.0.0", "3.7.1")).toBe("^4.0.0")
+    expect(nextPackageRange("effect", "^4.0.0", "4.2.0")).toBe("^4.0.0")
+  })
+})
+
+describe("MAJOR_CAP", () => {
+  test("solid-js is the one capped package, held at major 1", () => {
+    expect(MAJOR_CAP).toEqual({ "solid-js": 1 })
+  })
+
+  test("a capped package already on a higher line moves down to the capped line", () => {
+    // The registry release is already capped to the newest 1.x, so the caret range of it is ^1.0.0.
+    expect(nextPackageRange("solid-js", "^2.0.0", "1.9.19")).toBe("^1.0.0")
+  })
+
+  test("a capped package within the line keeps the never-down rule", () => {
+    expect(nextPackageRange("solid-js", "^1.0.0", "1.9.19")).toBe("^1.0.0")
+    expect(nextPackageRange("solid-js", "^0.9.0", "1.9.19")).toBe("^1.0.0")
+  })
+
+  test("an uncapped package is unaffected by the cap table", () => {
     expect(nextPackageRange("effect", "^4.0.0", "4.2.0")).toBe("^4.0.0")
   })
 })

@@ -4,6 +4,7 @@ import { $ } from "bun"
 import { Console, Data, Effect, Schema } from "effect"
 
 import {
+  MAJOR_CAP,
   newestAllowedRelease,
   newestPypiRelease,
   newestTag,
@@ -13,6 +14,7 @@ import {
   type PackageDependency,
   parseActionUses,
   parseMiseTools,
+  parseRelease,
   parseTags,
   renderPiPackages,
   rewriteActionUses,
@@ -175,8 +177,10 @@ const tagsOf = (repository: string) =>
 
 /**
  * The release a package moves to: the newest stable, non-deprecated version no higher than the
- * registry's `latest` dist-tag. A registry that takes longer than `timeoutMs` to answer fails with
- * a `SourceError`, so a stalled connection cannot hang the update.
+ * registry's `latest` dist-tag. A package with a {@link MAJOR_CAP} moves to the newest stable
+ * version within the capped line instead, so an incompatible newer line is never selected. A
+ * registry that takes longer than `timeoutMs` to answer fails with a `SourceError`, so a stalled
+ * connection cannot hang the update.
  */
 export const releaseOf = (
   name: string,
@@ -204,7 +208,17 @@ export const releaseOf = (
       strict,
     )(body).pipe(Effect.mapError((cause) => new SourceError({ source, cause })))
     const latest = packument["dist-tags"].latest
-    const release = newestAllowedRelease(packument.versions, latest)
+    const cap = MAJOR_CAP[name]
+    const eligible =
+      cap === undefined
+        ? packument.versions
+        : Object.fromEntries(
+            Object.entries(packument.versions).filter(([version]) => {
+              const parsed = parseRelease(version)
+              return parsed !== undefined && parsed.major <= cap
+            }),
+          )
+    const release = newestAllowedRelease(eligible, latest)
     return release === undefined
       ? yield* Effect.fail(
           new SourceError({
