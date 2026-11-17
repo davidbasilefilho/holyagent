@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "refresh-the-dependency-branch-again-so",
   "objective": "Refresh the dependency branch again so all pins, including the newly published Browse release, are current on the final candidate.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Work only in C:/Users/david.basile/dev/holyagent-deps-0.3.4 at 01b8c031.",
     "Run the documented updater and required generated build, preserving the Solid compatibility cap and all caret formats.",
@@ -58,7 +58,49 @@
     "agentId": "pi:assignment-0mwkxx3h2-e9as",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-17T17:02:19.863Z"
+    "startedAt": "2026-11-17T17:02:19.863Z",
+    "finishedAt": "2026-11-17T17:05:44.378Z"
+  },
+  "result": "Refresh complete. The documented updater moved exactly one pin — `@opencode/browse` 0.1.1 → 0.1.3 in `packages/core/src/config/pi-packages.json` — with no manual manifest or lockfile edits and no bun.lock change (the pin resolves at install time). No updater-owned test expectation changed, so none was edited. `mise run build` regenerated the plugin bundles that embed the pin.\n\n**Changed paths** (all under `C:/Users/david.basile/dev/holyagent-deps-0.3.4`):\n- `packages/core/src/config/pi-packages.json` — pin 0.1.1 → 0.1.3\n- `packages/integrations/claude/dist/scripts/holyagent.js`, `setup-tui.js`\n- `packages/integrations/pi/dist/extensions/holyagent.js`\n- `packages/integrations/pi/dist/scripts/holyagent-public.js`, `holyagent.js`, `setup-tui.js`\n\n**Checks** (all exit 0):\n- `bunx --no-install mise run deps:update` — \"moved 1 of 39 pins\", no other stable updates available\n- `bunx --no-install mise run build` — rebuilt 41 claude + 144 pi files\n- `bunx --no-install mise run deps:check` — \"every pin is on the newest stable release\"\n- `bun test scripts/update-dependencies.test.ts scripts/dependency-ranges.test.ts scripts/workflows.test.ts scripts/bump-version.test.ts` — 139 pass, 0 fail\n\nSolid remains capped at `^1.0.0` (`package.json:36`); all caret formats intact. Full verify not run per the brief.\n\n**Diffs:**\n- Complete (vs 765aa8b2): `C:/Users/david.basile/AppData/Local/Temp/holyagent-evidence/deps-complete-765aa8b2.diff`\n- Refresh-only (vs 01b8c031): `C:/Users/david.basile/AppData/Local/Temp/holyagent-evidence/deps-refresh-01b8c031.diff` (7 files, +7/−7)\n\nevidence:\n- Refresh: deps:update exited 0 with no manual edits; `@opencode/browse` moved 0.1.1 → 0.1.3 in `packages/core/src/config/pi-packages.json`, all 39 pins now current.\n- Checks: build, deps:check and the 4 focused dependency/workflow test files pass (139 pass, 0 fail); Solid capped at `^1.0.0`, caret formats intact.\n- Scope and evidence: only the pin and its 6 generated dist embeddings changed; diffs at the two paths above.\n- changed-paths: the 7 files listed above in the worktree.\n- diff-file: `C:/Users/david.basile/AppData/Local/Temp/holyagent-evidence/deps-complete-765aa8b2.diff` and `deps-refresh-01b8c031.diff`.\n",
+  "acceptance": {
+    "revision": 2,
+    "rationale": "The updater moved exactly the stale Browse pin to 0.1.3, rebuilt its six generated embeddings, passed deps:check and 139 focused tests, and preserved the Solid cap and caret rules.",
+    "criteria": [
+      {
+        "criterion": "Refresh: deps:update exits 0 and produces the newest compatible stable pins, including @opencode/browse 0.1.3 or newer, without manual manifest or lockfile edits.",
+        "support": "deps:update exited 0 with no manual edits; `@opencode/browse` moved 0.1.1 → 0.1.3 in `packages/core/src/config/pi-packages.json`, all 39 pins now current."
+      },
+      {
+        "criterion": "Checks: generated build, deps:check and focused dependency/workflow tests pass, with Solid capped at ^1.0.0 and all caret formats intact.",
+        "support": "build, deps:check and the 4 focused dependency/workflow test files pass (139 pass, 0 fail); Solid capped at `^1.0.0`, caret formats intact."
+      },
+      {
+        "criterion": "Scope and evidence: only updater/build outputs and direct pin expectations change; exact paths and complete/refresh diffs are reported.",
+        "support": "only the pin and its 6 generated dist embeddings changed; diffs at the two paths above."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "Refresh",
+        "support": "deps:update exited 0 with no manual edits; `@opencode/browse` moved 0.1.1 → 0.1.3 in `packages/core/src/config/pi-packages.json`, all 39 pins now current."
+      },
+      {
+        "label": "Checks",
+        "support": "build, deps:check and the 4 focused dependency/workflow test files pass (139 pass, 0 fail); Solid capped at `^1.0.0`, caret formats intact."
+      },
+      {
+        "label": "Scope and evidence",
+        "support": "only the pin and its 6 generated dist embeddings changed; diffs at the two paths above."
+      },
+      {
+        "label": "changed-paths",
+        "support": "the 7 files listed above in the worktree."
+      },
+      {
+        "label": "diff-file",
+        "support": "`C:/Users/david.basile/AppData/Local/Temp/holyagent-evidence/deps-complete-765aa8b2.diff` and `deps-refresh-01b8c031.diff`."
+      }
+    ]
   },
   "createdAt": "2026-11-17T17:02:19.863Z"
 }
