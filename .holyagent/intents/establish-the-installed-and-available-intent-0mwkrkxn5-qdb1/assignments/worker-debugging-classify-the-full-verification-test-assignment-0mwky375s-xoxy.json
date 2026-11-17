@@ -54,6 +54,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "pi:assignment-0mwky375s-xoxy",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-17T17:07:04.576Z"
