@@ -1,0 +1,62 @@
+{
+  "id": "assignment-0mwksepy9-ekat",
+  "intentId": "intent-0mwkrkxn5-qdb1",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "independently-review-the-committed",
+  "objective": "Independently review the committed dependency update for correctness, regressions, test coverage, scope and repository standards.",
+  "state": "Running",
+  "scope": [
+    "Review only commit range 765aa8b2..aefd20ab in C:/Users/david.basile/dev/holyagent-deps-0.3.4.",
+    "The change updates stable dependencies and tool pins, removes the just-bash exact-range exception, adds caret regression coverage and regenerates distribution files.",
+    "Do not modify files or version-control state."
+  ],
+  "constraints": [
+    "Use kimi-coding/kimi-for-coding for the delegated Pi run.",
+    "Review the committed diff and relevant surrounding source, not the writer report claims. The external final diff is C:/Users/david.basile/dev/holyagent-deps-0.3.4-final.diff.",
+    "Verify that removing EXACT_PACKAGES for just-bash correctly implements the user-required ^3.0.0 format without unintended downgrades or updater behavior changes for other packages.",
+    "Assess the new tests, lockfile consistency, generated dist synchronization, action SHA/tag comments and unchanged 0.3.4 version.",
+    "Run focused read-only checks if useful; final full verify is a later assignment.",
+    "Report every finding with severity and exact file/line evidence. If none, say so explicitly. Do not repair findings or start other reviews.",
+    "Report in under 400 words; logs outside the repository."
+  ],
+  "criteria": [
+    {
+      "text": "Correctness: dependency ranges, updater logic and lockfile behavior correctly implement the documented caret formats without downgrades or semantic regressions.",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Coverage: tests specifically cover the repaired just-bash behavior and repository-wide exact-range rejection.",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Generated and CI outputs: dist files are synchronized and workflow action updates preserve full-SHA pinning and required job identities.",
+      "blocking": true,
+      "dimension": "regressions"
+    },
+    {
+      "text": "Scope: the commit contains only dependency-updater, generated and directly related test changes, with version 0.3.4 unchanged.",
+      "blocking": true,
+      "dimension": "scope"
+    }
+  ],
+  "evidence": [
+    "Correctness",
+    "Coverage",
+    "Generated and CI outputs",
+    "Scope"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [
+    "assignment-0mwks1qag-exsv"
+  ],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-17T14:28:04.450Z"
+  },
+  "createdAt": "2026-11-17T14:28:04.450Z"
+}
