@@ -283,12 +283,12 @@ export const renderPiPackages = (table: Readonly<Record<string, string>>): strin
 
 /**
  * The registry packages whose `package.json` entry is an exact version, not a caret range. Each is
- * bundled into generated output and decides how a shipped feature behaves (just-bash is the shell
- * the Pi bash tool runs on: its command set, limits and output change from release to release), so
- * a move is one deliberate step of `mise run deps:update`, with the lockfile and the generated
- * bundle moving with it, and never a range that a plain install could widen.
+ * bundled into generated output and decides how a shipped feature behaves, so a move is one
+ * deliberate step of `mise run deps:update`, with the lockfile and the generated bundle moving with
+ * it, and never a range that a plain install could widen. Empty today: every dependency range is a
+ * caret range at its line boundary, on the newest release line of its major.
  */
-export const EXACT_PACKAGES: ReadonlyArray<string> = ["just-bash"]
+export const EXACT_PACKAGES: ReadonlyArray<string> = []
 
 /** Whether a dependency is an {@link EXACT_PACKAGES} entry with a stable exact version. */
 export const isExactPin = (name: string, range: unknown): boolean =>

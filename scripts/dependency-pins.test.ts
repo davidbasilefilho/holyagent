@@ -110,18 +110,18 @@ describe("nextRange", () => {
 })
 
 describe("exact package pins", () => {
-  test("just-bash is the one exact pin, and only a stable exact version counts", () => {
-    expect(EXACT_PACKAGES).toEqual(["just-bash"])
-    expect(isExactPin("just-bash", "3.6.0")).toBe(true)
+  test("no registry package is an exact pin, and only a stable exact version would count", () => {
+    expect(EXACT_PACKAGES).toEqual([])
+    expect(isExactPin("just-bash", "3.6.0")).toBe(false)
     expect(isExactPin("just-bash", "^3.0.0")).toBe(false)
     expect(isExactPin("just-bash", "3.6.0-rc.1")).toBe(false)
     expect(isExactPin("effect", "4.0.1")).toBe(false)
   })
 
-  test("an exact pin moves to the exact release, never down, and the rest to a caret range", () => {
-    expect(nextPackageRange("just-bash", "3.6.0", "3.7.1")).toBe("3.7.1")
-    expect(nextPackageRange("just-bash", "3.6.0", "3.5.0")).toBe("3.6.0")
-    expect(nextPackageRange("just-bash", "^3.0.0", "3.6.0")).toBe("3.6.0")
+  test("every dependency moves to a caret range, never down, just-bash included", () => {
+    expect(nextPackageRange("just-bash", "3.6.0", "3.6.1")).toBe("^3.0.0")
+    expect(nextPackageRange("just-bash", "^3.0.0", "3.6.0")).toBe("^3.0.0")
+    expect(nextPackageRange("just-bash", "^4.0.0", "3.7.1")).toBe("^4.0.0")
     expect(nextPackageRange("effect", "^4.0.0", "4.2.0")).toBe("^4.0.0")
   })
 })

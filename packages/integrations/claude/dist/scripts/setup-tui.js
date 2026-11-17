@@ -3419,22 +3419,22 @@ var FFF_NATIVE_HOSTS = [
 ];
 
 var pi_packages_default = {
-  "pi-provider-kimi-code": "0.6.13",
-  "@tintinweb/pi-subagents": "0.23.2",
-  "billion-context": "0.1.213",
+  "pi-provider-kimi-code": "0.6.14",
+  "@tintinweb/pi-subagents": "0.26.0",
+  "billion-context": "0.1.216",
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.6",
   "@amaster.ai/pi-computer-use": "0.1.38",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.0.16"
+  "@opencode/browse": "0.1.1"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 
 var pypi_packages_default = {
-  "browser-use": "1.0.2"
+  "browser-use": "1.0.6"
 };
 
 var PYPI_PACKAGE_VERSIONS = pypi_packages_default;

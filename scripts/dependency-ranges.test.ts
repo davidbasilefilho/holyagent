@@ -39,8 +39,8 @@ const uses = (manifest: Record<string, unknown>): Array<Use> =>
 /**
  * What breaks the rule in a manifest: any specifier that is not a boundary caret range, and a
  * `workspace:*` that does not name a workspace package. A Pi host package may be a peer with the
- * range `*`, which Pi's package documentation requires, and a package of `EXACT_PACKAGES`
- * (just-bash) must be an exact stable version, and nothing else.
+ * range `*`, which Pi's package documentation requires, and a package of `EXACT_PACKAGES` must be
+ * an exact stable version, and nothing else.
  */
 const problems = (
   file: string,
@@ -115,9 +115,9 @@ describe("the rule", () => {
     expect(problems("f", { peerDependencies: { typebox: ">=1.0.0" } }, workspaces)).toHaveLength(1)
   })
 
-  test("an exact version is allowed for just-bash only", () => {
-    expect(problems("f", { dependencies: { "just-bash": "3.6.0" } }, workspaces)).toEqual([])
-    expect(problems("f", { dependencies: { "just-bash": "^3.0.0" } }, workspaces)).toHaveLength(1)
+  test("an exact version is refused everywhere, just-bash included", () => {
+    expect(problems("f", { dependencies: { "just-bash": "3.6.1" } }, workspaces)).toHaveLength(1)
+    expect(problems("f", { dependencies: { "just-bash": "^3.0.0" } }, workspaces)).toEqual([])
     expect(problems("f", { dependencies: { "just-bash": "3.6.0-rc.1" } }, workspaces)).toHaveLength(
       1,
     )
@@ -125,6 +125,22 @@ describe("the rule", () => {
 
   test("a bad range in a nested override is found", () => {
     expect(problems("f", { overrides: { x: { y: "1.2.3" } } }, workspaces)).toHaveLength(1)
+  })
+})
+
+describe("the runtime manifest", () => {
+  test("holds no exact dependency range, so an exact just-bash pin fails here", async () => {
+    const text = await Bun.file(join(repository, "packages/runtime/package.json")).text()
+    const manifest = Effect.runSync(
+      Schema.decodeUnknownEffect(Schema.fromJsonString(Manifest))(text),
+    )
+    expect(
+      problems(
+        "packages/runtime/package.json",
+        manifest,
+        new Set(["@holyagent/runtime", "@holyagent/core"]),
+      ),
+    ).toEqual([])
   })
 })
 
