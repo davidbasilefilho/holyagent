@@ -5,7 +5,7 @@
   "roleTask": "Explorer.lookup",
   "slug": "identify-the-working-pr-branch-and-exact",
   "objective": "Identify the working PR branch and exact built Pi extension source and install destination for the user-requested installation.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only investigation of the local checkout, PRs #125 and #130 through gh, and relevant Pi installation/configuration files.",
     "Do not modify files, install anything, switch branches, or write version-control state."
@@ -52,7 +52,45 @@
     "agentId": "pi:assignment-0mwkngvo1-v2rh",
     "model": "haiku",
     "effort": "medium",
-    "startedAt": "2026-11-17T12:09:47.089Z"
+    "startedAt": "2026-11-17T12:09:47.089Z",
+    "finishedAt": "2026-11-17T12:16:50.088Z"
+  },
+  "result": "## Report — assignment-0mwkngvo1-v2rh\n\n**PR selection.** PR #130 (`release/0.3.4/feat/final-guidance-events`, \"feat: complete 0.3.4 with shared Core and native tools\") supplies the working built Pi extension: `gh` file API shows its head carries `packages/integrations/pi/dist/extensions/holyagent.js` at sha `6ecaf41` (1,247,944 bytes), while the identical `fd809ba` (781,681 bytes) sits on `main`, `dev` and PR #125's head — PR #125's diff never touches the bundle, it only changes `dist/scripts` and `dist/package.json`. Check status: PR #125 is fully green; PR #130 passes `check`, `installers`, `branch-model` but its `macos`/`windows` jobs are CANCELLED (an earlier run shows a `validation / macos` FAILURE) — so #130 is the extension source, with platform checks not green.\n\n**Install paths.** Built extension source: `packages/integrations/pi/dist/extensions/holyagent.js` on branch `release/0.3.4/feat/final-guidance-events` (package root `packages/integrations/pi/dist`, `pi` key → `./extensions`; docs/pi/extensions.md §The HolyAgent package). Documented install (docs/pi/installation.md): global `pi install git:github.com/davidbasilefilho/holyagent@release/0.3.4/feat/final-guidance-events`, or local build `pi install <worktree>/packages/integrations/pi/dist` (local folder used as-is). Declaration lands in `~/.pi/agent/settings.json` `packages` (currently `[]`); git/npm sources land in `~/.pi/agent/npm/`; `-l` instead writes the project's `.pi/settings.json`. The untracked `packages/integrations/pi/dist/extensions/.pi/settings.json` (`{\"packages\": [\"..\\holyagent.js\"]}`) is a stray experiment: unreferenced by any repo source, not a Pi discovery path (`~/.pi/agent/extensions/` or `.pi/extensions/`), and it names a bare `.js` instead of a package root, so it is neither the built extension nor a working install.\n\n**Verification (non-destructive).** `pi list` (proves the package configured/installable; non-zero exit on package failure), then a headless load proof: `pi -ne -e <dist>\\extensions\\holyagent.js --print --provider kimi-coding --model kimi-for-coding \"reply: loaded\"` — loads only this extension, one turn, no state writes. `holyagent doctor` additionally verifies the package is listed in Pi's settings.\n\nNo files modified; nothing installed; branch untouched.\n\nevidence:\nPR selection: PR #130 head sha 6ecaf410…/1,247,944 bytes for `packages/integrations/pi/dist/extensions/holyagent.js` vs fd809ba4…/781,681 bytes identical on main, dev and PR #125 (gh contents API); #125's diff (gh pr diff) lacks the bundle; #125 checks all SUCCESS, #130 check/installers/branch-model SUCCESS with macos/windows CANCELLED (gh pr checks).\nInstall paths: Source `packages/integrations/pi/dist/extensions/holyagent.js` on `release/0.3.4/feat/final-guidance-events`; destination `~/.pi/agent/settings.json` packages list (currently `[]`, verified on disk) via `pi install git:…@release/0.3.4/feat/final-guidance-events` or `pi install <dist>` (docs/pi/installation.md, docs/pi/extensions.md); the untracked `dist/extensions/.pi/settings.json` names a bare `.js`, is no discovery location and is referenced nowhere — an unrelated leftover artifact.\nVerification: `pi list` for configuration, plus `pi -ne -e packages/integrations/pi/dist/extensions/holyagent.js --print --provider kimi-coding --model kimi-for-coding \"reply: loaded\"` to prove the extension loads; read-only.\nScope: read-only investigation via Read/`gh`/grep only; `git status` unchanged apart from the pre-existing untracked artifact; no installs, no branch switches.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "The gh evidence identifies PR #130 as the only head with the newer built extension; the report gives the documented package install destination and a concrete load check, and confirms no files changed.",
+    "criteria": [
+      {
+        "criterion": "PR selection: identify whether PR #125, PR #130, or another PR supplies the working built Pi extension, citing gh evidence and check status.",
+        "support": "PR #130 head sha 6ecaf410…/1,247,944 bytes for `packages/integrations/pi/dist/extensions/holyagent.js` vs fd809ba4…/781,681 bytes identical on main, dev and PR #125 (gh contents API); #125's diff (gh pr diff) lacks the bundle; #125 checks all SUCCESS, #130 check/installers/branch-model SUCCESS with macos/windows CANCELLED (gh pr checks)."
+      },
+      {
+        "criterion": "Install paths: identify the exact built extension source and Pi destination, including what the existing untracked .pi path represents.",
+        "support": "Source `packages/integrations/pi/dist/extensions/holyagent.js` on `release/0.3.4/feat/final-guidance-events`; destination `~/.pi/agent/settings.json` packages list (currently `[]`, verified on disk) via `pi install git:…@release/0.3.4/feat/final-guidance-events` or `pi install <dist>` (docs/pi/installation.md, docs/pi/extensions.md); the untracked `dist/extensions/.pi/settings.json` names a bare `.js`, is no discovery location and is referenced nowhere — an unrelated leftover artifact."
+      },
+      {
+        "criterion": "Verification: give a non-destructive command that proves the extension is installed and loadable.",
+        "support": "`pi list` for configuration, plus `pi -ne -e packages/integrations/pi/dist/extensions/holyagent.js --print --provider kimi-coding --model kimi-for-coding \"reply: loaded\"` to prove the extension loads; read-only."
+      },
+      {
+        "criterion": "Scope: make no changes and preserve all existing files.",
+        "support": "read-only investigation via Read/`gh`/grep only; `git status` unchanged apart from the pre-existing untracked artifact; no installs, no branch switches."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "PR selection",
+        "support": "PR #130 head sha 6ecaf410…/1,247,944 bytes for `packages/integrations/pi/dist/extensions/holyagent.js` vs fd809ba4…/781,681 bytes identical on main, dev and PR #125 (gh contents API); #125's diff (gh pr diff) lacks the bundle; #125 checks all SUCCESS, #130 check/installers/branch-model SUCCESS with macos/windows CANCELLED (gh pr checks)."
+      },
+      {
+        "label": "Install paths",
+        "support": "Source `packages/integrations/pi/dist/extensions/holyagent.js` on `release/0.3.4/feat/final-guidance-events`; destination `~/.pi/agent/settings.json` packages list (currently `[]`, verified on disk) via `pi install git:…@release/0.3.4/feat/final-guidance-events` or `pi install <dist>` (docs/pi/installation.md, docs/pi/extensions.md); the untracked `dist/extensions/.pi/settings.json` names a bare `.js`, is no discovery location and is referenced nowhere — an unrelated leftover artifact."
+      },
+      {
+        "label": "Verification",
+        "support": "`pi list` for configuration, plus `pi -ne -e packages/integrations/pi/dist/extensions/holyagent.js --print --provider kimi-coding --model kimi-for-coding \"reply: loaded\"` to prove the extension loads; read-only."
+      }
+    ]
   },
   "createdAt": "2026-11-17T12:09:47.089Z"
 }
