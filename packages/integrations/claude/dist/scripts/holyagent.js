@@ -10981,12 +10981,23 @@ try {
     $step = 'decode-descriptor'
     $raw = [Security.AccessControl.RawSecurityDescriptor]::new([byte[]]$bytes, 0)
     if ($null -eq $raw.DiscretionaryAcl) { 'missing-dacl'; exit 0 }
-    $step = 'iterate-aces'
-    foreach ($ace in $raw.DiscretionaryAcl) {
+    $dacl = $raw.DiscretionaryAcl
+    $step = 'count-aces'
+    $count = $dacl.Count
+    for ($index = 0; $index -lt $count; $index++) {
+      # Use the typed indexer; avoid Windows PowerShell's non-generic collection adapter.
+      $step = 'index-ace'
+      $ace = $dacl.get_Item($index)
       if ($ace -isnot [Security.AccessControl.CommonAce]) { 'unsupported-ace'; exit 0 }
-      if ($ace.AceQualifier -eq [Security.AccessControl.AceQualifier]::AccessAllowed -and
-          -not ($ace.AceFlags -band [Security.AccessControl.AceFlags]::InheritOnly) -and
-          $allowed -notcontains $ace.SecurityIdentifier.Value) { 'untrusted-grant'; exit 0 }
+      $step = 'inspect-ace-flags'
+      $qualifier = [int]$ace.AceQualifier
+      $flags = [int]$ace.AceFlags
+      $allow = [int][Security.AccessControl.AceQualifier]::AccessAllowed
+      $inheritOnly = [int][Security.AccessControl.AceFlags]::InheritOnly
+      if ($qualifier -eq $allow -and ($flags -band $inheritOnly) -eq 0) {
+        $step = 'inspect-ace-sid'
+        if ($allowed -notcontains $ace.SecurityIdentifier.Value) { 'untrusted-grant'; exit 0 }
+      }
     }
   }
   'ok'
