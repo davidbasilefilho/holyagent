@@ -3,6 +3,7 @@
 node = "lts"
 # Bun remains the runtime, package manager and test runner.
 bun = "1.4.4"
+hk = "2.13.0"
 # The search tools behind `holyagent rg` and `holyagent fd`, which HolyAgent does not bundle. The
 # aqua backend is named so that mise installs the upstream release assets, with the checksum the aqua
 # registry records for them where it records one; the bare names would pick a backend by mise's own
@@ -10,7 +11,7 @@ bun = "1.4.4"
 "aqua:BurntSushi/ripgrep" = "15.2.0"
 "aqua:sharkdp/fd" = "10.5.2"
 
-# Package scripts and lefthook delegate to these tasks. Tools resolve from the frozen lockfile.
+# Package scripts and hk delegate to these tasks. Tools resolve from the frozen lockfile.
 
 [tasks.prepare]
 description = "Install the git hooks (skipped outside a git work tree, e.g. a `git archive` export)"

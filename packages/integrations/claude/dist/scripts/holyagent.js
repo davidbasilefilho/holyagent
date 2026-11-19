@@ -10423,7 +10423,6 @@ var package_default = {
     "@types/bun": "^1.0.0",
     effect: "^4.0.0",
     "eslint-plugin-jsdoc": "^65.0.0",
-    lefthook: "^2.0.0",
     oxfmt: "^0.79.0",
     oxlint: "^1.0.0",
     "solid-js": "^1.0.0",
@@ -10443,8 +10442,7 @@ var package_default = {
     }
   },
   trustedDependencies: [
-    "@anthropic-ai/claude-code",
-    "lefthook"
+    "@anthropic-ai/claude-code"
   ]
 };
 

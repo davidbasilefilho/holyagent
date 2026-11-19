@@ -137,6 +137,7 @@ const GITHUB = "https://github.com"
 /** The mise tools whose releases are tags of a GitHub repository. */
 export const MISE_SOURCES: Record<string, { repository: string; prefix: string }> = {
   bun: { repository: "oven-sh/bun", prefix: "bun-v" },
+  hk: { repository: "jdx/hk", prefix: "v" },
   "aqua:BurntSushi/ripgrep": { repository: "BurntSushi/ripgrep", prefix: "" },
   "aqua:sharkdp/fd": { repository: "sharkdp/fd", prefix: "v" },
 }
@@ -581,6 +582,13 @@ export const renderPypiPins = (root: string, versions: Survey["pypiPackages"]) =
     Effect.map((table) => renderPiPackages(withPiPackageVersions(table, versions))),
   )
 
+/** Keep hk's embedded Pkl import on the same release resolved by mise. */
+export const rewriteHkSchema = (text: string, version: string): string =>
+  text.replace(
+    /package:\/\/github\.com\/jdx\/hk\/releases\/download\/v[\d.]+\/hk@[\d.]+#\/Config\.pkl/g,
+    `package://github.com/jdx/hk/releases/download/v${version}/hk@${version}#/Config.pkl`,
+  )
+
 /**
  * Writes the moves a survey found. Everything that can fail on the network or on a file is done
  * first: the new texts of the workflows, `mise.toml`, the manifests and the Pi and PyPI package
@@ -599,11 +607,17 @@ export const applySurvey = (root: string, found: Survey) =>
         ),
     )
     const mise = rewriteMiseTools(yield* readText(root, "mise.toml"), found.mise)
+    const hkRelease = found.mise.get("hk")
+    const hk =
+      hkRelease === undefined
+        ? undefined
+        : rewriteHkSchema(yield* readText(root, "hk.pkl"), hkRelease)
     const ranges = yield* renderRanges(root, found.packages)
     const piPins = yield* renderPiPins(root, found.piPackages)
     const pypiPins = yield* renderPypiPins(root, found.pypiPackages)
     for (const [file, text] of workflows) yield* writeText(root, file, text)
     yield* writeText(root, "mise.toml", mise)
+    if (hk !== undefined) yield* writeText(root, "hk.pkl", hk)
     for (const [file, text] of ranges) yield* writeText(root, file, text)
     yield* writeText(root, PI_PACKAGE_PINS, piPins)
     yield* writeText(root, PYPI_PACKAGE_PINS, pypiPins)

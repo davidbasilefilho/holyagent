@@ -1,0 +1,68 @@
+amends "package://github.com/jdx/hk/releases/download/v2.13.0/hk@2.13.0#/Config.pkl"
+
+hooks {
+  ["pre-commit"] {
+    fix = true
+    stage = true
+    stash = "git"
+    steps {
+      ["lint"] {
+        glob = List("**/*.js", "**/*.mjs", "**/*.cjs", "**/*.jsx", "**/*.ts", "**/*.mts", "**/*.cts", "**/*.tsx")
+        fix = new Command {
+          argv = List("bun", "x", "--no-install", "mise", "run", "lint:fix", "--", "--no-error-on-unmatched-pattern", "--", "{{files}}")
+        }
+      }
+      ["format"] {
+        depends = "lint"
+        glob = "**/*"
+        fix = new Command {
+          argv = List("bun", "x", "--no-install", "mise", "run", "fmt", "--", "--no-error-on-unmatched-pattern", "--", "{{files}}")
+        }
+      }
+      ["build"] {
+        depends = "format"
+        check = new Command {
+          argv = List("bun", "x", "--no-install", "mise", "run", "build")
+        }
+      }
+      ["generated"] {
+        depends = "build"
+        check = new Command {
+          argv = List(
+            "git", "add", "-A", "--",
+            ".claude-plugin/marketplace.json",
+            "packages/integrations/claude/dist",
+            "packages/integrations/pi/dist",
+          )
+        }
+      }
+      ["versions"] {
+        depends = "generated"
+        condition = #"any(git.staged_files, {# == "package.json"})"#
+        check = new Command {
+          argv = List(
+            "git", "add", "--",
+            "packages/core/package.json",
+            "packages/runtime/package.json",
+            "packages/integrations/claude/package.json",
+            "packages/integrations/pi/package.json",
+            "bun.lock",
+          )
+        }
+      }
+    }
+  }
+
+  ["commit-msg"] {
+    steps {
+      ["attribution"] {
+        check = new Command {
+          argv = List(
+            "bun", "--no-env-file", "--config=packages/integrations/claude/dist/scripts/empty-bunfig.toml",
+            "packages/integrations/claude/dist/scripts/holyagent.js", "hook", "commit-msg", "{{commit_msg_file}}",
+          )
+        }
+      }
+    }
+  }
+}

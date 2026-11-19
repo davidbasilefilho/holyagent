@@ -34,7 +34,7 @@ scripts/                        Bun scripts behind the mise tasks: hooks, versio
 install/wsl-install.sh          prerequisites installer (WSL Ubuntu): Bun, Node LTS, git, gh; --dev adds mise
 install/windows-install.ps1     the same for native Windows (PowerShell; -Dev adds mise)
 docs/                           these pages; docs/pi holds the Pi integration's docs, its decisions and the research behind them
-mise.toml  .oxlintrc.json  .oxfmtrc.json  lefthook.yml
+mise.toml  .oxlintrc.json  .oxfmtrc.json  hk.pkl
 ```
 
 A new harness gets its own folder under `packages/integrations/`. It reuses the runtime's domain, state, CLI and instructions and generates its own plugin files.
@@ -46,12 +46,12 @@ Install native mise before installing the development dependencies. The npm wrap
 `bunx --no-install mise` resolves mise on PATH without downloading the npm wrapper:
 
 ```sh
-bun install --frozen-lockfile
 bunx --no-install mise install
+bun install --frozen-lockfile
 bunx --no-install mise run verify
 ```
 
-`mise install` installs stable Bun and the other pinned system tools; `bun install --frozen-lockfile` installs the locked Oxc tools. Development installs run the hooks setup only when local lefthook and native mise are available; production installs skip it.
+`mise install` installs stable Bun and the other pinned system tools; `bun install --frozen-lockfile` installs the locked Oxc tools. Development installs run the hooks setup only when local Oxlint and native mise are available; production installs skip it.
 
 ## Commands
 
@@ -74,7 +74,7 @@ bunx --no-install mise run verify
 | `deps:check`            | Fails when a pin is behind                                      |
 | `verify`                | `check`, `lint`, `fmt:check` and `test`, all read-only          |
 
-The root `prepare` script is `bun scripts/prepare-dev.ts`, which runs the `prepare` task only when `mise` is installed under `node_modules`, so a consumer install that omits dev dependencies (what Pi runs on a release tag) succeeds without hooks and a development install still installs them.
+The root `prepare` script is `bun scripts/prepare-dev.ts`, which runs the `prepare` task only when local Oxlint and native mise are available, so a consumer install that omits dev dependencies (what Pi runs on a release tag) succeeds without hooks and a development install still installs them.
 
 Done means `mise run verify` passes; after changing plugin sources, run `mise run build`. `scripts/repo-paths.test.ts` (part of `test`) fails on a tracked path over 120 characters, which overruns Windows MAX_PATH in the marketplace clone, or under `.holyagent/`, which lives on the `holyagent/state` branch.
 
@@ -131,13 +131,11 @@ Lint rules live in `.oxlintrc.json`, formatting in `.oxfmtrc.json`, and compiler
 
 ## Git hooks
 
-`lefthook.yml` runs on `pre-commit`, piped (the first failing job stops the rest). Its commands go through `bunx --no-install` and require native mise on `PATH`. Lefthook passes staged paths, temporarily hides unstaged changes in partly staged files, and stages lint and formatting fixes:
+The exact `hk` version in `mise.toml` comes from mise's registry. Run `mise install` before `bun install --frozen-lockfile`; the development prepare task runs `hk install --mise` for this clone only. No system hk or global Git hooks are needed.
 
-1. `lint`: runs `mise run lint:fix` on staged JavaScript and TypeScript paths.
-2. `fmt`: runs `mise run fmt` on staged paths.
-3. `build`: `bunx --no-install mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
-4. `build-pi`: `git add -A --` on the Pi package's generated path, `packages/integrations/pi/dist` (`GENERATED_PATHS` in its `src/generate.ts`); the build job already built it.
-5. `versions`: when the root `package.json` is staged, `git add --` on `packages/runtime/package.json`, `packages/integrations/claude/package.json`, `packages/integrations/pi/package.json` and `bun.lock`, the copies `build` rewrites, so a version bump carries every copy of the version; otherwise they are left alone.
+`hk.pkl` runs lint and format in order on staged paths. It saves unstaged work during pre-commit and restores it afterward, and stages the fixes. A failing step blocks its dependents and the commit. A build then stages exactly the generated Claude and Pi files, including deletions. If the root `package.json` is staged, the hook also stages the workspace version copies and `bun.lock`; otherwise it leaves those files alone. The separate `commit-msg` hook applies the same message rules as `holyagent vcs commit`.
+
+**Existing clones.** If prepare reports old Lefthook launchers, use `git rev-parse --path-format=absolute --git-path hooks` to find them. Back up the old `pre-commit` and `commit-msg` launchers rather than deleting them, then run `mise run prepare`. The installer never forces replacement of custom hooks or changes `core.hooksPath`. Keep a separate clone if you regularly switch between this setup and older worktrees that still depend on the shared Lefthook launchers.
 
 ## The generated plugin
 

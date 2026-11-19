@@ -19,6 +19,7 @@ import {
   releaseOf,
   renderPiPins,
   renderPypiPins,
+  rewriteHkSchema,
   SourceError,
   type Steps,
   type Survey,
@@ -178,6 +179,14 @@ describe("the mise tools of this repository", () => {
     const versions = new Map((await tools()).map(({ name, version }) => [name, version]))
     expect(versions.get("aqua:BurntSushi/ripgrep")).toMatch(/^\d+\.\d+\.\d+$/)
     expect(versions.get("aqua:sharkdp/fd")).toMatch(/^\d+\.\d+\.\d+$/)
+  })
+
+  test("keeps the hk Pkl import synced with the installed release", async () => {
+    const version = (await tools()).find(({ name }) => name === "hk")?.version ?? ""
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/)
+    const config = await Bun.file(join(import.meta.dir, "..", "hk.pkl")).text()
+    expect(config).toContain(`/download/v${version}/hk@${version}#/Config.pkl`)
+    expect(rewriteHkSchema(config, "99.2.0")).toContain("/download/v99.2.0/hk@99.2.0#/Config.pkl")
   })
 
   test("have a release source for every pinned version, so the updater moves them", async () => {
@@ -528,13 +537,13 @@ describe("PyPI package pins", () => {
 describe("the native mise toolchain", () => {
   test("removes the unsupported npm wrapper through the updater without dropping other dependencies", () => {
     const original = {
-      devDependencies: { mise: "^2026.0.0", lefthook: "^2.0.0" },
-      trustedDependencies: ["mise", "lefthook"],
+      devDependencies: { mise: "^2026.0.0", oxlint: "^1.0.0" },
+      trustedDependencies: ["mise", "eslint-plugin-jsdoc"],
       private: true,
     }
     expect(withoutNpmMise(original)).toEqual({
-      devDependencies: { lefthook: "^2.0.0" },
-      trustedDependencies: ["lefthook"],
+      devDependencies: { oxlint: "^1.0.0" },
+      trustedDependencies: ["eslint-plugin-jsdoc"],
       private: true,
     })
     expect(original.devDependencies.mise).toBe("^2026.0.0")
