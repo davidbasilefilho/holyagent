@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 import { constants } from "node:fs"
-import { link, lstat, open, readdir, realpath, rename, rm } from "node:fs/promises"
+import { link, lstat, mkdir, open, readdir, realpath, rename, rm } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 import { promisify } from "node:util"
 
@@ -169,54 +169,127 @@ const owner = (info: { uid: number; mode: number }) =>
 const runWindowsAcl = promisify(execFile)
 const windowsAclCheck = `
 $ErrorActionPreference = 'Stop'
-$allowed = @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value,
-  'S-1-5-18', 'S-1-5-32-544')
-$sidType = [Security.Principal.SecurityIdentifier]
-$paths = @($env:HOLYAGENT_JOURNAL_ACL_PARENT, $env:HOLYAGENT_JOURNAL_ACL_FILE)
-foreach ($path in $paths) {
-  if ([string]::IsNullOrEmpty($path)) { continue }
-  if ([IO.Directory]::Exists($path)) {
-    $acl = [IO.Directory]::GetAccessControl($path)
-  } else {
-    $acl = [IO.File]::GetAccessControl($path)
+try {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
+  $allowed = @($identity.Value, 'S-1-5-18', 'S-1-5-32-544')
+  $parent = $env:HOLYAGENT_JOURNAL_ACL_PARENT
+  if ($env:HOLYAGENT_JOURNAL_ACL_CREATE -eq '1') {
+    # Only the final, new private directory may be created here; leave existing ACLs alone.
+    if (-not [IO.Directory]::Exists([IO.Path]::GetDirectoryName($parent))) {
+      'missing-ancestor'; exit 0
+    }
+    $security = [Security.AccessControl.DirectorySecurity]::new()
+    $security.SetAccessRuleProtection($true, $false)
+    $security.SetOwner($identity)
+    foreach ($sid in $allowed) {
+      $rule = [Security.AccessControl.FileSystemAccessRule]::new(
+        [Security.Principal.SecurityIdentifier]::new($sid),
+        [Security.AccessControl.FileSystemRights]::FullControl,
+        ([Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+         [Security.AccessControl.InheritanceFlags]::ObjectInherit),
+        [Security.AccessControl.PropagationFlags]::None,
+        [Security.AccessControl.AccessControlType]::Allow)
+      $security.AddAccessRule($rule)
+    }
+    [void][IO.Directory]::CreateDirectory($parent, $security)
+    'ok'; exit 0
   }
-  if ($allowed -notcontains $acl.GetOwner($sidType).Value) { exit 1 }
-  # A NULL DACL permits everyone; only an explicit discretionary ACL qualifies.
-  $raw = [Security.AccessControl.RawSecurityDescriptor]::new($acl.GetSecurityDescriptorBinaryForm(), 0)
-  if ($null -eq $raw.DiscretionaryAcl) { exit 1 }
-  foreach ($ace in $raw.DiscretionaryAcl) {
-    if ($ace -isnot [Security.AccessControl.CommonAce]) { exit 1 }
-    if ($ace.AceQualifier -eq 'AccessAllowed' -and
-        -not ($ace.AceFlags -band [Security.AccessControl.AceFlags]::InheritOnly) -and
-        $allowed -notcontains $ace.SecurityIdentifier.Value) { exit 1 }
+  $sidType = [Security.Principal.SecurityIdentifier]
+  $paths = @($parent, $env:HOLYAGENT_JOURNAL_ACL_FILE)
+  foreach ($path in $paths) {
+    if ([string]::IsNullOrEmpty($path)) { continue }
+    if ([IO.Directory]::Exists($path)) {
+      $acl = [IO.Directory]::GetAccessControl($path)
+    } else {
+      $acl = [IO.File]::GetAccessControl($path)
+    }
+    $owner = $acl.GetOwner($sidType)
+    if ($null -eq $owner -or $allowed -notcontains $owner.Value) { 'untrusted-owner'; exit 0 }
+    # A NULL DACL permits everyone; only an explicit discretionary ACL qualifies.
+    $bytes = $acl.GetSecurityDescriptorBinaryForm()
+    $raw = [Security.AccessControl.RawSecurityDescriptor]::new([byte[]]$bytes, 0)
+    if ($null -eq $raw.DiscretionaryAcl) { 'missing-dacl'; exit 0 }
+    foreach ($ace in $raw.DiscretionaryAcl) {
+      if ($ace -isnot [Security.AccessControl.CommonAce]) { 'unsupported-ace'; exit 0 }
+      if ($ace.AceQualifier -eq [Security.AccessControl.AceQualifier]::AccessAllowed -and
+          -not ($ace.AceFlags -band [Security.AccessControl.AceFlags]::InheritOnly) -and
+          $allowed -notcontains $ace.SecurityIdentifier.Value) { 'untrusted-grant'; exit 0 }
+    }
   }
+  'ok'
+} catch {
+  'acl-operation-failed'
 }
+exit 0
 `
 
 // Windows stat permission bits are synthesized. Check the native DACL rather than
 // treating writable NTFS entries as world-writable or trusting them without checking.
-const secureWindowsAcl = async (parent: string, file?: string) => {
-  if (process.platform !== "win32") return true
-  const system = process.env["SystemRoot"] ?? process.env["SYSTEMROOT"]
-  if (system === undefined || !isAbsolute(system)) return false
+const windowsAclProblem = async (
+  parent: string,
+  options: { file?: string; create?: true } = {},
+) => {
+  const system = process.env["SystemRoot"] ?? process.env["SYSTEMROOT"] ?? process.env["windir"]
+  if (system === undefined || !isAbsolute(system)) return "missing Windows system directory"
   try {
-    await runWindowsAcl(
+    const { stdout } = await runWindowsAcl(
       join(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
-      ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", windowsAclCheck],
+      [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-EncodedCommand",
+        Buffer.from(windowsAclCheck, "utf16le").toString("base64"),
+      ],
       {
         env: {
           SystemRoot: system,
           HOLYAGENT_JOURNAL_ACL_PARENT: parent,
-          HOLYAGENT_JOURNAL_ACL_FILE: file,
+          ...(options.file === undefined ? {} : { HOLYAGENT_JOURNAL_ACL_FILE: options.file }),
+          ...(options.create === undefined ? {} : { HOLYAGENT_JOURNAL_ACL_CREATE: "1" }),
         },
         windowsHide: true,
         timeout: 5_000,
       },
     )
-    return true
+    const result = stdout.trim()
+    if (result === "ok") return undefined
+    return [
+      "untrusted-owner",
+      "missing-dacl",
+      "unsupported-ace",
+      "untrusted-grant",
+      "missing-ancestor",
+      "acl-operation-failed",
+    ].includes(result)
+      ? result
+      : "invalid ACL check response"
   } catch {
-    return false
+    return "cannot run Windows ACL check"
   }
+}
+
+/** Create only the journal's new private directory; do not alter existing permissions. */
+export const ensureMigrationJournalDirectory = async (directory: string) => {
+  if (process.platform !== "win32") {
+    try {
+      await mkdir(directory, { mode: 0o700 })
+    } catch (cause) {
+      if (!(
+        typeof cause === "object" &&
+        cause !== null &&
+        "code" in cause &&
+        cause.code === "EEXIST"
+      ))
+        throw cause
+    }
+    return
+  }
+  const ancestor = dirname(directory)
+  if (!canonicalAbsolute(directory) || (await realpath(ancestor)) !== ancestor)
+    throw new Error("journal directory ancestor is not a canonical directory")
+  const problem = await windowsAclProblem(directory, { create: true })
+  if (problem !== undefined) throw new Error(`cannot create private journal directory: ${problem}`)
 }
 
 /** A crash after the exclusive link may leave our synced temporary name as a second link. */
@@ -297,11 +370,7 @@ const read = async (location: MigrationJournalLocation): Promise<MigrationJourna
   try {
     handle = await open(location.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   } catch (cause) {
-    if (isMissing(cause)) {
-      if (process.platform === "win32" && !(await secureWindowsAcl(dirname(location.path))))
-        throw invalid(location, "journal parent does not have a private access list")
-      return undefined
-    }
+    if (isMissing(cause)) return undefined
     throw invalid(location, "cannot safely open journal; inspect it before retrying")
   }
   try {
@@ -322,8 +391,12 @@ const read = async (location: MigrationJournalLocation): Promise<MigrationJourna
     )
       throw invalid(location, "journal has an unexpected hard link")
     if (process.platform === "win32") {
-      if (!(await secureWindowsAcl(dirname(location.path), location.path)))
-        throw invalid(location, "journal or its parent does not have a private access list")
+      const problem = await windowsAclProblem(dirname(location.path), { file: location.path })
+      if (problem !== undefined)
+        throw invalid(
+          location,
+          `journal or its parent does not have a private access list: ${problem}`,
+        )
       const checkedPath = await lstat(location.path)
       if (
         checkedPath.isSymbolicLink() ||
@@ -376,8 +449,9 @@ const write = async (
     if (process.platform === "win32") await checkLocation(location)
     handle = await open(temporary, "wx", 0o600)
     if (process.platform === "win32") {
-      if (!(await secureWindowsAcl(dirname(location.path), temporary)))
-        throw invalid(location, "cannot create a private journal in this directory")
+      const problem = await windowsAclProblem(dirname(location.path), { file: temporary })
+      if (problem !== undefined)
+        throw invalid(location, `cannot create a private journal in this directory: ${problem}`)
       const [info, checkedPath] = await Promise.all([handle.stat(), lstat(temporary)])
       if (
         checkedPath.isSymbolicLink() ||

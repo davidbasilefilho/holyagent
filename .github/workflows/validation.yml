@@ -180,6 +180,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Fail fast on native ACL handling before running the full cross-platform suite.
+      - name: Verify Windows journal permissions
+        run: bun test packages/core/tests/migration-journal.test.ts --test-name-pattern "Windows rejects a journal"
+
       - name: Test
         run: mise run test
 

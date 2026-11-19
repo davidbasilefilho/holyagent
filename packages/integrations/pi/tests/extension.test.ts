@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { isAbsolute, join, posix, resolve, win32 } from "node:path"
+import nodePath, { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
 import { createEventBus, type ToolDefinition } from "@earendil-works/pi-coding-agent"
 import type {
@@ -83,7 +83,10 @@ const createExtension =
     const runtime = (project: string, signal: AbortSignal, ...words: ReadonlyArray<string>) =>
       Effect.gen(function* () {
         const platform = options.platform ?? process.platform
-        const path = options.platformPath ?? (platform === "win32" ? win32 : posix)
+        // Match the extension's path port and the fixture paths, which use the host's path
+        // syntax unless a test explicitly injects another dialect. The platform switch alone
+        // describes command launching; it does not turn real Windows temporary paths into POSIX ones.
+        const path = options.platformPath ?? nodePath
         const root = options.packageRoot ?? PACKAGE_ROOT
         const argv = [...runtimeArgs(root, path), PI_PROJECT_FLAG, project, ...words]
         const search = options.bunSearch ?? {}
