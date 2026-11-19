@@ -186,6 +186,11 @@ This text owns the severity of those findings. A finding blocks only when the ch
 
 Every other finding is optional, as is anything already on the base.
 
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- library documentation is needed: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/documentation-lookup/SKILL.md`
+- writing or reviewing model-facing instructions: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/instruction-writing/SKILL.md`
+
 ## Headless screen
 
 This machine has no graphical session. You have a headless browser. Outside T3 it is the browser-use MCP tools: `mcp__browser_use__browser_exec`, which runs Python on the browser, and `mcp__browser_use__browser_screenshot`, with a temporary profile that is removed when the session ends. Where T3 hosts the session, the browser is T3's preview tools and browser-use is not available: T3 exposes no endpoint browser-use could attach to, so HolyAgent does not start it. You have no desktop: computer use and the user's real browser are not available. Report a missing tool instead of working around it.

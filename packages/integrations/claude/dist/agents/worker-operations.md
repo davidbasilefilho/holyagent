@@ -70,3 +70,8 @@ evidence:
 ```
 
 The `evidence:` block comes last, with one line for each blocking criterion and each required evidence label. A line starts with the criterion's text alone (without the `[blocking]` prefix and the `(dimension)` suffix the Assignment shows) or the label, exactly as written, then a colon and the support (a command and exit code, a path and line, a diff-file path). Name each check you did not run. Put long logs in a file outside the repository and list its path. On a follow-up, report only what is new.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- a web app or served static build, a terminal UI, a desktop or mobile app needs a shared render target: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/dev-server/SKILL.md`
+- a task aims to improve measurable performance: `${CLAUDE_PLUGIN_ROOT}/guidance/claude-5.5/performance-iteration/SKILL.md`

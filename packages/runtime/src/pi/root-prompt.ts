@@ -35,7 +35,7 @@ import kimiVersionControl from "../instructions/kimi-k3.1/root/version-control.m
 import kimiWorkflows from "../instructions/kimi-k3.1/root/workflows.md" with { type: "text" }
 import kimiHistoryRules from "../instructions/kimi-k3.1/shared/history-rules.md" with { type: "text" }
 import kimiPrecedence from "../instructions/kimi-k3.1/shared/precedence.md" with { type: "text" }
-import { stripCitations } from "../instructions/skills.ts"
+import { GUIDANCE_MARKER, guidanceRouter, stripCitations } from "../instructions/skills.ts"
 
 /**
  * The sections of the root prompt as files of a family's `root/` folder, in prompt order: the same
@@ -108,7 +108,11 @@ const TEXTS: Readonly<Record<PiFamily, Readonly<Record<string, string>>>> = {
 }
 
 const promptOf = (family: PiFamily): string =>
-  PI_ROOT_SECTIONS.map((file) => stripCitations(TEXTS[family][file] ?? "").trim()).reduce(
+  PI_ROOT_SECTIONS.map((file) =>
+    stripCitations(TEXTS[family][file] ?? "")
+      .replace(GUIDANCE_MARKER, guidanceRouter("root", family, "${HOLYAGENT_PI_ROOT}"))
+      .trim(),
+  ).reduce(
     (text, section, at) =>
       at === 0
         ? section

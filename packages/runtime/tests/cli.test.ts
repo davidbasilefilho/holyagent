@@ -407,6 +407,13 @@ describe("report and prompt", () => {
     const refused = await cli(accept, report("parses: ran it"))
     expect(refused.code).toBe(3)
     expect(refused.stderr).toContain("error: InsufficientAcceptance:")
+    expect(refused.stderr).toContain(
+      `holyagent assignment close ${id} --outcome success --accept <rationale>`,
+    )
+    expect(refused.stderr).toContain(
+      `holyagent assignment accept ${id} --rationale <text> --report`,
+    )
+    expect(refused.stderr).toContain("report on stdin")
     expect(refused.stderr).toContain('evidence label "tests"')
     expect(refused.stderr).not.toContain('criterion "parses"')
     expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({
@@ -435,8 +442,8 @@ describe("report and prompt", () => {
     const gap = await cli(["assignment", "accept", id, "--rationale", "reviewed"])
     expect(gap.code).toBe(3)
     expect(gap.stderr).toContain("error: InsufficientAcceptance:")
-    expect(gap.stderr).toContain("assignment close <id> --outcome success --accept")
-    expect(gap.stderr).toContain("assignment accept <id> --rationale <text> --report")
+    expect(gap.stderr).toContain(`assignment close ${id} --outcome success --accept`)
+    expect(gap.stderr).toContain(`assignment accept ${id} --rationale <text> --report`)
     // A corrected report still short of the evidence stores nothing.
     const still = await cli(
       ["assignment", "close", id, "--outcome", "success", "--accept", "ok"],

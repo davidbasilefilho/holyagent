@@ -109,3 +109,7 @@ Failed fetches retry up to three times: tests/fetch.test.ts "retries three times
 - Report each check as command, exit code and counts; name each check you did not run, and leave routine passes at that.
 - Put long logs in a file outside the repository and list its path; quote CLI output (TOON) only by the lines that support a claim.
 - On a follow-up, report only what is new.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- a task aims to improve measurable performance: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/performance-iteration/SKILL.md`

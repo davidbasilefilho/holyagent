@@ -19,6 +19,7 @@ import {
   releaseOf,
   renderPiPins,
   renderPypiPins,
+  rewriteHkSchema,
   SourceError,
   type Steps,
   type Survey,
@@ -152,6 +153,22 @@ describe("manifestFiles", () => {
       "packages/x/b/package.json",
     ])
   })
+
+  test("accepts catalog-bearing workspace objects and respects exclusion globs", async () => {
+    const write = (file: string, text: string) => Bun.write(join(root, file), text)
+    await write(
+      "package.json",
+      JSON.stringify({
+        workspaces: { packages: ["packages/*", "!packages/excluded"], catalog: { x: "^1.0.0" } },
+      }),
+    )
+    await write("packages/a/package.json", "{}")
+    await write("packages/excluded/package.json", "{}")
+    expect(await Effect.runPromise(manifestFiles(root))).toEqual([
+      "package.json",
+      "packages/a/package.json",
+    ])
+  })
 })
 
 describe("the mise tools of this repository", () => {
@@ -162,6 +179,14 @@ describe("the mise tools of this repository", () => {
     const versions = new Map((await tools()).map(({ name, version }) => [name, version]))
     expect(versions.get("aqua:BurntSushi/ripgrep")).toMatch(/^\d+\.\d+\.\d+$/)
     expect(versions.get("aqua:sharkdp/fd")).toMatch(/^\d+\.\d+\.\d+$/)
+  })
+
+  test("keeps the hk Pkl import synced with the installed release", async () => {
+    const version = (await tools()).find(({ name }) => name === "hk")?.version ?? ""
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/)
+    const config = await Bun.file(join(import.meta.dir, "..", "hk.pkl")).text()
+    expect(config).toContain(`/download/v${version}/hk@${version}#/Config.pkl`)
+    expect(rewriteHkSchema(config, "99.2.0")).toContain("/download/v99.2.0/hk@99.2.0#/Config.pkl")
   })
 
   test("have a release source for every pinned version, so the updater moves them", async () => {
@@ -182,6 +207,53 @@ describe("releaseOf", () => {
       expect(error.source).toBe(`http://127.0.0.1:${stalled.port}/left-pad`)
     } finally {
       await stalled.stop(true)
+    }
+  })
+})
+
+describe("releaseOf major cap", () => {
+  /** The registry's answer for one package, with versions and a latest tag. */
+  const packument = (latest: string, versions: ReadonlyArray<string>) =>
+    JSON.stringify({
+      "dist-tags": { latest },
+      versions: Object.fromEntries(versions.map((version) => [version, {}])),
+    })
+
+  const registry = (answers: Record<string, string>) =>
+    Bun.serve({
+      port: 0,
+      fetch: (request) => {
+        const answer = answers[new URL(request.url).pathname.slice(1)]
+        return answer === undefined ? new Response("", { status: 404 }) : new Response(answer)
+      },
+    })
+
+  test("a capped package moves to the newest release within the capped line, not the newer line", async () => {
+    // solid-js is capped at major 1: even though latest is 2.0.0, the newest 1.x is selected.
+    const server = registry({
+      "solid-js": packument("2.0.0", ["1.9.18", "1.9.19", "2.0.0"]),
+    })
+    try {
+      const release = await Effect.runPromise(
+        releaseOf("solid-js", `http://127.0.0.1:${server.port}`),
+      )
+      expect(release).toBe("1.9.19")
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("an uncapped package still moves to the newest release at or below latest", async () => {
+    const server = registry({
+      effect: packument("4.2.0", ["4.1.0", "4.2.0", "5.0.0-rc.1"]),
+    })
+    try {
+      const release = await Effect.runPromise(
+        releaseOf("effect", `http://127.0.0.1:${server.port}`),
+      )
+      expect(release).toBe("4.2.0")
+    } finally {
+      await server.stop(true)
     }
   })
 })
@@ -363,7 +435,7 @@ describe("PyPI package pins", () => {
   test("the repository pins browser-use exactly, in the form the updater writes", async () => {
     const repository = join(import.meta.dir, "..")
     const text = await Bun.file(join(repository, PYPI_PACKAGE_PINS)).text()
-    expect(JSON.parse(text)).toEqual({ "browser-use": "1.0.2" })
+    expect(JSON.parse(text)).toEqual({ "browser-use": "1.0.6" })
     expect(await Effect.runPromise(renderPypiPins(repository, new Map()))).toBe(text)
   })
 
@@ -465,16 +537,50 @@ describe("PyPI package pins", () => {
 describe("the native mise toolchain", () => {
   test("removes the unsupported npm wrapper through the updater without dropping other dependencies", () => {
     const original = {
-      devDependencies: { mise: "^2026.0.0", lefthook: "^2.0.0" },
-      trustedDependencies: ["mise", "lefthook"],
+      devDependencies: { mise: "^2026.0.0", oxlint: "^1.0.0" },
+      trustedDependencies: ["mise", "eslint-plugin-jsdoc"],
       private: true,
     }
     expect(withoutNpmMise(original)).toEqual({
-      devDependencies: { lefthook: "^2.0.0" },
-      trustedDependencies: ["lefthook"],
+      devDependencies: { oxlint: "^1.0.0" },
+      trustedDependencies: ["eslint-plugin-jsdoc"],
       private: true,
     })
     expect(original.devDependencies.mise).toBe("^2026.0.0")
     expect(withoutNpmMise(withoutNpmMise(original))).toEqual(withoutNpmMise(original))
+  })
+})
+
+describe("workspace-only lock refresh", () => {
+  test("adds a workspace without changing locked external packages", async () => {
+    const repository = join(import.meta.dir, "..")
+    for (const file of [
+      "package.json",
+      "bun.lock",
+      "packages/core/package.json",
+      "packages/runtime/package.json",
+      "packages/integrations/claude/package.json",
+      "packages/integrations/pi/package.json",
+    ]) {
+      await Bun.write(join(root, file), Bun.file(join(repository, file)))
+    }
+    await Bun.write(
+      join(root, "packages/new-fixture/package.json"),
+      JSON.stringify({ name: "@holyagent/new-fixture", version: "0.3.4", private: true }),
+    )
+    const before = Bun.JSONC.parse(await Bun.file(join(root, "bun.lock")).text()) as {
+      packages: Record<string, unknown>
+    }
+    await Effect.runPromise(execute(["--workspace-lock-only", root]))
+    const after = Bun.JSONC.parse(await Bun.file(join(root, "bun.lock")).text()) as {
+      packages: Record<string, unknown>
+      workspaces: Record<string, unknown>
+    }
+    expect(after.workspaces["packages/new-fixture"]).toBeDefined()
+    const external = (packages: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(packages).filter(([name]) => !name.startsWith("@holyagent/")),
+      )
+    expect(external(after.packages)).toEqual(external(before.packages))
   })
 })

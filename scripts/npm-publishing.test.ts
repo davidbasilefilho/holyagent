@@ -1,11 +1,25 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync as createTemp, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { Cause, Effect, Exit } from "effect"
 
 import { type NpmResult, type NpmRunner, publishArtifact, PublishError } from "./npm-publishing.ts"
+
+// Refuse fixtures under an existing repository, even when the system temp directory is overridden.
+const mkdtempSync = (prefix: string) => {
+  const dir = createTemp(prefix)
+  const probe = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--show-toplevel"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  if (probe.exitCode !== 128) {
+    rmSync(dir, { recursive: true, force: true })
+    throw new Error("Fixture temp directory is inside a Git repository or Git is unavailable")
+  }
+  return dir
+}
 
 const ok = (stdout = "{}"): NpmResult => ({ exitCode: 0, stdout, stderr: "" })
 const fail = (stdout: string, stderr = ""): NpmResult => ({ exitCode: 1, stdout, stderr })
@@ -20,12 +34,65 @@ const context = {
 const object = (type: string, sha: string) => Response.json({ object: { type, sha } })
 
 describe("packed npm publication", () => {
+  test("rejects absent or mismatched repository metadata before network or npm operations", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "npm-metadata-"))
+    try {
+      const valid = {
+        type: "git",
+        url: "https://github.com/owner/repo",
+        directory: "packages/integrations/pi/dist",
+      }
+      for (const repository of [
+        undefined,
+        "https://github.com/owner/repo",
+        { ...valid, type: "svn" },
+        { ...valid, url: "https://github.com/other/repo" },
+        { ...valid, directory: "other" },
+      ]) {
+        writeFileSync(
+          join(dir, "package.json"),
+          JSON.stringify({ name: "x", version: "1.0.0", repository }),
+        )
+        expect(
+          Bun.spawnSync(["bun", "pm", "pack", "--destination", dir], { cwd: dir }).exitCode,
+        ).toBe(0)
+        let called = false
+        const result = await Effect.runPromiseExit(
+          publishArtifact(
+            join(dir, "x-1.0.0.tgz"),
+            "dev",
+            context,
+            () => {
+              called = true
+              return Effect.succeed(ok())
+            },
+            () => {
+              called = true
+              return Promise.resolve(new Response("{}"))
+            },
+          ),
+        )
+        expect(Exit.isFailure(result)).toBe(true)
+        expect(called).toBe(false)
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
   test("preflights the exact tag and rejects unsafe registry states without publishing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "npm-publish-test-"))
     try {
       writeFileSync(
         join(dir, "package.json"),
-        JSON.stringify({ name: "test-publish-artifact", version: "1.2.3-dev-0123456" }),
+        JSON.stringify({
+          name: "test-publish-artifact",
+          version: "1.2.3-dev-0123456",
+          repository: {
+            type: "git",
+            url: "https://github.com/owner/repo",
+            directory: "packages/integrations/pi/dist",
+          },
+        }),
       )
       expect(
         Bun.spawnSync(["bun", "pm", "pack", "--destination", dir], { cwd: dir }).exitCode,

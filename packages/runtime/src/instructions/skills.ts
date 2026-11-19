@@ -36,7 +36,14 @@ export const DESIGN_CORE_MARKER = "<!-- design-core -->"
  * The instruction comments a generator keeps: the lines that mark where a generator embeds shared
  * text. Every other HTML comment is a maintainer's note.
  */
-const MARKERS: ReadonlySet<string> = new Set([MATERIALITY_MARKER, DESIGN_CORE_MARKER])
+/** A placeholder in root skill sections replaced with the root router at assembly. */
+export const GUIDANCE_MARKER = "<!-- owned-guidance -->"
+
+const MARKERS: ReadonlySet<string> = new Set([
+  MATERIALITY_MARKER,
+  DESIGN_CORE_MARKER,
+  GUIDANCE_MARKER,
+])
 
 // Code stays as written, so a `<!--` in a code span, a fenced block or an indented block never pairs
 // with a later `-->`. The alternatives are an indented code block (lines of four or more spaces or a
@@ -183,13 +190,13 @@ export interface SkillFile {
 }
 
 /**
- * The files below a family's `skills/` folder, in path order, ready to write below a harness's own
- * skills folder. Each `SKILL.md` gets the materiality definition and, for a design skill, the
- * shared design core, then `note(source)` as a frontmatter comment, where `source` is the file's
- * path from the repository root, and the maintainers' notes of {@link stripCitations} removed. Every
- * other file is carried as it is, except dotfiles and symbolic links, which stay out as they did
- * when the skills were globbed. `root` is the folder of the family folders. Failing to read a
- * source, or a marker used wrongly, is an `InstructionsError`.
+ * The files below a family's `skills/` folder, in path order, ready to write below a harness's
+ * private guidance folder. Each `SKILL.md` gets the materiality definition and, for a design skill,
+ * the shared design core, then `note(source)` as a frontmatter comment, where `source` is the
+ * file's path from the repository root, and the maintainers' notes of {@link stripCitations}
+ * removed. Every other file is carried as it is, except dotfiles and symbolic links, which stay out
+ * as they did when the skills were globbed. `root` is the folder of the family folders. Failing to
+ * read a source, or a marker used wrongly, is an `InstructionsError`.
  */
 export const skillFiles = (
   family: Family,
@@ -226,3 +233,103 @@ export const skillFiles = (
       }),
     )
   })
+
+/** Situations and roles for each owned guidance body. Root is the main thread. */
+export const OWNED_GUIDANCE: ReadonlyArray<{
+  readonly name: string
+  readonly when: string
+  readonly roles: ReadonlyArray<string>
+}> = [
+  { name: "ci-watch", when: "a pushed PR or commit needs CI judged", roles: ["root"] },
+  {
+    name: "dev-server",
+    when: "a web app or served static build, a terminal UI, a desktop or mobile app needs a shared render target",
+    roles: ["root", "Worker.operations"],
+  },
+  {
+    name: "documentation-lookup",
+    when: "library documentation is needed",
+    roles: [
+      "Librarian.lookup",
+      "Librarian.research",
+      "Worker.implementation",
+      "Worker.integration",
+      "Worker.debugging",
+    ],
+  },
+  {
+    name: "evidence-judging",
+    when: "a specialist verdict needs acceptance or rejection",
+    roles: ["root"],
+  },
+  {
+    name: "instruction-writing",
+    when: "writing or reviewing model-facing instructions",
+    roles: ["root", "Worker.implementation", "Reviewer.artifact"],
+  },
+  {
+    name: "performance-iteration",
+    when: "a task aims to improve measurable performance",
+    roles: ["root", "Worker.operations", "Worker.validation"],
+  },
+  { name: "state-mode", when: "a clone has no Intent yet", roles: ["root"] },
+  { name: "user-busy", when: "the user is away or says not to ask", roles: ["root"] },
+  {
+    name: "visual-judging",
+    when: "before any visual-task writer, source edit or visual specialist dispatch, and when judging visual work",
+    roles: ["root"],
+  },
+  {
+    name: "web-design",
+    when: "the selected platform is web",
+    roles: ["root", "Worker.visual", "Reviewer.visual"],
+  },
+  {
+    name: "mobile-design",
+    when: "the selected platform is mobile",
+    roles: ["root", "Worker.visual", "Reviewer.visual"],
+  },
+  {
+    name: "desktop-design",
+    when: "the selected platform is desktop",
+    roles: ["root", "Worker.visual", "Reviewer.visual"],
+  },
+  {
+    name: "tui-design",
+    when: "the selected platform is terminal UI",
+    roles: ["root", "Worker.visual", "Reviewer.visual"],
+  },
+]
+
+/** The non-discovered package folder carrying generated owned bodies. */
+export const GUIDANCE_FOLDER = "guidance"
+
+/** Render only the paths and triggers relevant to one role, leaving bodies to the reader. */
+export const guidanceRouter = (role: string, family: Family, root: string): string => {
+  const entries = OWNED_GUIDANCE.filter((entry) => entry.roles.includes(role))
+  if (entries.length === 0) return ""
+  const lines = entries.map(
+    ({ name, when }) => `- ${when}: \`${root}/${GUIDANCE_FOLDER}/${family}/${name}/SKILL.md\``,
+  )
+  return [
+    "User and third-party skills remain available.",
+    ...(role === "root" ? [] : ["Read the relevant guidance when its situation applies."]),
+    ...lines,
+    ...(role === "root"
+      ? ["Delegate library documentation lookup to a librarian or implementation specialist."]
+      : []),
+  ].join("\n")
+}
+
+/** Fail generation when an owned skill is missing from the map or its source is absent. */
+export const validateOwnedGuidance = (files: ReadonlyArray<SkillFile>): void => {
+  const known = new Set(OWNED_GUIDANCE.map(({ name }) => name))
+  const actual = new Set(
+    files.filter(({ path }) => path.endsWith("/SKILL.md")).map(({ path }) => path.split("/")[0]),
+  )
+  for (const name of actual)
+    if (name !== undefined && !known.has(name))
+      throw new Error(`owned skill ${name} has no routing map entry`)
+  for (const name of known)
+    if (!actual.has(name)) throw new Error(`mapped owned skill ${name} is missing`)
+}

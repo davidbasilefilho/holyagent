@@ -14,6 +14,14 @@ import type {
   ToolRenderers,
 } from "@earendil-works/pi-coding-agent"
 import { Text } from "@earendil-works/pi-tui"
+import {
+  loadHolyagentConfig,
+  makeContext,
+  reconcile as coreReconcile,
+  resolveState,
+  status as coreStatus,
+} from "@holyagent/core"
+import { reconcileRows, statusFrom } from "@holyagent/core/api/status-views.ts"
 import { Cause, Data, Effect, Exit, Fiber, Schema } from "effect"
 
 import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/workflow-check.ts"
@@ -22,11 +30,12 @@ import {
   type CapabilityForm,
   type McpServer,
 } from "../../../runtime/src/config/capabilities.ts"
-import { Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { type Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { canonicalPiToolName, wordsFor } from "../../../runtime/src/domain/host.ts"
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
+import { agentFor, ROUTES } from "../../../runtime/src/domain/route.ts"
 import {
   DEFAULT_PI_ROLE,
-  parseOutput,
   PI_ROLES,
   PI_ROOT_PLACEHOLDER,
   piContext,
@@ -34,14 +43,17 @@ import {
   PiRoleSchema,
   type ProjectState,
 } from "../../../runtime/src/hooks/pi-context.ts"
-import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
 import { cmdExeArguments, type CmdLaunch } from "../../../runtime/src/pi/bash/cmd.ts"
 import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
 import { justBashOn } from "../../../runtime/src/pi/bash/settings.ts"
 import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
 import { APPLY_PATCH_TOOL } from "../../../runtime/src/pi/codex/apply-patch.ts"
-import { providerEnv } from "../../../runtime/src/pi/provider.ts"
+import {
+  nativeSearchInventory,
+  providerEnv,
+  WEB_KIT_TOOLS,
+} from "../../../runtime/src/pi/provider.ts"
 import { type CommandRunner, requireProviderReady } from "../../../runtime/src/pi/readiness.ts"
 import { PI_ROOT_PROMPT, PI_ROOT_PROMPTS } from "../../../runtime/src/pi/root-prompt.ts"
 import {
@@ -66,6 +78,15 @@ import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { familyAgentPrompt, familySkillPaths } from "./families.ts"
+import { NATIVE_ROOT_FLAG, registerNativeTools } from "./native-tools.ts"
+import {
+  checkProfileLaunch,
+  currentProfileRouting,
+  currentUserDisabled,
+  isManagedProfileAgent,
+  refuseProfileLaunch,
+} from "./profile-gate.ts"
+export { refuseProfileLaunch } from "./profile-gate.ts"
 import {
   isScreenAgent,
   refuseT3PreviewOutsideT3,
@@ -83,6 +104,8 @@ import {
   T3_ACCESS_STATUS,
   T3_STATUS_KEY,
 } from "./t3.ts"
+import { registerToolAliases } from "./tool-aliases.ts"
+import { registerAgentWait } from "./wait-for-agents.ts"
 
 /** The launch flag that tells the extension what the session is for: root, specialist or session. */
 export const ROLE_FLAG = "holyagent-role"
@@ -160,7 +183,10 @@ export const hostEnvironment = (
 ): Readonly<Record<string, string>> => ({
   [HOST_ENV]: "pi",
   [WORKFLOWS_ENV]:
-    activeTools.includes(WORKFLOW_TOOL) && activeTools.includes(CODEMODE_TOOL_NAME) ? "1" : "0",
+    activeTools.some((name) => canonicalPiToolName(name) === WORKFLOW_TOOL) &&
+    activeTools.includes(CODEMODE_TOOL_NAME)
+      ? "1"
+      : "0",
 })
 
 /**
@@ -220,7 +246,7 @@ export const refuseNonSpecialist = (event: {
   readonly toolName: string
   readonly input: Readonly<Record<string, unknown>>
 }): ToolCallEventResult | undefined => {
-  if (event.toolName !== AGENT_TOOL) return undefined
+  if (canonicalPiToolName(event.toolName) !== AGENT_TOOL) return undefined
   const { resume, subagent_type: type } = event.input
   if (typeof resume === "string" && resume.trim() !== "") return undefined
   const requested = typeof type === "string" ? type.trim() : ""
@@ -255,7 +281,7 @@ export const refuseNonSpecialistWorkflow = (event: {
   readonly toolName: string
   readonly input: Readonly<Record<string, unknown>>
 }): Effect.Effect<ToolCallEventResult | undefined> => {
-  if (event.toolName !== WORKFLOW_TOOL) return Effect.succeed(undefined)
+  if (canonicalPiToolName(event.toolName) !== WORKFLOW_TOOL) return Effect.succeed(undefined)
   const { script, scriptPath, name } = event.input
   const refuse = (reason: string): ToolCallEventResult => ({
     block: true,
@@ -452,11 +478,15 @@ interface Delivery {
 
 /** What one collection yields: what the next run is told, and the settings the config decides. */
 interface Collected {
+  /** Alias eligibility requires successful user and project configuration reads. */
+  readonly aliases?: true
   /**
    * False once the config is read and `pi.enable` is off, which adds no context and no settings;
    * only the root's prompt and exclusions remain, unless the user's own config is off.
    */
   readonly enabled?: false
+  /** Both user and merged Pi configuration were read successfully and enabled. */
+  readonly nativeEnabled?: true
   /**
    * True once the user-level config, read alone, has `pi.enable` off: the only thing that switches
    * the tool gates off. A project's config cannot, since a cloned repository would then lift the
@@ -484,6 +514,7 @@ interface Collected {
    * session reads them, since the root and the specialists both run on its models.
    */
   readonly codex?: CodexSettings
+  readonly uniformCodex?: true
   /**
    * What the user-level config, read alone, decides for auto-review. Present on every result,
    * whether the config was readable or not, and never from the project's config.
@@ -506,6 +537,9 @@ interface Collected {
   readonly tools?: Pick<ToolArgs, "tools" | "excludeTools">
   /** The config the provider checks read, present for the root after a collection that ended well. */
   readonly config?: Config
+  readonly webMode?: Config["pi"]["features"]["web"]
+  /** Whether a successfully read config explicitly enables profile routing. */
+  readonly profileRouting?: boolean
 }
 
 /**
@@ -540,6 +574,9 @@ interface Held {
   started: boolean
   /** The Codex provider's settings once the config is read, or undefined for another provider. */
   codex: CodexSettings | undefined
+  uniformCodex: boolean
+  webMode: Config["pi"]["features"]["web"] | undefined
+  profileRouting: boolean
   /**
    * The session's auto-review settings: on with the default policy from the start, fixed once by
    * the first collection to the user-level config's choice. The project's config has no part.
@@ -604,7 +641,14 @@ const settingsFor = (
   return {
     environment: rootArgs.env,
     providerEnvironment: providerEnv(config),
+    webMode: config.pi.features.web,
     ...(codex === undefined ? {} : { codex }),
+    ...(config.pi.provider === "openai-codex" &&
+    Object.values(config.pi.routes).every(
+      (row) => (row.provider ?? config.pi.provider) === "openai-codex",
+    )
+      ? { uniformCodex: true as const }
+      : {}),
     ...(justBashOn(config) ? { justBash: true as const } : {}),
     ...(role === "specialist" ? { screenServers: screenServers(config, form) } : {}),
     ...(role === "root"
@@ -640,8 +684,50 @@ export const refuseExcludedTool = (
       }
     : undefined
 
+/** Require an explicit fallback and respect disabled native tools. */
+export const refusePrematureWebFallback = (
+  event: { readonly toolName: string },
+  mode: Config["pi"]["features"]["web"] | undefined,
+  _registered: ReadonlyArray<string>,
+  active: ReadonlyArray<string>,
+): ToolCallEventResult | undefined => {
+  const native = event.toolName === "moonshot_search" || event.toolName === "moonshot_fetch"
+  if (native && (mode === "off" || !active.includes(event.toolName)))
+    return { block: true, reason: "Native web tool is off or inactive in this session." }
+  if (!WEB_KIT_TOOLS.includes(event.toolName)) return undefined
+  if (mode !== "pi-web-kit")
+    return { block: true, reason: "Web fallback requires explicit pi-web-kit configuration." }
+  return undefined
+}
+
+/** A provider cannot grant search to a specialist without that capability. */
+const searchSpecialist = (agent: string | undefined): boolean =>
+  ROUTES.some(
+    (route) =>
+      route.capabilities.includes("Search") &&
+      [
+        agentFor(route, false),
+        agentFor(route, true, "normal"),
+        agentFor(route, true, "headless"),
+      ].includes(agent ?? ""),
+  )
+
+/** A provider cannot grant search to a specialist without that capability. */
+export const refuseUnassignedWebTool = (
+  event: { readonly toolName: string },
+  agent: string | undefined,
+): ToolCallEventResult | undefined => {
+  if (!["moonshot_search", "moonshot_fetch", ...WEB_KIT_TOOLS].includes(event.toolName))
+    return undefined
+  return searchSpecialist(agent)
+    ? undefined
+    : { block: true, reason: "This specialist does not have the Search capability." }
+}
+
 /** Where the extension finds what it runs. */
 export interface ExtensionOptions {
+  /** Optional host-supplied data source for controlled embedding or tests. */
+  readonly coreServices?: CoreServices
   /**
    * The folder of the installed package, which holds `scripts/holyagent.js`; the extension's own by
    * default.
@@ -674,6 +760,29 @@ export interface ExtensionOptions {
    * its own to stand in for a machine with Bun in a given place.
    */
   readonly bunSearch?: BunSearch
+}
+
+/** The data used to collect one session context, supplied by core in normal operation. */
+export interface CoreServices {
+  readonly config: (
+    project: string,
+    folders: ReadonlyArray<string>,
+    signal: AbortSignal,
+  ) => Effect.Effect<Config, { readonly message: string }>
+  readonly directory: (
+    project: string,
+    top: string,
+    git: boolean,
+    signal: AbortSignal,
+  ) => Effect.Effect<unknown, { readonly message: string }>
+  readonly status: (
+    project: string,
+    signal: AbortSignal,
+  ) => Effect.Effect<Readonly<Record<string, unknown>>, { readonly message: string }>
+  readonly reconcile: (
+    project: string,
+    signal: AbortSignal,
+  ) => Effect.Effect<Readonly<Record<string, unknown>>, { readonly message: string }>
 }
 
 /** What the lookup of Bun reads: an environment and tests for a file's existence and mode. */
@@ -873,6 +982,7 @@ export const createExtension =
     platformPath = nodePath,
     platform = process.platform,
     bunSearch = {},
+    coreServices,
   }: ExtensionOptions = {}) =>
   (pi: ExtensionAPI): void => {
     const bundled = runtimeArgs(packageRoot, platformPath)
@@ -964,40 +1074,6 @@ export const createExtension =
       return { ok: true, program: bun }
     }
 
-    // Bun runs the package's bundled runtime, which enters the project first; its stdout is the
-    // command's output. A Bun that cmd.exe cannot start with these arguments (a shim, and a project
-    // path with a character no quoting protects) is passed over for the next one. A Bun that is gone
-    // when its start fails was found once and moved or removed since: it is looked up again, once.
-    const holyagent = (signal: AbortSignal, project: string, ...args: ReadonlyArray<string>) => {
-      const argv = [...bundled, PI_PROJECT_FLAG, project, ...args]
-      const attempt = (looked: boolean): Effect.Effect<ExecResult, CommandFailed> =>
-        Effect.suspend(() => {
-          const found = bunFor(argv)
-          if (!found.ok)
-            return Effect.fail(new CommandFailed({ command: args.join(" "), reason: found.reason }))
-          const program = found.program
-          const gone = () => !looked && !signal.aborted && !(bunSearch.exists ?? isFile)(program)
-          const again = Effect.suspend(() => {
-            bun = undefined
-            return attempt(true)
-          })
-          return exec(signal, program, argv).pipe(
-            Effect.matchEffect({
-              onFailure: (error) => (gone() ? again : Effect.fail(error)),
-              onSuccess: (result) =>
-                (result.code !== 0 || result.killed) && gone() ? again : Effect.succeed(result),
-            }),
-          )
-        })
-      return attempt(false).pipe(
-        Effect.flatMap((result) =>
-          result.code === 0 && !result.killed
-            ? Effect.succeed(result.stdout)
-            : Effect.fail(new CommandFailed({ command: args.join(" "), reason: reasonOf(result) })),
-        ),
-      )
-    }
-
     // The bash tool's shell: Bun on the package's `scripts/just-bash.js`, started in the package's
     // folder like every other program, and found the same way as for the CLI. It is registered
     // once a collection finds the capability on, and runs Pi's own bash while it is off.
@@ -1044,27 +1120,9 @@ export const createExtension =
         }),
       )
 
-    // The folder that holds the project's state: the one `holyagent state mode` reports in a git
-    // work tree, and `.holyagent` of the project outside git, where that command fails.
-    const stateFolderOf = (
-      signal: AbortSignal,
-      project: string,
-      located: { readonly top: string; readonly git: boolean },
-    ) =>
-      located.git
-        ? holyagent(signal, project, "state", "mode").pipe(
-            Effect.flatMap((text) => parseOutput("state mode", text)),
-            Effect.map((where) => where["directory"]),
-          )
-        : Effect.succeed<unknown>(join(located.top, STATE_DIRECTORY))
-
     // The configs whose exclusions the root keeps whatever the merged config says.
     const boundConfigs = (defaults: Config, user: Config | undefined): ReadonlyArray<Config> =>
       user === undefined ? [defaults] : [defaults, user]
-
-    const decodeConfig = Schema.decodeUnknownEffect(Schema.fromJsonString(Config), {
-      onExcessProperty: "error",
-    })
 
     // The form of the machine, from its environment alone, as setup and doctor detect it; a screen
     // specialist takes the form of the agent file it was launched from instead, so its servers and
@@ -1104,6 +1162,29 @@ export const createExtension =
       return role === "root" ? rootExclusions([yield* defaultConfig]) : []
     }).pipe(Effect.orDie)
 
+    const native = registerNativeTools(pi, { env })
+    const agentWait = registerAgentWait(pi, false)
+    let aliasesAllowed = false
+    let ownedAliases: ReadonlyArray<string> = []
+    let suppressedAliases: ReadonlyArray<string> = []
+    const suspendAliases = () => {
+      aliasesAllowed = false
+      Effect.runSync(
+        Effect.try(() => {
+          const active = pi.getActiveTools()
+          const removed = active.filter((name) => ownedAliases.includes(name))
+          if (removed.length > 0) {
+            suppressedAliases = [...new Set([...suppressedAliases, ...removed])]
+            pi.setActiveTools(active.filter((name) => !removed.includes(name)))
+          }
+        }).pipe(Effect.orElseSucceed(() => undefined)),
+      )
+    }
+    const disableAgentWait = () =>
+      Effect.runSync(
+        Effect.try(() => agentWait.disable()).pipe(Effect.orElseSucceed(() => undefined)),
+      )
+
     const collect = (cwd: string, signal: AbortSignal, reason: Reason) => {
       // What the config decided, kept once known so a later failure of the collection (the status
       // command, the deadline) still leaves the root its prompt, tools and provider settings.
@@ -1118,8 +1199,10 @@ export const createExtension =
       // deadline, counts for nothing, which leaves the gates on and the defaults' exclusions, and
       // is reported.
       const readUser = (project: string) =>
-        holyagent(signal, project, "config").pipe(
-          Effect.flatMap(decodeConfig),
+        (coreServices === undefined
+          ? loadHolyagentConfig({ projectDirectories: [], env })
+          : coreServices.config(project, [], signal)
+        ).pipe(
           Effect.map((own) => {
             user = own
           }),
@@ -1155,16 +1238,23 @@ export const createExtension =
           )
         const collected = yield* Effect.gen(function* () {
           const located = yield* topOf(signal, project)
-          // The loader reads files with Bun, which Pi's Node does not have, so the bundled CLI
-          // loads it. The state folder does not depend on the config or on `status`, so it is asked
-          // meanwhile; its failure counts only once the config says the extension is on.
+          // Read the merged config and state location directly through the Node-capable core.
           const attempt = yield* Effect.result(
             Effect.all(
               [
-                holyagent(signal, project, "config", join(located.top, STATE_DIRECTORY)).pipe(
-                  Effect.flatMap(decodeConfig),
+                coreServices === undefined
+                  ? loadHolyagentConfig({
+                      projectDirectories: [join(located.top, STATE_DIRECTORY)],
+                      env,
+                    })
+                  : coreServices.config(project, [join(located.top, STATE_DIRECTORY)], signal),
+                Effect.result(
+                  coreServices === undefined
+                    ? resolveState(project, env, "peek", false).pipe(
+                        Effect.map(({ directory }) => directory),
+                      )
+                    : coreServices.directory(project, located.top, located.git, signal),
                 ),
-                Effect.result(stateFolderOf(signal, project, located)),
               ],
               { concurrency: "unbounded" },
             ),
@@ -1173,6 +1263,8 @@ export const createExtension =
           const [config, folder] = yield* Effect.fromResult(attempt)
           read = config
           const bound = boundConfigs(yield* defaultConfig, user)
+          if (user !== undefined && !user.pi.enable)
+            return { enabled: false, gatesOff: true } satisfies Collected
           if (!config.pi.enable) {
             if (user !== undefined && !user.pi.enable)
               return { enabled: false, gatesOff: true } satisfies Collected
@@ -1191,16 +1283,31 @@ export const createExtension =
             } satisfies Collected
           }
           const role = yield* roleOf
-          configured = settingsFor(config, role, bound, machineForm())
+          configured = {
+            ...settingsFor(config, role, bound, machineForm()),
+            profileRouting: config.pi.profile !== undefined,
+            ...(user?.pi.enable === true ? { nativeEnabled: true as const } : {}),
+          }
           // Status first, then reconcile: for a project that keeps state, status makes the state
           // worktree that the next calls read.
-          const status = yield* holyagent(signal, project, "status").pipe(
-            Effect.flatMap((text) => parseOutput("status", text)),
-          )
+          const nativeContext =
+            coreServices === undefined
+              ? yield* makeContext({
+                  cwd: project,
+                  env,
+                  host: "pi",
+                  authorize: () => true,
+                  deferRouting: true,
+                })
+              : undefined
+          const status =
+            coreServices === undefined && nativeContext !== undefined
+              ? statusFrom(yield* coreStatus(nativeContext, {}))
+              : yield* coreServices!.status(project, signal)
           const reconcile = RECONCILED.has(reason)
-            ? yield* holyagent(signal, project, "reconcile").pipe(
-                Effect.flatMap((text) => parseOutput("reconcile", text)),
-              )
+            ? coreServices === undefined && nativeContext !== undefined
+              ? reconcileRows(yield* coreReconcile(nativeContext, {}), wordsFor("pi"))
+              : yield* coreServices!.reconcile(project, signal)
             : undefined
           const directory = yield* Effect.fromResult(folder)
           const state: ProjectState | undefined =
@@ -1210,7 +1317,11 @@ export const createExtension =
           const content = piContext(role, root, state)
           // The provider is checked only after a collection that ended well: a failed one already
           // carries a notice, and the checks would start commands after its deadline.
-          const ended = { ...configured, ...(role === "root" ? { config } : {}) }
+          const ended = {
+            ...configured,
+            ...(user?.pi.enable === true ? { aliases: true as const } : {}),
+            ...(role === "root" ? { config } : {}),
+          }
           return content === undefined
             ? ({ ...ended } satisfies Collected)
             : ({
@@ -1240,16 +1351,22 @@ export const createExtension =
     // started has ended, the ones of an older start or compaction included, and every child they
     // started has exited or its stop grace (STOP_GRACE_MS, the graceMs option) has passed.
     const release = (): Promise<void> => {
+      suspendAliases()
+      disableAgentWait()
+      native.setEnabled(false)
       const taken = held
       held = undefined
       taken?.current?.abort()
       taken?.probe?.abort()
-      return Effect.runPromise(
-        Effect.forEach([...running], (ended) => Effect.promise(() => ended), {
-          concurrency: "unbounded",
-          discard: true,
-        }),
-      )
+      return Promise.all([
+        native.shutdown(),
+        Effect.runPromise(
+          Effect.forEach([...running], (ended) => Effect.promise(() => ended), {
+            concurrency: "unbounded",
+            discard: true,
+          }),
+        ),
+      ]).then(() => undefined)
     }
 
     // The notice for a provider that is not ready or lacks a route's model, or undefined when the
@@ -1459,16 +1576,44 @@ export const createExtension =
     // the tools since, and one that stopped the start's collection must not skip them. The provider's
     // variables are applied before the checks start, since the checks inherit the environment.
     const gather = (taken: Held, ctx: ExtensionContext, reason: Reason): Promise<void> => {
+      suspendAliases()
+      disableAgentWait()
+      native.setEnabled(false)
       taken.current?.abort()
       const own = new AbortController()
       taken.current = own
-      const collected = Effect.runPromise(collect(ctx.cwd, own.signal, reason))
+      const collected = Effect.runPromise(collect(ctx.cwd, own.signal, reason), {
+        signal: own.signal,
+      }).catch(() => undefined)
       const ended = collected.then(() => undefined)
       running.add(ended)
       void ended.then(() => running.delete(ended))
       taken.pending = collected.then((result) => {
         if (own.signal.aborted) return undefined
+        aliasesAllowed = result?.aliases === true
+        if (aliasesAllowed && suppressedAliases.length > 0) {
+          pi.setActiveTools([...new Set([...pi.getActiveTools(), ...suppressedAliases])])
+          suppressedAliases = []
+        }
+        if (aliasesAllowed)
+          ownedAliases = [
+            ...new Set([...ownedAliases, ...registerToolAliases(pi, () => aliasesAllowed)]),
+          ]
+        if (coreServices === undefined && result?.aliases === true) agentWait.enable()
+        else {
+          disableAgentWait()
+          if (result?.enabled !== false && pi.getFlag(NATIVE_ROOT_FLAG) === true)
+            taken.setupNotice = joinNotices(
+              taken.setupNotice,
+              notice("wait_for_agents unavailable: enabled Pi configuration could not be verified"),
+            )
+        }
+        native.setEnabled(coreServices === undefined && result?.nativeEnabled === true)
         taken.gatesOff = result?.gatesOff === true
+        if (result?.enabled === false) taken.profileRouting = false
+        else if (result?.profileRouting !== undefined)
+          taken.profileRouting =
+            result.profileRouting || (env["HOLYAGENT_ROUTING_PROFILE"]?.trim() ?? "") !== ""
         if (result?.rootPrompt === true) taken.rootPrompt = true
         else if (result?.enabled === false) taken.rootPrompt = false
         // Only the user's own `pi.enable: false` clears the set; otherwise it grows, so a later
@@ -1480,12 +1625,44 @@ export const createExtension =
         if (result?.providerEnvironment !== undefined)
           applyEnvironment(env, result.providerEnvironment, true)
         if (result !== undefined) taken.codex = result.codex
+        if (result !== undefined) taken.uniformCodex = result.uniformCodex === true
+        if (result !== undefined) taken.webMode = result.webMode
         if (result?.autoReview !== undefined) taken.autoReview.fix(result.autoReview)
         if (result !== undefined) taken.justBash = result.justBash === true
         if (result?.justBash === true) bash.enable(ctx.cwd)
         if (!taken.started && result?.enabled !== false) {
           taken.started = true
-          if (result?.codex !== undefined) taken.specialistNotice = activateApplyPatch(result.codex)
+          if (result?.webMode === "provider" && searchSpecialist(childAgent(pi.getSessionName()))) {
+            const inventory = Effect.runSync(
+              Effect.try(() =>
+                nativeSearchInventory(
+                  pi.getAllTools().map(({ name }) => name),
+                  pi.getActiveTools(),
+                ),
+              ).pipe(
+                Effect.orElseSucceed(() => ({
+                  state: "unknown" as const,
+                  reason: "native tool inventory failed",
+                })),
+              ),
+            )
+            if (inventory.state !== "exposed")
+              taken.specialistNotice = joinOptional(
+                taken.specialistNotice,
+                notice(
+                  `${inventory.reason}; search availability is unknown or disabled. Configure pi-web-kit explicitly if you intend to use it.`,
+                ),
+              )
+          }
+          if (
+            result?.codex !== undefined &&
+            (ctx.model?.provider === "openai-codex" ||
+              (ctx.model === undefined && result.uniformCodex === true))
+          )
+            taken.specialistNotice = joinOptional(
+              taken.specialistNotice,
+              activateApplyPatch(result.codex),
+            )
           if (result?.screenServers !== undefined)
             taken.specialistNotice = joinOptional(
               taken.specialistNotice,
@@ -1496,7 +1673,7 @@ export const createExtension =
             const notApplied = applyRootTools(result.tools, taken.t3)
             taken.t3Gate = taken.t3
             taken.t3Root = taken.t3 && notApplied === undefined
-            taken.setupNotice = notApplied
+            taken.setupNotice = joinOptional(taken.setupNotice, notApplied)
             if (taken.t3 && belowFullAccess(env))
               taken.setupNotice = joinNotices(taken.setupNotice, warnBelowFullAccess(ctx))
           }
@@ -1527,6 +1704,9 @@ export const createExtension =
         t3Gate: false,
         t3Root: false,
         codex: undefined,
+        uniformCodex: false,
+        webMode: undefined,
+        profileRouting: (env["HOLYAGENT_ROUTING_PROFILE"]?.trim() ?? "") !== "",
         autoReview: createAutoReviewSettings(),
         justBash: false,
         probe: undefined,
@@ -1556,6 +1736,7 @@ export const createExtension =
       "before_agent_start",
       (
         event,
+        ctx,
       ):
         | Promise<BeforeAgentStartEventResult | undefined>
         | BeforeAgentStartEventResult
@@ -1572,7 +1753,11 @@ export const createExtension =
             applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true)
           // The Codex provider runs the GPT-6 family: the root's prompt is that family's, a
           // specialist's own prompt is swapped for it, and the skills Pi lists are its copies.
-          const family = taken?.codex?.family
+          const family =
+            ctx.model?.provider === "openai-codex" ||
+            (ctx.model === undefined && taken?.uniformCodex === true)
+              ? taken?.codex?.family
+              : undefined
           const own = child
             ? family === undefined
               ? event.systemPrompt
@@ -1648,18 +1833,76 @@ export const createExtension =
 
     // The gates stand down only for the user's own `pi.enable: false`; a project's cannot lift them,
     // nor take an exclusion away. The root's excluded tools are refused first, whatever else the call is.
-    pi.on("tool_call", (event) =>
-      held?.gatesOff === true
-        ? undefined
-        : (refuseExcludedTool(event, held?.excluded ?? []) ??
-          (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
-          refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ??
-          Effect.runPromise(
-            refuseNonSpecialistWorkflow(event).pipe(
-              Effect.map((refusal) => refuseNonSpecialist(event) ?? refusal),
-            ),
-          )),
-    )
+    pi.on("tool_call", (event, ctx) => {
+      const gate = () =>
+        refuseExcludedTool(event, held?.excluded ?? []) ??
+        (isChild()
+          ? (refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ??
+            refusePrematureWebFallback(
+              event,
+              held?.webMode,
+              pi.getAllTools().map(({ name }) => name),
+              pi.getActiveTools(),
+            ))
+          : undefined) ??
+        (held?.t3Gate === true ? refuseDeactivatedT3Tool(event) : undefined) ??
+        refuseT3PreviewOutsideT3(event, childAgent(pi.getSessionName()), held?.t3 === true) ??
+        Effect.runPromise(
+          Effect.gen(function* () {
+            const agent = event.toolName === "Agent" || event.toolName === "agent"
+            const workflow =
+              event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow"
+            const type = agent ? event.input["subagent_type"] : undefined
+            const managed = agent && isManagedProfileAgent(type)
+            const resume =
+              agent && typeof event.input["resume"] === "string" && event.input["resume"] !== ""
+            const current =
+              managed || workflow || resume ? yield* currentProfileRouting(ctx.cwd, env) : false
+            if (current === undefined && held?.profileRouting !== true)
+              return {
+                block: true,
+                reason:
+                  "Current routing configuration is unavailable. Restore it and redispatch the Assignment.",
+              } satisfies ToolCallEventResult
+            const active = current ?? held?.profileRouting ?? false
+            const registry =
+              active && agent
+                ? yield* Effect.try(() => ctx.modelRegistry).pipe(
+                    Effect.orElseSucceed(() => undefined),
+                  )
+                : undefined
+            const refusal = refuseProfileLaunch(event, active, registry)
+            if (refusal !== undefined) return refusal
+            if (active && managed) {
+              const reason = yield* checkProfileLaunch(event.input, ctx.cwd, env)
+              if (reason !== undefined) return { block: true, reason } satisfies ToolCallEventResult
+            }
+            return refuseNonSpecialist(event) ?? (yield* refuseNonSpecialistWorkflow(event))
+          }),
+        )
+      const agent = event.toolName === "Agent" || event.toolName === "agent"
+      const managed = agent && isManagedProfileAgent(event.input["subagent_type"])
+      const resume =
+        agent && typeof event.input["resume"] === "string" && event.input["resume"] !== ""
+      const workflow =
+        event.toolName === "SubagentWorkflow" || event.toolName === "subagent_workflow"
+      if (!managed && !resume && !workflow) return held?.gatesOff === true ? undefined : gate()
+      return Effect.runPromise(
+        currentUserDisabled(env).pipe(
+          Effect.flatMap((disabled): Effect.Effect<ToolCallEventResult | undefined> =>
+            disabled === true
+              ? Effect.succeed(undefined)
+              : disabled === false
+                ? Effect.promise(() => Promise.resolve(gate()))
+                : Effect.succeed({
+                    block: true,
+                    reason:
+                      "Current user configuration is unavailable. Restore it and redispatch the Assignment.",
+                  } satisfies ToolCallEventResult),
+          ),
+        ),
+      )
+    })
 
     // Pi finishes the shutdown when the handler's promise settles, and the folder may be removed
     // then: it settles only after every child has exited or its stop grace (STOP_GRACE_MS, 2 s,

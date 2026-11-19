@@ -116,7 +116,6 @@ const MODEL = {
 const COMPUTER_USE = {
   "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false },
 }
-const KIMI = { tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: true } } }
 const SUBAGENTS = { disableDefaultAgents: true, fallbackSubagent: "none" }
 /**
  * `@ff-labs/pi-fff`'s file with the override mode that puts its tools in place of Pi's. Setup
@@ -140,11 +139,11 @@ describe("holyagent setup, Pi tool settings", () => {
       ...MODEL,
     })
     expect(await read(globalSubagents())).toEqual(SUBAGENTS)
-    expect(await read(globalKimi())).toEqual(KIMI)
+    expect(await exists(globalKimi())).toBe(false)
     expect(await read(billion())).toEqual(BILLION)
     expect(await read(piFff())).toEqual(PI_FFF)
     // One line per file, none of which is a process.
-    expect(toolLines(report)).toHaveLength(5)
+    expect(toolLines(report)).toHaveLength(4)
     expect(toolLines(report)).toContain(
       `+ tool settings ${globalSubagents()}: added disableDefaultAgents true, fallbackSubagent "none"`,
     )
@@ -156,16 +155,16 @@ describe("holyagent setup, Pi tool settings", () => {
     await installed()
     await runSetup(withPi())
     const before = await Promise.all(
-      [globalSettings(), globalSubagents(), globalKimi(), billion(), piFff()].map((file) =>
+      [globalSettings(), globalSubagents(), billion(), piFff()].map((file) =>
         Bun.file(file).text(),
       ),
     )
     const report = await runSetup(withPi())
     expect(toolLines(report).every((line) => line.startsWith("= tool settings "))).toBe(true)
-    expect(toolLines(report)).toHaveLength(5)
+    expect(toolLines(report)).toHaveLength(4)
     expect(
       await Promise.all(
-        [globalSettings(), globalSubagents(), globalKimi(), billion(), piFff()].map((file) =>
+        [globalSettings(), globalSubagents(), billion(), piFff()].map((file) =>
           Bun.file(file).text(),
         ),
       ),
@@ -194,7 +193,7 @@ describe("holyagent setup, Pi tool settings", () => {
       fallbackSubagent: "Explore",
     })
     expect(await read(globalKimi())).toEqual({
-      tools: { moonshot_search: { enabled: false }, moonshot_fetch: { enabled: true } },
+      tools: { moonshot_search: { enabled: false } },
       region: "global",
     })
     expect(await read(billion())).toEqual({
@@ -323,7 +322,7 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(failures).toHaveLength(2)
     expect(failures.join("\n")).toContain(globalSubagents())
     expect(failures.join("\n")).toContain(billion())
-    expect(await read(globalKimi())).toEqual(KIMI)
+    expect(await exists(globalKimi())).toBe(false)
     expect(await read(globalSettings())).toEqual({
       ...FULL(),
       ...CODEMODE,
@@ -350,7 +349,7 @@ describe("holyagent setup, Pi tool settings", () => {
     await installed()
     const before = await Bun.file(globalSettings()).text()
     const report = await runSetup(withPi(), { dryRun: true })
-    expect(toolLines(report)).toHaveLength(5)
+    expect(toolLines(report)).toHaveLength(4)
     expect(toolLines(report).every((line) => line.includes("would add"))).toBe(true)
     expect(toolLines(report).every((line) => line.endsWith("(dry run, nothing written)"))).toBe(
       true,
@@ -384,7 +383,7 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(globalSettings())).toEqual({ ...FULL(), ...CODEMODE, ...MODEL })
     expect(await exists(globalSubagents())).toBe(false)
     expect(await exists(billion())).toBe(false)
-    expect(await read(globalKimi())).toEqual(KIMI)
+    expect(await exists(globalKimi())).toBe(false)
   })
 
   describe("fff", () => {
@@ -687,8 +686,7 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(join(agent, "subagents.json"))).toEqual(SUBAGENTS)
     expect(await read(bili)).toEqual(BILLION)
     expect(await exists(globalSettings())).toBe(false)
-    // The provider's own file stays under the home directory, where the package reads it.
-    expect(await read(globalKimi())).toEqual(KIMI)
+    expect(await exists(globalKimi())).toBe(false)
 
     const xdg = join(home, "xdg")
     await runSetup(withPi(), { env: { PI_CODING_AGENT_DIR: agent, XDG_CONFIG_HOME: xdg } })
@@ -706,7 +704,7 @@ describe("holyagent setup, Pi tool settings", () => {
         ...COMPUTER_USE,
         ...MODEL,
       })
-      expect(await read(projectPi("providers", "kimi-coding", "config.json"))).toEqual(KIMI)
+      expect(await exists(projectPi("providers", "kimi-coding", "config.json"))).toBe(false)
       expect(await exists(projectPi("subagents.json"))).toBe(false)
       expect(toolLines(report).some((line) => line.includes("has no file at"))).toBe(true)
       expect(toolLines(report).join("\n")).toContain(
@@ -732,12 +730,9 @@ describe("holyagent setup, Pi tool settings", () => {
         "pi-computer-use": { confirmDangerousActions: false },
         ...MODEL,
       })
-      expect(await read(projectPi("providers", "kimi-coding", "config.json"))).toEqual({
-        tools: { moonshot_fetch: { enabled: true } },
-      })
+      expect(await exists(projectPi("providers", "kimi-coding", "config.json"))).toBe(false)
       const lines = toolLines(report).join("\n")
       expect(lines).toContain("left out, set in your global file: pi-computer-use.confirmAppLaunch")
-      expect(lines).toContain("left out, set in your global file: tools.moonshot_search.enabled")
     }
     // The global files are as the user left them.
     expect(await read(globalKimi())).toEqual({ tools: { moonshot_search: { enabled: false } } })
@@ -791,18 +786,18 @@ describe("holyagent setup, Pi tool settings", () => {
         `! tool settings: ${projectPi("settings.json")} is a symlink; refusing to write through it in the ${scope} scope. Replace it with a real file and run again`,
       )
       expect(await Bun.file(globalSettings()).text()).toBe(before)
-      expect(await read(projectPi("providers", "kimi-coding", "config.json"))).toEqual(KIMI)
+      expect(await read(projectPi("subagents.json"))).toEqual(SUBAGENTS)
     }
   })
 
-  test("a symlink below the .pi folder is refused too", async () => {
+  test("an unused provider symlink is left untouched", async () => {
     const elsewhere = join(home, "elsewhere")
     await mkdir(elsewhere, { recursive: true })
     await mkdir(projectPi(), { recursive: true })
     await symlink(elsewhere, projectPi("providers"))
     const report = await runSetup(withPi(), { scope: "project" })
-    expect(report.ok).toBe(false)
-    expect(toolLines(report).join("\n")).toContain(`${projectPi("providers")} is a symlink`)
+    expect(report.ok).toBe(true)
+    expect(await read(projectPi("subagents.json"))).toEqual(SUBAGENTS)
     expect(await readdir(elsewhere)).toEqual([])
   })
 
@@ -856,7 +851,6 @@ describe("holyagent doctor, Pi tool settings", () => {
         globalSettings(),
         "codemode.mode, pi-computer-use.confirmAppLaunch, pi-computer-use.confirmDangerousActions, defaultProvider, defaultModel, defaultThinkingLevel",
       ),
-      lacking(globalKimi(), "tools.moonshot_search.enabled, tools.moonshot_fetch.enabled"),
       lacking(globalSubagents(), "disableDefaultAgents, fallbackSubagent"),
       lacking(
         billion(),
@@ -1039,6 +1033,41 @@ describe("holyagent doctor, Pi tool settings", () => {
 })
 
 describe("holyagent setup --undo, Pi tool settings", () => {
+  test("preserves user-owned Kimi permissions through setup, doctor and undo", async () => {
+    await installed()
+    const permissions = {
+      tools: { moonshot_search: { enabled: false }, moonshot_fetch: { enabled: true } },
+      region: "global",
+    }
+    await write(globalKimi(), permissions)
+    await runSetup(withPi())
+    const doctorReport = await runDoctor(withPi())
+    expect(toolLines(doctorReport).join("\n")).not.toContain(globalKimi())
+    await runSetup(withPi(), { undo: true })
+    expect(await read(globalKimi())).toEqual(permissions)
+  })
+
+  test("undo honors Kimi permissions recorded by an older setup", async () => {
+    await write(globalKimi(), {
+      tools: { moonshot_search: { enabled: true }, moonshot_fetch: { enabled: false } },
+      region: "global",
+    })
+    await Effect.runPromise(
+      addRecorded({ HOME: home }, globalKimi(), [
+        { path: ["tools", "moonshot_search", "enabled"], value: true },
+        { path: ["tools", "moonshot_fetch", "enabled"], value: true },
+      ]),
+    )
+    const report = await runSetup(withPi(), { undo: true })
+    expect(await read(globalKimi())).toEqual({
+      tools: { moonshot_fetch: { enabled: false } },
+      region: "global",
+    })
+    expect(toolLines(report).join("\n")).toContain(
+      "kept tools.moonshot_fetch.enabled false (setup wrote true)",
+    )
+  })
+
   test("removes the keys setup added while they still equal what it wrote, and keeps everything else", async () => {
     await write(globalSettings(), { ...FULL(), theme: "dark", codemode: { inlineBudget: 5 } })
     await write(globalSubagents(), { maxConcurrent: 3 })
@@ -1054,7 +1083,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     })
     expect(await read(globalSubagents())).toEqual({ maxConcurrent: 3 })
     // A file setup created and nothing else lives in is left as an empty object.
-    expect(await read(globalKimi())).toEqual({})
+    expect(await exists(globalKimi())).toBe(false)
     expect(await read(billion())).toEqual({})
     expect(toolLines(report)).toContain(
       `- tool settings ${globalSubagents()}: removed disableDefaultAgents true, fallbackSubagent "none"`,
@@ -1123,9 +1152,6 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     expect(toolLines(report).join("\n")).toContain(
       'kept fallbackSubagent "Plan" (setup wrote "none")',
     )
-    expect(toolLines(report).join("\n")).toContain(
-      "kept tools.moonshot_search.enabled false (setup wrote true)",
-    )
   })
 
   test("touches nothing setup did not record, and forgets the record afterwards", async () => {
@@ -1163,7 +1189,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     const claudeOnly = fakeShell({ commands: ["bun"] })
     const report = await runSetup(claudeOnly, { undo: true })
     expect(await read(globalSubagents())).toEqual({})
-    expect(toolLines(report).length).toBe(5)
+    expect(toolLines(report).length).toBe(4)
     expect(claudeOnly.calls).toEqual([])
   })
 
@@ -1205,6 +1231,6 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     expect(report.ok).toBe(false)
     expect(await Bun.file(globalSubagents()).text()).toBe("{ broken")
     expect(toolLines(report).some((line) => line.startsWith("! tool settings: "))).toBe(true)
-    expect(await read(globalKimi())).toEqual({})
+    expect(await exists(globalKimi())).toBe(false)
   })
 })

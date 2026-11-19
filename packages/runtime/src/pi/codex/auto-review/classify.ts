@@ -25,7 +25,11 @@ import { MAX_ACTION_STRING_TOKENS, truncateText } from "./transcript.ts"
  *   asks for a tool that does not say it is read-only).
  */
 export type TriggerKind =
-  "command" | "write-outside-root" | "protected-path" | "network" | "tool-approval"
+  | "command"
+  | "write-outside-root"
+  | "protected-path"
+  | "network"
+  | "tool-approval"
 
 /** A tool call that goes to review, with the reason shown to the reviewer. */
 export interface Trigger {

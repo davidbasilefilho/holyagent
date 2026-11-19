@@ -71,6 +71,8 @@ export interface Host {
    * neither is when absent, so a test or a pipe gets the line-based setup.
    */
   readonly terminal?: Terminal
+  /** The public CLI configures T3 Code instead of the retained Claude integration. */
+  readonly t3Workflow?: boolean
   /** Loads the setup interface for `setup`; the real loader when absent. A seam for tests. */
   readonly setupTui?: SetupTuiLoader
 }
@@ -106,6 +108,8 @@ export interface Call {
   readonly vcs: Layer.Layer<Git | GitHub>
   /** Whether stdin and stdout are terminals; see {@link Host.terminal}. */
   readonly terminal: Terminal | undefined
+  /** Whether this is the public T3 Code workflow. */
+  readonly t3Workflow: boolean
   /** Loads the setup interface; see {@link Host.setupTui}. */
   readonly setupTui: SetupTuiLoader | undefined
   /**
@@ -165,6 +169,8 @@ export interface Command {
   readonly positionals: number
   /** True when the last positional may be left out. */
   readonly optional?: true
+  /** This adapter delegates state handling to core; preliminary resolution is read-only. */
+  readonly core?: true
   /** Produces the value printed as TOON. */
   readonly run: (call: Call) => Effect.Effect<unknown, unknown>
 }

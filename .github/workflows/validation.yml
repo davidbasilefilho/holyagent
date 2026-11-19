@@ -46,7 +46,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up tools
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -57,7 +57,7 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
         run: bun scripts/pr-checks.ts branch-model "$BASE_REF" "$HEAD_REF"
 
-  # The version of a pull request into main must be strictly greater than the one on main.
+  # A same-version publication repair requires confirmation from the public npm registry.
   version:
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
@@ -88,13 +88,15 @@ jobs:
           persist-credentials: false
 
       - name: Set up tools
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Check the version
-        run: bun scripts/pr-checks.ts version main .
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: bun scripts/pr-checks.ts version main . "$HEAD_REF"
 
   check:
     runs-on: ubuntu-latest
@@ -105,16 +107,14 @@ jobs:
         with:
           persist-credentials: false
 
-      # Installs the tools in mise.toml. mise runs its postinstall hook after `mise install`, which
-      # upgrades the stable Bun to the canary build that `bun check`, `bun lint` and `bun fmt` need.
       - name: Set up tools
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-
-      - name: Check the toolchain
-        run: mise run toolchain
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Validate the Git hooks configuration
+        run: mise x hk -- hk validate
 
       - name: Verify
         run: mise run verify
@@ -135,14 +135,22 @@ jobs:
             exit 1
           fi
 
-      - name: Validate the plugin and the marketplace
-        env:
-          DISABLE_AUTOUPDATER: "1"
+      - name: Validate the plugin and marketplace offline
         run: |
-          # Claude Code is a locked devDependency, so a new release cannot turn the job red on its
-          # own and the binary is integrity-checked; validation needs no credentials.
-          bun run claude plugin validate --strict packages/integrations/claude/dist
-          bun run claude plugin validate --strict .
+          # The pinned CLI receives no runner credentials and cannot reach a provider or the
+          # Internet. Only unshare and setpriv run elevated; the vendor binary runs as the runner.
+          scratch="$(mktemp -d)"
+          trap 'rmdir "$scratch" 2>/dev/null || true' EXIT
+          bun_bin="$(command -v bun)"
+          node_bin="$(command -v node)"
+          host_netns="$(readlink /proc/self/ns/net)"
+          sudo -n /usr/bin/unshare --net -- /usr/bin/setpriv \
+            --reuid "$(id -u)" --regid "$(id -g)" --clear-groups --no-new-privs -- \
+            /usr/bin/env -i HOME="$scratch" TMPDIR="$scratch" \
+              PATH="$(dirname "$bun_bin"):$(dirname "$node_bin"):/usr/bin:/bin" \
+              CI=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+              HOLYAGENT_HOST_NETNS="$host_netns" \
+              "$bun_bin" --no-env-file scripts/validate-claude-plugin.ts
 
       - name: Lint the install script
         run: |
@@ -154,7 +162,8 @@ jobs:
   # show up on every pull request.
   windows:
     runs-on: windows-latest
-    timeout-minutes: 15
+    # Real Git worktree fixtures are slower here; leave time for the full suite and dependency setup.
+    timeout-minutes: 30
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -162,14 +171,20 @@ jobs:
           persist-credentials: false
 
       - name: Set up tools
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-
-      - name: Check the toolchain
-        run: mise run toolchain
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
 
       # Use the native mise supplied above; exercise trusted lifecycle scripts on Windows too.
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # Run the native-only permissions and path regressions first for actionable feedback.
+      - name: Verify Windows journal permissions and path handling
+        run: >
+          bun test packages/core/tests/migration-journal.test.ts
+          packages/core/src/state/migration-files.test.ts
+          packages/core/src/state/migration-worktrees.test.ts
+          packages/integrations/pi/tests/extension.test.ts
+          --test-name-pattern "Windows rejects a journal|migration identity keeps|detached cleanup preserves|terminal sweep authority|missing custom terminal guard|explicit malformed or denied terminal authority|the root routes to the chosen family"
 
       - name: Test
         run: mise run test
@@ -184,7 +199,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up tools
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

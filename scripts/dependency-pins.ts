@@ -62,15 +62,19 @@ export const caretRange = (release: string): string => {
 }
 
 /**
- * The range a dependency moves to: the caret range of `release`, unless the current range is a
- * caret range that already starts above it, which is kept. A registry whose `latest` tag points at
- * an older line (a backport published last) must not move a dependency down.
+ * Keep the newest line between the registry's stable release and the current range. Normalize the
+ * floor within that line; a backport published last must not move a dependency down a line.
  */
 export const nextRange = (current: string, release: string): string => {
   const next = caretRange(release)
-  const from = parseRelease(current.startsWith("^") ? current.slice(1) : "")
+  const version = current.startsWith("^") ? current.slice(1) : current
+  if (parseRelease(version) === undefined) return next
+  const previousLine = caretRange(version)
+  const from = parseRelease(previousLine.slice(1))
   const to = parseRelease(next.slice(1))
-  return from !== undefined && to !== undefined && compareReleases(from, to) > 0 ? current : next
+  return from !== undefined && to !== undefined && compareReleases(from, to) > 0
+    ? previousLine
+    : next
 }
 
 /** The stable release a git tag names, given the tag prefix (`v`, or `bun-v`), else `undefined`. */
@@ -283,24 +287,40 @@ export const renderPiPackages = (table: Readonly<Record<string, string>>): strin
 
 /**
  * The registry packages whose `package.json` entry is an exact version, not a caret range. Each is
- * bundled into generated output and decides how a shipped feature behaves (just-bash is the shell
- * the Pi bash tool runs on: its command set, limits and output change from release to release), so
- * a move is one deliberate step of `mise run deps:update`, with the lockfile and the generated
- * bundle moving with it, and never a range that a plain install could widen.
+ * bundled into generated output and decides how a shipped feature behaves, so a move is one
+ * deliberate step of `mise run deps:update`, with the lockfile and the generated bundle moving with
+ * it, and never a range that a plain install could widen. Empty today: every dependency range is a
+ * caret range at its line boundary, on the newest release line of its major.
  */
-export const EXACT_PACKAGES: ReadonlyArray<string> = ["just-bash"]
+export const EXACT_PACKAGES: ReadonlyArray<string> = []
 
 /** Whether a dependency is an {@link EXACT_PACKAGES} entry with a stable exact version. */
 export const isExactPin = (name: string, range: unknown): boolean =>
   EXACT_PACKAGES.includes(name) && typeof range === "string" && parseRelease(range) !== undefined
 
 /**
- * The version specifier a package dependency moves to: the exact release for an
- * {@link EXACT_PACKAGES} entry (never down, like a Pi package pin), else the caret range of
- * {@link nextRange}.
+ * The newest release line (by major version) a registry package may move to. solid-js is held at
+ * major 1: the newest @opentui/solid (0.9.2) declares a peer dependency on solid-js ^1.9.12, and
+ * solid-js 2.0 fails at import time (it removed onMount), so 1.x is the newest usable line. The cap
+ * applies both when the registry release is selected and when the range is computed, so a manifest
+ * already on a capped-out line moves back down to the capped line.
  */
-export const nextPackageRange = (name: string, current: string, release: string): string =>
-  EXACT_PACKAGES.includes(name) ? nextPiVersion(current, release) : nextRange(current, release)
+export const MAJOR_CAP: Readonly<Record<string, number>> = { "solid-js": 1 }
+
+/**
+ * The version specifier a package dependency moves to: the exact release for an
+ * {@link EXACT_PACKAGES} entry (never down, like a Pi package pin); otherwise the caret range of
+ * {@link nextRange}, except that a package with a {@link MAJOR_CAP} whose current range is on a
+ * higher line moves down to the caret range of the capped release.
+ */
+export const nextPackageRange = (name: string, current: string, release: string): string => {
+  const cap = MAJOR_CAP[name]
+  const from = parseRelease(current.startsWith("^") ? current.slice(1) : "")
+  if (cap !== undefined && from !== undefined && from.major > cap) return caretRange(release)
+  return EXACT_PACKAGES.includes(name)
+    ? nextPiVersion(current, release)
+    : nextRange(current, release)
+}
 
 /** The dependency fields of a `package.json` whose values are version ranges by package name. */
 export const DEPENDENCY_FIELDS: ReadonlyArray<string> = [
@@ -335,33 +355,69 @@ export interface PackageDependency {
   readonly field: string
   readonly name: string
   readonly range: string
+  /** Table keys below the top-level field, for nested overrides and catalogs. */
+  readonly path?: ReadonlyArray<string>
 }
 
+const registryName = /^(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*$/i
+const registryRange = /^(?:\^?\d+\.\d+\.\d+|\*|latest)$/
+
+const record = (value: unknown): Readonly<Record<string, unknown>> =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, unknown>>)
+    : {}
+
 /**
- * The registry dependencies of a parsed `package.json`, field by field. Workspace references, other
- * protocols (`npm:`, `file:`, git), nested override tables and the Pi host peers (see
- * {@link isPiHostPeer}) are not registry ranges the updater can move, so they are left out.
+ * The registry dependencies of a parsed manifest, including catalogs and nested overrides.
+ * Protocols, aliases, constrained or multi-line peer contracts, prerelease-only ranges and npm's
+ * direct dependency references (e.g. "$react") are not rewritten by the stable updater.
  */
 export const packageDependencies = (
   manifest: Readonly<Record<string, unknown>>,
-): ReadonlyArray<PackageDependency> =>
-  DEPENDENCY_FIELDS.flatMap((field) => {
-    const table = manifest[field]
-    if (table === null || typeof table !== "object" || Array.isArray(table)) return []
-    return Object.entries(table).flatMap(([name, range]) =>
-      typeof range === "string" && !range.includes(":") && !isPiHostPeer(field, name, range)
-        ? [{ field, name, range }]
-        : [],
-    )
-  })
+): ReadonlyArray<PackageDependency> => {
+  const walk = (
+    field: string,
+    table: unknown,
+    path: ReadonlyArray<string> = [],
+  ): PackageDependency[] =>
+    Object.entries(record(table)).flatMap(([name, range]) => {
+      if (typeof range !== "string") return walk(field, range, [...path, name])
+      if (
+        !registryName.test(name) ||
+        !registryRange.test(range) ||
+        isPiHostPeer(field, name, range)
+      )
+        return []
+      const dependency = { field, name, range }
+      return path.length === 0 ? [dependency] : [{ ...dependency, path }]
+    })
+  return [
+    ...[...DEPENDENCY_FIELDS, "catalog", "catalogs"].flatMap((field) =>
+      walk(field, manifest[field]),
+    ),
+    ...["catalog", "catalogs"].flatMap((field) =>
+      walk("workspaces", record(manifest["workspaces"])[field], [field]),
+    ),
+  ]
+}
 
-/** Sets dependency ranges in a parsed `package.json` by field and name, keeping the key order. */
+/** Sets dependency ranges in a parsed manifest without mutating siblings or changing key order. */
 export const withPackageRanges = (
   manifest: Readonly<Record<string, unknown>>,
   ranges: ReadonlyArray<PackageDependency>,
 ): Record<string, unknown> => {
-  const result: Record<string, unknown> = { ...manifest }
-  for (const { field, name, range } of ranges)
-    result[field] = { ...(result[field] as Record<string, unknown>), [name]: range }
-  return result
+  const write = (
+    table: Readonly<Record<string, unknown>>,
+    keys: ReadonlyArray<string>,
+    range: string,
+  ): Record<string, unknown> => {
+    const [key, ...rest] = keys
+    if (key === undefined) return { ...table }
+    const value = rest.length === 0 ? range : write(record(table[key]), rest, range)
+    return { ...table, [key]: value }
+  }
+  return ranges.reduce<Record<string, unknown>>(
+    (result, { field, name, range, path = [] }) => write(result, [field, ...path, name], range),
+    { ...manifest },
+  )
 }

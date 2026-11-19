@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "printWidth": 100,
+  "bracketSameLine": true,
+  "sortImports": true,
+  "sortPackageJson": true,
+  "jsdoc": true,
+  "ignorePatterns": [
+    "/.claude-plugin/marketplace.json",
+    "/packages/integrations/claude/dist/**",
+    "/packages/integrations/pi/dist/**",
+    "/packages/integrations/claude/src/wrapper.sh",
+    "/.holyagent/**",
+    "/.agents/skills/**",
+    "/bun.lock"
+  ]
+}

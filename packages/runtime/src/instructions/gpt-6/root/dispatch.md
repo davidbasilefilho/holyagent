@@ -16,7 +16,7 @@ Reuse is the CLI's decision: `assignment dispatch` prints either `continue` with
 
 ## Waiting
 
-Start all ready independent work together and end the turn. Completion notices are the only wake-ups: no polling (notification reads, scheduled check-ins, sleep or wait loops) and no steering of running specialists; a wake that changes nothing gets one short line. <!-- O19: no blocking waits. -->
+Start ready independent work together. After ready root work, respond to completion, submitted input or a supported bounded wait timeout. Return to workflow notices when no completion event exists; no polling, steering, scheduled check-ins or wait loops. A wake changing nothing gets one short line.
 
 Stop a running agent or workflow with the host's stop control only when a new requirement or new information conflicts with that running work. When finishing and then repairing costs less than stopping and relaunching, let it finish. Close a stopped Assignment with `--outcome stopped`.
 

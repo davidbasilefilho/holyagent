@@ -14,7 +14,7 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 - Let the subject supply the look: its trade, materials and idiom decide the visual choices, and the brief's real content stays in the work from start to finish. A ferry timetable and a toddler's game should look nothing alike.
 - Choose palette, type and layout on purpose and for this brief alone, accept visual risk when it earns its place, and treat each project as a chance to try something new instead of repeating what you do best.
 - Sketch a plan before building: a small named palette (four to six colors, each with a value and a role), the type roles, a layout idea in a sentence, compared through rough ASCII wireframes, with how the content aligns (left, centered or justified), and two or three principles. Audit it with "would I make this for any similar product?" and the competitor test: drop an idea that still works with a competitor's name on it. Rewrite what fails, note what changed and why, and start coding only from the revised plan.
-- Say whether this is a refinement, which preserves the existing design, or a redesign, which replaces it.
+- For an existing design, inspect the original render and name the component and state behind each finding, including what already works. Leave it alone when the findings show no material problem; polish locally when the issues are local; redesign when the issues run through the design and a new direction is in scope, or when the brief explicitly asks for one. Keep working flows, real content and deliberate visual choices unless changing them is in scope. If you cannot render the original, say so and separate code observations from visual evidence.
 
 ### Platform fidelity over invention
 
@@ -26,9 +26,9 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 - Read `DESIGN.md` at the project root before UI work and create or update it after: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't, and a brief log of the options already tried, so later passes explore new ground. Note a changed decision instead of silently overwriting it. (behavior check)
 
-### Spend boldness in one place
+### Focus expressive detail
 
-- Make one detail per screen the memorable one and keep the rest calm and restrained. Strip ornament that does nothing for the brief, and before finishing remove one accessory more, filling the gap with scale, real content or a real image so the screen is not left thin. (preference)
+- When it suits the product, concentrate visual richness in one or two focal points or in a recurring detail that belongs to the subject. Let nearby controls support that hierarchy. Keep expressive elements that already serve the brief; remove decoration when it competes with the user’s task. A quiet screen can stay quiet. (preference)
 - A labeled gray placeholder beats drawn art or emoji used as icons. (preference)
 
 ### Structure and content
@@ -49,3 +49,13 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 - Text contrast is at least 4.5:1 and non-text control contrast at least 3:1. Color is never the only signal, and the colors work together as a palette.
 - Every state exists and is captured where reachable: hover or press, focus, disabled, loading, empty, error and long content.
 - The system's reduced-motion, larger-text and high-contrast settings, where the platform has them, change the render; under reduced motion, movement becomes a fade or nothing.
+
+### Iteration quality
+
+Order changes by dependency: settle copy that affects type and layout before fitting either, then tune motion after layout and states are stable. Compare the revised render and relevant states with the original when available to check the repair held without regressions.
+
+Assess the design system, composition, alignment, contrast, distribution, placement and sizing, and responsiveness. Exercise fluid component and route animation and transitions, including reduced motion. For each interactive element check hover where applicable, press or tap, keyboard focus and disabled appearance where relevant. Follow platform conventions while preserving creative latitude.
+
+### Source credit
+
+Adapted from [unslop](https://github.com/heydamir/unslop/blob/620163eedb3529d9cd23a3994ed8d287d06f760d/skills/unslop/SKILL.md) by Damir Sokolovsky, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). HolyAgent rephrased and adapted its audit, restraint and ordering ideas for web, mobile, desktop and terminal interfaces; no source scripts or assets are included.
