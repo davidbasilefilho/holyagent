@@ -4,7 +4,6 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, normalize, win32 } from "node:path"
 
-import { $ } from "bun"
 import { Effect } from "effect"
 
 import { LOCKFILE, VERSION_COPIES } from "../../../../scripts/bump-version.ts"
@@ -1570,52 +1569,6 @@ describe("agents", () => {
       "packages/integrations/claude/dist/agents",
     )
   })
-})
-
-describe("claude plugin validate", () => {
-  // The pinned Claude Code of the `@anthropic-ai/claude-code` devDependency (the version in
-  // bun.lock, which the CI validation step runs too), started through Bun so a `claude` on PATH of
-  // another version never decides. A missing install fails the test: nothing is skipped.
-  // The external claude CLI starts a fresh process per check; on a loaded machine (the parallel
-  // verify gates, other workers) that can outlast the 5 s default, so the checks get a longer one.
-  const VALIDATE_TIMEOUT = 30_000
-  const check = async (directory: string) => {
-    const result = await $`bun run claude plugin validate --strict ${directory}`
-      .cwd(ROOT)
-      .quiet()
-      .nothrow()
-    return { code: result.exitCode, text: `${result.stdout.toString()}${result.stderr.toString()}` }
-  }
-  // The "plugin directory" block (README, license, icon) is about listing in Anthropic's catalog and
-  // does not change the result, so it is cut before checking for errors and warnings.
-  const clean = (text: string) => {
-    const own = text.replace(
-      /Plugin directory checks for[\s\S]*?The directory also runs[^\n]*\n/,
-      "",
-    )
-    expect(own).toContain("Validation passed")
-    expect(own).not.toMatch(/×|Found \d+ (?:error|warning)/)
-  }
-
-  test(
-    "the built plugin passes strict validation with the pinned Claude Code",
-    async () => {
-      const { code, text } = await check(PLUGIN)
-      expect(code).toBe(0)
-      clean(text)
-    },
-    VALIDATE_TIMEOUT,
-  )
-
-  test(
-    "the repository root marketplace passes strict validation with the pinned Claude Code",
-    async () => {
-      const { code, text } = await check(ROOT)
-      expect(code).toBe(0)
-      clean(text)
-    },
-    VALIDATE_TIMEOUT,
-  )
 })
 
 test("Claude role routers use private guidance and preserve normal host skill discovery", () => {

@@ -137,14 +137,20 @@ jobs:
             exit 1
           fi
 
-      - name: Validate the plugin and the marketplace
-        env:
-          DISABLE_AUTOUPDATER: "1"
+      - name: Validate the plugin and marketplace offline
         run: |
-          # Claude Code is a locked devDependency, so a new release cannot turn the job red on its
-          # own and the binary is integrity-checked; validation needs no credentials.
-          bun run claude plugin validate --strict packages/integrations/claude/dist
-          bun run claude plugin validate --strict .
+          # The pinned CLI receives no runner credentials and cannot reach a provider or the
+          # Internet. Only unshare and setpriv run elevated; the vendor binary runs as the runner.
+          scratch="$(mktemp -d)"
+          trap 'rmdir "$scratch" 2>/dev/null || true' EXIT
+          bun_bin="$(command -v bun)"
+          node_bin="$(command -v node)"
+          sudo -n /usr/bin/unshare --net -- /usr/bin/setpriv \
+            --reuid "$(id -u)" --regid "$(id -g)" --clear-groups --no-new-privs -- \
+            /usr/bin/env -i HOME="$scratch" TMPDIR="$scratch" \
+              PATH="$(dirname "$bun_bin"):$(dirname "$node_bin"):/usr/bin:/bin" \
+              CI=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+              "$bun_bin" --no-env-file scripts/validate-claude-plugin.ts
 
       - name: Lint the install script
         run: |
