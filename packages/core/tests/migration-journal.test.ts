@@ -20,6 +20,7 @@ import { Effect } from "effect"
 import {
   advanceMigrationJournal,
   beginMigrationJournal,
+  ensureMigrationJournalDirectory,
   finishMigrationJournal,
   type MigrationJournal,
   type MigrationJournalLocation,
@@ -37,7 +38,8 @@ const fixture = async () => {
   const sourceRoot = join(root, "source")
   const targetRoot = join(root, "target")
   const parent = join(root, "private")
-  await Promise.all([sourceRoot, targetRoot, parent].map((path) => mkdir(path, { mode: 0o700 })))
+  await Promise.all([sourceRoot, targetRoot].map((path) => mkdir(path, { mode: 0o700 })))
+  await ensureMigrationJournalDirectory(parent)
   const location: MigrationJournalLocation = {
     path: join(parent, "journal.json"),
     sourceRoot,
@@ -276,7 +278,18 @@ bunTest.skipIf(process.platform !== "win32")(
       await failed(beginMigrationJournal(f.location, f.record, Effect.void))
       expect(await Bun.file(f.location.path).exists()).toBe(false)
       grantEveryoneRead(parent)
-      await failed(readMigrationJournal(f.location))
+      // Ignoring an absent journal does not authorize creating one in this directory.
+      expect(await Effect.runPromise(readMigrationJournal(f.location))).toBeUndefined()
+      await ensureMigrationJournalDirectory(parent)
+      await failed(beginMigrationJournal(f.location, f.record, Effect.void))
+      expect(await Bun.file(f.location.path).exists()).toBe(false)
+
+      // A newly provisioned child starts private even under a parent that grants read access.
+      const child = join(parent, "new-private")
+      await ensureMigrationJournalDirectory(child)
+      const childLocation = { ...f.location, path: join(child, "journal.json") }
+      await Effect.runPromise(beginMigrationJournal(childLocation, f.record, Effect.void))
+      expect(await Effect.runPromise(readMigrationJournal(childLocation))).toEqual(f.record)
     } finally {
       await f.close()
     }
