@@ -38,7 +38,7 @@ Rules for working in this repository, each with the reason it exists. Claude Cod
 
 This repository's release convention includes CI checks; HolyAgent's instructions do not carry it.
 
-- Do not stack PRs in this repository. Start each work branch from `dev` and open the PR directly against `dev`, never another work branch. Keep dependent pieces of one delivery as separate commits in that PR; normal release PRs promote `dev` to `main` with a version strictly newer than `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
+- Start each ordinary work branch from `dev` and open its PR directly against `dev`. Stack PRs only when the project or user explicitly requires it; then base each dependent PR on its named predecessor. Otherwise keep dependent pieces of one delivery as separate commits in one PR; normal release PRs promote `dev` to `main` with a version strictly newer than `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
 - A deployment failure alone does not require a version bump. For a focused repair of an unpublished release, create `release/<version>/fix/publication-repair` from fresh `main` and squash its PR directly into `main`. The `version` check requires exact main/head version equality and confirmation that the exact npm version is absent. Never downgrade or overwrite an immutable published version. Retry an already published artifact only after verifying identical identity and provenance; product or source changes to a published artifact require a new version.
 - Protect `main` and `dev` (PRs only, no force push, no deletion) and `holyagent-*` tags (no update, no deletion). Required checks are the job ids `check`, `windows`, `installers` and `branch-model`, plus `version` on `main`. Renaming a job drops its check from protection until the ruleset names the new one.
 - Branch pushes run validation, then publish stable on protected `main` or a development release on protected `dev`. Development versions use the commit UTC time and short SHA. Tags never trigger publication.
@@ -51,7 +51,7 @@ This repository's release convention includes CI checks; HolyAgent's instruction
 ## Commits and pull requests
 
 - Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending, so every PR is available for review.
-- Review the full work PR against `dev`. Independent changes may use separate PRs to `dev`; do not make one PR depend on another PR's branch.
+- Review the full work PR against its intended base (normally `dev`). Independent changes may use separate PRs to `dev`; another open PR is not a reason to stack.
 - `holyagent vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `hk.pkl`) keeps agent attribution out of commits made with plain Git too.
 - Pass `holyagent vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
 - `holyagent vcs` refuses process words such as "Claude Code" in commit and PR text. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.
