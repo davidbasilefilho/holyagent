@@ -104,7 +104,7 @@ test("handoff dispatches a complete recorded summary, filters it, and leaves sta
   expect(await Bun.file(corrupt).text()).toBe('{"unexpected":true}')
 })
 
-test("branch-mode handoff refuses pending state and an unavailable state branch without writing", async () => {
+const branchModeHandoff = async () => {
   root = await mkdtemp(join(tmpdir(), "holyagent-handoff-git-"))
   expect(Bun.spawnSync(["git", "-C", root, "rev-parse", "--show-toplevel"]).exitCode).not.toBe(0)
   const git = (...args: string[]) => {
@@ -184,7 +184,14 @@ test("branch-mode handoff refuses pending state and an unavailable state branch 
   const complete = await cli("pi")
   expect(complete.code).toBe(0)
   expect(complete.stdout).toContain(intent().id)
-})
+}
+
+// Real Git worktrees and repeated state reads can exceed Bun’s default on Windows.
+test(
+  "branch-mode handoff refuses pending state and an unavailable state branch without writing",
+  branchModeHandoff,
+  process.platform === "win32" ? 20_000 : 5_000,
+)
 
 test("a marked ignored divergent record is refused while a clean tracked historical copy remains valid", async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), "holyagent-handoff-ignored-")))

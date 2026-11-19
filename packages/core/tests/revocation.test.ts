@@ -193,7 +193,10 @@ test.skipIf(process.platform === "win32")(
   },
 )
 
-test("migration retains the separate staged and unstaged source versions", async () => {
+const migrationTest = (name: string, run: () => Promise<void>) =>
+  test(name, run, process.platform === "win32" ? 30_000 : 5_000)
+
+migrationTest("migration retains the separate staged and unstaged source versions", async () => {
   const f = await fixture()
   try {
     const state = await Effect.runPromise(resolveState(f.cwd, { HOME: f.cwd }, "create"))
@@ -215,29 +218,32 @@ test("migration retains the separate staged and unstaged source versions", async
   }
 })
 
-test("migration refuses a conflicting owned target before consuming its index", async () => {
-  const f = await fixture()
-  try {
-    const state = await Effect.runPromise(resolveState(f.cwd, { HOME: f.cwd }, "create"))
-    const tree = join(state.directory, "..")
-    const target = join(state.directory, "fixture")
-    await writeFile(target, "staged target")
-    f.git("-C", tree, "add", "-f", ".holyagent/fixture")
-    await writeFile(target, "unstaged target")
-    const index = f.git("-C", tree, "show", ":.holyagent/fixture")
-    await rm(join(f.cwd, ".git", "holyagent", "migrated"), { recursive: true, force: true })
-    const source = join(f.cwd, ".holyagent", "fixture")
-    await mkdir(join(source, ".."), { recursive: true })
-    await writeFile(source, "source")
-    const result = await Effect.runPromiseExit(resolveState(f.cwd, { HOME: f.cwd }, "create"))
-    expect(result._tag).toBe("Failure")
-    expect(await readFile(source, "utf8")).toBe("source")
-    expect(await readFile(target, "utf8")).toBe("unstaged target")
-    expect(f.git("-C", tree, "show", ":.holyagent/fixture")).toBe(index)
-  } finally {
-    await f.close()
-  }
-})
+migrationTest(
+  "migration refuses a conflicting owned target before consuming its index",
+  async () => {
+    const f = await fixture()
+    try {
+      const state = await Effect.runPromise(resolveState(f.cwd, { HOME: f.cwd }, "create"))
+      const tree = join(state.directory, "..")
+      const target = join(state.directory, "fixture")
+      await writeFile(target, "staged target")
+      f.git("-C", tree, "add", "-f", ".holyagent/fixture")
+      await writeFile(target, "unstaged target")
+      const index = f.git("-C", tree, "show", ":.holyagent/fixture")
+      await rm(join(f.cwd, ".git", "holyagent", "migrated"), { recursive: true, force: true })
+      const source = join(f.cwd, ".holyagent", "fixture")
+      await mkdir(join(source, ".."), { recursive: true })
+      await writeFile(source, "source")
+      const result = await Effect.runPromiseExit(resolveState(f.cwd, { HOME: f.cwd }, "create"))
+      expect(result._tag).toBe("Failure")
+      expect(await readFile(source, "utf8")).toBe("source")
+      expect(await readFile(target, "utf8")).toBe("unstaged target")
+      expect(f.git("-C", tree, "show", ":.holyagent/fixture")).toBe(index)
+    } finally {
+      await f.close()
+    }
+  },
+)
 
 test.skipIf(process.platform === "win32")(
   "revocation during migration preparation preserves source and shared state",
@@ -373,34 +379,37 @@ test.skipIf(process.platform === "win32")(
   },
 )
 
-test("a read spanning completed migration is rejected instead of returning a mixed snapshot", async () => {
-  const f = await fixture()
-  try {
-    const state = await Effect.runPromise(resolveState(f.cwd, { HOME: f.cwd }, "create"))
-    await rm(join(f.cwd, ".git", "holyagent", "migrated"), { recursive: true, force: true })
-    const source = join(f.cwd, ".holyagent", "intents", "fixture", "intent.json")
-    await mkdir(join(source, ".."), { recursive: true })
-    await writeFile(source, "source")
-    const readOnly = {
-      ...context(f.cwd, { HOME: f.cwd }, () => false),
-      authorize: (capability: string) => capability === "intent.list",
+migrationTest(
+  "a read spanning completed migration is rejected instead of returning a mixed snapshot",
+  async () => {
+    const f = await fixture()
+    try {
+      const state = await Effect.runPromise(resolveState(f.cwd, { HOME: f.cwd }, "create"))
+      await rm(join(f.cwd, ".git", "holyagent", "migrated"), { recursive: true, force: true })
+      const source = join(f.cwd, ".holyagent", "intents", "fixture", "intent.json")
+      await mkdir(join(source, ".."), { recursive: true })
+      await writeFile(source, "source")
+      const readOnly = {
+        ...context(f.cwd, { HOME: f.cwd }, () => false),
+        authorize: (capability: string) => capability === "intent.list",
+      }
+      const result = await Effect.runPromiseExit(
+        withState(readOnly, "intent.list", "peek", () =>
+          resolveState(f.cwd, { HOME: f.cwd }, "create").pipe(Effect.as("snapshot")),
+        ),
+      )
+      expect(result._tag).toBe("Failure")
+      expect(
+        await readFile(join(state.directory, "intents", "fixture", "intent.json"), "utf8"),
+      ).toBe("source")
+      expect(
+        await Bun.file(join(f.cwd, ".git", "holyagent", "migration", "journal.json")).exists(),
+      ).toBe(false)
+    } finally {
+      await f.close()
     }
-    const result = await Effect.runPromiseExit(
-      withState(readOnly, "intent.list", "peek", () =>
-        resolveState(f.cwd, { HOME: f.cwd }, "create").pipe(Effect.as("snapshot")),
-      ),
-    )
-    expect(result._tag).toBe("Failure")
-    expect(await readFile(join(state.directory, "intents", "fixture", "intent.json"), "utf8")).toBe(
-      "source",
-    )
-    expect(
-      await Bun.file(join(f.cwd, ".git", "holyagent", "migration", "journal.json")).exists(),
-    ).toBe(false)
-  } finally {
-    await f.close()
-  }
-})
+  },
+)
 
 test.skipIf(process.platform === "win32")(
   "a read spanning an active migration fails without recovering it",
@@ -445,7 +454,7 @@ test.skipIf(process.platform === "win32")(
   },
 )
 
-test("migration refuses a matching untracked target without staging it", async () => {
+migrationTest("migration refuses a matching untracked target without staging it", async () => {
   const f = await fixture()
   try {
     const state = await Effect.runPromise(resolveState(f.cwd, { HOME: f.cwd }, "create"))
