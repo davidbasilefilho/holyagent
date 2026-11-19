@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -15,7 +15,8 @@ import {
 } from "../src/state/migration-runner.ts"
 
 const fixture = async () => {
-  const root = await mkdtemp(join(tmpdir(), "holyagent-runner-"))
+  // The host temp path may itself be an alias, such as /var on macOS.
+  const root = await mkdtemp(join(await realpath(tmpdir()), "holyagent-runner-"))
   if (spawnSync("git", ["-C", root, "rev-parse", "--show-toplevel"]).status === 0)
     throw new Error("fixture is inside a Git repository")
   const sourceRoot = join(root, "source")

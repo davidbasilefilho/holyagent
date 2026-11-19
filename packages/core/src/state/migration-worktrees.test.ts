@@ -6,6 +6,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  realpath,
   rename,
   rm,
   symlink,
@@ -19,7 +20,8 @@ import { Effect, Fiber } from "effect"
 import { resolveState } from "./tree.ts"
 
 const fixture = async (withOther = true) => {
-  const root = await mkdtemp(join(tmpdir(), "holyagent-migration-worktrees-"))
+  // The host temp path may itself be an alias, such as /var on macOS.
+  const root = await mkdtemp(join(await realpath(tmpdir()), "holyagent-migration-worktrees-"))
   if (spawnSync("git", ["-C", root, "rev-parse", "--show-toplevel"]).status === 0)
     throw new Error("fixture is inside a Git repository")
   const git = (...args: string[]) => {
@@ -173,7 +175,7 @@ test.skipIf(process.platform === "win32")(
       const fiber = Effect.runFork(resolveState(f.other, f.gateEnv(CAS, true), "create"))
       await f.wait()
       await interrupt(fiber)
-      const foreign = await mkdtemp(join(tmpdir(), "holyagent-foreign-root-"))
+      const foreign = await mkdtemp(join(await realpath(tmpdir()), "holyagent-foreign-root-"))
       try {
         const journal = join(f.root, ".git", "holyagent", "migration", "journal.json")
         const record = JSON.parse(await readFile(journal, "utf8")) as { sourceRoot: string }
@@ -273,7 +275,7 @@ test.skipIf(process.platform === "win32")(
   "a registered source replaced by a foreign link is not used for recovery",
   async () => {
     const f = await fixture(false)
-    const foreign = await mkdtemp(join(tmpdir(), "holyagent-foreign-root-"))
+    const foreign = await mkdtemp(join(await realpath(tmpdir()), "holyagent-foreign-root-"))
     try {
       await Effect.runPromise(resolveState(f.root, f.env, "create"))
       f.addOther()

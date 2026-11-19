@@ -1,7 +1,7 @@
 import { expect, spyOn, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdtemp, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, open, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -11,7 +11,8 @@ import { withStateLock } from "./lock.ts"
 import { cleanupMigrationSources, publishMigrationFiles } from "./migration-files.ts"
 
 const fixture = async (run: (root: string) => Promise<void>) => {
-  const root = await mkdtemp(join(tmpdir(), "holyagent-authority-test-"))
+  // The host temp path may itself be an alias, such as /var on macOS.
+  const root = await mkdtemp(join(await realpath(tmpdir()), "holyagent-authority-test-"))
   try {
     expect(spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root }).status).not.toBe(0)
     await run(root)
