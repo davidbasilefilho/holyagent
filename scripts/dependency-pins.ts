@@ -62,15 +62,19 @@ export const caretRange = (release: string): string => {
 }
 
 /**
- * The range a dependency moves to: the caret range of `release`, unless the current range is a
- * caret range that already starts above it, which is kept. A registry whose `latest` tag points at
- * an older line (a backport published last) must not move a dependency down.
+ * Keep the newest line between the registry's stable release and the current range. Normalize the
+ * floor within that line; a backport published last must not move a dependency down a line.
  */
 export const nextRange = (current: string, release: string): string => {
   const next = caretRange(release)
-  const from = parseRelease(current.startsWith("^") ? current.slice(1) : "")
+  const version = current.startsWith("^") ? current.slice(1) : current
+  if (parseRelease(version) === undefined) return next
+  const previousLine = caretRange(version)
+  const from = parseRelease(previousLine.slice(1))
   const to = parseRelease(next.slice(1))
-  return from !== undefined && to !== undefined && compareReleases(from, to) > 0 ? current : next
+  return from !== undefined && to !== undefined && compareReleases(from, to) > 0
+    ? previousLine
+    : next
 }
 
 /** The stable release a git tag names, given the tag prefix (`v`, or `bun-v`), else `undefined`. */
@@ -351,33 +355,69 @@ export interface PackageDependency {
   readonly field: string
   readonly name: string
   readonly range: string
+  /** Table keys below the top-level field, for nested overrides and catalogs. */
+  readonly path?: ReadonlyArray<string>
 }
 
+const registryName = /^(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*$/i
+const registryRange = /^(?:\^?\d+\.\d+\.\d+|\*|latest)$/
+
+const record = (value: unknown): Readonly<Record<string, unknown>> =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, unknown>>)
+    : {}
+
 /**
- * The registry dependencies of a parsed `package.json`, field by field. Workspace references, other
- * protocols (`npm:`, `file:`, git), nested override tables and the Pi host peers (see
- * {@link isPiHostPeer}) are not registry ranges the updater can move, so they are left out.
+ * The registry dependencies of a parsed manifest, including catalogs and nested overrides.
+ * Protocols, aliases, constrained or multi-line peer contracts, prerelease-only ranges and npm's
+ * direct dependency references (e.g. "$react") are not rewritten by the stable updater.
  */
 export const packageDependencies = (
   manifest: Readonly<Record<string, unknown>>,
-): ReadonlyArray<PackageDependency> =>
-  DEPENDENCY_FIELDS.flatMap((field) => {
-    const table = manifest[field]
-    if (table === null || typeof table !== "object" || Array.isArray(table)) return []
-    return Object.entries(table).flatMap(([name, range]) =>
-      typeof range === "string" && !range.includes(":") && !isPiHostPeer(field, name, range)
-        ? [{ field, name, range }]
-        : [],
-    )
-  })
+): ReadonlyArray<PackageDependency> => {
+  const walk = (
+    field: string,
+    table: unknown,
+    path: ReadonlyArray<string> = [],
+  ): PackageDependency[] =>
+    Object.entries(record(table)).flatMap(([name, range]) => {
+      if (typeof range !== "string") return walk(field, range, [...path, name])
+      if (
+        !registryName.test(name) ||
+        !registryRange.test(range) ||
+        isPiHostPeer(field, name, range)
+      )
+        return []
+      const dependency = { field, name, range }
+      return path.length === 0 ? [dependency] : [{ ...dependency, path }]
+    })
+  return [
+    ...[...DEPENDENCY_FIELDS, "catalog", "catalogs"].flatMap((field) =>
+      walk(field, manifest[field]),
+    ),
+    ...["catalog", "catalogs"].flatMap((field) =>
+      walk("workspaces", record(manifest["workspaces"])[field], [field]),
+    ),
+  ]
+}
 
-/** Sets dependency ranges in a parsed `package.json` by field and name, keeping the key order. */
+/** Sets dependency ranges in a parsed manifest without mutating siblings or changing key order. */
 export const withPackageRanges = (
   manifest: Readonly<Record<string, unknown>>,
   ranges: ReadonlyArray<PackageDependency>,
 ): Record<string, unknown> => {
-  const result: Record<string, unknown> = { ...manifest }
-  for (const { field, name, range } of ranges)
-    result[field] = { ...(result[field] as Record<string, unknown>), [name]: range }
-  return result
+  const write = (
+    table: Readonly<Record<string, unknown>>,
+    keys: ReadonlyArray<string>,
+    range: string,
+  ): Record<string, unknown> => {
+    const [key, ...rest] = keys
+    if (key === undefined) return { ...table }
+    const value = rest.length === 0 ? range : write(record(table[key]), rest, range)
+    return { ...table, [key]: value }
+  }
+  return ranges.reduce<Record<string, unknown>>(
+    (result, { field, name, range, path = [] }) => write(result, [field, ...path, name], range),
+    { ...manifest },
+  )
 }

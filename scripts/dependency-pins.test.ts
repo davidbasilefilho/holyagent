@@ -93,6 +93,8 @@ describe("nextRange", () => {
     ["^1.0.0", "4.0.6", "^4.0.0"],
     ["^4.0.0", "4.2.0", "^4.0.0"],
     ["^0.5.0", "0.6.1", "^0.6.0"],
+    ["^2.3.1", "2.4.1", "^2.0.0"],
+    ["^3.2.1", "2.4.1", "^3.0.0"],
   ])("moves %s up to the line of %s", (current, release, range) => {
     expect(nextRange(current, release)).toBe(range)
   })
@@ -271,6 +273,34 @@ describe("package dependencies", () => {
       { field: "devDependencies", name: "typebox", range: "*" },
       { field: "peerDependencies", name: "other", range: "*" },
     ])
+  })
+
+  test("updates catalog entries but keeps refs, aliases and narrower peer contracts", () => {
+    const manifest = {
+      dependencies: { x: "catalog:", typed: "catalog:tools", alias: "npm:target@^2.0.0" },
+      peerDependencies: { only: "~1.7.16", union: "^1.0.0 || ^2.0.0", beta: "^0.5.0-beta" },
+      catalog: { x: "^1.0.0" },
+      workspaces: { packages: ["packages/*"], catalogs: { tools: { typed: "^0.5.0" } } },
+      overrides: { other: { ".": "$other", x: "^1.0.0" } },
+    }
+    const ranges = packageDependencies(manifest)
+    expect(ranges).toEqual([
+      { field: "overrides", path: ["other"], name: "x", range: "^1.0.0" },
+      { field: "catalog", name: "x", range: "^1.0.0" },
+      { field: "workspaces", path: ["catalogs", "tools"], name: "typed", range: "^0.5.0" },
+    ])
+    expect(
+      withPackageRanges(
+        manifest,
+        ranges.map((use) => ({ ...use, range: "^3.0.0" })),
+      ),
+    ).toEqual({
+      ...manifest,
+      catalog: { x: "^3.0.0" },
+      workspaces: { packages: ["packages/*"], catalogs: { tools: { typed: "^3.0.0" } } },
+      overrides: { other: { ".": "$other", x: "^3.0.0" } },
+    })
+    expect(manifest.catalog.x).toBe("^1.0.0")
   })
 
   test("sets ranges by field and name and keeps the rest", () => {

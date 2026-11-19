@@ -152,6 +152,22 @@ describe("manifestFiles", () => {
       "packages/x/b/package.json",
     ])
   })
+
+  test("accepts catalog-bearing workspace objects and respects exclusion globs", async () => {
+    const write = (file: string, text: string) => Bun.write(join(root, file), text)
+    await write(
+      "package.json",
+      JSON.stringify({
+        workspaces: { packages: ["packages/*", "!packages/excluded"], catalog: { x: "^1.0.0" } },
+      }),
+    )
+    await write("packages/a/package.json", "{}")
+    await write("packages/excluded/package.json", "{}")
+    expect(await Effect.runPromise(manifestFiles(root))).toEqual([
+      "package.json",
+      "packages/a/package.json",
+    ])
+  })
 })
 
 describe("the mise tools of this repository", () => {

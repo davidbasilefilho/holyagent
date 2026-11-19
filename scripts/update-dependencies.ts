@@ -365,12 +365,39 @@ const surveyMise = (root: string) =>
 export const manifestFiles = (root: string) =>
   Effect.gen(function* () {
     const text = yield* readText(root, "package.json")
-    const { workspaces = [] } = yield* Schema.decodeUnknownEffect(
-      Schema.fromJsonString(open({ workspaces: Schema.optionalKey(Schema.Array(Schema.String)) })),
+    const WorkspaceGlobs = Schema.Array(Schema.String)
+    const { workspaces } = yield* Schema.decodeUnknownEffect(
+      Schema.fromJsonString(
+        open({
+          workspaces: Schema.optionalKey(
+            Schema.Union([WorkspaceGlobs, open({ packages: Schema.optionalKey(WorkspaceGlobs) })]),
+          ),
+        }),
+      ),
       strict,
     )(text).pipe(Effect.mapError((cause) => new FileError({ file: "package.json", cause })))
-    const found = yield* Effect.forEach(workspaces, (glob) =>
-      scan(root, `${glob}/package.json`, false),
+    const globs: ReadonlyArray<string> =
+      workspaces === undefined
+        ? []
+        : "packages" in workspaces
+          ? (workspaces.packages ?? [])
+          : Array.isArray(workspaces)
+            ? (workspaces as ReadonlyArray<string>)
+            : []
+    const included = globs.filter((glob) => !glob.startsWith("!"))
+    const excluded = globs
+      .filter((glob) => glob.startsWith("!"))
+      .map((glob) => new Bun.Glob(glob.slice(1)))
+    const found = (yield* Effect.forEach(included, (glob) =>
+      scan(root, `${glob.replace(/\/$/, "")}/package.json`, false),
+    )).map((files) =>
+      files.filter(
+        (file) =>
+          !file.split("/").includes("node_modules") &&
+          !excluded.some(
+            (glob) => glob.match(file) || glob.match(file.replace(/\/package\.json$/, "")),
+          ),
+      ),
     )
     return ["package.json", ...new Set(found.flat())].toSorted()
   })
@@ -412,7 +439,9 @@ const surveyPackages = (root: string) =>
       releaseOf,
     )
     const pins: Array<Pin> = []
-    const ranges = new Map<string, Array<PackageDependency>>()
+    const ranges = new Map<string, Array<PackageDependency>>(
+      manifests.map(({ file }) => [file, []]),
+    )
     for (const { file, dependencies } of manifests)
       for (const dependency of dependencies) {
         const next = nextPackageRange(
@@ -422,7 +451,7 @@ const surveyPackages = (root: string) =>
         )
         pins.push({
           kind: "package",
-          name: `${dependency.name} (${dependency.field})`,
+          name: `${dependency.name} (${[dependency.field, ...(dependency.path ?? [])].join(".")})`,
           file,
           current: dependency.range,
           next,
@@ -552,13 +581,6 @@ export const renderPypiPins = (root: string, versions: Survey["pypiPackages"]) =
     Effect.map((table) => renderPiPackages(withPiPackageVersions(table, versions))),
   )
 
-const writeRanges = (root: string, packages: Survey["packages"]) =>
-  renderRanges(root, packages).pipe(
-    Effect.flatMap((rendered) =>
-      Effect.forEach(rendered, ([file, text]) => writeText(root, file, text)),
-    ),
-  )
-
 /**
  * Writes the moves a survey found. Everything that can fail on the network or on a file is done
  * first: the new texts of the workflows, `mise.toml`, the manifests and the Pi and PyPI package
@@ -591,7 +613,7 @@ export const applySurvey = (root: string, found: Survey) =>
     yield* run("bun update --ignore-scripts", () =>
       $`bun update --ignore-scripts`.cwd(root).nothrow(),
     )
-    yield* writeRanges(root, found.packages)
+    for (const [file, text] of ranges) yield* writeText(root, file, text)
     yield* run("bun install --ignore-scripts", () =>
       $`bun install --ignore-scripts`.cwd(root).nothrow(),
     )

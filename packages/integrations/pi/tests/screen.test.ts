@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { Effect } from "effect"
 
+import piPins from "../../../core/src/config/pi-packages.json" with { type: "json" }
 import { BROWSER_USE_MCP_SERVER } from "../../../runtime/src/config/capabilities.ts"
 import { PYPI_PACKAGE_VERSIONS } from "../../../runtime/src/config/pypi-packages.ts"
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
@@ -34,7 +35,7 @@ const BROWSE = {
     ...REGISTRY,
     "--@opencode:registry=https://registry.npmjs.org/",
     "-y",
-    "@opencode/browse@0.0.16",
+    `@opencode/browse@${piPins["@opencode/browse"]}`,
     "mcp",
   ],
 }

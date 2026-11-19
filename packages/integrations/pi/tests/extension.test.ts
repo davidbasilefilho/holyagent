@@ -16,6 +16,7 @@ import type {
 import { assignment, intent, makeContext } from "@holyagent/core"
 import { Effect, Exit, Schema } from "effect"
 
+import piPins from "../../../core/src/config/pi-packages.json" with { type: "json" }
 import { PLUGIN_NAMESPACE } from "../../../runtime/src/cli/assignment.ts"
 import { HOST_VARIABLE, WORKFLOWS_VARIABLE } from "../../../runtime/src/cli/config.ts"
 import { CONTEXT_BUDGET, SESSION_REMINDER } from "../../../runtime/src/cli/sessioncontext.ts"
@@ -3211,7 +3212,7 @@ describe("the root's excluded tools", () => {
           parameters: { type: "object" },
           sourceInfo: {
             path: "fixture",
-            source: "npm:@tintinweb/pi-subagents@0.23.2",
+            source: `npm:@tintinweb/pi-subagents@${piPins["@tintinweb/pi-subagents"]}`,
             scope: "temporary",
             origin: "package",
           },
@@ -4165,7 +4166,7 @@ describe("the MCP servers of the screen capability", () => {
         name: "browse",
         config: {
           command: "npx",
-          args: [...REGISTRY, "-y", "@opencode/browse@0.0.16", "mcp"],
+          args: [...REGISTRY, "-y", `@opencode/browse@${piPins["@opencode/browse"]}`, "mcp"],
           cwd: "/home/neutral",
         },
       },
@@ -4549,7 +4550,7 @@ test("real Core configuration coordinates native tools, aliases and pending wait
             parameters: { type: "object" },
             sourceInfo: {
               path: "fixture",
-              source: "npm:@tintinweb/pi-subagents@0.23.2",
+              source: `npm:@tintinweb/pi-subagents@${piPins["@tintinweb/pi-subagents"]}`,
               scope: "temporary",
               origin: "package",
             },

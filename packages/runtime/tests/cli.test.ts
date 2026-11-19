@@ -407,6 +407,13 @@ describe("report and prompt", () => {
     const refused = await cli(accept, report("parses: ran it"))
     expect(refused.code).toBe(3)
     expect(refused.stderr).toContain("error: InsufficientAcceptance:")
+    expect(refused.stderr).toContain(
+      `holyagent assignment close ${id} --outcome success --accept <rationale>`,
+    )
+    expect(refused.stderr).toContain(
+      `holyagent assignment accept ${id} --rationale <text> --report`,
+    )
+    expect(refused.stderr).toContain("report on stdin")
     expect(refused.stderr).toContain('evidence label "tests"')
     expect(refused.stderr).not.toContain('criterion "parses"')
     expect(data(await cli(["assignment", "show", id, "--full"]))).toMatchObject({

@@ -6,3 +6,7 @@
 /packages/integrations/claude/src/wrapper.sh
 # The holyagent CLI writes its JSON state under .holyagent/, which is not source.
 /.holyagent
+# Static, byte-for-byte snapshots pinned in .agents/skills/README.md.
+/.agents/skills/bun-prefs/
+/.agents/skills/bun-stack-prefs/
+/.agents/skills/upgrade-deps/

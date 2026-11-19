@@ -23,6 +23,7 @@ import {
 import { Effect } from "effect"
 import { Type } from "typebox"
 
+import piPins from "../../../core/src/config/pi-packages.json" with { type: "json" }
 import { refuseNonSpecialist, refuseNonSpecialistWorkflow } from "../src/extension.ts"
 import { registerToolAliases } from "../src/tool-aliases.ts"
 
@@ -36,7 +37,7 @@ afterEach(() => rm(fixtureRoot, { recursive: true, force: true }))
 
 const sourceInfo = {
   path: "<fixture>",
-  source: "npm:@tintinweb/pi-subagents@0.23.2",
+  source: `npm:@tintinweb/pi-subagents@${piPins["@tintinweb/pi-subagents"]}`,
   scope: "temporary" as const,
   origin: "package" as const,
 }

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -16,7 +16,8 @@ import {
 } from "../src/state/migration-files.ts"
 
 const fixture = async (run: (root: string) => Promise<void>) => {
-  const root = await mkdtemp(join(tmpdir(), "holyagent-files-test-"))
+  // The host temp path may itself be an alias, such as /var on macOS.
+  const root = await mkdtemp(join(await realpath(tmpdir()), "holyagent-files-test-"))
   try {
     expect(spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: root }).status).not.toBe(0)
     await run(root)
