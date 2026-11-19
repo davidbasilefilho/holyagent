@@ -7,7 +7,10 @@ import { join } from "node:path"
 
 import { Deferred, Effect, Fiber } from "effect"
 
-import { readMigrationJournal } from "../src/state/migration-journal.ts"
+import {
+  ensureMigrationJournalDirectory,
+  readMigrationJournal,
+} from "../src/state/migration-journal.ts"
 import {
   type MigrationPreparation,
   type MigrationRunnerOptions,
@@ -25,9 +28,8 @@ const fixture = async () => {
   const sourceRoot = join(root, "source")
   const targetRoot = join(root, "target")
   const privateDir = join(root, "private")
-  await Promise.all(
-    [sourceRoot, targetRoot, privateDir].map((path) => mkdir(path, { mode: 0o700 })),
-  )
+  await Promise.all([sourceRoot, targetRoot].map((path) => mkdir(path, { mode: 0o700 })))
+  await ensureMigrationJournalDirectory(privateDir)
   const location = { path: join(privateDir, "journal"), sourceRoot, targetRoot }
   const parent = "a".repeat(40)
   const commit = "b".repeat(40)

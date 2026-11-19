@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { isAbsolute, join, posix, resolve, win32 } from "node:path"
+import nodePath, { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
 import { createEventBus, type ToolDefinition } from "@earendil-works/pi-coding-agent"
 import type {
@@ -84,7 +84,10 @@ const createExtension =
     const runtime = (project: string, signal: AbortSignal, ...words: ReadonlyArray<string>) =>
       Effect.gen(function* () {
         const platform = options.platform ?? process.platform
-        const path = options.platformPath ?? (platform === "win32" ? win32 : posix)
+        // Match the extension's path port and the fixture paths, which use the host's path
+        // syntax unless a test explicitly injects another dialect. The platform switch alone
+        // describes command launching; it does not turn real Windows temporary paths into POSIX ones.
+        const path = options.platformPath ?? nodePath
         const root = options.packageRoot ?? PACKAGE_ROOT
         const argv = [...runtimeArgs(root, path), PI_PROJECT_FLAG, project, ...words]
         const search = options.bunSearch ?? {}
@@ -3978,28 +3981,23 @@ describe("under the Codex provider", () => {
   })
 
   test("the root routes to the chosen family's private guidance and preserves unrelated skills", async () => {
+    // Model-facing paths keep forward slashes even when the package lives on a Windows drive.
+    const guidance = (family: "gpt-6" | "kimi-k3.1") =>
+      `${toPosix(PACKAGE_ROOT)}/guidance/${family}/ci-watch/SKILL.md`
     const unrelated = "<skill><location>/user/skills/unrelated/SKILL.md</location></skill>"
     const input = `${PI_PROMPT}\n${unrelated}`
     const gpt = await run(codexConfig(), { systemPrompt: input, pi: codexPi })
     expect(gpt.delivered?.systemPrompt).toBe(
       `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6"], PACKAGE_ROOT)}\n\n${input}`,
     )
-    expect(gpt.delivered?.systemPrompt).toContain(
-      join(PACKAGE_ROOT, "guidance/gpt-6/ci-watch/SKILL.md"),
-    )
-    expect(gpt.delivered?.systemPrompt).not.toContain(
-      join(PACKAGE_ROOT, "guidance/kimi-k3.1/ci-watch/SKILL.md"),
-    )
+    expect(gpt.delivered?.systemPrompt).toContain(guidance("gpt-6"))
+    expect(gpt.delivered?.systemPrompt).not.toContain(guidance("kimi-k3.1"))
     const kimi = await run(healthy("/missing"), { systemPrompt: input })
     expect(kimi.delivered?.systemPrompt).toBe(
       `${fillPackageRoot(PI_ROOT_PROMPT, PACKAGE_ROOT)}\n\n${input}`,
     )
-    expect(kimi.delivered?.systemPrompt).toContain(
-      join(PACKAGE_ROOT, "guidance/kimi-k3.1/ci-watch/SKILL.md"),
-    )
-    expect(kimi.delivered?.systemPrompt).not.toContain(
-      join(PACKAGE_ROOT, "guidance/gpt-6/ci-watch/SKILL.md"),
-    )
+    expect(kimi.delivered?.systemPrompt).toContain(guidance("kimi-k3.1"))
+    expect(kimi.delivered?.systemPrompt).not.toContain(guidance("gpt-6"))
   })
 
   test("a specialist that writes gets apply_patch beside the tools it has; the others and the root do not", async () => {

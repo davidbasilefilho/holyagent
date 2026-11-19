@@ -40,7 +40,11 @@ import {
   verifyMigrationCommit,
   verifyMigrationIndex,
 } from "./migration-index.ts"
-import { MigrationJournalError, readMigrationJournal } from "./migration-journal.ts"
+import {
+  ensureMigrationJournalDirectory,
+  MigrationJournalError,
+  readMigrationJournal,
+} from "./migration-journal.ts"
 import { MigrationRunnerConflict, runMigrationTransaction } from "./migration-runner.ts"
 import { parseStateMode, STATE_MODE_KEY, type StateMode } from "./mode.ts"
 import { definedEnv, looksLikeAgent } from "./portable.ts"
@@ -1014,12 +1018,16 @@ const migrateWorkTree = <E>(
         const privateRoot = join(commonRoot, "holyagent")
         for (const directory of [privateRoot, join(privateRoot, "migration")]) {
           yield* authorize
-          yield* io(directory, () => mkdir(directory, { mode: 0o700 })).pipe(
-            Effect.catchIf(
-              (error) => hasCode(error.cause, "EEXIST"),
-              () => Effect.void,
-            ),
-          )
+          if (directory === privateRoot) {
+            yield* io(directory, () => mkdir(directory, { mode: 0o700 })).pipe(
+              Effect.catchIf(
+                (error) => hasCode(error.cause, "EEXIST"),
+                () => Effect.void,
+              ),
+            )
+          } else {
+            yield* io(directory, () => ensureMigrationJournalDirectory(directory))
+          }
           const info = yield* io(directory, () => lstat(directory))
           const actual = yield* io(directory, () => realpath(directory))
           if (!info.isDirectory() || info.isSymbolicLink() || actual !== directory)
