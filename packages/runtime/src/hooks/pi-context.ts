@@ -2,13 +2,12 @@ import { decode } from "@toon-format/toon"
 import { Data, Effect, Schema } from "effect"
 
 import { bareContext, SESSION_REMINDER, sessionContext } from "../cli/sessioncontext.ts"
-import delegating from "../instructions/kimi-k3.1/root/delegating.md" with { type: "text" }
-import dispatch from "../instructions/kimi-k3.1/root/dispatch.md" with { type: "text" }
-import identity from "../instructions/kimi-k3.1/root/identity.md" with { type: "text" }
-import taskList from "../instructions/kimi-k3.1/root/task-list.md" with { type: "text" }
-import reminder from "../instructions/kimi-k3.1/session-reminder.md" with { type: "text" }
-import precedence from "../instructions/kimi-k3.1/shared/precedence.md" with { type: "text" }
+import type { PiFamily } from "../instructions/families.ts"
+import gpt62Reminder from "../instructions/gpt-6.2/session-reminder.md" with { type: "text" }
+import gptReminder from "../instructions/gpt-6/session-reminder.md" with { type: "text" }
+import kimiReminder from "../instructions/kimi-k3.1/session-reminder.md" with { type: "text" }
 import { stripCitations } from "../instructions/skills.ts"
+import { piRootSection } from "../pi/root-prompt.ts"
 
 /**
  * What a Pi session is for, which decides the context it gets at start: `root` is the default
@@ -33,24 +32,35 @@ export const PiRoleSchema = Schema.Literals(PI_ROLES)
  */
 export const PI_ROOT_PLACEHOLDER = "${HOLYAGENT_PI_ROOT}"
 
-/**
- * The core of the root rules for the Kimi family, with {@link PI_ROOT_PLACEHOLDER} unfilled: the
- * same files in the same order as the Claude core (`ROOT_CORE_FILES`), joined the same way, with
- * the maintainers' notes removed as the generators remove them.
- */
-export const PI_ROOT_CORE: string = [identity, precedence, delegating, dispatch, taskList]
-  .map((text) => stripCitations(text).trim())
-  .join("\n\n")
+const defaultFamily: PiFamily = "kimi-k3.1"
 
-/**
- * The block of rules the core leaves out, in the Kimi family's words: it ends the context of a root
- * or session role and replaces the Claude block that the shared context builder ends with.
- */
-export const PI_SESSION_REMINDER: string = stripCitations(reminder).trim()
+// Match the opening sections of the root system prompt, with no context or tools specific to
+// the launch. Keep this order aligned with the Claude core (checked in the Pi context tests).
+const coreSections = [
+  "identity.md",
+  "../shared/precedence.md",
+  "delegating.md",
+  "dispatch.md",
+  "task-list.md",
+]
+const coreOf = (family: PiFamily): string =>
+  coreSections.map((file) => piRootSection(family, file)).join("\n\n")
 
-/** The core of the root rules with {@link PI_ROOT_PLACEHOLDER} replaced by `piRoot`. */
-export const piRootCore = (piRoot: string): string =>
-  PI_ROOT_CORE.replaceAll(PI_ROOT_PLACEHOLDER, () => piRoot)
+const reminders: Readonly<Record<PiFamily, string>> = {
+  "kimi-k3.1": stripCitations(kimiReminder).trim(),
+  "gpt-6": stripCitations(gptReminder).trim(),
+  "gpt-6.2": stripCitations(gpt62Reminder).trim(),
+}
+
+/** The Kimi root’s core rules, with {@link PI_ROOT_PLACEHOLDER} unfilled. */
+export const PI_ROOT_CORE: string = coreOf(defaultFamily)
+
+/** The Kimi reminder restated with a root or session role’s context. */
+export const PI_SESSION_REMINDER: string = reminders[defaultFamily]
+
+/** The family’s core rules with {@link PI_ROOT_PLACEHOLDER} replaced by `piRoot`. */
+export const piRootCore = (piRoot: string, family: PiFamily = defaultFamily): string =>
+  coreOf(family).replaceAll(PI_ROOT_PLACEHOLDER, () => piRoot)
 
 /**
  * What the CLI printed for a status or reconcile call, as the context builders read it: the decoded
@@ -115,9 +125,10 @@ export const piContext = (
   role: PiRole,
   piRoot: string,
   state: ProjectState | undefined,
+  family: PiFamily = defaultFamily,
 ): string | undefined => {
-  const core = role === "session" ? piRootCore(piRoot) : undefined
-  const closing = role === "specialist" ? undefined : PI_SESSION_REMINDER
+  const core = role === "session" ? piRootCore(piRoot, family) : undefined
+  const closing = role === "specialist" ? undefined : reminders[family]
   if (state === undefined)
     return core === undefined ? undefined : withReminder(bareContext(core), closing)
   return withReminder(sessionContext(state.status, core, state.reconcile), closing)

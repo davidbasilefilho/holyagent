@@ -77,7 +77,7 @@ import {
 import { createBash, type ShellLaunch } from "./bash.ts"
 import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
-import { familyAgentPrompt, familySkillPaths } from "./families.ts"
+import { activePiFamily, familyAgentPrompt, familySkillPaths } from "./families.ts"
 import { NATIVE_ROOT_FLAG, registerNativeTools } from "./native-tools.ts"
 import {
   checkProfileLaunch,
@@ -1185,7 +1185,12 @@ export const createExtension =
         Effect.try(() => agentWait.disable()).pipe(Effect.orElseSucceed(() => undefined)),
       )
 
-    const collect = (cwd: string, signal: AbortSignal, reason: Reason) => {
+    const collect = (
+      cwd: string,
+      signal: AbortSignal,
+      reason: Reason,
+      model: ExtensionContext["model"],
+    ) => {
       // What the config decided, kept once known so a later failure of the collection (the status
       // command, the deadline) still leaves the root its prompt, tools and provider settings.
       let configured: Collected | undefined
@@ -1314,7 +1319,15 @@ export const createExtension =
             typeof directory === "string" && (yield* hasStateFolder(directory))
               ? { status, ...(reconcile === undefined ? {} : { reconcile }) }
               : undefined
-          const content = piContext(role, root, state)
+          const content = piContext(
+            role,
+            root,
+            state,
+            activePiFamily(
+              model,
+              configured.uniformCodex === true ? configured.codex?.rootFamily : undefined,
+            ),
+          )
           // The provider is checked only after a collection that ended well: a failed one already
           // carries a notice, and the checks would start commands after its deadline.
           const ended = {
@@ -1582,7 +1595,7 @@ export const createExtension =
       taken.current?.abort()
       const own = new AbortController()
       taken.current = own
-      const collected = Effect.runPromise(collect(ctx.cwd, own.signal, reason), {
+      const collected = Effect.runPromise(collect(ctx.cwd, own.signal, reason, ctx.model), {
         signal: own.signal,
       }).catch(() => undefined)
       const ended = collected.then(() => undefined)
@@ -1751,13 +1764,12 @@ export const createExtension =
         ): BeforeAgentStartEventResult | undefined => {
           if (!child && collected?.environment !== undefined)
             applyEnvironment(env, { ...collected.environment, [CACHE_RETENTION_ENV]: "long" }, true)
-          // The Codex provider runs the GPT-6 family: the root's prompt is that family's, a
-          // specialist's own prompt is swapped for it, and the skills Pi lists are its copies.
-          const family =
-            ctx.model?.provider === "openai-codex" ||
-            (ctx.model === undefined && taken?.uniformCodex === true)
-              ? taken?.codex?.family
-              : undefined
+          // Select from the live model, including a model the user picked after session start.
+          // Without a live model, only the root can fall back to its configured model.
+          const family = activePiFamily(
+            ctx.model,
+            taken?.uniformCodex === true ? (child ? "gpt-6" : taken.codex?.rootFamily) : undefined,
+          )
           const own = child
             ? family === undefined
               ? event.systemPrompt
