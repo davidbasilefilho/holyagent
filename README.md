@@ -31,7 +31,7 @@ bunx --no-install mise run build    # regenerate the Claude plugin after changin
 bunx --no-install mise run verify   # type-check, lint, format check and tests
 ```
 
-`mise.toml` is the source of commands, and the repository toolchain needs a canary Bun, which the `toolchain` task checks for you. Commits follow Conventional Commits.
+`mise.toml` is the source of commands, and the repository uses stable Bun plus the locked Oxlint, tsrs and Oxfmt development tools. Commits follow Conventional Commits.
 
 ## Special thanks
 

@@ -17,8 +17,7 @@
 # - ~/.bashrc gains a line that puts Bun's global bin directory on PATH, where `holyagent setup` puts
 #   ctx7 (a one-time copy is kept as ~/.bashrc.pre-holyagent).
 # - --dev adds mise (https://mise.run) and a line in ~/.bashrc that activates it. Bun stays a stable
-#   build; developing this repository needs a canary build, which `mise install` in the checkout
-#   upgrades to.
+#   build for both runtime and development.
 set -Eeuo pipefail
 
 USAGE="usage: bash ${0##*/} [--dev]   (--dev also installs mise, for developing HolyAgent)"

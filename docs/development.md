@@ -30,11 +30,11 @@ packages/
     dist/                       generated: the built Pi package (package.json, agents/, extensions/, prompts/, scripts/, skills/)
 .claude-plugin/marketplace.json generated; the marketplace entry for the plugin
 .github/                        the CI, publish and release workflows and the tag-release action
-scripts/                        Bun scripts behind the mise tasks: toolchain, hooks, versions, the dependency updater, PR checks
+scripts/                        Bun scripts behind the mise tasks: hooks, versions, the dependency updater, PR checks
 install/wsl-install.sh          prerequisites installer (WSL Ubuntu): Bun, Node LTS, git, gh; --dev adds mise
 install/windows-install.ps1     the same for native Windows (PowerShell; -Dev adds mise)
 docs/                           these pages; docs/pi holds the Pi integration's docs, its decisions and the research behind them
-mise.toml  bunfig.toml  lefthook.yml
+mise.toml  .oxlintrc.json  .oxfmtrc.json  lefthook.yml
 ```
 
 A new harness gets its own folder under `packages/integrations/`. It reuses the runtime's domain, state, CLI and instructions and generates its own plugin files.
@@ -51,21 +51,20 @@ bunx --no-install mise install
 bunx --no-install mise run verify
 ```
 
-`mise install` installs the pinned tools and upgrades Bun to canary. The upgrade child drops inherited `BUN_OPTIONS` and, on Windows, `PSModulePath`, so a PowerShell 7 host does not make Windows PowerShell load an incompatible archive module. Development installs run the hooks setup only when local lefthook and native mise are available; production installs skip it.
+`mise install` installs stable Bun and the other pinned system tools; `bun install --frozen-lockfile` installs the locked Oxc tools. Development installs run the hooks setup only when local lefthook and native mise are available; production installs skip it.
 
 ## Commands
 
-`mise.toml` is the single source of commands. `package.json` scripts and the git hooks only delegate to it, and `--no-script` makes Bun run its own tool rather than a same-named script. Run gates through mise (`bunx --no-install mise run <task>` with the local one) so the `toolchain` task can first confirm a canary Bun.
+`mise.toml` is the single source of commands. `package.json` scripts and the git hooks delegate to it. Run gates through mise (`bunx --no-install mise run <task>`), which runs the locked development tools without downloading them.
 
 | Task                    | Does                                                            |
 | ----------------------- | --------------------------------------------------------------- |
-| `toolchain`             | Fails unless Bun is a canary build, and names the fix           |
 | `prepare`               | Installs the git hooks; skips outside a git work tree           |
-| `check`                 | `bun check`: type-check                                         |
-| `lint`                  | `bun lint`: type-aware lint, no fixing                          |
-| `lint:fix`              | `bun lint --fix`; extra arguments go to Bun (`--staged`)        |
-| `fmt`                   | `bun fmt`: format in place; extra arguments go to Bun           |
-| `fmt:check`             | `bun fmt --check`                                               |
+| `check`                 | `tsrs --noEmit`: type-check the entire TypeScript project       |
+| `lint`                  | Oxlint with tsrs: type-aware lint, no fixing                    |
+| `lint:fix`              | `oxlint --fix`; accepts selected files                          |
+| `fmt`                   | `oxfmt`: format in place; accepts selected files                |
+| `fmt:check`             | `oxfmt --check`                                                 |
 | `test`                  | `bun test`                                                      |
 | `build`                 | Generates the Claude plugin and the Pi package                  |
 | `instructions:scaffold` | Adds the requirements tree to every family as empty files       |
@@ -87,12 +86,12 @@ A change starts in `requirements/`. `bunx --no-install mise run instructions:sca
 
 ## Dependencies
 
-Every dependency range in every `package.json` is a caret range at its line boundary (`^X.0.0` for X of 1 or more, `^0.X.0`, `^0.0.X`), or `workspace:*` for a workspace package, and `bun.lock` holds the exact versions. A line boundary lets a fresh install take every compatible release without a manifest edit, while the lockfile keeps installs reproducible; `scripts/dependency-ranges.test.ts` fails on any other range, in any dependency field. The one exception is Pi's host packages (`PI_HOST_PACKAGES` in `scripts/dependency-pins.ts`: `@earendil-works/pi-ai`, `@earendil-works/pi-agent-core`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui` and `typebox`): the Pi integration declares them as `peerDependencies` with the range `*`, which Pi's package documentation requires so that Pi supplies them and the package bundles none. The exception covers those names in that field only, and the updater leaves them as they are. The same package lists `@earendil-works/pi-coding-agent` as a caret-range `devDependency` for the extension API types. This includes `@anthropic-ai/claude-code` and `mise`: nothing depends on their exact version, because `trustedDependencies` matches names, `scripts/toolchain.ts` checks only that Bun is a canary build, and CI runs the Claude Code binary the lockfile resolves (`bun run claude`).
+Use a caret range at its compatibility-line boundary (`^X.0.0` for X of 1 or more, `^0.X.0`, or `^0.0.X`), or `workspace:*` for workspace dependencies. `bun.lock` keeps the resulting installs reproducible. Preserve protocol and host contracts, including Pi's `*` host peers and the exact bundle-tested `just-bash` release. The validator checks manifest dependency fields and catalog values. A constrained peer may use a tilde if an installed package demonstrably requires that narrower range. CI runs the Claude CLI version resolved in the lockfile.
 
-Dependencies change only through the updater, `scripts/update-dependencies.ts`, so a pin never drifts by hand and a release is never a prerelease. It moves each pin to the newest stable release line (the major, or the minor for a `0.x` project) and the newest stable release within it. For a package, the range it writes comes from the newest stable version that is not deprecated and is no higher than the registry's `latest` dist-tag, so a canary or a version above the publisher's current release is not chosen as the range. The cap covers that range only: `bun update` then resolves the lockfile within it by its own rules and can pick a release above `latest`. The installs run with `--ignore-scripts`, so no package's install script runs during an update; a later plain `bun install` runs the trusted ones, so read the lockfile diff first. The pins:
+Use the updater, `scripts/update-dependencies.ts`, for routine stable dependency updates. It moves each pin to the newest stable release line (the major, or the minor for a `0.x` project) and the newest stable release within it. For a package, the range it writes comes from the newest stable version that is not deprecated and is no higher than the registry's `latest` dist-tag, so a canary or a version above the publisher's current release is not chosen as the range. The cap covers that range only: `bun update` then resolves the lockfile within it by its own rules and can pick a release above `latest`. The installs run with `--ignore-scripts`, so no package's install script runs during an update; a later plain `bun install` runs the trusted ones, so read the lockfile diff first. The pins:
 
 - the external GitHub Actions in `.github/`: the tag becomes its full commit SHA, and the `# vX.Y.Z` comment follows;
-- the mise tools in `mise.toml` that are pinned to a version (`bun`, whose stable base the `postinstall` hook upgrades to canary, and `aqua:BurntSushi/ripgrep` and `aqua:sharkdp/fd`, the aqua backend named so that mise installs the upstream releases, which dev machines and CI need for `holyagent rg` and `holyagent fd`; `node = "lts"` is a channel and stays), each moved to the newest stable tag of its GitHub repository;
+- the mise tools in `mise.toml` that are pinned to a version (`bun` and `aqua:BurntSushi/ripgrep` and `aqua:sharkdp/fd`, the aqua backend named so that mise installs the upstream releases, which dev machines and CI need for `holyagent rg` and `holyagent fd`; `node = "lts"` is a channel and stays), each moved to the newest stable tag of its GitHub repository;
 - the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` (the provider, the reused extensions, and the npm MCP server of the `browser-use` capability, opencode browse `@opencode/browse`, which Pi does not install: it runs with `npx` at its pin, with the public npm registry passed explicitly), each set to the newest stable, non-deprecated release no higher than the registry's `latest`, never moved down. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in that table: it moves with `bun.lock` when `bun update` runs, within its caret range, and a user's own Pi install is theirs. The updater does not re-record the CI fixtures, so a move of the host or of a Pi pin shows up as a failing replay until they are re-recorded ([Re-recording the Pi fixtures](#re-recording-the-pi-fixtures));
 - the exact PyPI pins in `packages/runtime/src/config/pypi-packages.json` (browser-use, the headless form's MCP server, which `uvx` runs at its pin with `--no-config` and the public PyPI index passed explicitly), each set to the newest stable release of the project's PyPI JSON API (`https://pypi.org/pypi/<name>/json`) that has a file nobody yanked, never a prerelease, a post release or a yanked one, and never moved down;
 - the ranges of every `package.json` (the root and the workspace packages, never `node_modules`), followed by `bun update` and `bun install` for the lockfile.
@@ -119,21 +118,23 @@ The test also fails when a fixture file differs from what `record.ts` writes, so
 
 `packages/integrations/pi/tests/t3-rpc.test.ts` replays the traffic of T3 Code driving `pi --mode rpc`, from the JSONL files in `packages/integrations/pi/tests/fixtures/t3/`. They are synthesized, not recorded from T3: each header says `synthesized` and lists its sources (T3's `buildPiRpcLaunch` and Pi adapter, Pi's RPC types, `@tintinweb/pi-subagents`' new-turn trigger), and the Pi messages are built with `satisfies` on Pi's exported RPC types like the fixtures above. The test runs the real extension (`createExtension`) in RPC mode with the T3 environment (`T3_PI_RUNTIME_MODE` at each access mode, `T3_MCP_URL`), feeds it the session events of the fixtures and records every `ctx.ui` member it reads through a proxy, so an alias or a destructuring is caught too: only `select`, `confirm`, `input`, `editor`, `notify` and `setStatus`, the methods T3 renders, may be touched, and below Full access the one call is the `setStatus` warning; a planted `setWidget`, `custom` or `setTitle` call proves the recording catches a stray one. The fixtures themselves are pinned for their header, their staleness against the installed Pi, the T3 launch (`T3_PI_RUNTIME_MODE`, `T3_MCP_URL` and the injected bridge) and the shape of the `extension_ui_request` and `extension_ui_response` messages; those checks read the files back and say nothing about the extension. The late-completion fixture (a specialist's notice after `agent_settled` opening a new root turn) documents an assumed turn behaviour and is not a regression test: it needs `@tintinweb/pi-subagents` and T3 Code, which the tests do not run, so a change in either would not fail it. After `mise run deps:update` moves Pi, run `bun packages/integrations/pi/tests/fixtures/t3/record.ts` as well, and read the diff of `fixtures/t3/` the same way; `fixtures/record.ts` does not write these files.
 
+The root development dependency `tsrs` is declared as `^7.1.0-beta.tsrs3` because there is no compatible stable release. A zeroed `^7.0.0` (even with a prerelease suffix) would not admit that 7.1.0 beta. The stable dependency updater leaves that prerelease range alone; update it with Oxlint and validate both tools together.
+
 ## Lint and format rules
 
-Everything is configured in `bunfig.toml`. Bun's own `check`, `lint` and `fmt` are the tools (`eslint-plugin-jsdoc` runs inside `bun lint`); the repository adds none beside them.
+Lint rules live in `.oxlintrc.json`, formatting in `.oxfmtrc.json`, and compiler settings in `tsconfig.json`. Oxlint automatically uses the installed `tsrs` backend for type-aware rules. The separate `check` task reports compiler diagnostics for the entire TypeScript project, including paths skipped by the linter.
 
-- **Type-aware lint with type-check and zero warnings** (`typeAware`, `typeCheck`, `maxWarnings = 0`). The `correctness` category is an error. `consistent-type-imports`, `no-floating-promises` and `no-misused-promises` catch errors the type-checker accepts, such as a dropped promise.
+- **Type-aware lint with zero warnings** (`typeAware: true`, `maxWarnings: 0`). The `correctness` category is an error. `consistent-type-imports`, `no-floating-promises` and `no-misused-promises` catch errors the type-checker accepts, such as a dropped promise. The new backend’s `await-thenable` diagnostic is disabled only for `*.test.ts` because Bun’s asynchronous test matchers are typed as synchronous; production code keeps the rule.
 - **Effect enforcement.** In `packages/runtime/src` the lint forbids `async` and `await`, `new Promise`, `try`/`catch` and `Promise` statics. Failures there are tagged Effect errors and effects are composed with Effect; `Effect.runPromise` is for integration boundaries only. One error model keeps failures typed and visible in signatures, and keeps the runtime's behavior testable without exceptions. The generators (`packages/integrations/claude` and `packages/integrations/pi`) are outside the override and use plain async code.
-- **JSDoc on the public API.** `jsdoc/require-jsdoc` covers exported functions, classes, methods, interfaces, type aliases, enums and exported variables, and the formatter keeps JSDoc tidy (`jsdoc = true`). Skills open their description with the situation, so a model can tell when to load them.
+- **JSDoc on the public API.** `jsdoc-js/require-jsdoc` covers exported functions, classes, methods, interfaces, type aliases, enums and exported variables, and the formatter keeps JSDoc tidy (`jsdoc = true`). Skills open their description with the situation, so a model can tell when to load them.
 - **Formatting.** No semicolons, 100 columns, `sortImports` and `sortPackageJson` so imports and `package.json` keys have one order and diffs carry no reordering noise. `bracketSameLine` keeps the closing `>` of a multi-line tag on its last attribute line. The maintainer requested these three options; the repository has no JSX yet, so `bracketSameLine` only fixes the style for later UI code.
 
 ## Git hooks
 
-`lefthook.yml` runs on `pre-commit`, piped (the first failing job stops the rest). Its commands go through `bunx --no-install`, which resolves the dev dependency in `node_modules/.bin` and never fetches it, so a hook needs no mise on `PATH`:
+`lefthook.yml` runs on `pre-commit`, piped (the first failing job stops the rest). Its commands go through `bunx --no-install` and require native mise on `PATH`. Lefthook passes staged paths, temporarily hides unstaged changes in partly staged files, and stages lint and formatting fixes:
 
-1. `lint`: `bunx --no-install mise run lint:fix -- --staged`, then `stage_fixed` re-stages what lint changed (the `bun lint` docs do not say that `--staged --fix` stages again).
-2. `fmt`: `bunx --no-install mise run fmt -- --staged`, re-staged (Bun leaves a partly staged file unwritten rather than committing its unstaged changes).
+1. `lint`: runs `mise run lint:fix` on staged JavaScript and TypeScript paths.
+2. `fmt`: runs `mise run fmt` on staged paths.
 3. `build`: `bunx --no-install mise run build`, then `git add -A --` on exactly the generated paths, deletions included, so a commit always carries a plugin in step with its sources.
 4. `build-pi`: `git add -A --` on the Pi package's generated path, `packages/integrations/pi/dist` (`GENERATED_PATHS` in its `src/generate.ts`); the build job already built it.
 5. `versions`: when the root `package.json` is staged, `git add --` on `packages/runtime/package.json`, `packages/integrations/claude/package.json`, `packages/integrations/pi/package.json` and `bun.lock`, the copies `build` rewrites, so a version bump carries every copy of the version; otherwise they are left alone.
@@ -154,7 +155,7 @@ Every agent prompt is split into one file per section, and the order of the sect
 
 For how a rebuilt plugin reaches a session, see the Updates paragraph in [usage.md](usage.md#install).
 
-Do not edit generated files; each carries a note naming its source. `.prettierignore` and `.eslintignore` list them so the formatter leaves them as built.
+Do not edit generated files; each carries a note naming its source. The Oxlint and Oxfmt configs list them so the formatter leaves them as built.
 
 `packages/integrations/claude/tests/plugin.test.ts` is the sync test: every committed generated file equals a fresh build byte for byte, the generated paths hold nothing the build does not make, the build is deterministic, the wrapper is the one executable file, and the commit hook stages exactly `GENERATED_PATHS`. Other tests there cover the hooks (the `Workflow` hook's allowed and refused scripts among them) and the plugin manifest.
 
@@ -170,7 +171,7 @@ Do not edit generated files; each carries a note naming its source. `.prettierig
 - `packages/runtime/src/pi/bash/entry.ts`, bundled for Bun into `dist/scripts/just-bash.js` (`SHELL_SOURCE` in `src/generate.ts`): the shell process the extension starts for each bash call, with just-bash inside and `sql.js` stubbed out (`pi/bash/bundle.ts`). It is a bundle of its own, beside `holyagent.js`, so a move of the just-bash pin changes that file and no other; it is committed like the rest of `dist/` (see [pi/shell.md](pi/shell.md));
 - `packages/integrations/pi/package.json`, whose `version` the build first syncs from the root and whose `peerDependencies` the generated manifest carries.
 
-The generated `package.json` has the `pi-package` keyword, a `pi` key listing `./extensions`, `./prompts`, `./skills` and, under `subagents`, `./agents`, `files` naming `agents`, `extensions`, `prompts`, `scripts` and `skills`, and the host modules as `peerDependencies` with the range `*`. It lists no `dependencies`: Pi would install every one whatever the config says and load none, because it loads a package only from a `pi install` entry in its settings, which `holyagent setup` writes per config. Each generated file that can hold a comment carries a note naming its source; JSON has none. The root `package.json` has its own `pi` key that points at the same folders under `packages/integrations/pi/dist/`, because `pi install git:<repo>@<ref>` installs the repository root. `.prettierignore` and `.eslintignore` list the folder.
+The generated `package.json` has the `pi-package` keyword, a `pi` key listing `./extensions`, `./prompts`, `./skills` and, under `subagents`, `./agents`, `files` naming `agents`, `extensions`, `prompts`, `scripts` and `skills`, and the host modules as `peerDependencies` with the range `*`. It lists no `dependencies`: Pi would install every one whatever the config says and load none, because it loads a package only from a `pi install` entry in its settings, which `holyagent setup` writes per config. Each generated file that can hold a comment carries a note naming its source; JSON has none. The root `package.json` has its own `pi` key that points at the same folders under `packages/integrations/pi/dist/`, because `pi install git:<repo>@<ref>` installs the repository root. The Oxlint and Oxfmt configs exclude the folder.
 
 `packages/integrations/pi/tests/pi.test.ts` is its sync test: every committed generated file equals a fresh build byte for byte, the generated path holds nothing the build does not make, the build is deterministic, the commit hook stages exactly `GENERATED_PATHS`, the manifest and the root `pi` key name the same folders, the skills are those of the family, the 18 agent files carry the tools the config decides, the extension registers only its flag and handlers and loads under Node, and the host modules are not bundled. `tests/extension.test.ts` covers the extension's handlers with synthesized Pi events; the tests never run Pi or a model.
 

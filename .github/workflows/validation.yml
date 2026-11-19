@@ -107,13 +107,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # Installs the tools in mise.toml. mise runs its postinstall hook after `mise install`, which
-      # upgrades the stable Bun to the canary build that `bun check`, `bun lint` and `bun fmt` need.
       - name: Set up tools
         uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-
-      - name: Check the toolchain
-        run: mise run toolchain
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -145,11 +140,13 @@ jobs:
           trap 'rmdir "$scratch" 2>/dev/null || true' EXIT
           bun_bin="$(command -v bun)"
           node_bin="$(command -v node)"
+          host_netns="$(readlink /proc/self/ns/net)"
           sudo -n /usr/bin/unshare --net -- /usr/bin/setpriv \
             --reuid "$(id -u)" --regid "$(id -g)" --clear-groups --no-new-privs -- \
             /usr/bin/env -i HOME="$scratch" TMPDIR="$scratch" \
               PATH="$(dirname "$bun_bin"):$(dirname "$node_bin"):/usr/bin:/bin" \
               CI=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+              HOLYAGENT_HOST_NETNS="$host_netns" \
               "$bun_bin" --no-env-file scripts/validate-claude-plugin.ts
 
       - name: Lint the install script
@@ -171,9 +168,6 @@ jobs:
 
       - name: Set up tools
         uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
-
-      - name: Check the toolchain
-        run: mise run toolchain
 
       # Use the native mise supplied above; exercise trusted lifecycle scripts on Windows too.
       - name: Install dependencies

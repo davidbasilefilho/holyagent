@@ -1,8 +1,20 @@
+import { readlinkSync } from "node:fs"
 import { join } from "node:path"
 
 import { $ } from "bun"
 
 // The dedicated Linux validation step launches this smoke inside an isolated network namespace.
+const hostNamespace = process.env["HOLYAGENT_HOST_NETNS"]
+if (
+  process.platform !== "linux" ||
+  hostNamespace === undefined ||
+  !/^net:\[\d+\]$/.test(hostNamespace) ||
+  readlinkSync("/proc/self/ns/net") === hostNamespace
+) {
+  console.error("The plugin validator requires its dedicated offline Linux CI step.")
+  process.exit(1)
+}
+
 const root = join(import.meta.dir, "..")
 const claude = join(root, "node_modules", ".bin", "claude")
 for (const directory of [join(root, "packages", "integrations", "claude", "dist"), root]) {

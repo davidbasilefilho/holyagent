@@ -319,6 +319,22 @@ describe("validation.yml", () => {
     expect(step?.run).toBe('bun scripts/pr-checks.ts version main . "$HEAD_REF"')
   })
 
+  test("the vendor validator runs only in the isolated Linux CI step", () => {
+    const steps = Object.entries(validation.jobs).flatMap(([job, value]) =>
+      (value.steps ?? []).map(({ run }) => ({ job, run: run ?? "" })),
+    )
+    const invocations = steps.filter(({ run }) =>
+      /validate-claude-plugin\.ts|plugin validate/.test(run),
+    )
+    expect(invocations.map(({ job }) => job)).toEqual(["check"])
+    const command = invocations[0]?.run ?? ""
+    expect(command).toContain("sudo -n /usr/bin/unshare --net -- /usr/bin/setpriv")
+    expect(command).toContain("--clear-groups --no-new-privs")
+    expect(command).toContain("/usr/bin/env -i")
+    expect(command).toContain("HOLYAGENT_HOST_NETNS")
+    expect(command).toContain("--no-env-file scripts/validate-claude-plugin.ts")
+  })
+
   test("only a pull request run is cancelled by a newer run", () => {
     expect(validation.concurrency["cancel-in-progress"]).toBe(
       "${{ github.event_name == 'pull_request' }}",

@@ -8,20 +8,17 @@ commit-msg:
         packages/integrations/claude/dist/scripts/holyagent.js hook commit-msg {1}
 
 # Hooks use the same tasks as CI through native mise on PATH (see docs/development.md).
-# `bunx --no-install` never downloads the unsupported npm wrapper. Arguments after `--`
-# go to the underlying Bun command.
-# `--staged` limits lint and fmt to the staged files, and Bun leaves a partly staged file unwritten
-# rather than committing its unstaged changes. `stage_fixed` re-stages what lint fixed, since the
-# `bun lint` docs do not say `--staged --fix` stages again (`bun fmt --staged` does). `piped` stops at
-# the first failing job.
+# Lefthook hides unstaged changes to partly staged files and restores them after re-staging fixes.
+# `piped` stops at the first failing job.
 pre-commit:
   piped: true
   jobs:
     - name: lint
-      run: bunx --no-install mise run lint:fix -- --staged
+      glob: "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"
+      run: bunx --no-install mise run lint:fix -- --no-error-on-unmatched-pattern -- {staged_files}
       stage_fixed: true
     - name: fmt
-      run: bunx --no-install mise run fmt -- --staged
+      run: bunx --no-install mise run fmt -- --no-error-on-unmatched-pattern -- {staged_files}
       stage_fixed: true
     # Stages exactly the paths build.ts generates (its GENERATED_PATHS), deletions included, so a
     # commit always carries a plugin in step with its sources.

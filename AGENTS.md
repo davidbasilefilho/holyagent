@@ -8,17 +8,17 @@ Rules for working in this repository, each with the reason it exists. Claude Cod
 
 ## Code
 
-- Use Effect for effects and errors, and model failures as tagged errors. In runtime and CLI source, compose with Effect instead of try/catch, `new Promise`, Promise statics or async functions; the linter enforces this (`bunfig.toml`). Call `Effect.runPromise` only at integration boundaries.
+- Use Effect for effects and errors, and model failures as tagged errors. In runtime and CLI source, compose with Effect instead of try/catch, `new Promise`, Promise statics or async functions; the linter enforces this (`.oxlintrc.json`). Call `Effect.runPromise` only at integration boundaries.
 - Use Effect Schema (`import { Schema } from "effect"`) at every data boundary: decode first with `onExcessProperty: "error"`, then validate domain rules.
 - Prefer Bun APIs over Node equivalents, and fall back to `node:` where Bun has none.
 - Use the Bun Shell `$` from "bun" wherever a process would be spawned.
-- Add only tools that do something Bun and the configured toolchain do not already do. Bun covers the runtime, tests, type-check, lint and format, and lint plugins configured in `bunfig.toml` are part of that toolchain.
+- Add only tools that do something Bun and the configured toolchain do not already do. Bun covers the runtime, dependency installation and tests; Oxlint with tsrs checks types and lints, and Oxfmt formats.
 - Write JSDoc on every exported or public function, type, type alias and interface.
 - Start a skill description with the situation, then what the skill does, so a model can tell when to load it.
 
 ## Done
 
-`mise.toml` is the source of commands; `package.json` scripts and the git hooks delegate to it. Run the gates through mise, because it first checks for the canary Bun that provides `bun check`, `bun lint` and `bun fmt`.
+`mise.toml` is the source of commands; `package.json` scripts and the git hooks delegate to it. Run the gates through mise with stable Bun and the locked development dependencies.
 
 - Done means `mise run verify` passes (type-check, lint, format check and tests).
 - When plugin sources change, rebuild the generated plugin with `mise run build`; the pre-commit hook runs it too.
@@ -63,7 +63,7 @@ This repository's release convention includes CI checks; HolyAgent's instruction
 
 ## Dependencies
 
-- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the mise tools (ripgrep and fd included), the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in the pin table; it moves with `bun.lock` when the updater's `bun update` runs, and a user's own Pi install is theirs. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Every dependency range in a `package.json` is a caret range at its line boundary, or `workspace:*`.
+- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the mise tools (ripgrep and fd included), the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in the pin table; it moves with `bun.lock` when the updater's `bun update` runs, and a user's own Pi install is theirs. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Dependency ranges follow the rules in [docs/development.md](docs/development.md#dependencies). The root development dependency `tsrs` uses a prerelease caret range until a stable version is available.
 
 ## The README
 
