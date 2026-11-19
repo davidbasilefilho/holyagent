@@ -446,7 +446,7 @@ describe("direct shared application operations", () => {
       }
     },
   )
-  test("direct ownership checks reject operational targets inside a linked worktree", async () => {
+  const rejectLinkedTarget = async () => {
     const f = await fixture()
     const linked = `${f.cwd}-linked`
     try {
@@ -478,7 +478,13 @@ describe("direct shared application operations", () => {
       await rm(linked, { recursive: true, force: true })
       await f.close()
     }
-  })
+  }
+  // Creating a real linked worktree and exercising several Git-backed operations exceeds 5s on Windows.
+  test(
+    "direct ownership checks reject operational targets inside a linked worktree",
+    rejectLinkedTarget,
+    process.platform === "win32" ? 15_000 : 5_000,
+  )
   test("direct migration preserves legacy state and makes its records readable", async () => {
     const f = await fixture()
     try {

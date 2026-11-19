@@ -10931,7 +10931,7 @@ var validateOperationalResources = (resources, worktrees) => gen2(function* () {
 import { createHash as createHash5 } from "node:crypto";
 import {
   lstat as lstat6,
-  mkdir as mkdir5,
+  mkdir as mkdir6,
   open as open6,
   readdir as readdir3,
   readFile as readFile4,
@@ -11025,13 +11025,13 @@ var withStateLock = (directory, use, patience = STATE_PATIENCE, authorize = void
 
 import { createHash as createHash3, randomUUID } from "node:crypto";
 import { constants as constants2 } from "node:fs";
-import { link as link4, lstat as lstat5, mkdir as mkdir4, open as open4, realpath as realpath4, rename as rename5, rm as rm5, unlink } from "node:fs/promises";
+import { link as link4, lstat as lstat5, mkdir as mkdir5, open as open4, realpath as realpath4, rename as rename5, rm as rm5, unlink } from "node:fs/promises";
 import { dirname as dirname5, isAbsolute as isAbsolute4, join as join6, resolve as resolve5 } from "node:path";
 
 import { execFile } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
 import { constants } from "node:fs";
-import { link as link3, lstat as lstat4, open as open3, readdir, realpath as realpath3, rename as rename4, rm as rm4 } from "node:fs/promises";
+import { link as link3, lstat as lstat4, mkdir as mkdir4, open as open3, readdir, realpath as realpath3, rename as rename4, rm as rm4 } from "node:fs/promises";
 import { basename as basename2, dirname as dirname4, isAbsolute as isAbsolute3, join as join5, resolve as resolve4 } from "node:path";
 import { promisify } from "node:util";
 var MigrationJournalFile = Struct({
@@ -11110,49 +11110,134 @@ var owner = (info) => (typeof process.getuid !== "function" || info.uid === proc
 var runWindowsAcl = promisify(execFile);
 var windowsAclCheck = `
 $ErrorActionPreference = 'Stop'
-$allowed = @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value,
-  'S-1-5-18', 'S-1-5-32-544')
-$sidType = [Security.Principal.SecurityIdentifier]
-$paths = @($env:HOLYAGENT_JOURNAL_ACL_PARENT, $env:HOLYAGENT_JOURNAL_ACL_FILE)
-foreach ($path in $paths) {
-  if ([string]::IsNullOrEmpty($path)) { continue }
-  if ([IO.Directory]::Exists($path)) {
-    $acl = [IO.Directory]::GetAccessControl($path)
-  } else {
-    $acl = [IO.File]::GetAccessControl($path)
+$step = 'identify'
+try {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
+  $allowed = @($identity.Value, 'S-1-5-18', 'S-1-5-32-544')
+  $parent = $env:HOLYAGENT_JOURNAL_ACL_PARENT
+  if ($env:HOLYAGENT_JOURNAL_ACL_CREATE -eq '1') {
+    # Only the final, new private directory may be created here; leave existing ACLs alone.
+    if (-not [IO.Directory]::Exists([IO.Path]::GetDirectoryName($parent))) {
+      'missing-ancestor'; exit 0
+    }
+    $step = 'build-directory-dacl'
+    $security = [Security.AccessControl.DirectorySecurity]::new()
+    $security.SetAccessRuleProtection($true, $false)
+    $security.SetOwner($identity)
+    foreach ($sid in $allowed) {
+      $rule = [Security.AccessControl.FileSystemAccessRule]::new(
+        [Security.Principal.SecurityIdentifier]::new($sid),
+        [Security.AccessControl.FileSystemRights]::FullControl,
+        ([Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+         [Security.AccessControl.InheritanceFlags]::ObjectInherit),
+        [Security.AccessControl.PropagationFlags]::None,
+        [Security.AccessControl.AccessControlType]::Allow)
+      $security.AddAccessRule($rule)
+    }
+    $step = 'create-directory'
+    [void][IO.Directory]::CreateDirectory($parent, $security)
+    'ok'; exit 0
   }
-  if ($allowed -notcontains $acl.GetOwner($sidType).Value) { exit 1 }
-  # A NULL DACL permits everyone; only an explicit discretionary ACL qualifies.
-  $raw = [Security.AccessControl.RawSecurityDescriptor]::new($acl.GetSecurityDescriptorBinaryForm(), 0)
-  if ($null -eq $raw.DiscretionaryAcl) { exit 1 }
-  foreach ($ace in $raw.DiscretionaryAcl) {
-    if ($ace -isnot [Security.AccessControl.CommonAce]) { exit 1 }
-    if ($ace.AceQualifier -eq 'AccessAllowed' -and
-        -not ($ace.AceFlags -band [Security.AccessControl.AceFlags]::InheritOnly) -and
-        $allowed -notcontains $ace.SecurityIdentifier.Value) { exit 1 }
+  $sidType = [Security.Principal.SecurityIdentifier]
+  $paths = @($parent, $env:HOLYAGENT_JOURNAL_ACL_FILE)
+  foreach ($path in $paths) {
+    if ([string]::IsNullOrEmpty($path)) { continue }
+    if ([IO.Directory]::Exists($path)) {
+      $step = 'get-directory-acl'
+      $acl = [IO.Directory]::GetAccessControl($path)
+    } else {
+      $step = 'get-file-acl'
+      $acl = [IO.File]::GetAccessControl($path)
+    }
+    $step = 'get-owner'
+    $owner = $acl.GetOwner($sidType)
+    if ($null -eq $owner -or $allowed -notcontains $owner.Value) { 'untrusted-owner'; exit 0 }
+    # A NULL DACL permits everyone; only an explicit discretionary ACL qualifies.
+    $step = 'encode-descriptor'
+    $bytes = $acl.GetSecurityDescriptorBinaryForm()
+    $step = 'decode-descriptor'
+    $raw = [Security.AccessControl.RawSecurityDescriptor]::new([byte[]]$bytes, 0)
+    if ($null -eq $raw.DiscretionaryAcl) { 'missing-dacl'; exit 0 }
+    $dacl = $raw.DiscretionaryAcl
+    $step = 'count-aces'
+    $count = $dacl.Count
+    for ($index = 0; $index -lt $count; $index++) {
+      # Use the typed indexer; avoid Windows PowerShell's non-generic collection adapter.
+      $step = 'index-ace'
+      $ace = $dacl.get_Item($index)
+      if ($ace -isnot [Security.AccessControl.CommonAce]) { 'unsupported-ace'; exit 0 }
+      $step = 'inspect-ace-flags'
+      $qualifier = [int]$ace.AceQualifier
+      $flags = [int]$ace.AceFlags
+      $allow = [int][Security.AccessControl.AceQualifier]::AccessAllowed
+      $inheritOnly = [int][Security.AccessControl.AceFlags]::InheritOnly
+      if ($qualifier -eq $allow -and ($flags -band $inheritOnly) -eq 0) {
+        $step = 'inspect-ace-sid'
+        if ($allowed -notcontains $ace.SecurityIdentifier.Value) { 'untrusted-grant'; exit 0 }
+      }
+    }
   }
+  'ok'
+} catch {
+  $exception = $_.Exception
+  while ($null -ne $exception.InnerException) { $exception = $exception.InnerException }
+  'acl-operation-failed:{0}:{1}:{2:X8}' -f $step, $exception.GetType().Name, $exception.HResult
 }
+exit 0
 `;
-var secureWindowsAcl = async (parent, file) => {
-  if (process.platform !== "win32")
-    return true;
-  const system = process.env["SystemRoot"] ?? process.env["SYSTEMROOT"];
+var windowsAclProblem = async (parent, options = {}) => {
+  const system = process.env["SystemRoot"] ?? process.env["SYSTEMROOT"] ?? process.env["windir"];
   if (system === undefined || !isAbsolute3(system))
-    return false;
+    return "missing Windows system directory";
   try {
-    await runWindowsAcl(join5(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", windowsAclCheck], {
+    const { stdout } = await runWindowsAcl(join5(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-EncodedCommand",
+      Buffer.from(windowsAclCheck, "utf16le").toString("base64")
+    ], {
       env: {
         SystemRoot: system,
         HOLYAGENT_JOURNAL_ACL_PARENT: parent,
-        HOLYAGENT_JOURNAL_ACL_FILE: file
+        ...options.file === undefined ? {} : { HOLYAGENT_JOURNAL_ACL_FILE: options.file },
+        ...options.create === undefined ? {} : { HOLYAGENT_JOURNAL_ACL_CREATE: "1" }
       },
       windowsHide: true,
       timeout: 5000
     });
-    return true;
+    const result = stdout.trim();
+    if (result === "ok")
+      return;
+    if (/^acl-operation-failed:[a-z-]+:[a-zA-Z]{1,60}:[0-9A-F]{8}$/.test(result))
+      return result;
+    return [
+      "untrusted-owner",
+      "missing-dacl",
+      "unsupported-ace",
+      "untrusted-grant",
+      "missing-ancestor"
+    ].includes(result) ? result : "invalid ACL check response";
   } catch {
-    return false;
+    return "cannot run Windows ACL check";
   }
+};
+var ensureMigrationJournalDirectory = async (directory) => {
+  if (process.platform !== "win32") {
+    try {
+      await mkdir4(directory, { mode: 448 });
+    } catch (cause) {
+      if (!(typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "EEXIST"))
+        throw cause;
+    }
+    return;
+  }
+  const ancestor = dirname4(directory);
+  if (!canonicalAbsolute(directory) || await realpath3(ancestor) !== ancestor)
+    throw new Error("journal directory ancestor is not a canonical directory");
+  const problem = await windowsAclProblem(directory, { create: true });
+  if (problem !== undefined)
+    throw new Error(`cannot create private journal directory: ${problem}`);
 };
 var temporaryAlias = async (location, info) => {
   const prefix = `${basename2(location.path)}.`;
@@ -11208,11 +11293,8 @@ var read = async (location) => {
   try {
     handle = await open3(location.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   } catch (cause) {
-    if (isMissing(cause)) {
-      if (process.platform === "win32" && !await secureWindowsAcl(dirname4(location.path)))
-        throw invalid3(location, "journal parent does not have a private access list");
+    if (isMissing(cause))
       return;
-    }
     throw invalid3(location, "cannot safely open journal; inspect it before retrying");
   }
   try {
@@ -11222,8 +11304,9 @@ var read = async (location) => {
     if (info.nlink !== 1 && !(info.nlink === 2 && (await temporaryAlias(location, info)).length === 1))
       throw invalid3(location, "journal has an unexpected hard link");
     if (process.platform === "win32") {
-      if (!await secureWindowsAcl(dirname4(location.path), location.path))
-        throw invalid3(location, "journal or its parent does not have a private access list");
+      const problem = await windowsAclProblem(dirname4(location.path), { file: location.path });
+      if (problem !== undefined)
+        throw invalid3(location, `journal or its parent does not have a private access list: ${problem}`);
       const checkedPath = await lstat4(location.path);
       if (checkedPath.isSymbolicLink() || checkedPath.dev !== info.dev || checkedPath.ino !== info.ino)
         throw invalid3(location, "journal changed while verifying its access list");
@@ -11269,8 +11352,9 @@ var write = async (location, record, create) => {
       await checkLocation(location);
     handle = await open3(temporary, "wx", 384);
     if (process.platform === "win32") {
-      if (!await secureWindowsAcl(dirname4(location.path), temporary))
-        throw invalid3(location, "cannot create a private journal in this directory");
+      const problem = await windowsAclProblem(dirname4(location.path), { file: temporary });
+      if (problem !== undefined)
+        throw invalid3(location, `cannot create a private journal in this directory: ${problem}`);
       const [info, checkedPath] = await Promise.all([handle.stat(), lstat4(temporary)]);
       if (checkedPath.isSymbolicLink() || checkedPath.dev !== info.dev || checkedPath.ino !== info.ino)
         throw invalid3(location, "temporary journal changed while verifying its access list");
@@ -11478,7 +11562,7 @@ var publishMigrationFiles = (options) => gen2(function* () {
       yield* operation2(dir, async () => {
         terminal(dir, options.authorize, options.terminalAuthorize);
         try {
-          await mkdir4(dir);
+          await mkdir5(dir);
         } catch (cause) {
           if (!hasCode(cause, "EEXIST"))
             throw cause;
@@ -12352,7 +12436,7 @@ var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTR
   if (again !== undefined) {
     if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready))) {
       yield* authorize;
-      yield* io(ready, () => mkdir5(dirname6(ready), { recursive: true }).then(() => writeFile4(ready, "")));
+      yield* io(ready, () => mkdir6(dirname6(ready), { recursive: true }).then(() => writeFile4(ready, "")));
     }
     return { kind: "ready", path: again, created: false };
   }
@@ -12378,10 +12462,10 @@ var ensureWorktree = (top, common, env, branch, path, options, patience = WORKTR
   yield* authorize;
   yield* io(path, () => rm7(path, { recursive: true, force: true }));
   yield* authorize;
-  yield* io(path, () => mkdir5(dirname6(path), { recursive: true }));
+  yield* io(path, () => mkdir6(dirname6(path), { recursive: true }));
   yield* authorize;
   yield* gitText(top, env, [...add, ...target]);
-  yield* uninterruptible2(io(ready, () => mkdir5(dirname6(ready), { recursive: true }).then(() => writeFile4(ready, ""))));
+  yield* uninterruptible2(io(ready, () => mkdir6(dirname6(ready), { recursive: true }).then(() => writeFile4(ready, ""))));
   return { kind: "ready", path, created: true };
 }), patience, authorize);
 var LOCAL_FILES = new Set(["local/specialists.json"]);
@@ -12473,7 +12557,7 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
       return;
     if (!(yield* pendingMigration(common)) && (yield* workTreeEntries(top, env)).length === 0) {
       yield* authorize;
-      yield* io(marker, () => mkdir5(dirname6(marker), { recursive: true }).then(() => writeFile4(marker, "")));
+      yield* io(marker, () => mkdir6(dirname6(marker), { recursive: true }).then(() => writeFile4(marker, "")));
       return;
     }
     const sourceRoot = yield* io(top, () => realpath5(top));
@@ -12483,7 +12567,11 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
     const privateRoot = join9(commonRoot, "holyagent");
     for (const directory of [privateRoot, join9(privateRoot, "migration")]) {
       yield* authorize;
-      yield* io(directory, () => mkdir5(directory, { mode: 448 })).pipe(catchIf2((error) => hasCode(error.cause, "EEXIST"), () => void_3));
+      if (directory === privateRoot) {
+        yield* io(directory, () => mkdir6(directory, { mode: 448 })).pipe(catchIf2((error) => hasCode(error.cause, "EEXIST"), () => void_3));
+      } else {
+        yield* io(directory, () => ensureMigrationJournalDirectory(directory));
+      }
       const info = yield* io(directory, () => lstat6(directory));
       const actual = yield* io(directory, () => realpath5(directory));
       if (!info.isDirectory() || info.isSymbolicLink() || actual !== directory)
@@ -12624,7 +12712,7 @@ var migrateWorkTree = (top, common, worktree, env, branch, patience = STATE_PATI
           yield* begin;
           yield* io(source, () => rmdir(source)).pipe(ignore2);
           yield* begin;
-          yield* io(marker, () => mkdir5(dirname6(marker), { recursive: true }).then(() => writeFile4(marker, "")));
+          yield* io(marker, () => mkdir6(dirname6(marker), { recursive: true }).then(() => writeFile4(marker, "")));
         })
       }
     });
@@ -16694,7 +16782,7 @@ var stateMode2 = (context, input) => gen2(function* () {
     return yield* setStateMode(context.cwd, context.env, request.mode);
   }));
 });
-import { copyFile as copyFile2, lstat as lstat7, mkdir as mkdir6, readdir as readdir4 } from "node:fs/promises";
+import { copyFile as copyFile2, lstat as lstat7, mkdir as mkdir7, readdir as readdir4 } from "node:fs/promises";
 import { dirname as dirname10, join as join23, relative as relative4 } from "node:path";
 
 import { join as join22 } from "node:path";
@@ -18962,7 +19050,7 @@ var writeAll = (found) => gen2(function* () {
       yield* commitFile(record.file.path, record.file.content);
   const notes = found.flatMap((gathered) => gathered.notes);
   for (const note of notes) {
-    yield* io(note.to, () => mkdir6(dirname10(note.to), { recursive: true }));
+    yield* io(note.to, () => mkdir7(dirname10(note.to), { recursive: true }));
     yield* io(note.to, () => copyFile2(note.from, note.to));
   }
   return { records, copied: notes.map((note) => note.to) };
