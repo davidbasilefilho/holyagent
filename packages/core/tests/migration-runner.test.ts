@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, test as bunTest } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
@@ -13,6 +13,9 @@ import {
   type MigrationRunnerOptions,
   runMigrationTransaction,
 } from "../src/state/migration-runner.ts"
+
+const test = (name: string, run: () => Promise<void>) =>
+  bunTest(name, run, process.platform === "win32" ? 30_000 : 5_000)
 
 const fixture = async () => {
   // The host temp path may itself be an alias, such as /var on macOS.
@@ -127,7 +130,12 @@ const fixture = async () => {
   }
   const interruptAtGate = async () => {
     const fiber = Effect.runFork(runMigrationTransaction(options))
-    await Effect.runPromise(Deferred.await(started))
+    await Promise.race([
+      Effect.runPromise(Deferred.await(started)),
+      Effect.runPromise(Fiber.join(fiber)).then(() => {
+        throw new Error("migration finished before reaching its interruption gate")
+      }),
+    ])
     const interrupted = await Promise.race([
       Effect.runPromise(Fiber.interrupt(fiber)).then(() => true),
       new Promise<boolean>((done) => setTimeout(() => done(false), 2000)),

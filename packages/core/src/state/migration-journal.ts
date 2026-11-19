@@ -1,7 +1,9 @@
+import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 import { constants } from "node:fs"
 import { link, lstat, open, readdir, realpath, rename, rm } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, resolve } from "node:path"
+import { promisify } from "node:util"
 
 import { Data, Effect, Schema } from "effect"
 
@@ -164,6 +166,59 @@ const owner = (info: { uid: number; mode: number }) =>
   (typeof process.getuid !== "function" || info.uid === process.getuid()) &&
   (info.mode & 0o022) === 0
 
+const runWindowsAcl = promisify(execFile)
+const windowsAclCheck = `
+$ErrorActionPreference = 'Stop'
+$allowed = @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value,
+  'S-1-5-18', 'S-1-5-32-544')
+$sidType = [Security.Principal.SecurityIdentifier]
+$paths = @($env:HOLYAGENT_JOURNAL_ACL_PARENT, $env:HOLYAGENT_JOURNAL_ACL_FILE)
+foreach ($path in $paths) {
+  if ([string]::IsNullOrEmpty($path)) { continue }
+  if ([IO.Directory]::Exists($path)) {
+    $acl = [IO.Directory]::GetAccessControl($path)
+  } else {
+    $acl = [IO.File]::GetAccessControl($path)
+  }
+  if ($allowed -notcontains $acl.GetOwner($sidType).Value) { exit 1 }
+  # A NULL DACL permits everyone; only an explicit discretionary ACL qualifies.
+  $raw = [Security.AccessControl.RawSecurityDescriptor]::new($acl.GetSecurityDescriptorBinaryForm(), 0)
+  if ($null -eq $raw.DiscretionaryAcl) { exit 1 }
+  foreach ($ace in $raw.DiscretionaryAcl) {
+    if ($ace -isnot [Security.AccessControl.CommonAce]) { exit 1 }
+    if ($ace.AceQualifier -eq 'AccessAllowed' -and
+        -not ($ace.AceFlags -band [Security.AccessControl.AceFlags]::InheritOnly) -and
+        $allowed -notcontains $ace.SecurityIdentifier.Value) { exit 1 }
+  }
+}
+`
+
+// Windows stat permission bits are synthesized. Check the native DACL rather than
+// treating writable NTFS entries as world-writable or trusting them without checking.
+const secureWindowsAcl = async (parent: string, file?: string) => {
+  if (process.platform !== "win32") return true
+  const system = process.env["SystemRoot"] ?? process.env["SYSTEMROOT"]
+  if (system === undefined || !isAbsolute(system)) return false
+  try {
+    await runWindowsAcl(
+      join(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+      ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", windowsAclCheck],
+      {
+        env: {
+          SystemRoot: system,
+          HOLYAGENT_JOURNAL_ACL_PARENT: parent,
+          HOLYAGENT_JOURNAL_ACL_FILE: file,
+        },
+        windowsHide: true,
+        timeout: 5_000,
+      },
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** A crash after the exclusive link may leave our synced temporary name as a second link. */
 const temporaryAlias = async (
   location: MigrationJournalLocation,
@@ -219,12 +274,12 @@ const checkLocation = async (location: MigrationJournalLocation) => {
     if (
       !directory.isDirectory() ||
       directory.isSymbolicLink() ||
-      !owner(directory) ||
       actualParent !== parent ||
       !sourceInfo.isDirectory() ||
       !targetInfo.isDirectory() ||
       source !== location.sourceRoot ||
-      target !== location.targetRoot
+      target !== location.targetRoot ||
+      (process.platform !== "win32" && !owner(directory))
     )
       throw invalid(
         location,
@@ -242,7 +297,11 @@ const read = async (location: MigrationJournalLocation): Promise<MigrationJourna
   try {
     handle = await open(location.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   } catch (cause) {
-    if (isMissing(cause)) return undefined
+    if (isMissing(cause)) {
+      if (process.platform === "win32" && !(await secureWindowsAcl(dirname(location.path))))
+        throw invalid(location, "journal parent does not have a private access list")
+      return undefined
+    }
     throw invalid(location, "cannot safely open journal; inspect it before retrying")
   }
   try {
@@ -251,8 +310,7 @@ const read = async (location: MigrationJournalLocation): Promise<MigrationJourna
       !info.isFile() ||
       !pathInfo.isFile() ||
       pathInfo.isSymbolicLink() ||
-      !owner(info) ||
-      (info.mode & 0o077) !== 0 ||
+      (process.platform !== "win32" && (!owner(info) || (info.mode & 0o077) !== 0)) ||
       info.dev !== pathInfo.dev ||
       info.ino !== pathInfo.ino ||
       info.size > MAX_BYTES
@@ -263,6 +321,17 @@ const read = async (location: MigrationJournalLocation): Promise<MigrationJourna
       !(info.nlink === 2 && (await temporaryAlias(location, info)).length === 1)
     )
       throw invalid(location, "journal has an unexpected hard link")
+    if (process.platform === "win32") {
+      if (!(await secureWindowsAcl(dirname(location.path), location.path)))
+        throw invalid(location, "journal or its parent does not have a private access list")
+      const checkedPath = await lstat(location.path)
+      if (
+        checkedPath.isSymbolicLink() ||
+        checkedPath.dev !== info.dev ||
+        checkedPath.ino !== info.ino
+      )
+        throw invalid(location, "journal changed while verifying its access list")
+    }
     const text = await handle.readFile("utf8")
     if (Buffer.byteLength(text) > MAX_BYTES) throw invalid(location, "journal exceeds size limit")
     let value: unknown
@@ -304,7 +373,19 @@ const write = async (
   const temporary = `${location.path}.${crypto.randomUUID()}.tmp`
   let handle
   try {
+    if (process.platform === "win32") await checkLocation(location)
     handle = await open(temporary, "wx", 0o600)
+    if (process.platform === "win32") {
+      if (!(await secureWindowsAcl(dirname(location.path), temporary)))
+        throw invalid(location, "cannot create a private journal in this directory")
+      const [info, checkedPath] = await Promise.all([handle.stat(), lstat(temporary)])
+      if (
+        checkedPath.isSymbolicLink() ||
+        checkedPath.dev !== info.dev ||
+        checkedPath.ino !== info.ino
+      )
+        throw invalid(location, "temporary journal changed while verifying its access list")
+    }
     await handle.writeFile(contents, "utf8")
     await handle.sync()
     await handle.close()
@@ -347,7 +428,6 @@ export const beginMigrationJournal = <E>(
     if (record.phase !== "prepared")
       return yield* invalid(location, "a new journal must be prepared")
     yield* operation(location, async () => {
-      await checkLocation(location)
       encoded(location, record)
       if ((await read(location)) !== undefined)
         throw invalid(location, "a journal already exists; recover it first")
