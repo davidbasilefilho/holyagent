@@ -6,7 +6,7 @@ import { join } from "node:path"
 
 import { Deferred, Effect, Fiber } from "effect"
 
-import type { Capability, Context } from "../src/api/context.ts"
+import type { Context } from "../src/api/context.ts"
 import { createIntent } from "../src/domain/intent.ts"
 import { assignment, handoff, intent, makeContext, migrate, plan } from "../src/index.ts"
 import { WorkTree } from "../src/state/local.ts"
@@ -98,7 +98,7 @@ describe("direct shared application operations", () => {
     const f = await fixture()
     try {
       let checks = 0
-      const context: Context = { ...f.context, authorize: (_: Capability) => ++checks === 1 }
+      const context: Context = { ...f.context, authorize: () => ++checks === 1 }
       const result = await Effect.runPromiseExit(intent.create(context, { objective: "revoked" }))
       expect(result._tag).toBe("Failure")
       expect((await Effect.runPromise(intent.list(f.context, {}))).intents).toHaveLength(0)

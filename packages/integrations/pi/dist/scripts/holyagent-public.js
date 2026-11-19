@@ -13409,8 +13409,10 @@ var init_package = __esm(() => {
       "@types/bun": "^1.0.0",
       effect: "^4.0.0",
       "eslint-plugin-jsdoc": "^65.0.0",
-      lefthook: "^2.0.0",
-      "solid-js": "^1.0.0"
+      oxfmt: "^0.79.0",
+      oxlint: "^1.0.0",
+      "solid-js": "^1.0.0",
+      tsrs: "^7.1.0-beta.tsrs3"
     },
     pi: {
       extensions: [
@@ -13426,8 +13428,7 @@ var init_package = __esm(() => {
       }
     },
     trustedDependencies: [
-      "@anthropic-ai/claude-code",
-      "lefthook"
+      "@anthropic-ai/claude-code"
     ]
   };
 });

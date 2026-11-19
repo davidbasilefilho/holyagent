@@ -90,6 +90,17 @@ const peerNarrows = (specifier: string, requirements: ReadonlyArray<string>): bo
   })
 }
 
+/**
+ * Semver admits a prerelease only on the numeric version named in the range. tsrs publishes the
+ * available compatible backend on the 7.1.0 prerelease line; zeroing that to ^7.0.0 would exclude
+ * it.
+ */
+const tsrsPrerelease = (file: string, field: string, name: string, range: string): boolean =>
+  file === "package.json" &&
+  field === "devDependencies" &&
+  name === "tsrs" &&
+  /^\^\d+\.\d+\.\d+-beta\.tsrs\d+$/.test(range)
+
 /** Find range violations without rewriting workspace, Pi host or other protocol contracts. */
 const problems = (
   file: string,
@@ -103,7 +114,10 @@ const problems = (
       : typeof range === "string" &&
         ((DEPENDENCY_FIELDS.slice(0, 4).includes(field) && workspaces.has(name)
           ? range === "workspace:*"
-          : boundary(range) || PROTOCOL.test(range) || peerNarrows(range, peers.get(name) ?? [])) ||
+          : boundary(range) ||
+            PROTOCOL.test(range) ||
+            peerNarrows(range, peers.get(name) ?? []) ||
+            tsrsPrerelease(file, field, name, range)) ||
           isPiHostPeer(field, name, range))
     return ok ? [] : [`${file} ${field} ${name}: ${JSON.stringify(range)}`]
   })
@@ -188,6 +202,21 @@ describe("the rule", () => {
     "workspace:^",
   ])("%s is refused", (range) => {
     expect(problems("f", { dependencies: { x: range } }, workspaces)).toHaveLength(1)
+  })
+
+  test("admits the tsrs beta only through the root development dependency's caret", () => {
+    const beta = "7.1.0-beta.tsrs3"
+    const tsrs = `^${beta}`
+    expect(Bun.semver.satisfies(beta, tsrs)).toBe(true)
+    expect(Bun.semver.satisfies(beta, "^7.0.0-beta.tsrs3")).toBe(false)
+    expect(problems("package.json", { devDependencies: { tsrs } }, workspaces)).toEqual([])
+    expect(problems("package.json", { devDependencies: { tsrs: beta } }, workspaces)).toHaveLength(
+      1,
+    )
+    expect(
+      problems("packages/core/package.json", { devDependencies: { tsrs } }, workspaces),
+    ).toHaveLength(1)
+    expect(problems("package.json", { dependencies: { tsrs } }, workspaces)).toHaveLength(1)
   })
 
   test("allows a tilde only when an installed dependency narrows the peer range", () => {

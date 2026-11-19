@@ -4415,7 +4415,8 @@ describe("auto-review under the extension", () => {
   // The gate registers last, so its answer is the last one.
   const reviewed = async (api: ReturnType<typeof fakeApi>) =>
     (await api.emit("tool_call", REVIEWED)).at(-1) as
-      { block?: boolean; reason?: string } | undefined
+      | { block?: boolean; reason?: string }
+      | undefined
 
   test("is on from the session's start, before any config is read", async () => {
     const hold = gate()
@@ -4566,7 +4567,8 @@ test("real Core configuration coordinates native tools, aliases and pending wait
     expect(api.tools.some((tool) => tool.name === "holyagent_intent_list")).toBe(true)
     expect(api.tools.some((tool) => tool.name === "agent")).toBe(true)
     const wait = api.tools.find((tool) => tool.name === "wait_for_agents") as
-      ToolDefinition | undefined
+      | ToolDefinition
+      | undefined
     expect(wait).toBeDefined()
     bus.emit("subagents:ready", {})
     bus.emit("subagents:started", { id: "fixture" })

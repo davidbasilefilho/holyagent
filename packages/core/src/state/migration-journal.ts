@@ -297,12 +297,9 @@ export const ensureMigrationJournalDirectory = async (directory: string) => {
     try {
       await mkdir(directory, { mode: 0o700 })
     } catch (cause) {
-      if (!(
-        typeof cause === "object" &&
-        cause !== null &&
-        "code" in cause &&
-        cause.code === "EEXIST"
-      ))
+      if (
+        !(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "EEXIST")
+      )
         throw cause
     }
     return

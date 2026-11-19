@@ -14,7 +14,7 @@ The Windows installer (`install/windows-install.ps1`) installs missing `git`, No
 
 mise is installed only with the development option (`--dev` for the WSL installer, `-Dev` for the Windows one), because only developing this repository needs it. The WSL installer runs mise's official installer into `~/.local/bin/mise` and activates it in `~/.bashrc`. The Windows installer installs `jdx.mise` with `winget` and activates it in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`). Without the option, neither installer installs or activates mise.
 
-The plugin needs only a stable Bun on `PATH`; developing this repository needs a canary build ([requirements.md](requirements.md#why-bun-canary)). `holyagent setup` installs the global package below with `bun add -g`; its command lives in `$BUN_INSTALL/bin` (`~/.bun/bin`), which the installers put on `PATH`, and setup prints a hint when that directory is not on `PATH`.
+Both the supported T3 Code integration and repository development use stable Bun ([requirements.md](requirements.md#development-toolchain)).
 
 ## Claude Code
 

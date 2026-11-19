@@ -17,8 +17,7 @@
 #   PATH gains Bun's global bin directory, where `holyagent setup` puts ctx7.
 # - -Dev adds mise (winget package jdx.mise) and a line in your PowerShell profile that activates it (a
 #   one-time copy of the profile is kept next to it as <profile>.pre-holyagent). Bun stays a stable
-#   build; developing this repository needs a canary build, which `mise install` in the checkout
-#   upgrades to.
+#   build for both runtime and development.
 #
 # Tested by the maintainer on a Windows machine; see docs/requirements.md.
 param([switch]$Dev)

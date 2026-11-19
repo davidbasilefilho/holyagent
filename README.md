@@ -31,14 +31,14 @@ bunx --no-install mise run build    # regenerate the Claude plugin after changin
 bunx --no-install mise run verify   # type-check, lint, format check and tests
 ```
 
-`mise.toml` is the source of commands, and the repository toolchain needs a canary Bun, which the `toolchain` task checks for you. Commits follow Conventional Commits.
+`mise.toml` is the source of commands, and the repository uses stable Bun plus the locked Oxlint, tsrs and Oxfmt development tools. Commits follow Conventional Commits.
 
 ## Special thanks
 
 - [HolyClaude](docs/decisions.md), the predecessor plugin whose one long session was audited to shape HolyAgent's decisions.
 - [t3dotgg/tstack](https://github.com/t3dotgg/tstack), for the inspiration.
 - Anthropic's [frontend-design](docs/attributions.md#design-skill-sources) skill, an inspiration for the design skills.
-- [Context7](https://context7.com), [Effect](https://effect.website), [Bun](https://bun.sh), [mise](https://mise.jdx.dev), [lefthook](https://lefthook.dev), [TOON](https://toonformat.dev), [acorn](https://github.com/acornjs/acorn), [ripgrep](https://github.com/BurntSushi/ripgrep) and [fd](https://github.com/sharkdp/fd), the software HolyAgent builds with or needs.
+- [Context7](https://context7.com), [Effect](https://effect.website), [Bun](https://bun.sh), [mise](https://mise.jdx.dev), [hk](https://hk.jdx.dev), [TOON](https://toonformat.dev), [acorn](https://github.com/acornjs/acorn), [ripgrep](https://github.com/BurntSushi/ripgrep) and [fd](https://github.com/sharkdp/fd), the software HolyAgent builds with or needs.
 
 The full list, with licenses, is in [docs/attributions.md](docs/attributions.md).
 

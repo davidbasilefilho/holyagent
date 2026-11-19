@@ -30,7 +30,9 @@ import { readOpenState } from "../state/store.ts"
  * is in use.
  */
 export type Recorded =
-  { readonly intent: string } | { readonly unrecorded: string } | Record<never, never>
+  | { readonly intent: string }
+  | { readonly unrecorded: string }
+  | Record<never, never>
 
 /**
  * Runs a recorder against the Intent in use and folds its failure into the result. Nothing is
