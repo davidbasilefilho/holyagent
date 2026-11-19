@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, test as bunTest } from "bun:test"
 import { execFileSync, spawnSync } from "node:child_process"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -12,6 +12,11 @@ import {
   verifyMigrationCommit,
   verifyMigrationIndex,
 } from "../src/state/migration-index.ts"
+
+// Each integration case starts a real repository and launches multiple native Git processes.
+// On hosted Windows those processes can outlive Bun's default five-second unit-test budget.
+const test = (name: string, run: () => Promise<void>) =>
+  bunTest(name, run, process.platform === "win32" ? 15_000 : 5_000)
 
 const fixture = async (run: (cwd: string, git: (...args: string[]) => string) => Promise<void>) => {
   const cwd = await mkdtemp(join(tmpdir(), "holyagent-index-test-"))
