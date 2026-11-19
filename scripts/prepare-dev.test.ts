@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { hasDevToolchain, prepareDev } from "./prepare-dev.ts"
+import { isLegacyHook } from "./prepare.ts"
 
 const roots: string[] = []
 
@@ -18,7 +19,7 @@ afterEach(async () => {
 })
 
 describe("the dev toolchain check", () => {
-  test("is false when node_modules has no mise, as after a consumer install", async () => {
+  test("is false when node_modules has no Oxc dev dependencies, as after a consumer install", async () => {
     expect(hasDevToolchain(await makeRoot())).toBe(false)
   })
 
@@ -29,7 +30,7 @@ describe("the dev toolchain check", () => {
     const shim = join(bin, process.platform === "win32" ? "mise.cmd" : "mise")
     await writeFile(shim, "")
     await chmod(shim, 0o755)
-    const hook = join(bin, process.platform === "win32" ? "lefthook.cmd" : "lefthook")
+    const hook = join(bin, process.platform === "win32" ? "oxlint.cmd" : "oxlint")
     await writeFile(hook, "")
     await chmod(hook, 0o755)
     expect(hasDevToolchain(root)).toBe(true)
@@ -52,4 +53,17 @@ describe("the prepare script", () => {
   test("succeeds with a note and runs nothing when the dev toolchain is absent", async () => {
     expect(await prepareDev(await makeRoot())).toBe(0)
   })
+})
+
+test("recognizes only the corresponding old Lefthook launcher", () => {
+  const legacy = [
+    "#!/bin/sh",
+    'if [ "$LEFTHOOK_VERBOSE" = "1" ]; then',
+    "  set -x",
+    "fi",
+    'call_lefthook run "pre-commit" "$@"',
+  ].join("\n")
+  expect(isLegacyHook(legacy, "pre-commit")).toBe(true)
+  expect(isLegacyHook(legacy, "commit-msg")).toBe(false)
+  expect(isLegacyHook('#!/bin/sh\nexec mise x -- hk run pre-commit "$@"', "pre-commit")).toBe(false)
 })

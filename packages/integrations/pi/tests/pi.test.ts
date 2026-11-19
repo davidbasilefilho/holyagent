@@ -111,13 +111,12 @@ describe("the generated Pi package is in step with its sources", () => {
   })
 
   test("the commit hook stages exactly the generated paths", () => {
-    const lefthook = Bun.YAML.parse(read("lefthook.yml")) as {
-      readonly "pre-commit": { readonly jobs: ReadonlyArray<{ name: string; run?: string }> }
-    }
-    const job = lefthook["pre-commit"].jobs.find(({ name }) => name === "build-pi")
-    const [, paths = ""] = (job?.run ?? "").split(/\s--\s/)
-    expect(job?.run).toStartWith("git add -A -- ")
-    expect(paths.split(/\s+/).filter((path) => path !== "")).toEqual([...GENERATED_PATHS])
+    const step = read("hk.pkl").split('["generated"]')[1]?.split('["versions"]')[0] ?? ""
+    expect(step).toContain('"git", "add", "-A", "--"')
+    const paths = [...step.matchAll(/"(packages\/integrations\/pi\/[^"]+)"/g)].map(
+      (match) => match[1],
+    )
+    expect(paths).toEqual([...GENERATED_PATHS])
   })
 })
 
