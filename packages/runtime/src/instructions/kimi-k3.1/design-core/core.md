@@ -28,7 +28,10 @@ Apply the skill's capture checklist on the final captures: the worker before rep
   5. An audit with two questions: "would I make this for any similar product?" and the competitor test (drop an idea that still works with a competitor's name on it).
   6. A rewrite of what fails, with a note of what changed and why.
   7. Code only from the revised plan.
-- Say whether this is a refinement, which preserves the existing design, or a redesign, which replaces it.
+- For an existing interface, choose the scope from the original render and the brief:
+  1. Record the named component and state, what works there and what needs repair. When the original cannot be rendered, report that limit and label code-only observations.
+  2. Choose leave unchanged if nothing material needs repair, targeted polish if the failures are local, or redesign if the problems are systemic and a new direction is in scope. Follow an explicit request for a new direction even if nothing needs repair.
+  3. Keep working workflows, meaningful content and deliberate expressive choices unless the brief calls for changing them.
 
 ### Platform fidelity over invention
 
@@ -40,9 +43,9 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 - Read `DESIGN.md` at the project root before UI work and create or update it after. It holds: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't, and a brief log of the options already tried, so later passes explore new ground. Note a changed decision instead of silently overwriting it. (behavior check)
 
-### Spend boldness in one place
+### Focus expressive detail
 
-- Make one detail per screen the memorable one and keep the rest calm and restrained. Strip ornament that does nothing for the brief, and before finishing remove one accessory more, filling the gap with scale, real content or a real image so the screen is not left thin. (preference)
+- Choose whether the screen needs a distinguishing detail. If it does, use one or two focal points or a repeated detail drawn from the product, and let surrounding controls support them. Keep ornament that serves the brief. Restrained and expressive designs are both valid; do not add a signature just to check a box. (preference)
 - A labeled gray placeholder beats drawn art or emoji used as icons. (preference)
 
 ### Structure and content
@@ -66,4 +69,10 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 ### Iteration quality
 
+Sequence the work by dependency: settle the copy first where it drives type and layout; stabilize layout and states before tuning motion; compare the revised render and relevant states with the original when available.
+
 Assess the design system, composition, alignment, contrast, distribution, placement and sizing, and responsiveness. Exercise fluid component and route animation and transitions, including reduced motion. For each interactive element check hover where applicable, press or tap, keyboard focus and disabled appearance where relevant. Follow platform conventions while preserving creative latitude.
+
+### Source credit
+
+Adapted from [unslop](https://github.com/heydamir/unslop/blob/620163eedb3529d9cd23a3994ed8d287d06f760d/skills/unslop/SKILL.md) by Damir Sokolovsky, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). HolyAgent rephrased and adapted its audit, restraint and ordering ideas for web, mobile, desktop and terminal interfaces; no source scripts or assets are included.

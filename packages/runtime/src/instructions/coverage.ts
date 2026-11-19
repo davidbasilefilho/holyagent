@@ -36,6 +36,18 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "design-core/core.md",
       phrase: "fluid component and route animation",
     },
+    "R-DESIGN-AUDIT": {
+      section: "design-core/core.md",
+      phrase: "name the component and state",
+    },
+    "R-DESIGN-SIGNATURE": {
+      section: "design-core/core.md",
+      phrase: "recurring detail that belongs",
+    },
+    "R-DESIGN-DEPENDENCIES": {
+      section: "design-core/core.md",
+      phrase: "after layout and states are stable",
+    },
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",
       phrase: "immediately previous commit",
@@ -372,6 +384,18 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-DESIGN-QUALITY": {
       section: "design-core/core.md",
       phrase: "fluid component and route animation",
+    },
+    "R-DESIGN-AUDIT": {
+      section: "design-core/core.md",
+      phrase: "choose the scope from",
+    },
+    "R-DESIGN-SIGNATURE": {
+      section: "design-core/core.md",
+      phrase: "repeated detail drawn",
+    },
+    "R-DESIGN-DEPENDENCIES": {
+      section: "design-core/core.md",
+      phrase: "stabilize layout and states before tuning motion",
     },
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",
@@ -726,6 +750,18 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-DESIGN-QUALITY": {
       section: "design-core/core.md",
       phrase: "fluid component and route animation",
+    },
+    "R-DESIGN-AUDIT": {
+      section: "design-core/core.md",
+      phrase: "Name the component and state",
+    },
+    "R-DESIGN-SIGNATURE": {
+      section: "design-core/core.md",
+      phrase: "surrounding chrome supporting",
+    },
+    "R-DESIGN-DEPENDENCIES": {
+      section: "design-core/core.md",
+      phrase: "motion follows stable layout and states",
     },
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",

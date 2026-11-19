@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { Effect } from "effect"
 
 import { toPosix } from "../../../runtime/src/domain/paths.ts"
+import { REQUIREMENT_COVERAGE } from "../../../runtime/src/instructions/coverage.ts"
 import { FAMILIES } from "../../../runtime/src/instructions/families.ts"
 import {
   DESIGN_CORE_MARKER,
@@ -130,13 +131,13 @@ describe("the platform design skills", () => {
       const source = read(`${INSTRUCTIONS_DIRECTORY}/skills/${name}/SKILL.md`)
       const markers = source.split("\n").filter((line) => line === DESIGN_CORE_MARKER)
       expect({ name, markers }).toEqual({ name, markers: [DESIGN_CORE_MARKER] })
-      expect({ name, repeats: source.includes("### Spend boldness in one place") }).toEqual({
+      expect({ name, repeats: source.includes("### Focus expressive detail") }).toEqual({
         name,
         repeats: false,
       })
     }
     const holders = generated
-      .filter((file) => file.content.includes("### Spend boldness in one place"))
+      .filter((file) => file.content.includes("### Focus expressive detail"))
       .map((file) => file.path.split("/").at(-2) ?? "")
     expect(holders.toSorted()).toEqual([...DESIGN_SKILLS].toSorted())
   })
@@ -161,7 +162,9 @@ describe("the platform design skills", () => {
     expect(
       run(skillBody("other/SKILL.md", "---\nname: other\n---\nbody\n", core, "other")),
     ).toContain("body")
-    expect(run(skillBody("web-design/SKILL.md", text, core, "web"))).toContain("### Spend boldness")
+    expect(run(skillBody("web-design/SKILL.md", text, core, "web"))).toContain(
+      "### Focus expressive detail",
+    )
   })
 
   test("name no framework, library, component kit or API", () => {
@@ -283,4 +286,23 @@ describe("the materiality definition", () => {
       run(embedMateriality(`${MATERIALITY_MARKER}\n\t${MATERIALITY_MARKER}  `, "definition", "a")),
     ).toThrow("at most once")
   })
+})
+
+describe("the rendered-design audit in every published skill", () => {
+  for (const family of FAMILIES) {
+    test(`${family} ships the audit, signature, dependency order and source credit on all four platforms`, () => {
+      const host = family === "claude-5.5" ? "claude" : "pi"
+      for (const name of DESIGN_SKILLS) {
+        const body = read(`packages/integrations/${host}/dist/guidance/${family}/${name}/SKILL.md`)
+        for (const id of ["R-DESIGN-AUDIT", "R-DESIGN-SIGNATURE", "R-DESIGN-DEPENDENCIES"]) {
+          const coverage = REQUIREMENT_COVERAGE[family][id]
+          expect(coverage).toBeDefined()
+          expect(body).toContain(coverage?.phrase ?? "missing coverage")
+        }
+        expect(body).toContain("Damir Sokolovsky")
+        expect(body).toContain("https://github.com/heydamir/unslop/blob/")
+        expect(body).toContain("https://creativecommons.org/licenses/by/4.0/")
+      }
+    })
+  }
 })
