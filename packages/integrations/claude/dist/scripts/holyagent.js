@@ -16108,7 +16108,7 @@ var PI_MINIMUM_NODE = "22.19.0";
 var PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`;
 var NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`;
 var PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`;
-var PACKAGE_COMMAND = `pi install git:github.com/davidbasilefilho/holyagent@holyagent-${package_default.version}`;
+var PACKAGE_COMMAND = `pi install npm:holyagent@${package_default.version}`;
 var packageFix = (scope) => scope === "user" ? `install it with \`${PACKAGE_COMMAND}\`` : `install it with \`${PACKAGE_COMMAND}\` (add -l for this project only)`;
 var VERSION = /(\d+)\.(\d+)\.(\d+)/;
 var releaseIn = (text) => {
@@ -17248,6 +17248,13 @@ var restoreSettings = (path, previous, unchangedSince) => previous === undefined
 var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
+var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
+  const home = t3Home(env);
+  return [
+    ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`],
+    ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
+  ];
+});
 var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join21(homeDirectory2(env), ".t3");
 var t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map4((info) => info.isDirectory()), orElseSucceed2(() => false));
@@ -17539,17 +17546,28 @@ var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
     return [];
   const decided = yield* decide(env, cwd, options);
   if (decided === undefined || "line" in decided)
-    return [];
+    return options.required === true ? [
+      fail8(label2, "Cannot configure the Pi provider; check pi.enable and pi.t3.scope, then run holyagent setup")
+    ] : [];
   const { file, units: wanted } = decided.target;
   return yield* gen2(function* () {
     const { value } = yield* readJsonObjectSnapshot(file);
+    if (options.required === true) {
+      const instances = value["providerInstances"];
+      const instance = isJsonObject2(instances) ? instances["pi"] : undefined;
+      const config = isJsonObject2(instance) ? instance["config"] : undefined;
+      if (!isJsonObject2(instance) || instance["driver"] !== "pi" || instance["enabled"] !== true || isJsonObject2(config) && config["enabled"] === false)
+        return [
+          fail8(label2, "Pi provider is not enabled; run holyagent setup, and check the provider in T3 Code Settings")
+        ];
+    }
     const { keys } = wantedKeys(value, wanted);
     const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added");
     return [
       missing.length === 0 ? pass(label2, `${file} holds the settings HolyAgent writes`) : hint(`${label2} ${file} lacks ${names(missing)}; run \`holyagent setup\``)
     ];
   }).pipe(catchTag2("SetupFailure", (error) => succeed6([
-    hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
+    options.required === true ? fail8(label2, `${error.message}; fix the file, then run holyagent setup`) : hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
   ])));
 });
 
@@ -17602,7 +17620,7 @@ var setup = fn2("setup")(function* (env, options) {
   if (options.undo === true) {
     const lines = [
       hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-      ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
+      ...options.t3Workflow === true ? [] : yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
       ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions)),
       ...scope === "user" ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun })) : []
     ];
@@ -17610,6 +17628,11 @@ var setup = fn2("setup")(function* (env, options) {
   }
   const cloud = inCloudSession(env);
   const piUsed = !cloud && (yield* piInUse(env));
+  if (options.t3Workflow === true) {
+    const blockers = yield* checkT3Prerequisites(env, piUsed);
+    if (blockers.length > 0)
+      return { lines: blockers.map((line) => `! ${line}`), ok: false };
+  }
   const ctx7Lines = options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun));
   const capabilityLines = piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
     scope,
@@ -17634,7 +17657,7 @@ var setup = fn2("setup")(function* (env, options) {
       ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
     })) : [],
     ...yield* searchToolLines(piOptions.cwd, setupToolLine),
-    ...yield* onSettings((file) => mergeUserSettings({
+    ...options.t3Workflow === true ? [] : yield* onSettings((file) => mergeUserSettings({
       env,
       file,
       subagentCacheTtl: options.subagentCacheTtl,
@@ -17648,9 +17671,9 @@ var FIX = "run /holyagent:setup, or `holyagent doctor --fix`";
 var checkBun = gen2(function* () {
   const shell = yield* Shell;
   const found = yield* shell.which("bun");
-  return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the plugin hooks");
+  return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the HolyAgent CLI");
 });
-var checkCommand = (env, command) => gen2(function* () {
+var checkCommand = (env, command, fix = FIX) => gen2(function* () {
   if (inCloudSession(env))
     return pass(command, "not installed in a claude.ai cloud session, by design");
   const shell = yield* Shell;
@@ -17658,7 +17681,7 @@ var checkCommand = (env, command) => gen2(function* () {
   if (isSome2(onPath))
     return pass(command, onPath.value);
   const anywhere = yield* shell.which(command, { includeBunBin: true });
-  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
+  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${fix}`);
 });
 var fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
 var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail8("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail8("settings", error.message))));
@@ -17670,8 +17693,22 @@ var doctor = fn2("doctor")(function* (env, options) {
   const pi = inCloudSession(env) ? [] : [
     ...yield* piChecks(env, cwd, scope, form),
     ...yield* checkPiToolSettings(env, cwd, scope, form.form),
-    ...scope === "user" ? yield* checkT3Settings(env, cwd) : []
+    ...scope === "user" || options.t3Workflow === true ? yield* checkT3Settings(env, cwd, { required: options.t3Workflow === true }) : []
   ];
+  if (options.t3Workflow === true) {
+    const blockers = yield* checkT3Prerequisites(env, !inCloudSession(env) && (yield* piInUse(env)));
+    const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix");
+    const ctx7 = yield* checkCtx7;
+    const fixes = options.fix && ctx7.startsWith("FAIL ") && blockers.length === 0 ? yield* asStep("ctx7", installCtx7(env, false)) : [];
+    const lines = [
+      ...blockers.map((line) => `FAIL ${line}`),
+      yield* checkBun,
+      ...fixes,
+      ...fixes.length > 0 ? [yield* checkCtx7] : [ctx7],
+      ...pi
+    ];
+    return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
+  }
   const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
   if (located instanceof SetupFailure) {
     const lines = yield* all2([
@@ -17722,6 +17759,7 @@ var Choices = Struct({
 var schemas4 = {
   setup: Struct({
     subagentCacheTtl: Literals(CACHE_TTLS),
+    t3Workflow: optionalKey2(Boolean3),
     dryRun: Boolean3,
     skipCtx7: Boolean3,
     scope: optionalKey2(Literals(SCOPES)),
@@ -17733,6 +17771,7 @@ var schemas4 = {
   }),
   doctor: Struct({
     fix: Boolean3,
+    t3Workflow: optionalKey2(Boolean3),
     scope: optionalKey2(Literals(SCOPES)),
     form: optionalKey2(Form)
   })
@@ -29067,9 +29106,9 @@ var CAPABILITY_FLAGS = Object.fromEntries(CAPABILITIES.map((capability) => [capa
 var printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
 `, "", report.ok ? 0 : 1);
-var resolveScope = fn2("resolveScope")(function* (flag, usage, cwd) {
+var resolveScope = fn2("resolveScope")(function* (flag, usage, cwd, t3Workflow) {
   if (flag === undefined)
-    return yield* installedScope(cwd);
+    return t3Workflow ? { scope: "user", source: "default", notices: [] } : yield* installedScope(cwd);
   const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
   return { scope, source: "flag" };
 });
@@ -29095,17 +29134,18 @@ var SETUP_COMMANDS = [
   {
     path: ["setup"],
     usage: SETUP_USAGE,
-    summary: "Install and configure what HolyAgent needs beside the plugin, skipping every step already done",
+    summary: "Configure HolyAgent for T3 Code, skipping every step already done",
     output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
+      "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
       "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
       "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
-      "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-      "--scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
-      "without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
-      "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
+      "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
+      "internal Claude entry only: --scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+      "internal Claude entry only: without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
+      "internal Claude settings: setup records their keys, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
       "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
-      "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+      "a failed step is reported and the rest still run; in the internal Claude entry in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
       `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
@@ -29126,8 +29166,8 @@ var SETUP_COMMANDS = [
     },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd, emit, terminal, setupTui }) => gen2(function* () {
-      const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+    run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow }) => gen2(function* () {
+      const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd, t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
       if (resolved instanceof SetupFailure) {
         return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
       }
@@ -29146,6 +29186,7 @@ var SETUP_COMMANDS = [
       const apply = (choices, chosen, notes = []) => gen2(function* () {
         const report = yield* setup2(coreContext2(cwd, env), {
           scope: resolved.scope,
+          t3Workflow,
           undo: booleanFlag(args, "undo"),
           subagentCacheTtl,
           dryRun: booleanFlag(args, "dry-run"),
@@ -29187,25 +29228,27 @@ var SETUP_COMMANDS = [
   {
     path: ["doctor"],
     usage: DOCTOR_USAGE,
-    summary: "Check bun, ctx7 and the settings of a scope, and, when Pi is in use, pi, node and the Pi packages the config enables; exit 1 when a check fails",
+    summary: "Check T3 Code readiness, Bun, the Pi backend and feature packages; exit 1 when a check fails",
     output: "one line per check, `ok   <name>: \u2026` or `FAIL <name>: \u2026`; exit 1 when any check failed",
     notes: [
-      "--scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
-      "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
+      "public T3 Code doctor uses user scope by default and does not check Claude Code settings; open T3 Code once and use the Pi provider",
+      "internal Claude entry only: --scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
+      "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; in the public workflow missing Pi fails, while the internal entry prints a `~ pi: not in use` hint; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
       "the Pi checks include `ok   pi form:` (headless or normal, detected from the machine as setup does, or named by --form) and one `pi capability <name>` line for each capability the config turns on: `ok` with its form and what applies, `FAIL` naming an unmet system need or a package not listed at its pin, or a `~` line when the form does not offer it (computer-use on a headless machine), which fails nothing; the provider and web kit packages are the `pi base packages` line",
       "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages. The ctx7 check verifies CLI availability, not authentication"
     ],
     flags: { scope: "string", fix: "boolean", form: "string" },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd }) => gen2(function* () {
-      const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+    run: ({ args, env, cwd, t3Workflow }) => gen2(function* () {
+      const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, cwd, t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
       if (resolved instanceof SetupFailure) {
         return printed({ lines: [fail8("scope", resolved.message)], ok: false });
       }
       const form = yield* formOf(args, env, DOCTOR_USAGE);
       const report = yield* doctor2(coreContext2(cwd, env), {
         fix: booleanFlag(args, "fix"),
+        t3Workflow,
         scope: resolved.scope,
         form
       });
@@ -29424,6 +29467,7 @@ var callFor = (args, host, emit, command) => gen2(function* () {
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
     terminal: host.terminal,
+    t3Workflow: host.t3Workflow ?? false,
     setupTui: host.setupTui,
     input: (schema) => readInput(host, schema, inline),
     inputBy: (pick) => readInputBy(host, pick, inline)
@@ -29517,6 +29561,7 @@ var main = (interactiveSetup = false) => runPromise2(run2(Bun.argv.slice(2), {
   stdin,
   emit: (text) => write2(process.stdout, text),
   ...interactiveSetup ? {
+    t3Workflow: true,
     terminal: {
       stdin: Boolean(process.stdin.isTTY),
       stdout: Boolean(process.stdout.isTTY)

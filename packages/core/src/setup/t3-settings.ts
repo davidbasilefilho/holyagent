@@ -21,7 +21,7 @@ import {
 } from "./json-file.ts"
 import { loadPiConfig, piInUse } from "./pi-check.ts"
 import { addRecorded, clearRecorded, readRecorded, type Recorded } from "./record.ts"
-import { hint, pass, show, skipped } from "./report.ts"
+import { fail, hint, pass, show, skipped } from "./report.ts"
 import { take } from "./settings.ts"
 
 /**
@@ -160,6 +160,18 @@ export const writeSettings = (path: string, value: JsonObject, unchangedSince?: 
               ),
         ),
       )
+
+/** Lists the missing prerequisites for the public T3 Code workflow without writing settings. */
+export const checkT3Prerequisites = (env: Env, piUsed: boolean) =>
+  Effect.gen(function* () {
+    const home = t3Home(env)
+    return [
+      ...((yield* isDirectory(home))
+        ? []
+        : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`]),
+      ...(piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]),
+    ]
+  })
 
 /** T3 Code's home: `T3CODE_HOME`, else `.t3` in the home directory. */
 export const t3Home = (env: Env) =>
@@ -708,15 +720,42 @@ export const undoT3Settings = Effect.fn("undoT3Settings")(function* (
 export const checkT3Settings = (
   env: Env,
   cwd: string,
-  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform"> = {},
+  options: Pick<T3SettingsOptions, "worktrees" | "deviceAccess" | "platform"> & {
+    readonly required?: boolean
+  } = {},
 ) =>
   Effect.gen(function* () {
     if (!(yield* piInUse(env))) return []
     const decided = yield* decide(env, cwd, options)
-    if (decided === undefined || "line" in decided) return []
+    if (decided === undefined || "line" in decided)
+      return options.required === true
+        ? [
+            fail(
+              label,
+              "Cannot configure the Pi provider; check pi.enable and pi.t3.scope, then run holyagent setup",
+            ),
+          ]
+        : []
     const { file, units: wanted } = decided.target
     return yield* Effect.gen(function* () {
       const { value } = yield* readJsonObjectSnapshot(file)
+      if (options.required === true) {
+        const instances = value["providerInstances"]
+        const instance = isJsonObject(instances) ? instances["pi"] : undefined
+        const config = isJsonObject(instance) ? instance["config"] : undefined
+        if (
+          !isJsonObject(instance) ||
+          instance["driver"] !== "pi" ||
+          instance["enabled"] !== true ||
+          (isJsonObject(config) && config["enabled"] === false)
+        )
+          return [
+            fail(
+              label,
+              "Pi provider is not enabled; run holyagent setup, and check the provider in T3 Code Settings",
+            ),
+          ]
+      }
       const { keys } = wantedKeys(value, wanted)
       const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added")
       return [
@@ -727,7 +766,9 @@ export const checkT3Settings = (
     }).pipe(
       Effect.catchTag("SetupFailure", (error) =>
         Effect.succeed([
-          hint(`${label}: ${error.message}; fix the file, then run \`holyagent setup\``),
+          options.required === true
+            ? fail(label, `${error.message}; fix the file, then run holyagent setup`)
+            : hint(`${label}: ${error.message}; fix the file, then run \`holyagent setup\``),
         ]),
       ),
     )
