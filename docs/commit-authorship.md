@@ -1,6 +1,6 @@
 # Commit authorship
 
-Commits and PR text read as the user wrote them: commits use the configured Git identity, the author is never an agent, and nothing in the text names an agent. The one exception is the committer of a claude.ai cloud session, which stays Claude so that branch commits are Verified (see [Cloud sessions](#cloud-sessions)). The history describes the change, not the process that made it, and the owner is accountable for it. An audit of the predecessor plugin found nearly all of about 397 commits and every observed PR body carrying `Co-Authored-By`, `Claude-Session` and "Generated with" lines, because the harness injects the trailer rule and nothing in the project overrode it. `holyagent vcs commit`, `holyagent vcs pr` and the `commit-msg` hook below are the fix; the root never writes `git commit -m` by hand.
+Commits and PR text read as the user wrote them: commits use the configured Git identity, the author is never an agent, and nothing in the text names an agent. The one exception is the committer of a claude.ai cloud session, which stays Claude so that branch commits are Verified (see [Cloud sessions](#cloud-sessions)). The history describes the change, not the process that made it, and the owner is accountable for it. An audit of the predecessor plugin found nearly all of about 397 commits and every observed PR body carrying `Co-Authored-By`, `Claude-Session` and "Generated with" lines, because the harness injects the trailer rule and nothing in the project overrode it. Claude Code requires `holyagent vcs commit` both locally and on the web. The web harness motivates that rule because it defaults to Claude as the author and committer; its extra identity setup changes only the author. Other harnesses use plain Git with the configured owner as author. The PR wrapper and the `commit-msg` hook below apply the same text rules.
 
 ## The `vcs` commands
 
@@ -49,7 +49,7 @@ The `vcs` section is one of the settings that the project's `.holyagent/config.j
 
 ## The `commit-msg` hook
 
-`holyagent hook commit-msg <message-file>` runs the same cleaning and check on the message file git passes to a `commit-msg` hook. It rewrites the file without the attribution lines and exits 3 on a refused message, which stops the commit, so a commit made with plain `git commit` (by the user, or by an agent that ran it anyway) gets the same text rule. Git's own comment lines (`core.commentString` or `core.commentChar`, `#` by default) are left alone and not checked for phrases, and so is everything after the exact scissors line (`<comment> ------------------------ >8 ------------------------`) that `git commit -v` adds before the staged diff. Attribution lines are removed from there too, since a message made by hand keeps everything below such a line. A comment string that comes only from a `-c` on the command line is ignored; the repository's files decide.
+`holyagent hook commit-msg <message-file>` runs the same cleaning and check on the message file git passes to a `commit-msg` hook. It rewrites the file without the attribution lines and exits 3 on a refused message, which stops the commit, so a commit made with plain `git commit` (by the user or by an agent in another harness) gets the same text rule. Git's own comment lines (`core.commentString` or `core.commentChar`, `#` by default) are left alone and not checked for phrases, and so is everything after the exact scissors line (`<comment> ------------------------ >8 ------------------------`) that `git commit -v` adds before the staged diff. Attribution lines are removed from there too, since a message made by hand keeps everything below such a line. A comment string that comes only from a `-c` on the command line is ignored; the repository's files decide.
 
 Install it in any repository as `.git/hooks/commit-msg`:
 
@@ -62,7 +62,7 @@ exec bun --no-env-file "--config=/path/to/holyagent/scripts/empty-bunfig.toml" "
 
 ## Raw git commits
 
-A raw `git commit` still runs: the rule that commits go through `holyagent vcs commit` is instruction text, delivered by the hooks in [hooks.md](hooks.md) and chosen over a guard in [decisions.md](decisions.md). Its message gets the `commit-msg` hook above where that is installed.
+A raw `git commit` still runs: the Claude Code rule that commits go through `holyagent vcs commit` is instruction text, delivered by the hooks in [hooks.md](hooks.md) and chosen over a guard in [decisions.md](decisions.md). Its message gets the `commit-msg` hook above where that is installed.
 
 ## Settings that `holyagent setup` writes
 

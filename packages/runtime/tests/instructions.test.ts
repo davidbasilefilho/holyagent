@@ -41,6 +41,20 @@ const PI_CLI = "${HOLYAGENT_PI_ROOT}/scripts/holyagent"
  * The checks of how a family's text starts the bundled CLI, given the family's files. Each family
  * names the CLI in one form only, so a project's `.env` and `bunfig.toml` stay out of it.
  */
+const bareHolyAgentCli = (files: ReadonlyArray<string>) => {
+  // GPT source text uses the bare CLI without wrappers or other hosts’ placeholders.
+  const invoking = files.filter((path) => /`holyagent (?:rg|fd|vcs|assignment)\b/.test(read(path)))
+  expect(invoking.length).toBeGreaterThanOrEqual(2)
+  for (const path of files)
+    expect({
+      path,
+      found:
+        /scripts\/holyagent|holyagent\.js|--no-env-file|CLAUDE_PLUGIN_ROOT|HOLYAGENT_PI_ROOT/.exec(
+          read(path),
+        )?.[0],
+    }).toEqual({ path, found: undefined })
+}
+
 const CLI_CHECKS: Record<Family, (files: ReadonlyArray<string>) => void> = {
   "claude-5.5": (files) => {
     const invocations = files.flatMap((path) =>
@@ -98,22 +112,8 @@ const CLI_CHECKS: Record<Family, (files: ReadonlyArray<string>) => void> = {
         })
     }
   },
-  "gpt-6": (files) => {
-    // The host that runs this family is not wired yet, so the text names the CLI as a bare
-    // `holyagent <command>` and carries no wrapper path, flag or placeholder of another host.
-    const invoking = files.filter((path) =>
-      /`holyagent (?:rg|fd|vcs|assignment)\b/.test(read(path)),
-    )
-    expect(invoking.length).toBeGreaterThanOrEqual(3)
-    for (const path of files)
-      expect({
-        path,
-        found:
-          /scripts\/holyagent|holyagent\.js|--no-env-file|CLAUDE_PLUGIN_ROOT|HOLYAGENT_PI_ROOT/.exec(
-            read(path),
-          )?.[0],
-      }).toEqual({ path, found: undefined })
-  },
+  "gpt-6": bareHolyAgentCli,
+  "gpt-6.2": bareHolyAgentCli,
 }
 
 describe.each(FAMILIES)("instruction sources of family %s", (family) => {

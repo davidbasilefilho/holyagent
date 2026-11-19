@@ -14,12 +14,14 @@ const clauses = [
 
 describe("GPT human-facing prose guidance", () => {
   test("the root and every composed specialist receive it, without changing Kimi", async () => {
-    for (const clause of clauses) expect(PI_ROOT_PROMPTS["gpt-6"]).toContain(clause)
     expect(PI_ROOT_PROMPTS["kimi-k3.1"]).not.toContain(guidance)
-    const gpt = await agentFiles("gpt-6")
-    expect(gpt.length).toBeGreaterThan(0)
-    for (const agent of gpt) {
-      for (const clause of clauses) expect(agent.content, agent.path).toContain(clause)
+    for (const family of ["gpt-6", "gpt-6.2"] as const) {
+      for (const clause of clauses) expect(PI_ROOT_PROMPTS[family]).toContain(clause)
+      const gpt = await agentFiles(family)
+      expect(gpt.length).toBeGreaterThan(0)
+      for (const agent of gpt) {
+        for (const clause of clauses) expect(agent.content, agent.path).toContain(clause)
+      }
     }
     // The other families remain unchanged by this GPT-only requirement.
     for (const family of ["kimi-k3.1", "claude-5.5"] as const) {

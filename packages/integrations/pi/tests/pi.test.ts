@@ -327,7 +327,7 @@ describe("the other families the package carries", () => {
   const expectedAgents = AGENT_TYPES.map((name) => `${name}.md`).toSorted()
 
   test("the package's own agents stay the default family's; others sit below families/", () => {
-    expect(EXTRA_PI_FAMILIES).toEqual(["gpt-6"])
+    expect(EXTRA_PI_FAMILIES).toEqual(["gpt-6", "gpt-6.2"])
     expect(PI_FAMILY).toBe(DEFAULT_PI_FAMILY)
     expect(PACKAGE_FILES).toContain(FAMILIES_FOLDER)
     expect(names(folder("agents"))).toEqual(expectedAgents)
@@ -348,12 +348,14 @@ describe("the other families the package carries", () => {
   test("a family's prompt is written from that family's sources, not copied from the default's", () => {
     for (const name of SPECIALIST_NAMES) {
       const own = generated.find((file) => file.path === `${DIST_DIRECTORY}/agents/${name}.md`)
-      const gpt = generated.find(
-        (file) => file.path === `${DIST_DIRECTORY}/${familyAgents("gpt-6")}/${name}.md`,
-      )
-      expect(gpt?.content, name).toContain(`instructions/gpt-6/roles/${name}`)
       expect(own?.content, name).toContain(`instructions/kimi-k3.1/roles/${name}`)
-      expect(promptBody(gpt?.content ?? ""), name).not.toBe(promptBody(own?.content ?? ""))
+      for (const family of EXTRA_PI_FAMILIES) {
+        const gpt = generated.find(
+          (file) => file.path === `${DIST_DIRECTORY}/${familyAgents(family)}/${name}.md`,
+        )
+        expect(gpt?.content, name).toContain(`instructions/${family}/roles/${name}`)
+        expect(promptBody(gpt?.content ?? ""), name).not.toBe(promptBody(own?.content ?? ""))
+      }
     }
   })
 })
@@ -565,7 +567,7 @@ describe("the specialists", () => {
           agentTools(from, route).filter((tool) => web.includes(tool)),
           route.agent,
         ).toEqual(searches ? web : [])
-      for (const folder of ["agents", familyAgents("gpt-6")]) {
+      for (const folder of ["agents", ...EXTRA_PI_FAMILIES.map(familyAgents)]) {
         const file = generated.find(
           (entry) => entry.path === `${DIST_DIRECTORY}/${folder}/${route.agent}.md`,
         )
