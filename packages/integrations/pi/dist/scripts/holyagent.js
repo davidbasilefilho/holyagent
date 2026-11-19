@@ -13823,10 +13823,12 @@ var scanFiles = async (directory) => {
 };
 var init_scan = () => {};
 
+import { execFile } from "child_process";
 import { createHash as createHash2 } from "crypto";
 import { constants } from "fs";
 import { link as link3, lstat as lstat3, open as open3, readdir as readdir2, realpath as realpath2, rename as rename4, rm as rm4 } from "fs/promises";
 import { basename, dirname as dirname3, isAbsolute as isAbsolute2, join as join4, resolve as resolve3 } from "path";
+import { promisify } from "util";
 var MigrationJournalFile, MigrationJournalSource, MigrationJournalPhase, MigrationJournal, MigrationJournalError, MAX_BYTES, OID, FINGERPRINT, PHASES, decode3, invalid3 = (location, reason) => new MigrationJournalError({ path: location.path, reason }), canonicalAbsolute = (path) => isAbsolute2(path) && resolve3(path) === path, isMissing = (cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT", validate2 = (location, value) => {
   let record;
   try {
@@ -13846,7 +13848,51 @@ var MigrationJournalFile, MigrationJournalSource, MigrationJournalPhase, Migrati
   if (!canonicalAbsolute(record.sourceRoot) || !canonicalAbsolute(record.targetRoot) || record.sourceRoot !== location.sourceRoot || record.targetRoot !== location.targetRoot || !/^[A-Za-z0-9_-]{1,128}$/.test(record.transaction) || !validBranch || ![record.parent, record.commit, record.tree].every((oid) => OID.test(oid)) || ![record.indexBefore, record.indexAfter].every((hash) => FINGERPRINT.test(hash)) || !unique(filePaths) || !unique(sourcePaths) || !record.files.every((file) => (file.before === null || OID.test(file.before)) && OID.test(file.after) && (file.mode === 33188 || file.mode === 33261) && validContent(file.content) && matchesBlob(file)) || !record.source.every((file) => OID.test(file.digest)))
     throw invalid3(location, "invalid journal fields or root binding; inspect it before retrying");
   return record;
-}, owner = (info) => (typeof process.getuid !== "function" || info.uid === process.getuid()) && (info.mode & 18) === 0, temporaryAlias = async (location, info) => {
+}, owner = (info) => (typeof process.getuid !== "function" || info.uid === process.getuid()) && (info.mode & 18) === 0, runWindowsAcl, windowsAclCheck = `
+$ErrorActionPreference = 'Stop'
+$allowed = @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value,
+  'S-1-5-18', 'S-1-5-32-544')
+$sidType = [Security.Principal.SecurityIdentifier]
+$paths = @($env:HOLYAGENT_JOURNAL_ACL_PARENT, $env:HOLYAGENT_JOURNAL_ACL_FILE)
+foreach ($path in $paths) {
+  if ([string]::IsNullOrEmpty($path)) { continue }
+  if ([IO.Directory]::Exists($path)) {
+    $acl = [IO.Directory]::GetAccessControl($path)
+  } else {
+    $acl = [IO.File]::GetAccessControl($path)
+  }
+  if ($allowed -notcontains $acl.GetOwner($sidType).Value) { exit 1 }
+  # A NULL DACL permits everyone; only an explicit discretionary ACL qualifies.
+  $raw = [Security.AccessControl.RawSecurityDescriptor]::new($acl.GetSecurityDescriptorBinaryForm(), 0)
+  if ($null -eq $raw.DiscretionaryAcl) { exit 1 }
+  foreach ($ace in $raw.DiscretionaryAcl) {
+    if ($ace -isnot [Security.AccessControl.CommonAce]) { exit 1 }
+    if ($ace.AceQualifier -eq 'AccessAllowed' -and
+        -not ($ace.AceFlags -band [Security.AccessControl.AceFlags]::InheritOnly) -and
+        $allowed -notcontains $ace.SecurityIdentifier.Value) { exit 1 }
+  }
+}
+`, secureWindowsAcl = async (parent, file) => {
+  if (process.platform !== "win32")
+    return true;
+  const system = process.env["SystemRoot"] ?? process.env["SYSTEMROOT"];
+  if (system === undefined || !isAbsolute2(system))
+    return false;
+  try {
+    await runWindowsAcl(join4(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", windowsAclCheck], {
+      env: {
+        SystemRoot: system,
+        HOLYAGENT_JOURNAL_ACL_PARENT: parent,
+        HOLYAGENT_JOURNAL_ACL_FILE: file
+      },
+      windowsHide: true,
+      timeout: 5000
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}, temporaryAlias = async (location, info) => {
   const prefix = `${basename(location.path)}.`;
   const names = await readdir2(dirname3(location.path));
   const candidates = names.filter((name) => name.startsWith(prefix) && /^[0-9a-f-]{36}\.tmp$/.test(name.slice(prefix.length)));
@@ -13884,7 +13930,7 @@ var MigrationJournalFile, MigrationJournalSource, MigrationJournalPhase, Migrati
       lstat3(location.sourceRoot),
       lstat3(location.targetRoot)
     ]);
-    if (!directory.isDirectory() || directory.isSymbolicLink() || !owner(directory) || actualParent !== parent || !sourceInfo.isDirectory() || !targetInfo.isDirectory() || source !== location.sourceRoot || target !== location.targetRoot)
+    if (!directory.isDirectory() || directory.isSymbolicLink() || actualParent !== parent || !sourceInfo.isDirectory() || !targetInfo.isDirectory() || source !== location.sourceRoot || target !== location.targetRoot || process.platform !== "win32" && !owner(directory))
       throw invalid3(location, "journal parent or trusted roots are not private canonical directories");
   } catch (cause) {
     if (cause instanceof MigrationJournalError)
@@ -13897,16 +13943,26 @@ var MigrationJournalFile, MigrationJournalSource, MigrationJournalPhase, Migrati
   try {
     handle = await open3(location.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   } catch (cause) {
-    if (isMissing(cause))
+    if (isMissing(cause)) {
+      if (process.platform === "win32" && !await secureWindowsAcl(dirname3(location.path)))
+        throw invalid3(location, "journal parent does not have a private access list");
       return;
+    }
     throw invalid3(location, "cannot safely open journal; inspect it before retrying");
   }
   try {
     const [info, pathInfo] = await Promise.all([handle.stat(), lstat3(location.path)]);
-    if (!info.isFile() || !pathInfo.isFile() || pathInfo.isSymbolicLink() || !owner(info) || (info.mode & 63) !== 0 || info.dev !== pathInfo.dev || info.ino !== pathInfo.ino || info.size > MAX_BYTES)
+    if (!info.isFile() || !pathInfo.isFile() || pathInfo.isSymbolicLink() || process.platform !== "win32" && (!owner(info) || (info.mode & 63) !== 0) || info.dev !== pathInfo.dev || info.ino !== pathInfo.ino || info.size > MAX_BYTES)
       throw invalid3(location, "journal is not an owned private regular file");
     if (info.nlink !== 1 && !(info.nlink === 2 && (await temporaryAlias(location, info)).length === 1))
       throw invalid3(location, "journal has an unexpected hard link");
+    if (process.platform === "win32") {
+      if (!await secureWindowsAcl(dirname3(location.path), location.path))
+        throw invalid3(location, "journal or its parent does not have a private access list");
+      const checkedPath = await lstat3(location.path);
+      if (checkedPath.isSymbolicLink() || checkedPath.dev !== info.dev || checkedPath.ino !== info.ino)
+        throw invalid3(location, "journal changed while verifying its access list");
+    }
     const text = await handle.readFile("utf8");
     if (Buffer.byteLength(text) > MAX_BYTES)
       throw invalid3(location, "journal exceeds size limit");
@@ -13941,7 +13997,16 @@ var MigrationJournalFile, MigrationJournalSource, MigrationJournalPhase, Migrati
   const temporary = `${location.path}.${crypto.randomUUID()}.tmp`;
   let handle;
   try {
+    if (process.platform === "win32")
+      await checkLocation(location);
     handle = await open3(temporary, "wx", 384);
+    if (process.platform === "win32") {
+      if (!await secureWindowsAcl(dirname3(location.path), temporary))
+        throw invalid3(location, "cannot create a private journal in this directory");
+      const [info, checkedPath] = await Promise.all([handle.stat(), lstat3(temporary)]);
+      if (checkedPath.isSymbolicLink() || checkedPath.dev !== info.dev || checkedPath.ino !== info.ino)
+        throw invalid3(location, "temporary journal changed while verifying its access list");
+    }
     await handle.writeFile(contents, "utf8");
     await handle.sync();
     await handle.close();
@@ -13963,7 +14028,6 @@ var MigrationJournalFile, MigrationJournalSource, MigrationJournalPhase, Migrati
   if (record.phase !== "prepared")
     return yield* invalid3(location, "a new journal must be prepared");
   yield* operation(location, async () => {
-    await checkLocation(location);
     encoded(location, record);
     if (await read(location) !== undefined)
       throw invalid3(location, "a journal already exists; recover it first");
@@ -14051,6 +14115,7 @@ var init_migration_journal = __esm(() => {
     "source-cleaned"
   ];
   decode3 = decodeUnknownSync(MigrationJournal, { onExcessProperty: "error" });
+  runWindowsAcl = promisify(execFile);
 });
 
 import { createHash as createHash3, randomUUID } from "crypto";

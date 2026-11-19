@@ -33,16 +33,22 @@ const draft = {
 } as const
 
 describe("direct shared application operations", () => {
-  test("Node executes real lifecycle, brief and handoff without Bun", () => {
-    const run = spawnSync(
-      "node",
-      ["--experimental-strip-types", join(import.meta.dir, "node-fixture.mjs")],
-      { encoding: "utf8" },
-    )
-    expect(run.status).toBe(0)
-    expect(run.stdout).toContain("node direct lifecycle, brief and handoff passed")
-    expect(run.stderr).toBe("")
-  })
+  // Node startup plus real Git/state operations exceeded the default on hosted Windows.
+  test(
+    "Node executes real lifecycle, brief and handoff without Bun",
+    () => {
+      const run = spawnSync(
+        "node",
+        ["--experimental-strip-types", join(import.meta.dir, "node-fixture.mjs")],
+        { encoding: "utf8", timeout: process.platform === "win32" ? 15_000 : 4_000 },
+      )
+      expect(run.error).toBeUndefined()
+      expect(run.status).toBe(0)
+      expect(run.stdout).toContain("node direct lifecycle, brief and handoff passed")
+      expect(run.stderr).toBe("")
+    },
+    process.platform === "win32" ? 20_000 : 5_000,
+  )
   test("Bun creates, dispatches, records, closes, accepts and lists state", async () => {
     const f = await fixture()
     try {
