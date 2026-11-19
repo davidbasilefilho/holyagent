@@ -193,7 +193,7 @@ test(
   process.platform === "win32" ? 20_000 : 5_000,
 )
 
-test("a marked ignored divergent record is refused while a clean tracked historical copy remains valid", async () => {
+const markedIgnoredHandoff = async () => {
   root = await realpath(await mkdtemp(join(tmpdir(), "holyagent-handoff-ignored-")))
   const git = (...args: string[]) => {
     const result = Bun.spawnSync(["git", ...args], {
@@ -261,7 +261,14 @@ test("a marked ignored divergent record is refused while a clean tracked histori
   expect(git("worktree", "list", "--porcelain")).toBe(worktrees)
   await Bun.write(local, JSON.stringify(current))
   expect((await cli("pi")).code).toBe(0)
-})
+}
+
+// Like branchModeHandoff, this awaits multiple native Git children before cleaning the worktree.
+test(
+  "a marked ignored divergent record is refused while a clean tracked historical copy remains valid",
+  markedIgnoredHandoff,
+  process.platform === "win32" ? 20_000 : 5_000,
+)
 
 test("handoff does not create a lock for an unfinished standard state checkout", async () => {
   root = await mkdtemp(join(tmpdir(), "holyagent-handoff-pending-"))

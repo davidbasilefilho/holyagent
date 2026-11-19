@@ -395,7 +395,10 @@ test.skipIf(process.platform === "win32")(
   },
 )
 
-test("terminal sweep authority retains the marker after revocation", async () => {
+// Completing a real Git migration includes repeated native ACL checks on Windows.
+const terminalBudget = process.platform === "win32" ? 45_000 : 5_000
+
+const terminalSweepRevocation = async () => {
   const f = await fixture(false)
   try {
     await f.source(f.root, "first")
@@ -424,9 +427,15 @@ test("terminal sweep authority retains the marker after revocation", async () =>
   } finally {
     await f.close()
   }
-})
+}
 
-test("missing custom terminal guard fails before state setup and leaves peek read-only", async () => {
+test(
+  "terminal sweep authority retains the marker after revocation",
+  terminalSweepRevocation,
+  terminalBudget,
+)
+
+const missingTerminalGuard = async () => {
   const f = await fixture(false)
   try {
     await f.source(f.root, "first")
@@ -462,9 +471,15 @@ test("missing custom terminal guard fails before state setup and leaves peek rea
   } finally {
     await f.close()
   }
-})
+}
 
-test("explicit malformed or denied terminal authority cannot start state setup", async () => {
+test(
+  "missing custom terminal guard fails before state setup and leaves peek read-only",
+  missingTerminalGuard,
+  terminalBudget,
+)
+
+const deniedTerminalAuthority = async () => {
   const f = await fixture(false)
   try {
     await f.source(f.root, "first")
@@ -538,4 +553,10 @@ test("explicit malformed or denied terminal authority cannot start state setup",
   } finally {
     await f.close()
   }
-})
+}
+
+test(
+  "explicit malformed or denied terminal authority cannot start state setup",
+  deniedTerminalAuthority,
+  terminalBudget,
+)
