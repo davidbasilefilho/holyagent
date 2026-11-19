@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, test as bunTest } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import {
@@ -25,6 +25,9 @@ import {
   type MigrationJournalLocation,
   readMigrationJournal,
 } from "../src/state/migration-journal.ts"
+
+const test = (name: string, run: () => Promise<void>) =>
+  bunTest(name, run, process.platform === "win32" ? 30_000 : 5_000)
 
 const fixture = async () => {
   // The host temp path may itself be an alias, such as /var on macOS.
@@ -199,7 +202,7 @@ test("a journal changed during an authorization wait is not overwritten", async 
   }
 })
 
-test.skipIf(process.platform === "win32")(
+bunTest.skipIf(process.platform === "win32")(
   "symlinks, hardlinks and nonprivate journal files are rejected",
   async () => {
     const f = await fixture()
@@ -244,4 +247,39 @@ test.skipIf(process.platform === "win32")(
       await f.close()
     }
   },
+)
+
+bunTest.skipIf(process.platform !== "win32")(
+  "Windows rejects a journal or parent with an untrusted access grant",
+  async () => {
+    const f = await fixture()
+    try {
+      await Effect.runPromise(beginMigrationJournal(f.location, f.record, Effect.void))
+      expect(await Effect.runPromise(readMigrationJournal(f.location))).toEqual(f.record)
+      const grantEveryoneRead = (path: string, inheritance = "") => {
+        const system = process.env["SystemRoot"] ?? process.env["SYSTEMROOT"] ?? ""
+        const changed = spawnSync(
+          join(system, "System32", "icacls.exe"),
+          [path, "/grant", `*S-1-1-0:${inheritance}(R)`],
+          { encoding: "utf8" },
+        )
+        expect(changed.status, changed.stderr).toBe(0)
+      }
+      grantEveryoneRead(f.location.path)
+      await failed(readMigrationJournal(f.location))
+      await rm(f.location.path)
+      const parent = join(f.root, "private")
+      // This grant applies only to descendants. The empty temporary file inherits it,
+      // so a new journal must fail without writing sensitive bytes.
+      grantEveryoneRead(parent, "(OI)(CI)(IO)")
+      expect(await Effect.runPromise(readMigrationJournal(f.location))).toBeUndefined()
+      await failed(beginMigrationJournal(f.location, f.record, Effect.void))
+      expect(await Bun.file(f.location.path).exists()).toBe(false)
+      grantEveryoneRead(parent)
+      await failed(readMigrationJournal(f.location))
+    } finally {
+      await f.close()
+    }
+  },
+  15_000,
 )

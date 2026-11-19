@@ -162,7 +162,8 @@ jobs:
   # show up on every pull request.
   windows:
     runs-on: windows-latest
-    timeout-minutes: 15
+    # Real Git worktree fixtures are slower here; leave time for the full suite and dependency setup.
+    timeout-minutes: 30
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
