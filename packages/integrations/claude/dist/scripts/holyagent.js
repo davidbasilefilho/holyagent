@@ -10933,6 +10933,7 @@ var owner = (info) => (typeof process.getuid !== "function" || info.uid === proc
 var runWindowsAcl = promisify(execFile);
 var windowsAclCheck = `
 $ErrorActionPreference = 'Stop'
+$step = 'identify'
 try {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
   $allowed = @($identity.Value, 'S-1-5-18', 'S-1-5-32-544')
@@ -10942,6 +10943,7 @@ try {
     if (-not [IO.Directory]::Exists([IO.Path]::GetDirectoryName($parent))) {
       'missing-ancestor'; exit 0
     }
+    $step = 'build-directory-dacl'
     $security = [Security.AccessControl.DirectorySecurity]::new()
     $security.SetAccessRuleProtection($true, $false)
     $security.SetOwner($identity)
@@ -10955,6 +10957,7 @@ try {
         [Security.AccessControl.AccessControlType]::Allow)
       $security.AddAccessRule($rule)
     }
+    $step = 'create-directory'
     [void][IO.Directory]::CreateDirectory($parent, $security)
     'ok'; exit 0
   }
@@ -10963,16 +10966,22 @@ try {
   foreach ($path in $paths) {
     if ([string]::IsNullOrEmpty($path)) { continue }
     if ([IO.Directory]::Exists($path)) {
+      $step = 'get-directory-acl'
       $acl = [IO.Directory]::GetAccessControl($path)
     } else {
+      $step = 'get-file-acl'
       $acl = [IO.File]::GetAccessControl($path)
     }
+    $step = 'get-owner'
     $owner = $acl.GetOwner($sidType)
     if ($null -eq $owner -or $allowed -notcontains $owner.Value) { 'untrusted-owner'; exit 0 }
     # A NULL DACL permits everyone; only an explicit discretionary ACL qualifies.
+    $step = 'encode-descriptor'
     $bytes = $acl.GetSecurityDescriptorBinaryForm()
+    $step = 'decode-descriptor'
     $raw = [Security.AccessControl.RawSecurityDescriptor]::new([byte[]]$bytes, 0)
     if ($null -eq $raw.DiscretionaryAcl) { 'missing-dacl'; exit 0 }
+    $step = 'iterate-aces'
     foreach ($ace in $raw.DiscretionaryAcl) {
       if ($ace -isnot [Security.AccessControl.CommonAce]) { 'unsupported-ace'; exit 0 }
       if ($ace.AceQualifier -eq [Security.AccessControl.AceQualifier]::AccessAllowed -and
@@ -10982,7 +10991,9 @@ try {
   }
   'ok'
 } catch {
-  'acl-operation-failed'
+  $exception = $_.Exception
+  while ($null -ne $exception.InnerException) { $exception = $exception.InnerException }
+  'acl-operation-failed:{0}:{1}:{2:X8}' -f $step, $exception.GetType().Name, $exception.HResult
 }
 exit 0
 `;
@@ -11010,13 +11021,14 @@ var windowsAclProblem = async (parent, options = {}) => {
     const result = stdout.trim();
     if (result === "ok")
       return;
+    if (/^acl-operation-failed:[a-z-]+:[a-zA-Z]{1,60}:[0-9A-F]{8}$/.test(result))
+      return result;
     return [
       "untrusted-owner",
       "missing-dacl",
       "unsupported-ace",
       "untrusted-grant",
-      "missing-ancestor",
-      "acl-operation-failed"
+      "missing-ancestor"
     ].includes(result) ? result : "invalid ACL check response";
   } catch {
     return "cannot run Windows ACL check";
