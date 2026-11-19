@@ -268,20 +268,26 @@ bunTest.skipIf(process.platform !== "win32")(
         expect(changed.status, changed.stderr).toBe(0)
       }
       grantEveryoneRead(f.location.path)
-      await failed(readMigrationJournal(f.location))
+      await expect(Effect.runPromise(readMigrationJournal(f.location))).rejects.toThrow(
+        "untrusted-grant",
+      )
       await rm(f.location.path)
       const parent = join(f.root, "private")
       // This grant applies only to descendants. The empty temporary file inherits it,
       // so a new journal must fail without writing sensitive bytes.
       grantEveryoneRead(parent, "(OI)(CI)(IO)")
       expect(await Effect.runPromise(readMigrationJournal(f.location))).toBeUndefined()
-      await failed(beginMigrationJournal(f.location, f.record, Effect.void))
+      await expect(
+        Effect.runPromise(beginMigrationJournal(f.location, f.record, Effect.void)),
+      ).rejects.toThrow("untrusted-grant")
       expect(await Bun.file(f.location.path).exists()).toBe(false)
       grantEveryoneRead(parent)
       // Ignoring an absent journal does not authorize creating one in this directory.
       expect(await Effect.runPromise(readMigrationJournal(f.location))).toBeUndefined()
       await ensureMigrationJournalDirectory(parent)
-      await failed(beginMigrationJournal(f.location, f.record, Effect.void))
+      await expect(
+        Effect.runPromise(beginMigrationJournal(f.location, f.record, Effect.void)),
+      ).rejects.toThrow("untrusted-grant")
       expect(await Bun.file(f.location.path).exists()).toBe(false)
 
       // A newly provisioned child starts private even under a parent that grants read access.
@@ -294,5 +300,6 @@ bunTest.skipIf(process.platform !== "win32")(
       await f.close()
     }
   },
-  15_000,
+  // Exercises multiple real PowerShell and icacls calls, including cold startup.
+  45_000,
 )

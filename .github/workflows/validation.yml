@@ -181,9 +181,10 @@ jobs:
       - name: Verify Windows journal permissions and path handling
         run: >
           bun test packages/core/tests/migration-journal.test.ts
+          packages/core/src/state/migration-files.test.ts
           packages/core/src/state/migration-worktrees.test.ts
           packages/integrations/pi/tests/extension.test.ts
-          --test-name-pattern "Windows rejects a journal|terminal sweep authority|missing custom terminal guard|explicit malformed or denied terminal authority|the root routes to the chosen family"
+          --test-name-pattern "Windows rejects a journal|migration identity keeps|detached cleanup preserves|terminal sweep authority|missing custom terminal guard|explicit malformed or denied terminal authority|the root routes to the chosen family"
 
       - name: Test
         run: mise run test

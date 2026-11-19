@@ -11030,7 +11030,7 @@ var windowsAclProblem = async (parent, options = {}) => {
         ...options.create === undefined ? {} : { HOLYAGENT_JOURNAL_ACL_CREATE: "1" }
       },
       windowsHide: true,
-      timeout: 5000
+      timeout: 15000
     });
     const result = stdout.trim();
     if (result === "ok")
@@ -11044,7 +11044,9 @@ var windowsAclProblem = async (parent, options = {}) => {
       "untrusted-grant",
       "missing-ancestor"
     ].includes(result) ? result : "invalid ACL check response";
-  } catch {
+  } catch (cause) {
+    if (typeof cause === "object" && cause !== null && "killed" in cause && cause.killed === true)
+      return "Windows ACL check timed out or was terminated";
     return "cannot run Windows ACL check";
   }
 };

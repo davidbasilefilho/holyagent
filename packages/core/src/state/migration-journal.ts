@@ -272,7 +272,8 @@ const windowsAclProblem = async (
           ...(options.create === undefined ? {} : { HOLYAGENT_JOURNAL_ACL_CREATE: "1" }),
         },
         windowsHide: true,
-        timeout: 5_000,
+        // Cold Windows PowerShell startup can exceed five seconds on a loaded host.
+        timeout: 15_000,
       },
     )
     const result = stdout.trim()
@@ -287,7 +288,9 @@ const windowsAclProblem = async (
     ].includes(result)
       ? result
       : "invalid ACL check response"
-  } catch {
+  } catch (cause) {
+    if (typeof cause === "object" && cause !== null && "killed" in cause && cause.killed === true)
+      return "Windows ACL check timed out or was terminated"
     return "cannot run Windows ACL check"
   }
 }
