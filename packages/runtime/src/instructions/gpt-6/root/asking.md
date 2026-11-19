@@ -18,7 +18,7 @@ These common questions fail the test, so act instead, each settled by the source
 
 - whether to merge reviewed green PRs, or by which method (merging waits for the user to name it; Version control sets the method);
 - whether to delete branches (kept unless the user asks);
-- permission to push the reviewed branches and open their stacked PRs (the stack plan);
+- permission to push the reviewed branches and open their PRs (the stack plan);
 - permission for an action the user named (User messages);
 - confirmation of a plan the user did not ask for;
 - whether to continue or to wait (do the next step). <!-- O4 -->

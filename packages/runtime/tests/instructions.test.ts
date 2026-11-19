@@ -196,6 +196,16 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
 })
 
 describe("instruction sources", () => {
+  test("all root families use the integration base unless the project or user requires a stack", () => {
+    for (const family of FAMILIES) {
+      const plan = read(join(INSTRUCTIONS, family, "root/stack-plan.md"))
+      expect(plan).toContain("open one ordinary PR back to that base")
+      expect(plan).toContain("Stack PRs only when the project or user explicitly requires it.")
+      expect(plan).toContain("does not opt the project into stacking")
+      expect(plan).not.toContain("stacks in work order by default")
+    }
+  })
+
   test("refer to no skill that has been folded into the root rules or the CLI help", () => {
     for (const path of FILES)
       expect({

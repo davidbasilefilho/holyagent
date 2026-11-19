@@ -30,7 +30,7 @@ Rules for working in this repository, each with the reason it exists. Claude Cod
 
 ## Branches and worktrees
 
-- Keep the main checkout on `main` (in a cloud session, the assigned branch, because the session panel shows the primary checkout's diff) and do other branches in git worktrees, for example `../holyagent-<branch-slug>`. Use worktrees for stack branches where helpful. Sessions here load the holyagent plugin from this checkout through the directory marketplace in `.claude/settings.json`, so checking out a branch that moves or deletes the plugin folder breaks the running session: every Bash call blocks and workflows fail.
+- Keep the main checkout on `main` (in a cloud session, the assigned branch, because the session panel shows the primary checkout's diff) and do other branches in git worktrees, for example `../holyagent-<branch-slug>`. Use worktrees to isolate work without changing its intended PR base. Sessions here load the holyagent plugin from this checkout through the directory marketplace in `.claude/settings.json`, so checking out a branch that moves or deletes the plugin folder breaks the running session: every Bash call blocks and workflows fail.
 - `.holyagent/` state lives on its own branch, `holyagent/state`, in one worktree shared by every worktree of the clone, so work branches never carry it and nothing is copied between worktrees. Push `holyagent/state` with plain Git alongside the work branches.
 - Run the gates as `bunx --no-install mise run <task>` (see `docs/development.md`). A missing `mise` on PATH is no reason to skip the gates or run Bun steps by hand. Each worktree needs its own `bun install --frozen-lockfile`, because `node_modules` is not shared between worktrees. `bun install` runs the `prepare` step, which installs the repository's mise-managed hk hooks into the shared `.git/hooks`; that is expected.
 
@@ -38,7 +38,7 @@ Rules for working in this repository, each with the reason it exists. Claude Cod
 
 This repository's release convention includes CI checks; HolyAgent's instructions do not carry it.
 
-- Work PRs target `dev`; normal release PRs promote `dev` to `main` with a version strictly newer than `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
+- Do not stack PRs in this repository. Start each work branch from `dev` and open the PR directly against `dev`, never another work branch. Keep dependent pieces of one delivery as separate commits in that PR; normal release PRs promote `dev` to `main` with a version strictly newer than `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
 - A deployment failure alone does not require a version bump. For a focused repair of an unpublished release, create `release/<version>/fix/publication-repair` from fresh `main` and squash its PR directly into `main`. The `version` check requires exact main/head version equality and confirmation that the exact npm version is absent. Never downgrade or overwrite an immutable published version. Retry an already published artifact only after verifying identical identity and provenance; product or source changes to a published artifact require a new version.
 - Protect `main` and `dev` (PRs only, no force push, no deletion) and `holyagent-*` tags (no update, no deletion). Required checks are the job ids `check`, `windows`, `installers` and `branch-model`, plus `version` on `main`. Renaming a job drops its check from protection until the ruleset names the new one.
 - Branch pushes run validation, then publish stable on protected `main` or a development release on protected `dev`. Development versions use the commit UTC time and short SHA. Tags never trigger publication.
@@ -51,7 +51,7 @@ This repository's release convention includes CI checks; HolyAgent's instruction
 ## Commits and pull requests
 
 - Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending, so every PR is available for review.
-- Keep each PR to one reviewable change. When branch rules allow, stack on the preceding open owner PR and set the PR base to the branch the work started from, so each review shows only its own change.
+- Review the full work PR against `dev`. Independent changes may use separate PRs to `dev`; do not make one PR depend on another PR's branch.
 - `holyagent vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `hk.pkl`) keeps agent attribution out of commits made with plain Git too.
 - Pass `holyagent vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
 - `holyagent vcs` refuses process words such as "Claude Code" in commit and PR text. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.

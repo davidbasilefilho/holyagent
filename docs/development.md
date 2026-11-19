@@ -179,7 +179,7 @@ Versions follow ZeroVer, `0.X.Y`: the major stays 0, a minor bump advances X and
 
 ## Branches, CI and releases
 
-Work happens on branches with PRs targeting `dev`. The first PR of a release carries the version bump as its own commit (`mise run bump:patch` or `bump:minor`); a release PR promotes `dev` to `main`. A focused repair of an unpublished release may instead use `release/<version>/fix/publication-repair` from fresh `main`, squashed directly into `main`, without a version bump. [AGENTS.md](../AGENTS.md) states the rules and their reasons; this section is the machinery behind them.
+Work PRs target `dev` directly. Do not create stacked PRs in this repository; keep dependent changes in one work PR. The first PR of a release carries the version bump as its own commit (`mise run bump:patch` or `bump:minor`); a release PR promotes `dev` to `main`. A focused repair of an unpublished release may instead use `release/<version>/fix/publication-repair` from fresh `main`, squashed directly into `main`, without a version bump. [AGENTS.md](../AGENTS.md) states the rules and their reasons; this section is the machinery behind them.
 
 **Validation** (`.github/workflows/validation.yml`) runs on pull requests (opened, pushed to, reopened and edited, so a changed base is checked again) and is callable, so `publish.yml` runs the same jobs for a push. Its jobs and their status check names, which are the job ids:
 

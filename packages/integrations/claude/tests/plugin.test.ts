@@ -770,11 +770,11 @@ describe("agents", () => {
     }
   })
 
-  test("the root carries the instruction guidelines and the stacking and task list defaults", () => {
+  test("the root carries the instruction guidelines and the integration-base and task list defaults", () => {
     const text = agent("holyagent")?.content ?? ""
     expect(text).toContain(read(`${CLAUDE}/root`, "instruction-guidelines.md").trim())
-    expect(text).toContain("Every PR of one delivery stacks in work order by default")
-    expect(text).not.toContain("only on a real code dependency")
+    expect(text).toContain("open one ordinary PR back to that base")
+    expect(text).toContain("Stack PRs only when the project or user explicitly requires it.")
     expect(text).toContain("Create the task list first")
   })
 
@@ -965,14 +965,14 @@ describe("agents", () => {
     for (const part of [
       "The base is the branch the conventions or the user name as the work's target, else the default branch",
       "supply only the remote and the default branch, so the base (see the identity rules) comes from the conventions or the user first",
-      "settle its PR's target (the open stack's top, or the base, which the conventions may point at an integration branch)",
-      "check it against the conventions' rules on which branches may open PRs into which",
-      "if the check bars the stack's top, start from the base",
+      "start the work branch from the intended integration base",
+      "check the intended PR target against the repository’s branch rules",
+      "If a requested stack target is barred, use the permitted integration base instead",
       "which also decides any other branch the plan needs (an integration branch, where it is cut from and who cuts it)",
       "cut from the start the convention gives, carrying only that start, and pushed as part of this plan without asking (Precedence)",
       "Pushing commits onto an existing base needs the user's approval",
       "Creating and pushing a convention-named base absent remotely is not such a push; pushing commits to an existing base is",
-      "`git diff <target>...HEAD` (the PR's actual target: its predecessor in the stack or the base)",
+      "`git diff <target>...HEAD` (the PR's actual target: the integration base, or its named predecessor in a required stack)",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
     expect(text).not.toContain("git diff <base>...HEAD")

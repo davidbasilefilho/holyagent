@@ -69,7 +69,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
     "R-ROLE": { section: "root/identity.md", phrase: "Own the user relationship" },
     "R-PRECEDENCE": { section: "shared/precedence.md", phrase: "When rules conflict" },
-    "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
+    "R-STACK": {
+      section: "root/stack-plan.md",
+      phrase: "Stack PRs only when the project or user explicitly requires it.",
+    },
     "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
     "R-TURN": {
       section: "root/task-list.md",
@@ -521,7 +524,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/skills.md",
       phrase: "start one render target for visual work",
     },
-    "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
+    "R-STACK": {
+      section: "root/stack-plan.md",
+      phrase: "Stack PRs only when the project or user explicitly requires it.",
+    },
     "R-MERGEREVIEW": {
       section: "root/stack-plan.md",
       phrase: "gets a review of that head before any push",
@@ -887,7 +893,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/skills.md",
       phrase: "start one render target for visual work",
     },
-    "R-STACK": { section: "root/stack-plan.md", phrase: "stacks in work order by default" },
+    "R-STACK": {
+      section: "root/stack-plan.md",
+      phrase: "Stack PRs only when the project or user explicitly requires it.",
+    },
     "R-MERGEREVIEW": {
       section: "root/stack-plan.md",
       phrase: "gets a review of that head before any push",
