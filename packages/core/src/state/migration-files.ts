@@ -7,6 +7,7 @@ import { Data, Effect, Schema } from "effect"
 
 import { pathProblem, pathsOverlap } from "../domain/paths.ts"
 import { hasCode } from "./files.ts"
+import { type MigrationFileIdentity, sameMigrationIdentity } from "./migration-identity.ts"
 import { MigrationJournalFile, MigrationJournalSource } from "./migration-journal.ts"
 
 /** A migration path could not be safely verified or changed. */
@@ -35,12 +36,10 @@ const operation = <A>(path: string, run: () => Promise<A>) =>
         ? cause
         : fail(path, "filesystem operation failed; inspect and retry"),
   })
-const sameIdentity = (a: { dev: number; ino: number }, b: { dev: number; ino: number }) =>
-  a.dev === b.dev && a.ino === b.ino
 const missing = (cause: unknown) => hasCode(cause, "ENOENT")
 const infoOrMissing = async (path: string) => {
   try {
-    return await lstat(path)
+    return await lstat(path, { bigint: true })
   } catch (cause) {
     if (missing(cause)) return undefined
     throw cause
@@ -106,7 +105,7 @@ const validateSources = (root: string, input: readonly MigrationJournalSource[])
  * isolation.
  */
 const parents = async (root: string, path: string) => {
-  const rootInfo = await lstat(root)
+  const rootInfo = await lstat(root, { bigint: true })
   if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || (await realpath(root)) !== root)
     throw fail(root, "root is not a canonical directory")
   const checked = [{ path: root, info: rootInfo }]
@@ -123,11 +122,11 @@ const parents = async (root: string, path: string) => {
 }
 const recheck = async (checked: Awaited<ReturnType<typeof parents>>, path: string) => {
   for (const entry of checked) {
-    const latest = await lstat(entry.path)
+    const latest = await lstat(entry.path, { bigint: true })
     if (
       !latest.isDirectory() ||
       latest.isSymbolicLink() ||
-      !sameIdentity(entry.info, latest) ||
+      !sameMigrationIdentity(entry.info, latest) ||
       (await realpath(entry.path)) !== entry.path
     )
       throw fail(path, "parent changed")
@@ -139,14 +138,14 @@ const readRegular = async (path: string) => {
   if (!before.isFile() || before.isSymbolicLink()) throw fail(path, "path is not a regular file")
   const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   try {
-    const info = await handle.stat()
-    const latest = await lstat(path)
+    const info = await handle.stat({ bigint: true })
+    const latest = await lstat(path, { bigint: true })
     if (
       !info.isFile() ||
       !latest.isFile() ||
       latest.isSymbolicLink() ||
-      !sameIdentity(before, info) ||
-      !sameIdentity(info, latest)
+      !sameMigrationIdentity(before, info) ||
+      !sameMigrationIdentity(info, latest)
     )
       throw fail(path, "file changed while reading")
     return { bytes: await handle.readFile(), info }
@@ -174,8 +173,8 @@ const initialTerminal = (path: string, authorize: unknown, supplied: boolean, gu
         : fail(path, "terminal migration authority is unavailable or revoked"),
   })
 
-const matchesMode = (mode: number, expected: number) =>
-  process.platform === "win32" || (mode & 0o111) === (expected & 0o111)
+const matchesMode = (mode: bigint, expected: number) =>
+  process.platform === "win32" || (mode & 0o111n) === BigInt(expected & 0o111)
 
 /**
  * Publish absent postimages with an exclusive hard link; existing matching files are unchanged.
@@ -236,14 +235,14 @@ export const publishMigrationFiles = <E, R>(options: {
       yield* operation(path, () => recheck(checked, path))
       const temporary = join(dirname(path), `.holyagent-migration-${randomUUID()}.tmp`)
       // Preparation can outlive interruption. Its finalizer schedules cleanup after it settles.
-      let identity: { dev: number; ino: number } | undefined
+      let identity: MigrationFileIdentity | undefined
       yield* Effect.acquireUseRelease(
         Effect.sync(() => {
           const preparation = (async () => {
             terminal(path, options.authorize, options.terminalAuthorize)
             const handle = await open(temporary, "wx", file.mode & 0o777)
             try {
-              const info = await handle.stat()
+              const info = await handle.stat({ bigint: true })
               identity = { dev: info.dev, ino: info.ino }
               await handle.writeFile(Buffer.from(file.content, "base64"))
               if (process.platform !== "win32") await handle.chmod(file.mode & 0o777)
@@ -265,7 +264,7 @@ export const publishMigrationFiles = <E, R>(options: {
               const latest = yield* operation(path, () => readRegular(path))
               if (
                 latest === undefined ||
-                !sameIdentity(existing.info, latest.info) ||
+                !sameMigrationIdentity(existing.info, latest.info) ||
                 file.before === null ||
                 blob(latest.bytes, file.before) !== file.before ||
                 !matchesMode(latest.info.mode, file.mode)
@@ -287,7 +286,7 @@ export const publishMigrationFiles = <E, R>(options: {
                 if (
                   current?.isFile() &&
                   !current.isSymbolicLink() &&
-                  sameIdentity(identity, current)
+                  sameMigrationIdentity(identity, current)
                 )
                   await rm(temporary, { force: true }).catch(() => {})
               })
@@ -349,7 +348,7 @@ export const cleanupMigrationSources = <E, R, E2 = never, R2 = never>(options: {
       })
       if (latest === undefined) continue
       if (
-        !sameIdentity(current.info, latest.info) ||
+        !sameMigrationIdentity(current.info, latest.info) ||
         blob(latest.bytes, file.digest) !== file.digest
       ) {
         retained.push({ path: file.path, reason: "changed" })
@@ -426,6 +425,6 @@ export const readMigrationSource = (options: { readonly root: string; readonly p
     await recheck(checked, options.path)
     return {
       bytes: value.bytes,
-      mode: process.platform !== "win32" && (value.info.mode & 0o111) !== 0 ? 0o100755 : 0o100644,
+      mode: process.platform !== "win32" && (value.info.mode & 0o111n) !== 0n ? 0o100755 : 0o100644,
     }
   })

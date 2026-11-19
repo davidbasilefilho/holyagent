@@ -10852,6 +10852,8 @@ import { constants as constants2 } from "fs";
 import { link as link4, lstat as lstat3, mkdir as mkdir4, open as open3, realpath as realpath2, rename as rename4, rm as rm4, unlink } from "fs/promises";
 import { dirname as dirname4, isAbsolute as isAbsolute3, join as join4, resolve as resolve4 } from "path";
 
+var sameMigrationIdentity = (left, right) => left.ino !== 0n && left.dev === right.dev && left.ino === right.ino;
+
 import { execFile } from "child_process";
 import { createHash as createHash2 } from "crypto";
 import { constants } from "fs";
@@ -10930,7 +10932,7 @@ var validate2 = (location, value) => {
     throw invalid3(location, "invalid journal fields or root binding; inspect it before retrying");
   return record;
 };
-var owner = (info) => (typeof process.getuid !== "function" || info.uid === process.getuid()) && (info.mode & 18) === 0;
+var owner = (info) => (typeof process.getuid !== "function" || info.uid === BigInt(process.getuid())) && (info.mode & 0o022n) === 0n;
 var runWindowsAcl = promisify(execFile);
 var windowsAclCheck = `
 $ErrorActionPreference = 'Stop'
@@ -11071,8 +11073,8 @@ var temporaryAlias = async (location, info) => {
   for (const name of candidates) {
     const path = join3(dirname3(location.path), name);
     try {
-      const entry = await lstat2(path);
-      if (entry.isFile() && !entry.isSymbolicLink() && entry.dev === info.dev && entry.ino === info.ino)
+      const entry = await lstat2(path, { bigint: true });
+      if (entry.isFile() && !entry.isSymbolicLink() && sameMigrationIdentity(entry, info))
         aliases.push(path);
     } catch (cause) {
       if (!isMissing(cause))
@@ -11082,8 +11084,8 @@ var temporaryAlias = async (location, info) => {
   return aliases;
 };
 var removeTemporaryAlias = async (location) => {
-  const info = await lstat2(location.path);
-  if (info.nlink === 2) {
+  const info = await lstat2(location.path, { bigint: true });
+  if (info.nlink === 2n) {
     const aliases = await temporaryAlias(location, info);
     if (aliases.length !== 1)
       throw invalid3(location, "journal has an unexpected hard link");
@@ -11096,12 +11098,12 @@ var checkLocation = async (location) => {
   try {
     const parent = dirname3(location.path);
     const [directory, actualParent, source, target, sourceInfo, targetInfo] = await Promise.all([
-      lstat2(parent),
+      lstat2(parent, { bigint: true }),
       realpath(parent),
       realpath(location.sourceRoot),
       realpath(location.targetRoot),
-      lstat2(location.sourceRoot),
-      lstat2(location.targetRoot)
+      lstat2(location.sourceRoot, { bigint: true }),
+      lstat2(location.targetRoot, { bigint: true })
     ]);
     if (!directory.isDirectory() || directory.isSymbolicLink() || actualParent !== parent || !sourceInfo.isDirectory() || !targetInfo.isDirectory() || source !== location.sourceRoot || target !== location.targetRoot || process.platform !== "win32" && !owner(directory))
       throw invalid3(location, "journal parent or trusted roots are not private canonical directories");
@@ -11122,17 +11124,20 @@ var read = async (location) => {
     throw invalid3(location, "cannot safely open journal; inspect it before retrying");
   }
   try {
-    const [info, pathInfo] = await Promise.all([handle.stat(), lstat2(location.path)]);
-    if (!info.isFile() || !pathInfo.isFile() || pathInfo.isSymbolicLink() || process.platform !== "win32" && (!owner(info) || (info.mode & 63) !== 0) || info.dev !== pathInfo.dev || info.ino !== pathInfo.ino || info.size > MAX_BYTES)
+    const [info, pathInfo] = await Promise.all([
+      handle.stat({ bigint: true }),
+      lstat2(location.path, { bigint: true })
+    ]);
+    if (!info.isFile() || !pathInfo.isFile() || pathInfo.isSymbolicLink() || process.platform !== "win32" && (!owner(info) || (info.mode & 0o077n) !== 0n) || !sameMigrationIdentity(info, pathInfo) || info.size > MAX_BYTES)
       throw invalid3(location, "journal is not an owned private regular file");
-    if (info.nlink !== 1 && !(info.nlink === 2 && (await temporaryAlias(location, info)).length === 1))
+    if (info.nlink !== 1n && !(info.nlink === 2n && (await temporaryAlias(location, info)).length === 1))
       throw invalid3(location, "journal has an unexpected hard link");
     if (process.platform === "win32") {
       const problem = await windowsAclProblem(dirname3(location.path), { file: location.path });
       if (problem !== undefined)
         throw invalid3(location, `journal or its parent does not have a private access list: ${problem}`);
-      const checkedPath = await lstat2(location.path);
-      if (checkedPath.isSymbolicLink() || checkedPath.dev !== info.dev || checkedPath.ino !== info.ino)
+      const checkedPath = await lstat2(location.path, { bigint: true });
+      if (checkedPath.isSymbolicLink() || !sameMigrationIdentity(checkedPath, info))
         throw invalid3(location, "journal changed while verifying its access list");
     }
     const text = await handle.readFile("utf8");
@@ -11179,8 +11184,11 @@ var write = async (location, record, create) => {
       const problem = await windowsAclProblem(dirname3(location.path), { file: temporary });
       if (problem !== undefined)
         throw invalid3(location, `cannot create a private journal in this directory: ${problem}`);
-      const [info, checkedPath] = await Promise.all([handle.stat(), lstat2(temporary)]);
-      if (checkedPath.isSymbolicLink() || checkedPath.dev !== info.dev || checkedPath.ino !== info.ino)
+      const [info, checkedPath] = await Promise.all([
+        handle.stat({ bigint: true }),
+        lstat2(temporary, { bigint: true })
+      ]);
+      if (checkedPath.isSymbolicLink() || !sameMigrationIdentity(checkedPath, info))
         throw invalid3(location, "temporary journal changed while verifying its access list");
     }
     await handle.writeFile(contents, "utf8");
@@ -11258,11 +11266,10 @@ var operation2 = (path, run) => tryPromise2({
   try: run,
   catch: (cause) => cause instanceof MigrationFilesError ? cause : fail6(path, "filesystem operation failed; inspect and retry")
 });
-var sameIdentity = (a, b) => a.dev === b.dev && a.ino === b.ino;
 var missing2 = (cause) => hasCode(cause, "ENOENT");
 var infoOrMissing = async (path) => {
   try {
-    return await lstat3(path);
+    return await lstat3(path, { bigint: true });
   } catch (cause) {
     if (missing2(cause))
       return;
@@ -11309,7 +11316,7 @@ var validateSources = (root, input) => {
   return source;
 };
 var parents = async (root, path) => {
-  const rootInfo = await lstat3(root);
+  const rootInfo = await lstat3(root, { bigint: true });
   if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || await realpath2(root) !== root)
     throw fail6(root, "root is not a canonical directory");
   const checked = [{ path: root, info: rootInfo }];
@@ -11327,8 +11334,8 @@ var parents = async (root, path) => {
 };
 var recheck = async (checked, path) => {
   for (const entry of checked) {
-    const latest = await lstat3(entry.path);
-    if (!latest.isDirectory() || latest.isSymbolicLink() || !sameIdentity(entry.info, latest) || await realpath2(entry.path) !== entry.path)
+    const latest = await lstat3(entry.path, { bigint: true });
+    if (!latest.isDirectory() || latest.isSymbolicLink() || !sameMigrationIdentity(entry.info, latest) || await realpath2(entry.path) !== entry.path)
       throw fail6(path, "parent changed");
   }
 };
@@ -11340,9 +11347,9 @@ var readRegular = async (path) => {
     throw fail6(path, "path is not a regular file");
   const handle = await open3(path, constants2.O_RDONLY | (constants2.O_NOFOLLOW ?? 0));
   try {
-    const info = await handle.stat();
-    const latest = await lstat3(path);
-    if (!info.isFile() || !latest.isFile() || latest.isSymbolicLink() || !sameIdentity(before, info) || !sameIdentity(info, latest))
+    const info = await handle.stat({ bigint: true });
+    const latest = await lstat3(path, { bigint: true });
+    if (!info.isFile() || !latest.isFile() || latest.isSymbolicLink() || !sameMigrationIdentity(before, info) || !sameMigrationIdentity(info, latest))
       throw fail6(path, "file changed while reading");
     return { bytes: await handle.readFile(), info };
   } finally {
@@ -11361,7 +11368,7 @@ var initialTerminal = (path, authorize, supplied, guard) => try_2({
   },
   catch: (cause) => cause instanceof MigrationFilesError ? cause : fail6(path, "terminal migration authority is unavailable or revoked")
 });
-var matchesMode = (mode, expected) => process.platform === "win32" || (mode & 73) === (expected & 73);
+var matchesMode = (mode, expected) => process.platform === "win32" || (mode & 0o111n) === BigInt(expected & 73);
 var publishMigrationFiles = (options) => gen2(function* () {
   yield* initialTerminal(options.root, options.authorize, "terminalAuthorize" in options, options.terminalAuthorize);
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
@@ -11403,7 +11410,7 @@ var publishMigrationFiles = (options) => gen2(function* () {
         terminal(path, options.authorize, options.terminalAuthorize);
         const handle = await open3(temporary, "wx", file.mode & 511);
         try {
-          const info = await handle.stat();
+          const info = await handle.stat({ bigint: true });
           identity = { dev: info.dev, ino: info.ino };
           await handle.writeFile(Buffer.from(file.content, "base64"));
           if (process.platform !== "win32")
@@ -11421,7 +11428,7 @@ var publishMigrationFiles = (options) => gen2(function* () {
       yield* operation2(path, () => recheck(checked, path));
       if (existing !== undefined) {
         const latest = yield* operation2(path, () => readRegular(path));
-        if (latest === undefined || !sameIdentity(existing.info, latest.info) || file.before === null || blob(latest.bytes, file.before) !== file.before || !matchesMode(latest.info.mode, file.mode))
+        if (latest === undefined || !sameMigrationIdentity(existing.info, latest.info) || file.before === null || blob(latest.bytes, file.before) !== file.before || !matchesMode(latest.info.mode, file.mode))
           return yield* fail6(file.path, "preexisting file changed during publication");
       }
       yield* operation2(path, () => {
@@ -11435,7 +11442,7 @@ var publishMigrationFiles = (options) => gen2(function* () {
         const current = await infoOrMissing(temporary).catch(() => {
           return;
         });
-        if (current?.isFile() && !current.isSymbolicLink() && sameIdentity(identity, current))
+        if (current?.isFile() && !current.isSymbolicLink() && sameMigrationIdentity(identity, current))
           await rm4(temporary, { force: true }).catch(() => {});
       });
     }));
@@ -11472,7 +11479,7 @@ var cleanupMigrationSources = (options) => gen2(function* () {
     });
     if (latest === undefined)
       continue;
-    if (!sameIdentity(current.info, latest.info) || blob(latest.bytes, file.digest) !== file.digest) {
+    if (!sameMigrationIdentity(current.info, latest.info) || blob(latest.bytes, file.digest) !== file.digest) {
       retained.push({ path: file.path, reason: "changed" });
       continue;
     }
@@ -11519,7 +11526,7 @@ var readMigrationSource = (options) => operation2(options.root, async () => {
   await recheck(checked, options.path);
   return {
     bytes: value.bytes,
-    mode: process.platform !== "win32" && (value.info.mode & 73) !== 0 ? 33261 : 33188
+    mode: process.platform !== "win32" && (value.info.mode & 0o111n) !== 0n ? 33261 : 33188
   };
 });
 

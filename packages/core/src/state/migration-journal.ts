@@ -8,6 +8,7 @@ import { promisify } from "node:util"
 import { Data, Effect, Schema } from "effect"
 
 import { pathProblem, pathsOverlap } from "../domain/paths.ts"
+import { type MigrationFileIdentity, sameMigrationIdentity } from "./migration-identity.ts"
 
 /** Recovery data is private to one migration and is never included in error messages. */
 export const MigrationJournalFile = Schema.Struct({
@@ -162,9 +163,9 @@ const validate = (location: MigrationJournalLocation, value: unknown): Migration
   return record
 }
 
-const owner = (info: { uid: number; mode: number }) =>
-  (typeof process.getuid !== "function" || info.uid === process.getuid()) &&
-  (info.mode & 0o022) === 0
+const owner = (info: { uid: bigint; mode: bigint }) =>
+  (typeof process.getuid !== "function" || info.uid === BigInt(process.getuid())) &&
+  (info.mode & 0o022n) === 0n
 
 const runWindowsAcl = promisify(execFile)
 const windowsAclCheck = `
@@ -312,10 +313,7 @@ export const ensureMigrationJournalDirectory = async (directory: string) => {
 }
 
 /** A crash after the exclusive link may leave our synced temporary name as a second link. */
-const temporaryAlias = async (
-  location: MigrationJournalLocation,
-  info: { dev: number; ino: number },
-) => {
+const temporaryAlias = async (location: MigrationJournalLocation, info: MigrationFileIdentity) => {
   const prefix = `${basename(location.path)}.`
   const names = await readdir(dirname(location.path))
   const candidates = names.filter(
@@ -325,13 +323,8 @@ const temporaryAlias = async (
   for (const name of candidates) {
     const path = join(dirname(location.path), name)
     try {
-      const entry = await lstat(path)
-      if (
-        entry.isFile() &&
-        !entry.isSymbolicLink() &&
-        entry.dev === info.dev &&
-        entry.ino === info.ino
-      )
+      const entry = await lstat(path, { bigint: true })
+      if (entry.isFile() && !entry.isSymbolicLink() && sameMigrationIdentity(entry, info))
         aliases.push(path)
     } catch (cause) {
       if (!isMissing(cause)) throw cause
@@ -341,8 +334,8 @@ const temporaryAlias = async (
 }
 
 const removeTemporaryAlias = async (location: MigrationJournalLocation) => {
-  const info = await lstat(location.path)
-  if (info.nlink === 2) {
+  const info = await lstat(location.path, { bigint: true })
+  if (info.nlink === 2n) {
     const aliases = await temporaryAlias(location, info)
     if (aliases.length !== 1) throw invalid(location, "journal has an unexpected hard link")
     await rm(aliases[0]!)
@@ -356,12 +349,12 @@ const checkLocation = async (location: MigrationJournalLocation) => {
   try {
     const parent = dirname(location.path)
     const [directory, actualParent, source, target, sourceInfo, targetInfo] = await Promise.all([
-      lstat(parent),
+      lstat(parent, { bigint: true }),
       realpath(parent),
       realpath(location.sourceRoot),
       realpath(location.targetRoot),
-      lstat(location.sourceRoot),
-      lstat(location.targetRoot),
+      lstat(location.sourceRoot, { bigint: true }),
+      lstat(location.targetRoot, { bigint: true }),
     ])
     if (
       !directory.isDirectory() ||
@@ -393,20 +386,22 @@ const read = async (location: MigrationJournalLocation): Promise<MigrationJourna
     throw invalid(location, "cannot safely open journal; inspect it before retrying")
   }
   try {
-    const [info, pathInfo] = await Promise.all([handle.stat(), lstat(location.path)])
+    const [info, pathInfo] = await Promise.all([
+      handle.stat({ bigint: true }),
+      lstat(location.path, { bigint: true }),
+    ])
     if (
       !info.isFile() ||
       !pathInfo.isFile() ||
       pathInfo.isSymbolicLink() ||
-      (process.platform !== "win32" && (!owner(info) || (info.mode & 0o077) !== 0)) ||
-      info.dev !== pathInfo.dev ||
-      info.ino !== pathInfo.ino ||
+      (process.platform !== "win32" && (!owner(info) || (info.mode & 0o077n) !== 0n)) ||
+      !sameMigrationIdentity(info, pathInfo) ||
       info.size > MAX_BYTES
     )
       throw invalid(location, "journal is not an owned private regular file")
     if (
-      info.nlink !== 1 &&
-      !(info.nlink === 2 && (await temporaryAlias(location, info)).length === 1)
+      info.nlink !== 1n &&
+      !(info.nlink === 2n && (await temporaryAlias(location, info)).length === 1)
     )
       throw invalid(location, "journal has an unexpected hard link")
     if (process.platform === "win32") {
@@ -416,12 +411,8 @@ const read = async (location: MigrationJournalLocation): Promise<MigrationJourna
           location,
           `journal or its parent does not have a private access list: ${problem}`,
         )
-      const checkedPath = await lstat(location.path)
-      if (
-        checkedPath.isSymbolicLink() ||
-        checkedPath.dev !== info.dev ||
-        checkedPath.ino !== info.ino
-      )
+      const checkedPath = await lstat(location.path, { bigint: true })
+      if (checkedPath.isSymbolicLink() || !sameMigrationIdentity(checkedPath, info))
         throw invalid(location, "journal changed while verifying its access list")
     }
     const text = await handle.readFile("utf8")
@@ -471,12 +462,11 @@ const write = async (
       const problem = await windowsAclProblem(dirname(location.path), { file: temporary })
       if (problem !== undefined)
         throw invalid(location, `cannot create a private journal in this directory: ${problem}`)
-      const [info, checkedPath] = await Promise.all([handle.stat(), lstat(temporary)])
-      if (
-        checkedPath.isSymbolicLink() ||
-        checkedPath.dev !== info.dev ||
-        checkedPath.ino !== info.ino
-      )
+      const [info, checkedPath] = await Promise.all([
+        handle.stat({ bigint: true }),
+        lstat(temporary, { bigint: true }),
+      ])
+      if (checkedPath.isSymbolicLink() || !sameMigrationIdentity(checkedPath, info))
         throw invalid(location, "temporary journal changed while verifying its access list")
     }
     await handle.writeFile(contents, "utf8")

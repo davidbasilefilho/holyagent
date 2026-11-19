@@ -9,6 +9,17 @@ import { Effect, Fiber } from "effect"
 
 import { withStateLock } from "./lock.ts"
 import { cleanupMigrationSources, publishMigrationFiles } from "./migration-files.ts"
+import { sameMigrationIdentity } from "./migration-identity.ts"
+
+test("migration identity keeps distinct 64-bit IDs and rejects unavailable IDs", () => {
+  // Distinct NTFS file IDs can have the same IEEE-754 representation.
+  const ino = 2n ** 53n
+  expect(Number(ino)).toBe(Number(ino + 1n))
+  expect(sameMigrationIdentity({ dev: 1n, ino }, { dev: 1n, ino: ino + 1n })).toBe(false)
+  expect(sameMigrationIdentity({ dev: ino, ino: 1n }, { dev: ino + 1n, ino: 1n })).toBe(false)
+  expect(sameMigrationIdentity({ dev: 1n, ino: 0n }, { dev: 1n, ino: 0n })).toBe(false)
+  expect(sameMigrationIdentity({ dev: 1n, ino }, { dev: 1n, ino })).toBe(true)
+})
 
 const fixture = async (run: (root: string) => Promise<void>) => {
   // The host temp path may itself be an alias, such as /var on macOS.
