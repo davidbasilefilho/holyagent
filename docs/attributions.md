@@ -20,7 +20,9 @@
 
 ## Design skill sources
 
-The `web-design`, `mobile-design`, `desktop-design` and `tui-design` skills take ideas from the sources below and restate them in this project's own words. Anthropic's `frontend-design` skill (Apache-2.0) was embedded in the visual specialists through 0.2.1, with its license shipped alongside. From 0.2.2 it is no longer vendored and neither its text nor its license travels with the plugin; its directives live on as HolyAgent's own restatement in the shared core and `web-design`. The skills' shared core is a single source file, `packages/runtime/src/instructions/claude-5.5/design-core/core.md`.
+The `web-design`, `mobile-design`, `desktop-design` and `tui-design` skills take ideas from the sources below and restate them in this project's own words. Anthropic's `frontend-design` skill (Apache-2.0) was embedded in the visual specialists through 0.2.1, with its license shipped alongside. From 0.2.2 it is no longer vendored and neither its text nor its license travels with the plugin; its directives live on as HolyAgent's own restatement in the shared core and `web-design`. Each model family carries the same design requirements in its own shared core (`packages/runtime/src/instructions/<family>/design-core/core.md`).
+
+Adapted from [unslop](https://github.com/heydamir/unslop/blob/620163eedb3529d9cd23a3994ed8d287d06f760d/skills/unslop/SKILL.md) by Damir Sokolovsky, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). HolyAgent rephrased and adapted its audit, restraint and ordering ideas for web, mobile, desktop and terminal interfaces; no source scripts or assets are included.
 
 | Source                                                                                                 | Inspired                                                                                     | License                                              |
 | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------------------- |

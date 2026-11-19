@@ -40,7 +40,7 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
   Write code only from the revised plan.
 
-- Say whether this is a refinement, which preserves the existing design, or a redesign, which replaces it.
+- Base the scope of work on the original render. Name the component and state and record strengths alongside problems. Keep a sound design as it is, polish isolated defects, and redesign for systemic issues within the brief. An explicit request for a new direction can warrant redesign even when the original works. Preserve working flows, meaningful content and deliberate expressive choices unless the brief puts them in scope. If the original cannot be rendered, disclose the gap and keep code observations distinct from visual findings.
 
 ### Platform fidelity over invention
 
@@ -52,9 +52,9 @@ Apply the skill's capture checklist on the final captures: the worker before rep
 
 - Read `DESIGN.md` at the project root before UI work and create or update it after. It holds: platform and stack, direction, color roles, type roles, spacing and shape, components and states, do and don't, and a brief log of the options already tried, so later passes explore new ground. Note a changed decision instead of silently overwriting it. (behavior check)
 
-### Spend boldness in one place
+### Focus expressive detail
 
-- Make one detail per screen the memorable one and keep the rest calm and restrained. Strip ornament that does nothing for the brief, and before finishing remove one accessory more, filling the gap with scale, real content or a real image so the screen is not left thin. (preference)
+- Spend expressive effort where it helps someone understand or remember this product: perhaps one or two focal points or a recurring detail, with surrounding chrome supporting their hierarchy. Let the brief, existing expressive elements and the platform guide how quiet or rich the screen should be. (preference)
 - A labeled gray placeholder beats drawn art or emoji used as icons. (preference)
 
 ### Structure and content
@@ -88,7 +88,13 @@ Models tend to ship cramped or misaligned spacing that a glance at the whole pag
 
 ### Iteration quality
 
+Change dependent decisions in order. Copy that determines type and layout comes before fitting them; motion follows stable layout and states. When the original render is available, compare the affected states with it before claiming the repairs held.
+
 Assess the design system, composition, alignment, contrast, distribution, placement and sizing, and responsiveness. Exercise fluid component and route animation and transitions, including reduced motion. For each interactive element check hover where applicable, press or tap, keyboard focus and disabled appearance where relevant. Follow platform conventions while preserving creative latitude.
+
+### Source credit
+
+Adapted from [unslop](https://github.com/heydamir/unslop/blob/620163eedb3529d9cd23a3994ed8d287d06f760d/skills/unslop/SKILL.md) by Damir Sokolovsky, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). HolyAgent rephrased and adapted its audit, restraint and ordering ideas for web, mobile, desktop and terminal interfaces; no source scripts or assets are included.
 
 ## Shared mobile rules
 
