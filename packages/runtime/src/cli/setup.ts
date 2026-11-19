@@ -50,8 +50,12 @@ const resolveScope = Effect.fn("resolveScope")(function* (
   flag: string | undefined,
   usage: string,
   cwd: string,
+  t3Workflow: boolean,
 ): Effect.fn.Return<ResolvedScope, Usage | SetupFailure, Shell> {
-  if (flag === undefined) return yield* installedScope(cwd)
+  if (flag === undefined)
+    return t3Workflow
+      ? { scope: "user", source: "default", notices: [] }
+      : yield* installedScope(cwd)
   const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage)
   return { scope, source: "flag" }
 })
@@ -111,19 +115,19 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
   {
     path: ["setup"],
     usage: SETUP_USAGE,
-    summary:
-      "Install and configure what HolyAgent needs beside the plugin, skipping every step already done",
+    summary: "Configure HolyAgent for T3 Code, skipping every step already done",
     output:
       "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
+      "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
       "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
       "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
-      "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-      "--scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
-      "without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
-      "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
+      "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
+      "internal Claude entry only: --scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+      "internal Claude entry only: without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
+      "internal Claude settings: setup records their keys, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
       "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
-      "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+      "a failed step is reported and the rest still run; in the internal Claude entry in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
       `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
@@ -144,11 +148,14 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
     },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd, emit, terminal, setupTui }) =>
+    run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow }) =>
       Effect.gen(function* () {
-        const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd).pipe(
-          Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
-        )
+        const resolved = yield* resolveScope(
+          stringFlag(args, "scope"),
+          SETUP_USAGE,
+          cwd,
+          t3Workflow,
+        ).pipe(Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)))
         if (resolved instanceof SetupFailure) {
           return printed({ lines: [`! scope: ${resolved.message}`], ok: false })
         }
@@ -183,6 +190,7 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
           Effect.gen(function* () {
             const report = yield* coreSetup.setup(coreContext(cwd, env), {
               scope: resolved.scope,
+              t3Workflow,
               undo: booleanFlag(args, "undo"),
               subagentCacheTtl,
               dryRun: booleanFlag(args, "dry-run"),
@@ -232,29 +240,34 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
     path: ["doctor"],
     usage: DOCTOR_USAGE,
     summary:
-      "Check bun, ctx7 and the settings of a scope, and, when Pi is in use, pi, node and the Pi packages the config enables; exit 1 when a check fails",
+      "Check T3 Code readiness, Bun, the Pi backend and feature packages; exit 1 when a check fails",
     output:
       "one line per check, `ok   <name>: …` or `FAIL <name>: …`; exit 1 when any check failed",
     notes: [
-      "--scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
-      "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
+      "public T3 Code doctor uses user scope by default and does not check Claude Code settings; open T3 Code once and use the Pi provider",
+      "internal Claude entry only: --scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
+      "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; in the public workflow missing Pi fails, while the internal entry prints a `~ pi: not in use` hint; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
       "the Pi checks include `ok   pi form:` (headless or normal, detected from the machine as setup does, or named by --form) and one `pi capability <name>` line for each capability the config turns on: `ok` with its form and what applies, `FAIL` naming an unmet system need or a package not listed at its pin, or a `~` line when the form does not offer it (computer-use on a headless machine), which fails nothing; the provider and web kit packages are the `pi base packages` line",
       "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages. The ctx7 check verifies CLI availability, not authentication",
     ],
     flags: { scope: "string", fix: "boolean", form: "string" },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd }) =>
+    run: ({ args, env, cwd, t3Workflow }) =>
       Effect.gen(function* () {
-        const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, cwd).pipe(
-          Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
-        )
+        const resolved = yield* resolveScope(
+          stringFlag(args, "scope"),
+          DOCTOR_USAGE,
+          cwd,
+          t3Workflow,
+        ).pipe(Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)))
         if (resolved instanceof SetupFailure) {
           return printed({ lines: [fail("scope", resolved.message)], ok: false })
         }
         const form = yield* formOf(args, env, DOCTOR_USAGE)
         const report = yield* coreSetup.doctor(coreContext(cwd, env), {
           fix: booleanFlag(args, "fix"),
+          t3Workflow,
           scope: resolved.scope,
           form,
         })

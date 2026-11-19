@@ -43,7 +43,7 @@ export const PI_MINIMUM_NODE = "22.19.0"
 const PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`
 const NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`
 const PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`
-const PACKAGE_COMMAND = `pi install git:github.com/davidbasilefilho/holyagent@holyagent-${manifest.version}`
+const PACKAGE_COMMAND = `pi install npm:holyagent@${manifest.version}`
 
 /**
  * How a missing HolyAgent package is installed: for this project only (`-l`) when the scope counts

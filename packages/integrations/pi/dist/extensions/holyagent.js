@@ -14724,7 +14724,7 @@ var PI_MINIMUM_NODE = "22.19.0";
 var PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`;
 var NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`;
 var PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`;
-var PACKAGE_COMMAND = `pi install git:github.com/davidbasilefilho/holyagent@holyagent-${package_default.version}`;
+var PACKAGE_COMMAND = `pi install npm:holyagent@${package_default.version}`;
 var packageFix = (scope) => scope === "user" ? `install it with \`${PACKAGE_COMMAND}\`` : `install it with \`${PACKAGE_COMMAND}\` (add -l for this project only)`;
 var VERSION = /(\d+)\.(\d+)\.(\d+)/;
 var releaseIn = (text) => {
@@ -15934,6 +15934,13 @@ var restoreSettings = (path, previous, unchangedSince) => previous === undefined
 var writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 }))));
+var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
+  const home = t3Home(env);
+  return [
+    ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`],
+    ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
+  ];
+});
 var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join21(homeDirectory2(env), ".t3");
 var t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map4((info) => info.isDirectory()), orElseSucceed2(() => false));
@@ -16225,17 +16232,28 @@ var checkT3Settings = (env, cwd, options = {}) => gen2(function* () {
     return [];
   const decided = yield* decide(env, cwd, options);
   if (decided === undefined || "line" in decided)
-    return [];
+    return options.required === true ? [
+      fail8(label2, "Cannot configure the Pi provider; check pi.enable and pi.t3.scope, then run holyagent setup")
+    ] : [];
   const { file, units: wanted } = decided.target;
   return yield* gen2(function* () {
     const { value } = yield* readJsonObjectSnapshot(file);
+    if (options.required === true) {
+      const instances = value["providerInstances"];
+      const instance = isJsonObject(instances) ? instances["pi"] : undefined;
+      const config = isJsonObject(instance) ? instance["config"] : undefined;
+      if (!isJsonObject(instance) || instance["driver"] !== "pi" || instance["enabled"] !== true || isJsonObject(config) && config["enabled"] === false)
+        return [
+          fail8(label2, "Pi provider is not enabled; run holyagent setup, and check the provider in T3 Code Settings")
+        ];
+    }
     const { keys } = wantedKeys(value, wanted);
     const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added");
     return [
       missing.length === 0 ? pass(label2, `${file} holds the settings HolyAgent writes`) : hint(`${label2} ${file} lacks ${names(missing)}; run \`holyagent setup\``)
     ];
   }).pipe(catchTag2("SetupFailure", (error) => succeed6([
-    hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
+    options.required === true ? fail8(label2, `${error.message}; fix the file, then run holyagent setup`) : hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
   ])));
 });
 
@@ -16288,7 +16306,7 @@ var setup = fn2("setup")(function* (env, options) {
   if (options.undo === true) {
     const lines = [
       hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-      ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
+      ...options.t3Workflow === true ? [] : yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
       ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions)),
       ...scope === "user" ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun })) : []
     ];
@@ -16296,6 +16314,11 @@ var setup = fn2("setup")(function* (env, options) {
   }
   const cloud = inCloudSession(env);
   const piUsed = !cloud && (yield* piInUse(env));
+  if (options.t3Workflow === true) {
+    const blockers = yield* checkT3Prerequisites(env, piUsed);
+    if (blockers.length > 0)
+      return { lines: blockers.map((line) => `! ${line}`), ok: false };
+  }
   const ctx7Lines = options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun));
   const capabilityLines = piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
     scope,
@@ -16320,7 +16343,7 @@ var setup = fn2("setup")(function* (env, options) {
       ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
     })) : [],
     ...yield* searchToolLines(piOptions.cwd, setupToolLine),
-    ...yield* onSettings((file) => mergeUserSettings({
+    ...options.t3Workflow === true ? [] : yield* onSettings((file) => mergeUserSettings({
       env,
       file,
       subagentCacheTtl: options.subagentCacheTtl,
@@ -16334,9 +16357,9 @@ var FIX = "run /holyagent:setup, or `holyagent doctor --fix`";
 var checkBun = gen2(function* () {
   const shell = yield* Shell;
   const found = yield* shell.which("bun");
-  return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the plugin hooks");
+  return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the HolyAgent CLI");
 });
-var checkCommand = (env, command) => gen2(function* () {
+var checkCommand = (env, command, fix = FIX) => gen2(function* () {
   if (inCloudSession(env))
     return pass(command, "not installed in a claude.ai cloud session, by design");
   const shell = yield* Shell;
@@ -16344,7 +16367,7 @@ var checkCommand = (env, command) => gen2(function* () {
   if (isSome2(onPath))
     return pass(command, onPath.value);
   const anywhere = yield* shell.which(command, { includeBunBin: true });
-  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
+  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${fix}`);
 });
 var fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``;
 var checkSettings = (file, scope) => missingSettingKeys(file).pipe(map4((missing) => missing.length === 0 ? pass("settings", file) : fail8("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail8("settings", error.message))));
@@ -16356,8 +16379,22 @@ var doctor = fn2("doctor")(function* (env, options) {
   const pi = inCloudSession(env) ? [] : [
     ...yield* piChecks(env, cwd, scope, form),
     ...yield* checkPiToolSettings(env, cwd, scope, form.form),
-    ...scope === "user" ? yield* checkT3Settings(env, cwd) : []
+    ...scope === "user" || options.t3Workflow === true ? yield* checkT3Settings(env, cwd, { required: options.t3Workflow === true }) : []
   ];
+  if (options.t3Workflow === true) {
+    const blockers = yield* checkT3Prerequisites(env, !inCloudSession(env) && (yield* piInUse(env)));
+    const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix");
+    const ctx7 = yield* checkCtx7;
+    const fixes = options.fix && ctx7.startsWith("FAIL ") && blockers.length === 0 ? yield* asStep("ctx7", installCtx7(env, false)) : [];
+    const lines = [
+      ...blockers.map((line) => `FAIL ${line}`),
+      yield* checkBun,
+      ...fixes,
+      ...fixes.length > 0 ? [yield* checkCtx7] : [ctx7],
+      ...pi
+    ];
+    return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
+  }
   const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
   if (located instanceof SetupFailure) {
     const lines = yield* all2([
@@ -16408,6 +16445,7 @@ var Choices = Struct({
 var schemas4 = {
   setup: Struct({
     subagentCacheTtl: Literals(CACHE_TTLS),
+    t3Workflow: optionalKey2(Boolean3),
     dryRun: Boolean3,
     skipCtx7: Boolean3,
     scope: optionalKey2(Literals(SCOPES)),
@@ -16419,6 +16457,7 @@ var schemas4 = {
   }),
   doctor: Struct({
     fix: Boolean3,
+    t3Workflow: optionalKey2(Boolean3),
     scope: optionalKey2(Literals(SCOPES)),
     form: optionalKey2(Form)
   })

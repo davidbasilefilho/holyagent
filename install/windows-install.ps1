@@ -1,6 +1,6 @@
-# Installs the prerequisites of HolyAgent on native Windows (no WSL, no Git Bash needed to run the
-# plugin): git, Node LTS, Bun and gh. With -Dev it also installs mise, which developing this repository
-# needs. HolyAgent itself installs as a Claude Code plugin; the script ends by printing those commands.
+# Installs the prerequisites of HolyAgent on native Windows: Git for Windows (including Git Bash),
+# Node LTS, Bun and gh. With -Dev it also installs mise for development. Install T3 Code and follow
+# the supported quickstart afterwards.
 # It mirrors install/wsl-install.sh step for step.
 #
 # Usage: powershell -ExecutionPolicy Bypass -File install\windows-install.ps1 [-Dev]
@@ -187,7 +187,7 @@ try {
   }
 
   # ---------------------------------------------------------------------------------------------
-  Step "Bun (the plugin's hooks run it)"
+  Step "Bun (runs the HolyAgent CLI)"
 
   Update-SessionPath
   if (Have bun) {
@@ -250,18 +250,10 @@ try {
   if ((Invoke-Probe 'gh' @('auth', 'status')).ExitCode -ne 0) {
     Warn 'gh is not authenticated; run: gh auth login (or set GH_TOKEN)'
   }
-  if (-not (Have claude)) {
-    Warn 'Claude Code is not installed; see https://code.claude.com/docs/en/setup'
-  }
-
   Write-Host ''
-  Write-Host 'Done. Open a new PowerShell window so PATH picks up Bun, then install HolyAgent with these'
-  Write-Host 'two commands:'
-  Write-Host ''
-  Write-Host '  claude plugin marketplace add davidbasilefilho/holyagent'
-  Write-Host '  claude plugin install holyagent@holyagent'
-  Write-Host ''
-  Write-Host 'On the first launch, run /holyagent:setup to install ctx7 and to configure Claude Code.'
+  Write-Host 'Done. Open a new PowerShell window so PATH picks up Bun.'
+  Write-Host 'Install and open T3 Code, then follow its HolyAgent quickstart:'
+  Write-Host 'https://github.com/davidbasilefilho/holyagent/blob/main/docs/usage.md#install'
 } catch {
   [Console]::Error.WriteLine("error: step failed: $($script:CurrentStep) ($($_.Exception.Message)). Fix the cause and re-run; finished steps are skipped.")
   exit 1

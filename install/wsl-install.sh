@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the prerequisites of HolyAgent on a clean WSL Ubuntu install: git, Node LTS, Bun and gh.
-# With --dev it also installs mise, which developing this repository needs. HolyAgent itself installs
-# as a Claude Code plugin; the script ends by printing those commands.
+# With --dev it also installs mise, which developing this repository needs. Install T3 Code and
+# follow the supported quickstart after preparing the shell where its Pi backend runs.
 #
 # Usage: bash install/wsl-install.sh [--dev]
 #
@@ -106,9 +106,9 @@ as_root() {
   fi
 }
 
-# Whether node is installed at a version ctx7 supports (22.13 or later).
+# Whether node is installed at a version Pi supports (22.19 or later).
 node_is_current() {
-  have node && node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 13) ? 0 : 1)' 2>/dev/null
+  have node && node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 19) ? 0 : 1)' 2>/dev/null
 }
 
 # Bun's global bin directory comes first for the rest of this run.
@@ -158,7 +158,7 @@ if node_is_current; then
   note "node $(node --version) already installed"
 else
   if have node; then
-    note "node $(node --version) is older than 22.13 (needed by ctx7); installing the LTS release"
+    note "node $(node --version) is older than 22.19 (needed by Pi); installing the LTS release"
   fi
   # NodeSource's setup script adds its apt repository for the current LTS line.
   download https://deb.nodesource.com/setup_lts.x
@@ -167,13 +167,13 @@ else
   hash -r
 fi
 if ! node_is_current; then
-  echo "error: node is missing or older than 22.13 after the install; check: command -v node" >&2
+  echo "error: node is missing or older than 22.19 after the install; check: command -v node" >&2
   exit 1
 fi
 note "node $(node --version)"
 
 # ---------------------------------------------------------------------------------------------
-step "Bun (the plugin's hooks run it)"
+step "Bun (runs the HolyAgent CLI)"
 
 if have bun; then
   note "bun $(bun --revision) already installed"
@@ -264,17 +264,12 @@ fi
 if ! gh auth status >/dev/null 2>&1; then
   warn "gh is not authenticated; run: gh auth login (or export GH_TOKEN)"
 fi
-if ! have claude; then
-  warn "Claude Code is not installed; see https://code.claude.com/docs/en/setup"
-fi
-
 cat <<'EOF'
 
-Done. Open a new shell (or run: source ~/.bashrc) so PATH picks up Bun, then install HolyAgent with
-these two commands:
+Done. Open a new shell (or run: source ~/.bashrc) so PATH picks up Bun.
+Install and open T3 Code, then follow its HolyAgent quickstart:
+https://github.com/davidbasilefilho/holyagent/blob/main/docs/usage.md#install
 
-  claude plugin marketplace add davidbasilefilho/holyagent
-  claude plugin install holyagent@holyagent
-
-On the first launch, run /holyagent:setup to install ctx7 and to configure Claude Code.
+Install the Pi backend in the environment T3 Code can launch it from. If T3 Code runs on
+Windows and does not launch Pi through WSL, install the backend on Windows instead.
 EOF

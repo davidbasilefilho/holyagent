@@ -33,6 +33,7 @@ const Choices = Schema.Struct({
 export const schemas = {
   setup: Schema.Struct({
     subagentCacheTtl: Schema.Literals(CACHE_TTLS),
+    t3Workflow: Schema.optionalKey(Schema.Boolean),
     dryRun: Schema.Boolean,
     skipCtx7: Schema.Boolean,
     scope: Schema.optionalKey(Schema.Literals(SCOPES)),
@@ -44,6 +45,7 @@ export const schemas = {
   }),
   doctor: Schema.Struct({
     fix: Schema.Boolean,
+    t3Workflow: Schema.optionalKey(Schema.Boolean),
     scope: Schema.optionalKey(Schema.Literals(SCOPES)),
     form: Schema.optionalKey(Form),
   }),
