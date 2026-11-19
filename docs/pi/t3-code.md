@@ -1,16 +1,16 @@
-# T3 Code: the primary interface for HolyAgent on Pi
+# T3 Code: HolyAgent’s supported interface
 
 **Status: built for 0.3.0, except the macOS permission walkthrough for computer use and the adapter for rpiv tools that need `custom()`; the specifics still to verify are in [To verify](#to-verify).** What the code does under T3 Code: the extension detects a T3 session, keeps only the T3 tools HolyAgent uses active, blocks a call to any other T3 tool, and warns when the thread is below Full access ([T3's tools](#t3s-tools-kept-and-deactivated), [Full access](#full-access-is-required)); `holyagent setup` writes T3's settings through an interactive screen with flags ([T3 settings](#t3-settings-written-by-setup), [the setup screen](#the-setup-screen-and-its-flags)); and a replay of synthesized T3 traffic tests it ([Tests](#tests)). HolyAgent 0.2.x supports Claude Code only. This page records what the maintainer decided for T3 Code as the primary interface of the Pi integration, with the research it rests on. Where a section says "decided" or "will" without a "built" note, check [the Pi status table](README.md#what-ships-now-and-what-is-planned).
 
 The maintainer's words: "also I want holyagent pi to be compatible with t3 code", in scope "In 0.3.0"; then "t3code shall be the primary interface for the pi integration, so we will deeply integrate with it. that means we can rely on its integrated browser, computer use, as well as enable anything beneficial we can from it globally or locally".
 
-The research read T3 Code's documentation and pull requests on 2026-11-07. Several T3 source files were read through mirrors rather than upstream `main`; those links are labelled "third-party", and so are the third-party packages. T3's Pi provider is Early Access, so details change: the T3 release must be checked before a detail is relied on ([To verify](#to-verify)). "Inference:" marks a conclusion drawn here, not a stated fact. The Claude plugin under T3 Code is a separate case, described in [usage.md](../usage.md#t3-code).
+The research read T3 Code's documentation and pull requests on 2026-11-07. Several T3 source files were read through mirrors rather than upstream `main`; those links are labelled "third-party", and so are the third-party packages. T3's Pi provider is Early Access, so details change: the T3 release must be checked before a detail is relied on ([To verify](#to-verify)). "Inference:" marks a conclusion drawn here, not a stated fact. The legacy Claude plugin integration is described in [usage.md](../usage.md#t3-code).
 
 ## The decisions
 
 | Area                  | Decision                                                                                                                                                                                                                                    | Detail                                                                    |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Primary interface     | The docs lead with T3 Code. The plain Pi terminal stays supported. HolyAgent relies on T3 features instead of rebuilding them.                                                                                                              | [Primary interface](#the-primary-interface)                               |
+| Primary interface     | T3 Code is the only supported interface. HolyAgent relies on T3 features instead of rebuilding them.                                                                                                                                        | [Primary interface](#the-primary-interface)                               |
 | How T3 runs Pi        | `pi --mode rpc` on the user's own Pi 0.80.5 or newer, enabled in T3 Settings. The Pi 1.x the lockfile resolves satisfies the floor. HolyAgent sets no launch args for mode or session.                                                      | [How T3 runs Pi](#how-t3-runs-pi)                                         |
 | Dialogs and UI        | Only the RPC extension UI that T3 renders. Never `custom()`, widgets, footer, titles or theme calls. A HolyAgent adapter for rpiv tools that need `custom()` is not built; the todo panel does not show ([todo](#dialogs-and-status-only)). | [Dialogs and status](#dialogs-and-status-only)                            |
 | Approval              | HolyAgent threads run in T3's Full access mode. The docs say so, and HolyAgent's extension warns in Supervised and Auto-accept edits; setup writes no access mode.                                                                          | [Full access](#full-access-is-required)                                   |
@@ -25,15 +25,7 @@ The research read T3 Code's documentation and pull requests on 2026-11-07. Sever
 
 ## The primary interface
 
-T3 Code is the primary interface for HolyAgent on Pi. The Pi documentation leads with it, and HolyAgent relies on T3's browser, dialogs, pickers, worktrees and the rest instead of rebuilding them.
-
-**Start here.**
-
-1. Install Pi and the HolyAgent package as in [installation.md](installation.md#how-holyagent-installs). Use the user (global) install: the T3 step of setup runs at `--scope user` only, and a project-local install loads under T3 only once a saved trust decision, `defaultProjectTrust` or an `--approve` launch arg applies ([installation.md](installation.md#global-and-project-local-installs)).
-2. Run `holyagent setup` in a terminal. It turns on T3's Pi provider and, on [the setup screen](#the-setup-screen-and-its-flags), lets you choose device access and worktrees for new threads; it skips the T3 step when T3 Code is not installed.
-3. In T3 Code, start a thread on the Pi provider and set its access mode to Full access ([why](#full-access-is-required)). The same install serves plain `pi`, so nothing else is needed.
-
-The plain `pi` terminal stays supported: everything in the other [Pi pages](README.md) works there, and no terminal path is removed. The pieces below that exist only under T3 (the MCP bridge tools, the dialogs) are absent in a terminal, and the visual roles report an inspection as blocked when their tools are missing, as the Claude text already does ([claude-parity.md](claude-parity.md#8-what-pi-cannot-carry)).
+T3 Code is HolyAgent’s only supported interface. Start with the [quickstart](../usage.md#install) or [migration guide](../usage.md#migrate-to-t3-code). HolyAgent uses Pi as its backend and relies on T3 Code's browser, dialogs, pickers and worktrees.
 
 ## How T3 runs Pi
 
@@ -229,7 +221,7 @@ The line-based setup also runs, with one `~ t3 tui:` line saying why, when stdin
 
 ## To verify
 
-Each point is settled during implementation and recorded here when it is:
+The automated checks exercise setup and doctor with isolated config files and replay synthesized T3 RPC traffic. They do not launch the T3 Code desktop client or verify live provider login. The points below still need live verification:
 
 - The T3 release that contains PR #7211.
 - The exact `preview_*` set on upstream `main` against the mirror.

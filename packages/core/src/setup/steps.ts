@@ -15,7 +15,7 @@ import { type Scope, settingsFile } from "./scope.ts"
 import { searchToolLines, setupToolLine } from "./search-tools.ts"
 import { type CacheTtl, mergeUserSettings, undoUserSettings } from "./settings.ts"
 import { EMPTY_BUNFIG, Shell } from "./shell.ts"
-import { installT3Settings, undoT3Settings } from "./t3-settings.ts"
+import { checkT3Prerequisites, installT3Settings, undoT3Settings } from "./t3-settings.ts"
 
 /** Why ctx7 is left out of a claude.ai cloud session. */
 const CLOUD_SKIP =
@@ -84,6 +84,8 @@ export interface SetupOptions {
   readonly subagentCacheTtl: CacheTtl
   readonly dryRun: boolean
   readonly skipCtx7: boolean
+  /** Run public T3 Code onboarding, not the internal Claude settings step. */
+  readonly t3Workflow?: boolean
   /** The settings scope to write, `user` when absent. */
   readonly scope?: Scope
   /** Back out the settings setup wrote instead of writing them; ctx7 is left installed. */
@@ -149,7 +151,9 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
   if (options.undo === true) {
     const lines = [
       hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-      ...(yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))),
+      ...(options.t3Workflow === true
+        ? []
+        : yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))),
       // Only files with a setup record get a line, so a machine that never ran the step prints none.
       ...(yield* asStep("tool settings", undoPiToolSettings(env, piOptions))),
       // T3 Code's settings are the user's, whatever scope was asked for; the step undoes at scope user.
@@ -161,6 +165,11 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
   }
   const cloud = inCloudSession(env)
   const piUsed = !cloud && (yield* piInUse(env))
+  if (options.t3Workflow === true) {
+    const blockers = yield* checkT3Prerequisites(env, piUsed)
+    if (blockers.length > 0)
+      return { lines: blockers.map((line) => `! ${line}`), ok: false } satisfies Report
+  }
   const ctx7Lines = options.skipCtx7
     ? [skipped("ctx7: skipped by flag")]
     : cloud
@@ -212,14 +221,16 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
         )
       : []),
     ...(yield* searchToolLines(piOptions.cwd, setupToolLine)),
-    ...(yield* onSettings((file) =>
-      mergeUserSettings({
-        env,
-        file,
-        subagentCacheTtl: options.subagentCacheTtl,
-        dryRun: options.dryRun,
-      }),
-    )),
+    ...(options.t3Workflow === true
+      ? []
+      : yield* onSettings((file) =>
+          mergeUserSettings({
+            env,
+            file,
+            subagentCacheTtl: options.subagentCacheTtl,
+            dryRun: options.dryRun,
+          }),
+        )),
   ]
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) } satisfies Report
 })

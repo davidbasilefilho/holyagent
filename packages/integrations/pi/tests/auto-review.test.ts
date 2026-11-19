@@ -421,7 +421,7 @@ describe("the default reviewer client", () => {
     )
     expect(await module.call("bash", RISKY)).toEqual({})
     expect(seen[0]?.url).toBe(CODEX_RESPONSES_URL)
-    expect((seen[0]?.init.headers as Record<string, string>)["authorization"]).toBe(
+    expect((seen[0]?.init.headers as Record<string, string> | undefined)?.["authorization"]).toBe(
       "Bearer secret-token",
     )
     const broken = start(

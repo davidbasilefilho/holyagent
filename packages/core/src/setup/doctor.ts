@@ -4,7 +4,7 @@ import { inCloudSession } from "../vcs/identity.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, type FormChoice } from "./form.ts"
-import { piChecks } from "./pi-check.ts"
+import { piChecks, piInUse } from "./pi-check.ts"
 import { checkPiToolSettings } from "./pi-settings.ts"
 import { fail, hint, pass, type Report } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
@@ -12,7 +12,7 @@ import { doctorToolLine, searchToolLines } from "./search-tools.ts"
 import { mergeUserSettings, missingSettingKeys } from "./settings.ts"
 import { Shell } from "./shell.ts"
 import { asStep, installCtx7 } from "./steps.ts"
-import { checkT3Settings } from "./t3-settings.ts"
+import { checkT3Prerequisites, checkT3Settings } from "./t3-settings.ts"
 
 const FIX = "run /holyagent:setup, or `holyagent doctor --fix`"
 
@@ -21,7 +21,7 @@ const checkBun = Effect.gen(function* () {
   const found = yield* shell.which("bun")
   return Option.isSome(found)
     ? pass("bun", found.value)
-    : fail("bun", "not found on PATH; install Bun (https://bun.sh), which runs the plugin hooks")
+    : fail("bun", "not found on PATH; install Bun (https://bun.sh), which runs the HolyAgent CLI")
 })
 
 /**
@@ -29,7 +29,7 @@ const checkBun = Effect.gen(function* () {
  * SessionStart check look too), or skipped by design in a claude.ai cloud session. A command found
  * only in Bun's bin directory passes with a hint to add that directory to PATH.
  */
-const checkCommand = (env: Env, command: string) =>
+const checkCommand = (env: Env, command: string, fix = FIX) =>
   Effect.gen(function* () {
     if (inCloudSession(env))
       return pass(command, "not installed in a claude.ai cloud session, by design")
@@ -39,7 +39,7 @@ const checkCommand = (env: Env, command: string) =>
     const anywhere = yield* shell.which(command, { includeBunBin: true })
     return Option.isSome(anywhere)
       ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`)
-      : fail(command, `not found on PATH or in Bun's bin directory; ${FIX}`)
+      : fail(command, `not found on PATH or in Bun's bin directory; ${fix}`)
   })
 
 /** The fix for failing settings; a scope other than user is named, or the fix would target user. */
@@ -83,6 +83,8 @@ export const doctor = Effect.fn("doctor")(function* (
   env: Env,
   options: {
     readonly fix: boolean
+    /** Check the public T3 Code workflow without checking or fixing Claude settings. */
+    readonly t3Workflow?: boolean
     readonly scope?: Scope
     readonly cwd?: string
     /** The form every capability is checked in; the normal form when absent. */
@@ -97,8 +99,27 @@ export const doctor = Effect.fn("doctor")(function* (
     : [
         ...(yield* piChecks(env, cwd, scope, form)),
         ...(yield* checkPiToolSettings(env, cwd, scope, form.form)),
-        ...(scope === "user" ? yield* checkT3Settings(env, cwd) : []),
+        ...(scope === "user" || options.t3Workflow === true
+          ? yield* checkT3Settings(env, cwd, { required: options.t3Workflow === true })
+          : []),
       ]
+  if (options.t3Workflow === true) {
+    const blockers = yield* checkT3Prerequisites(env, !inCloudSession(env) && (yield* piInUse(env)))
+    const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix")
+    const ctx7 = yield* checkCtx7
+    const fixes =
+      options.fix && ctx7.startsWith("FAIL ") && blockers.length === 0
+        ? yield* asStep("ctx7", installCtx7(env, false))
+        : []
+    const lines = [
+      ...blockers.map((line) => `FAIL ${line}`),
+      yield* checkBun,
+      ...fixes,
+      ...(fixes.length > 0 ? [yield* checkCtx7] : [ctx7]),
+      ...pi,
+    ]
+    return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) } satisfies Report
+  }
   const located = yield* settingsFile(env, scope, cwd).pipe(
     Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
   )

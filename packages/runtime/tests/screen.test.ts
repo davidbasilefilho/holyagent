@@ -14,6 +14,7 @@ import { join } from "node:path"
 import { decode } from "@toon-format/toon"
 import { Effect } from "effect"
 
+import piPins from "../../core/src/config/pi-packages.json" with { type: "json" }
 import { recordLaunch } from "../src/cli/assignment.ts"
 import { AgentMismatch, StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
@@ -484,7 +485,7 @@ describe("the browse pin", () => {
   test("is exact, from the table, and in the argument of the MCP server the capability registers", () => {
     const entryOf = CAPABILITIES.find((capability) => capability.name === "browser-use")
     const server = entryOf?.forms.normal
-    expect(PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]).toBe("0.0.16")
+    expect(PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]).toBe(piPins["@opencode/browse"])
     expect(server).toMatchObject({
       packages: [],
       mcpServers: [
@@ -495,7 +496,7 @@ describe("the browse pin", () => {
             "--registry=https://registry.npmjs.org/",
             "--@opencode:registry=https://registry.npmjs.org/",
             "-y",
-            "@opencode/browse@0.0.16",
+            `@opencode/browse@${piPins["@opencode/browse"]}`,
             "mcp",
           ],
         },

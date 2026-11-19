@@ -27,13 +27,15 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-code": "^2.0.0",
-    "@opentui/core": "^0.8.0",
-    "@opentui/solid": "^0.8.0",
+    "@opentui/core": "^0.9.0",
+    "@opentui/solid": "^0.9.0",
     "@types/bun": "^1.0.0",
     "effect": "^4.0.0",
     "eslint-plugin-jsdoc": "^65.0.0",
-    "lefthook": "^2.0.0",
-    "solid-js": "^1.0.0"
+    "oxfmt": "^0.79.0",
+    "oxlint": "^1.0.0",
+    "solid-js": "^1.0.0",
+    "tsrs": "^7.1.0-beta.tsrs3"
   },
   "pi": {
     "extensions": [
@@ -49,7 +51,6 @@
     }
   },
   "trustedDependencies": [
-    "@anthropic-ai/claude-code",
-    "lefthook"
+    "@anthropic-ai/claude-code"
   ]
 }

@@ -4,6 +4,7 @@ import { $ } from "bun"
 import { Console, Data, Effect, Schema } from "effect"
 
 import {
+  MAJOR_CAP,
   newestAllowedRelease,
   newestPypiRelease,
   newestTag,
@@ -13,6 +14,7 @@ import {
   type PackageDependency,
   parseActionUses,
   parseMiseTools,
+  parseRelease,
   parseTags,
   renderPiPackages,
   rewriteActionUses,
@@ -135,6 +137,7 @@ const GITHUB = "https://github.com"
 /** The mise tools whose releases are tags of a GitHub repository. */
 export const MISE_SOURCES: Record<string, { repository: string; prefix: string }> = {
   bun: { repository: "oven-sh/bun", prefix: "bun-v" },
+  hk: { repository: "jdx/hk", prefix: "v" },
   "aqua:BurntSushi/ripgrep": { repository: "BurntSushi/ripgrep", prefix: "" },
   "aqua:sharkdp/fd": { repository: "sharkdp/fd", prefix: "v" },
 }
@@ -175,8 +178,10 @@ const tagsOf = (repository: string) =>
 
 /**
  * The release a package moves to: the newest stable, non-deprecated version no higher than the
- * registry's `latest` dist-tag. A registry that takes longer than `timeoutMs` to answer fails with
- * a `SourceError`, so a stalled connection cannot hang the update.
+ * registry's `latest` dist-tag. A package with a {@link MAJOR_CAP} moves to the newest stable
+ * version within the capped line instead, so an incompatible newer line is never selected. A
+ * registry that takes longer than `timeoutMs` to answer fails with a `SourceError`, so a stalled
+ * connection cannot hang the update.
  */
 export const releaseOf = (
   name: string,
@@ -204,7 +209,17 @@ export const releaseOf = (
       strict,
     )(body).pipe(Effect.mapError((cause) => new SourceError({ source, cause })))
     const latest = packument["dist-tags"].latest
-    const release = newestAllowedRelease(packument.versions, latest)
+    const cap = MAJOR_CAP[name]
+    const eligible =
+      cap === undefined
+        ? packument.versions
+        : Object.fromEntries(
+            Object.entries(packument.versions).filter(([version]) => {
+              const parsed = parseRelease(version)
+              return parsed !== undefined && parsed.major <= cap
+            }),
+          )
+    const release = newestAllowedRelease(eligible, latest)
     return release === undefined
       ? yield* Effect.fail(
           new SourceError({
@@ -351,12 +366,39 @@ const surveyMise = (root: string) =>
 export const manifestFiles = (root: string) =>
   Effect.gen(function* () {
     const text = yield* readText(root, "package.json")
-    const { workspaces = [] } = yield* Schema.decodeUnknownEffect(
-      Schema.fromJsonString(open({ workspaces: Schema.optionalKey(Schema.Array(Schema.String)) })),
+    const WorkspaceGlobs = Schema.Array(Schema.String)
+    const { workspaces } = yield* Schema.decodeUnknownEffect(
+      Schema.fromJsonString(
+        open({
+          workspaces: Schema.optionalKey(
+            Schema.Union([WorkspaceGlobs, open({ packages: Schema.optionalKey(WorkspaceGlobs) })]),
+          ),
+        }),
+      ),
       strict,
     )(text).pipe(Effect.mapError((cause) => new FileError({ file: "package.json", cause })))
-    const found = yield* Effect.forEach(workspaces, (glob) =>
-      scan(root, `${glob}/package.json`, false),
+    const globs: ReadonlyArray<string> =
+      workspaces === undefined
+        ? []
+        : "packages" in workspaces
+          ? (workspaces.packages ?? [])
+          : Array.isArray(workspaces)
+            ? (workspaces as ReadonlyArray<string>)
+            : []
+    const included = globs.filter((glob) => !glob.startsWith("!"))
+    const excluded = globs
+      .filter((glob) => glob.startsWith("!"))
+      .map((glob) => new Bun.Glob(glob.slice(1)))
+    const found = (yield* Effect.forEach(included, (glob) =>
+      scan(root, `${glob.replace(/\/$/, "")}/package.json`, false),
+    )).map((files) =>
+      files.filter(
+        (file) =>
+          !file.split("/").includes("node_modules") &&
+          !excluded.some(
+            (glob) => glob.match(file) || glob.match(file.replace(/\/package\.json$/, "")),
+          ),
+      ),
     )
     return ["package.json", ...new Set(found.flat())].toSorted()
   })
@@ -398,7 +440,9 @@ const surveyPackages = (root: string) =>
       releaseOf,
     )
     const pins: Array<Pin> = []
-    const ranges = new Map<string, Array<PackageDependency>>()
+    const ranges = new Map<string, Array<PackageDependency>>(
+      manifests.map(({ file }) => [file, []]),
+    )
     for (const { file, dependencies } of manifests)
       for (const dependency of dependencies) {
         const next = nextPackageRange(
@@ -408,7 +452,7 @@ const surveyPackages = (root: string) =>
         )
         pins.push({
           kind: "package",
-          name: `${dependency.name} (${dependency.field})`,
+          name: `${dependency.name} (${[dependency.field, ...(dependency.path ?? [])].join(".")})`,
           file,
           current: dependency.range,
           next,
@@ -538,11 +582,11 @@ export const renderPypiPins = (root: string, versions: Survey["pypiPackages"]) =
     Effect.map((table) => renderPiPackages(withPiPackageVersions(table, versions))),
   )
 
-const writeRanges = (root: string, packages: Survey["packages"]) =>
-  renderRanges(root, packages).pipe(
-    Effect.flatMap((rendered) =>
-      Effect.forEach(rendered, ([file, text]) => writeText(root, file, text)),
-    ),
+/** Keep hk's embedded Pkl import on the same release resolved by mise. */
+export const rewriteHkSchema = (text: string, version: string): string =>
+  text.replace(
+    /package:\/\/github\.com\/jdx\/hk\/releases\/download\/v[\d.]+\/hk@[\d.]+#\/Config\.pkl/g,
+    `package://github.com/jdx/hk/releases/download/v${version}/hk@${version}#/Config.pkl`,
   )
 
 /**
@@ -563,11 +607,17 @@ export const applySurvey = (root: string, found: Survey) =>
         ),
     )
     const mise = rewriteMiseTools(yield* readText(root, "mise.toml"), found.mise)
+    const hkRelease = found.mise.get("hk")
+    const hk =
+      hkRelease === undefined
+        ? undefined
+        : rewriteHkSchema(yield* readText(root, "hk.pkl"), hkRelease)
     const ranges = yield* renderRanges(root, found.packages)
     const piPins = yield* renderPiPins(root, found.piPackages)
     const pypiPins = yield* renderPypiPins(root, found.pypiPackages)
     for (const [file, text] of workflows) yield* writeText(root, file, text)
     yield* writeText(root, "mise.toml", mise)
+    if (hk !== undefined) yield* writeText(root, "hk.pkl", hk)
     for (const [file, text] of ranges) yield* writeText(root, file, text)
     yield* writeText(root, PI_PACKAGE_PINS, piPins)
     yield* writeText(root, PYPI_PACKAGE_PINS, pypiPins)
@@ -577,7 +627,7 @@ export const applySurvey = (root: string, found: Survey) =>
     yield* run("bun update --ignore-scripts", () =>
       $`bun update --ignore-scripts`.cwd(root).nothrow(),
     )
-    yield* writeRanges(root, found.packages)
+    for (const [file, text] of ranges) yield* writeText(root, file, text)
     yield* run("bun install --ignore-scripts", () =>
       $`bun install --ignore-scripts`.cwd(root).nothrow(),
     )

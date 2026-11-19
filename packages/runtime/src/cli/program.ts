@@ -103,6 +103,7 @@ const callFor = (args: Call["args"], host: Host, emit: Call["emit"], command: Co
       emit,
       vcs: host.vcs ?? vcsLive(root, host.env),
       terminal: host.terminal,
+      t3Workflow: host.t3Workflow ?? false,
       setupTui: host.setupTui,
       input: (schema) => readInput(host, schema, inline),
       inputBy: (pick) => readInputBy(host, pick, inline),

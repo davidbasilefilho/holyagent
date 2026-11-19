@@ -182,7 +182,7 @@ try {
   assert.deepEqual(await snapshot(join(cwd, ".holyagent")), before)
   assert.ok(
     calls.every((program) => program === "git"),
-    `unexpected subprocesses: ${calls}`,
+    `unexpected subprocesses: ${calls.join(",")}`,
   )
   console.log("Node Core-backed SDK launch checks passed")
 } finally {

@@ -87,7 +87,8 @@ export interface StateTree {
  * them from git config. {@link commitState} takes them instead of reading the same config again.
  */
 export type Resolved =
-  { readonly mode: "branch"; readonly branch: string } | { readonly mode: "work" | "local" }
+  | { readonly mode: "branch"; readonly branch: string }
+  | { readonly mode: "work" | "local" }
 
 /** The environment of a process, as the host passes it. */
 export type Environment = Readonly<Record<string, string | undefined>>

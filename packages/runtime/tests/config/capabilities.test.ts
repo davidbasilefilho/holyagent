@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import { Effect, Schema } from "effect"
 
+import pypiPins from "../../../core/src/config/pypi-packages.json" with { type: "json" }
 import {
   BROWSE_MCP_SERVER,
   BROWSE_TOOLS,
@@ -359,7 +360,7 @@ describe("the browser-use capability entry", () => {
   })
 
   test("the headless server is browser-use at an exact PyPI pin, run by uvx with no uv config and the public index", () => {
-    expect(PYPI_PACKAGE_VERSIONS[BROWSER_USE_PACKAGE]).toBe("1.0.2")
+    expect(PYPI_PACKAGE_VERSIONS[BROWSER_USE_PACKAGE]).toBe(pypiPins["browser-use"])
     expect(PYPI_INDEX).toBe("https://pypi.org/simple")
     expect(BROWSER_USE_MCP_SERVER).toEqual({
       name: "browser_use",
@@ -369,7 +370,7 @@ describe("the browser-use capability entry", () => {
         "--default-index",
         "https://pypi.org/simple",
         "--from",
-        "browser-use==1.0.2",
+        `browser-use==${pypiPins["browser-use"]}`,
         "browser-use",
         "--cli-mcp",
       ],

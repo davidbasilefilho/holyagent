@@ -11098,16 +11098,16 @@ var init_settings = __esm(() => {
 var pi_packages_default;
 var init_pi_packages = __esm(() => {
   pi_packages_default = {
-    "pi-provider-kimi-code": "0.6.13",
-    "@tintinweb/pi-subagents": "0.23.2",
-    "billion-context": "0.1.213",
+    "pi-provider-kimi-code": "0.6.14",
+    "@tintinweb/pi-subagents": "0.26.0",
+    "billion-context": "0.1.216",
     "@juicesharp/rpiv-todo": "2.15.0",
     "@juicesharp/rpiv-ask-user-question": "2.15.0",
     "@aliou/pi-processes": "0.13.6",
     "@amaster.ai/pi-computer-use": "0.1.38",
     "pi-web-kit": "0.5.0",
     "@ff-labs/pi-fff": "0.11.0",
-    "@opencode/browse": "0.0.16"
+    "@opencode/browse": "0.1.3"
   };
 });
 
@@ -11120,7 +11120,7 @@ var init_pi_packages2 = __esm(() => {
 var pypi_packages_default;
 var init_pypi_packages = __esm(() => {
   pypi_packages_default = {
-    "browser-use": "1.0.2"
+    "browser-use": "1.0.6"
   };
 });
 
@@ -13404,13 +13404,15 @@ var init_package = __esm(() => {
     },
     devDependencies: {
       "@anthropic-ai/claude-code": "^2.0.0",
-      "@opentui/core": "^0.8.0",
-      "@opentui/solid": "^0.8.0",
+      "@opentui/core": "^0.9.0",
+      "@opentui/solid": "^0.9.0",
       "@types/bun": "^1.0.0",
       effect: "^4.0.0",
       "eslint-plugin-jsdoc": "^65.0.0",
-      lefthook: "^2.0.0",
-      "solid-js": "^1.0.0"
+      oxfmt: "^0.79.0",
+      oxlint: "^1.0.0",
+      "solid-js": "^1.0.0",
+      tsrs: "^7.1.0-beta.tsrs3"
     },
     pi: {
       extensions: [
@@ -13426,8 +13428,7 @@ var init_package = __esm(() => {
       }
     },
     trustedDependencies: [
-      "@anthropic-ai/claude-code",
-      "lefthook"
+      "@anthropic-ai/claude-code"
     ]
   };
 });
@@ -18507,7 +18508,7 @@ var init_pi_check = __esm(() => {
   PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`;
   NODE_FIX = `install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`;
   PI_FIX = `install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`;
-  PACKAGE_COMMAND = `pi install git:github.com/davidbasilefilho/holyagent@holyagent-${package_default.version}`;
+  PACKAGE_COMMAND = `pi install npm:holyagent@${package_default.version}`;
   VERSION = /(\d+)\.(\d+)\.(\d+)/;
   PINNED_PI = releaseIn(PI_HOST_VERSION) ?? [0, 0, 0];
   MINIMUM_NODE = releaseIn(PI_MINIMUM_NODE) ?? [0, 0, 0];
@@ -19453,7 +19454,13 @@ var init_pi_install = __esm(() => {
 import { join as join21 } from "path";
 var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 = "t3 settings", restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false)), writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
-})))), t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join21(homeDirectory2(env), ".t3"), t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
+})))), checkT3Prerequisites = (env, piUsed) => gen2(function* () {
+  const home = t3Home(env);
+  return [
+    ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`],
+    ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
+  ];
+}), t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join21(homeDirectory2(env), ".t3"), t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
   {
     name: "Pi provider",
     choice: "pi",
@@ -19574,17 +19581,28 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
     return [];
   const decided = yield* decide(env, cwd, options);
   if (decided === undefined || "line" in decided)
-    return [];
+    return options.required === true ? [
+      fail8(label2, "Cannot configure the Pi provider; check pi.enable and pi.t3.scope, then run holyagent setup")
+    ] : [];
   const { file, units: wanted } = decided.target;
   return yield* gen2(function* () {
     const { value } = yield* readJsonObjectSnapshot(file);
+    if (options.required === true) {
+      const instances = value["providerInstances"];
+      const instance = isJsonObject2(instances) ? instances["pi"] : undefined;
+      const config = isJsonObject2(instance) ? instance["config"] : undefined;
+      if (!isJsonObject2(instance) || instance["driver"] !== "pi" || instance["enabled"] !== true || isJsonObject2(config) && config["enabled"] === false)
+        return [
+          fail8(label2, "Pi provider is not enabled; run holyagent setup, and check the provider in T3 Code Settings")
+        ];
+    }
     const { keys } = wantedKeys(value, wanted);
     const missing = applyDefaults(value, keys).entries.filter((entry) => entry.status === "added");
     return [
       missing.length === 0 ? pass(label2, `${file} holds the settings HolyAgent writes`) : hint(`${label2} ${file} lacks ${names(missing)}; run \`holyagent setup\``)
     ];
   }).pipe(catchTag2("SetupFailure", (error) => succeed6([
-    hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
+    options.required === true ? fail8(label2, `${error.message}; fix the file, then run holyagent setup`) : hint(`${label2}: ${error.message}; fix the file, then run \`holyagent setup\``)
   ])));
 });
 var init_t3_settings = __esm(() => {
@@ -19831,7 +19849,7 @@ var init_steps = __esm(() => {
     if (options.undo === true) {
       const lines = [
         hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-        ...yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
+        ...options.t3Workflow === true ? [] : yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
         ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions)),
         ...scope === "user" ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun })) : []
       ];
@@ -19839,6 +19857,11 @@ var init_steps = __esm(() => {
     }
     const cloud = inCloudSession(env);
     const piUsed = !cloud && (yield* piInUse(env));
+    if (options.t3Workflow === true) {
+      const blockers = yield* checkT3Prerequisites(env, piUsed);
+      if (blockers.length > 0)
+        return { lines: blockers.map((line) => `! ${line}`), ok: false };
+    }
     const ctx7Lines = options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun));
     const capabilityLines = piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
       scope,
@@ -19863,7 +19886,7 @@ var init_steps = __esm(() => {
         ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
       })) : [],
       ...yield* searchToolLines(piOptions.cwd, setupToolLine),
-      ...yield* onSettings((file) => mergeUserSettings({
+      ...options.t3Workflow === true ? [] : yield* onSettings((file) => mergeUserSettings({
         env,
         file,
         subagentCacheTtl: options.subagentCacheTtl,
@@ -19874,7 +19897,7 @@ var init_steps = __esm(() => {
   });
 });
 
-var FIX = "run /holyagent:setup, or `holyagent doctor --fix`", checkBun, checkCommand = (env, command) => gen2(function* () {
+var FIX = "run /holyagent:setup, or `holyagent doctor --fix`", checkBun, checkCommand = (env, command, fix = FIX) => gen2(function* () {
   if (inCloudSession(env))
     return pass(command, "not installed in a claude.ai cloud session, by design");
   const shell = yield* Shell;
@@ -19882,7 +19905,7 @@ var FIX = "run /holyagent:setup, or `holyagent doctor --fix`", checkBun, checkCo
   if (isSome2(onPath))
     return pass(command, onPath.value);
   const anywhere = yield* shell.which(command, { includeBunBin: true });
-  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${FIX}`);
+  return isSome2(anywhere) ? pass(command, `${anywhere.value} (not on PATH; add its directory to PATH)`) : fail8(command, `not found on PATH or in Bun's bin directory; ${fix}`);
 }), fixFor2 = (scope) => scope === "user" ? FIX : `run /holyagent:setup --scope ${scope}, or \`holyagent doctor --fix --scope ${scope}\``, checkSettings = (file, scope) => missingSettingKeys(file).pipe(map5((missing) => missing.length === 0 ? pass("settings", file) : fail8("settings", `${file} lacks ${missing.join(", ")}; ${fixFor2(scope)}`)), catchTag2("SetupFailure", (error) => succeed6(fail8("settings", error.message)))), checks = (env, file, scope) => all2([checkBun, checkCommand(env, "ctx7"), checkSettings(file, scope)]), doctor;
 var init_doctor = __esm(() => {
   init_dist();
@@ -19900,7 +19923,7 @@ var init_doctor = __esm(() => {
   checkBun = gen2(function* () {
     const shell = yield* Shell;
     const found = yield* shell.which("bun");
-    return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the plugin hooks");
+    return isSome2(found) ? pass("bun", found.value) : fail8("bun", "not found on PATH; install Bun (https://bun.sh), which runs the HolyAgent CLI");
   });
   doctor = fn2("doctor")(function* (env, options) {
     const scope = options.scope ?? "user";
@@ -19909,8 +19932,22 @@ var init_doctor = __esm(() => {
     const pi = inCloudSession(env) ? [] : [
       ...yield* piChecks(env, cwd, scope, form),
       ...yield* checkPiToolSettings(env, cwd, scope, form.form),
-      ...scope === "user" ? yield* checkT3Settings(env, cwd) : []
+      ...scope === "user" || options.t3Workflow === true ? yield* checkT3Settings(env, cwd, { required: options.t3Workflow === true }) : []
     ];
+    if (options.t3Workflow === true) {
+      const blockers = yield* checkT3Prerequisites(env, !inCloudSession(env) && (yield* piInUse(env)));
+      const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix");
+      const ctx7 = yield* checkCtx7;
+      const fixes = options.fix && ctx7.startsWith("FAIL ") && blockers.length === 0 ? yield* asStep("ctx7", installCtx7(env, false)) : [];
+      const lines = [
+        ...blockers.map((line) => `FAIL ${line}`),
+        yield* checkBun,
+        ...fixes,
+        ...fixes.length > 0 ? [yield* checkCtx7] : [ctx7],
+        ...pi
+      ];
+      return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
+    }
     const located = yield* settingsFile(env, scope, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
     if (located instanceof SetupFailure) {
       const lines = yield* all2([
@@ -19985,6 +20022,7 @@ var init_setup = __esm(() => {
   schemas4 = {
     setup: Struct({
       subagentCacheTtl: Literals(CACHE_TTLS),
+      t3Workflow: optionalKey2(Boolean3),
       dryRun: Boolean3,
       skipCtx7: Boolean3,
       scope: optionalKey2(Literals(SCOPES)),
@@ -19996,6 +20034,7 @@ var init_setup = __esm(() => {
     }),
     doctor: Struct({
       fix: Boolean3,
+      t3Workflow: optionalKey2(Boolean3),
       scope: optionalKey2(Literals(SCOPES)),
       form: optionalKey2(Form)
     })
@@ -29967,8 +30006,8 @@ var init_lock3 = __esm(() => {
 });
 
 var TUI_PACKAGES = {
-  "@opentui/core": "0.8.4",
-  "@opentui/solid": "0.8.4",
+  "@opentui/core": "0.9.2",
+  "@opentui/solid": "0.9.2",
   "solid-js": "1.9.19"
 }, TUI_LOCK = `{
   "lockfileVersion": 2,
@@ -29977,8 +30016,8 @@ var TUI_PACKAGES = {
     "": {
       "name": "holyagent-setup-tui",
       "dependencies": {
-        "@opentui/core": "0.8.4",
-        "@opentui/solid": "0.8.4",
+        "@opentui/core": "0.9.2",
+        "@opentui/solid": "0.9.2",
         "solid-js": "1.9.19"
       }
     }
@@ -30027,18 +30066,18 @@ var TUI_PACKAGES = {
       "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
     ],
     "@babel/generator": [
-      "@babel/generator@7.29.13",
+      "@babel/generator@7.29.14",
       "",
       {
         "dependencies": {
-          "@babel/parser": "^7.29.13",
-          "@babel/types": "^7.29.11",
+          "@babel/parser": "^7.29.14",
+          "@babel/types": "^7.29.14",
           "@jridgewell/gen-mapping": "^0.3.12",
           "@jridgewell/trace-mapping": "^0.3.28",
           "jsesc": "^3.0.2"
         }
       },
-      "sha512-T5FRo+RzVHvGjWOuF1Ljc44b+NXAOazodHkGUHp4I3zCkQ4/sNVJm56h1S278LMR0bY5xBhztGziSbli8zObIw=="
+      "sha512-qSY56jgW5JnSXzuekLVil6zaOQxOCtOHidr65KkaMBw772IuAY28Qx4ZykAcDn8+FRF15qk80XzKwgSc/RYW6g=="
     ],
     "@babel/helper-annotate-as-pure": [
       "@babel/helper-annotate-as-pure@7.29.7",
@@ -30090,15 +30129,16 @@ var TUI_PACKAGES = {
       "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
     ],
     "@babel/helper-member-expression-to-functions": [
-      "@babel/helper-member-expression-to-functions@7.29.7",
+      "@babel/helper-member-expression-to-functions@7.29.14",
       "",
       {
         "dependencies": {
-          "@babel/traverse": "^7.29.7",
-          "@babel/types": "^7.29.7"
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.14",
+          "@babel/types": "^7.29.14"
         }
       },
-      "sha512-j+7JYmk1JYDtACIGj0QJqqWZjoUpMoEikQGADMaHgCMCSDqd2+P32rfcibUNrGOMWrlzK1WJBdxrB3JJQZwWtg=="
+      "sha512-FuTSn8mXKAP+aHXnbkCYQsQAdlEIJptEutwc2NaPd28hyVqsjRDmBnI2EPJX6HCodKIqOHfayQHqtxQCkqwthA=="
     ],
     "@babel/helper-module-imports": [
       "@babel/helper-module-imports@7.29.7",
@@ -30112,19 +30152,19 @@ var TUI_PACKAGES = {
       "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
     ],
     "@babel/helper-module-transforms": [
-      "@babel/helper-module-transforms@7.29.13",
+      "@babel/helper-module-transforms@7.29.14",
       "",
       {
         "dependencies": {
           "@babel/helper-module-imports": "^7.29.7",
           "@babel/helper-validator-identifier": "^7.29.7",
-          "@babel/traverse": "^7.29.13"
+          "@babel/traverse": "^7.29.14"
         },
         "peerDependencies": {
           "@babel/core": "^7.0.0"
         }
       },
-      "sha512-/U96wOz+SCoZ7Da/8kjDGltcNY280JPQcRNPK0Hk3PTbdpaiBDQImtC6JsbVwb1HGMr3usZQU2WsWVjhYNmRzw=="
+      "sha512-2XDvQVd9JESaOgGc4jT2/jquTAO7ppA5noTZQqH+MmZ89yjCzScLwtCPbWtkPZylL+TLWR49IwWmk+QkRR4GsA=="
     ],
     "@babel/helper-optimise-call-expression": [
       "@babel/helper-optimise-call-expression@7.29.7",
@@ -30169,10 +30209,10 @@ var TUI_PACKAGES = {
       "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
     ],
     "@babel/helper-string-parser": [
-      "@babel/helper-string-parser@7.29.13",
+      "@babel/helper-string-parser@7.29.14",
       "",
       {},
-      "sha512-fWegr+WsEsiMVW4KUNdIIzzMTZSzNiqhy0//6+2MRi2d5NFNsL/AYwBQW8eBnRbTBVRnDVzjaJEUqKaCWjMMdQ=="
+      "sha512-CXvKMFvM80ihI7Vox9jb+kQjnyjESQNPM+vB7U0Zz6TWuZA+Z/FL0QPMH300h33qJtIx+REeBhXqWOPW48TcAQ=="
     ],
     "@babel/helper-validator-identifier": [
       "@babel/helper-validator-identifier@7.29.7",
@@ -30187,26 +30227,26 @@ var TUI_PACKAGES = {
       "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
     ],
     "@babel/helpers": [
-      "@babel/helpers@7.29.13",
+      "@babel/helpers@7.29.14",
       "",
       {
         "dependencies": {
           "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.11"
+          "@babel/types": "^7.29.14"
         }
       },
-      "sha512-laoRpD/kO/iA4CDlgJbixHekg7oPvWALK0PQyK3Ob2I2njZRvVAD77RfWCIImtqWCq6KijoBoZK7bp/HlTWASQ=="
+      "sha512-6E3Mi1r0B0umq6vmZa4/78q+64fqO2YY0THUdjDPKUCKhNb0yQy5NQIaPHCSD3ryTgiTss//P4JsWS80AsZ6LQ=="
     ],
     "@babel/parser": [
-      "@babel/parser@7.29.13",
+      "@babel/parser@7.29.14",
       "",
       {
         "dependencies": {
-          "@babel/types": "^7.29.11"
+          "@babel/types": "^7.29.14"
         },
         "bin": "./bin/babel-parser.js"
       },
-      "sha512-fJM50YYjlTiBhgdkGmC1tBpv+FMAyo4annf2X6Aks+0yRlaiVkYW/3f07xAfVVkYIoZ9fFZp+mEThUFnuybhkQ=="
+      "sha512-VL220vXuyO2z3rNIQwY7ftj9UwpqOt+33sH+sBWkOekbsSR2g7EEMnOx24ZlCH0xOA3DM/33SifVFGbnJD8r/w=="
     ],
     "@babel/plugin-syntax-jsx": [
       "@babel/plugin-syntax-jsx@7.29.7",
@@ -30235,18 +30275,18 @@ var TUI_PACKAGES = {
       "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
     ],
     "@babel/plugin-transform-modules-commonjs": [
-      "@babel/plugin-transform-modules-commonjs@7.29.7",
+      "@babel/plugin-transform-modules-commonjs@7.29.14",
       "",
       {
         "dependencies": {
-          "@babel/helper-module-transforms": "^7.29.7",
+          "@babel/helper-module-transforms": "^7.29.14",
           "@babel/helper-plugin-utils": "^7.29.7"
         },
         "peerDependencies": {
           "@babel/core": "^7.0.0-0"
         }
       },
-      "sha512-j0vCldybPC5b5dwCQOJ21uKtHzt7hxLygJTg9eF1ScfaikEDNfzn94XoW5Fi+seBR0nCyL23xaBFFkq7dTM8XQ=="
+      "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
     ],
     "@babel/plugin-transform-typescript": [
       "@babel/plugin-transform-typescript@7.29.9",
@@ -30295,31 +30335,31 @@ var TUI_PACKAGES = {
       "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
     ],
     "@babel/traverse": [
-      "@babel/traverse@7.29.13",
+      "@babel/traverse@7.29.14",
       "",
       {
         "dependencies": {
           "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.13",
+          "@babel/generator": "^7.29.14",
           "@babel/helper-globals": "^7.29.7",
-          "@babel/parser": "^7.29.13",
+          "@babel/parser": "^7.29.14",
           "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.11",
+          "@babel/types": "^7.29.14",
           "debug": "^4.3.1"
         }
       },
-      "sha512-0ve0xMlFA73dgY1oyJRY6RoW+/bncdcOQqg6jjYcVfXBK90OdLXjm9R6lmRetdZVrPjXkKIoMVBqYFPjcAlZ4Q=="
+      "sha512-RAdQJrBgmIH1FWvN0X+1hoDxzMzlP4cv/1Zi4dn4tG1H0cTb+rw7CzUxQJhp1f4ANd8j5vH3fy8BAWFGkBDEsA=="
     ],
     "@babel/types": [
-      "@babel/types@7.29.11",
+      "@babel/types@7.29.14",
       "",
       {
         "dependencies": {
-          "@babel/helper-string-parser": "^7.29.11",
+          "@babel/helper-string-parser": "^7.29.14",
           "@babel/helper-validator-identifier": "^7.29.7"
         }
       },
-      "sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ=="
+      "sha512-UjI/dKmwJwT9pOszJitq2G6EObZPnsZUfdCr92z2TlF3EZK9J3EdfOKUrCzHl6wFthbzwhzl1Soc/UIwxRiq6w=="
     ],
     "@jridgewell/gen-mapping": [
       "@jridgewell/gen-mapping@0.3.13",
@@ -30344,10 +30384,10 @@ var TUI_PACKAGES = {
       "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
     ],
     "@jridgewell/resolve-uri": [
-      "@jridgewell/resolve-uri@3.1.2",
+      "@jridgewell/resolve-uri@3.1.3",
       "",
       {},
-      "sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw=="
+      "sha512-lhTtjtoEArWBjismtfS761S9Hlyn+nIZqOZVYoZ1Xn82PMNMVnk+jj/NhC4fAXGTs7ydONcJiR5vyQBTMDu27g=="
     ],
     "@jridgewell/sourcemap-codec": [
       "@jridgewell/sourcemap-codec@1.6.0",
@@ -30367,113 +30407,112 @@ var TUI_PACKAGES = {
       "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
     ],
     "@opentui/core": [
-      "@opentui/core@0.8.4",
+      "@opentui/core@0.9.2",
       "",
       {
         "dependencies": {
           "bun-ffi-structs": "0.3.1",
           "diff": "9.0.0",
-          "marked": "17.0.1",
           "string-width": "7.2.0"
         },
         "optionalDependencies": {
-          "@opentui/core-darwin-arm64": "0.8.4",
-          "@opentui/core-darwin-x64": "0.8.4",
-          "@opentui/core-linux-arm64": "0.8.4",
-          "@opentui/core-linux-arm64-musl": "0.8.4",
-          "@opentui/core-linux-x64": "0.8.4",
-          "@opentui/core-linux-x64-musl": "0.8.4",
-          "@opentui/core-win32-arm64": "0.8.4",
-          "@opentui/core-win32-x64": "0.8.4"
+          "@opentui/core-darwin-arm64": "0.9.2",
+          "@opentui/core-darwin-x64": "0.9.2",
+          "@opentui/core-linux-arm64": "0.9.2",
+          "@opentui/core-linux-arm64-musl": "0.9.2",
+          "@opentui/core-linux-x64": "0.9.2",
+          "@opentui/core-linux-x64-musl": "0.9.2",
+          "@opentui/core-win32-arm64": "0.9.2",
+          "@opentui/core-win32-x64": "0.9.2"
         },
         "peerDependencies": {
           "web-tree-sitter": "0.25.10"
         }
       },
-      "sha512-s2z2FFEWxsQ6IPVEiAjlHHY5yssnCI+dIltL54+ZhVz1EWxylaB0HER+ypPL2goot0DKwKqrM57rnomh19/2rQ=="
+      "sha512-Wp0szaFvKET8TlcCO9C7AHgUnPY8qCTsj1im88jOAdX9InlYrerooWF9ez1QBrR/i6+6xhBf/iF/pch3d1xbeg=="
     ],
     "@opentui/core-darwin-arm64": [
-      "@opentui/core-darwin-arm64@0.8.4",
+      "@opentui/core-darwin-arm64@0.9.2",
       "",
       {
         "os": "darwin",
         "cpu": "arm64"
       },
-      "sha512-kAWCmLsGuxQANeq4AjjX0Yodca2VIofQGUfIH9Edg9BKajYpf941heZfMJkkkJUXawYTNFTR2lBYsdneUUJBrg=="
+      "sha512-6ASALGMPpmpsoGKYUpJYF+HJs1lZiw9zYsUhInCRYuVvBxYkBqV7MSz+1HFsTTd/ewqFuNnV/JMlEieMXZqiEA=="
     ],
     "@opentui/core-darwin-x64": [
-      "@opentui/core-darwin-x64@0.8.4",
+      "@opentui/core-darwin-x64@0.9.2",
       "",
       {
         "os": "darwin",
         "cpu": "x64"
       },
-      "sha512-0S62YHtIh1Q9tTun7065njEtYUUtf1zXwllDKXr63R1cVgq+8eRdVQ2PsAGNOqB5OYYno+M8o2tuK/Es2uvmBA=="
+      "sha512-KWSEd1W0Gmx+EiixTc8YWbF3/htVFRPREeWV9BsT3Sag0SAwuZNJYhIixR+UGptggShUc4EiNofaAwEdDUG2IA=="
     ],
     "@opentui/core-linux-arm64": [
-      "@opentui/core-linux-arm64@0.8.4",
+      "@opentui/core-linux-arm64@0.9.2",
       "",
       {
         "os": "linux",
         "cpu": "arm64"
       },
-      "sha512-VGnBN3ItBwZog109wtPIou8pn93TseZwA5OZ05X2PYIYPw+IC6mVeO2Dn0qwwozLBDxeyH3ydbHMFlwzS4/fLg=="
+      "sha512-SKhb+H6F+iAz/Vb0avxxZYor1CIzVYhuMo21qN67xZ9XdqnvPaM5aHRU05rWOjU1U3pRlMslnf4DZZvyqfxjkQ=="
     ],
     "@opentui/core-linux-arm64-musl": [
-      "@opentui/core-linux-arm64-musl@0.8.4",
+      "@opentui/core-linux-arm64-musl@0.9.2",
       "",
       {
         "os": "linux",
         "cpu": "arm64",
         "libc": "musl"
       },
-      "sha512-IG887NHjPJEw5D1dvNl9jPbcwNFREFKj2fnqEjdrwCnDRywtjNL7k7GgTo24NNlyMAZAq0OkoM0M0Sn6ex/Adg=="
+      "sha512-RZ8k4ShFV4N9nKCIeNos2NVi1a9dtWpO5HHk75ey8/a9JTiJUtGJhDgko73Hsw/CSqo0rj20yR4n532UuexTzg=="
     ],
     "@opentui/core-linux-x64": [
-      "@opentui/core-linux-x64@0.8.4",
+      "@opentui/core-linux-x64@0.9.2",
       "",
       {
         "os": "linux",
         "cpu": "x64"
       },
-      "sha512-N/uxyaPpWkCZlDXz3fgHMfMuj1L3IVZ/xZ4JifUc4NW9bwa/CYWFJ5J5jBoy2QsAIqoqo8/OD3iFpXR4o12mNQ=="
+      "sha512-5tEyEyYioX8owwsSJPTgvDdgMqjqOjOg6g8Bu5gSV9D9XKd5uRzhRC/zCQLubaVmK7oREmaXWJqT4tfIdVqeuw=="
     ],
     "@opentui/core-linux-x64-musl": [
-      "@opentui/core-linux-x64-musl@0.8.4",
+      "@opentui/core-linux-x64-musl@0.9.2",
       "",
       {
         "os": "linux",
         "cpu": "x64",
         "libc": "musl"
       },
-      "sha512-FAiH7wMt/ZbpP2w6TL62deNExTg5w6mujKUBSK89+gJV8FN4jk/K2xz9f522aYhC6SdbpyIKwS0oGIJldYLkcg=="
+      "sha512-23T5lMds4fckZxOiLs3INU6Sg5MmSes31li9Oh43bZixD03q0q7dlaD38RetK0RqUhrhlqyDdkcNpcRf9p0U2w=="
     ],
     "@opentui/core-win32-arm64": [
-      "@opentui/core-win32-arm64@0.8.4",
+      "@opentui/core-win32-arm64@0.9.2",
       "",
       {
         "os": "win32",
         "cpu": "arm64"
       },
-      "sha512-vjDuuIcmanoipIKdME8A7ZuBgIw2E1fv4pRJp6M19+Zfx0HIUmtA8bv+mT/kaz8Cpad9EUzJkNI5fV8P2p/iKg=="
+      "sha512-chqxvz7+SXdVLMva7vvfmOogLNn4t9LfeyvUrkc0QLiL4pJyKaR7KxnkI59ykd7A9PlMwzx+Jeb03l6J6kZhVA=="
     ],
     "@opentui/core-win32-x64": [
-      "@opentui/core-win32-x64@0.8.4",
+      "@opentui/core-win32-x64@0.9.2",
       "",
       {
         "os": "win32",
         "cpu": "x64"
       },
-      "sha512-I4XnzUmyKCb8cRD1UntQXRkIEl0fxfQnzS3bTODWbENAOdRsK2c7Ff07DG2qTAqNijyTuk63C+uLmAT9ObOQ1Q=="
+      "sha512-1DlQEOwM8vOoipAJa/IA4VvtAzpQtbdSjZ9iLA0918HP24iZOAhSfjzH+KkEmRTtPECVL8mk7eFBENS6DtoEwQ=="
     ],
     "@opentui/solid": [
-      "@opentui/solid@0.8.4",
+      "@opentui/solid@0.9.2",
       "",
       {
         "dependencies": {
           "@babel/core": "7.29.7",
           "@babel/preset-typescript": "7.27.1",
-          "@opentui/core": "0.8.4",
+          "@opentui/core": "0.9.2",
           "babel-plugin-module-resolver": "5.0.2",
           "babel-preset-solid": "1.9.16",
           "entities": "7.0.1",
@@ -30483,7 +30522,7 @@ var TUI_PACKAGES = {
           "solid-js": "^1.9.12"
         }
       },
-      "sha512-QyaWIAtZTaAdYJiP4K2cG6hbXQkNUBfa0hjYQwvvr/V2OFIZWZ7l+SP8CYM05lBqVDfOraeThvSrhX+IuvKySA=="
+      "sha512-HzfUiUUqJnbnuxp1PpfmhDT6Gn/zkrm7GaajTJ0LbznkgKfs5jtJM+kZEwvbbpyToV9lS9N+QkfzCHvxN6BwbQ=="
     ],
     "ansi-regex": [
       "ansi-regex@6.6.0",
@@ -30540,31 +30579,31 @@ var TUI_PACKAGES = {
       "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
     ],
     "baseline-browser-mapping": [
-      "baseline-browser-mapping@2.11.35",
+      "baseline-browser-mapping@2.11.38",
       "",
       {
         "bin": {
           "baseline-browser-mapping": "dist/cli.cjs"
         }
       },
-      "sha512-GNk8KX52CHqeNKGk8+7tZnQab/2k1t/BgrUHPKNdijzpEhF1saPQZHVKb6m5loSAxB39gyrTYw34Qf9CQ3u1qQ=="
+      "sha512-rMgy5YW7x28SMfXHLlVZDBqlWzYZ0x2rVR/6FWrNBF0chjigARK1H6nM0hKA1Um3kPOlkQFVtjJs00d2N1ezuw=="
     ],
     "browserslist": [
-      "browserslist@4.29.5",
+      "browserslist@4.29.6",
       "",
       {
         "dependencies": {
-          "baseline-browser-mapping": "^2.11.33",
-          "caniuse-lite": "^1.0.30001819",
-          "electron-to-chromium": "^1.5.464",
-          "node-releases": "^2.0.60",
-          "update-browserslist-db": "^1.3.4"
+          "baseline-browser-mapping": "^2.11.37",
+          "caniuse-lite": "^1.0.30001826",
+          "electron-to-chromium": "^1.5.486",
+          "node-releases": "^2.0.64",
+          "update-browserslist-db": "^1.4.0"
         },
         "bin": {
           "browserslist": "cli.js"
         }
       },
-      "sha512-khTmKu5NGYTotqcYo8Bew2k4RAE9PuXRSFRXG2lQBrCEQHyeQ/vX6gKMxfokwywBsLiXZMnHsmWMG1pnO8J7uQ=="
+      "sha512-CmVVIQ3RVc5HxYEc9X84GvxK/C8C1wH8TlKAiO7uTxF8PDwt7r8t9Qk3J9NkMOVzX5O/HbLv3yzxZg9HPrnI9w=="
     ],
     "bun-ffi-structs": [
       "bun-ffi-structs@0.3.1",
@@ -30589,10 +30628,10 @@ var TUI_PACKAGES = {
       "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
     ],
     "csstype": [
-      "csstype@3.2.3",
+      "csstype@3.2.4",
       "",
       {},
-      "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="
+      "sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ=="
     ],
     "debug": [
       "debug@4.4.3",
@@ -30617,10 +30656,10 @@ var TUI_PACKAGES = {
       "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
     ],
     "electron-to-chromium": [
-      "electron-to-chromium@1.5.481",
+      "electron-to-chromium@1.5.487",
       "",
       {},
-      "sha512-dNUsbAP6E2S1dHIYEuN3cQ0dViThjMtpVRheGdvv5HgHFtzLi4Cu4Mbzms85YggP3Eh2VVZTl5+XxEN8ofCbmQ=="
+      "sha512-qWotOhQYeYEj+DK4+Y+cfPj44qiC6ETIiWtJLfmDJydED2BJJ7loPA4SfBbbrMI6X/X3tryJgxnY9nxsO545Zw=="
     ],
     "emoji-regex": [
       "emoji-regex@10.6.0",
@@ -30739,16 +30778,6 @@ var TUI_PACKAGES = {
       },
       "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
     ],
-    "marked": [
-      "marked@17.0.1",
-      "",
-      {
-        "bin": {
-          "marked": "bin/marked.js"
-        }
-      },
-      "sha512-boeBdiS0ghpWcSwoNm/jJBwdpFaMnZWRzjA6SkUMYb40SVaN1x7mmfGKp0jvexGcx+7y2La5zRZsYFZI6Qpypg=="
-    ],
     "minipass": [
       "minipass@4.2.8",
       "",
@@ -30762,10 +30791,10 @@ var TUI_PACKAGES = {
       "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
     ],
     "node-releases": [
-      "node-releases@2.0.63",
+      "node-releases@2.0.65",
       "",
       {},
-      "sha512-6li2QanLsAXpIH2R6j77MzRyvOyrvdTqlKtO4CgBdHGNvN99ZZfyxszHc5o5+IZBWD5u6Hzwg83JoGXmqZNG9Q=="
+      "sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA=="
     ],
     "p-try": [
       "p-try@2.2.0",
@@ -30912,7 +30941,7 @@ var TUI_PACKAGES = {
       "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
     ],
     "update-browserslist-db": [
-      "update-browserslist-db@1.3.4",
+      "update-browserslist-db@1.4.0",
       "",
       {
         "dependencies": {
@@ -30926,7 +30955,7 @@ var TUI_PACKAGES = {
           "update-browserslist-db": "cli.js"
         }
       },
-      "sha512-t8wonIOdQyOjtPd2VktlBu6QjTVTks6v8bSi7kd0r2Vll8TK1JYDZtRRdbmCHOAMphkZgrzK+L+vXK4pyZ8t4A=="
+      "sha512-WPJuOnjI9FWDct4fB+ej4Mz8opLaw5CDcZ2t44tFZ0vIQVYWzBhWR3mkixuUj/A7+vY4V9+ApOZ2YYLwdgq46w=="
     ],
     "web-tree-sitter": [
       "web-tree-sitter@0.25.10",
@@ -31042,14 +31071,14 @@ var TUI_PACKAGES = {
       "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
     ],
     "glob/minimatch/brace-expansion": [
-      "brace-expansion@2.1.7",
+      "brace-expansion@2.1.8",
       "",
       {
         "dependencies": {
           "balanced-match": "^1.0.0"
         }
       },
-      "sha512-uZbew1NqdmPDTMJ8ah1y+b+9QEJrfkXFk3RcTQw3X0jW/xRUvFKsg1CfQdSYGdTbXZWExtU3J3ccxtnfw1Fi0g=="
+      "sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig=="
     ],
     "pkg-up/find-up/locate-path": [
       "locate-path@3.0.0",
@@ -31473,9 +31502,9 @@ var init_setup2 = __esm(() => {
   ScopeFlag = Literals(SCOPES);
   FormFlag = Literals(FORM_CHOICES);
   CAPABILITY_FLAGS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.name, "string"]));
-  resolveScope = fn2("resolveScope")(function* (flag, usage, cwd) {
+  resolveScope = fn2("resolveScope")(function* (flag, usage, cwd, t3Workflow) {
     if (flag === undefined)
-      return yield* installedScope(cwd);
+      return t3Workflow ? { scope: "user", source: "default", notices: [] } : yield* installedScope(cwd);
     const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
     return { scope, source: "flag" };
   });
@@ -31499,17 +31528,18 @@ var init_setup2 = __esm(() => {
     {
       path: ["setup"],
       usage: SETUP_USAGE,
-      summary: "Install and configure what HolyAgent needs beside the plugin, skipping every step already done",
+      summary: "Configure HolyAgent for T3 Code, skipping every step already done",
       output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
       notes: [
+        "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
         "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
         "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
-        "merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-        "--scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
-        "without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
-        "setup records the keys it adds, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
+        "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
+        "internal Claude entry only: --scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+        "internal Claude entry only: without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
+        "internal Claude settings: setup records their keys, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
         "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
-        "a failed step is reported and the rest still run; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+        "a failed step is reported and the rest still run; in the internal Claude entry in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
         `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
         "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
         "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
@@ -31530,8 +31560,8 @@ var init_setup2 = __esm(() => {
       },
       stateless: true,
       positionals: 0,
-      run: ({ args, env, cwd, emit, terminal, setupTui }) => gen2(function* () {
-        const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+      run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow }) => gen2(function* () {
+        const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd, t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
         if (resolved instanceof SetupFailure) {
           return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
         }
@@ -31550,6 +31580,7 @@ var init_setup2 = __esm(() => {
         const apply = (choices, chosen, notes = []) => gen2(function* () {
           const report = yield* setup2(coreContext2(cwd, env), {
             scope: resolved.scope,
+            t3Workflow,
             undo: booleanFlag(args, "undo"),
             subagentCacheTtl,
             dryRun: booleanFlag(args, "dry-run"),
@@ -31591,25 +31622,27 @@ var init_setup2 = __esm(() => {
     {
       path: ["doctor"],
       usage: DOCTOR_USAGE,
-      summary: "Check bun, ctx7 and the settings of a scope, and, when Pi is in use, pi, node and the Pi packages the config enables; exit 1 when a check fails",
+      summary: "Check T3 Code readiness, Bun, the Pi backend and feature packages; exit 1 when a check fails",
       output: "one line per check, `ok   <name>: \u2026` or `FAIL <name>: \u2026`; exit 1 when any check failed",
       notes: [
-        "--scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
-        "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; otherwise one `~ pi: not in use` line is printed and nothing fails; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
+        "public T3 Code doctor uses user scope by default and does not check Claude Code settings; open T3 Code once and use the Pi provider",
+        "internal Claude entry only: --scope picks the settings file to check, as for setup; without it the scope is user unless your own uncommitted .claude/settings.local.json enables the plugin in a git work tree where git does not track it (then local), the output starts with an `ok   scope:` line naming the scope and, when inferred, the file, with the same `~ scope:` lines as setup; --fix then merges into that file",
+        "the Pi checks run when HOLYAGENT_HOST=pi or pi is on PATH and pi.enable is on; in the public workflow missing Pi fails, while the internal entry prints a `~ pi: not in use` hint; a missing Pi package line names its `pi install` command, and `holyagent setup` installs them",
         "the Pi checks include `ok   pi form:` (headless or normal, detected from the machine as setup does, or named by --form) and one `pi capability <name>` line for each capability the config turns on: `ok` with its form and what applies, `FAIL` naming an unmet system need or a package not listed at its pin, or a `~` line when the form does not offer it (computer-use on a headless machine), which fails nothing; the provider and web kit packages are the `pi base packages` line",
         "--fix runs the setup steps behind a failing check, prints their lines, then checks again; it never installs Bun, Pi, Node or Pi packages. The ctx7 check verifies CLI availability, not authentication"
       ],
       flags: { scope: "string", fix: "boolean", form: "string" },
       stateless: true,
       positionals: 0,
-      run: ({ args, env, cwd }) => gen2(function* () {
-        const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, cwd).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+      run: ({ args, env, cwd, t3Workflow }) => gen2(function* () {
+        const resolved = yield* resolveScope(stringFlag(args, "scope"), DOCTOR_USAGE, cwd, t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
         if (resolved instanceof SetupFailure) {
           return printed({ lines: [fail8("scope", resolved.message)], ok: false });
         }
         const form = yield* formOf(args, env, DOCTOR_USAGE);
         const report = yield* doctor2(coreContext2(cwd, env), {
           fix: booleanFlag(args, "fix"),
+          t3Workflow,
           scope: resolved.scope,
           form
         });
@@ -31849,6 +31882,7 @@ ${plainText(output.text)}
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
     terminal: host.terminal,
+    t3Workflow: host.t3Workflow ?? false,
     setupTui: host.setupTui,
     input: (schema) => readInput(host, schema, inline),
     inputBy: (pick) => readInputBy(host, pick, inline)
@@ -31945,6 +31979,7 @@ var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write2 = (stream, te
   stdin,
   emit: (text) => write2(process.stdout, text),
   ...interactiveSetup ? {
+    t3Workflow: true,
     terminal: {
       stdin: Boolean(process.stdin.isTTY),
       stdout: Boolean(process.stdout.isTTY)

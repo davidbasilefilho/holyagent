@@ -1,36 +1,20 @@
 # Components
 
-What HolyAgent installs or configures, and why. The installers (`install/wsl-install.sh` for WSL Ubuntu, `install/windows-install.ps1` for native Windows) set up only the prerequisites; `holyagent setup` (run as `/holyagent:setup`) installs and configures the rest. Both skip any step that is already right, so re-running changes nothing that is already set.
+For the supported T3 Code workflow, start at [Install](usage.md#install). Descriptions of the Claude plugin and its setup below are internal and legacy reference.
 
-| Component                       | Installed by                                                               | Why                                                                       |
-| ------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| mise                            | Installers, only with `--dev` (`-Dev`)                                     | Version manager and the source of the repository's commands (development) |
-| Node.js LTS                     | WSL and Windows installers (apt, winget)                                   | ctx7 runs on Node                                                         |
-| Bun                             | WSL and Windows installers (Bun's install script)                          | Runs the plugin's hooks and CLI; development needs a canary build         |
-| git, gh                         | WSL installer (apt), Windows installer (winget)                            | Every commit, branch and PR step runs them                                |
-| HolyAgent plugin                | Marketplace (`claude plugin install holyagent@holyagent`)                  | The root agent, specialists, skills, hooks and runtime CLI                |
-| ctx7 and skill                  | `holyagent setup`                                                          | Current library documentation for the agents                              |
-| Pi (optional)                   | You, with Pi's installer or npm (see below)                                | The agent host of the Pi integration; needs Node.js 22.19 or newer        |
-| HolyAgent Pi package (optional) | `pi install git:github.com/davidbasilefilho/holyagent@holyagent-<version>` | The root, 18 specialists, skills and extension on Pi                      |
-| Exa connector                   | claude.ai connectors (see [Exa](#exa))                                     | Web search and page reading for the Search specialists                    |
+The prerequisite installers (`install/wsl-install.sh` for WSL Ubuntu and `install/windows-install.ps1` for native Windows) install Node, Bun, Git and GitHub CLI. They do not install T3 Code, Pi or HolyAgent. Use the [quickstart](usage.md#install) after running the installer for the environment where T3 Code can launch Pi. If T3 Code runs on Windows and does not launch Pi through WSL, install the backend on Windows.
 
-Claude Code itself is a prerequisite that none of these install; Anthropic documents the ways to get it at <https://code.claude.com/docs/en/setup>.
-
-ripgrep and fd are prerequisites you install yourself, because HolyAgent does not bundle them; see [ripgrep and fd](#ripgrep-and-fd).
-
-Pi is not installed by these installers. The Pi integration is `packages/integrations/pi`, which builds the HolyAgent Pi package (`packages/integrations/pi/dist`): the 18 specialists as agent files, the skills, an extension that gives each Pi session its role and context, and the bundled CLI behind a wrapper. You install Pi yourself (Node.js 22.19 or newer, then the official installer or `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0`) and the package with `pi install git:github.com/davidbasilefilho/holyagent@holyagent-<version>`, globally or per project; plain `pi` then starts the root ([pi/installation.md](pi/installation.md), [usage.md](usage.md#pi), [pi/README.md](pi/README.md)). The package lists no dependencies; `holyagent setup` installs the Pi packages your `config.json` enables, each at an exact pin ([pi/configuration.md](pi/configuration.md#holyagent-configjson)). T3 Code is the primary interface: the extension keeps only the T3 tools HolyAgent uses and warns when a thread is below Full access, and `holyagent setup` writes T3's settings ([pi/t3-code.md](pi/t3-code.md)).
-
-The plugin installs at user, project or local scope ([usage.md](usage.md#install-scopes)). A user-level `~/.holyagent/config.json` holds your defaults and the project's `.holyagent/config.json` overrides it key by key ([pi/configuration.md](pi/configuration.md#the-user-level-config)).
+The Pi package provides HolyAgent's extension, agents and skills. The matching public CLI runs `holyagent setup` to install configured capabilities and write T3 Code's settings, and `holyagent doctor` to check them. Set defaults in `~/.holyagent/config.json` or override them by project ([configuration](pi/configuration.md#the-user-level-config)).
 
 ## mise, Node, Bun, gh
 
-The WSL installer first installs any missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`) with sudo. Node LTS comes from NodeSource's apt repository, Bun from its official install script into `~/.bun`, and `gh` from GitHub's apt repository. The installer refuses a Node older than 22.13, the floor for ctx7, and puts Bun's global bin directory on `PATH` through a line in `~/.bashrc` (a one-time copy is kept as `~/.bashrc.pre-holyagent`).
+The WSL installer first installs any missing apt packages (`curl`, `git`, `ca-certificates`, `unzip`) with sudo. Node LTS comes from NodeSource's apt repository, Bun from its official install script into `~/.bun`, and `gh` from GitHub's apt repository. The installer refuses a Node older than 22.19, the floor for Pi, and puts Bun's global bin directory on `PATH` through a line in `~/.bashrc` (a one-time copy is kept as `~/.bashrc.pre-holyagent`).
 
 The Windows installer (`install/windows-install.ps1`) installs missing `git`, Node LTS and `gh` with `winget`, and Bun from its official install script into `~\.bun`. It refuses a Node older than 22.19, the floor for Pi (ctx7 needs 22.13), and puts Bun's global bin folder on your user `PATH` ([pi/installation.md](pi/installation.md#what-setup-and-doctor-do)).
 
 mise is installed only with the development option (`--dev` for the WSL installer, `-Dev` for the Windows one), because only developing this repository needs it. The WSL installer runs mise's official installer into `~/.local/bin/mise` and activates it in `~/.bashrc`. The Windows installer installs `jdx.mise` with `winget` and activates it in your PowerShell profile (`$PROFILE.CurrentUserAllHosts`, with a one-time copy kept as `<profile>.pre-holyagent`). Without the option, neither installer installs or activates mise.
 
-The plugin needs only a stable Bun on `PATH`; developing this repository needs a canary build ([requirements.md](requirements.md#why-bun-canary)). `holyagent setup` installs the global package below with `bun add -g`; its command lives in `$BUN_INSTALL/bin` (`~/.bun/bin`), which the installers put on `PATH`, and setup prints a hint when that directory is not on `PATH`.
+Both the supported T3 Code integration and repository development use stable Bun ([requirements.md](requirements.md#development-toolchain)).
 
 ## Claude Code
 

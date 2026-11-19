@@ -58,18 +58,7 @@ Install it in any repository as `.git/hooks/commit-msg`:
 exec bun --no-env-file "--config=/path/to/holyagent/scripts/empty-bunfig.toml" "/path/to/holyagent/scripts/holyagent.js" hook commit-msg "$1"
 ```
 
-(`chmod +x` it; `/path/to/holyagent/scripts` is the plugin's `scripts` folder, `${CLAUDE_PLUGIN_ROOT}/scripts` inside a Claude Code session. Git for Windows runs this `sh` file too.) With lefthook, a job under `commit-msg:` does the same, and needs no shell syntax, so it runs the same on Windows:
-
-```yaml
-commit-msg:
-  jobs:
-    - name: attribution
-      run: >-
-        bun --no-env-file --config=/path/to/holyagent/scripts/empty-bunfig.toml
-        /path/to/holyagent/scripts/holyagent.js hook commit-msg {1}
-```
-
-This repository wires it that way in `lefthook.yml`, through the built bundle in `packages/integrations/claude/dist/scripts/holyagent.js`.
+(`chmod +x` it; `/path/to/holyagent/scripts` is the plugin's `scripts` folder, `${CLAUDE_PLUGIN_ROOT}/scripts` inside a Claude Code session. Git for Windows runs this `sh` file too.) This repository invokes the same command in [hk.pkl](../hk.pkl), passing the message path as a separate argument. See [development.md](development.md#git-hooks) for installation.
 
 ## Raw git commits
 

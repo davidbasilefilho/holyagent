@@ -151,19 +151,21 @@ describe("the generated plugin is in step with its sources", () => {
   })
 
   test("the commit hook stages exactly the generated paths", () => {
-    const stage = (read("lefthook.yml").split("git add -A --")[1] ?? "").split("- name:")[0] ?? ""
-    expect(
-      stage
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line !== "" && !line.startsWith("#")),
-    ).toEqual([...GENERATED_PATHS])
+    const step = read("hk.pkl").split('["generated"]')[1]?.split('["versions"]')[0] ?? ""
+    const paths = [...step.matchAll(/"((?:\.claude-plugin|packages\/integrations)\/[^"]+)"/g)].map(
+      (match) => match[1],
+    )
+    expect(step).toContain('"git", "add", "-A", "--"')
+    expect(paths).toEqual([...GENERATED_PATHS, "packages/integrations/pi/dist"])
   })
 
   test("the commit hook stages the copies of the version and the lockfile that the build rewrites", () => {
-    const job = read("lefthook.yml").split("- name: versions")[1] ?? ""
-    const staged = /git add -- (.*)/.exec(job)?.[1]?.trim().split(/\s+/)
-    expect(staged).toEqual([...VERSION_COPIES, LOCKFILE])
+    const step = read("hk.pkl").split('["versions"]')[1]?.split('["commit-msg"]')[0] ?? ""
+    const paths = [...step.matchAll(/"((?:packages\/[^"]+\/package\.json)|bun\.lock)"/g)].map(
+      (match) => match[1],
+    )
+    expect(step).toContain('any(git.staged_files, {# == "package.json"})')
+    expect(paths).toEqual([...VERSION_COPIES, LOCKFILE])
   })
 
   test("generated files carry the note where their format allows one", () => {

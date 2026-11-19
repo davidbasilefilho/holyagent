@@ -40,6 +40,7 @@ export const main = (interactiveSetup = false) =>
       emit: (text) => write(process.stdout, text),
       ...(interactiveSetup
         ? {
+            t3Workflow: true,
             terminal: {
               stdin: Boolean(process.stdin.isTTY),
               stdout: Boolean(process.stdout.isTTY),

@@ -4,6 +4,8 @@ import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
 
+import piPins from "../../core/src/config/pi-packages.json" with { type: "json" }
+import pypiPins from "../../core/src/config/pypi-packages.json" with { type: "json" }
 import { CAPABILITIES } from "../src/config/capabilities.ts"
 import {
   BROWSE_COMMAND,
@@ -130,8 +132,8 @@ describe("where browse keeps its pairings", () => {
   })
 
   test("the pinned release is the one the commands name", () => {
-    expect(BROWSE_VERSION).toBe("0.0.16")
-    expect(BROWSE_COMMAND).toBe("npx -y @opencode/browse@0.0.16")
+    expect(BROWSE_VERSION).toBe(piPins["@opencode/browse"])
+    expect(BROWSE_COMMAND).toBe(`npx -y @opencode/browse@${piPins["@opencode/browse"]}`)
     expect(BROWSE_PAIR_FIX).toContain(`${BROWSE_COMMAND} install`)
     expect(BROWSE_PAIR_FIX).toContain(`${BROWSE_COMMAND} pair`)
   })
@@ -454,8 +456,7 @@ describe("holyagent doctor on browse", () => {
 })
 
 describe("holyagent setup on browse", () => {
-  const server =
-    "npx --registry=https://registry.npmjs.org/ --@opencode:registry=https://registry.npmjs.org/ -y @opencode/browse@0.0.16 mcp"
+  const server = `npx --registry=https://registry.npmjs.org/ --@opencode:registry=https://registry.npmjs.org/ -y @opencode/browse@${piPins["@opencode/browse"]} mcp`
 
   test("normal form, paired: says the form, the server the extension registers and the paired browser", async () => {
     await writeBrowsePairing(home)
@@ -544,7 +545,7 @@ describe("holyagent setup on browse", () => {
     await writeBrowsePairing(home)
     const lines = await report("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })
     expect(lines).toEqual([
-      "= browser-use: headless form; the extension registers `uvx --no-config --default-index https://pypi.org/simple --from browser-use==1.0.2 browser-use --cli-mcp` for screen specialists through `holyagent browser-server`, which starts the headless browser and stops it with the server and writes no file for it",
+      `= browser-use: headless form; the extension registers \`uvx --no-config --default-index https://pypi.org/simple --from browser-use==${pypiPins["browser-use"]} browser-use --cli-mcp\` for screen specialists through \`holyagent browser-server\`, which starts the headless browser and stops it with the server and writes no file for it`,
       `= browser-use: the headless browser is the Chromium at ${chromiumPath}`,
     ])
   })
