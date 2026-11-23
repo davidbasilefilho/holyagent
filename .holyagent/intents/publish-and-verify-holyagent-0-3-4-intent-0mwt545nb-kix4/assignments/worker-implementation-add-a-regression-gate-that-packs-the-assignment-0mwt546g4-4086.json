@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "add-a-regression-gate-that-packs-the",
   "objective": "Add a regression gate that packs the actual generated 0.3.4 npm package, installs its CLI outside the monorepo using npm, and verifies its version and help through the installed executable on Linux and native Windows.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "The existing Pi npm publishing test suite or a small standalone smoke test used by the existing CI jobs."
   ],
@@ -37,7 +37,9 @@
     "agentId": "npm_gate",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-23T10:45:57.028Z"
+    "startedAt": "2026-11-23T10:45:57.028Z",
+    "finishedAt": "2026-11-23T10:48:42.239Z"
   },
+  "result": "result: Added an installed CLI smoke test that catches the missing executable regression.\nchanged: packages/integrations/pi/installed-cli.test.ts\nchecks: bunx --no-install mise run test -- packages/integrations/pi/installed-cli.test.ts -> exit 0, 1 pass, 0 fail; focused mise lint and fmt:check -> exit 0; isolated 0.3.3 negative control -> exit 1 at missing launcher.\nblockers: Native Windows execution remains for the existing Windows CI job.\nquestions: none\nnotes: The Linux test used the generated repository bundle and did not publish it. The negative control repacked the untouched files extracted from the published 0.3.3 tarball.\nevidence:\nPack and install the generated artifact in clean temporary paths and verify the real version and setup help: the focused Linux test packs dist using Bun, installs globally with npm in a fresh temp directory outside the checkout, and checks exact 0.3.4 plus T3 Code setup help from npm's launcher.\nExercise the native npm shim on Windows and keep the test offline after packing: npm installs from the local tarball with --offline and an empty cache and isolated config; the Windows branch uses cmd.exe to execute prefix\\holyagent.cmd and runs in the existing Windows test job.\nchecks-run: Focused test 1 pass, 0 fail in 1.70s on Linux with Bun 1.4.4; focused lint and format passed; 0.3.3 negative control failed with bun: command not found at the prefix/bin/holyagent invocation.\n",
   "createdAt": "2026-11-23T10:45:57.028Z"
 }
