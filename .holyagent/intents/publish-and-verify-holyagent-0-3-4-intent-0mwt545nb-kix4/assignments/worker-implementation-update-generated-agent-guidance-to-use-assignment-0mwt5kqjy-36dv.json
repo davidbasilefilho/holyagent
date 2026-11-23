@@ -36,5 +36,20 @@
     "finishedAt": "2026-11-23T11:29:56.844Z"
   },
   "result": "result: Updated instructions, documentation and host wiring for the internal CLI.\nchanged: The four instruction families, integration entry paths and tests.\nchecks: 428 instruction and Pi integration tests and 14 Claude-focused tests passed.\nblockers: None.\nquestions: None.\nnotes: Private host protocols retain their existing transport.\nevidence:\nAgent guidance teaches the internal executable and typed flags with valid structured results: All families use the isolated CLI and explicit report paths.\nRequirements coverage and T3-only user setup guidance are preserved: The focused requirements and prompt tests passed.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Reviewed generated agent artifacts and verified the packaged CLI and T3 setup examples.",
+    "criteria": [
+      {
+        "criterion": "Agent guidance teaches the internal executable and typed flags with valid structured results",
+        "support": "All families use the isolated CLI and explicit report paths."
+      },
+      {
+        "criterion": "Requirements coverage and T3-only user setup guidance are preserved",
+        "support": "The focused requirements and prompt tests passed."
+      }
+    ],
+    "evidence": []
+  },
   "createdAt": "2026-11-23T10:58:49.582Z"
 }
