@@ -1,0 +1,42 @@
+{
+  "id": "assignment-0mwt546g4-4086",
+  "intentId": "intent-0mwt545nb-kix4",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "add-a-regression-gate-that-packs-the",
+  "objective": "Add a regression gate that packs the actual generated 0.3.4 npm package, installs its CLI outside the monorepo using npm, and verifies its version and help through the installed executable on Linux and native Windows.",
+  "state": "Running",
+  "scope": [
+    "The existing Pi npm publishing test suite or a small standalone smoke test used by the existing CI jobs."
+  ],
+  "constraints": [
+    "Use the stable workflow pack mechanism and existing Bun and mise tools. Test the native npm .cmd shim under Windows. Leave the production launcher and 0.4.0 work alone unless a reproduced defect needs escalation. No Git or GitHub writes."
+  ],
+  "criteria": [
+    {
+      "text": "Pack and install the generated artifact in clean temporary paths and verify the real version and setup help",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Exercise the native npm shim on Windows and keep the test offline after packing",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "checks-run"
+  ],
+  "ownershipPaths": [
+    "packages/integrations/pi/publishing.test.ts",
+    "packages/integrations/pi/installed-cli.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-23T10:45:57.028Z"
+  },
+  "createdAt": "2026-11-23T10:45:57.028Z"
+}
