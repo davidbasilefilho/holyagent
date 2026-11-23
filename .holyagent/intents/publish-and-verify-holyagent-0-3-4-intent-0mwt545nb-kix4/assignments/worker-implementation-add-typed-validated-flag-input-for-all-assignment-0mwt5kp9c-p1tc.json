@@ -35,5 +35,20 @@
     "finishedAt": "2026-11-23T11:29:55.049Z"
   },
   "result": "result: Added typed flags, explicit report files, and noninteractive search output.\nchanged: agent-input.ts, agent-input.test.ts, tools.ts, tools.test.ts\nchecks: 24 passed and 1 platform skip across the focused tests.\nblockers: None.\nquestions: None.\nnotes: The CLI accepts existing schemas behind typed options.\nevidence:\nAll agent operations accept flags without hand-written JSON payloads: The CLI maps flags to its existing Intent and Assignment schemas.\nUnknown, conflicting and ill-typed flags fail closed: Tests exercised invalid enums, revisions, incompatible flags and manual JSON arguments.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Independently verified typed flags and fail-closed parsing on the exact release tree.",
+    "criteria": [
+      {
+        "criterion": "All agent operations accept flags without hand-written JSON payloads",
+        "support": "The CLI maps flags to its existing Intent and Assignment schemas."
+      },
+      {
+        "criterion": "Unknown, conflicting and ill-typed flags fail closed",
+        "support": "Tests exercised invalid enums, revisions, incompatible flags and manual JSON arguments."
+      }
+    ],
+    "evidence": []
+  },
   "createdAt": "2026-11-23T10:58:47.904Z"
 }
