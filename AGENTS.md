@@ -53,14 +53,14 @@ This repository's release convention includes CI checks; HolyAgent's instruction
 
 - Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending, so every PR is available for review.
 - Review the full work PR against its intended base (normally `dev`). Independent changes may use separate PRs to `dev`; another open PR is not a reason to stack.
-- `holyagent vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `hk.pkl`) keeps agent attribution out of commits made with plain Git too.
-- Pass `holyagent vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
-- `holyagent vcs` refuses process words such as "Claude Code" in commit and PR text. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.
+- `holyagent-cli vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`scripts/holyagent.js hook commit-msg`, wired in `hk.pkl`) keeps agent attribution out of commits made with plain Git too.
+- Pass `holyagent-cli vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
+- `holyagent-cli vcs` refuses process words such as "Claude Code" in commit and PR text. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.
 - Start each evidence line of a specialist report with the criterion text or the evidence label, then a colon and the support. `assignment close --accept` matches the text before the colon after normalizing case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`, so those differences are fine; a paraphrase or another criterion's text matches nothing. A support may continue on indented lines below its entry.
 
 ## Version-control rules
 
-- The root commits with `holyagent vcs commit` in Claude Code and with plain Git under the configured author in other harnesses. The root uses plain Git and `gh` for branches, pushes, merges and CI, and never force-pushes or pushes to a protected branch without the user's approval. After a denial it stops that line of work and reports a blocker, and does not reach the same result through another tool, because a workaround defeats the boundary the user set. A specialist makes no version-control writes and no edits under `.git/` or `.holyagent/`, and reports its changed paths for the root to record. Nothing blocks these writes: the rules are instruction text, restated by hooks that only add context (`docs/hooks.md`).
+- The root commits with `holyagent-cli vcs commit` in Claude Code and with plain Git under the configured author in other harnesses. The root uses plain Git and `gh` for branches, pushes, merges and CI, and never force-pushes or pushes to a protected branch without the user's approval. After a denial it stops that line of work and reports a blocker, and does not reach the same result through another tool, because a workaround defeats the boundary the user set. A specialist makes no version-control writes and no edits under `.git/` or `.holyagent/`, and reports its changed paths for the root to record. Nothing blocks these writes: the rules are instruction text, restated by hooks that only add context (`docs/hooks.md`).
 
 ## Dependencies
 

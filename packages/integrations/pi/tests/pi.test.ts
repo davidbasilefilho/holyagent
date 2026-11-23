@@ -132,7 +132,10 @@ describe("the package manifest", () => {
       description: DESCRIPTION,
       keywords: ["pi-package"],
       license: "Apache-2.0",
-      bin: { holyagent: "./scripts/holyagent-public.js" },
+      bin: {
+        holyagent: "./scripts/holyagent-public-bin.js",
+        "holyagent-cli": "./scripts/holyagent-cli-bin.js",
+      },
     })
     expect(packageJson.version).toBe(readJson("package.json")["version"] as string)
   })
@@ -203,12 +206,19 @@ describe("the runtime scripts", () => {
       "scripts/empty-bunfig.toml",
       "scripts/holyagent.js",
       "scripts/holyagent-public.js",
+      "scripts/holyagent-cli.js",
+      "scripts/holyagent-public-bin.js",
+      "scripts/holyagent-cli-bin.js",
+      "scripts/launcher.js",
     ])
       expect({ path, shipped: scriptsOf(path) !== undefined }).toEqual({ path, shipped: true })
-    expect(scriptsOf("scripts/holyagent-public.js")?.executable).toBe(true)
-    expect((readJson("package.json")["bin"] as Record<string, string>)["holyagent"]).toBe(
-      "./packages/integrations/pi/dist/scripts/holyagent-public.js",
-    )
+    for (const command of ["holyagent", "holyagent-cli"]) {
+      const name = command === "holyagent" ? "holyagent-public" : command
+      expect(scriptsOf(`scripts/${name}-bin.js`)?.executable).toBe(true)
+      expect((readJson("package.json")["bin"] as Record<string, string>)[command]).toBe(
+        `./packages/integrations/pi/dist/scripts/${name}-bin.js`,
+      )
+    }
     expect(scriptsOf("scripts/holyagent")?.executable).toBe(true)
     const wrapper = join(REPOSITORY, DIST_DIRECTORY, "scripts/holyagent")
     expect(await isExecutable(wrapper)).toBe(true)

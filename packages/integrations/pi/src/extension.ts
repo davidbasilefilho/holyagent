@@ -37,7 +37,6 @@ import { agentFor, ROUTES } from "../../../runtime/src/domain/route.ts"
 import {
   DEFAULT_PI_ROLE,
   PI_ROLES,
-  PI_ROOT_PLACEHOLDER,
   piContext,
   type PiRole,
   PiRoleSchema,
@@ -47,6 +46,7 @@ import { hasStateFolder } from "../../../runtime/src/hooks/state-folder.ts"
 import { cmdExeArguments, type CmdLaunch } from "../../../runtime/src/pi/bash/cmd.ts"
 import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
 import { justBashOn } from "../../../runtime/src/pi/bash/settings.ts"
+import { bunFlags, fillPackageRoot } from "../../../runtime/src/pi/bun-flags.ts"
 import { validateModelCatalog } from "../../../runtime/src/pi/catalog.ts"
 import { APPLY_PATCH_TOOL } from "../../../runtime/src/pi/codex/apply-patch.ts"
 import {
@@ -75,7 +75,6 @@ import {
   registerAutoReview,
 } from "./auto-review.ts"
 import { createBash, type ShellLaunch } from "./bash.ts"
-import { bunFlags } from "./bun-flags.ts"
 import { type CodexSettings, codexSettings, registerCodex } from "./codex.ts"
 import { activePiFamily, familyAgentPrompt, familySkillPaths } from "./families.ts"
 import { NATIVE_ROOT_FLAG, registerNativeTools } from "./native-tools.ts"
@@ -204,35 +203,7 @@ export const applyEnvironment = (
     if (!keep || target[name] === undefined) target[name] = value
 }
 
-/**
- * A specialist's prompt with `${HOLYAGENT_PI_ROOT}` replaced by the package folder, written with
- * `/` only, as the model writes it into shell commands (a `\` escapes there). The agent files hold
- * the placeholder because the install folder is not known when they are built; the extension fills
- * it when the child starts.
- */
-export const fillPackageRoot = (
-  prompt: string,
-  packageRoot: string,
-  platformPath: Pick<typeof nodePath, "sep"> = nodePath,
-): string => {
-  const root = toPosix(packageRoot, platformPath.sep)
-  // Windows shell scripts may have no executable bit; start the same isolated Bun entry directly.
-  const quote = (value: string) => "'" + value.replaceAll("'", "'\"'\"'") + "'"
-  const command =
-    platformPath.sep === "\\"
-      ? "bun --no-env-file --config=" +
-        quote(root + "/scripts/empty-bunfig.toml") +
-        " " +
-        quote(root + "/scripts/holyagent.js")
-      : quote(root + "/scripts/holyagent")
-  return (
-    prompt
-      // Host-neutral families name the CLI in inline code rather than carrying a package placeholder.
-      .replaceAll(/`holyagent (?=[^`])/g, () => "`" + command + " ")
-      .replaceAll(PI_ROOT_PLACEHOLDER + "/scripts/holyagent", () => command)
-      .replaceAll(PI_ROOT_PLACEHOLDER, () => root)
-  )
-}
+export { fillPackageRoot } from "../../../runtime/src/pi/bun-flags.ts"
 
 /**
  * Refuses an `Agent` call whose `subagent_type` is not one of the 18 specialists or its `-screen`

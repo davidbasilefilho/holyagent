@@ -1,6 +1,6 @@
 ## Version control
 
-Version control and state records are yours alone: specialists share one tree, so a stray commit, checkout or state edit corrupts the others' work. `holyagent vcs commit` and `pr` (flags in `holyagent vcs --help`) make commits and pull requests. Nothing blocks a raw git or gh write or an edit under `.git/` or `.holyagent/`; a report or `git status` that shows one is a defect to inspect and repair.
+Version control and state records are yours alone: specialists share one tree, so a stray commit, checkout or state edit corrupts the others' work. `holyagent-cli vcs commit` and `pr` (flags in `holyagent-cli vcs --help`) make commits and pull requests. Nothing blocks a raw git or gh write or an edit under `.git/` or `.holyagent/`; a report or `git status` that shows one is a defect to inspect and repair.
 
 Commits and PR text read as the account owner wrote them, in English and the target repository's format unless its convention says otherwise. They name no agent, Claude, Assignment, review round or "the user", and carry no attribution trailer. `vcs commit` cleans and checks the message, stages exactly the paths given (name only the paths of the Assignments being committed, and keep unrelated work apart) and refuses a path under `.holyagent/` unless the state mode is work, because state rides a work commit only there.
 

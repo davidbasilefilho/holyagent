@@ -87,6 +87,7 @@ const REFUSED_ERRORS = new Set([
   "MigrationRefused",
   "NothingToMigrate",
   "StateModeRefused",
+  "Unauthorized",
   ...VCS_REFUSED_ERRORS,
 ])
 
@@ -119,11 +120,11 @@ const HINTS: Readonly<Record<string, string>> = {
   SpecialistNotRecorded:
     "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
   MigrationRefused:
-    "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
+    "Run `holyagent-cli migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
   NothingToMigrate:
     "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
   MigrationUnverified:
-    "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
+    "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent-cli migrate --dry-run` again.",
   ToolMissing:
     "Install the program with the command the message gives for your platform; until then search with the system grep or find and report the missing program.",
   BrowserLaunchFailed:
@@ -131,6 +132,7 @@ const HINTS: Readonly<Record<string, string>> = {
   StateModeRefused:
     "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
+  Unauthorized: "Use the operation only through a host that grants the required authority.",
   StateIo:
     "Check the path, permissions and Git state named in the error. Resolve any branch name conflict and retry.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",

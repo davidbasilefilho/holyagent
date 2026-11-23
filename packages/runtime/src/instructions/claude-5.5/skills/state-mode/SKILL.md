@@ -5,7 +5,7 @@ description: "Use before a clone's first Intent to choose where state lives, and
 
 # State mode
 
-Once per clone, before the first Intent, set the mode with `holyagent state mode <mode>`; bare, it reads the mode (unset is `branch`). A mode moves no records, so change it only while the clone holds none. Take the first signal that applies:
+Once per clone, before the first Intent, set the mode with `holyagent-cli state mode <mode>`; bare, it reads the mode (unset is `branch`). A mode moves no records, so change it only while the clone holds none. Take the first signal that applies:
 
 1. The user's words.
 2. `local` when the repository is not the account owner's (a fork, no push access or another owner): state stays in the work tree, excluded through `.git/info/exclude`, in no commit, PR or remote branch. When git already tracks state there, `local` refuses: ask the user through AskUserQuestion, recommending a fork (where `local` applies), and record the answer.

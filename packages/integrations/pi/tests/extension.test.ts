@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import nodePath, { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -202,8 +202,6 @@ const createExtension =
   }
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
-// The model reads the wrapper's path with `/` only, drive letter included on Windows.
-const WRAPPER = toPosix(join(PACKAGE_ROOT, "scripts", "holyagent"))
 // What the extension starts Bun with: the bundled CLI, never the `sh` wrapper.
 const RUNTIME = runtimeArgs(PACKAGE_ROOT)
 // A machine with Bun on its PATH, and a Windows one: the program the extension starts is the
@@ -656,7 +654,7 @@ describe("the role flag", () => {
 
   test("root and specialist get the status without the core; session adds the core", async () => {
     const { directory, done } = await projects()
-    const core = PI_ROOT_CORE.split(PI_ROOT_PLACEHOLDER)[0] ?? ""
+    const core = piRootCore(toPosix(PACKAGE_ROOT))
     const text = async (flag: string) =>
       (await run(healthy(directory), { flag })).delivered?.message?.content ?? ""
     const [root, specialist, session] = [
@@ -668,7 +666,7 @@ describe("the role flag", () => {
     expect(root).not.toContain(core)
     expect(specialist).not.toContain(core)
     expect(session).toContain(core)
-    expect(session).toContain(WRAPPER)
+    expect(session).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent-cli.js`)
     expect(session).not.toContain(PI_ROOT_PLACEHOLDER)
     // The reminder restates root rules: the root and the session role end with the Pi block, the
     // specialist with none, and nobody gets the Claude block.
@@ -2089,7 +2087,7 @@ describe("a Windows package root", () => {
 
   test("the session role's core names the package folder with / only too", async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-win-"))
-    const wrapper = "C:/Users/me/pkg/scripts/holyagent"
+    const agentCli = "C:/Users/me/pkg/scripts/holyagent-cli.js"
     const { delivered } = await run(
       (call) =>
         call.command === "git"
@@ -2103,7 +2101,7 @@ describe("a Windows package root", () => {
                 : { code: 2 },
       { ...WINDOWS, flag: "session" },
     )
-    expect(delivered?.message?.content).toContain(wrapper)
+    expect(delivered?.message?.content).toContain(agentCli)
     expect(delivered?.message?.content).not.toContain("C:\\Users")
     await removeTemporary(directory)
   })
@@ -2147,7 +2145,7 @@ describe("telling a child from the root", () => {
   })
 
   test("a child fills the package folder into its prompt and leaves the root's process variables alone", async () => {
-    const prompt = `run ${PI_ROOT_PLACEHOLDER}/scripts/holyagent status, then ${PI_ROOT_PLACEHOLDER}/scripts/holyagent rg x .`
+    const prompt = `run ${PI_ROOT_PLACEHOLDER}/scripts/holyagent-cli.js status, then ${PI_ROOT_PLACEHOLDER}/scripts/holyagent-cli.js rg x .`
     const { delivered, env } = await run(healthy("/missing"), {
       sessionName: "worker-implementation#a1b2c3d4",
       activeTools: ["SubagentWorkflow", "codemode"],
@@ -2157,7 +2155,7 @@ describe("telling a child from the root", () => {
     })
     expect(delivered?.systemPrompt).toBe(fillPackageRoot(prompt, "C:\\Users\\me\\pkg", win32))
     expect(delivered?.systemPrompt).toBe(
-      "run bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent.js' status, then bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent.js' rg x .",
+      "run bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent-cli.js' status, then bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent-cli.js' rg x .",
     )
     // The wrapper of a Windows root is not the one the fake answers for, so the config is
     // unreadable and the provider's variables are the defaults'; the host and the worker cap are
@@ -2172,25 +2170,27 @@ describe("telling a child from the root", () => {
   })
 
   test("host-neutral CLI examples are wired to the installed package too", () => {
-    expect(fillPackageRoot("Run \u0060holyagent status\u0060.", "C:\\pkg", win32)).toBe(
-      "Run \u0060bun --no-env-file --config='C:/pkg/scripts/empty-bunfig.toml' 'C:/pkg/scripts/holyagent.js' status\u0060.",
+    expect(fillPackageRoot("Run \u0060holyagent-cli status\u0060.", "C:\\pkg", win32)).toBe(
+      "Run \u0060bun --no-env-file --config='C:/pkg/scripts/empty-bunfig.toml' 'C:/pkg/scripts/holyagent-cli.js' status\u0060.",
     )
   })
 
   test.skipIf(process.platform === "win32")(
-    "Unix prompt commands execute the installed wrapper with their arguments",
+    "Unix prompt commands execute the installed agent bundle with their arguments",
     async () => {
       const directory = await mkdtemp(join(tmpdir(), "holyagent-prompt-"))
       try {
         const root = join(directory, "My Apps' $(touch injected); package")
         const scripts = join(root, "scripts")
         await mkdir(scripts, { recursive: true })
-        const wrapper = join(scripts, "holyagent")
-        await Bun.write(wrapper, '#!/bin/sh\nprintf "%s\\n" "$@"\n')
-        await chmod(wrapper, 0o755)
+        await Bun.write(join(scripts, "empty-bunfig.toml"), "")
+        await Bun.write(
+          join(scripts, "holyagent-cli.js"),
+          'console.log(Bun.argv.slice(2).join("\\n"))',
+        )
         for (const prompt of [
-          "`holyagent status --project 'my project'`",
-          `${PI_ROOT_PLACEHOLDER}/scripts/holyagent status --project 'my project'`,
+          "`holyagent-cli status --project 'my project'`",
+          `${PI_ROOT_PLACEHOLDER}/scripts/holyagent-cli.js status --project 'my project'`,
         ]) {
           const command = fillPackageRoot(prompt, root).replaceAll("`", "")
           const child = Bun.spawn(["sh", "-c", command], {
@@ -2210,12 +2210,12 @@ describe("telling a child from the root", () => {
 
   test("Windows CLI prompts use isolated Bun rather than a non-executable shell wrapper", () => {
     const prompt = fillPackageRoot(
-      PI_ROOT_PLACEHOLDER + "/scripts/holyagent --version",
+      PI_ROOT_PLACEHOLDER + "/scripts/holyagent-cli.js --version",
       "C:\\Program Files\\holyagent",
       win32,
     )
     expect(prompt).toBe(
-      "bun --no-env-file --config='C:/Program Files/holyagent/scripts/empty-bunfig.toml' 'C:/Program Files/holyagent/scripts/holyagent.js' --version",
+      "bun --no-env-file --config='C:/Program Files/holyagent/scripts/empty-bunfig.toml' 'C:/Program Files/holyagent/scripts/holyagent-cli.js' --version",
     )
   })
 
@@ -2892,7 +2892,7 @@ describe("the root's system prompt", () => {
     const { delivered } = await run(healthy("/missing"), { systemPrompt: PI_PROMPT })
     expect(delivered?.systemPrompt).toBe(`${filledPrompt}\n\n${PI_PROMPT}`)
     expect(delivered?.systemPrompt).not.toContain(PI_ROOT_PLACEHOLDER)
-    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent`)
+    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent-cli.js`)
   })
 
   test("is returned on every run, since Pi starts each run from its own prompt", async () => {
@@ -3232,7 +3232,7 @@ describe("the root's excluded tools", () => {
   test("a project's pi.enable false keeps the exclusions, the gate and the root prompt", async () => {
     const { api, delivered } = await run(configs(project({ enable: false })))
     expect(delivered?.message).toBeUndefined()
-    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent`)
+    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent-cli.js`)
     for (const name of EXCLUDED)
       expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
         blocked,

@@ -141,10 +141,10 @@ describe("commit workflow by harness", () => {
   test("requires the commit wrapper only in Claude Code and scopes author setup to its web sessions", async () => {
     const claude = folderOf("claude-5.5")
     expect(await Bun.file(join(claude, "root/identity.md")).text()).toContain(
-      "Claude Code: commit with `holyagent vcs commit`",
+      "Claude Code: commit with `holyagent-cli vcs commit`",
     )
     expect(await Bun.file(join(claude, "session-cloud-identity.md")).text()).toContain(
-      "holyagent vcs identity --name",
+      "holyagent-cli vcs identity --name",
     )
     for (const family of FAMILIES.filter((name) => name !== "claude-5.5")) {
       const folder = folderOf(family)

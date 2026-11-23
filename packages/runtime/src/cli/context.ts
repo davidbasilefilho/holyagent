@@ -27,6 +27,30 @@ const compact = (message: string): string =>
     return `${choices.slice(0, 3).join(" | ")} | … (${choices.length} choices)`
   })
 
+const invalidInput = (source: string, error: { readonly message: string }) =>
+  new InvalidDraft({ message: compact(`${source}: ${error.message}`) })
+
+/** Strictly decodes values collected from the typed agent flags. */
+export const decodeInputValueBy = <S extends Schema.Decoder<unknown>>(
+  raw: unknown,
+  pick: (raw: unknown) => S,
+  source: string,
+) =>
+  Schema.decodeUnknownEffect(pick(raw), { onExcessProperty: "error" })(raw).pipe(
+    Effect.mapError((error) => invalidInput(source, error)),
+  )
+
+/** Decodes JSON from an explicit file or from the retained host protocol. */
+export const decodeJsonInputBy = <S extends Schema.Decoder<unknown>>(
+  text: string,
+  pick: (raw: unknown) => S,
+  source: string,
+) =>
+  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
+    Effect.mapError((error) => invalidInput(source, error)),
+    Effect.flatMap((raw) => decodeInputValueBy(raw, pick, source)),
+  )
+
 /**
  * The JSON text a command was given: the inline `--input` value when present, else stdin. With the
  * flag, stdin is never read: a pipe that stays open (an agent's shell tool) would block the command
@@ -55,14 +79,7 @@ export const readInputBy = <S extends Schema.Decoder<unknown>>(
 ) =>
   Effect.gen(function* () {
     const { source, text } = yield* payloadOf(host, inline)
-    const invalid = (error: { readonly message: string }) =>
-      new InvalidDraft({ message: compact(`${source}: ${error.message}`) })
-    const raw = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
-      Effect.mapError(invalid),
-    )
-    return yield* Schema.decodeUnknownEffect(pick(raw), { onExcessProperty: "error" })(raw).pipe(
-      Effect.mapError(invalid),
-    )
+    return yield* decodeJsonInputBy(text, pick, source)
   })
 
 /**

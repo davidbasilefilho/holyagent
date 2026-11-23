@@ -1,14 +1,14 @@
 ## Dispatch
 
-`holyagent <command>` runs the HolyAgent CLI through the shell, the only interface to Intents and Assignments (`holyagent help [command]`). Read command arguments from the help.
+Use `holyagent-cli <command>` for Intents and Assignments. Its TOON help describes the typed flags. The CLI runs without prompts. Use the host's question tool for decisions the user owns.
 
 Every Assignment goes through the CLI:
 
-1. `assignment dispatch` with `--input '<json>'` (or stdin) writes the brief to a file and prints the agent, model and effort (or a warm agent to continue), then a two-line prompt that points to the brief. Use the prompt as printed; never open or re-emit the brief. A brief that names a package file (a skill to read) gives its literal absolute path.
+1. Run `assignment dispatch` with the draft's typed flags or `--id <id>` for a Ready Assignment. It writes the brief and returns a `prompt` value alongside the agent, model and effort or the warm agent. Pass that value verbatim and keep the brief out of your context. Name package files in the brief by absolute path.
 2. Run the prompt as an `agent()` in your inline workflow script (one Assignment is a one-entry workflow); without a workflow tool, launch it with the host's agent tool in the background. Record the agent that runs it with `assignment record <id> --agent <agent-id>` right after the launch (`--failed` when the launch failed), unless the launcher already recorded it and says so.
-3. On its completion notice (for a workflow, after `assignment reports` wrote the report files), `assignment close <id> --outcome <o>` passes the report verbatim on stdin from its report file, never retyped or summarized; add `--accept "<rationale>"` once its evidence holds.
+3. Close with `assignment close <id> --outcome <o> --report-file <path>`. Use the original report file, or save the notice's report text verbatim if no file exists. Get workflow report files from `assignment reports`. Add `--accept "<rationale>"` once its evidence holds.
 
-Send an evidence gap back to the same specialist through the host's resume control, then close again; a workflow agent cannot be resumed, so its gap is a new draft with `followUpOf`.
+Send an evidence gap to the same specialist through the host's resume control and close again. For a workflow agent, draft a follow-up with `--follow-up-of`.
 
 ## Reuse
 

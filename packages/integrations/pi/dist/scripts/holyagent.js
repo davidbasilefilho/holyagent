@@ -10775,6 +10775,7 @@ var init_errors4 = __esm(() => {
     "MigrationRefused",
     "NothingToMigrate",
     "StateModeRefused",
+    "Unauthorized",
     ...VCS_REFUSED_ERRORS
   ]);
   HINTS = {
@@ -10793,13 +10794,14 @@ var init_errors4 = __esm(() => {
     DependencyNotAccepted: "Close and accept the dependency first (`holyagent assignment accept <id>`), then dispatch.",
     SpecialistMismatch: "Record the agent that was actually launched, or dispatch again.",
     SpecialistNotRecorded: "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
-    MigrationRefused: "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
+    MigrationRefused: "Run `holyagent-cli migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
     NothingToMigrate: "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
-    MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
+    MigrationUnverified: "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent-cli migrate --dry-run` again.",
     ToolMissing: "Install the program with the command the message gives for your platform; until then search with the system grep or find and report the missing program.",
     BrowserLaunchFailed: "Check the message: install uv (uvx) and a Chromium as `holyagent doctor` says, then restart the session; run `holyagent doctor` to see what the headless browser-use form needs.",
     StateModeRefused: "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
     StateLocked: "Another process holds the state lock; retry in a moment.",
+    Unauthorized: "Use the operation only through a host that grants the required authority.",
     StateIo: "Check the path, permissions and Git state named in the error. Resolve any branch name conflict and retry.",
     CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
     ConfigInvalid: "Fix the field the message names in that config.json (the keys and values are listed in docs/pi/configuration.md), or delete the file to use the defaults.",
@@ -11641,6 +11643,12 @@ var init_load = __esm(() => {
   ];
   JsonValue = fromJsonString2(Unknown2);
 });
+
+var init_errors7 = __esm(() => {
+  init_errors5();
+});
+
+var PI_PROJECT_FLAG = "--project", projectOf = (args) => args[0] === PI_PROJECT_FLAG && args[1] !== undefined ? { directory: args[1], rest: args.slice(2) } : { directory: undefined, rest: args };
 
 var init_files2 = __esm(() => {
   init_files();
@@ -13382,7 +13390,8 @@ var init_package = __esm(() => {
     description: "HolyAgent: a root agent that plans work as Intents and Assignments and delegates it to specialists.",
     license: "Apache-2.0",
     bin: {
-      holyagent: "./packages/integrations/pi/dist/scripts/holyagent-public.js"
+      holyagent: "./packages/integrations/pi/dist/scripts/holyagent-public-bin.js",
+      "holyagent-cli": "./packages/integrations/pi/dist/scripts/holyagent-cli-bin.js"
     },
     workspaces: [
       "packages/*",
@@ -16069,69 +16078,6 @@ var init_live = __esm(() => {
   init_github2();
 });
 
-var INPUT_FLAG = "input", readFlags = (args, spec, usage) => gen2(function* () {
-  const hint = `Usage: holyagent ${usage}`;
-  const positionals = [];
-  const values = {};
-  const switches = new Set;
-  const lookup = (flag) => Object.entries(spec).find(([name, shape]) => flag.startsWith("--") ? flag.slice(2) === name : shape.short !== undefined && flag === `-${shape.short}`);
-  for (let index = 0;index < args.length; index += 1) {
-    const arg = args[index] ?? "";
-    if (arg === "--") {
-      positionals.push(...args.slice(index + 1));
-      break;
-    }
-    if (!arg.startsWith("-") || arg === "-") {
-      positionals.push(arg);
-      continue;
-    }
-    const equals = arg.startsWith("--") ? arg.indexOf("=") : -1;
-    const flag = equals === -1 ? arg : arg.slice(0, equals);
-    const found = lookup(flag);
-    if (found === undefined)
-      return yield* new Usage({ message: `Unknown flag ${flag}`, hint });
-    const [name, shape] = found;
-    if (shape.kind === "switch") {
-      if (equals !== -1)
-        return yield* new Usage({ message: `Flag ${flag} takes no value`, hint });
-      switches.add(name);
-      continue;
-    }
-    const next = args[index + 1];
-    const value = equals === -1 ? next?.startsWith("--") ? undefined : next : arg.slice(equals + 1);
-    if (equals === -1 && value !== undefined)
-      index += 1;
-    if (value === undefined)
-      return yield* new Usage({ message: `Flag ${flag} needs a value`, hint });
-    if (shape.kind === "one" && values[name] !== undefined)
-      return yield* new Usage({ message: `Flag ${flag} was given twice`, hint });
-    (values[name] ??= []).push(value);
-  }
-  return { positionals, values, switches };
-}), parseArgs = (args, spec, usage) => readFlags(args, Object.fromEntries(Object.entries(spec).map(([name, kind]) => [
-  name,
-  { kind: kind === "boolean" ? "switch" : "one" }
-])), usage).pipe(map5(({ positionals, values, switches }) => ({
-  positionals,
-  flags: {
-    ...Object.fromEntries(Object.entries(values).map(([name, list]) => [name, list[0] ?? ""])),
-    ...Object.fromEntries([...switches].map((name) => [name, true]))
-  }
-}))), stringFlag = (parsed, name) => {
-  const value = parsed.flags[name];
-  return typeof value === "string" ? value : undefined;
-}, booleanFlag = (parsed, name) => parsed.flags[name] === true, requiredFlag = (parsed, name, usage) => {
-  const value = stringFlag(parsed, name);
-  return value === undefined ? fail5(new Usage({ message: `Missing --${name}`, hint: `Usage: holyagent ${usage}` })) : succeed6(value);
-}, choiceFlag = (schema, name, value, usage) => decodeUnknownEffect2(schema)(value).pipe(mapError2(() => new Usage({
-  message: `Invalid value for --${name}: ${String(value)}`,
-  hint: `Usage: holyagent ${usage}`
-})));
-var init_args = __esm(() => {
-  init_dist();
-  init_errors4();
-});
-
 var AcceptanceInput, coverageProblem = (assignment, input) => {
   const checks = [
     {
@@ -16638,6 +16584,9 @@ var init_context = __esm(() => {
   init_store();
   init_tree();
   Unauthorized = class Unauthorized extends TaggedError2("Unauthorized") {
+    get message() {
+      return `The current host does not authorize ${this.capability}.`;
+    }
   };
   NoActiveIntent2 = class NoActiveIntent2 extends TaggedError2("NoActiveIntent") {
     get message() {
@@ -17775,11 +17724,13 @@ var schemas3, guardedState = (context, capability, state) => ({
   const done = yield* commit({
     message,
     paths: request.paths,
-    cloud: inCloudSession(context.env)
+    cloud: context.host === "claude" && inCloudSession(context.env)
   });
   return { ...done, ...yield* recordBranch(guardedState(context, "vcs.commit", state), done) };
 }), identity2 = (context, input) => gen2(function* () {
   const request = yield* decode4(schemas3.identity, input);
+  if (context.host !== "claude")
+    return yield* new Unauthorized({ capability: "vcs.identity" });
   yield* requireCapability(context, "vcs.identity");
   return yield* setAuthor(request);
 }), pr = (context, root, state, input) => gen2(function* () {
@@ -17835,7 +17786,7 @@ var init_vcs = __esm(() => {
 });
 
 var SetupFailure;
-var init_errors7 = __esm(() => {
+var init_errors8 = __esm(() => {
   init_dist();
   SetupFailure = class SetupFailure extends TaggedError2("SetupFailure") {
   };
@@ -17980,7 +17931,7 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
 var init_json_file = __esm(() => {
   init_dist();
   init_filesystem();
-  init_errors7();
+  init_errors8();
   JsonObjectText = fromJsonString2(Record(String6, Unknown2), {
     space: 2
   });
@@ -18511,7 +18462,7 @@ var init_pi_check = __esm(() => {
   init_browse();
   init_chromium();
   init_environment2();
-  init_errors7();
+  init_errors8();
   init_form();
   init_json_file();
   init_shell();
@@ -18579,7 +18530,7 @@ var RecordedKey, RecordFile, recordPath = (env) => join17(userFiles(env).claudeD
 var init_record2 = __esm(() => {
   init_dist();
   init_environment2();
-  init_errors7();
+  init_errors8();
   init_json_file();
   RecordedKey = Struct({
     path: NonEmptyArray(String6),
@@ -18784,7 +18735,7 @@ var init_scope = __esm(() => {
   init_dist();
   init_filesystem();
   init_environment2();
-  init_errors7();
+  init_errors8();
   init_json_file();
   init_settings4();
   init_shell();
@@ -19001,7 +18952,7 @@ var init_pi_settings = __esm(() => {
   init_provider();
   init_tools();
   init_environment2();
-  init_errors7();
+  init_errors8();
   init_json_file();
   init_pi_check();
   init_record2();
@@ -19313,7 +19264,7 @@ var init_capabilities2 = __esm(() => {
   init_capabilities();
   init_load();
   init_layout();
-  init_errors7();
+  init_errors8();
   init_json_file();
   init_pi_check();
   init_scope();
@@ -19619,7 +19570,7 @@ var init_t3_settings = __esm(() => {
   init_dist();
   init_filesystem();
   init_environment2();
-  init_errors7();
+  init_errors8();
   init_json_file();
   init_pi_check();
   init_record2();
@@ -19920,7 +19871,7 @@ var FIX = "run /holyagent:setup, or `holyagent doctor --fix`", checkBun, checkCo
 var init_doctor = __esm(() => {
   init_dist();
   init_identity();
-  init_errors7();
+  init_errors8();
   init_form();
   init_pi_check();
   init_pi_settings();
@@ -20822,7 +20773,7 @@ var init_migrate = __esm(() => {
     get message() {
       const shown = this.problems.slice(0, 10);
       const more = this.problems.length - shown.length;
-      return `Nothing was written, ${this.problems.length} problem(s) stop the migration: ${shown.join("; ")}${more > 0 ? `; and ${more} more (run \`holyagent migrate --dry-run\` for the full list)` : ""}. Fix them and run the command again`;
+      return `Nothing was written, ${this.problems.length} problem(s) stop the migration: ${shown.join("; ")}${more > 0 ? `; and ${more} more (run \`holyagent-cli migrate --dry-run\` for the full list)` : ""}. Fix them and run the command again`;
     }
   };
   MigrationUnverified = class MigrationUnverified extends TaggedError2("MigrationUnverified") {
@@ -20926,6 +20877,296 @@ var init_src = __esm(() => {
   init_tree();
 });
 
+var init_assignment3 = __esm(() => {
+  init_assignment();
+});
+
+var init_ids2 = __esm(() => {
+  init_ids();
+});
+
+var init_primitives2 = __esm(() => {
+  init_primitives();
+});
+
+var INPUT_FLAG = "input", readFlags = (args, spec, usage) => gen2(function* () {
+  const hint = `Usage: holyagent ${usage}`;
+  const positionals = [];
+  const values = {};
+  const switches = new Set;
+  const lookup = (flag) => Object.entries(spec).find(([name, shape]) => flag.startsWith("--") ? flag.slice(2) === name : shape.short !== undefined && flag === `-${shape.short}`);
+  for (let index = 0;index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (arg === "--") {
+      positionals.push(...args.slice(index + 1));
+      break;
+    }
+    if (!arg.startsWith("-") || arg === "-") {
+      positionals.push(arg);
+      continue;
+    }
+    const equals = arg.startsWith("--") ? arg.indexOf("=") : -1;
+    const flag = equals === -1 ? arg : arg.slice(0, equals);
+    const found = lookup(flag);
+    if (found === undefined)
+      return yield* new Usage({ message: `Unknown flag ${flag}`, hint });
+    const [name, shape] = found;
+    if (shape.kind === "switch") {
+      if (equals !== -1)
+        return yield* new Usage({ message: `Flag ${flag} takes no value`, hint });
+      switches.add(name);
+      continue;
+    }
+    const next = args[index + 1];
+    const value = equals === -1 ? next?.startsWith("--") ? undefined : next : arg.slice(equals + 1);
+    if (equals === -1 && value !== undefined)
+      index += 1;
+    if (value === undefined)
+      return yield* new Usage({ message: `Flag ${flag} needs a value`, hint });
+    if (shape.kind === "one" && values[name] !== undefined)
+      return yield* new Usage({ message: `Flag ${flag} was given twice`, hint });
+    (values[name] ??= []).push(value);
+  }
+  return { positionals, values, switches };
+}), parseArgs = (args, spec, usage) => readFlags(args, Object.fromEntries(Object.entries(spec).map(([name, kind]) => [
+  name,
+  { kind: kind === "boolean" ? "switch" : "one" }
+])), usage).pipe(map5(({ positionals, values, switches }) => ({
+  positionals,
+  flags: {
+    ...Object.fromEntries(Object.entries(values).map(([name, list]) => [name, list[0] ?? ""])),
+    ...Object.fromEntries([...switches].map((name) => [name, true]))
+  }
+}))), stringFlag = (parsed, name) => {
+  const value = parsed.flags[name];
+  return typeof value === "string" ? value : undefined;
+}, booleanFlag = (parsed, name) => parsed.flags[name] === true, requiredFlag = (parsed, name, usage) => {
+  const value = stringFlag(parsed, name);
+  return value === undefined ? fail5(new Usage({ message: `Missing --${name}`, hint: `Usage: holyagent ${usage}` })) : succeed6(value);
+}, choiceFlag = (schema, name, value, usage) => decodeUnknownEffect2(schema)(value).pipe(mapError2(() => new Usage({
+  message: `Invalid value for --${name}: ${String(value)}`,
+  hint: `Usage: holyagent ${usage}`
+})));
+var init_args = __esm(() => {
+  init_dist();
+  init_errors4();
+});
+
+var DRAFT_FLAGS = "--role-task <role> --objective <text> --criterion <blocking|advisory:dimension:text>...", DRAFT_NOTES, usages, agentInputHelp = (path) => Object.hasOwn(usages, path.join(" ")) ? usages[path.join(" ")] : undefined, one, many, toggle, value2 = (args, name) => args.values[name]?.[0], invalid4 = (usage, message) => new Usage({ message, hint: `Usage: holyagent-cli ${usage}` }), readAgentFlags = (argv, flags, usage) => readFlags(argv, flags, usage).pipe(mapError2((error) => invalid4(usage, error.message))), decode5 = (schema, input, usage) => decodeUnknownEffect2(schema, { onExcessProperty: "error" })(input).pipe(mapError2((error) => invalid4(usage, error.message))), withoutPositionals = (args, usage) => args.positionals.length === 0 ? void_3 : fail5(invalid4(usage, "Unexpected positional arguments. Pass values with named flags.")), intentInput = (command, argv, usage) => gen2(function* () {
+  const create = command === "intent create";
+  const args = yield* readAgentFlags(argv, {
+    objective: one,
+    requirement: many,
+    ...create ? {} : { material: toggle, "clear-requirements": toggle }
+  }, usage);
+  yield* withoutPositionals(args, usage);
+  const objective = value2(args, "objective");
+  const requested = args.values["requirement"];
+  const clear = args.switches.has("clear-requirements");
+  const material = args.switches.has("material");
+  if (create && objective === undefined)
+    return yield* invalid4(usage, "Missing --objective");
+  if (clear && requested !== undefined)
+    return yield* invalid4(usage, "Use either --requirement or --clear-requirements");
+  const requirements = clear ? [] : requested;
+  if (objective === undefined && requirements === undefined && !material)
+    return yield* invalid4(usage, "Supply --objective, --requirement, --clear-requirements, or --material");
+  const fields = {
+    ...objective === undefined ? {} : { objective },
+    ...requirements === undefined ? {} : { requirements }
+  };
+  if (create)
+    return { argv: [], input: yield* decode5(schemas2.create, fields, usage) };
+  yield* decode5(schemas2.update, { ...fields, material }, usage);
+  return { argv: material ? ["--material"] : [], input: fields };
+}), draftFlags, decodeCriterion = (raw, usage) => {
+  const parts = /^(blocking|advisory):([^:]+):([\s\S]+)$/.exec(raw);
+  return parts === null ? fail5(invalid4(usage, "--criterion expects blocking:dimension:text or advisory:dimension:text")) : decode5(Criterion, { blocking: parts[1] === "blocking", dimension: parts[2], text: parts[3] }, usage);
+}, assignmentInput = (command, argv, usage) => gen2(function* () {
+  const args = yield* readAgentFlags(argv, { ...draftFlags, ...command === "assignment dispatch" ? { id: one } : {} }, usage);
+  yield* withoutPositionals(args, usage);
+  const id = value2(args, "id");
+  if (id !== undefined) {
+    if (Object.keys(args.values).length !== 1 || args.switches.size !== 0)
+      return yield* invalid4(usage, "Use --id on its own to dispatch an existing Assignment");
+    return { argv: [], input: { id: yield* decode5(AssignmentId, id, usage) } };
+  }
+  const roleTask = value2(args, "role-task");
+  const objective = value2(args, "objective");
+  const givenCriteria = args.values["criterion"];
+  if (roleTask === undefined)
+    return yield* invalid4(usage, "Missing --role-task");
+  if (objective === undefined)
+    return yield* invalid4(usage, "Missing --objective");
+  if (givenCriteria === undefined)
+    return yield* invalid4(usage, "Missing --criterion");
+  const criteria = yield* forEach2(givenCriteria, (criterion) => decodeCriterion(criterion, usage));
+  const operationalPaths = args.values["operational-path"];
+  const followUpOf = value2(args, "follow-up-of");
+  const intentId = value2(args, "intent-id");
+  const revision = value2(args, "intent-revision");
+  if (revision !== undefined && (!/^[1-9]\d*$/.test(revision) || !Number.isSafeInteger(Number(revision))))
+    return yield* invalid4(usage, "--intent-revision expects a positive safe integer");
+  const list = (flag) => args.values[flag] ?? [];
+  const draft = {
+    roleTask,
+    objective,
+    criteria,
+    scope: list("scope"),
+    constraints: list("constraint"),
+    evidence: list("evidence"),
+    ownershipPaths: list("ownership-path"),
+    dependencies: list("dependency"),
+    independentFrom: list("independent-from"),
+    ...operationalPaths === undefined ? {} : {
+      operationalResources: operationalPaths.map((target) => ({
+        kind: "local-path",
+        target
+      }))
+    },
+    ...followUpOf === undefined ? {} : { followUpOf },
+    ...intentId === undefined ? {} : { intentId },
+    ...revision === undefined ? {} : { intentRevision: Number(revision) },
+    ...args.switches.has("screen") ? { screen: true } : {}
+  };
+  return { argv: [], input: yield* decode5(schemas.create, draft, usage) };
+}), reportInput = (command, argv, usage) => gen2(function* () {
+  const close = command === "assignment close";
+  const args = yield* readAgentFlags(argv, close ? { outcome: one, accept: one, "report-file": one, "report-json": toggle } : { rationale: one, "report-file": one, "carry-forward": toggle }, usage);
+  const [rawId] = args.positionals;
+  if (args.positionals.length !== 1)
+    return yield* invalid4(usage, "Supply exactly one Assignment id");
+  const id = yield* decode5(AssignmentId, rawId, usage);
+  const file = value2(args, "report-file");
+  if (file !== undefined && (file.trim() === "" || file === "-" || file.includes("\x00")))
+    return yield* invalid4(usage, "--report-file expects a local file path");
+  if (close) {
+    const outcomeArg = value2(args, "outcome");
+    if (outcomeArg === undefined)
+      return yield* invalid4(usage, "Missing --outcome");
+    const outcome = yield* decode5(schemas.close.fields.outcome, outcomeArg, usage);
+    const json = args.switches.has("report-json");
+    if (file === undefined && (outcome === "success" || json))
+      return yield* invalid4(usage, "Supply --report-file for a successful result or --report-json");
+    const acceptance = value2(args, "accept");
+    if (acceptance !== undefined)
+      yield* decode5(Text, acceptance, usage);
+    return {
+      argv: [
+        id,
+        `--outcome=${outcome}`,
+        ...acceptance === undefined ? [] : [`--accept=${acceptance}`],
+        ...json ? ["--report-json"] : []
+      ],
+      ...file === undefined ? {} : { reportFile: file }
+    };
+  }
+  const rationaleArg = value2(args, "rationale");
+  if (rationaleArg === undefined)
+    return yield* invalid4(usage, "Missing --rationale");
+  const rationale = yield* decode5(Text, rationaleArg, usage);
+  return {
+    argv: [
+      id,
+      `--rationale=${rationale}`,
+      ...args.switches.has("carry-forward") ? ["--carry-forward"] : [],
+      ...file === undefined ? [] : ["--report"]
+    ],
+    ...file === undefined ? {} : { reportFile: file }
+  };
+}), adaptAgentInput = (path, argv) => {
+  const command = path.join(" ");
+  const help = agentInputHelp(path);
+  if (help === undefined)
+    return succeed6({ argv });
+  if (path[0] === "intent")
+    return intentInput(command, argv, help.usage);
+  if (path[1] === "create" || path[1] === "dispatch")
+    return assignmentInput(command, argv, help.usage);
+  return reportInput(command, argv, help.usage);
+};
+var init_agent_input = __esm(() => {
+  init_src();
+  init_dist();
+  init_assignment3();
+  init_ids2();
+  init_primitives2();
+  init_args();
+  init_errors4();
+  DRAFT_NOTES = [
+    "Repeat --criterion for each criterion. Use blocking or advisory, then a dimension and the full criterion text, for example --criterion 'blocking:behavior:Reject malformed input'. Dimensions: behavior, regressions, tests, scope, style, repo-standards.",
+    "Optional repeatable flags: --scope, --constraint, --evidence, --ownership-path, --operational-path, --dependency, --independent-from. An operational path is an absolute local path.",
+    "Optional single flags: --follow-up-of <assignment-id>, --intent-id <id>, --intent-revision <positive-integer>, --screen."
+  ];
+  usages = {
+    "intent create": {
+      usage: "intent create --objective <text> [--requirement <text>...]",
+      notes: ["Repeat --requirement to supply the binding requirements in order."]
+    },
+    "intent update": {
+      usage: "intent update [--objective <text>] [--requirement <text>... | --clear-requirements] [--material]",
+      notes: [
+        "Set at least one flag. Requirements replace the previous list. --material advances the Intent revision and makes older open work stale."
+      ]
+    },
+    "assignment create": { usage: `assignment create ${DRAFT_FLAGS}`, notes: DRAFT_NOTES },
+    "assignment dispatch": {
+      usage: `assignment dispatch (--id <id> | ${DRAFT_FLAGS})`,
+      notes: [
+        "--id starts an existing Ready Assignment and cannot be combined with a draft.",
+        ...DRAFT_NOTES
+      ]
+    },
+    "assignment close": {
+      usage: "assignment close <id> --outcome <outcome> [--accept <rationale>] [--report-file <path>] [--report-json]",
+      notes: [
+        "Outcomes: success, failure, errored, interrupted, stopped. Success requires --report-file. --report-json reads a structured report from that file.",
+        "With --accept, supply the specialist's result and the evidence for each blocking criterion and required label. Keep their text intact."
+      ]
+    },
+    "assignment accept": {
+      usage: "assignment accept <id> --rationale <text> [--report-file <path>] [--carry-forward]",
+      notes: ["Without --report-file, acceptance uses the stored report."]
+    }
+  };
+  one = { kind: "one" };
+  many = { kind: "many" };
+  toggle = { kind: "switch" };
+  draftFlags = {
+    "role-task": one,
+    objective: one,
+    scope: many,
+    constraint: many,
+    criterion: many,
+    evidence: many,
+    "ownership-path": many,
+    "operational-path": many,
+    dependency: many,
+    "independent-from": many,
+    "follow-up-of": one,
+    screen: toggle,
+    "intent-id": one,
+    "intent-revision": one
+  };
+});
+
+var HOST_VARIABLE = "HOLYAGENT_HOST", agentHostOf = (env) => {
+  const value = env[HOST_VARIABLE]?.trim();
+  return value === undefined || value === "" ? succeed6("claude") : decodeUnknownEffect2(Literals(AGENT_HOSTS))(value).pipe(mapError2(() => new Usage({
+    message: `${HOST_VARIABLE} must be ${AGENT_HOSTS.join(" or ")}, not "${value}"`,
+    hint: `Unset ${HOST_VARIABLE} for the default of claude.`
+  })));
+}, loadConfig2 = (env, root) => gen2(function* () {
+  const host = yield* agentHostOf(env);
+  return yield* executionConfig({ cwd: root, env, host, authorize: () => true }, root).pipe(mapError2((error) => new Usage({ message: error.message, hint: "Check HolyAgent execution settings." })));
+});
+var init_config = __esm(() => {
+  init_src();
+  init_dist();
+  init_host2();
+  init_errors4();
+});
+
 var init_links2 = __esm(() => {
   init_links();
 });
@@ -21006,13 +21247,13 @@ var init_author2 = __esm(() => {
   init_author();
 });
 
-var coreContext = (call) => ({
+var coreContext = (call) => agentHostOf(call.env).pipe(map5((host) => ({
   cwd: call.cwd,
   env: call.env,
-  host: "claude",
+  host,
   execution: DEFAULT_CONFIG,
   authorize: () => true
-}), arguments_ = (call, usage, spec, positionals) => readFlags(call.args.positionals, spec, usage).pipe(filterOrFail2((args) => positionals === "any" || args.positionals.length === positionals, (args) => new Usage({
+}))), arguments_ = (call, usage, spec, positionals) => readFlags(call.args.positionals, spec, usage).pipe(filterOrFail2((args) => positionals === "any" || args.positionals.length === positionals, (args) => new Usage({
   message: `Expected ${positionals} argument(s), got ${args.positionals.length}`,
   hint: `Usage: holyagent ${usage}`
 }))), short = (sha) => sha.slice(0, 7), COMMIT_USAGE = "vcs commit -m <headline> [-m <body>] -- <paths\u2026>", PR_USAGE = "vcs pr --base <b> --title <t> [--body-file <f>] [--update <n>]", VCS_COMMANDS;
@@ -21020,6 +21261,7 @@ var init_commands = __esm(() => {
   init_src();
   init_dist();
   init_args();
+  init_config();
   init_errors4();
   init_views();
   init_directive2();
@@ -21029,11 +21271,11 @@ var init_commands = __esm(() => {
     {
       path: ["vcs", "commit"],
       usage: COMMIT_USAGE,
-      summary: "Commit exactly the named paths with the configured git identity (in a claude.ai cloud session, with the user as author and the platform's committer), after the message check, and record the branch and commit on the Intent in use",
+      summary: "Commit the named paths with the configured Git identity and record the commit on the active Intent",
       notes: [
         "state mode (holyagent state mode): in branch, the default, Intent state is committed on the state branch as it changes and a path under .holyagent/ is refused; in local it is in no commit and such a path is refused; in work the changed state files (not config.json unless named) are staged with the named paths",
         "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that is exactly the agent's own (the email noreply@anthropic.com, or the name Claude or Claude Code) is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
-        "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included"
+        "Git runs the repository's commit-msg hook when configured"
       ],
       flags: {},
       raw: true,
@@ -21046,7 +21288,7 @@ var init_commands = __esm(() => {
             message: messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
             hint: `Usage: holyagent ${COMMIT_USAGE}`
           });
-        const done = yield* commit2(coreContext(call), call.root, call, {
+        const done = yield* commit2(yield* coreContext(call), call.root, call, {
           messages,
           paths: args.positionals
         });
@@ -21060,6 +21302,7 @@ var init_commands = __esm(() => {
     },
     {
       path: ["vcs", "identity"],
+      hosts: ["claude"],
       usage: IDENTITY_USAGE,
       summary: "Set the commit author of this clone in its local git config (author.name and author.email), so a commit has the user as author and keeps the committer",
       notes: [
@@ -21071,7 +21314,7 @@ var init_commands = __esm(() => {
       positionals: 0,
       run: (call) => gen2(function* () {
         const args = yield* arguments_(call, IDENTITY_USAGE, { name: { kind: "one" }, email: { kind: "one" } }, 0);
-        const author = yield* identity2(coreContext(call), {
+        const author = yield* identity2(yield* coreContext(call), {
           name: yield* requiredValue(args, "name", IDENTITY_USAGE),
           email: yield* requiredValue(args, "email", IDENTITY_USAGE)
         });
@@ -21107,7 +21350,7 @@ var init_commands = __esm(() => {
         const base = valueOf(args, "base");
         const title = valueOf(args, "title");
         const bodyFile = valueOf(args, "body-file");
-        return yield* pr(coreContext(call), call.root, call, {
+        return yield* pr(yield* coreContext(call), call.root, call, {
           ...base === undefined ? {} : { base },
           ...title === undefined ? {} : { title },
           ...bodyFile === undefined ? {} : { bodyFile },
@@ -21130,16 +21373,8 @@ var init_route2 = __esm(() => {
   init_route();
 });
 
-var init_assignment3 = __esm(() => {
-  init_assignment();
-});
-
-var init_errors8 = __esm(() => {
+var init_errors9 = __esm(() => {
   init_errors();
-});
-
-var init_ids2 = __esm(() => {
-  init_ids();
 });
 
 var code_review_default = `---
@@ -21244,23 +21479,6 @@ var init_mode2 = __esm(() => {
   init_mode();
 });
 
-var HOST_VARIABLE = "HOLYAGENT_HOST", agentHostOf = (env) => {
-  const value = env[HOST_VARIABLE]?.trim();
-  return value === undefined || value === "" ? succeed6("claude") : decodeUnknownEffect2(Literals(AGENT_HOSTS))(value).pipe(mapError2(() => new Usage({
-    message: `${HOST_VARIABLE} must be ${AGENT_HOSTS.join(" or ")}, not "${value}"`,
-    hint: `Unset ${HOST_VARIABLE} for the default of claude.`
-  })));
-}, loadConfig2 = (env, root) => gen2(function* () {
-  const host = yield* agentHostOf(env);
-  return yield* executionConfig({ cwd: root, env, host, authorize: () => true }, root).pipe(mapError2((error) => new Usage({ message: error.message, hint: "Check HolyAgent execution settings." })));
-});
-var init_config = __esm(() => {
-  init_src();
-  init_dist();
-  init_host2();
-  init_errors4();
-});
-
 var present4 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0))), oneLine3 = (text) => text.replace(/\s+/g, " ").trim(), byId2 = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0), assignmentRow2 = (row) => ({
   id: row.id,
   role: row.roleTask,
@@ -21303,7 +21521,7 @@ var present4 = (record) => Object.fromEntries(Object.entries(record).filter(([, 
       startedAt: row.specialist?.startedAt ?? null
     })),
     ...present4({
-      next: running.length === 0 ? undefined : `close as interrupted only an agent confirmed gone (${words.confirmGone}; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted`
+      next: running.length === 0 ? undefined : `close as interrupted only an agent confirmed gone (${words.confirmGone}; an exited parent session proves nothing): holyagent-cli assignment close <id> --outcome interrupted`
     })
   };
 };
@@ -21460,7 +21678,7 @@ var coreCommand = (name) => (call) => gen2(function* () {
     }
     case "assignment dispatch": {
       const input = yield* call.inputBy((raw) => typeof raw === "object" && raw !== null && ("id" in raw) ? Struct({ id: AssignmentId }) : schemas.create).pipe(mapError2((error) => error instanceof InvalidDraft ? new InvalidDraft({
-        message: `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`
+        message: call.surface === "agent" ? `${error.message}. To dispatch an existing Assignment use --id <id>.` : `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`
       }) : error));
       const started = yield* dispatch2(context, input);
       const directive = started.directive.action === "continue" ? { continue: started.directive.agentId, reason: started.directive.reason } : present3({
@@ -21645,7 +21863,7 @@ var init_core2 = __esm(() => {
   init_dist();
   init_assignment3();
   init_directive2();
-  init_errors8();
+  init_errors9();
   init_host2();
   init_ids2();
   init_prompts();
@@ -21659,7 +21877,7 @@ var init_core2 = __esm(() => {
   init_views();
 });
 
-var PLUGIN_NAMESPACE = "holyagent", DRAFT_SHAPE, DRAFT_NOTES, dispatchOutput = (words) => ({
+var PLUGIN_NAMESPACE = "holyagent", DRAFT_SHAPE, DRAFT_NOTES2, dispatchOutput = (words) => ({
   output: `TOON fields (id, state, agent/model/effort or continue, reason), then a line \`prompt:\` alone, then a two-line specialist prompt that names the brief file the full Assignment was written to; pass that text as it is: as the prompt of its agent() in your inline workflow script first, to the ${words.agentTool} tool only when the ${words.workflowTool} tool is disabled or unavailable, and by ${words.message} only for a warm continuation. The brief itself is never printed: the specialist reads it with the ${words.readTool} tool${words.launchNote === undefined ? "" : `. ${words.launchNote}`}`
 }), recordHelp = (words) => ({
   summary: `Record the launch of a dispatched Assignment (a workflow's agent as ${words.workflowAgentPrefix}<run-id>/<id>), or roll it back when the launch failed`,
@@ -21700,7 +21918,7 @@ var init_assignment4 = __esm(() => {
   init_core2();
   init_errors4();
   DRAFT_SHAPE = `{roleTask: ${RoleTask.literals.join("|")}, objective, scope?: [text], constraints?: [text], criteria: [{text, blocking, dimension: behavior|regressions|tests|scope|style|repo-standards}], evidence?: [label], ownershipPaths?: [path], operationalResources?: [{kind: local-path, target: absolutePath}], dependencies?: [assignmentId], independentFrom?: [assignmentId], followUpOf?: assignmentId, screen?: boolean, intentId?, intentRevision?}`;
-  DRAFT_NOTES = [
+  DRAFT_NOTES2 = [
     "required: roleTask, objective and criteria; unknown fields are refused",
     "evidence labels are answered by the specialist by name; keep them few and observable (checks-run, changed-paths, diff-file)",
     "screen: true when the Assignment needs to see or drive a screen (a desktop app, a real browser, the page shown in T3); its specialist then gets the computer-use, browser-use and T3 preview tools, and under the Codex provider runs on GPT-6.1 Terra at medium or higher effort. Pi host only; the dispatch prints the agent to launch, whose name ends in -screen",
@@ -21726,7 +21944,7 @@ var init_assignment4 = __esm(() => {
       input: `{id} for a Ready Assignment, or a new draft ${DRAFT_SHAPE}`,
       ...dispatchOutput(CLAUDE_WORDS),
       forHost: dispatchOutput,
-      notes: [...DRAFT_NOTES, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
+      notes: [...DRAFT_NOTES2, 'dispatching a Ready Assignment takes {"id": "<id>"}'],
       flags: { input: "string" },
       positionals: 0,
       core: true,
@@ -22040,7 +22258,7 @@ At optimization start, load \`performance-iteration\`; accept the collected base
 `;
 var init_delegating = () => {};
 
-var dispatch_default = '`holyagent <command>` means `bun --no-env-file --config="${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml" "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent.js" <command>`, the CLI for Intents and Assignments (`holyagent help [command]`):\n\n1. `assignment dispatch --input \'<json>\'` (or stdin) writes the brief and prints agent, model, effort (or warm agent) and its two-line prompt. Use it as printed; never open or re-emit the brief. A brief that names a plugin file gives its literal absolute path under the plugin folder, the directory above `scripts/` in the CLI path above; plugin-path variables resolve only in agent and skill text.\n2. Run it as `agent()` in an inline workflow script (one Assignment is a one-entry workflow), or in the background without Workflow. A hook records a spawn; otherwise or on SendMessage, run `assignment record <id> --agent <agentId>` (`--failed` on launch failure).\n3. On notice, pass the report verbatim, never retyped or summarized: `assignment close <id> --outcome <o> < <report-file>`; add `--accept "<rationale>"` when its evidence holds.\n\nSend gaps via SendMessage and close again; workflow agents need a `followUpOf` draft.\n\nStart work together. After root work, respond to completion, submitted input or a supported bounded wait timeout. Use workflow notices; no polling, steering, scheduled check-ins or wait loops. A timeout does not guarantee cache reuse; a wake changing nothing gets one short line.\n\nStop a running agent or workflow (TaskStop) only for conflicting new requirements or information; let it finish if finishing and repairing costs less than stopping and relaunching. Close the stopped Assignment with `--outcome stopped`.\n\nAfter resume or compaction, `reconcile` is in context: close a Running Assignment as `interrupted` only when its agent is confirmed gone (SendMessage or transcript; an exited parent session proves nothing).\n';
+var dispatch_default = '`holyagent-cli <command>` means `bun --no-env-file --config="${CLAUDE_PLUGIN_ROOT}/scripts/empty-bunfig.toml" "${CLAUDE_PLUGIN_ROOT}/scripts/holyagent-cli.js" <command>`. Read TOON help for typed flags. The CLI runs without prompts. Use AskUserQuestion for user decisions.\n\n1. Run `assignment dispatch` with typed flags or `--id <id>` for Ready work. Use the returned agent, model and effort or warm agent. Pass the `prompt` value verbatim. Keep the brief out of context. Name plugin files by literal absolute path from the directory above `scripts/`.\n2. Run it as `agent()` in an inline workflow script (one Assignment is a one-entry workflow), or in the background without Workflow. A hook records a spawn; otherwise or on SendMessage, run `assignment record <id> --agent <agentId>` (`--failed` on launch failure).\n3. Run `assignment close <id> --outcome <o> --report-file <path>` with the original file. Save notice-only reports verbatim. Add `--accept "<rationale>"` when evidence holds.\n\nSend gaps via SendMessage and close again; workflow agents need a draft with `--follow-up-of`.\n\nAfter root work, respond to completion, submitted input or a supported bounded wait timeout. Use notices with no polling, steering, scheduled check-ins or wait loops. A timeout does not guarantee cache reuse. A wake changing nothing gets one short line.\n\nUse TaskStop only for conflicting new requirements or information. Let work finish when repairing is cheaper than stopping and relaunching. Close stopped work with `--outcome stopped`.\n\nAfter resume or compaction, use `reconcile`. Close as `interrupted` when the agent is confirmed gone through SendMessage or transcript. An exited parent session proves nothing.\n';
 var init_dispatch = () => {};
 
 var identity_default = `# HolyAgent root
@@ -22054,7 +22272,7 @@ Own the user relationship, material decisions, acceptance, version control and c
 - Never force-push or push to the base, default or a protected branch without the user's approval. The base is the branch the conventions or the user name as the work's target, else the default branch. Creating and pushing a convention-named base absent remotely is not such a push; pushing commits to an existing base is.
 - Never work on a branch the platform assigns; a branch the user named as the work branch is not one. Before the first commit, check \`git branch --show-current\`; on an assigned branch, first create the conventional branch in a worktree (\`git worktree add -b <name> <path> <start>\`, per plan), then commit and push only there. If refused, stop, report the blocker and ask via AskUserQuestion to push to the assigned branch; it is never a default, so park the push when the user is away.
 - After an explicit user denial, stop that line of work. After an automatic tool rejection, report the exact blocked effect and existing authorization; ask for fresh scoped approval when it can resolve the block. Retry only after the required approval is obtained and any host restriction is resolved. Never work around an unresolved denial through another tool, script, or link. If the host rejects a retry, stop and report the exact tool payload and reason.
-- Claude Code: commit with \`holyagent vcs commit\`; use Git and \`gh\` for branches, pushes, merges and CI.
+- Claude Code: commit with \`holyagent-cli vcs commit\`; use Git and \`gh\` for branches, pushes, merges and CI.
 - Reply on threads only when the request or repository workflow authorizes it.
 - Merging, publishing, deploying, credentials, security settings, third-party messages and destructive steps need user approval; a branch name or stack grants none.
 `;
@@ -22091,7 +22309,7 @@ var init_root_core = __esm(() => {
 var history_rules_default = "- Never bypass hooks or signing (`--no-verify`, `--no-gpg-sign`, `-c commit.gpgsign=false`) unless the user asks, because they carry the repository's checks.\n- Amend only your own unpushed commit; never `rebase -i`, `reset --hard` or amend a published or another author's commit without the user's approval, since others build on that history.\n";
 var init_history_rules = () => {};
 
-var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
+var state_changes_default = "## Leave state changes to the root\n\nLeave to the root every command that changes git, GitHub or holyagent-cli state (`git commit`, `branch`, `push`, `checkout`, `stash`, `merge`, `reset`, `gh` writes, and `holyagent-cli vcs`, `assignment` and `intent` commands) and anything under `.git/` or `.holyagent/`. The root owns the branch, PR and state records and records your changed paths from the report; a stray write corrupts the shared tree, and nothing blocks one, so it rests on you. When you need such a change, say so in the report. Read-only commands are open: `git status`, `diff`, `log`, `show`, `blame`, `fetch`, and `holyagent-cli status`, `plan`, `assignment show` and `assignment list`. Never change HEAD, a branch, the index or the working tree of a checkout other workers share with git commands (`switch`, `restore`, `clean`, `add`, `rebase`, `cherry-pick`): they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the scratchpad. To undo your own edit, edit the file back.\n";
 var init_state_changes = () => {};
 
 var setupNotice = (env, cwd) => {
@@ -22478,7 +22696,7 @@ var init_report2 = __esm(() => {
   init_report();
 });
 
-var session_cloud_identity_default = "This session runs on claude.ai. Its git committer is the platform's Claude, and the signature that makes branch commits Verified belongs to that committer, so leave the committer alone. Commits still need the user as author, set once per clone from the GitHub connector: call `get_me` (`mcp__github__get_me`), then run `holyagent vcs identity --name '<name>' --email \"<id>+<login>@users.noreply.github.com\"` with the name, id and login it returns (the login when the name is empty). Single-quote the name and write each single quote inside it as `'\\''`: a name with `$`, a backtick or a double quote breaks double quotes. The command writes `author.name` and `author.email` to the clone's local git config, never to a file of the repository. `holyagent vcs commit` refuses a commit whose author is missing or is the agent's. The no-attribution rule covers the author and the commit text; the Claude committer is the one exception.\n";
+var session_cloud_identity_default = "This session runs on claude.ai. Its git committer is the platform's Claude, and the signature that makes branch commits Verified belongs to that committer, so leave the committer alone. Commits still need the user as author, set once per clone from the GitHub connector: call `get_me` (`mcp__github__get_me`), then run `holyagent-cli vcs identity --name '<name>' --email \"<id>+<login>@users.noreply.github.com\"` with the name, id and login it returns (the login when the name is empty). Single-quote the name and write each single quote inside it as `'\\''`: a name with `$`, a backtick or a double quote breaks double quotes. The command writes `author.name` and `author.email` to the clone's local git config, never to a file of the repository. `holyagent-cli vcs commit` refuses a commit whose author is missing or is the agent's. The no-attribution rule covers the author and the commit text; the Claude committer is the one exception.\n";
 var init_session_cloud_identity = () => {};
 
 var session_reminder_default = `Rules most often missed that the core root rules leave out, restated at every session start:
@@ -22510,7 +22728,7 @@ var CONTEXT_BUDGET = 9400, SESSION_REMINDER, ROOT_TAKEOVER = "The default, user-
   ...core === undefined ? [] : [core],
   ...cloud === undefined ? [] : [cloud],
   ...notice === undefined ? [] : [notice],
-  `This project holds the legacy state folder ${folders.map((name) => `\`${name}/\``).join(" and ")} and no \`.holyagent/\`. Run \`holyagent migrate --dry-run\` to preview the conversion, then \`holyagent migrate\` to convert it; there are no Intents or Assignments to read until then.`,
+  `This project holds the legacy state folder ${folders.map((name) => `\`${name}/\``).join(" and ")} and no \`.holyagent/\`. Run \`holyagent-cli migrate --dry-run\` to preview the conversion, then \`holyagent-cli migrate\` to convert it; there are no Intents or Assignments to read until then.`,
   SESSION_REMINDER
 ].join(`
 
@@ -22529,7 +22747,7 @@ var CONTEXT_BUDGET = 9400, SESSION_REMINDER, ROOT_TAKEOVER = "The default, user-
     requirements: intent.requirements.slice(0, shown)
   }),
   ...shown < intent.requirements.length ? [
-    `+${intent.requirements.length - shown} more requirements; run \`holyagent intent show\` for all of them`
+    `+${intent.requirements.length - shown} more requirements; run \`holyagent-cli intent show\` for all of them`
   ] : []
 ].join(`
 `), sessionContext = (status, core, reconcile, intent, cloud, notice) => {
@@ -29764,13 +29982,13 @@ var init_hook = __esm(() => {
   HAND_BACK = {
     AgentMismatch: "The wrong agent was launched: dispatch the Assignment again with the printed agent.",
     StateFolderMissing: "Run the command from the project that holds the Assignment.",
-    InvalidTransition: "Check the Assignment with `holyagent assignment show`; it is not Running.",
-    UnknownRecord: "Check the id with `holyagent assignment list --all`."
+    InvalidTransition: "Check the Assignment with `holyagent-cli assignment show`; it is not Running.",
+    UnknownRecord: "Check the id with `holyagent-cli assignment list --all`."
   };
   SPECIALIST_RULES = state_changes_default.trim();
   HISTORY_RULES = history_rules_default.trim().split(`
 `).map((line) => line.replace(/^- /, "")).join(" ");
-  VCS_REMINDER = `Version control is the root's: it commits with \`holyagent vcs commit\`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. ${HISTORY_RULES}`;
+  VCS_REMINDER = `Version control is the root's: it commits with \`holyagent-cli vcs commit\`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. ${HISTORY_RULES}`;
   MENTIONS_VCS_WRITE = /git[\s\S]*(?:commit|push)|\bvcs\s+(?:commit|pr)\b/i;
   commentPrefix = gen2(function* () {
     const configured = (yield* fileSetting("core.commentString")) ?? (yield* fileSetting("core.commentChar"));
@@ -29778,7 +29996,7 @@ var init_hook = __esm(() => {
   });
   INLINE_INPUTS = new Set(["script", "args"]);
   HOOK_COMMANDS = [
-    hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user, and one line when the primary checkout is on a detached HEAD or on a branch other than the one it started on), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
+    hook("session-start", "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user, and one line when the primary checkout is on a detached HEAD or on a branch other than the one it started on), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent-cli migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing", (payload, call) => {
       const core = rootCore(payload, call);
       const cloud = inCloudSession(call.env) ? CLOUD_IDENTITY : undefined;
       return gen2(function* () {
@@ -29810,7 +30028,7 @@ var init_hook = __esm(() => {
         hookEventName: "SessionStart",
         additionalContext: [
           bareContext(core, cloud),
-          `holyagent: the project state could not be read (${describeFailure(error).tag}), so no status is shown. Run \`holyagent status\` to see the error.`
+          `holyagent: the project state could not be read (${describeFailure(error).tag}), so no status is shown. Run \`holyagent-cli status\` to see the error.`
         ].join(`
 
 `)
@@ -29844,7 +30062,7 @@ var init_hook = __esm(() => {
         return postToolUse(`holyagent: recorded agent ${agentId} for ${id}.`);
       }).pipe(catch_2((error) => {
         const { tag } = describeFailure(error);
-        const next = HAND_BACK[tag] ?? `Run \`holyagent assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`;
+        const next = HAND_BACK[tag] ?? `Run \`holyagent-cli assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`;
         return succeed6(postToolUse(`holyagent: could not record the launch of ${id} (${tag}). ${next}`));
       }));
     }, true),
@@ -29949,8 +30167,8 @@ var init_migrate2 = __esm(() => {
   ];
 });
 
-var init_errors9 = __esm(() => {
-  init_errors7();
+var init_errors10 = __esm(() => {
+  init_errors8();
 });
 
 var init_report3 = () => {};
@@ -31498,7 +31716,7 @@ var init_setup2 = __esm(() => {
   init_dist();
   init_capabilities3();
   init_directive2();
-  init_errors9();
+  init_errors10();
   init_form2();
   init_report3();
   init_scope2();
@@ -31750,12 +31968,26 @@ var ToolMissing, visibleBytes = (bytes, previous, final) => {
     }).pipe(andThen2(done ? void_3 : suspend2(() => read(output.pending))));
   }));
   return read(0);
+}, FD_EXEC, runsExternalCommand = (tool, args) => {
+  const separator = args.indexOf("--");
+  const options = separator < 0 ? args : args.slice(0, separator);
+  return options.some((arg) => tool === "rg" ? arg === "--pre" || arg.startsWith("--pre=") : /^--exec(?:-batch)?(?:=|$)/.test(arg) || FD_EXEC.test(arg));
 }, runTool = (options) => gen2(function* () {
+  if (options.agent && runsExternalCommand(options.tool, options.args))
+    return yield* new Usage({
+      message: `${options.tool} cannot run a user-supplied subprocess through holyagent-cli`,
+      hint: `Pass search arguments to holyagent-cli ${options.tool}.`
+    });
   const found = yield* locateTool(options.tool, options.cwd, (command, whichOptions) => sync2(() => findCommand(options.env, command, whichOptions)));
   if (isNone2(found))
     return yield* new ToolMissing({ tool: options.tool });
   const path = found.value;
   const env = { ...definedEnv2(options.env), NO_COLOR: "1", FORCE_COLOR: "0", CLICOLOR_FORCE: "0" };
+  if (options.agent) {
+    const args = options.tool === "rg" ? ["--no-config", ...options.args] : options.args;
+    const result = yield* spawn(path, args, { cwd: options.cwd, env });
+    return new Verbatim(new TextDecoder().decode(result.stdout), result.stderr, result.code);
+  }
   const child = yield* try_2(() => Bun.spawn([path, ...options.args], {
     cwd: options.cwd,
     env,
@@ -31768,7 +32000,7 @@ var ToolMissing, visibleBytes = (bytes, previous, final) => {
     forward(child.stdout, process.stdout),
     forward(child.stderr, process.stderr)
   ], { concurrency: "unbounded" }).pipe(ensuring2(sync2(() => child.kill())));
-  return code;
+  return new Verbatim("", "", code);
 }), toolCommand = (tool, summary) => ({
   path: [tool],
   usage: `${tool} <${SEARCH_TOOLS[tool].title} arguments\u2026>`,
@@ -31782,19 +32014,28 @@ var ToolMissing, visibleBytes = (bytes, previous, final) => {
   raw: true,
   passthrough: true,
   positionals: 0,
-  run: (call) => runTool({ tool, args: call.args.positionals, cwd: call.cwd, env: call.env }).pipe(map5((code) => new Verbatim("", "", code)))
+  run: (call) => runTool({
+    tool,
+    args: call.args.positionals,
+    cwd: call.cwd,
+    env: call.env,
+    agent: call.surface === "agent"
+  })
 }), TOOL_COMMANDS;
 var init_tools2 = __esm(() => {
+  init_process();
   init_dist();
   init_environment3();
   init_search_tools2();
   init_shell2();
+  init_errors4();
   ToolMissing = class ToolMissing extends TaggedError2("ToolMissing") {
     get message() {
       const { title, commands } = SEARCH_TOOLS[this.tool];
       return `${title} (${commands.join(" or ")}) is not on PATH; ${installAdvice}`;
     }
   };
+  FD_EXEC = /^-[HIusigFalLp0q1hV]*[xX]/;
   TOOL_COMMANDS = [
     toolCommand("rg", "Search file contents with the ripgrep installed on this machine; runs it with your arguments"),
     toolCommand("fd", "Find files and folders by name with the fd installed on this machine (fdfind on Debian and Ubuntu); runs it with your arguments")
@@ -31830,7 +32071,7 @@ var init_commands2 = __esm(() => {
 var nowIso2, readReport = (host) => host.stdin.pipe(filterOrFail2((text) => text.trim() !== "", () => new StdinMissing({ reason: "stdin was empty" }))), LITERAL_RUN, compact = (message) => message.replace(LITERAL_RUN, (run) => {
   const choices = run.split(" | ");
   return `${choices.slice(0, 3).join(" | ")} | \u2026 (${choices.length} choices)`;
-}), payloadOf = (host, inline) => gen2(function* () {
+}), invalidInput = (source, error) => new InvalidDraft({ message: compact(`${source}: ${error.message}`) }), decodeInputValueBy = (raw, pick, source) => decodeUnknownEffect2(pick(raw), { onExcessProperty: "error" })(raw).pipe(mapError2((error) => invalidInput(source, error))), decodeJsonInputBy = (text, pick, source) => decodeUnknownEffect2(fromJsonString2(Unknown2))(text).pipe(mapError2((error) => invalidInput(source, error)), flatMap2((raw) => decodeInputValueBy(raw, pick, source))), payloadOf = (host, inline) => gen2(function* () {
   if (inline === undefined)
     return { source: "stdin", text: yield* readReport(host) };
   if (inline.trim() === "")
@@ -31841,25 +32082,105 @@ var nowIso2, readReport = (host) => host.stdin.pipe(filterOrFail2((text) => text
   return { source: "--input", text: inline };
 }), readInputBy = (host, pick, inline) => gen2(function* () {
   const { source, text } = yield* payloadOf(host, inline);
-  const invalid = (error) => new InvalidDraft({ message: compact(`${source}: ${error.message}`) });
-  const raw = yield* decodeUnknownEffect2(fromJsonString2(Unknown2))(text).pipe(mapError2(invalid));
-  return yield* decodeUnknownEffect2(pick(raw), { onExcessProperty: "error" })(raw).pipe(mapError2(invalid));
-}), readInput = (host, schema, inline) => readInputBy(host, () => schema, inline);
+  return yield* decodeJsonInputBy(text, pick, source);
+});
 var init_context2 = __esm(() => {
   init_dist();
-  init_errors8();
+  init_errors9();
   init_errors4();
   nowIso2 = currentTimeMillis2.pipe(map5((millis) => new Date(millis).toISOString()));
   LITERAL_RUN = /(?:"[^"]*" \| ){4,}"[^"]*"/g;
 });
 
+var RELEASE, VERSION_RESPONSE, REGISTRY = "https://registry.npmjs.org/", USAGE = "update [--version <0.x.y>] [--dry-run]", failure = (message, result) => {
+  const details = result?.stderr.trim() || result?.stdout.trim();
+  return new Verbatim("", details ? `${message}
+${details}
+` : `${message}
+`, 1);
+}, updateInstallation, PUBLIC_MAINTENANCE_COMMANDS;
+var init_public_maintenance = __esm(() => {
+  init_dist();
+  init_package();
+  init_environment3();
+  init_pi_check2();
+  init_shell2();
+  init_args();
+  RELEASE = String6.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
+  VERSION_RESPONSE = fromJsonString2(RELEASE);
+  updateInstallation = fn2("updateInstallation")(function* (env, requested, dryRun) {
+    const target = requested === undefined ? undefined : yield* choiceFlag(RELEASE, "version", requested, USAGE);
+    const shell = yield* Shell;
+    if (isNone2(yield* shell.which("npm")))
+      return failure("npm was not found. Install Node.js and reopen your terminal.");
+    if (isNone2(yield* shell.which("pi")))
+      return failure("Pi was not found. Install the Pi backend from the HolyAgent quickstart.");
+    const cwd = homeDirectory2(env);
+    const [settings] = piSettingsFiles(env, cwd);
+    const sources = yield* piSettingsSources(settings);
+    if (sources.some((source) => isHolyagentSource(source) && parseNpmSource(source) === undefined))
+      return failure("Pi is loading HolyAgent from Git or a local path. Remove that source before switching to npm with the HolyAgent quickstart.");
+    const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
+    if (selected.exitCode !== 0)
+      return failure("Could not resolve the HolyAgent release on npm.", selected);
+    const decoded = yield* decodeUnknownEffect2(VERSION_RESPONSE)(selected.stdout).pipe(option2);
+    if (isNone2(decoded) || target !== undefined && decoded.value !== target)
+      return failure("npm did not return the requested stable HolyAgent version.");
+    const version2 = decoded.value;
+    if (Bun.semver.order(version2, version) < 0)
+      return failure(`HolyAgent ${version2} is older than the running version ${version}.`);
+    if (dryRun)
+      return new Verbatim(`Would install HolyAgent ${version2} in Pi and on the npm global PATH.
+`, "", 0);
+    const source = `holyagent@${version2}`;
+    const pi = yield* shell.run("pi", ["install", `npm:${source}`], {
+      cwd,
+      env: {
+        PI_CODING_AGENT_DIR: piAgentDirectory(env),
+        npm_config_registry: REGISTRY,
+        npm_config_ignore_scripts: "true"
+      }
+    });
+    if (pi.exitCode !== 0)
+      return failure("The Pi backend update failed. The global commands were left in place.", pi);
+    const npm = yield* shell.run("npm", ["install", "-g", "--ignore-scripts", "--legacy-peer-deps", "--registry", REGISTRY, source], { cwd });
+    if (npm.exitCode !== 0)
+      return failure(`Pi has HolyAgent ${version2}. The global command update failed. Retry with holyagent update --version ${version2}.`, npm);
+    return new Verbatim(`Installed HolyAgent ${version2} in Pi and on the npm global PATH. Restart T3 Code to load it.
+`, "", 0);
+  });
+  PUBLIC_MAINTENANCE_COMMANDS = [
+    {
+      path: ["update"],
+      usage: USAGE,
+      summary: "Update the Pi package and the global HolyAgent commands together",
+      notes: [
+        "Uses the latest stable release unless --version names a published version.",
+        "Use --dry-run to check the target version without installing it."
+      ],
+      flags: { version: "string", "dry-run": "boolean" },
+      stateless: true,
+      positionals: 0,
+      run: ({ args, env }) => updateInstallation(env, stringFlag(args, "version"), booleanFlag(args, "dry-run")).pipe(provide4(shellLive(env)))
+    }
+  ];
+});
+
+import { constants as constants6, fstatSync } from "fs";
+import { open as open8, stat as stat7 } from "fs/promises";
+import { resolve as resolve12 } from "path";
 var encodeRecord = (value) => encode2(value, {
   replacer: (_key, item) => typeof item === "string" && /[\u007f-\u009f]/.test(item) ? rawString(`"${escapeString(item)}"`) : item
 }).replace(/[\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`), renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
 ${plainText(output.label)}:
 ${plainText(output.text)}
 ` : `${encodeRecord(output)}
-`, forWords = (command, words) => command.forHost === undefined ? command : { ...command, ...command.forHost(words) }, help = (command, words) => {
+`, toon = (output, code = 0) => ({
+  stdout: `${encodeRecord(output)}
+`,
+  stderr: "",
+  code
+}), forWords = (command, words) => command.forHost === undefined ? command : { ...command, ...command.forHost(words) }, help = (command, words) => {
   const { usage, summary, input, output, notes, flags } = forWords(command, words);
   return [
     `${usage}  ${summary}`,
@@ -31868,84 +32189,214 @@ ${plainText(output.text)}
     ...(notes ?? []).map((note) => `note: ${note}`)
   ].join(`
 `);
-}, listed = (host) => COMMANDS.filter((command) => command.hosts === undefined || command.hosts.includes(host)), topHelp = (host, words) => [
-  "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
-  "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure.",
-  ...listed(host).map((command) => {
+}, publicSetupCommands, install, publicCommands, agentCommands, commandsFor = (surface) => surface === "agent" ? agentCommands : surface === "public" ? publicCommands : COMMANDS, listed = (commands, host) => commands.filter((command) => command.hosts === undefined || command.hosts.includes(host)), topHelp = (commands, words, surface) => [
+  ...surface === "public" ? ["Manage your HolyAgent installation for T3 Code.", "Run holyagent <command> [options]."] : [
+    "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
+    "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure."
+  ],
+  ...commands.map((command) => {
     const { usage, summary } = forWords(command, words);
     return `${usage}  ${summary}`;
   }),
   "Run holyagent help [command] for details."
 ].join(`
-`), callFor = (args, host, emit, command) => gen2(function* () {
+`), agentCommandHelp = (entry, words, detailed) => {
+  const command = forWords(entry, words);
+  const path = command.path.join(" ");
+  const flags = agentInputHelp(command.path);
+  const usage = flags?.usage ?? command.usage;
+  const search = command.path[0] === "rg" || command.path[0] === "fd";
+  const output = search ? "One TOON document with exitCode, stdout and stderr." : path === "assignment dispatch" ? "One TOON document. Use the decoded prompt field as the specialist prompt." : command.output;
+  const notes = search ? ["Uses the installed search program and its exit code. It does not read stdin."] : path === "assignment reports" ? [
+    "Pass the path of a regular workflow journal or supported session file.",
+    "The returned paths can be passed as --report-file to assignment close.",
+    ...words.reportsNote === undefined ? [] : [words.reportsNote]
+  ] : flags?.notes ?? command.notes;
+  const summary = path === "assignment close" ? "Finish an Assignment using the specialist's report file and optionally accept its evidence" : path === "assignment accept" ? "Accept an Assignment using its stored report or a corrected report file" : command.summary;
+  return {
+    usage,
+    summary,
+    ...detailed && output !== undefined ? { output } : {},
+    ...detailed && notes !== undefined ? { notes: notes.map(agentCommandNames) } : {}
+  };
+}, agentCommandNames = (text) => text.replaceAll(/(`|Usage: )holyagent (?=[a-z-])/g, (prefix) => prefix.replace("holyagent", "holyagent-cli")), showHelp = (commands, agent, surface, path = []) => {
+  const words = wordsFor(agent);
+  if (surface === "agent") {
+    return toon({
+      usage: path.length === 0 ? "holyagent-cli <command> [flags]" : `holyagent-cli ${path.join(" ")} --help`,
+      commands: commands.map((command) => agentCommandHelp(command, words, path.length > 0)),
+      ...path.length === 0 ? {
+        notes: [
+          "Run holyagent-cli help <command> for its flags.",
+          "Give --project <dir> before the command to select a different working directory.",
+          "Exit codes: 2 for invalid input, 3 for refused operations, 4 for state or I/O errors."
+        ]
+      } : {}
+    });
+  }
+  const output = path.length === 0 ? topHelp(commands, words, surface) : commands.map((command) => help(command, words)).join(`
+`);
+  return { stdout: `${output}
+`, stderr: "", code: 0 };
+}, agentReportError = (path) => new Usage({
+  message: `Could not read a nonempty regular report file at ${path}`,
+  hint: "Pass a readable file with --report-file."
+}), aliasesStdin = (file) => try_2({ try: () => fstatSync(0), catch: () => {
+  return;
+} }).pipe(map5((stdin) => stdin.isFile() && stdin.dev === file.dev && stdin.ino === file.ino), orElseSucceed2(() => false)), readAgentReport = (path) => gen2(function* () {
+  const fail = () => agentReportError(path);
+  const file = yield* tryPromise2({ try: () => stat7(path), catch: fail });
+  if (!file.isFile() || (yield* aliasesStdin(file)))
+    return yield* fail();
+  return yield* acquireUseRelease2(tryPromise2({
+    try: () => open8(path, constants6.O_RDONLY | constants6.O_NONBLOCK),
+    catch: fail
+  }), (handle) => gen2(function* () {
+    const opened = yield* tryPromise2({ try: () => handle.stat(), catch: fail });
+    if (!opened.isFile() || (yield* aliasesStdin(opened)))
+      return yield* fail();
+    const contents = yield* tryPromise2({
+      try: () => handle.readFile("utf8"),
+      catch: fail
+    });
+    if (contents.trim() === "")
+      return yield* fail();
+    return contents;
+  }), (handle) => tryPromise2(() => handle.close()).pipe(ignore2));
+}), missingReport, callFor = (args, host, emit, command, surface, input, report) => gen2(function* () {
   const { root, directory, resolved } = command.stateless === true ? { root: host.cwd, directory: stateDirectory(host.cwd), resolved: undefined } : yield* resolveState(host.cwd, host.env, command.core === true ? "peek" : typeof command.state === "function" ? command.state(args) : command.state ?? "ifPresent", command.core !== true && command.path[0] !== "hook");
   const inline = stringFlag(args, INPUT_FLAG);
+  const inputBy = (pick) => {
+    if (surface !== "agent")
+      return readInputBy(host, pick, inline);
+    if (input !== undefined)
+      return decodeInputValueBy(input, pick, "flags");
+    return report === undefined ? missingReport : decodeJsonInputBy(report, pick, "--report-file");
+  };
   return {
     args,
+    surface,
     cwd: host.cwd,
     env: host.env,
     root,
     directory,
     update: (transition) => updateState(directory, transition, host.env, undefined, resolved),
     config: loadConfig2(host.env, root),
-    text: readReport(host),
+    text: surface === "agent" ? report === undefined ? missingReport : succeed6(report) : readReport(host),
     emit,
     vcs: host.vcs ?? vcsLive(root, host.env),
-    terminal: host.terminal,
-    t3Workflow: host.t3Workflow ?? false,
+    terminal: surface === "agent" ? undefined : host.terminal,
+    t3Workflow: surface === "public" || (host.t3Workflow ?? false),
     setupTui: host.setupTui,
-    input: (schema) => readInput(host, schema, inline),
-    inputBy: (pick) => readInputBy(host, pick, inline)
+    input: (schema) => inputBy(() => schema),
+    inputBy
   };
-}), hostForText = (env) => agentHostOf(env).pipe(orElseSucceed2(() => "claude")), asFlag = (argv) => argv[0] === "help" ? argv.length === 1 ? ["--help"] : [...argv.slice(1), "--help"] : argv, execute = (given, host) => gen2(function* () {
-  const argv = asFlag(given);
+}), hostForText = (env) => agentHostOf(env).pipe(orElseSucceed2(() => "claude")), asFlag = (argv) => argv[0] === "help" ? argv.length === 1 ? ["--help"] : [...argv.slice(1), "--help"] : argv, isHelp = (arg) => arg === "--help" || arg === "-h", requestsHelp = (args) => args.slice(0, args.indexOf("--") < 0 ? args.length : args.indexOf("--")).some(isHelp), noninteractiveEnvironment = (env) => ({
+  ...env,
+  NO_COLOR: "1",
+  FORCE_COLOR: "0",
+  CLICOLOR_FORCE: "0",
+  GIT_TERMINAL_PROMPT: "0",
+  GIT_ASKPASS: "",
+  GIT_EDITOR: "false",
+  GCM_INTERACTIVE: "never",
+  GH_PROMPT_DISABLED: "1",
+  SSH_ASKPASS_REQUIRE: "never"
+}), projectContext = (given, host, surface) => gen2(function* () {
+  if (surface === "host")
+    return { argv: given, host };
+  const { directory, rest } = projectOf(given);
+  if (given[0] !== PI_PROJECT_FLAG)
+    return { argv: given, host };
+  if (directory === undefined || directory.trim() === "" || directory.startsWith("--"))
+    return yield* new Usage({
+      message: "Missing project directory",
+      hint: `Give a directory after ${PI_PROJECT_FLAG}.`
+    });
+  const cwd = resolve12(host.cwd, directory);
+  const location = yield* tryPromise2({
+    try: () => stat7(cwd),
+    catch: (cause) => new StateIo({ path: cwd, cause })
+  });
+  if (!location.isDirectory())
+    return yield* new Usage({
+      message: `Project is not a directory: ${cwd}`,
+      hint: `Give a directory after ${PI_PROJECT_FLAG}.`
+    });
+  return { argv: rest, host: { ...host, cwd } };
+}), execute = (given, initialHost, surface) => gen2(function* () {
+  const { argv: projectArgs, host } = yield* projectContext(given, initialHost, surface);
+  const argv = asFlag(projectArgs);
   const [first] = argv;
-  if (first === undefined || first === "--help" || first === "-h") {
+  const commands = commandsFor(surface);
+  if (first === undefined || isHelp(first)) {
     const agent = yield* hostForText(host.env);
-    return { stdout: `${topHelp(agent, wordsFor(agent))}
+    return showHelp(listed(commands, agent), agent, surface);
+  }
+  if (first === "--version" || first === "-v") {
+    if (surface === "agent" && argv.length > 1)
+      return yield* new Usage({
+        message: "The version flag takes no arguments",
+        hint: "Run holyagent-cli --version."
+      });
+    return surface === "agent" ? toon({ version }) : { stdout: `${version}
 `, stderr: "", code: 0 };
   }
-  if (first === "--version")
-    return { stdout: `${version}
-`, stderr: "", code: 0 };
-  const command = COMMANDS.find((candidate) => candidate.path.every((word, index) => argv[index] === word));
+  const command = commands.find((candidate) => candidate.path.every((word, index) => argv[index] === word));
   if (command === undefined) {
-    const group = COMMANDS.filter((candidate) => candidate.path[0] === first);
-    if (group.length > 0 && (argv.length === 1 || argv.includes("--help") || argv.includes("-h"))) {
+    const group = commands.filter((candidate) => candidate.path[0] === first);
+    if (group.length > 0 && (argv.length === 1 || (surface === "agent" ? argv.length === 2 && isHelp(argv[1]) : requestsHelp(argv)))) {
       const agent = yield* hostForText(host.env);
-      const words = wordsFor(agent);
-      const shown = listed(agent).filter((candidate) => group.includes(candidate));
-      return {
-        stdout: `${shown.map((entry) => help(entry, words)).join(`
-`)}
-`,
-        stderr: "",
-        code: 0
-      };
+      return showHelp(listed(group, agent), agent, surface, [first]);
     }
+    const program = surface === "agent" ? "holyagent-cli" : "holyagent";
     return yield* new Usage({
       message: `Unknown command ${argv.slice(0, 2).join(" ")}`,
-      hint: group.length > 0 ? `Run \`holyagent ${first} --help\` for its commands.` : "Run `holyagent --help` for the commands."
+      hint: group.length > 0 ? `Run \`${program} ${first} --help\` for its commands.` : `Run \`${program} --help\` for the commands.`
     });
   }
-  const rest = argv.slice(command.path.length);
-  if (command.passthrough !== true && (rest.includes("--help") || rest.includes("-h"))) {
+  const provided = argv.slice(command.path.length);
+  if ((surface === "agent" || command.passthrough !== true) && requestsHelp(provided)) {
     const agent = yield* hostForText(host.env);
-    return { stdout: `${help(command, wordsFor(agent))}
-`, stderr: "", code: 0 };
+    return showHelp([command], agent, surface, command.path);
   }
-  const args = command.raw === true ? { positionals: rest, flags: {} } : yield* parseArgs(rest, command.flags, command.usage);
+  const adapted = surface === "agent" ? yield* adaptAgentInput(command.path, provided) : undefined;
+  const rest = adapted?.argv ?? provided;
+  const usage = surface === "agent" ? agentInputHelp(command.path)?.usage ?? command.usage : command.usage;
+  const args = command.raw === true ? { positionals: rest, flags: {} } : yield* parseArgs(rest, command.flags, usage);
   const count = args.positionals.length;
   if (command.raw !== true && count !== command.positionals && !(command.optional && count === command.positionals - 1))
     return yield* new Usage({
       message: `Expected ${command.positionals} argument(s), got ${count}`,
-      hint: `Usage: holyagent ${command.usage}`
+      hint: `Usage: holyagent ${usage}`
     });
   const emitted = [];
-  const write = host.emit ?? ((text) => sync2(() => void emitted.push(text)));
+  const capture = (text) => sync2(() => void emitted.push(text));
+  const write = surface === "agent" ? capture : host.emit ?? capture;
   const emit = (text) => write(plainText(text));
-  const call = yield* callFor(args, host, emit, command);
+  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve12(host.cwd, adapted.reportFile));
+  if (surface === "agent" && command.path.join(" ") === "assignment reports") {
+    const path = resolve12(host.cwd, args.positionals[0] ?? "");
+    const source = yield* tryPromise2(() => stat7(path)).pipe(orElseSucceed2(() => {
+      return;
+    }));
+    if (source !== undefined && (yield* aliasesStdin(source)))
+      return yield* agentReportError(path);
+  }
+  if (report !== undefined && args.flags["report-json"] === true)
+    yield* decodeJsonInputBy(report, () => Unknown2, "--report-file");
+  const call = yield* callFor(args, host, emit, command, surface, adapted?.input, report);
   const output = yield* command.run(call).pipe(provideService2(WorkTree, call.root));
+  if (surface === "agent") {
+    const stdout = emitted.join("");
+    if (output instanceof Verbatim)
+      return toon({ exitCode: output.code, stdout: `${stdout}${output.stdout}`, stderr: output.stderr }, output.code);
+    if (output instanceof Streamed)
+      return toon({ exitCode: output.code, stdout, stderr: "" }, output.code);
+    if (output instanceof WithTrailer)
+      return toon({ ...output.fields, [output.label]: output.text });
+    return toon(output);
+  }
   if (output instanceof Verbatim)
     return {
       stdout: plainText(output.stdout),
@@ -31956,46 +32407,93 @@ ${plainText(output.text)}
     return { stdout: emitted.join(""), stderr: "", code: output.code };
   const stdout = renderRecord(output);
   return { stdout, stderr: "", code: 0 };
-}), failed4 = (error, env) => hostForText(env).pipe(map5((agent) => {
+}), agentHint = (tag, hint) => {
+  if (tag === "StdinMissing")
+    return "Pass a readable file with --report-file.";
+  if (tag === "InvalidDraft")
+    return "Check the typed flags in the command's --help. Unknown fields are refused.";
+  if (tag === "InsufficientAcceptance")
+    return "Save the corrected specialist report to a regular file and pass it with --report-file to assignment close or assignment accept.";
+  return agentCommandNames(hint);
+}, failed4 = (error, env, surface) => hostForText(env).pipe(map5((agent) => {
   const { tag, message, hint, code } = describeFailure(error, wordsFor(agent));
+  if (surface === "agent")
+    return toon({ error: { tag, message, hint: agentHint(tag, hint), code } }, code);
+  if (surface === "public")
+    return { stdout: "", stderr: `Error: ${message}
+${hint}
+`, code };
   return { stdout: "", stderr: `error: ${tag}: ${message}
 hint: ${hint}
 `, code };
-})), run2 = (argv, host) => execute(argv, host).pipe(catch_2((error) => failed4(error, host.env)), catchCause2((cause) => failed4({ _tag: "Defect", message: pretty(cause) }, host.env)));
+})), run2 = (argv, host, surface = "host") => execute(argv, surface === "agent" ? { ...host, env: noninteractiveEnvironment(host.env) } : host, surface).pipe(catch_2((error) => failed4(error, host.env, surface)), catchCause2((cause) => failed4({ _tag: "Defect", message: pretty(cause) }, host.env, surface)));
 var init_program = __esm(() => {
   init_dist2();
   init_dist();
   init_package();
   init_host2();
+  init_errors7();
   init_layout2();
   init_local2();
   init_store2();
   init_tree2();
   init_live();
+  init_agent_input();
   init_args();
   init_commands2();
   init_config();
   init_context2();
   init_errors4();
+  init_public_maintenance();
+  init_setup2();
+  publicSetupCommands = SETUP_COMMANDS.map((command) => {
+    const { "subagent-cache-ttl": _claudeOnly, ...flags } = command.flags;
+    return {
+      ...command,
+      flags,
+      usage: command.usage.replace(" [--subagent-cache-ttl 1h|5m]", ""),
+      notes: command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []
+    };
+  });
+  install = publicSetupCommands.find((command) => command.path[0] === "setup");
+  publicCommands = [
+    ...install === undefined ? [] : [
+      {
+        ...install,
+        path: ["install"],
+        usage: install.usage.replace(/^setup\b/, "install"),
+        summary: "Set up the HolyAgent installation for T3 Code"
+      }
+    ],
+    ...publicSetupCommands,
+    ...PUBLIC_MAINTENANCE_COMMANDS
+  ];
+  agentCommands = COMMANDS.filter(({ path: [group] }) => group !== "setup" && group !== "doctor" && group !== "hook" && group !== "browser-server");
+  missingReport = fail5(new StdinMissing({ reason: "no report file was given" }));
 });
 
 var exports_entry = {};
 __export(exports_entry, {
   main: () => main
 });
-var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write2 = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause))), main = (interactiveSetup = false) => runPromise2(run2(Bun.argv.slice(2), {
-  cwd: process.cwd(),
-  env: process.env,
-  stdin,
-  emit: (text) => write2(process.stdout, text),
-  ...interactiveSetup ? {
-    t3Workflow: true,
-    terminal: {
-      stdin: Boolean(process.stdin.isTTY),
-      stdout: Boolean(process.stdout.isTTY)
-    }
-  } : {}
-}).pipe(tap2((result) => write2(process.stdout, result.stdout).pipe(andThen2(write2(process.stderr, result.stderr)), andThen2(sync2(() => void (process.exitCode = result.code)))))));
+var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write2 = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause))), main = (interactiveSetup = false, surface = "host") => runPromise2(gen2(function* () {
+  const result = yield* run2(Bun.argv.slice(2), {
+    cwd: process.cwd(),
+    env: process.env,
+    stdin: surface === "agent" ? fail5(new StdinMissing({ reason: "stdin is unavailable" })) : stdin,
+    ...surface === "agent" ? {} : { emit: (text) => write2(process.stdout, text) },
+    ...interactiveSetup ? {
+      t3Workflow: true,
+      terminal: {
+        stdin: Boolean(process.stdin.isTTY),
+        stdout: Boolean(process.stdout.isTTY)
+      }
+    } : {}
+  }, surface);
+  yield* write2(process.stdout, result.stdout);
+  yield* write2(process.stderr, result.stderr);
+  process.exitCode = result.code;
+}));
 var init_entry = __esm(() => {
   init_dist();
   init_files2();
@@ -32018,11 +32516,7 @@ init_errors4();
 
 init_load();
 
-init_errors5();
-
-var PI_PROJECT_FLAG = "--project";
-var projectOf = (args) => args[0] === PI_PROJECT_FLAG && args[1] !== undefined ? { directory: args[1], rest: args.slice(2) } : { directory: undefined, rest: args };
-
+init_errors7();
 var PI_CONFIG_COMMAND = "config";
 var failureResult = (error) => {
   const { tag, message, hint, code } = describeFailure(error);

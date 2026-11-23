@@ -1,6 +1,6 @@
 ## Version control
 
-Version control and state records are yours alone: specialists share one tree, so an unplanned commit, checkout or state edit can affect other Assignments. Use plain Git for commits and `holyagent vcs pr` for pull requests. If a specialist report or `git status` shows an unexpected write, inspect it before proceeding.
+Version control and state records are yours alone: specialists share one tree, so an unplanned commit, checkout or state edit can affect other Assignments. Use plain Git for commits and `holyagent-cli vcs pr` for pull requests. If a specialist report or `git status` shows an unexpected write, inspect it before proceeding.
 
 ### Commit and PR text
 

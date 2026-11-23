@@ -33,26 +33,129 @@ test("TOON escapes terminal controls without changing nested records, keys or ta
   expect(trailer).not.toMatch(/[\u007f-\u009f]/)
 })
 
-test("public and internal Pi entries keep CLI results and stdin compatible", async () => {
+test("the public entry keeps the private Pi config protocol and agent commands out of its surface", async () => {
   root = await fixture("holyagent-pi-entries-")
   const env = { ...process.env, HOME: root, HOLYAGENT_HOST: "pi" }
-  const entries = ["pi-entry.ts", "pi-public-entry.ts"].map((name) =>
-    join(import.meta.dir, "../src/hooks", name),
-  )
-  for (const argv of [["--version"], ["config", join(root, ".holyagent")], ["intent", "create"]]) {
-    const results = entries.map((entry) =>
-      Bun.spawnSync([process.execPath, entry, ...argv], {
-        cwd: root,
-        env,
-        stdin: new TextEncoder().encode("{}"),
-      }),
-    )
-    expect(results[0]?.exitCode).not.toBeNull()
-    expect(results[1]?.exitCode).not.toBeNull()
-    expect(results[0]?.exitCode).toBe(results[1]?.exitCode)
-    expect(results[0]?.stdout.toString()).toBe(results[1]?.stdout.toString())
-    expect(results[0]?.stderr.toString()).toBe(results[1]?.stderr.toString())
+  const launch = (entry: string, ...argv: string[]) =>
+    Bun.spawnSync([process.execPath, join(import.meta.dir, "../src/hooks", entry), ...argv], {
+      cwd: root,
+      env,
+      stdin: "ignore",
+    })
+  const hostConfig = launch("pi-entry.ts", "config", join(root, ".holyagent"))
+  expect(hostConfig.exitCode).toBe(0)
+  expect(JSON.parse(hostConfig.stdout.toString())).toBeObject()
+
+  const help = launch("pi-public-entry.ts", "--help")
+  expect(help.exitCode).toBe(0)
+  expect(help.stdout.toString()).toContain("Manage your HolyAgent installation for T3 Code")
+  expect(help.stdout.toString()).toContain("update")
+  expect(help.stdout.toString()).not.toContain("assignment dispatch")
+  const setupHelp = launch("pi-public-entry.ts", "setup", "-h")
+  expect(setupHelp.stdout.toString()).toContain("interactive screen")
+  expect(setupHelp.stdout.toString()).not.toContain("internal Claude")
+  const publicVersion = launch("pi-public-entry.ts", "-v")
+  expect(publicVersion.exitCode).toBe(0)
+  expect(publicVersion.stdout.toString()).toMatch(/^\d+\.\d+\.\d+\n$/)
+  for (const argv of [["config"], ["intent", "create"]]) {
+    const refused = launch("pi-public-entry.ts", ...argv)
+    expect(refused.exitCode).toBe(2)
+    expect(refused.stdout.toString()).toBe("")
+    expect(refused.stderr.toString()).toStartWith("Error: Unknown command")
   }
+}, 60_000)
+
+test("the agent program emits one TOON document for help, version, errors and a prompt trailer", async () => {
+  root = await fixture("holyagent-agent-output-")
+  const cli = (...argv: string[]) =>
+    Effect.runPromise(
+      run(
+        argv,
+        {
+          cwd: root,
+          env: { HOLYAGENT_HOST: "pi", FORCE_COLOR: "3", HOME: root },
+          stdin: Effect.die("agent command must not read stdin"),
+          terminal: { stdin: true, stdout: true },
+        },
+        "agent",
+      ),
+    )
+  const help = await cli("-h")
+  expect(help).toEqual(await cli("--help"))
+  expect(decode(help.stdout)).toMatchObject({ usage: "holyagent-cli <command> [flags]" })
+  for (const group of [["intent"], ["assignment", "dispatch"], ["rg"], ["fd"]]) {
+    const short = await cli(...group, "-h")
+    expect(short).toEqual(await cli(...group, "--help"))
+    expect(decode(short.stdout)).toMatchObject({ usage: `holyagent-cli ${group.join(" ")} --help` })
+    expect(short.stderr).toBe("")
+    expect(short.code).toBe(0)
+  }
+  const version = await cli("-v")
+  expect(version).toEqual(await cli("--version"))
+  expect(decode(version.stdout)).toMatchObject({
+    version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
+  })
+  for (const argv of [
+    ["setup", "-h"],
+    ["update", "-h"],
+    ["hook", "session-start"],
+    ["intent", "create"],
+    ["intent", "create", "--input\u001b[31m", "{}"],
+  ]) {
+    const failed = await cli(...argv)
+    expect(failed.code).toBe(2)
+    expect(failed.stderr).toBe("")
+    expect(failed.stdout).not.toContain("\u001b")
+    expect(decode(failed.stdout)).toMatchObject({ error: { tag: "Usage", code: 2 } })
+  }
+  const created = await cli("intent", "create", "--objective", "One document")
+  expect(created.code).toBe(0)
+  const dispatched = await cli(
+    "assignment",
+    "dispatch",
+    "--role-task",
+    "Reviewer.code",
+    "--objective",
+    "Read the brief",
+    "--criterion",
+    "blocking:behavior:Read the output",
+  )
+  expect(dispatched.code).toBe(0)
+  expect(dispatched.stderr).toBe("")
+  expect(decode(dispatched.stdout)).toMatchObject({
+    id: expect.stringMatching(/^assignment-/),
+    state: "Running",
+    prompt: expect.stringMatching(/^Role: Reviewer\.code[^\n]+\nRead the brief at /),
+  })
+  expect(dispatched.stdout).not.toContain("\nprompt:\n")
+}, 60_000)
+
+test("the installed Pi runtime keeps Claude authorship out even with inherited Claude variables", async () => {
+  root = await fixture("holyagent-pi-agent-host-")
+  const git = (args: string[]) => Bun.spawnSync(["git", ...args], { cwd: root }).exitCode
+  expect(git(["init", "-q"])).toBe(0)
+  const entry = join(import.meta.dir, "../src/hooks/pi-agent-entry.ts")
+  const child = Bun.spawnSync(
+    [
+      process.execPath,
+      entry,
+      "vcs",
+      "identity",
+      "--name",
+      "Test Fixture",
+      "--email",
+      "fixture@example.com",
+    ],
+    {
+      cwd: root,
+      env: { ...process.env, HOME: root, HOLYAGENT_HOST: "claude", CLAUDE_CODE_REMOTE: "true" },
+      stdin: "ignore",
+    },
+  )
+  expect(child.exitCode).toBe(3)
+  expect(child.stderr.toString()).toBe("")
+  expect(decode(child.stdout.toString())).toMatchObject({ error: { tag: "Unauthorized", code: 3 } })
+  expect(git(["config", "--local", "--get", "author.name"])).toBe(1)
 }, 60_000)
 
 test.skipIf(process.platform === "win32" || Bun.which("script") === null)(

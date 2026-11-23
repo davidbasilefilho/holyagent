@@ -123,13 +123,17 @@ const EXISTING_COVERAGE = {
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",
     },
-    "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
+    "R-SEARCH": {
+      section: "root/search.md",
+      phrase: "Search file contents with `holyagent-cli rg`",
+    },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
-    "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch --input '<json>'`" },
+    "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
+    "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
     "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
     "R-WAIT": { section: "root/dispatch.md", phrase: "A timeout does not guarantee cache reuse" },
-    "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
+    "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
     "R-WAKE": {
       section: "root/dispatch.md",
       phrase: "respond to completion, submitted input or a supported bounded wait timeout",
@@ -146,7 +150,7 @@ const EXISTING_COVERAGE = {
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
     "R-VISUAL": {
       section: "skills/visual-judging/SKILL.md",
       phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
@@ -185,7 +189,7 @@ const EXISTING_COVERAGE = {
     },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
-      phrase: "set the mode with `holyagent state mode <mode>`",
+      phrase: "set the mode with `holyagent-cli state mode <mode>`",
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",
@@ -464,7 +468,7 @@ const EXISTING_COVERAGE = {
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
     "R-LEAN": {
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",
@@ -488,8 +492,9 @@ const EXISTING_COVERAGE = {
     "R-CTX-READ": { section: "root/context.md", phrase: "Read only what a decision needs" },
     "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
+    "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
-    "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
+    "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
     "R-WAKE": {
       section: "root/dispatch.md",
       phrase: "respond to completion, submitted input or a supported bounded wait timeout",
@@ -721,7 +726,7 @@ const EXISTING_COVERAGE = {
     },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
-      phrase: "set the mode with `holyagent state mode <mode>`",
+      phrase: "set the mode with `holyagent-cli state mode <mode>`",
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",
@@ -833,7 +838,7 @@ const EXISTING_COVERAGE = {
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
     "R-LEAN": {
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",
@@ -857,8 +862,9 @@ const EXISTING_COVERAGE = {
     "R-CTX-READ": { section: "root/context.md", phrase: "Read only what a decision needs" },
     "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
+    "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
-    "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
+    "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
     "R-WAKE": {
       section: "root/dispatch.md",
       phrase: "respond to completion, submitted input or a supported bounded wait timeout",
@@ -1090,7 +1096,7 @@ const EXISTING_COVERAGE = {
     },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
-      phrase: "set the mode with `holyagent state mode <mode>`",
+      phrase: "set the mode with `holyagent-cli state mode <mode>`",
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",

@@ -7,7 +7,10 @@ import gpt62Reminder from "../instructions/gpt-6.2/session-reminder.md" with { t
 import gptReminder from "../instructions/gpt-6/session-reminder.md" with { type: "text" }
 import kimiReminder from "../instructions/kimi-k3.1/session-reminder.md" with { type: "text" }
 import { stripCitations } from "../instructions/skills.ts"
+import { fillPackageRoot } from "../pi/bun-flags.ts"
 import { piRootSection } from "../pi/root-prompt.ts"
+
+export { PI_ROOT_PLACEHOLDER } from "../pi/bun-flags.ts"
 
 /**
  * What a Pi session is for, which decides the context it gets at start: `root` is the default
@@ -25,12 +28,6 @@ export const DEFAULT_PI_ROLE: PiRole = "root"
 
 /** The schema of a role, for decoding the value of the launch flag. */
 export const PiRoleSchema = Schema.Literals(PI_ROLES)
-
-/**
- * The placeholder of the root text for the absolute path of the installed Pi package, which holds
- * `scripts/holyagent`. Whoever delivers the text fills it in.
- */
-export const PI_ROOT_PLACEHOLDER = "${HOLYAGENT_PI_ROOT}"
 
 const defaultFamily: PiFamily = "kimi-k3.1"
 
@@ -52,15 +49,15 @@ const reminders: Readonly<Record<PiFamily, string>> = {
   "gpt-6.2": stripCitations(gpt62Reminder).trim(),
 }
 
-/** The Kimi root’s core rules, with {@link PI_ROOT_PLACEHOLDER} unfilled. */
+/** The Kimi root’s core rules, with the package-root placeholder unfilled. */
 export const PI_ROOT_CORE: string = coreOf(defaultFamily)
 
 /** The Kimi reminder restated with a root or session role’s context. */
 export const PI_SESSION_REMINDER: string = reminders[defaultFamily]
 
-/** The family’s core rules with {@link PI_ROOT_PLACEHOLDER} replaced by `piRoot`. */
+/** The family’s core rules with its installed agent CLI command and paths filled in. */
 export const piRootCore = (piRoot: string, family: PiFamily = defaultFamily): string =>
-  coreOf(family).replaceAll(PI_ROOT_PLACEHOLDER, () => piRoot)
+  fillPackageRoot(coreOf(family), piRoot)
 
 /**
  * What the CLI printed for a status or reconcile call, as the context builders read it: the decoded

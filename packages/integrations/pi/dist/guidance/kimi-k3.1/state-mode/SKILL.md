@@ -6,7 +6,7 @@ description: "Use before a clone's first Intent to choose where state lives, and
 
 # State mode
 
-Once per clone, before the first Intent, set the mode with `holyagent state mode <mode>` (the `holyagent` wrapper, through bash); bare, it reads the mode (unset is `branch`). A mode moves no records, so change it only while the clone holds none.
+Once per clone, before the first Intent, set the mode with `holyagent-cli state mode <mode>` through bash. Without a mode argument, it reads the mode (unset is `branch`). A mode moves no records, so change it only while the clone holds none.
 
 Take the first signal that applies, in this order:
 

@@ -1,6 +1,6 @@
 ## Version control
 
-Version control and state records are yours alone: specialists share one tree, so a stray commit, checkout or state edit corrupts the others' work. Use `git commit` for commits and `holyagent vcs pr` for pull requests. Nothing blocks a raw git or gh write or an edit under `.git/` or `.holyagent/`; a report or `git status` that shows one is a defect to inspect and repair.
+Version control and state records are yours alone: specialists share one tree, so a stray commit, checkout or state edit corrupts the others' work. Use `git commit` for commits and `holyagent-cli vcs pr` for pull requests. Nothing blocks a raw git or gh write or an edit under `.git/` or `.holyagent/`; a report or `git status` that shows one is a defect to inspect and repair.
 
 ### Commit and PR text
 
