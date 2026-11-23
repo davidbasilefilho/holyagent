@@ -5,7 +5,7 @@
   "roleTask": "Reviewer.code",
   "slug": "determine-whether-a-normal-protected-pr",
   "objective": "Determine whether a normal protected PR can promote 0.3.4 after the main and dev branches diverged, while preserving the main publication repair.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [
     "Read-only review of PR 138, release policy, and Git ancestry."
   ],
@@ -29,7 +29,25 @@
     "agentId": "promotion_review",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-23T10:46:24.679Z"
+    "startedAt": "2026-11-23T10:46:24.679Z",
+    "finishedAt": "2026-11-23T10:47:43.512Z"
+  },
+  "result": "result: The existing promotion is blocked by conflicts and strict ancestry.\nchanged: none\nchecks: GitHub PR 138 DIRTY and CONFLICTING. Git rev-list main...dev reports 1 and 1.\nblockers: Existing dev squashes do not retain main ancestry.\nquestions: none\nnotes: main already documents release integration branches. Use the protected 0.3.4 integration branch and retain all checks if the transition is used. Creating the branch from unmodified main risks an old-version prerelease.\nevidence:\nIdentify a protected promotion path or the exact preventing rule: GitHub active rulesets 26614767 and 27644379, current main 460f9453 and dev 1f8547a1. Existing active integration ruleset 26614707.\ngit-and-github-evidence: https://github.com/davidbasilefilho/holyagent/pull/138 and https://github.com/davidbasilefilho/holyagent/actions/runs/42867538660\n",
+  "acceptance": {
+    "revision": 1,
+    "rationale": "Confirmed strict ancestry, current protection and the already protected legacy integration path.",
+    "criteria": [
+      {
+        "criterion": "Identify a protected promotion path or the exact preventing rule",
+        "support": "GitHub active rulesets 26614767 and 27644379, current main 460f9453 and dev 1f8547a1. Existing active integration ruleset 26614707."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "git-and-github-evidence",
+        "support": "https://github.com/davidbasilefilho/holyagent/pull/138 and https://github.com/davidbasilefilho/holyagent/actions/runs/42867538660"
+      }
+    ]
   },
   "createdAt": "2026-11-23T10:46:24.679Z"
 }
