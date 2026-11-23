@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwt5kpub-yjyq",
+  "intentId": "intent-0mwt545nb-kix4",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "separate-named-public-and-agent-cli",
+  "objective": "Separate named public and agent CLI entry points, with mutually appropriate commands and valid TOON-only automation results.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "The packed public and internal commands have different help and behavior",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Agent success, help, version, trailers and failures decode as TOON",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/entry.ts",
+    "packages/runtime/src/hooks/pi-public-entry.ts",
+    "packages/runtime/src/hooks/pi-agent-entry.ts",
+    "packages/integrations/pi/src/generate.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-23T10:58:48.660Z"
+  },
+  "createdAt": "2026-11-23T10:58:48.660Z"
+}
