@@ -5,7 +5,7 @@
   "roleTask": "Worker.implementation",
   "slug": "update-generated-agent-guidance-to-use",
   "objective": "Update generated agent guidance to use holyagent-cli and its typed flags and preserve distinct user setup instructions.",
-  "state": "Running",
+  "state": "Succeeded",
   "scope": [],
   "constraints": [],
   "criteria": [
@@ -32,7 +32,9 @@
     "agentId": "cli_guidance",
     "model": "sonnet",
     "effort": "high",
-    "startedAt": "2026-11-23T10:58:49.582Z"
+    "startedAt": "2026-11-23T10:58:49.582Z",
+    "finishedAt": "2026-11-23T11:29:56.844Z"
   },
+  "result": "result: Updated instructions, documentation and host wiring for the internal CLI.\nchanged: The four instruction families, integration entry paths and tests.\nchecks: 428 instruction and Pi integration tests and 14 Claude-focused tests passed.\nblockers: None.\nquestions: None.\nnotes: Private host protocols retain their existing transport.\nevidence:\nAgent guidance teaches the internal executable and typed flags with valid structured results: All families use the isolated CLI and explicit report paths.\nRequirements coverage and T3-only user setup guidance are preserved: The focused requirements and prompt tests passed.\n",
   "createdAt": "2026-11-23T10:58:49.582Z"
 }
