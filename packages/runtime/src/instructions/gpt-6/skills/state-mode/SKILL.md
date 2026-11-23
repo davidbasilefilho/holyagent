@@ -1,6 +1,6 @@
 ---
 name: state-mode
-description: "Use before a clone's first Intent, to choose where holyagent state lives."
+description: "Use before a clone's first Intent to choose where state lives, and on resume or before state changes for durable handoff."
 ---
 
 # State mode
@@ -14,3 +14,7 @@ Take the first signal that applies, in this order:
 3. `work` when `git ls-files .holyagent ':!.holyagent/config.json'` lists files: `vcs commit` stages changed state files with the work.
 4. `local`, likewise, when CONTRIBUTING, AGENTS.md or CLAUDE.md ask for independent PRs from the base.
 5. `branch` otherwise: state lives on `holyagent/state` in one shared worktree, committed by every command. Work branches never carry it: keep it out of work merges and settle a diverged one with plain Git there.
+
+## Handoff durability
+
+In branch state mode, push `holyagent/state` after each Assignment close and merge and before turn end, even without a source push. After each merge, on a new blocker and before the final response, replace the current status and open-items requirement in the Intent in place: include merged and open PRs and CI, the next concrete action, residuals and untried real-service checks. Write enough for a different harness to resume. The shared handoff command reads recorded state without changing it.

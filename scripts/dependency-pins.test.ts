@@ -4,6 +4,7 @@ import {
   caretRange,
   EXACT_PACKAGES,
   isExactPin,
+  MAJOR_CAP,
   newestAllowedRelease,
   newestPypiRelease,
   newestRelease,
@@ -92,6 +93,8 @@ describe("nextRange", () => {
     ["^1.0.0", "4.0.6", "^4.0.0"],
     ["^4.0.0", "4.2.0", "^4.0.0"],
     ["^0.5.0", "0.6.1", "^0.6.0"],
+    ["^2.3.1", "2.4.1", "^2.0.0"],
+    ["^3.2.1", "2.4.1", "^3.0.0"],
   ])("moves %s up to the line of %s", (current, release, range) => {
     expect(nextRange(current, release)).toBe(range)
   })
@@ -110,18 +113,38 @@ describe("nextRange", () => {
 })
 
 describe("exact package pins", () => {
-  test("just-bash is the one exact pin, and only a stable exact version counts", () => {
-    expect(EXACT_PACKAGES).toEqual(["just-bash"])
-    expect(isExactPin("just-bash", "3.6.0")).toBe(true)
+  test("no registry package is an exact pin, and only a stable exact version would count", () => {
+    expect(EXACT_PACKAGES).toEqual([])
+    expect(isExactPin("just-bash", "3.6.0")).toBe(false)
     expect(isExactPin("just-bash", "^3.0.0")).toBe(false)
     expect(isExactPin("just-bash", "3.6.0-rc.1")).toBe(false)
     expect(isExactPin("effect", "4.0.1")).toBe(false)
   })
 
-  test("an exact pin moves to the exact release, never down, and the rest to a caret range", () => {
-    expect(nextPackageRange("just-bash", "3.6.0", "3.7.1")).toBe("3.7.1")
-    expect(nextPackageRange("just-bash", "3.6.0", "3.5.0")).toBe("3.6.0")
-    expect(nextPackageRange("just-bash", "^3.0.0", "3.6.0")).toBe("3.6.0")
+  test("every dependency moves to a caret range, never down, just-bash included", () => {
+    expect(nextPackageRange("just-bash", "3.6.0", "3.6.1")).toBe("^3.0.0")
+    expect(nextPackageRange("just-bash", "^3.0.0", "3.6.0")).toBe("^3.0.0")
+    expect(nextPackageRange("just-bash", "^4.0.0", "3.7.1")).toBe("^4.0.0")
+    expect(nextPackageRange("effect", "^4.0.0", "4.2.0")).toBe("^4.0.0")
+  })
+})
+
+describe("MAJOR_CAP", () => {
+  test("solid-js is the one capped package, held at major 1", () => {
+    expect(MAJOR_CAP).toEqual({ "solid-js": 1 })
+  })
+
+  test("a capped package already on a higher line moves down to the capped line", () => {
+    // The registry release is already capped to the newest 1.x, so the caret range of it is ^1.0.0.
+    expect(nextPackageRange("solid-js", "^2.0.0", "1.9.19")).toBe("^1.0.0")
+  })
+
+  test("a capped package within the line keeps the never-down rule", () => {
+    expect(nextPackageRange("solid-js", "^1.0.0", "1.9.19")).toBe("^1.0.0")
+    expect(nextPackageRange("solid-js", "^0.9.0", "1.9.19")).toBe("^1.0.0")
+  })
+
+  test("an uncapped package is unaffected by the cap table", () => {
     expect(nextPackageRange("effect", "^4.0.0", "4.2.0")).toBe("^4.0.0")
   })
 })
@@ -250,6 +273,34 @@ describe("package dependencies", () => {
       { field: "devDependencies", name: "typebox", range: "*" },
       { field: "peerDependencies", name: "other", range: "*" },
     ])
+  })
+
+  test("updates catalog entries but keeps refs, aliases and narrower peer contracts", () => {
+    const manifest = {
+      dependencies: { x: "catalog:", typed: "catalog:tools", alias: "npm:target@^2.0.0" },
+      peerDependencies: { only: "~1.7.16", union: "^1.0.0 || ^2.0.0", beta: "^0.5.0-beta" },
+      catalog: { x: "^1.0.0" },
+      workspaces: { packages: ["packages/*"], catalogs: { tools: { typed: "^0.5.0" } } },
+      overrides: { other: { ".": "$other", x: "^1.0.0" } },
+    }
+    const ranges = packageDependencies(manifest)
+    expect(ranges).toEqual([
+      { field: "overrides", path: ["other"], name: "x", range: "^1.0.0" },
+      { field: "catalog", name: "x", range: "^1.0.0" },
+      { field: "workspaces", path: ["catalogs", "tools"], name: "typed", range: "^0.5.0" },
+    ])
+    expect(
+      withPackageRanges(
+        manifest,
+        ranges.map((use) => ({ ...use, range: "^3.0.0" })),
+      ),
+    ).toEqual({
+      ...manifest,
+      catalog: { x: "^3.0.0" },
+      workspaces: { packages: ["packages/*"], catalogs: { tools: { typed: "^3.0.0" } } },
+      overrides: { other: { ".": "$other", x: "^3.0.0" } },
+    })
+    expect(manifest.catalog.x).toBe("^1.0.0")
   })
 
   test("sets ranges by field and name and keeps the rest", () => {

@@ -1,0 +1,8 @@
+---
+name: documentation-lookup
+description: Use when a task needs library documentation; resolve the relevant library and version, retrieve focused references, and report sources and gaps.
+---
+
+# Library documentation lookup
+
+Honor the user's selected provider and check the project dependency version. Use primary documentation when available. Context7 is one option: where the `ctx7` CLI is available, run `ctx7 library <name> "<question>"`, select the matching library and version, then `ctx7 docs <library-id> "<question>"`. Verify the result against the primary source and task. Cite sources and versions and report gaps or unavailable tools; do not invent documentation. When a shell is unavailable, use available research tools or primary documentation.

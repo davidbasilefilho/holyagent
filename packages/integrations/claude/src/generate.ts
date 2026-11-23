@@ -4,7 +4,11 @@ import { Effect } from "effect"
 
 import { bundleModule } from "../../../runtime/src/bundle.ts"
 import { ROUTES } from "../../../runtime/src/domain/route.ts"
-import { DESIGN_CORE_PATH, skillFiles } from "../../../runtime/src/instructions/skills.ts"
+import {
+  DESIGN_CORE_PATH,
+  skillFiles,
+  validateOwnedGuidance,
+} from "../../../runtime/src/instructions/skills.ts"
 import { bundleSetupTui } from "../../../runtime/src/setup/tui/build.ts"
 import { TUI_BUNDLE, TUI_SOURCE } from "../../../runtime/src/setup/tui/files.ts"
 import packageJson from "../package.json" with { type: "json" }
@@ -206,10 +210,13 @@ export const DESIGN_CORE_FILE = `${INSTRUCTIONS_DIRECTORY}/${DESIGN_CORE_PATH}`
 
 /** The skills of the Claude family, from the runtime's shared skill generator. */
 const skills = async (): Promise<ReadonlyArray<GeneratedFile>> =>
-  (await Effect.runPromise(skillFiles("claude-5.5", generatedNote))).map(({ path, content }) => ({
-    path: inPlugin(`skills/${path}`),
-    content,
-  }))
+  Effect.runPromise(skillFiles("claude-5.5", generatedNote)).then((files) => {
+    validateOwnedGuidance(files)
+    return files.map(({ path, content }) => ({
+      path: inPlugin(`guidance/claude-5.5/${path}`),
+      content,
+    }))
+  })
 
 /** The CLI as one file for Bun, bundled the way every generated runtime is. */
 const bundle = (): Promise<string> =>

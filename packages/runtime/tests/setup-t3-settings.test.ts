@@ -90,6 +90,7 @@ const runSetup = (
     env?: Record<string, string>
     scope?: "user" | "project" | "local"
     dryRun?: boolean
+    t3Workflow?: boolean
     undo?: boolean
     shell?: ReturnType<typeof fakeShell>
   } = {},
@@ -101,13 +102,14 @@ const runSetup = (
       subagentCacheTtl: "1h",
       dryRun: extra.dryRun ?? false,
       skipCtx7: true,
+      t3Workflow: extra.t3Workflow ?? false,
       undo: extra.undo ?? false,
     }).pipe(Effect.provide((extra.shell ?? withPi()).layer)),
   )
 
-const runDoctor = (extraEnv: Record<string, string> = {}) =>
+const runDoctor = (extraEnv: Record<string, string> = {}, t3Workflow = false) =>
   Effect.runPromise(
-    doctor(env(extraEnv), { fix: false, cwd: project, scope: "user" }).pipe(
+    doctor(env(extraEnv), { fix: false, cwd: project, scope: "user", t3Workflow }).pipe(
       Effect.provide(withPi().layer),
     ),
   )
@@ -698,7 +700,11 @@ describe("holyagent doctor, T3 Code settings", () => {
     await write(settingsFile(), rest)
     const line = t3Lines(await runDoctor())[0] ?? ""
     expect(line).toContain("lacks branchNamingMode, branchNameInstructions;")
-    await write(settingsFile(), { ...rest, branchNamingMode: "static", branchNameInstructions: "" })
+    await write(settingsFile(), {
+      ...rest,
+      branchNamingMode: "static",
+      branchNameInstructions: "",
+    })
     expect(t3Lines(await runDoctor())[0]).toStartWith("ok   t3 settings")
   })
 
@@ -734,5 +740,45 @@ describe("holyagent doctor, T3 Code settings", () => {
     expect(report.lines.join("\n")).not.toMatch(
       /client settings|contextWindowMeter|followUpBehavior/i,
     )
+  })
+})
+
+describe("the supported T3 Code onboarding", () => {
+  test("directs users to initialize T3 Code before setup writes any config", async () => {
+    await machine({ t3: false })
+    const result = await runSetup({ t3Workflow: true })
+    expect(result.ok).toBe(false)
+    expect(result.lines.join("\n")).toContain("open T3 Code once")
+    expect(await exists(settingsFile())).toBe(false)
+    const doctorReport = await runDoctor({}, true)
+    expect(doctorReport.ok).toBe(false)
+    expect(doctorReport.lines.join("\n")).toContain("open T3 Code once")
+  })
+
+  test("setup enables Pi and doctor verifies it without reading or changing Claude settings", async () => {
+    await machine()
+    const claude = join(home, ".claude", "settings.json")
+    await write(claude, "[1]")
+    const before = await runDoctor({}, true)
+    expect(before.ok).toBe(false)
+    expect(before.lines.join("\n")).toContain("Pi provider is not enabled")
+    const configured = await runSetup({ t3Workflow: true })
+    expect(configured.ok).toBe(true)
+    expect(await read(settingsFile())).toMatchObject(PROVIDER)
+    expect(await readText(claude)).toBe("[1]")
+    const after = await runDoctor({}, true)
+    expect(after.ok).toBe(true)
+    expect(after.lines.join("\n")).toContain("holds the settings HolyAgent writes")
+    expect(after.lines.join("\n")).not.toContain(claude)
+  })
+
+  test("doctor reports a disabled provider without overwriting the user's choice", async () => {
+    await machine()
+    const disabled = { providerInstances: { pi: { driver: "pi", enabled: false } } }
+    await write(settingsFile(), disabled)
+    const report = await runDoctor({}, true)
+    expect(report.ok).toBe(false)
+    expect(report.lines.join("\n")).toContain("Pi provider is not enabled")
+    expect(await read(settingsFile())).toEqual(disabled)
   })
 })

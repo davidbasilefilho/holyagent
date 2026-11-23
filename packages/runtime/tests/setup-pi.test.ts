@@ -56,6 +56,7 @@ afterEach(() => remove())
 const DEFAULT = await Effect.runPromise(defaultConfig)
 const DEFAULT_SOURCES = piPackages(DEFAULT)
 const SOURCE = `git:github.com/davidbasilefilho/holyagent@holyagent-${version}`
+const NPM_SOURCE = `npm:holyagent@${version}`
 const PI_INSTALL = `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_HOST_VERSION}`
 
 const write = async (file: string, content: unknown) => {
@@ -158,7 +159,7 @@ describe("holyagent doctor, Pi checks", () => {
       expect(piLines(report)).toEqual([
         `FAIL pi: not found on PATH; install Pi with \`${PI_INSTALL}\` (Node.js ${PI_MINIMUM_NODE} or newer), or with the official installer (https://pi.dev)`,
         `FAIL node: not found on PATH; install Node.js ${PI_MINIMUM_NODE} or newer (https://nodejs.org)`,
-        `FAIL pi package: not in the packages of ${globalSettings()}; install it with \`pi install ${SOURCE}\``,
+        `FAIL pi package: not in the packages of ${globalSettings()}; install it with \`pi install ${NPM_SOURCE}\``,
         `FAIL pi base package pi-provider-kimi-code: not listed at ${DEFAULT_SOURCES[0]} in the packages of ${globalSettings()}; install it with \`pi install ${DEFAULT_SOURCES[0]}\`, or re-run \`holyagent setup\``,
         FORM_OK,
         // The default provider is Kimi, so a capability of the Codex provider is not listed.
@@ -268,7 +269,7 @@ describe("holyagent doctor, Pi checks", () => {
     const user = await check(shellWith())
     expect(user.ok).toBe(false)
     expect(piLines(user)[2]).toBe(
-      `FAIL pi package: not in the packages of ${globalSettings()}; install it with \`pi install ${SOURCE}\``,
+      `FAIL pi package: not in the packages of ${globalSettings()}; install it with \`pi install ${NPM_SOURCE}\``,
     )
     expect(piLines(user).filter((line) => line.startsWith("FAIL pi "))).toHaveLength(
       DEFAULT_SOURCES.length + 1,

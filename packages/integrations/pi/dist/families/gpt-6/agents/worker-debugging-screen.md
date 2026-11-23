@@ -162,3 +162,7 @@ This text owns the severity of those findings. A finding blocks only when the ch
 - leaves a duplicate that already disagrees with its original.
 
 Every other finding is optional, as is anything already on the base.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- library documentation is needed: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/documentation-lookup/SKILL.md`

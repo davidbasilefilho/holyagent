@@ -1,11 +1,9 @@
 [tools]
 # ctx7 runs on Node.
 node = "lts"
-# The toolchain is Bun's builtin `bun check`, `bun lint` and `bun fmt`, which exist only in canary
-# builds, and mise cannot install bun@canary. mise installs the stable base and the postinstall hook
-# below upgrades it to canary; the `toolchain` task, which every gate depends on, fails on a
-# non-canary Bun and names the fix.
+# Bun remains the runtime, package manager and test runner.
 bun = "1.4.4"
+hk = "2.13.0"
 # The search tools behind `holyagent rg` and `holyagent fd`, which HolyAgent does not bundle. The
 # aqua backend is named so that mise installs the upstream release assets, with the checksum the aqua
 # registry records for them where it records one; the bare names would pick a backend by mise's own
@@ -13,19 +11,7 @@ bun = "1.4.4"
 "aqua:BurntSushi/ripgrep" = "15.2.0"
 "aqua:sharkdp/fd" = "10.5.2"
 
-[hooks]
-# Runs after `mise install` (also on `mise use` and the automatic install before `mise run`), with
-# the mise-installed Bun first on PATH. Idempotent: a canary Bun is left alone. BUN_OPTIONS is unset
-# for the upgrade because Bun reads its flags (e.g. --smol) as package names and refuses. The
-# commands are Bun scripts, not shell text, so they run the same under sh and cmd (native Windows).
-postinstall = "bun scripts/toolchain.ts upgrade"
-
-# mise tasks are the single source of truth for commands. package.json scripts and lefthook only
-# delegate here, and `--no-script` makes Bun run its own tool instead of the same-named script.
-
-[tasks.toolchain]
-description = "Fail unless Bun is a canary build"
-run = "bun scripts/toolchain.ts check"
+# Package scripts and hk delegate to these tasks. Tools resolve from the frozen lockfile.
 
 [tasks.prepare]
 description = "Install the git hooks (skipped outside a git work tree, e.g. a `git archive` export)"
@@ -33,28 +19,23 @@ run = "bun scripts/prepare.ts"
 
 [tasks.check]
 description = "Type-check the repository"
-depends = ["toolchain"]
-run = "bun check --no-script"
+run = "bunx --no-install tsrs --noEmit"
 
 [tasks.lint]
 description = "Lint the repository with type-aware rules, without fixing"
-depends = ["toolchain"]
-run = "bun lint --no-script"
+run = "bunx --no-install oxlint"
 
 [tasks."lint:fix"]
-description = "Lint the repository and write fixes (extra arguments go to bun lint, e.g. --staged)"
-depends = ["toolchain"]
-run = "bun lint --no-script --fix"
+description = "Lint the repository and write fixes (extra arguments go to Oxlint)"
+run = "bunx --no-install oxlint --fix"
 
 [tasks.fmt]
-description = "Format the repository in place (extra arguments go to bun fmt, e.g. --staged)"
-depends = ["toolchain"]
-run = "bun fmt --no-script"
+description = "Format the repository in place (extra arguments go to Oxfmt)"
+run = "bunx --no-install oxfmt"
 
 [tasks."fmt:check"]
 description = "Check formatting without writing"
-depends = ["toolchain"]
-run = "bun fmt --no-script --check"
+run = "bunx --no-install oxfmt --check"
 
 [tasks.test]
 description = "Run the test suite"

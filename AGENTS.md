@@ -8,17 +8,17 @@ Rules for working in this repository, each with the reason it exists. Claude Cod
 
 ## Code
 
-- Use Effect for effects and errors, and model failures as tagged errors. In runtime and CLI source, compose with Effect instead of try/catch, `new Promise`, Promise statics or async functions; the linter enforces this (`bunfig.toml`). Call `Effect.runPromise` only at integration boundaries.
+- Use Effect for effects and errors, and model failures as tagged errors. In runtime and CLI source, compose with Effect instead of try/catch, `new Promise`, Promise statics or async functions; the linter enforces this (`.oxlintrc.json`). Call `Effect.runPromise` only at integration boundaries.
 - Use Effect Schema (`import { Schema } from "effect"`) at every data boundary: decode first with `onExcessProperty: "error"`, then validate domain rules.
 - Prefer Bun APIs over Node equivalents, and fall back to `node:` where Bun has none.
 - Use the Bun Shell `$` from "bun" wherever a process would be spawned.
-- Add only tools that do something Bun and the configured toolchain do not already do. Bun covers the runtime, tests, type-check, lint and format, and lint plugins configured in `bunfig.toml` are part of that toolchain.
+- Add only tools that do something Bun and the configured toolchain do not already do. Bun covers the runtime, dependency installation and tests; Oxlint with tsrs checks types and lints, and Oxfmt formats.
 - Write JSDoc on every exported or public function, type, type alias and interface.
 - Start a skill description with the situation, then what the skill does, so a model can tell when to load it.
 
 ## Done
 
-`mise.toml` is the source of commands; `package.json` scripts and the git hooks delegate to it. Run the gates through mise, because it first checks for the canary Bun that provides `bun check`, `bun lint` and `bun fmt`.
+`mise.toml` is the source of commands; `package.json` scripts and the git hooks delegate to it. Run the gates through mise with stable Bun and the locked development dependencies.
 
 - Done means `mise run verify` passes (type-check, lint, format check and tests).
 - When plugin sources change, rebuild the generated plugin with `mise run build`; the pre-commit hook runs it too.
@@ -30,20 +30,18 @@ Rules for working in this repository, each with the reason it exists. Claude Cod
 
 ## Branches and worktrees
 
-- Keep the main checkout on `main` (in a cloud session, the assigned branch, because the session panel shows the primary checkout's diff) and do other branches in git worktrees, for example `../holyagent-<branch-slug>`. Use worktrees for stack branches where helpful. Sessions here load the holyagent plugin from this checkout through the directory marketplace in `.claude/settings.json`, so checking out a branch that moves or deletes the plugin folder breaks the running session: every Bash call blocks and workflows fail.
+- Keep the main checkout on `main` (in a cloud session, the assigned branch, because the session panel shows the primary checkout's diff) and do other branches in git worktrees, for example `../holyagent-<branch-slug>`. Use worktrees to isolate work without changing its intended PR base. Sessions here load the holyagent plugin from this checkout through the directory marketplace in `.claude/settings.json`, so checking out a branch that moves or deletes the plugin folder breaks the running session: every Bash call blocks and workflows fail.
 - `.holyagent/` state lives on its own branch, `holyagent/state`, in one worktree shared by every worktree of the clone, so work branches never carry it and nothing is copied between worktrees. Push `holyagent/state` with plain Git alongside the work branches.
-- Run the gates as `bunx --no-install mise run <task>` (see `docs/development.md`). A missing `mise` on PATH is no reason to skip the gates or run Bun steps by hand. Each worktree needs its own `bun install --frozen-lockfile`, because `node_modules` is not shared between worktrees. `bun install` runs the `prepare` step, which installs the repository's lefthook hooks into the shared `.git/hooks`; that is expected.
+- Run the gates as `bunx --no-install mise run <task>` (see `docs/development.md`). A missing `mise` on PATH is no reason to skip the gates or run Bun steps by hand. Each worktree needs its own `bun install --frozen-lockfile`, because `node_modules` is not shared between worktrees. `bun install` runs the `prepare` step, which installs the repository's mise-managed hk hooks into the shared `.git/hooks`; that is expected.
 
 ## The release-branch model
 
-This repository's own convention, enforced by CI and rulesets; HolyAgent's instructions do not carry it.
+This repository's release convention includes CI checks; HolyAgent's instructions do not carry it.
 
-- Each release has an integration branch, `release/0.X.Y/integration`, cut from `main`. Work branches are `release/0.X.Y/<type>/<change>`. The first work PR targets the integration branch; later work PRs may stack within the release. One integration branch per release lets `main` move only by a whole, validated release.
-- The first PR of a release carries the version bump as its own commit, made with `mise run bump:patch` (or `bump:minor`). Every later branch of the release is cut after it, so the version in a branch's head equals the `<v>` in its name, which the `branch-model` check compares.
-- Normal releases reach `main` through `release/0.X.Y/integration`, with a version strictly newer than `main`. The `branch-model` check also rejects a `release/<v>/...` head whose `<v>` differs from its version and a PR into a release branch from another release.
-- A deployment failure alone does not require a version bump. For a focused repair of an unpublished release, create `release/<version>/fix/publication-repair` from fresh `main` and squash its PR directly into `main`. The required `version` check verifies exact equality of the main and head versions and absence of that exact npm version. Never downgrade or overwrite an immutable published version. Retry an already published artifact only after verifying identical identity and provenance; product or source changes to a published artifact require a new version.
-- Rulesets protect `main` and `release/*/integration` (PRs only, no force push, no deletion) and the `holyagent-*` tags (no update, no deletion). The required checks are the job ids in `.github/workflows/validation.yml`: `check`, `windows`, `installers` and `branch-model`, plus `version` on `main`. Renaming a job drops its check from protection until the ruleset names the new one; `docs/development.md` lists them.
-- A push to a branch runs `publish.yml`: validation first, then `stable.yml` on `main` (tag `holyagent-<version>` and a Release) or `dev.yml` on release integration branches (tag `holyagent-<version>-dev-<short-hash>` and a pre-release). Only protected release contexts publish npm packages. Tags are never a trigger, so a tag cannot start a release.
+- Start each ordinary work branch from `dev` and open its PR directly against `dev`. Stack PRs only when the project or user explicitly requires it; then base each dependent PR on its named predecessor. Otherwise keep dependent pieces of one delivery as separate commits in one PR; normal release PRs promote `dev` to `main` with a version strictly newer than `main`. The first PR of a release carries its version bump as a separate commit made with `mise run bump:patch` (or `bump:minor`).
+- A deployment failure alone does not require a version bump. For a focused repair of an unpublished release, create `release/<version>/fix/publication-repair` from fresh `main` and squash its PR directly into `main`. The `version` check requires exact main/head version equality and confirmation that the exact npm version is absent. Never downgrade or overwrite an immutable published version. Retry an already published artifact only after verifying identical identity and provenance; product or source changes to a published artifact require a new version.
+- Protect `main` and `dev` (PRs only, no force push, no deletion) and `holyagent-*` tags (no update, no deletion). Required checks are the job ids `check`, `windows`, `installers` and `branch-model`, plus `version` on `main`. Renaming a job drops its check from protection until the ruleset names the new one.
+- Branch pushes run validation, then publish stable on protected `main` or a development release on protected `dev`. Development versions use the commit UTC time and short SHA. Tags never trigger publication.
 - Pin every external action to a full commit SHA with a `# vX.Y.Z` comment, and give `contents: write` only to the jobs that tag and release. A moving tag can change what runs with the repository's token; `scripts/workflows.test.ts` checks both rules.
 
 ## The version
@@ -53,8 +51,8 @@ This repository's own convention, enforced by CI and rulesets; HolyAgent's instr
 ## Commits and pull requests
 
 - Never create draft pull requests. Open pull requests ready for review, and leave them unmerged while prerequisites or validation are pending, so every PR is available for review.
-- Keep each PR to one reviewable change. When branch rules allow, stack on the preceding open owner PR and set the PR base to the branch the work started from, so each review shows only its own change.
-- `holyagent vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `lefthook.yml`) keeps agent attribution out of commits made with plain Git too.
+- Review the full work PR against its intended base (normally `dev`). Independent changes may use separate PRs to `dev`; another open PR is not a reason to stack.
+- `holyagent vcs` has three commands, `commit`, `pr` and `identity` (the commit author in a cloud session); branches, pushes, merges and CI use plain Git and `gh`. The `commit-msg` hook (`holyagent hook commit-msg`, wired in `hk.pkl`) keeps agent attribution out of commits made with plain Git too.
 - Pass `holyagent vcs pr --body-file` an unignored file inside the project. Files outside the project or ignored by git are rejected, so a scratch file will not work.
 - `holyagent vcs` refuses process words such as "Claude Code" in commit and PR text. Rephrase, or list a genuine domain word in `vcs.allowWords` of `.holyagent/config.json`.
 - Start each evidence line of a specialist report with the criterion text or the evidence label, then a colon and the support. `assignment close --accept` matches the text before the colon after normalizing case, spacing, trailing punctuation, a leading `[blocking]` and a trailing `(dimension)`, so those differences are fine; a paraphrase or another criterion's text matches nothing. A support may continue on indented lines below its entry.
@@ -65,7 +63,7 @@ This repository's own convention, enforced by CI and rulesets; HolyAgent's instr
 
 ## Dependencies
 
-- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the mise tools (ripgrep and fd included), the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in the pin table; it moves with `bun.lock` when the updater's `bun update` runs, and a user's own Pi install is theirs. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Every dependency range in a `package.json` is a caret range at its line boundary, or `workspace:*`.
+- Dependencies change only through the updater: `mise run deps:update` (`--dry-run` previews it, `mise run deps:check` fails when a pin is behind). It moves the GitHub Actions, the mise tools (ripgrep and fd included), the exact Pi package pins in `packages/runtime/src/config/pi-packages.json` and the `package.json` ranges to the newest stable release line, and refreshes `bun.lock`. The Pi host used for development and tests, `@earendil-works/pi-coding-agent` (a caret-range `devDependency` of `packages/integrations/pi`), is not in the pin table; it moves with `bun.lock` when the updater's `bun update` runs, and a user's own Pi install is theirs. A hand edit of a pin or of `bun.lock` skips the SHA resolution, the checksum recomputation and the prerelease filter, and drifts from what the updater and `scripts/dependency-ranges.test.ts` expect. Dependency ranges follow the rules in [docs/development.md](docs/development.md#dependencies). The root development dependency `tsrs` uses a prerelease caret range until a stable version is available.
 
 ## The README
 

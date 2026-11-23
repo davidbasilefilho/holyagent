@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext, ToolInfo } from "@earendil-works/p
 import { Effect } from "effect"
 
 import type { Config } from "../../../runtime/src/config/schema.ts"
+import { canonicalPiToolName } from "../../../runtime/src/domain/host.ts"
 import {
   isStateOnlyTool,
   type ToolTraits,
@@ -157,7 +158,7 @@ export const registerAutoReview = (pi: ExtensionAPI, host: AutoReviewHost): void
     // to review: a call that runs at once looks up no credentials and walks no history.
     const result = await Effect.runPromise(
       gate({
-        call: { toolName: event.toolName, input: event.input },
+        call: { toolName: canonicalPiToolName(event.toolName), input: event.input },
         cwd: ctx.cwd,
         traits: toolTraits(info),
         entries: Effect.sync(() =>

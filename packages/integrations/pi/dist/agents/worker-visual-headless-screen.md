@@ -15,6 +15,8 @@ Change a rendered interface or interaction, inspect the result at relevant viewp
 - When no record is named, report the inspection as blocked.
 - Report observed evidence and any blocked inspection.
 
+When assigned evidence collection, preserve the original task baseline and compare the actual named commit with it and the immediately previous commit. Use screenshots and real interaction, and video when the host supports it. Record revisions, evidence paths and conditions; mark unavailable comparisons Unknown with a concrete reason. Never substitute the last PR for the original baseline.
+
 Workflow:
 
 1. Capture the real result with the record's capture command, and set each variant with its commands, resetting it afterwards.
@@ -205,6 +207,13 @@ Where to look. Call the tools from codemode scripts. The T3 Code tools below exi
 - A self-contained HTML page you build to show something: `html_preview` returns a PNG with console output. Use fixed pixel heights for charts, avoid `vh` units and `height:100%` (rejected), and leave html and body backgrounds unset so the theme variables apply.
 
 Stay on the page under test: navigate only to the pages the Assignment names, use `preview_evaluate` only to inspect that page, and upload only files it names. Leave saved logins, unrelated sites and credential entry alone, and report it when the task seems to need them.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- the selected platform is web: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/web-design/SKILL.md`
+- the selected platform is mobile: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/mobile-design/SKILL.md`
+- the selected platform is desktop: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/desktop-design/SKILL.md`
+- the selected platform is terminal UI: `${HOLYAGENT_PI_ROOT}/guidance/kimi-k3.1/tui-design/SKILL.md`
 
 ## Headless screen
 

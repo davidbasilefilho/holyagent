@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -7,6 +8,7 @@ import type { ExecResult, ExtensionAPI, ExtensionContext } from "@earendil-works
 import { Effect, Schema } from "effect"
 
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
+import { parseOutput } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { assignmentStatusOf, type PiOutcome } from "../../../runtime/src/pi/journal.ts"
 import { routedModels } from "../../../runtime/src/pi/provider.ts"
@@ -125,7 +127,7 @@ const CATALOG = [
 type Ran = Array<string>
 
 /** An extension on a stub Pi API that answers the wrapper's commands as a healthy install does. */
-const start = (directory: string, sessionName?: string) => {
+const start = (directory: string, sessionName?: string, cwd = "/work/project/src") => {
   const ran: Ran = []
   const handlers = new Map<string, Array<(event: object, ctx: ExtensionContext) => unknown>>()
   const answer = (command: string, args: ReadonlyArray<string>): Partial<ExecResult> => {
@@ -181,7 +183,7 @@ const start = (directory: string, sessionName?: string) => {
   }
   // Only `cwd` of the context is read; any other member, the TUI's `ui` included, fails the test.
   const context = new Proxy(
-    { cwd: "/work/project/src" },
+    { cwd },
     {
       get: (target, key) => {
         if (key === "cwd") return target.cwd
@@ -192,9 +194,30 @@ const start = (directory: string, sessionName?: string) => {
     },
   ) as unknown as ExtensionContext
   // A POSIX machine, whatever the platform the tests run on.
-  createExtension({ packageRoot: PACKAGE_ROOT, env: {}, platform: "linux", bunSearch: BUN_SEARCH })(
-    api as unknown as ExtensionAPI,
-  )
+  createExtension({
+    packageRoot: PACKAGE_ROOT,
+    env: { HOME: cwd },
+    platform: "linux",
+    bunSearch: BUN_SEARCH,
+    coreServices: {
+      config: () => Effect.succeed(DEFAULTS),
+      directory: () => Effect.succeed(directory),
+      status: () => {
+        ran.push("status")
+        return parseOutput(
+          "status",
+          "intents[1]{id,revision,objective,running,unaccepted}:\n  intent-a,1,Ship the thing,0,0\n",
+        )
+      },
+      reconcile: () => {
+        ran.push("reconcile")
+        return parseOutput(
+          "reconcile",
+          "running[1]{id,role,agent,startedAt}:\n  assignment-1,Worker.implementation,agent-1,null\n",
+        )
+      },
+    },
+  })(api as unknown as ExtensionAPI)
   /** Delivers a fixture event to the handlers registered for its type; the results are returned. */
   const deliver = async (event: Record<string, unknown>): Promise<Array<unknown>> => {
     const results: Array<unknown> = []
@@ -313,16 +336,19 @@ describe("the extension's handlers on the recorded extension events", () => {
       "call-bash": false,
     }
     expect([...calls.keys()].toSorted()).toEqual(Object.keys(expected).toSorted())
-    const { deliver } = start("/missing")
-    for (const [id, blocked] of Object.entries(expected)) {
-      const [result] = (await deliver(calls.get(id) ?? {})) as Array<
-        { block?: boolean; reason?: string } | undefined
-      >
-      if (blocked) {
-        expect(result?.block).toBe(true)
-        expect(typeof result?.reason).toBe("string")
-      } else expect(result).toBeUndefined()
-    }
+    await withDirectory(async (directory) => {
+      expect(spawnSync("git", ["-C", directory, "rev-parse", "--show-toplevel"]).status).not.toBe(0)
+      const { deliver } = start(directory, undefined, directory)
+      for (const [id, blocked] of Object.entries(expected)) {
+        const [result] = (await deliver(calls.get(id) ?? {})) as Array<
+          { block?: boolean; reason?: string } | undefined
+        >
+        if (blocked) {
+          expect(result?.block).toBe(true)
+          expect(typeof result?.reason).toBe("string")
+        } else expect(result).toBeUndefined()
+      }
+    })
   })
 })
 

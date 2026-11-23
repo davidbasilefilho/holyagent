@@ -98,7 +98,8 @@ describe("a T3 RPC session start", () => {
   test("T3 launches Pi in RPC mode, names its mode in T3_PI_RUNTIME_MODE and injects its bridge", async () => {
     const { events } = await load("t3-session-start")
     const launch = events.find((event) => event["type"] === "t3_launch") as
-      { args: Array<string>; env: Record<string, string> } | undefined
+      | { args: Array<string>; env: Record<string, string> }
+      | undefined
     expect(launch).toBeDefined()
     expect(launch?.args.slice(0, 2)).toEqual(["--mode", "rpc"])
     expect(launch?.args).not.toContain("--no-extensions")
@@ -393,7 +394,8 @@ describe("the extension under T3 Code in RPC mode", () => {
   test("it touches only the ctx.ui members T3 renders, in every access mode and every fixture session", async () => {
     const { events: launchEvents } = await load("t3-session-start")
     const launch = launchEvents.find((event) => event["type"] === "t3_launch") as
-      { env: Record<string, string> } | undefined
+      | { env: Record<string, string> }
+      | undefined
     expect(launch?.env["T3_MCP_URL"]).toBeString()
     const { events: dialogs } = await load("t3-ui-dialogs")
     const statusKey = dialogs.find((event) => event["method"] === "setStatus")?.["statusKey"]
@@ -517,7 +519,8 @@ describe("the documented assumption of a specialist completion after agent_settl
     const { events } = await load("t3-late-completion")
     const notice = events.flatMap((event) => {
       const message = event["message"] as
-        { role?: string; content?: string; display?: boolean } | undefined
+        | { role?: string; content?: string; display?: boolean }
+        | undefined
       return event["type"] === "message_end" && message?.role === "custom" ? [message] : []
     })
     expect(notice).toHaveLength(1)

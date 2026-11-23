@@ -551,6 +551,16 @@ describe("the fetch of the remote state branch", () => {
     return { dir, bin, script, env, logged }
   }
 
+  /** Git for Windows may resolve its bundled ssh before the fixture's PATH entry. */
+  const fixtureSsh = async (behavior: string) => {
+    const fixture = await overSsh(behavior)
+    if (process.platform === "win32") {
+      // Set the Git config, not GIT_SSH_COMMAND: fetch must still append its own safety options.
+      await sh(fixture.dir, ["git", "config", "core.sshCommand", `"${fixture.script}"`])
+    }
+    return fixture
+  }
+
   test("the default ssh environment is non-interactive", () => {
     const env = fetchEnvironment(
       {
@@ -573,7 +583,7 @@ describe("the fetch of the remote state branch", () => {
   })
 
   test("ssh runs in batch mode with a connect timeout and no askpass program", async () => {
-    const { dir, env, logged } = await overSsh("exit 255")
+    const { dir, env, logged } = await fixtureSsh("exit 255")
 
     toon(
       await vcs(
@@ -780,7 +790,7 @@ describe("the fetch of the remote state branch", () => {
   })
 
   test("a hook makes no network call, and the next command fetches", async () => {
-    const { dir, env: pathEnv, logged } = await overSsh("exit 255")
+    const { dir, env: pathEnv, logged } = await fixtureSsh("exit 255")
     const env = {
       ...pathEnv,
       SSH_ASKPASS: "/bin/false",
@@ -1208,7 +1218,10 @@ describe("moving the state found in a work tree", () => {
     const shown = toon(await holy(dir, ["intent", "show", id]))
 
     expect(shown["objective"]).toBe("Ship the parser v2")
-    expect(await sh(dir, ["git", "status", "--porcelain"])).toBe("")
+    expect(await sh(dir, ["git", "status", "--porcelain"])).toContain(` M ${record}`)
+    expect(JSON.parse(await readFile(join(dir, record), "utf8"))).toMatchObject({
+      objective: "Ship the parser v2",
+    })
     expect(JSON.parse(await sh(dir, ["git", "show", `${STATE}:${record}`]))).toMatchObject({
       objective: "Ship the parser v2",
     })

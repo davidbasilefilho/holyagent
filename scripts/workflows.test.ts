@@ -1,7 +1,21 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync as createTemp, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
+
+// Refuse fixtures under an existing repository, even when the system temp directory is overridden.
+const mkdtempSync = (prefix: string) => {
+  const dir = createTemp(prefix)
+  const probe = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--show-toplevel"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  if (probe.exitCode !== 128) {
+    rmSync(dir, { recursive: true, force: true })
+    throw new Error("Fixture temp directory is inside a Git repository or Git is unavailable")
+  }
+  return dir
+}
 
 const repoRoot = join(import.meta.dir, "..")
 const githubDir = join(repoRoot, ".github")
@@ -149,7 +163,7 @@ describe("publication authority", () => {
       expect(jobs["publish"]?.if).toBe(
         name === "stable"
           ? "github.ref == 'refs/heads/main' && github.ref_protected"
-          : "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
+          : "github.ref == 'refs/heads/dev' && github.ref_protected",
       )
     },
   )
@@ -245,7 +259,7 @@ describe("publish.yml", () => {
     })
     expect(publish.jobs["dev"]).toMatchObject({
       needs: "validation",
-      if: "startsWith(github.ref, 'refs/heads/release/') && endsWith(github.ref, '/integration') && github.ref_protected",
+      if: "github.ref == 'refs/heads/dev' && github.ref_protected",
       uses: "./.github/workflows/dev.yml",
     })
   })
@@ -303,6 +317,22 @@ describe("validation.yml", () => {
     )
     expect(step?.env).toEqual({ HEAD_REF: "${{ github.head_ref }}" })
     expect(step?.run).toBe('bun scripts/pr-checks.ts version main . "$HEAD_REF"')
+  })
+
+  test("the vendor validator runs only in the isolated Linux CI step", () => {
+    const steps = Object.entries(validation.jobs).flatMap(([job, value]) =>
+      (value.steps ?? []).map(({ run }) => ({ job, run: run ?? "" })),
+    )
+    const invocations = steps.filter(({ run }) =>
+      /validate-claude-plugin\.ts|plugin validate/.test(run),
+    )
+    expect(invocations.map(({ job }) => job)).toEqual(["check"])
+    const command = invocations[0]?.run ?? ""
+    expect(command).toContain("sudo -n /usr/bin/unshare --net -- /usr/bin/setpriv")
+    expect(command).toContain("--clear-groups --no-new-privs")
+    expect(command).toContain("/usr/bin/env -i")
+    expect(command).toContain("HOLYAGENT_HOST_NETNS")
+    expect(command).toContain("--no-env-file scripts/validate-claude-plugin.ts")
   })
 
   test("only a pull request run is cancelled by a newer run", () => {
