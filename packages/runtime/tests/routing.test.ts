@@ -192,7 +192,7 @@ describe("Pi policy routes", () => {
         routes: { root: { model: "gpt-6.1-sol", thinking: "medium" } },
       },
     })
-    expect(routeModel(normal, "root").model).toBe("gpt-6.1-sol")
+    expect(routeModel(normal, "root").model).toBe("gpt-6.2-sol")
     expect(routeModel(fast, "root").model).toBe("gpt-6.1-terra")
     expect(routeModel(overridden, "root").spec).toBe("openai-codex/gpt-6.1-sol:medium")
   })

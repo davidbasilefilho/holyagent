@@ -28,7 +28,7 @@ const CODEX = await decode({ pi: { provider: "openai-codex" } })
 
 /** The approved Codex table, row by row, as `--model` values. */
 const APPROVED: Readonly<Record<string, string>> = {
-  root: "openai-codex/gpt-6.1-sol:high",
+  root: "openai-codex/gpt-6.2-sol:high",
   "Explorer.map": "openai-codex/gpt-6-luna:low",
   "Explorer.lookup": "openai-codex/gpt-6-luna:low",
   "Librarian.lookup": "openai-codex/gpt-6-luna:low",

@@ -55,9 +55,9 @@ describe("codexSettings", () => {
     expect(codexSettings(KIMI)).toBeUndefined()
   })
 
-  test("names the GPT-6 family, the specialists that write, and each switch from the config", () => {
+  test("names the default root model’s family, the specialists that write, and each switch from the config", () => {
     expect(settings(WITH_BILLION)).toEqual({
-      family: "gpt-6",
+      rootFamily: "gpt-6.2",
       contextManagement: false,
       lunaReserve: true,
       applyPatchAgents: WRITERS,

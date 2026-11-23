@@ -18,7 +18,7 @@ export type Coverage =
  * stands in for tags inside the files, which would add text to every generated agent. A family
  * joins `FAMILIES` together with its entry here, which the type requires.
  */
-export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<string, Coverage>>>> = {
+const EXISTING_COVERAGE = {
   "claude-5.5": {
     "R-HANDOFF": {
       section: "skills/state-mode/SKILL.md",
@@ -1109,4 +1109,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "leave out content that changes or that the agent can discover from the repository",
     },
   },
+} satisfies Readonly<Record<Exclude<Family, "gpt-6.2">, Readonly<Record<string, Coverage>>>>
+
+/** Requirement anchors for each family; GPT-6.2 overrides only wording it changed. */
+export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<string, Coverage>>>> = {
+  ...EXISTING_COVERAGE,
+  "gpt-6.2": EXISTING_COVERAGE["gpt-6"],
 }

@@ -28,6 +28,7 @@ import {
   PI_ROOT_CORE,
   PI_ROOT_PLACEHOLDER,
   PI_SESSION_REMINDER,
+  piRootCore,
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { cmdExeArguments } from "../../../runtime/src/pi/bash/cmd.ts"
@@ -322,7 +323,7 @@ const fakeApi = (
     /** The context's `ui`, likewise only for a session that uses it. */
     readonly ui?: object
     /** The context's active model; none by default. */
-    readonly model?: { readonly provider: string }
+    readonly model?: { readonly provider: string; readonly id?: string }
     /** Other members of the context a test gives (a session manager, a model registry). */
     readonly members?: Readonly<Record<string, unknown>>
     /** Makes `registerMcpServer` throw this. */
@@ -461,7 +462,7 @@ const run = async (
     toolsFailOnce?: Error
     mode?: ExtensionContext["mode"]
     ui?: object
-    model?: { readonly provider: string }
+    model?: { readonly provider: string; readonly id?: string }
     members?: Readonly<Record<string, unknown>>
     mcpFail?: Error
     deadlineMs?: number
@@ -3946,29 +3947,47 @@ describe("under the Codex provider", () => {
   const PI_PROMPT = "Pi's own prompt, with AGENTS.md and the skills"
   const body = (path: string) => promptBody(readFileSync(join(PACKAGE_ROOT, path), "utf8"))
 
-  test("the root's prompt is the GPT-6 family's, in front of Pi's own", async () => {
-    const { delivered } = await run(codexConfig(), { systemPrompt: PI_PROMPT, pi: codexPi })
+  test.each([
+    [undefined, "gpt-6.2"],
+    ["gpt-6.2-sol", "gpt-6.2"],
+    ["gpt-6.2-astra", "gpt-6.2"],
+    ["gpt-6.1-sol", "gpt-6"],
+    ["gpt-6.1-terra", "gpt-6"],
+    ["gpt-6-luna", "gpt-6"],
+    ["gpt-6.20-sol", "gpt-6"],
+  ] as const)("the root’s active model %s gets the %s family", async (id, family) => {
+    const { delivered } = await run(codexConfig(), {
+      systemPrompt: PI_PROMPT,
+      pi: codexPi,
+      ...(id === undefined ? {} : { model: { provider: "openai-codex", id } }),
+    })
     expect(delivered?.systemPrompt).toBe(
-      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6"], PACKAGE_ROOT)}\n\n${PI_PROMPT}`,
+      `${fillPackageRoot(PI_ROOT_PROMPTS[family], PACKAGE_ROOT)}\n\n${PI_PROMPT}`,
     )
-    expect(PI_ROOT_PROMPTS["gpt-6"]).not.toBe(PI_ROOT_PROMPT)
     expect(delivered?.systemPrompt).not.toContain(fillPackageRoot(PI_ROOT_PROMPT, PACKAGE_ROOT))
   })
 
-  test("a specialist's own prompt is swapped for the family's, and what Pi adds around it stays", async () => {
-    const agent = "worker-implementation"
-    const own = body(`agents/${agent}.md`)
-    const gpt = body(`families/gpt-6/agents/${agent}.md`)
-    expect(gpt).not.toBe(own)
-    const { delivered } = await run(codexConfig(), {
-      sessionName: `${agent}#a1b2c3d4`,
-      systemPrompt: `${own}\n\nPi appended this`,
-      pi: codexPi,
-    })
-    expect(delivered?.systemPrompt).toBe(
-      `${fillPackageRoot(gpt, PACKAGE_ROOT)}\n\nPi appended this`,
-    )
-  })
+  test.each([
+    ["gpt-6.1-terra", "gpt-6"],
+    ["gpt-6.2-sol", "gpt-6.2"],
+  ] as const)(
+    "a specialist on %s gets the %s prompt without losing Pi’s text",
+    async (id, family) => {
+      const agent = "worker-implementation"
+      const own = body(`agents/${agent}.md`)
+      const gpt = body(`families/${family}/agents/${agent}.md`)
+      expect(gpt).not.toBe(own)
+      const { delivered } = await run(codexConfig(), {
+        sessionName: `${agent}#a1b2c3d4`,
+        model: { provider: "openai-codex", id },
+        systemPrompt: `${own}\n\nPi appended this`,
+        pi: codexPi,
+      })
+      expect(delivered?.systemPrompt).toBe(
+        `${fillPackageRoot(gpt, PACKAGE_ROOT)}\n\nPi appended this`,
+      )
+    },
+  )
 
   test("every specialist, with and without the screen tools, has a GPT-6 prompt the swap finds", () => {
     for (const agent of AGENT_TYPES) {
@@ -3980,24 +3999,47 @@ describe("under the Codex provider", () => {
     }
   })
 
+  test.each(["startup", "resume", "compact"] as const)(
+    "the session’s %s context uses the active family’s core and reminder",
+    async (reason) => {
+      const { delivered } = await run(codexConfig(), {
+        flag: "session",
+        pi: codexPi,
+        model: { provider: "openai-codex", id: "gpt-6.2-astra" },
+        start: { reason: reason === "compact" ? "startup" : reason },
+        ...(reason === "compact"
+          ? {
+              afterwards: async (api: ReturnType<typeof fakeApi>) => {
+                await api.emit("before_agent_start", { prompt: "first" })
+                await api.emit("session_compact", { reason: "threshold" })
+              },
+            }
+          : {}),
+      })
+      expect(delivered?.message?.content).toContain(piRootCore(PACKAGE_ROOT, "gpt-6.2"))
+      expect(delivered?.message?.content).toContain("Make the task list tool callable")
+      expect(delivered?.message?.content).not.toContain(PI_SESSION_REMINDER)
+    },
+  )
+
   test("the root routes to the chosen family's private guidance and preserves unrelated skills", async () => {
     // Model-facing paths keep forward slashes even when the package lives on a Windows drive.
-    const guidance = (family: "gpt-6" | "kimi-k3.1") =>
+    const guidance = (family: "gpt-6.2" | "kimi-k3.1") =>
       `${toPosix(PACKAGE_ROOT)}/guidance/${family}/ci-watch/SKILL.md`
     const unrelated = "<skill><location>/user/skills/unrelated/SKILL.md</location></skill>"
     const input = `${PI_PROMPT}\n${unrelated}`
     const gpt = await run(codexConfig(), { systemPrompt: input, pi: codexPi })
     expect(gpt.delivered?.systemPrompt).toBe(
-      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6"], PACKAGE_ROOT)}\n\n${input}`,
+      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6.2"], PACKAGE_ROOT)}\n\n${input}`,
     )
-    expect(gpt.delivered?.systemPrompt).toContain(guidance("gpt-6"))
+    expect(gpt.delivered?.systemPrompt).toContain(guidance("gpt-6.2"))
     expect(gpt.delivered?.systemPrompt).not.toContain(guidance("kimi-k3.1"))
     const kimi = await run(healthy("/missing"), { systemPrompt: input })
     expect(kimi.delivered?.systemPrompt).toBe(
       `${fillPackageRoot(PI_ROOT_PROMPT, PACKAGE_ROOT)}\n\n${input}`,
     )
     expect(kimi.delivered?.systemPrompt).toContain(guidance("kimi-k3.1"))
-    expect(kimi.delivered?.systemPrompt).not.toContain(guidance("gpt-6"))
+    expect(kimi.delivered?.systemPrompt).not.toContain(guidance("gpt-6.2"))
   })
 
   test("a specialist that writes gets apply_patch beside the tools it has; the others and the root do not", async () => {

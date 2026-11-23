@@ -3,7 +3,7 @@ import { join } from "node:path"
 
 import { INSTRUCTIONS_ROOT } from "../packages/runtime/src/instructions/families.ts"
 
-describe.each(["gpt-6", "kimi-k3.1"])("Pi search policy: %s", (family) => {
+describe.each(["gpt-6", "gpt-6.2", "kimi-k3.1"])("Pi search policy: %s", (family) => {
   const section = (path: string) => Bun.file(join(INSTRUCTIONS_ROOT, family, path)).text()
 
   test.each([
