@@ -34,6 +34,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "npm_gate",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-23T10:45:57.028Z"
