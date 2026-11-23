@@ -29,6 +29,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "cli_guidance",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-23T10:58:49.582Z"
