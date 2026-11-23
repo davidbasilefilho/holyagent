@@ -31,6 +31,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "cli_contract_tests",
     "model": "haiku",
     "effort": "medium",
     "startedAt": "2026-11-23T10:58:50.528Z"
