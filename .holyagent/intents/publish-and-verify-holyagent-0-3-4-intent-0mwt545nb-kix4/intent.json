@@ -8,6 +8,7 @@
     "Retain T3 Code as the supported interface, GPT-6.2 Sol for the existing Pi Codex route and Claude Code-only authorship handling. Keep other work outside this release."
   ],
   "revision": 3,
-  "state": "Open",
+  "state": "Closed",
+  "closeReason": "HolyAgent 0.3.4 was published by the protected main workflow. The npm tarball matched the GitHub asset, and the clean documented install verified both command contracts, the OpenTUI setup and the Pi model routes.",
   "createdAt": "2026-11-23T10:45:55.991Z"
 }
