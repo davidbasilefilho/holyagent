@@ -16,8 +16,8 @@ import type { FlagSpec, Parsed } from "./args.ts"
 import type { StdinMissing, Usage } from "./errors.ts"
 
 /**
- * A result printed as TOON fields, then a line `<label>:` alone, then the text verbatim to the end
- * of the output. TOON has no multi-line string, so text meant to be copied as it is goes here.
+ * A result with text the caller copies as it is. The agent surface encodes it as a TOON string
+ * field. The retained host protocol prints it verbatim after a line with the label.
  */
 export class WithTrailer {
   /** Builds a result from its TOON fields, the trailer label and the verbatim text. */
@@ -29,8 +29,8 @@ export class WithTrailer {
 }
 
 /**
- * A result printed exactly as it is, with its own exit code, for a caller that reads stdout as
- * something other than TOON, such as a host hook.
+ * A result with its own stdout, stderr and exit code. The agent surface encodes them in TOON; the
+ * public and retained host surfaces use the streams directly.
  */
 export class Verbatim {
   /** Builds a result from the text of stdout and stderr and the exit code. */
@@ -56,6 +56,9 @@ export type SetupTuiLoader = (
   notify: (text: string) => Effect.Effect<void>,
 ) => Effect.Effect<SetupTuiModule, TuiUnavailable, Shell>
 
+/** The human installer, the structured agent CLI, or a retained host protocol. */
+export type CliSurface = "public" | "agent" | "host"
+
 /** What the CLI needs from the process it runs in; tests supply their own. */
 export interface Host {
   readonly cwd: string
@@ -80,6 +83,8 @@ export interface Host {
 /** Everything a command may use while it runs. */
 export interface Call {
   readonly args: Parsed
+  /** The entry point that selected this command. */
+  readonly surface: CliSurface
   /** The working directory of the process. */
   readonly cwd: string
   /** The environment of the process. */

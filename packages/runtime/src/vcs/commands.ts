@@ -2,6 +2,7 @@ import { type Context, vcs } from "@holyagent/core"
 import { Effect } from "effect"
 
 import { type FlagShape, readFlags } from "../cli/args.ts"
+import { agentHostOf } from "../cli/config.ts"
 import { Usage } from "../cli/errors.ts"
 import { type Call, type Command } from "../cli/types.ts"
 import { present } from "../cli/views.ts"
@@ -13,13 +14,16 @@ import { IDENTITY_USAGE } from "./author.ts"
  * The folder that holds the config file: `.holyagent` of the work tree. The config file is the
  * project's settings, not state, so it is never read from the state worktree.
  */
-const coreContext = (call: Call): Context => ({
-  cwd: call.cwd,
-  env: call.env,
-  host: "claude",
-  execution: DEFAULT_CONFIG,
-  authorize: () => true,
-})
+const coreContext = (call: Call) =>
+  agentHostOf(call.env).pipe(
+    Effect.map((host): Context => ({
+      cwd: call.cwd,
+      env: call.env,
+      host,
+      execution: DEFAULT_CONFIG,
+      authorize: () => true,
+    })),
+  )
 
 /** Reads the raw arguments of a command against its flags, refusing more positionals than it takes. */
 const arguments_ = (
@@ -53,11 +57,11 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
     path: ["vcs", "commit"],
     usage: COMMIT_USAGE,
     summary:
-      "Commit exactly the named paths with the configured git identity (in a claude.ai cloud session, with the user as author and the platform's committer), after the message check, and record the branch and commit on the Intent in use",
+      "Commit the named paths with the configured Git identity and record the commit on the active Intent",
     notes: [
       "state mode (holyagent state mode): in branch, the default, Intent state is committed on the state branch as it changes and a path under .holyagent/ is refused; in local it is in no commit and such a path is refused; in work the changed state files (not config.json unless named) are staged with the named paths",
       "the message is cleaned of agent attribution and refused when it talks about the user or the agent; an identity that is exactly the agent's own (the email noreply@anthropic.com, or the name Claude or Claude Code) is refused; in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) it is the author that is checked, and the committer is left as the platform set it",
-      "the repository's own hooks run, a commit-msg hook that runs `holyagent hook commit-msg` included",
+      "Git runs the repository's commit-msg hook when configured",
     ],
     flags: {},
     raw: true,
@@ -77,7 +81,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
               messages.length === 0 ? "Missing -m <headline>" : "Name the paths to commit after --",
             hint: `Usage: holyagent ${COMMIT_USAGE}`,
           })
-        const done = yield* vcs.commit(coreContext(call), call.root, call, {
+        const done = yield* vcs.commit(yield* coreContext(call), call.root, call, {
           messages,
           paths: args.positionals,
         })
@@ -95,6 +99,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
   },
   {
     path: ["vcs", "identity"],
+    hosts: ["claude"],
     usage: IDENTITY_USAGE,
     summary:
       "Set the commit author of this clone in its local git config (author.name and author.email), so a commit has the user as author and keeps the committer",
@@ -113,7 +118,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
           { name: { kind: "one" }, email: { kind: "one" } },
           0,
         )
-        const author = yield* vcs.identity(coreContext(call), {
+        const author = yield* vcs.identity(yield* coreContext(call), {
           name: yield* requiredValue(args, "name", IDENTITY_USAGE),
           email: yield* requiredValue(args, "email", IDENTITY_USAGE),
         })
@@ -156,7 +161,7 @@ export const VCS_COMMANDS: ReadonlyArray<Command> = [
         const base = valueOf(args, "base")
         const title = valueOf(args, "title")
         const bodyFile = valueOf(args, "body-file")
-        return yield* vcs.pr(coreContext(call), call.root, call, {
+        return yield* vcs.pr(yield* coreContext(call), call.root, call, {
           ...(base === undefined ? {} : { base }),
           ...(title === undefined ? {} : { title }),
           ...(bodyFile === undefined ? {} : { bodyFile }),

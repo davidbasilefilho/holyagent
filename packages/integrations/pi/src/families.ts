@@ -13,7 +13,27 @@ import type { PiFamily } from "../../../runtime/src/instructions/families.ts"
 export const DEFAULT_PI_FAMILY: PiFamily = "kimi-k3.1"
 
 /** The families the package carries besides {@link DEFAULT_PI_FAMILY}, built next to it. */
-export const EXTRA_PI_FAMILIES: ReadonlyArray<PiFamily> = ["gpt-6"]
+export const EXTRA_PI_FAMILIES: ReadonlyArray<PiFamily> = ["gpt-6", "gpt-6.2"]
+
+/** Selects the GPT-6.2 family only for an exact generation match, including model variants. */
+export const codexFamily = (model: string): PiFamily =>
+  /^gpt-6\.2(?:-|$)/.test(model) ? "gpt-6.2" : "gpt-6"
+
+/**
+ * Selects the active model’s instruction family. With no model, use the supplied fallback only when
+ * the launch is known to be using Codex; an explicit non-Codex model wins.
+ */
+export const activePiFamily = (
+  model: { readonly provider: string; readonly id?: string } | undefined,
+  fallback: PiFamily | undefined,
+): PiFamily | undefined =>
+  model === undefined
+    ? fallback
+    : model.provider !== "openai-codex"
+      ? undefined
+      : model.id === undefined
+        ? (fallback ?? "gpt-6")
+        : codexFamily(model.id)
 
 /** The folder of the package that holds other families' agent copies. */
 export const FAMILIES_FOLDER = "families"

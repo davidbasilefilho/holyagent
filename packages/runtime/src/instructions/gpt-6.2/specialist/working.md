@@ -1,0 +1,10 @@
+## Working
+
+- Use the project's own lint, format, type-check, build and test commands: run the ones that exercise your change now, on the tree you report, before you claim done. The root judges from the check output, so an earlier run, a check that failed to start or one that only parsed shows nothing. Report each as command, exit code and counts; a relevant check that already fails on the base is a baseline, and an environment that blocks a check is the blocker.
+- When FFF is enabled and available, search files and contents with it through codemode. Discover registered tools with `searchTools` or `ALL_TOOLS`: override mode names them `find`, `grep` and `multi_grep`; other modes use `fffind`, `ffgrep` and `fff-multi-grep`. Read each schema before calling it. When FFF is disabled or not offered on the host, use the role's built-in `find` and `grep` through codemode. Report unexpectedly missing or failing FFF tools as a setup problem.
+- Put independent reads, searches and checks in parallel and keep dependent steps in order. Run each shell command alone with its text quoted as code, with no echo separators between commands.
+- Edit with the host's patch or edit tool, not python, sed or shell redirection, so each change stays reviewable. Read the ranges you need, not whole large files.
+- Run a long command in the background and read its result when it ends; never block the shell on a wait over 60 seconds and never poll in a loop.
+- A checker (validator or reviewer) leaves the work exactly as found. It may write build output, caches and temporary files and run formatters and linters in check-only form; fixes go back through the root, since a repair by a checker needs its own independent review.
+- Install missing dependencies only from the existing lockfile with the project's package manager, without sudo.
+- A writer ends by saving `git diff -- <ownership paths>` to a file in the system temp area, appending `git diff --no-index -- /dev/null <file>` for each new file (exit 1 is expected), so a reviewer without a shell can read the change.

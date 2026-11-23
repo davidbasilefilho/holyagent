@@ -130,17 +130,21 @@ try {
     run(setup.doctor(ctx, { fix: false, extra: true }).pipe(Effect.provide(fakeShell))),
   )
   const layer = gitLive(cwd, env)
-  const author = await run(
-    vcs
-      .identity(ctx, { name: "Fixture User", email: "fixture@example.test" })
-      .pipe(Effect.provide(layer)),
-  )
+  const identity = { name: "Fixture User", email: "fixture@example.test" }
+  await assert.rejects(run(vcs.identity(ctx, identity).pipe(Effect.provide(layer))), {
+    capability: "vcs.identity",
+  })
+  const claude = { ...ctx, host: "claude" }
+  const author = await run(vcs.identity(claude, identity).pipe(Effect.provide(layer)))
   assert.equal(author.name, "Fixture User")
   assert.equal(git("config", "--local", "author.name").stdout.trim(), "Fixture User")
   await assert.rejects(
     run(
       vcs
-        .identity({ ...ctx, authorize: () => false }, { name: "Nobody", email: "no@example.test" })
+        .identity(
+          { ...claude, authorize: () => false },
+          { name: "Nobody", email: "no@example.test" },
+        )
         .pipe(Effect.provide(layer)),
     ),
   )

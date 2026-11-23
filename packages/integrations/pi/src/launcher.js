@@ -1,0 +1,52 @@
+import { spawn } from "node:child_process"
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+
+/** Starts Bun with package-owned configuration before it can load a project's bunfig or .env. */
+export const launch = (surface) => {
+  const agent = surface === "agent"
+  const directory = fileURLToPath(new URL("./", import.meta.url))
+  const args = [
+    "--no-env-file",
+    `--config=${join(directory, "empty-bunfig.toml")}`,
+    join(directory, agent ? "holyagent-cli.js" : "holyagent-public.js"),
+    ...process.argv.slice(2),
+  ]
+  const name = process.platform === "win32" ? "bun.exe" : "bun"
+  const fallback = join(process.env.BUN_INSTALL || join(homedir(), ".bun"), "bin", name)
+
+  const runtimeFailure = () => {
+    if (agent)
+      process.stdout.write(
+        "error:\n  tag: RuntimeUnavailable\n  message: Could not run the HolyAgent Bun runtime\n  hint: Install Bun and reopen your terminal.\n  code: 4\n",
+      )
+    else process.stderr.write("Could not run Bun. Install Bun and reopen your terminal.\n")
+    process.exitCode = 4
+  }
+
+  const start = (program) => {
+    const child = spawn(program, args, {
+      stdio: agent ? ["ignore", "pipe", "ignore"] : "inherit",
+      windowsHide: agent,
+    })
+    let failed = false
+    let wrote = false
+    child.stdout?.once("data", () => {
+      wrote = true
+    })
+    child.stdout?.pipe(process.stdout, { end: false })
+    child.once("error", (error) => {
+      failed = true
+      if (error.code === "ENOENT" && program === name) start(fallback)
+      else runtimeFailure()
+    })
+    child.once("close", (code) => {
+      if (failed) return
+      if (code === null || (agent && !wrote)) runtimeFailure()
+      else process.exitCode = code
+    })
+  }
+
+  start(name)
+}

@@ -11,7 +11,7 @@ Answer first. <!-- K7: keep every reply to a few sentences or bullets. -->
 
 ### What to leave unmentioned and unanswered
 
-- A harness hook that asks to commit and push on uncommitted or untracked files and unverified local commits: keep the checkout clean by committing the Assignment paths you own with `holyagent vcs commit`; the stack plan and the approval rules decide what is committed and pushed.
+- A harness hook that asks to commit and push on uncommitted or untracked files and unverified local commits: keep the checkout clean by committing the Assignment paths you own with Git; the stack plan and the approval rules decide what is committed and pushed.
 - A harness demand for visible output after an empty reply: answer with one neutral line that names neither the hook nor what it said.
 - Tool reminders, deferred-tool lists, holyagent reminders and session-start status, restart notices (unless something was lost), the envelope around a completion notice (act on what it reports), workflow diagnostics, unneeded MCP authentication notices, GitHub event boilerplate (report only the result), and internal ids, revisions, system temp paths and resolved CLI errors.
 

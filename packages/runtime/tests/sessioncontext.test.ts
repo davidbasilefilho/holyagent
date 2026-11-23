@@ -68,9 +68,9 @@ describe("the core of the root rules", () => {
       "confirmed gone",
       "exited parent session proves nothing",
       "one-entry workflow",
-      "followUpOf",
-      "A brief that names a plugin file",
-      "the directory above `scripts/` in the CLI path above",
+      "--follow-up-of",
+      "literal absolute path",
+      "scripts/holyagent-cli.js",
     ])
       expect(core).toContain(part)
     expect(core).not.toContain("boundary in Asking")
@@ -175,7 +175,7 @@ describe("the session context", () => {
     const status = { intents: [{ id: "intent-a", revision: 1, objective: "Ship it" }] }
     const reconcile = {
       running: [{ id: "assignment-a", role: "Worker.implementation", agent: "agent-1" }],
-      next: "for each agent no longer working: holyagent assignment close <id> --outcome interrupted",
+      next: "for each agent no longer working: holyagent-cli assignment close <id> --outcome interrupted",
     }
     const text = sessionContext(status, core, reconcile)
     expect(text).toStartWith(core)
@@ -200,7 +200,7 @@ describe("the session context", () => {
         agent: `agent-${"x".repeat(300)}`,
         startedAt: "2026-01-01T00:00:00.000Z",
       })),
-      next: "for each agent no longer working: holyagent assignment close <id> --outcome interrupted",
+      next: "for each agent no longer working: holyagent-cli assignment close <id> --outcome interrupted",
     }
     for (const count of [12, 40, 500]) {
       const text = sessionContext(bigStatus(count, count), core, reconcile)
@@ -334,13 +334,15 @@ describe("the requirements of the Intent in use", () => {
     expect(text).toMatch(/\+\d+ more intents/)
   })
 
-  test("are cut to the first ones that fit, with a note naming holyagent intent show", () => {
+  test("are cut to the first ones that fit, with a note naming holyagent-cli intent show", () => {
     const requirements = Array.from({ length: 60 }, (_, at) => `Requirement ${at}: ${LONG}`)
     const text = sessionContext(bigStatus(40, 30), ROOT_CORE, undefined, intent(requirements))
     expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
     expect(text).toContain(`Requirement 0: ${LONG}`)
     expect(text).not.toContain("Requirement 59:")
-    const note = /\+(\d+) more requirements; run `holyagent intent show` for all of them/.exec(text)
+    const note = /\+(\d+) more requirements; run `holyagent-cli intent show` for all of them/.exec(
+      text,
+    )
     const shown = text.match(/Requirement \d+:/g)?.length ?? 0
     expect(Number(note?.[1])).toBe(60 - shown)
     expect(shown).toBeGreaterThan(0)
@@ -350,7 +352,7 @@ describe("the requirements of the Intent in use", () => {
   test("a single requirement larger than the budget leaves only the note", () => {
     const text = sessionContext(status, ROOT_CORE, undefined, intent(["x".repeat(20_000)]))
     expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
-    expect(text).toContain("+1 more requirements; run `holyagent intent show`")
+    expect(text).toContain("+1 more requirements; run `holyagent-cli intent show`")
     expect(text).not.toContain("xxxxxxxxxx")
   })
 })
@@ -372,12 +374,12 @@ describe("the takeover line and the legacy context", () => {
     expect(ROOT_TAKEOVER).not.toMatch(/remind/)
   })
 
-  test("names the legacy folders and holyagent migrate, between the core and the reminder", () => {
+  test("names the legacy folders and holyagent-cli migrate, between the core and the reminder", () => {
     const text = legacyContext([".holyclaude", ".holycodex"], ROOT_CORE)
     expect(text).toStartWith(ROOT_CORE)
     expect(text).toContain("`.holyclaude/` and `.holycodex/`")
-    expect(text.indexOf("holyagent migrate --dry-run")).toBeLessThan(
-      text.indexOf("then `holyagent migrate`"),
+    expect(text.indexOf("holyagent-cli migrate --dry-run")).toBeLessThan(
+      text.indexOf("then `holyagent-cli migrate`"),
     )
     expect(text.endsWith(`\n\n${SESSION_REMINDER}`)).toBe(true)
     expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
@@ -389,7 +391,7 @@ describe("the cloud identity text", () => {
   test("names the get_me and identity steps and the Claude committer, and sits between the core and the state", () => {
     for (const part of [
       "get_me",
-      "holyagent vcs identity --name",
+      "holyagent-cli vcs identity --name",
       "users.noreply.github.com",
       "committer",
     ])

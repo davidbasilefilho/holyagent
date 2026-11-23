@@ -54,6 +54,13 @@ export const RUNTIME_SOURCE = "packages/runtime/src/hooks/pi-entry.ts"
 /** The public CLI entry, which enables interactive setup. */
 export const PUBLIC_SOURCE = "packages/runtime/src/hooks/pi-public-entry.ts"
 
+/** The noninteractive agent CLI shipped beside the public installer. */
+export const AGENT_SOURCE = "packages/runtime/src/hooks/pi-agent-entry.ts"
+
+const AGENT_BIN_SOURCE = `${SOURCES}/agent-bin.js`
+const PUBLIC_BIN_SOURCE = `${SOURCES}/public-bin.js`
+const LAUNCHER_SOURCE = `${SOURCES}/launcher.js`
+
 /**
  * The entry the package bundles as `scripts/just-bash.js` (see `SHELL_BUNDLE`): the shell process
  * the extension starts with Bun for each bash call, with just-bash inside. A bundle of its own,
@@ -110,7 +117,10 @@ export const manifest = (): GeneratedFile => ({
       directory: "packages/integrations/pi/dist",
     },
     type: "module",
-    bin: { holyagent: "./scripts/holyagent-public.js" },
+    bin: {
+      holyagent: "./scripts/holyagent-public-bin.js",
+      "holyagent-cli": "./scripts/holyagent-cli-bin.js",
+    },
     keywords: ["pi-package"],
     files: PACKAGE_FILES,
     pi: {
@@ -187,6 +197,14 @@ const wrapperExecLine = (): string =>
 
 const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const [shebang = "", ...wrapper] = (await readSource(WRAPPER_SOURCE)).split("\n")
+  const bin = async (name: string, source: string): Promise<GeneratedFile> => {
+    const [first = "", ...body] = (await readSource(source)).split("\n")
+    return {
+      path: inPackage(`scripts/${name}`),
+      content: [first, `// ${generatedNote(source)}`, ...body].join("\n"),
+      executable: true,
+    }
+  }
   if (!WRAPPER_EXEC.test(wrapper.join("\n")))
     throw new Error(`${WRAPPER_SOURCE} no longer has the line that starts Bun for the generator`)
   const text = wrapper.join("\n").replace(WRAPPER_EXEC, wrapperExecLine)
@@ -213,6 +231,17 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       path: inPackage("scripts/holyagent-public.js"),
       content: await runtime(PUBLIC_SOURCE),
       executable: true,
+    },
+    {
+      path: inPackage("scripts/holyagent-cli.js"),
+      content: await runtime(AGENT_SOURCE),
+      executable: true,
+    },
+    await bin("holyagent-cli-bin.js", AGENT_BIN_SOURCE),
+    await bin("holyagent-public-bin.js", PUBLIC_BIN_SOURCE),
+    {
+      path: inPackage("scripts/launcher.js"),
+      content: `// ${generatedNote(LAUNCHER_SOURCE)}\n${await readSource(LAUNCHER_SOURCE)}`,
     },
     { path: inPackage(`scripts/${SHELL_BUNDLE}`), content: await shell() },
     {

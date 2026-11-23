@@ -108,7 +108,7 @@ The defaults under `pi.provider` `"openai-codex"` (`CODEX_ROUTES`):
 
 | Row                                                                                                   | `model`         | `thinking` |
 | ----------------------------------------------------------------------------------------------------- | --------------- | ---------- |
-| `root`                                                                                                | `gpt-6.1-sol`   | `high`     |
+| `root`                                                                                                | `gpt-6.2-sol`   | `high`     |
 | `Explorer.map`, `Explorer.lookup`, `Librarian.lookup`, `Worker.validation`                            | `gpt-6-luna`    | `low`      |
 | `Worker.mechanical`, `Worker.operations`                                                              | `gpt-6-luna`    | `medium`   |
 | `Reviewer.audit`                                                                                      | `gpt-6-luna`    | `high`     |

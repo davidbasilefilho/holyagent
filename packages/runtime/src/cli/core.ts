@@ -114,7 +114,10 @@ export const coreCommand = (name: string) => (call: Call) =>
             Effect.mapError((error) =>
               error instanceof InvalidDraft
                 ? new InvalidDraft({
-                    message: `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`,
+                    message:
+                      call.surface === "agent"
+                        ? `${error.message}. To dispatch an existing Assignment use --id <id>.`
+                        : `${error.message}. To dispatch an existing Assignment send {"id": "<id>"}`,
                   })
                 : error,
             ),
