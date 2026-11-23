@@ -38,5 +38,20 @@
     "finishedAt": "2026-11-23T11:29:57.584Z"
   },
   "result": "result: Verified the two installed commands and the structured state compatibility path.\nchanged: The packed agent CLI and state integration test.\nchecks: Packed test passed 180 assertions on Linux. Migration suite passed.\nblockers: Native Windows runs in GitHub CI.\nquestions: None.\nnotes: Used actual 0.3.3 JSON state.\nevidence:\nThe generated tarball installs both executables and exercises their contracts outside the repository: The suite installed the generated tarball offline, used help and version aliases, and checked a real PTY and open stdin.\nExisting JSON state survives operations and invalid state is refused: The suite updated the old fixture in place and refused invalid JSON without rewriting the bytes.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "The packed install and state schema gates passed on the release tree, including native Windows.",
+    "criteria": [
+      {
+        "criterion": "The generated tarball installs both executables and exercises their contracts outside the repository",
+        "support": "The suite installed the generated tarball offline, used help and version aliases, and checked a real PTY and open stdin."
+      },
+      {
+        "criterion": "Existing JSON state survives operations and invalid state is refused",
+        "support": "The suite updated the old fixture in place and refused invalid JSON without rewriting the bytes."
+      }
+    ],
+    "evidence": []
+  },
   "createdAt": "2026-11-23T10:58:50.528Z"
 }
