@@ -1,0 +1,39 @@
+{
+  "id": "assignment-0mwt5kra8-wovv",
+  "intentId": "intent-0mwt545nb-kix4",
+  "intentRevision": 3,
+  "roleTask": "Worker.validation",
+  "slug": "verify-existing-json-state-schemas-and",
+  "objective": "Verify existing JSON state schemas and add installed package regression coverage for the public and agent CLI contracts, including native Windows launching.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "The generated tarball installs both executables and exercises their contracts outside the repository",
+      "blocking": true,
+      "dimension": "tests"
+    },
+    {
+      "text": "Existing JSON state survives operations and invalid state is refused",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "operationalResources": [
+    {
+      "kind": "local-path",
+      "target": "/tmp/holyagent-release-contract-tests"
+    }
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-23T10:58:50.528Z"
+  },
+  "createdAt": "2026-11-23T10:58:50.528Z"
+}
