@@ -38,5 +38,20 @@
     "finishedAt": "2026-11-23T11:29:55.989Z"
   },
   "result": "result: Separated the public installer from the noninteractive agent CLI.\nchanged: CLI program and entry, package launcher and generator, focused tests.\nchecks: 32 focused tests passed, 1 Windows-only skip. The integration build and type checking passed.\nblockers: None.\nquestions: None.\nnotes: Both installed entries ignore project Bun startup configuration.\nevidence:\nThe packed public and internal commands have different help and behavior: The packed npm suite checked both global shims. The public OpenTUI opened its review and cancellation preserved settings.\nAgent success, help, version, trailers and failures decode as TOON: The installed-package suite tested both aliases, open stdin and a real TTY.\n",
+  "acceptance": {
+    "revision": 3,
+    "rationale": "Independently verified the clean installed artifacts and one TOON document per internal invocation.",
+    "criteria": [
+      {
+        "criterion": "The packed public and internal commands have different help and behavior",
+        "support": "The packed npm suite checked both global shims. The public OpenTUI opened its review and cancellation preserved settings."
+      },
+      {
+        "criterion": "Agent success, help, version, trailers and failures decode as TOON",
+        "support": "The installed-package suite tested both aliases, open stdin and a real TTY."
+      }
+    ],
+    "evidence": []
+  },
   "createdAt": "2026-11-23T10:58:48.660Z"
 }
