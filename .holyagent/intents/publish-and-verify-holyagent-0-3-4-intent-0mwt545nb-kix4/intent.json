@@ -1,0 +1,13 @@
+{
+  "id": "intent-0mwt545nb-kix4",
+  "slug": "publish-and-verify-holyagent-0-3-4",
+  "objective": "Publish and verify HolyAgent 0.3.4 through the protected release workflow",
+  "requirements": [
+    "Reproduce the published 0.3.3 missing executable and validate the 0.3.4 package outside the monorepo.",
+    "Preserve the main publication repair and complete the supported Linux and Windows checks before merge.",
+    "Stop after the stable release and its published artifact are verified, or report the exact blocker."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-23T10:45:55.991Z"
+}
