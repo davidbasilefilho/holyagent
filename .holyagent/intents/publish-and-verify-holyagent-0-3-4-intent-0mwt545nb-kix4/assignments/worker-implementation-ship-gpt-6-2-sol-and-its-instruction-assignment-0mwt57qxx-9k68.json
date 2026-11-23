@@ -48,5 +48,26 @@
     "finishedAt": "2026-11-23T12:52:38.788Z"
   },
   "result": "result: The existing Pi Codex route selects GPT-6.2 Sol at high effort and resolves the matching instructions from the package. Astra uses the same 6.2 guidance. The 6 and 6.1 routes retain their own guidance.\nchecks: The real installed Pi 1.5.0 RPC smoke used a synthetic sign-in and a local prompt observer before inference. The exact release PR passed the Linux, Windows and macOS matrix. The local repository verify on 79e43564 passed 3,758 tests with 3 platform skips.\nevidence:\nThe existing Pi Codex provider defaults to GPT-6.2 Sol and selects GPT-6.2 instructions for Sol and Astra: The installed Pi RPC returned openai-codex/gpt-6.2-sol:high by default, identical GPT-6.2 guidance for Sol and Astra, and previous GPT-6 guidance for explicit GPT-6.1 Sol.\nOlder models, other providers and harness-specific authorship retain their intended behavior: The codex, prompts and VCS tests passed on the exact release tree. Pi's effective root prompt used normal Git and contained no special identity setup.\nfocused-verification: https://github.com/davidbasilefilho/holyagent/actions/runs/45174666649 and the candidate Pi RPC smoke.\n",
+  "acceptance": {
+    "revision": 3,
+    "carriedFrom": 2,
+    "rationale": "The verified release tree meets all original blocking criteria after the Intent revision changed.",
+    "criteria": [
+      {
+        "criterion": "The existing Pi Codex provider defaults to GPT-6.2 Sol and selects GPT-6.2 instructions for Sol and Astra",
+        "support": "The installed Pi RPC returned openai-codex/gpt-6.2-sol:high by default, identical GPT-6.2 guidance for Sol and Astra, and previous GPT-6 guidance for explicit GPT-6.1 Sol."
+      },
+      {
+        "criterion": "Older models, other providers and harness-specific authorship retain their intended behavior",
+        "support": "The codex, prompts and VCS tests passed on the exact release tree. Pi's effective root prompt used normal Git and contained no special identity setup."
+      }
+    ],
+    "evidence": [
+      {
+        "label": "focused-verification",
+        "support": "https://github.com/davidbasilefilho/holyagent/actions/runs/45174666649 and the candidate Pi RPC smoke."
+      }
+    ]
+  },
   "createdAt": "2026-11-23T10:48:43.557Z"
 }
