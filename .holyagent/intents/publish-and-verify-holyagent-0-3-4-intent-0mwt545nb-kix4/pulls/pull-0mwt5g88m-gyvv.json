@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mwt5g88m-gyvv",
+  "intentId": "intent-0mwt545nb-kix4",
+  "number": 141,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/141",
+  "branch": "release/0.3.4/fix/reconcile-promotion",
+  "base": "release/0.3.4/integration",
+  "created": true,
+  "recordedAt": "2026-11-23T10:55:19.222Z"
+}
