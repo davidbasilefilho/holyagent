@@ -3,11 +3,11 @@
   "slug": "publish-and-verify-holyagent-0-3-4",
   "objective": "Publish and verify HolyAgent 0.3.4 through the protected release workflow",
   "requirements": [
-    "Reproduce the published 0.3.3 missing executable and validate the 0.3.4 package outside the monorepo.",
-    "Preserve the main publication repair and complete the supported Linux and Windows checks before merge.",
-    "Reuse the GPT-6.2 model and instructions for the existing T3 Code Pi Codex provider. Preserve unrelated defaults and Claude Code-only attribution handling. Stop after the stable release and its published artifact are verified, or report the exact blocker."
+    "Publish version 0.3.4 only after verifying the stable npm package and GitHub artifact through the protected workflow.",
+    "Separate the human holyagent CLI from the agent holyagent-cli. Keep all agent-visible results, help, version and failures TOON. Use validated typed flags for agent operations and preserve JSON state.",
+    "Retain T3 Code as the supported interface, GPT-6.2 Sol for the existing Pi Codex route and Claude Code-only authorship handling. Keep other work outside this release."
   ],
-  "revision": 2,
+  "revision": 3,
   "state": "Open",
   "createdAt": "2026-11-23T10:45:55.991Z"
 }
