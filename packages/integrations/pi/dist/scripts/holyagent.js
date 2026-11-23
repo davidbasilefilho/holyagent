@@ -187,6 +187,37 @@ var backEdges = 0, addBackEdge = () => {
   backEdges++;
 };
 
+function ownEnumerableKeys(self) {
+  const keys = Object.keys(self);
+  for (const key of Object.getOwnPropertySymbols(self)) {
+    if (Object.prototype.propertyIsEnumerable.call(self, key)) {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+function assignProperty(self, key, value) {
+  if (key === "__proto__") {
+    Object.defineProperty(self, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+  } else {
+    self[key] = value;
+  }
+}
+function assignProperties(self, source) {
+  if (!Object.hasOwn(source, "__proto__")) {
+    Object.assign(self, source);
+    return;
+  }
+  for (const key of ownEnumerableKeys(source)) {
+    assignProperty(self, key, source[key]);
+  }
+}
+
 function isString(input) {
   return typeof input === "string";
 }
@@ -833,30 +864,6 @@ var init_Utils = __esm(() => {
   internalCall = /* @__PURE__ */ pickInternalCall();
 });
 
-function assignProperty(self, key, value) {
-  if (key === "__proto__") {
-    Object.defineProperty(self, key, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true
-    });
-  } else {
-    self[key] = value;
-  }
-}
-function assignProperties(self, source) {
-  if (!Object.hasOwn(source, "__proto__")) {
-    Object.assign(self, source);
-    return;
-  }
-  for (const key of Reflect.ownKeys(source)) {
-    if (Object.prototype.propertyIsEnumerable.call(source, key)) {
-      assignProperty(self, key, source[key]);
-    }
-  }
-}
-
 function defaultEvaluate(_fiber) {
   return exitDie(`Effect.evaluate: Not implemented`);
 }
@@ -994,11 +1001,11 @@ var init_core = __esm(() => {
   };
   StructuralProto = {
     [symbol]() {
-      return structureKeys(this, Object.keys(this));
+      return structureKeys(this, ownEnumerableKeys(this));
     },
     [symbol2](that) {
-      const selfKeys = Object.keys(this);
-      if (selfKeys.length !== Object.keys(that).length)
+      const selfKeys = ownEnumerableKeys(this);
+      if (selfKeys.length !== ownEnumerableKeys(that).length)
         return false;
       for (const key of selfKeys) {
         if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
@@ -1391,7 +1398,7 @@ var init_result = __esm(() => {
       return {
         _id: "Result",
         _tag: this._tag,
-        value: toJson(this.success)
+        success: toJson(this.success)
       };
     }
   });
@@ -2782,7 +2789,7 @@ ${prefix}}`;
       if (done)
         break;
       const index = i++;
-      const fiber = forkUnsafe(parent, effect, true, true, false);
+      const fiber = new FiberImpl(parent.context);
       fibers.add(fiber);
       fiber.addObserver((exit) => {
         fibers.delete(fiber);
@@ -2798,6 +2805,12 @@ ${prefix}}`;
           });
         }
       });
+      if (done)
+        fiber.interruptUnsafe(parent.id, fiberStackAnnotations(parent));
+      else
+        fiber.evaluate(effect);
+      if (done)
+        break;
     }
   });
 }), interruptRaceLosers = (fibers, parent) => {
@@ -2977,10 +2990,13 @@ ${prefix}}`;
 }), all = (arg, options) => {
   if (isIterable(arg)) {
     return options?.mode === "result" ? forEach(arg, result, options) : forEach(arg, identity, options);
-  } else if (options?.discard) {
-    return options.mode === "result" ? forEach(Object.values(arg), result, options) : forEach(Object.values(arg), identity, options);
   }
-  return suspend(() => map3(forEach(Object.entries(arg), ([key, effect]) => map3(options?.mode === "result" ? result(effect) : effect, (value) => [key, value]), {
+  const fields = arg;
+  if (options?.discard) {
+    const effects = ownEnumerableKeys(fields).map((key) => fields[key]);
+    return options.mode === "result" ? forEach(effects, result, options) : forEach(effects, identity, options);
+  }
+  return suspend(() => map3(forEach(ownEnumerableKeys(fields).map((key) => [key, fields[key]]), ([key, effect]) => map3(options?.mode === "result" ? result(effect) : effect, (value) => [key, value]), {
     concurrency: options?.concurrency
   }), Object.fromEntries));
 }, whileLoop, forEach, forEachSequential = (iterable, f, options) => suspend(() => {
@@ -3483,6 +3499,7 @@ var init_effect = __esm(() => {
       }
       const interruptChildren = fiberMiddleware.interruptChildren && fiberMiddleware.interruptChildren(this);
       if (interruptChildren !== undefined) {
+        this.interruptible = false;
         return this.evaluate(flatMap(interruptChildren, () => exit));
       }
       this._exit = exit;
@@ -4433,9 +4450,10 @@ var init_Number = __esm(() => {
   Number3 = globalThis.Number;
 });
 
-var String3;
+var String3, loneSurrogate, isWellFormed = (self) => self.isWellFormed?.() ?? !loneSurrogate.test(self);
 var init_String = __esm(() => {
   String3 = globalThis.String;
+  loneSurrogate = /[\uD800-\uDFFF]/u;
 });
 
 function toPojo(cron) {
@@ -5807,8 +5825,13 @@ function stringifyJson(options) {
     }, input, parseOptions)
   }));
 }
+function encodeWithWellFormedString(encode) {
+  return transformEffect((input, options) => typeof input === "string" && !isWellFormed(input) ? fail5(new InvalidValue({
+    expected: "a well-formed Unicode string"
+  }, input, options)) : succeed6(encode(input)));
+}
 function encodeBase64() {
-  return transform(encode);
+  return encodeWithWellFormedString(encode);
 }
 function decodeBase64() {
   return transformEffect((input, options) => mapErrorEager2(fromResult2(decode(input)), () => new InvalidValue({
@@ -5823,6 +5846,7 @@ var init_SchemaGetter = __esm(() => {
   init_Pipeable();
   init_Predicate();
   init_SchemaIssue();
+  init_String();
   passthrough_ = /* @__PURE__ */ makeGetter({
     _tag: "Passthrough"
   });
@@ -5885,7 +5909,7 @@ var init_SchemaTransformation = __esm(() => {
     }
   };
   passthrough_2 = /* @__PURE__ */ new Transformation(/* @__PURE__ */ passthrough2(), /* @__PURE__ */ passthrough2());
-  numberFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ Number4(), /* @__PURE__ */ String4());
+  numberFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ Number4(), /* @__PURE__ */ transform((n) => Object.is(n, -0) ? "-0" : globalThis.String(n)));
   bigintFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ BigInt3(), /* @__PURE__ */ String4());
   urlFromString = /* @__PURE__ */ transformEffect2({
     decode: (s, options) => URL.canParse(s) ? succeed6(new URL(s)) : fail5(new InvalidValue({
@@ -6011,7 +6035,7 @@ function combineChecks(a, b) {
   return [...a, ...b];
 }
 function struct(fields, checks, annotations) {
-  return new Objects(Reflect.ownKeys(fields).map((key) => {
+  return new Objects(ownEnumerableKeys(fields).map((key) => {
     return new PropertySignature(key, fields[key].ast);
   }), [], annotations, checks);
 }
@@ -7288,10 +7312,10 @@ var init_SchemaAST = __esm(() => {
                   coveredKeys.add(key);
               }
             }
-            const inputKeys = Reflect.ownKeys(record);
+            const inputKeys = ownEnumerableKeys(record);
             for (let i = 0;i < inputKeys.length; i++) {
               const key = inputKeys[i];
-              if (!coveredKeys.has(key) && Object.prototype.propertyIsEnumerable.call(record, key)) {
+              if (!coveredKeys.has(key)) {
                 const unexpected = new UnexpectedKey(ast, record[key], options);
                 const issue = new Pointer([key], unexpected);
                 if (errorsAllOption) {
@@ -9083,6 +9107,8 @@ var init_Channel = __esm(() => {
 
 var init_ChannelSchema = () => {};
 
+var init_Codegen = () => {};
+
 var init_PlatformError = () => {};
 
 var TypeId26 = "~effect/Sink", sinkVariance, SinkProto;
@@ -9155,13 +9181,14 @@ function fromEnvRecord(env, options) {
   return make10((path) => succeed6(nodeAtEnv(trie, env, path, preserveEmptyStrings)));
 }
 function fromEnv(options) {
-  const env = options?.env ?? {
+  if (options?.env !== undefined) {
+    return fromEnvRecord(options.env, options);
+  }
+  let provider;
+  return make10((path) => suspend2(() => (provider ??= fromEnvRecord({
     ...globalThis.process?.env,
     ...import.meta?.env
-  };
-  return fromEnvRecord(env, {
-    preserveEmptyStrings: options?.preserveEmptyStrings
-  });
+  }, options)).load(path)));
 }
 function buildEnvTrie(env) {
   const trie = {};
@@ -9940,6 +9967,7 @@ var init_dist = __esm(() => {
   init_ChannelSchema();
   init_Chunk();
   init_Clock();
+  init_Codegen();
   init_Config();
   init_ConfigProvider();
   init_Console();
@@ -11101,15 +11129,15 @@ var pi_packages_default;
 var init_pi_packages = __esm(() => {
   pi_packages_default = {
     "pi-provider-kimi-code": "0.6.14",
-    "@tintinweb/pi-subagents": "0.26.0",
+    "@tintinweb/pi-subagents": "0.26.2",
     "billion-context": "0.1.216",
     "@juicesharp/rpiv-todo": "2.15.0",
     "@juicesharp/rpiv-ask-user-question": "2.15.0",
-    "@aliou/pi-processes": "0.13.6",
-    "@amaster.ai/pi-computer-use": "0.1.38",
+    "@aliou/pi-processes": "0.13.8",
+    "@amaster.ai/pi-computer-use": "0.1.40",
     "pi-web-kit": "0.5.0",
     "@ff-labs/pi-fff": "0.11.0",
-    "@opencode/browse": "0.1.3"
+    "@opencode/browse": "0.1.5"
   };
 });
 
@@ -11122,7 +11150,7 @@ var init_pi_packages2 = __esm(() => {
 var pypi_packages_default;
 var init_pypi_packages = __esm(() => {
   pypi_packages_default = {
-    "browser-use": "1.0.6"
+    "browser-use": "1.0.8"
   };
 });
 
@@ -23114,7 +23142,7 @@ var astralIdentifierCodes, astralIdentifierStartCodes, nonASCIIidentifierChars =
   this.postfix = !!conf.postfix;
   this.binop = conf.binop || null;
   this.updateContext = null;
-}, beforeExpr, startsExpr, keywords, types$1, lineBreak, lineBreakG, nonASCIIwhitespace, skipWhiteSpace, ref, hasOwnProperty, toString, hasOwn, isArray2, regexpCache, loneSurrogate, Position = function Position(line, col) {
+}, beforeExpr, startsExpr, keywords, types$1, lineBreak, lineBreakG, nonASCIIwhitespace, skipWhiteSpace, ref, hasOwnProperty, toString, hasOwn, isArray2, regexpCache, loneSurrogate2, Position = function Position(line, col) {
   this.line = line;
   this.column = col;
 }, SourceLocation = function SourceLocation(p, start, end) {
@@ -23350,7 +23378,7 @@ var init_acorn = __esm(() => {
     return toString.call(obj) === "[object Array]";
   };
   regexpCache = Object.create(null);
-  loneSurrogate = /(?:[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])/;
+  loneSurrogate2 = /(?:[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])/;
   Position.prototype.offset = function offset(n) {
     return new Position(this.line, this.column + n);
   };
@@ -24718,7 +24746,7 @@ var init_acorn = __esm(() => {
   pp$8.parseModuleExportName = function() {
     if (this.options.ecmaVersion >= 13 && this.type === types$1.string) {
       var stringLiteral = this.parseLiteral(this.value);
-      if (loneSurrogate.test(stringLiteral.value)) {
+      if (loneSurrogate2.test(stringLiteral.value)) {
         this.raise(stringLiteral.start, "An export name cannot include a lone surrogate.");
       }
       return stringLiteral;
@@ -30234,9 +30262,9 @@ var init_lock3 = __esm(() => {
 });
 
 var TUI_PACKAGES = {
-  "@opentui/core": "0.9.2",
-  "@opentui/solid": "0.9.2",
-  "solid-js": "1.9.19"
+  "@opentui/core": "0.9.7",
+  "@opentui/solid": "0.9.7",
+  "solid-js": "1.9.20"
 }, TUI_LOCK = `{
   "lockfileVersion": 2,
   "configVersion": 1,
@@ -30244,9 +30272,9 @@ var TUI_PACKAGES = {
     "": {
       "name": "holyagent-setup-tui",
       "dependencies": {
-        "@opentui/core": "0.9.2",
-        "@opentui/solid": "0.9.2",
-        "solid-js": "1.9.19"
+        "@opentui/core": "0.9.7",
+        "@opentui/solid": "0.9.7",
+        "solid-js": "1.9.20"
       }
     }
   },
@@ -30294,18 +30322,18 @@ var TUI_PACKAGES = {
       "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
     ],
     "@babel/generator": [
-      "@babel/generator@7.29.14",
+      "@babel/generator@7.29.15",
       "",
       {
         "dependencies": {
-          "@babel/parser": "^7.29.14",
-          "@babel/types": "^7.29.14",
+          "@babel/parser": "^7.29.15",
+          "@babel/types": "^7.29.15",
           "@jridgewell/gen-mapping": "^0.3.12",
           "@jridgewell/trace-mapping": "^0.3.28",
           "jsesc": "^3.0.2"
         }
       },
-      "sha512-qSY56jgW5JnSXzuekLVil6zaOQxOCtOHidr65KkaMBw772IuAY28Qx4ZykAcDn8+FRF15qk80XzKwgSc/RYW6g=="
+      "sha512-gNWJUX0FlevflramOkaInywOMhU1lkln38gAC7TFZv2tsWbLYbN/2WZFGcq8zbX0Z55e4vGa27IB/NaeZoauWQ=="
     ],
     "@babel/helper-annotate-as-pure": [
       "@babel/helper-annotate-as-pure@7.29.7",
@@ -30437,10 +30465,10 @@ var TUI_PACKAGES = {
       "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
     ],
     "@babel/helper-string-parser": [
-      "@babel/helper-string-parser@7.29.14",
+      "@babel/helper-string-parser@7.29.15",
       "",
       {},
-      "sha512-CXvKMFvM80ihI7Vox9jb+kQjnyjESQNPM+vB7U0Zz6TWuZA+Z/FL0QPMH300h33qJtIx+REeBhXqWOPW48TcAQ=="
+      "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="
     ],
     "@babel/helper-validator-identifier": [
       "@babel/helper-validator-identifier@7.29.7",
@@ -30455,26 +30483,26 @@ var TUI_PACKAGES = {
       "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
     ],
     "@babel/helpers": [
-      "@babel/helpers@7.29.14",
+      "@babel/helpers@7.29.15",
       "",
       {
         "dependencies": {
           "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.14"
+          "@babel/types": "^7.29.15"
         }
       },
-      "sha512-6E3Mi1r0B0umq6vmZa4/78q+64fqO2YY0THUdjDPKUCKhNb0yQy5NQIaPHCSD3ryTgiTss//P4JsWS80AsZ6LQ=="
+      "sha512-l+ezV2czw3t2d2ELq+3CwPL4WLKK5O8IywBXb9/gpmbCOVZFmRYJPmHVqSCv2k+8iKbE30Zf54siOoIZ52XOxA=="
     ],
     "@babel/parser": [
-      "@babel/parser@7.29.14",
+      "@babel/parser@7.29.15",
       "",
       {
         "dependencies": {
-          "@babel/types": "^7.29.14"
+          "@babel/types": "^7.29.15"
         },
         "bin": "./bin/babel-parser.js"
       },
-      "sha512-VL220vXuyO2z3rNIQwY7ftj9UwpqOt+33sH+sBWkOekbsSR2g7EEMnOx24ZlCH0xOA3DM/33SifVFGbnJD8r/w=="
+      "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="
     ],
     "@babel/plugin-syntax-jsx": [
       "@babel/plugin-syntax-jsx@7.29.7",
@@ -30517,21 +30545,21 @@ var TUI_PACKAGES = {
       "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
     ],
     "@babel/plugin-transform-typescript": [
-      "@babel/plugin-transform-typescript@7.29.9",
+      "@babel/plugin-transform-typescript@7.29.15",
       "",
       {
         "dependencies": {
           "@babel/helper-annotate-as-pure": "^7.29.7",
-          "@babel/helper-create-class-features-plugin": "^7.29.7",
+          "@babel/helper-create-class-features-plugin": "^7.29.13",
           "@babel/helper-plugin-utils": "^7.29.7",
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
           "@babel/plugin-syntax-typescript": "^7.29.7"
         },
         "peerDependencies": {
           "@babel/core": "^7.0.0-0"
         }
       },
-      "sha512-FFwIwzU+7SCOuxxV4YtJql6T9981ZVTm+FHO5GhVsRqCTdy0WwrEZh3l42ARpXruJUDGOptdduHW6Zr7pNPLNg=="
+      "sha512-FFuMssbHj8DFMDsTH8xrgKBiE1eXuDvO9jLqav7/vsIe6YdoyPQbWCgLNzQxkcIkOv5itBD17TvZkHGIjUMzLg=="
     ],
     "@babel/preset-typescript": [
       "@babel/preset-typescript@7.27.1",
@@ -30563,31 +30591,31 @@ var TUI_PACKAGES = {
       "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
     ],
     "@babel/traverse": [
-      "@babel/traverse@7.29.14",
+      "@babel/traverse@7.29.15",
       "",
       {
         "dependencies": {
           "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.14",
+          "@babel/generator": "^7.29.15",
           "@babel/helper-globals": "^7.29.7",
-          "@babel/parser": "^7.29.14",
+          "@babel/parser": "^7.29.15",
           "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.14",
+          "@babel/types": "^7.29.15",
           "debug": "^4.3.1"
         }
       },
-      "sha512-RAdQJrBgmIH1FWvN0X+1hoDxzMzlP4cv/1Zi4dn4tG1H0cTb+rw7CzUxQJhp1f4ANd8j5vH3fy8BAWFGkBDEsA=="
+      "sha512-ZfawBo2i8vvt+BTt37dWDKBPjUfm/H+bw+ltwsCRhW7gPtyNVwUXuNo54eO2Xo+P4VXpalPFfFISbBTRKC8SOQ=="
     ],
     "@babel/types": [
-      "@babel/types@7.29.14",
+      "@babel/types@7.29.15",
       "",
       {
         "dependencies": {
-          "@babel/helper-string-parser": "^7.29.14",
+          "@babel/helper-string-parser": "^7.29.15",
           "@babel/helper-validator-identifier": "^7.29.7"
         }
       },
-      "sha512-UjI/dKmwJwT9pOszJitq2G6EObZPnsZUfdCr92z2TlF3EZK9J3EdfOKUrCzHl6wFthbzwhzl1Soc/UIwxRiq6w=="
+      "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="
     ],
     "@jridgewell/gen-mapping": [
       "@jridgewell/gen-mapping@0.3.13",
@@ -30635,7 +30663,7 @@ var TUI_PACKAGES = {
       "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
     ],
     "@opentui/core": [
-      "@opentui/core@0.9.2",
+      "@opentui/core@0.9.7",
       "",
       {
         "dependencies": {
@@ -30644,103 +30672,103 @@ var TUI_PACKAGES = {
           "string-width": "7.2.0"
         },
         "optionalDependencies": {
-          "@opentui/core-darwin-arm64": "0.9.2",
-          "@opentui/core-darwin-x64": "0.9.2",
-          "@opentui/core-linux-arm64": "0.9.2",
-          "@opentui/core-linux-arm64-musl": "0.9.2",
-          "@opentui/core-linux-x64": "0.9.2",
-          "@opentui/core-linux-x64-musl": "0.9.2",
-          "@opentui/core-win32-arm64": "0.9.2",
-          "@opentui/core-win32-x64": "0.9.2"
+          "@opentui/core-darwin-arm64": "0.9.7",
+          "@opentui/core-darwin-x64": "0.9.7",
+          "@opentui/core-linux-arm64": "0.9.7",
+          "@opentui/core-linux-arm64-musl": "0.9.7",
+          "@opentui/core-linux-x64": "0.9.7",
+          "@opentui/core-linux-x64-musl": "0.9.7",
+          "@opentui/core-win32-arm64": "0.9.7",
+          "@opentui/core-win32-x64": "0.9.7"
         },
         "peerDependencies": {
           "web-tree-sitter": "0.25.10"
         }
       },
-      "sha512-Wp0szaFvKET8TlcCO9C7AHgUnPY8qCTsj1im88jOAdX9InlYrerooWF9ez1QBrR/i6+6xhBf/iF/pch3d1xbeg=="
+      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
     ],
     "@opentui/core-darwin-arm64": [
-      "@opentui/core-darwin-arm64@0.9.2",
+      "@opentui/core-darwin-arm64@0.9.7",
       "",
       {
         "os": "darwin",
         "cpu": "arm64"
       },
-      "sha512-6ASALGMPpmpsoGKYUpJYF+HJs1lZiw9zYsUhInCRYuVvBxYkBqV7MSz+1HFsTTd/ewqFuNnV/JMlEieMXZqiEA=="
+      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
     ],
     "@opentui/core-darwin-x64": [
-      "@opentui/core-darwin-x64@0.9.2",
+      "@opentui/core-darwin-x64@0.9.7",
       "",
       {
         "os": "darwin",
         "cpu": "x64"
       },
-      "sha512-KWSEd1W0Gmx+EiixTc8YWbF3/htVFRPREeWV9BsT3Sag0SAwuZNJYhIixR+UGptggShUc4EiNofaAwEdDUG2IA=="
+      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
     ],
     "@opentui/core-linux-arm64": [
-      "@opentui/core-linux-arm64@0.9.2",
+      "@opentui/core-linux-arm64@0.9.7",
       "",
       {
         "os": "linux",
         "cpu": "arm64"
       },
-      "sha512-SKhb+H6F+iAz/Vb0avxxZYor1CIzVYhuMo21qN67xZ9XdqnvPaM5aHRU05rWOjU1U3pRlMslnf4DZZvyqfxjkQ=="
+      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
     ],
     "@opentui/core-linux-arm64-musl": [
-      "@opentui/core-linux-arm64-musl@0.9.2",
+      "@opentui/core-linux-arm64-musl@0.9.7",
       "",
       {
         "os": "linux",
         "cpu": "arm64",
         "libc": "musl"
       },
-      "sha512-RZ8k4ShFV4N9nKCIeNos2NVi1a9dtWpO5HHk75ey8/a9JTiJUtGJhDgko73Hsw/CSqo0rj20yR4n532UuexTzg=="
+      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
     ],
     "@opentui/core-linux-x64": [
-      "@opentui/core-linux-x64@0.9.2",
+      "@opentui/core-linux-x64@0.9.7",
       "",
       {
         "os": "linux",
         "cpu": "x64"
       },
-      "sha512-5tEyEyYioX8owwsSJPTgvDdgMqjqOjOg6g8Bu5gSV9D9XKd5uRzhRC/zCQLubaVmK7oREmaXWJqT4tfIdVqeuw=="
+      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
     ],
     "@opentui/core-linux-x64-musl": [
-      "@opentui/core-linux-x64-musl@0.9.2",
+      "@opentui/core-linux-x64-musl@0.9.7",
       "",
       {
         "os": "linux",
         "cpu": "x64",
         "libc": "musl"
       },
-      "sha512-23T5lMds4fckZxOiLs3INU6Sg5MmSes31li9Oh43bZixD03q0q7dlaD38RetK0RqUhrhlqyDdkcNpcRf9p0U2w=="
+      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
     ],
     "@opentui/core-win32-arm64": [
-      "@opentui/core-win32-arm64@0.9.2",
+      "@opentui/core-win32-arm64@0.9.7",
       "",
       {
         "os": "win32",
         "cpu": "arm64"
       },
-      "sha512-chqxvz7+SXdVLMva7vvfmOogLNn4t9LfeyvUrkc0QLiL4pJyKaR7KxnkI59ykd7A9PlMwzx+Jeb03l6J6kZhVA=="
+      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
     ],
     "@opentui/core-win32-x64": [
-      "@opentui/core-win32-x64@0.9.2",
+      "@opentui/core-win32-x64@0.9.7",
       "",
       {
         "os": "win32",
         "cpu": "x64"
       },
-      "sha512-1DlQEOwM8vOoipAJa/IA4VvtAzpQtbdSjZ9iLA0918HP24iZOAhSfjzH+KkEmRTtPECVL8mk7eFBENS6DtoEwQ=="
+      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
     ],
     "@opentui/solid": [
-      "@opentui/solid@0.9.2",
+      "@opentui/solid@0.9.7",
       "",
       {
         "dependencies": {
           "@babel/core": "7.29.7",
           "@babel/preset-typescript": "7.27.1",
-          "@opentui/core": "0.9.2",
+          "@opentui/core": "0.9.7",
           "babel-plugin-module-resolver": "5.0.2",
           "babel-preset-solid": "1.9.16",
           "entities": "7.0.1",
@@ -30750,7 +30778,7 @@ var TUI_PACKAGES = {
           "solid-js": "^1.9.12"
         }
       },
-      "sha512-HzfUiUUqJnbnuxp1PpfmhDT6Gn/zkrm7GaajTJ0LbznkgKfs5jtJM+kZEwvbbpyToV9lS9N+QkfzCHvxN6BwbQ=="
+      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
     ],
     "ansi-regex": [
       "ansi-regex@6.6.0",
@@ -30807,14 +30835,14 @@ var TUI_PACKAGES = {
       "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
     ],
     "baseline-browser-mapping": [
-      "baseline-browser-mapping@2.11.38",
+      "baseline-browser-mapping@2.11.39",
       "",
       {
         "bin": {
           "baseline-browser-mapping": "dist/cli.cjs"
         }
       },
-      "sha512-rMgy5YW7x28SMfXHLlVZDBqlWzYZ0x2rVR/6FWrNBF0chjigARK1H6nM0hKA1Um3kPOlkQFVtjJs00d2N1ezuw=="
+      "sha512-Q9buOYhr2ggrEZpImICecZTJHCCd8yXkRUokFlUEQ8uiD6oP82F4W4jWnhOHZYV+wlvrC51V7Wy0ULyWjil5Wg=="
     ],
     "browserslist": [
       "browserslist@4.29.6",
@@ -30844,10 +30872,10 @@ var TUI_PACKAGES = {
       "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
     ],
     "caniuse-lite": [
-      "caniuse-lite@1.0.30001826",
+      "caniuse-lite@1.0.30001827",
       "",
       {},
-      "sha512-wTB+9tIbLro/BCXwLuNV1meHE4L9dS6dArMDwgYfNBPMYScqClHyGunhkCSDtHhe/69Xl0sHlKgBVZ+fNsYtWA=="
+      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
     ],
     "convert-source-map": [
       "convert-source-map@2.0.0",
@@ -30884,10 +30912,10 @@ var TUI_PACKAGES = {
       "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
     ],
     "electron-to-chromium": [
-      "electron-to-chromium@1.5.487",
+      "electron-to-chromium@1.5.492",
       "",
       {},
-      "sha512-qWotOhQYeYEj+DK4+Y+cfPj44qiC6ETIiWtJLfmDJydED2BJJ7loPA4SfBbbrMI6X/X3tryJgxnY9nxsO545Zw=="
+      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
     ],
     "emoji-regex": [
       "emoji-regex@10.6.0",
@@ -31118,7 +31146,7 @@ var TUI_PACKAGES = {
       "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
     ],
     "solid-js": [
-      "solid-js@1.9.19",
+      "solid-js@1.9.20",
       "",
       {
         "dependencies": {
@@ -31127,7 +31155,7 @@ var TUI_PACKAGES = {
           "seroval-plugins": "~1.6.8"
         }
       },
-      "sha512-NIrV/6o1FtmrA9iuAAYvnQJZaHrGcaH3LKSVj4kCiZfwqjCtJNDgIgR9XcqYl6KR/Lb3oRx1HrlyswPWR8SRvw=="
+      "sha512-7zEbPxRU5/hHX8O/rYtQ34p/wq44w09gv0u4+myOW5Ode8unKhoG5FbcGlqRXKqqDuDW9yOJ1OXoHgUUl/1f3Q=="
     ],
     "string-width": [
       "string-width@7.2.0",

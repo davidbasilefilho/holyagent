@@ -158,6 +158,37 @@ var addBackEdge = () => {
   backEdges++;
 };
 
+function ownEnumerableKeys(self) {
+  const keys = Object.keys(self);
+  for (const key of Object.getOwnPropertySymbols(self)) {
+    if (Object.prototype.propertyIsEnumerable.call(self, key)) {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+function assignProperty(self, key, value) {
+  if (key === "__proto__") {
+    Object.defineProperty(self, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+  } else {
+    self[key] = value;
+  }
+}
+function assignProperties(self, source) {
+  if (!Object.hasOwn(source, "__proto__")) {
+    Object.assign(self, source);
+    return;
+  }
+  for (const key of ownEnumerableKeys(source)) {
+    assignProperty(self, key, source[key]);
+  }
+}
+
 function isString(input) {
   return typeof input === "string";
 }
@@ -784,30 +815,6 @@ var pickInternalCall = () => {
 };
 var internalCall = /* @__PURE__ */ pickInternalCall();
 
-function assignProperty(self, key, value) {
-  if (key === "__proto__") {
-    Object.defineProperty(self, key, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true
-    });
-  } else {
-    self[key] = value;
-  }
-}
-function assignProperties(self, source) {
-  if (!Object.hasOwn(source, "__proto__")) {
-    Object.assign(self, source);
-    return;
-  }
-  for (const key of Reflect.ownKeys(source)) {
-    if (Object.prototype.propertyIsEnumerable.call(source, key)) {
-      assignProperty(self, key, source[key]);
-    }
-  }
-}
-
 var EffectTypeId = `~effect/Effect`;
 var ExitTypeId = `~effect/Exit`;
 var effectVariance = {
@@ -843,11 +850,11 @@ var PipeInspectableProto = {
 };
 var StructuralProto = {
   [symbol]() {
-    return structureKeys(this, Object.keys(this));
+    return structureKeys(this, ownEnumerableKeys(this));
   },
   [symbol2](that) {
-    const selfKeys = Object.keys(this);
-    if (selfKeys.length !== Object.keys(that).length)
+    const selfKeys = ownEnumerableKeys(this);
+    if (selfKeys.length !== ownEnumerableKeys(that).length)
       return false;
     for (const key of selfKeys) {
       if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
@@ -1327,7 +1334,7 @@ var SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(C
     return {
       _id: "Result",
       _tag: this._tag,
-      value: toJson(this.success)
+      success: toJson(this.success)
     };
   }
 });
@@ -2590,6 +2597,7 @@ class FiberImpl {
     }
     const interruptChildren = fiberMiddleware.interruptChildren && fiberMiddleware.interruptChildren(this);
     if (interruptChildren !== undefined) {
+      this.interruptible = false;
       return this.evaluate(flatMap(interruptChildren, () => exit));
     }
     this._exit = exit;
@@ -3140,7 +3148,7 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
       if (done)
         break;
       const index = i++;
-      const fiber = forkUnsafe(parent, effect, true, true, false);
+      const fiber = new FiberImpl(parent.context);
       fibers.add(fiber);
       fiber.addObserver((exit) => {
         fibers.delete(fiber);
@@ -3156,6 +3164,12 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
           });
         }
       });
+      if (done)
+        fiber.interruptUnsafe(parent.id, fiberStackAnnotations(parent));
+      else
+        fiber.evaluate(effect);
+      if (done)
+        break;
     }
   });
 });
@@ -3600,10 +3614,13 @@ var uninterruptibleMask = (f) => withFiber((fiber) => {
 var all = (arg, options) => {
   if (isIterable(arg)) {
     return options?.mode === "result" ? forEach(arg, result, options) : forEach(arg, identity, options);
-  } else if (options?.discard) {
-    return options.mode === "result" ? forEach(Object.values(arg), result, options) : forEach(Object.values(arg), identity, options);
   }
-  return suspend(() => map2(forEach(Object.entries(arg), ([key, effect]) => map2(options?.mode === "result" ? result(effect) : effect, (value) => [key, value]), {
+  const fields = arg;
+  if (options?.discard) {
+    const effects = ownEnumerableKeys(fields).map((key) => fields[key]);
+    return options.mode === "result" ? forEach(effects, result, options) : forEach(effects, identity, options);
+  }
+  return suspend(() => map2(forEach(ownEnumerableKeys(fields).map((key) => [key, fields[key]]), ([key, effect]) => map2(options?.mode === "result" ? result(effect) : effect, (value) => [key, value]), {
     concurrency: options?.concurrency
   }), Object.fromEntries));
 };
@@ -4403,6 +4420,10 @@ var merge2 = /* @__PURE__ */ dual(2, (self, that) => mergeAll2(self, ...Array.is
 
 var currentTimeMillis2 = currentTimeMillis;
 
+var String2 = globalThis.String;
+var loneSurrogate = /[\uD800-\uDFFF]/u;
+var isWellFormed = (self) => self.isWellFormed?.() ?? !loneSurrogate.test(self);
+
 var Random = /* @__PURE__ */ Reference("effect/Random", {
   defaultValue: () => ({
     nextIntUnsafe() {
@@ -5114,9 +5135,6 @@ function withDefault(defaultValue) {
     return isSome2(filtered) ? succeed6(filtered) : mapEager2(defaultValue, some2);
   });
 }
-function String2() {
-  return transform(globalThis.String);
-}
 function Number3() {
   return transform(globalThis.Number);
 }
@@ -5142,8 +5160,13 @@ function stringifyJson(options) {
     }, input, parseOptions)
   }));
 }
+function encodeWithWellFormedString(encode) {
+  return transformEffect((input, options) => typeof input === "string" && !isWellFormed(input) ? fail5(new InvalidValue({
+    expected: "a well-formed Unicode string"
+  }, input, options)) : succeed6(encode(input)));
+}
 function encodeBase64() {
-  return transform(encode);
+  return encodeWithWellFormedString(encode);
 }
 function decodeBase64() {
   return transformEffect((input, options) => mapErrorEager2(fromResult2(decode(input)), () => new InvalidValue({
@@ -5193,7 +5216,7 @@ var passthrough_2 = /* @__PURE__ */ new Transformation(/* @__PURE__ */ passthrou
 function passthrough3() {
   return passthrough_2;
 }
-var numberFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ Number3(), /* @__PURE__ */ String2());
+var numberFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ Number3(), /* @__PURE__ */ transform((n) => Object.is(n, -0) ? "-0" : globalThis.String(n)));
 var urlFromString = /* @__PURE__ */ transformEffect2({
   decode: (s, options) => URL.canParse(s) ? succeed6(new URL(s)) : fail5(new InvalidValue({
     expected: "a valid URL string"
@@ -5376,7 +5399,7 @@ function literalToString(ast) {
   const literalAsString = globalThis.String(ast.literal);
   return replaceEncoding(ast, [new Link(new Literal(literalAsString), new Transformation(transform(() => ast.literal), transform(() => literalAsString)))]);
 }
-var String3 = class extends ASTNodeImpl {
+var String4 = class extends ASTNodeImpl {
   _tag = "String";
   getParser() {
     return fromRefinement(this, isString);
@@ -5389,7 +5412,7 @@ var String3 = class extends ASTNodeImpl {
     return "string";
   }
 };
-var string2 = /* @__PURE__ */ new String3;
+var string2 = /* @__PURE__ */ new String4;
 var Number4 = class extends ASTNodeImpl {
   _tag = "Number";
   getParser() {
@@ -5801,10 +5824,10 @@ var Objects = class extends ASTNodeImpl {
                 coveredKeys.add(key);
             }
           }
-          const inputKeys = Reflect.ownKeys(record);
+          const inputKeys = ownEnumerableKeys(record);
           for (let i = 0;i < inputKeys.length; i++) {
             const key = inputKeys[i];
-            if (!coveredKeys.has(key) && Object.prototype.propertyIsEnumerable.call(record, key)) {
+            if (!coveredKeys.has(key)) {
               const unexpected = new UnexpectedKey(ast, record[key], options);
               const issue = new Pointer([key], unexpected);
               if (errorsAllOption) {
@@ -5995,7 +6018,7 @@ function combineChecks(a, b) {
   return [...a, ...b];
 }
 function struct(fields, checks, annotations) {
-  return new Objects(Reflect.ownKeys(fields).map((key) => {
+  return new Objects(ownEnumerableKeys(fields).map((key) => {
     return new PropertySignature(key, fields[key].ast);
   }), [], annotations, checks);
 }
@@ -7495,7 +7518,7 @@ var Never2 = /* @__PURE__ */ make7(never2);
 var Unknown2 = /* @__PURE__ */ make7(unknown);
 var Null2 = /* @__PURE__ */ make7(null_);
 var Undefined2 = /* @__PURE__ */ make7(undefined_2);
-var String4 = /* @__PURE__ */ make7(string2);
+var String5 = /* @__PURE__ */ make7(string2);
 var Number5 = /* @__PURE__ */ make7(number2);
 var Boolean3 = /* @__PURE__ */ make7(boolean);
 function makeStruct(ast, fields) {
@@ -7776,8 +7799,8 @@ var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
   }),
   expected: "RegExp",
   toCodecJson: () => link()(Struct({
-    source: String4,
-    flags: String4
+    source: String5,
+    flags: String5
   }), transformEffect2({
     decode: (e, options) => try_2({
       try: () => new globalThis.RegExp(e.source, e.flags),
@@ -7791,7 +7814,7 @@ var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
     })
   }))
 });
-var URLString = /* @__PURE__ */ String4.annotate({
+var URLString = /* @__PURE__ */ String5.annotate({
   expected: "a string that will be decoded as a URL"
 });
 var URL2 = /* @__PURE__ */ instanceOf(globalThis.URL, {
@@ -7806,7 +7829,7 @@ var URL2 = /* @__PURE__ */ instanceOf(globalThis.URL, {
   expected: "URL",
   toCodecJson: () => link()(URLString, urlFromString)
 });
-var JsonString = /* @__PURE__ */ String4.annotate({
+var JsonString = /* @__PURE__ */ String5.annotate({
   expected: "a string that will be decoded as JSON"
 });
 function fromJsonString2(schema, options) {
@@ -7823,9 +7846,9 @@ var File = /* @__PURE__ */ instanceOf(globalThis.File, {
   }),
   expected: "File",
   toCodecJson: () => link()(Struct({
-    data: String4.check(isBase64()),
-    type: String4,
-    name: String4,
+    data: String5.check(isBase64()),
+    type: String5,
+    name: String5,
     lastModified: Int
   }), transformEffect2({
     decode: (e, options) => match(decode(e.data), {
@@ -7866,17 +7889,17 @@ var URLSearchParams2 = /* @__PURE__ */ instanceOf(globalThis.URLSearchParams, {
     Type: `globalThis.URLSearchParams`
   }),
   expected: "URLSearchParams",
-  toCodecJson: () => link()(String4.annotate({
+  toCodecJson: () => link()(String5.annotate({
     expected: "a query string that will be decoded as URLSearchParams"
   }), transform2({
     decode: (e) => new globalThis.URLSearchParams(e),
     encode: (params) => params.toString()
   }))
 });
-var NumberFromString = /* @__PURE__ */ String4.annotate({
+var NumberFromString = /* @__PURE__ */ String5.annotate({
   expected: "a string that will be decoded as a number"
 }).pipe(/* @__PURE__ */ decodeTo2(Number5, numberFromString));
-var Base64String = /* @__PURE__ */ String4.annotate({
+var Base64String = /* @__PURE__ */ String5.annotate({
   expected: "a base64 encoded string that will be decoded as Uint8Array",
   format: "byte",
   contentEncoding: "base64"
@@ -8024,12 +8047,12 @@ class SpecialistNotRecorded extends TaggedError2("SpecialistNotRecorded") {
   }
 }
 
-var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
+var identifier2 = (kind) => String5.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
 var IntentId = identifier2("intent");
 var AssignmentId = identifier2("assignment");
 var BranchId = identifier2("branch");
 var PullId = identifier2("pull");
-var AgentId = String4.check(isPattern2(/\S/));
+var AgentId = String5.check(isPattern2(/\S/));
 var newId = (kind) => gen2(function* () {
   const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
   const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
@@ -8055,7 +8078,7 @@ var pathProblem = (path) => {
   }
   return;
 };
-var PortablePath = String4.check(makeFilter2((path) => pathProblem(path) ?? undefined));
+var PortablePath = String5.check(makeFilter2((path) => pathProblem(path) ?? undefined));
 var pathsOverlap = (a, b) => {
   const left = a.toLowerCase();
   const right = b.toLowerCase();
@@ -8065,7 +8088,7 @@ var firstOverlap = (a, b) => a.find((left) => b.some((right) => pathsOverlap(lef
 var toPosix = (path, separator = sep) => separator === "/" ? path : path.replaceAll(separator, "/");
 var fromGitPath = (path, separator = sep) => separator === "/" ? path : path.replaceAll("/", separator);
 
-var Text = String4.check(isPattern2(/\S/));
+var Text = String5.check(isPattern2(/\S/));
 var Revision = Int.check(isGreaterThanOrEqualTo2(1));
 var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
 var isInstant = (text) => {
@@ -8076,7 +8099,7 @@ var isInstant = (text) => {
   const date = new Date(text);
   return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
 };
-var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
+var Timestamp = String5.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
 var TextList = ArraySchema(Text);
 
 var findIntent = (project, id) => {
@@ -8133,11 +8156,11 @@ var Model = Literals(["haiku", "sonnet"]);
 var Effort = Literals(["medium", "high", "xhigh"]);
 var IntendedLaunch = Struct({
   host: Literals(["pi", "claude"]),
-  provider: String4,
-  model: String4,
-  effort: String4,
+  provider: String5,
+  model: String5,
+  effort: String5,
   profile: Literals(["normal", "fast"]),
-  evidenceRevision: optionalKey2(String4)
+  evidenceRevision: optionalKey2(String5)
 });
 var Mutability = Literals(["ReadOnly", "ScopedWrite"]);
 var Independence = Literals([
@@ -8188,7 +8211,7 @@ var ROUTES = RoleTask.literals.map(routeFor);
 var isWriter = (roleTask) => SPECS[roleTask].mutability === "ScopedWrite";
 var isReviewer = (roleTask) => SPECS[roleTask].role === "Reviewer";
 
-var Slug = String4.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
+var Slug = String5.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
 var MAX_LENGTH = 40;
 var READ_LENGTH = 512;
 var slugOf = (text) => {
@@ -10721,7 +10744,7 @@ import { link as link2, lstat, mkdir as mkdir2, open, rename as rename2, rm as r
 import { dirname as dirname2 } from "path";
 var LockOwner = Struct({
   pid: Int,
-  token: String4,
+  token: String5,
   acquiredAt: Int
 });
 var UNREADABLE_STALE_MS = 30000;
@@ -10870,15 +10893,15 @@ import { link as link3, lstat as lstat2, mkdir as mkdir3, open as open2, readdir
 import { basename, dirname as dirname3, isAbsolute as isAbsolute2, join as join3, resolve as resolve3 } from "path";
 import { promisify } from "util";
 var MigrationJournalFile = Struct({
-  path: String4,
-  before: NullOr(String4),
-  after: String4,
-  content: String4,
+  path: String5,
+  before: NullOr(String5),
+  after: String5,
+  content: String5,
   mode: Int
 });
 var MigrationJournalSource = Struct({
-  path: String4,
-  digest: String4,
+  path: String5,
+  digest: String5,
   tracked: Boolean3
 });
 var MigrationJournalPhase = Literals([
@@ -10889,15 +10912,15 @@ var MigrationJournalPhase = Literals([
 ]);
 var MigrationJournal = Struct({
   version: Literal2(1),
-  transaction: String4,
-  sourceRoot: String4,
-  targetRoot: String4,
-  branch: String4,
-  parent: String4,
-  commit: String4,
-  tree: String4,
-  indexBefore: String4,
-  indexAfter: String4,
+  transaction: String5,
+  sourceRoot: String5,
+  targetRoot: String5,
+  branch: String5,
+  parent: String5,
+  commit: String5,
+  tree: String5,
+  indexBefore: String5,
+  indexAfter: String5,
   files: ArraySchema(MigrationJournalFile),
   source: ArraySchema(MigrationJournalSource),
   phase: MigrationJournalPhase
@@ -13123,7 +13146,7 @@ var repoSlug = (url) => {
 class GitHub extends Service()("holyagent/vcs/GitHub") {
 }
 var apiPath = (path) => path.split("/").map(encodeURIComponent).join("/");
-var ErrorBody = fromJsonString2(Struct({ message: String4 }));
+var ErrorBody = fromJsonString2(Struct({ message: String5 }));
 var Json2 = fromJsonString2(Unknown2);
 var gh = (cwd, env, what, args, stdin) => spawn2("gh", args, {
   cwd,
@@ -13263,35 +13286,35 @@ var screenRoute = (row) => {
 
 var EvidenceDataset = Struct({
   version: Literal2(1),
-  revision: String4,
-  retrievedAt: String4,
-  generatedAt: String4,
+  revision: String5,
+  retrievedAt: String5,
+  generatedAt: String5,
   rows: ArraySchema(Struct({
-    role: String4,
-    harness: String4,
-    provider: String4,
-    model: String4,
-    effort: String4,
-    plan: String4,
-    region: String4,
+    role: String5,
+    harness: String5,
+    provider: String5,
+    model: String5,
+    effort: String5,
+    plan: String5,
+    region: String5,
     monthlyUsd: Number5,
-    allowance: String4,
-    utilization: String4,
-    cacheAssumptions: String4,
+    allowance: String5,
+    utilization: String5,
+    cacheAssumptions: String5,
     tier: Literals(["normal", "fast"]),
-    benchmark: String4,
-    benchmarkVersion: String4,
-    benchmarkHarness: String4,
-    qualityUnit: String4,
+    benchmark: String5,
+    benchmarkVersion: String5,
+    benchmarkHarness: String5,
+    qualityUnit: String5,
     direction: Literals(["higher", "lower"]),
     quality: Number5,
     taskCostUsd: Number5,
     costKind: Literals(["subscription", "api-fallback"]),
-    measuredAt: String4,
-    sourceUrl: String4,
-    planSourceUrl: String4,
-    planSourceDate: String4,
-    confidence: String4
+    measuredAt: String5,
+    sourceUrl: String5,
+    planSourceUrl: String5,
+    planSourceDate: String5,
+    confidence: String5
   }))
 });
 var rankCandidates = (dataset, candidates, comparison) => {
@@ -13388,22 +13411,22 @@ var FFF_NATIVE_HOSTS = [
 
 var pi_packages_default = {
   "pi-provider-kimi-code": "0.6.14",
-  "@tintinweb/pi-subagents": "0.26.0",
+  "@tintinweb/pi-subagents": "0.26.2",
   "billion-context": "0.1.216",
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
-  "@aliou/pi-processes": "0.13.6",
-  "@amaster.ai/pi-computer-use": "0.1.38",
+  "@aliou/pi-processes": "0.13.8",
+  "@amaster.ai/pi-computer-use": "0.1.40",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.1.3"
+  "@opencode/browse": "0.1.5"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 var piPackageSource = (name) => `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`;
 
 var pypi_packages_default = {
-  "browser-use": "1.0.6"
+  "browser-use": "1.0.8"
 };
 
 var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
@@ -13741,12 +13764,12 @@ var managedCapabilityPackages = (definitions = CAPABILITIES) => [
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
-  allowWords: optionalKey2(ArraySchema(String4)),
-  stateBranch: optionalKey2(String4)
+  allowWords: optionalKey2(ArraySchema(String5)),
+  stateBranch: optionalKey2(String5)
 });
 var PiProvider = Literals(["kimi-coding-global", "openai-codex"]);
 var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
+var ModelId = String5.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
 var KIMI_ROOT = "k3.1-pro";
 var KIMI_SPECIALIST = "kimi-for-coding";
 var kimi = (model, thinking) => ({ model, thinking });
@@ -13786,8 +13809,8 @@ var CodemodeMode = Literals(["on", "only"]);
 var T3Scope = Literals(["global", "project"]);
 var Enabled = Boolean3;
 var AutoReviewPolicy = Struct({
-  policy: optionalKey2(String4),
-  extraPolicy: optionalKey2(String4)
+  policy: optionalKey2(String5),
+  extraPolicy: optionalKey2(String5)
 });
 var capabilitySwitch = (on) => defaulted(Enabled, on);
 var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
@@ -13818,7 +13841,7 @@ var PiResolved = toType2(Struct({
     key,
     Struct({
       provider: optionalKey2(PiProvider),
-      model: String4,
+      model: String5,
       thinking: Thinking
     })
   ])))
@@ -13851,21 +13874,21 @@ var DeclaredCandidate = Struct({
   provider: Literals(["kimi-coding-global", "openai-codex", "anthropic"]),
   model: ModelId,
   effort: Thinking,
-  plan: String4,
+  plan: String5,
   tier: Literals(["normal", "fast"]),
   availability: Literals(["yes", "no", "unknown"]),
-  capabilities: Record(String4, Literals(["yes", "no", "unknown"])),
-  requiredCapabilities: ArraySchema(String4),
+  capabilities: Record(String5, Literals(["yes", "no", "unknown"])),
+  requiredCapabilities: ArraySchema(String5),
   identityStable: Boolean3
 });
 var RoutingBenchmark = Struct({
   role: RoleTask,
   harness: Literals(["pi", "claude"]),
-  benchmark: String4,
-  benchmarkVersion: String4,
-  benchmarkHarness: String4,
-  qualityUnit: String4,
-  requiredCapabilities: ArraySchema(String4)
+  benchmark: String5,
+  benchmarkVersion: String5,
+  benchmarkHarness: String5,
+  qualityUnit: String5,
+  requiredCapabilities: ArraySchema(String5)
 });
 var RoutingSettings = Struct({
   version: Literal2(1),
@@ -13874,7 +13897,7 @@ var RoutingSettings = Struct({
   benchmarks: ArraySchema(RoutingBenchmark),
   maxAgeDays: Int.check(isBetween({ minimum: 1, maximum: 365 }))
 });
-var ClaudeSection = defaulted(Record(String4, Never2), {});
+var ClaudeSection = defaulted(Record(String5, Never2), {});
 var Config = Struct({
   vcs: defaulted(VcsSettings, {}),
   pi: PiSection,
@@ -14423,14 +14446,14 @@ var resolveIntent = (snapshot) => {
 var oneLine = (text) => text.replace(/\s+/g, " ").trim();
 var REPORT_FIELDS = Struct({
   status: Literals(["done", "partial", "blocked"]),
-  changed_paths: ArraySchema(String4),
-  checks: ArraySchema(Struct({ command: String4, exit: Int })),
-  blockers: ArraySchema(String4),
-  notes: ArraySchema(String4),
-  evidence: ArraySchema(Struct({ key: String4, support: String4 }))
+  changed_paths: ArraySchema(String5),
+  checks: ArraySchema(Struct({ command: String5, exit: Int })),
+  blockers: ArraySchema(String5),
+  notes: ArraySchema(String5),
+  evidence: ArraySchema(Struct({ key: String5, support: String5 }))
 });
 var JsonReport = StructWithRest(REPORT_FIELDS, [
-  Record(String4, Unknown2)
+  Record(String5, Unknown2)
 ]);
 var section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine(line)}`)];
 var KNOWN = new Set(Object.keys(REPORT_FIELDS.fields));
@@ -14469,9 +14492,9 @@ class InvalidPiRecord extends TaggedError2("InvalidPiRecord") {
 }
 var JournalEntry = Struct({
   index: Int.check(isGreaterThanOrEqualTo2(0)),
-  key: String4,
+  key: String5,
   ok: Boolean3,
-  text: optionalKey2(String4),
+  text: optionalKey2(String5),
   resumed: optionalKey2(Literal2(true))
 });
 var JournalLine = fromJsonString2(JournalEntry);
@@ -14517,9 +14540,9 @@ var matchJournal = (entries, expected) => {
 };
 var AGENT_RECORD_ENTRY_TYPE = "subagents:record";
 var AgentRecordData = Struct({
-  id: String4,
-  type: String4,
-  description: String4,
+  id: String5,
+  type: String5,
+  description: String5,
   status: Literals([
     "queued",
     "running",
@@ -14529,25 +14552,25 @@ var AgentRecordData = Struct({
     "stopped",
     "error"
   ]),
-  result: optionalKey2(String4),
-  error: optionalKey2(String4),
+  result: optionalKey2(String5),
+  error: optionalKey2(String5),
   startedAt: Number5,
   completedAt: optionalKey2(Number5),
-  sessionFile: optionalKey2(String4),
-  handle: optionalKey2(String4),
-  alias: optionalKey2(String4),
+  sessionFile: optionalKey2(String5),
+  handle: optionalKey2(String5),
+  alias: optionalKey2(String5),
   worktreeLost: optionalKey2(Boolean3)
 });
 var RecordEntry = Struct({
   type: Literal2("custom"),
   customType: Literal2(AGENT_RECORD_ENTRY_TYPE),
   data: AgentRecordData,
-  id: String4,
-  parentId: NullOr(String4),
-  timestamp: String4
+  id: String5,
+  parentId: NullOr(String5),
+  timestamp: String5
 });
 var RecordLine = fromJsonString2(RecordEntry);
-var SessionLine = fromJsonString2(Struct({ type: String4, customType: optionalKey2(String4) }));
+var SessionLine = fromJsonString2(Struct({ type: String5, customType: optionalKey2(String5) }));
 
 class PiRecordMissing extends TaggedError2("PiRecordMissing") {
   get message() {
@@ -14766,18 +14789,18 @@ ${body}` : body;
 };
 var Started = Struct({
   type: Literal2("started"),
-  key: String4,
-  agentId: String4,
-  label: String4
+  key: String5,
+  agentId: String5,
+  label: String5
 });
 var Resulted = Struct({
   type: Literal2("result"),
-  key: String4,
-  agentId: String4,
+  key: String5,
+  agentId: String5,
   result: Unknown2
 });
 var Other = Struct({
-  type: String4.check(isPattern2(/^(?!(?:started|result)$)/))
+  type: String5.check(isPattern2(/^(?!(?:started|result)$)/))
 });
 var JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
 var journalResults = (journal, source) => gen2(function* () {
@@ -14852,28 +14875,28 @@ var schemas = {
   create: Draft,
   dispatch: Union2([Reference2, Draft]),
   record: Union2([
-    Struct({ id: AssignmentId, agent: String4 }),
+    Struct({ id: AssignmentId, agent: String5 }),
     Struct({ id: AssignmentId, failed: Literal2(true) })
   ]),
   close: Struct({
     id: AssignmentId,
     outcome: Literals(["success", "failure", "errored", "interrupted", "stopped"]),
-    accept: optionalKey2(String4),
-    report: optionalKey2(String4),
+    accept: optionalKey2(String5),
+    report: optionalKey2(String5),
     reportJson: optionalKey2(JsonReport)
   }),
   accept: Struct({
     id: AssignmentId,
-    rationale: String4,
+    rationale: String5,
     carryForward: optionalKey2(Boolean3),
-    report: optionalKey2(String4)
+    report: optionalKey2(String5)
   }),
   show: Reference2,
   list: Struct({
     state: optionalKey2(AssignmentState),
     all: optionalKey2(Boolean3)
   }),
-  reports: Struct({ source: String4 })
+  reports: Struct({ source: String5 })
 };
 
 class MissingAsset extends TaggedError2("MissingAsset") {
@@ -15402,8 +15425,8 @@ var recordPull = (call, pull) => onIntentInUse(call, (intentId) => gen2(function
 
 var Created = Struct({
   number: Int,
-  html_url: String4,
-  head: Struct({ ref: String4 })
+  html_url: String5,
+  head: Struct({ ref: String5 })
 });
 var MAX_BODY_BYTES = 256 * 1024;
 var hasGitSegment = (path) => path.split(/[\\/]/).some((segment) => segment.toLowerCase() === ".git");
@@ -15502,14 +15525,14 @@ var readSettings = (directories, env = process.env) => loadConfig({ projectDirec
 
 var schemas3 = {
   commit: Struct({
-    messages: ArraySchema(String4),
-    paths: ArraySchema(String4)
+    messages: ArraySchema(String5),
+    paths: ArraySchema(String5)
   }),
-  identity: Struct({ name: String4, email: String4 }),
+  identity: Struct({ name: String5, email: String5 }),
   pr: Struct({
-    base: optional2(String4),
-    title: optional2(String4),
-    bodyFile: optional2(String4),
+    base: optional2(String5),
+    title: optional2(String5),
+    bodyFile: optional2(String5),
     update: optional2(Int)
   })
 };
@@ -15635,7 +15658,7 @@ var userFiles = (env) => {
 };
 
 import { basename as basename6, dirname as dirname7, join as join13 } from "path";
-var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
+var JsonObjectText = fromJsonString2(Record(String5, Unknown2), {
   space: 2
 });
 var strict2 = { onExcessProperty: "error" };
@@ -15743,15 +15766,15 @@ var browseDataDirectory = (env) => {
   return join14(data !== undefined && isAbsolute7(data) ? data : join14(homeDirectory2(env), ".local", "share"), "browse");
 };
 var browsePairingFile = (env) => join14(browseDataDirectory(env), "browser-tokens.json");
-var Open = Record(String4, Unknown2);
+var Open = Record(String5, Unknown2);
 var Pairing = StructWithRest(Struct({
-  token: String4.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
+  token: String5.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
   pairedAt: optionalKey2(Number5),
   lastSeen: optionalKey2(Number5),
-  id: optionalKey2(String4),
-  name: optionalKey2(String4)
+  id: optionalKey2(String5),
+  name: optionalKey2(String5)
 }), [Open]);
-var PairingFile = fromJsonString2(Record(String4, Unknown2));
+var PairingFile = fromJsonString2(Record(String5, Unknown2));
 var readBrowsePairing = (env) => gen2(function* () {
   const text = yield* readJsonText(browsePairingFile(env));
   if (text === undefined || text.trim() === "")
@@ -15819,10 +15842,10 @@ var browserDirectories = (env, platform = process.platform) => {
   ].map(([name = "", folder = ""]) => ({ name, directory: join14(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
-  profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String4, Open)) }), [Open]))
+  profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String5, Open)) }), [Open]))
 }), [Open]));
 var Preferences = fromJsonString2(StructWithRest(Struct({
-  extensions: optionalKey2(StructWithRest(Struct({ settings: optionalKey2(Record(String4, Open)) }), [Open]))
+  extensions: optionalKey2(StructWithRest(Struct({ settings: optionalKey2(Record(String5, Open)) }), [Open]))
 }), [Open]));
 var readOptional = (file) => readJsonText(file).pipe(orElseSucceed2(() => {
   return;
@@ -16109,10 +16132,10 @@ var checkNode = (env) => checkVersioned(env, "node", "node", {
     detail: `${shown} at ${path} is older than ${PI_MINIMUM_NODE}, which Pi needs; ${NODE_FIX}`
   } : { ok: true, detail: `${shown} (${path})` }
 });
-var Open2 = Record(String4, Unknown2);
+var Open2 = Record(String5, Unknown2);
 var PackageEntry = Union2([
-  String4,
-  StructWithRest(Struct({ source: String4 }), [Open2])
+  String5,
+  StructWithRest(Struct({ source: String5 }), [Open2])
 ]);
 var PiSettings = StructWithRest(Struct({ packages: optionalKey2(ArraySchema(PackageEntry)) }), [Open2]);
 var GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i;
@@ -16320,11 +16343,11 @@ var toolSettings = (config, _profile = providerProfile(config), form = "normal",
 
 import { join as join17, resolve as resolve9 } from "path";
 var RecordedKey = Struct({
-  path: NonEmptyArray(String4),
+  path: NonEmptyArray(String5),
   value: Unknown2
 });
 var RecordFile = Struct({
-  files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
+  files: Record(String5, Struct({ keys: ArraySchema(RecordedKey) }))
 });
 var recordPath = (env) => join17(userFiles(env).claudeDir, "holyagent", "setup-records.json");
 var keyOf = (file) => resolve9(file);
@@ -17698,7 +17721,7 @@ var doctor = fn2("doctor")(function* (env, options) {
 var Form = Struct({
   form: Literals(FORM_CHOICES),
   source: Literals(["flag", "detected", "default"]),
-  reason: String4
+  reason: String5
 });
 var Choices = Struct({
   subagents: optionalKey2(Boolean3),
@@ -17925,23 +17948,23 @@ var LEGACY_FOLDERS = {
 };
 var strict3 = { onExcessProperty: "error" };
 var collapse = (message) => message.replace(/\s+/g, " ").trim();
-var strings = ArraySchema(String4);
+var strings = ArraySchema(String5);
 var optionalStrings = optionalKey2(strings);
 var HolyclaudeIntent = Struct({
-  id: String4,
-  objective: String4,
-  requirements: String4,
+  id: String5,
+  objective: String5,
+  requirements: String5,
   revision: Int,
   state: optionalKey2(Literals(["open", "closed"])),
-  close_reason: optionalKey2(String4),
-  closed_at: optionalKey2(String4)
+  close_reason: optionalKey2(String5),
+  closed_at: optionalKey2(String5)
 });
 var HolyclaudeAssignment = Struct({
-  id: String4,
-  intent_id: String4,
+  id: String5,
+  intent_id: String5,
   intent_revision: Int,
-  role: String4,
-  objective: String4,
+  role: String5,
+  objective: String5,
   scope: optionalStrings,
   constraints: optionalStrings,
   acceptance_criteria: optionalStrings,
@@ -17955,14 +17978,14 @@ var HolyclaudeAssignment = Struct({
     related_assignments: optionalStrings,
     independent_from: optionalStrings
   })),
-  clone_id: optionalKey2(String4),
+  clone_id: optionalKey2(String5),
   state: Literals(["Ready", "Running", "Succeeded", "Failed", "Cancelled"]),
-  result: optionalKey2(NullOr(String4)),
+  result: optionalKey2(NullOr(String5)),
   acceptance: optionalKey2(NullOr(Struct({
     intent_revision: Int,
-    rationale: String4,
-    criteria_evidence: Record(String4, String4),
-    required_evidence: Record(String4, String4)
+    rationale: String5,
+    criteria_evidence: Record(String5, String5),
+    required_evidence: Record(String5, String5)
   })))
 });
 var CodexIntentState = Literals([
@@ -17977,26 +18000,26 @@ var CodexIntentState = Literals([
   "abandoned"
 ]);
 var codexIntentFields = {
-  toon_compatibility: String4,
-  id: String4,
-  slug: String4,
-  title: String4,
-  goal: String4,
+  toon_compatibility: String5,
+  id: String5,
+  slug: String5,
+  title: String5,
+  goal: String5,
   acceptance_criteria: strings,
   state: CodexIntentState,
   revision: Int,
   baseline: Unknown2,
-  created_at: String4,
-  updated_at: String4
+  created_at: String5,
+  updated_at: String5
 };
 var HolycodexIntent = Struct({
   ...codexIntentFields,
   schema_version: Literals(["holycodex-intent-1"]),
   plan_required: Boolean3,
   active_plan_revision: optionalKey2(Int),
-  active_plan_digest: optionalKey2(String4),
+  active_plan_digest: optionalKey2(String5),
   blockers: strings,
-  resume_state: optionalKey2(String4),
+  resume_state: optionalKey2(String5),
   verification: Unknown2,
   review: Unknown2,
   acceptance_met: Boolean3,
@@ -18009,23 +18032,23 @@ var HolycodexIntentV0 = Struct({
   schema_version: Literals(["holycodex-intent-0"])
 });
 var CodexInvocation = Struct({
-  id: String4,
-  outcome: String4,
-  started_at: String4,
-  finished_at: String4,
-  summary: String4,
+  id: String5,
+  outcome: String5,
+  started_at: String5,
+  finished_at: String5,
+  summary: String5,
   evidence: ArraySchema(Unknown2),
   context7: optionalKey2(Unknown2),
-  blocker: optionalKey2(String4),
+  blocker: optionalKey2(String5),
   remaining_risk: strings
 });
 var HolycodexAssignment = Struct({
   schema_version: Literals(["holycodex-assignment-1"]),
-  toon_compatibility: String4,
-  intent_id: String4,
-  id: String4,
-  objective: String4,
-  owner: Struct({ role: String4, task: String4 }),
+  toon_compatibility: String5,
+  intent_id: String5,
+  id: String5,
+  objective: String5,
+  owner: Struct({ role: String5, task: String5 }),
   scope: strings,
   constraints: strings,
   exclusions: strings,
@@ -18042,19 +18065,19 @@ var HolycodexAssignment = Struct({
   ]),
   revision: Int,
   invocations: ArraySchema(CodexInvocation),
-  active_invocation_id: optionalKey2(String4),
-  active_started_at: optionalKey2(String4),
-  supersedes: optionalKey2(String4),
-  superseded_by: optionalKey2(String4),
-  supersession_reason: optionalKey2(String4),
-  supersession_provenance: optionalKey2(String4),
+  active_invocation_id: optionalKey2(String5),
+  active_started_at: optionalKey2(String5),
+  supersedes: optionalKey2(String5),
+  superseded_by: optionalKey2(String5),
+  supersession_reason: optionalKey2(String5),
+  supersession_provenance: optionalKey2(String5),
   evidence: ArraySchema(Unknown2),
-  blocker: optionalKey2(String4),
+  blocker: optionalKey2(String5),
   remaining_risk: strings,
-  created_at: String4,
-  updated_at: String4,
-  active_invocation_capability_verifier: optionalKey2(String4),
-  active_invocation_capability: optionalKey2(String4)
+  created_at: String5,
+  updated_at: String5,
+  active_invocation_capability_verifier: optionalKey2(String5),
+  active_invocation_capability: optionalKey2(String5)
 });
 var parseText = (format, text) => try_2({
   try: () => format === "json" ? JSON.parse(text) : decode2(text, { strict: true }),
@@ -20590,7 +20613,7 @@ function codePointToString(code) {
   code -= 65536;
   return String.fromCharCode((code >> 10) + 55296, (code & 1023) + 56320);
 }
-var loneSurrogate = /(?:[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])/;
+var loneSurrogate2 = /(?:[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])/;
 var Position = function Position(line, col) {
   this.line = line;
   this.column = col;
@@ -22147,7 +22170,7 @@ pp$8.parseImportAttribute = function() {
 pp$8.parseModuleExportName = function() {
   if (this.options.ecmaVersion >= 13 && this.type === types$1.string) {
     var stringLiteral = this.parseLiteral(this.value);
-    if (loneSurrogate.test(stringLiteral.value)) {
+    if (loneSurrogate2.test(stringLiteral.value)) {
       this.raise(stringLiteral.start, "An export name cannot include a lone surrogate.");
     }
     return stringLiteral;
@@ -27562,14 +27585,14 @@ var workflowRefusal = (script, specialists = CLAUDE_SPECIALISTS, host = "claude"
 }).pipe(catch_2((reason) => succeed6(reason)));
 
 var Payload = Struct({
-  tool_name: optionalKey2(String4),
-  tool_input: optionalKey2(Record(String4, Unknown2)),
-  agent_type: optionalKey2(String4),
-  agent_id: optionalKey2(String4),
-  cwd: optionalKey2(String4),
-  session_id: optionalKey2(String4),
-  hook_event_name: optionalKey2(String4),
-  source: optionalKey2(String4),
+  tool_name: optionalKey2(String5),
+  tool_input: optionalKey2(Record(String5, Unknown2)),
+  agent_type: optionalKey2(String5),
+  agent_id: optionalKey2(String5),
+  cwd: optionalKey2(String5),
+  session_id: optionalKey2(String5),
+  hook_event_name: optionalKey2(String5),
+  source: optionalKey2(String5),
   tool_response: optionalKey2(Unknown2)
 });
 var NOTHING = new Verbatim("", "", 0);
@@ -27814,10 +27837,10 @@ import { pathToFileURL } from "url";
 var TUI_BUNDLE = "setup-tui.js";
 
 var TUI_MANIFEST_NAME = "holyagent-setup-tui";
-var Dependencies = optional2(Record(String4, String4));
+var Dependencies = optional2(Record(String5, String5));
 var Entry = TupleWithRest(Tuple([
-  String4,
-  String4,
+  String5,
+  String5,
   Struct({
     dependencies: Dependencies,
     optionalDependencies: Dependencies,
@@ -27827,13 +27850,13 @@ var Entry = TupleWithRest(Tuple([
 var Lock = Struct({
   lockfileVersion: Number5,
   configVersion: optional2(Number5),
-  packages: Record(String4, Unknown2)
+  packages: Record(String5, Unknown2)
 });
 
 var TUI_PACKAGES = {
-  "@opentui/core": "0.9.2",
-  "@opentui/solid": "0.9.2",
-  "solid-js": "1.9.19"
+  "@opentui/core": "0.9.7",
+  "@opentui/solid": "0.9.7",
+  "solid-js": "1.9.20"
 };
 var TUI_LOCK = `{
   "lockfileVersion": 2,
@@ -27842,9 +27865,9 @@ var TUI_LOCK = `{
     "": {
       "name": "holyagent-setup-tui",
       "dependencies": {
-        "@opentui/core": "0.9.2",
-        "@opentui/solid": "0.9.2",
-        "solid-js": "1.9.19"
+        "@opentui/core": "0.9.7",
+        "@opentui/solid": "0.9.7",
+        "solid-js": "1.9.20"
       }
     }
   },
@@ -27892,18 +27915,18 @@ var TUI_LOCK = `{
       "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
     ],
     "@babel/generator": [
-      "@babel/generator@7.29.14",
+      "@babel/generator@7.29.15",
       "",
       {
         "dependencies": {
-          "@babel/parser": "^7.29.14",
-          "@babel/types": "^7.29.14",
+          "@babel/parser": "^7.29.15",
+          "@babel/types": "^7.29.15",
           "@jridgewell/gen-mapping": "^0.3.12",
           "@jridgewell/trace-mapping": "^0.3.28",
           "jsesc": "^3.0.2"
         }
       },
-      "sha512-qSY56jgW5JnSXzuekLVil6zaOQxOCtOHidr65KkaMBw772IuAY28Qx4ZykAcDn8+FRF15qk80XzKwgSc/RYW6g=="
+      "sha512-gNWJUX0FlevflramOkaInywOMhU1lkln38gAC7TFZv2tsWbLYbN/2WZFGcq8zbX0Z55e4vGa27IB/NaeZoauWQ=="
     ],
     "@babel/helper-annotate-as-pure": [
       "@babel/helper-annotate-as-pure@7.29.7",
@@ -28035,10 +28058,10 @@ var TUI_LOCK = `{
       "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
     ],
     "@babel/helper-string-parser": [
-      "@babel/helper-string-parser@7.29.14",
+      "@babel/helper-string-parser@7.29.15",
       "",
       {},
-      "sha512-CXvKMFvM80ihI7Vox9jb+kQjnyjESQNPM+vB7U0Zz6TWuZA+Z/FL0QPMH300h33qJtIx+REeBhXqWOPW48TcAQ=="
+      "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="
     ],
     "@babel/helper-validator-identifier": [
       "@babel/helper-validator-identifier@7.29.7",
@@ -28053,26 +28076,26 @@ var TUI_LOCK = `{
       "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
     ],
     "@babel/helpers": [
-      "@babel/helpers@7.29.14",
+      "@babel/helpers@7.29.15",
       "",
       {
         "dependencies": {
           "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.14"
+          "@babel/types": "^7.29.15"
         }
       },
-      "sha512-6E3Mi1r0B0umq6vmZa4/78q+64fqO2YY0THUdjDPKUCKhNb0yQy5NQIaPHCSD3ryTgiTss//P4JsWS80AsZ6LQ=="
+      "sha512-l+ezV2czw3t2d2ELq+3CwPL4WLKK5O8IywBXb9/gpmbCOVZFmRYJPmHVqSCv2k+8iKbE30Zf54siOoIZ52XOxA=="
     ],
     "@babel/parser": [
-      "@babel/parser@7.29.14",
+      "@babel/parser@7.29.15",
       "",
       {
         "dependencies": {
-          "@babel/types": "^7.29.14"
+          "@babel/types": "^7.29.15"
         },
         "bin": "./bin/babel-parser.js"
       },
-      "sha512-VL220vXuyO2z3rNIQwY7ftj9UwpqOt+33sH+sBWkOekbsSR2g7EEMnOx24ZlCH0xOA3DM/33SifVFGbnJD8r/w=="
+      "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="
     ],
     "@babel/plugin-syntax-jsx": [
       "@babel/plugin-syntax-jsx@7.29.7",
@@ -28115,21 +28138,21 @@ var TUI_LOCK = `{
       "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
     ],
     "@babel/plugin-transform-typescript": [
-      "@babel/plugin-transform-typescript@7.29.9",
+      "@babel/plugin-transform-typescript@7.29.15",
       "",
       {
         "dependencies": {
           "@babel/helper-annotate-as-pure": "^7.29.7",
-          "@babel/helper-create-class-features-plugin": "^7.29.7",
+          "@babel/helper-create-class-features-plugin": "^7.29.13",
           "@babel/helper-plugin-utils": "^7.29.7",
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
           "@babel/plugin-syntax-typescript": "^7.29.7"
         },
         "peerDependencies": {
           "@babel/core": "^7.0.0-0"
         }
       },
-      "sha512-FFwIwzU+7SCOuxxV4YtJql6T9981ZVTm+FHO5GhVsRqCTdy0WwrEZh3l42ARpXruJUDGOptdduHW6Zr7pNPLNg=="
+      "sha512-FFuMssbHj8DFMDsTH8xrgKBiE1eXuDvO9jLqav7/vsIe6YdoyPQbWCgLNzQxkcIkOv5itBD17TvZkHGIjUMzLg=="
     ],
     "@babel/preset-typescript": [
       "@babel/preset-typescript@7.27.1",
@@ -28161,31 +28184,31 @@ var TUI_LOCK = `{
       "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
     ],
     "@babel/traverse": [
-      "@babel/traverse@7.29.14",
+      "@babel/traverse@7.29.15",
       "",
       {
         "dependencies": {
           "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.14",
+          "@babel/generator": "^7.29.15",
           "@babel/helper-globals": "^7.29.7",
-          "@babel/parser": "^7.29.14",
+          "@babel/parser": "^7.29.15",
           "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.14",
+          "@babel/types": "^7.29.15",
           "debug": "^4.3.1"
         }
       },
-      "sha512-RAdQJrBgmIH1FWvN0X+1hoDxzMzlP4cv/1Zi4dn4tG1H0cTb+rw7CzUxQJhp1f4ANd8j5vH3fy8BAWFGkBDEsA=="
+      "sha512-ZfawBo2i8vvt+BTt37dWDKBPjUfm/H+bw+ltwsCRhW7gPtyNVwUXuNo54eO2Xo+P4VXpalPFfFISbBTRKC8SOQ=="
     ],
     "@babel/types": [
-      "@babel/types@7.29.14",
+      "@babel/types@7.29.15",
       "",
       {
         "dependencies": {
-          "@babel/helper-string-parser": "^7.29.14",
+          "@babel/helper-string-parser": "^7.29.15",
           "@babel/helper-validator-identifier": "^7.29.7"
         }
       },
-      "sha512-UjI/dKmwJwT9pOszJitq2G6EObZPnsZUfdCr92z2TlF3EZK9J3EdfOKUrCzHl6wFthbzwhzl1Soc/UIwxRiq6w=="
+      "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="
     ],
     "@jridgewell/gen-mapping": [
       "@jridgewell/gen-mapping@0.3.13",
@@ -28233,7 +28256,7 @@ var TUI_LOCK = `{
       "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
     ],
     "@opentui/core": [
-      "@opentui/core@0.9.2",
+      "@opentui/core@0.9.7",
       "",
       {
         "dependencies": {
@@ -28242,103 +28265,103 @@ var TUI_LOCK = `{
           "string-width": "7.2.0"
         },
         "optionalDependencies": {
-          "@opentui/core-darwin-arm64": "0.9.2",
-          "@opentui/core-darwin-x64": "0.9.2",
-          "@opentui/core-linux-arm64": "0.9.2",
-          "@opentui/core-linux-arm64-musl": "0.9.2",
-          "@opentui/core-linux-x64": "0.9.2",
-          "@opentui/core-linux-x64-musl": "0.9.2",
-          "@opentui/core-win32-arm64": "0.9.2",
-          "@opentui/core-win32-x64": "0.9.2"
+          "@opentui/core-darwin-arm64": "0.9.7",
+          "@opentui/core-darwin-x64": "0.9.7",
+          "@opentui/core-linux-arm64": "0.9.7",
+          "@opentui/core-linux-arm64-musl": "0.9.7",
+          "@opentui/core-linux-x64": "0.9.7",
+          "@opentui/core-linux-x64-musl": "0.9.7",
+          "@opentui/core-win32-arm64": "0.9.7",
+          "@opentui/core-win32-x64": "0.9.7"
         },
         "peerDependencies": {
           "web-tree-sitter": "0.25.10"
         }
       },
-      "sha512-Wp0szaFvKET8TlcCO9C7AHgUnPY8qCTsj1im88jOAdX9InlYrerooWF9ez1QBrR/i6+6xhBf/iF/pch3d1xbeg=="
+      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
     ],
     "@opentui/core-darwin-arm64": [
-      "@opentui/core-darwin-arm64@0.9.2",
+      "@opentui/core-darwin-arm64@0.9.7",
       "",
       {
         "os": "darwin",
         "cpu": "arm64"
       },
-      "sha512-6ASALGMPpmpsoGKYUpJYF+HJs1lZiw9zYsUhInCRYuVvBxYkBqV7MSz+1HFsTTd/ewqFuNnV/JMlEieMXZqiEA=="
+      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
     ],
     "@opentui/core-darwin-x64": [
-      "@opentui/core-darwin-x64@0.9.2",
+      "@opentui/core-darwin-x64@0.9.7",
       "",
       {
         "os": "darwin",
         "cpu": "x64"
       },
-      "sha512-KWSEd1W0Gmx+EiixTc8YWbF3/htVFRPREeWV9BsT3Sag0SAwuZNJYhIixR+UGptggShUc4EiNofaAwEdDUG2IA=="
+      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
     ],
     "@opentui/core-linux-arm64": [
-      "@opentui/core-linux-arm64@0.9.2",
+      "@opentui/core-linux-arm64@0.9.7",
       "",
       {
         "os": "linux",
         "cpu": "arm64"
       },
-      "sha512-SKhb+H6F+iAz/Vb0avxxZYor1CIzVYhuMo21qN67xZ9XdqnvPaM5aHRU05rWOjU1U3pRlMslnf4DZZvyqfxjkQ=="
+      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
     ],
     "@opentui/core-linux-arm64-musl": [
-      "@opentui/core-linux-arm64-musl@0.9.2",
+      "@opentui/core-linux-arm64-musl@0.9.7",
       "",
       {
         "os": "linux",
         "cpu": "arm64",
         "libc": "musl"
       },
-      "sha512-RZ8k4ShFV4N9nKCIeNos2NVi1a9dtWpO5HHk75ey8/a9JTiJUtGJhDgko73Hsw/CSqo0rj20yR4n532UuexTzg=="
+      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
     ],
     "@opentui/core-linux-x64": [
-      "@opentui/core-linux-x64@0.9.2",
+      "@opentui/core-linux-x64@0.9.7",
       "",
       {
         "os": "linux",
         "cpu": "x64"
       },
-      "sha512-5tEyEyYioX8owwsSJPTgvDdgMqjqOjOg6g8Bu5gSV9D9XKd5uRzhRC/zCQLubaVmK7oREmaXWJqT4tfIdVqeuw=="
+      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
     ],
     "@opentui/core-linux-x64-musl": [
-      "@opentui/core-linux-x64-musl@0.9.2",
+      "@opentui/core-linux-x64-musl@0.9.7",
       "",
       {
         "os": "linux",
         "cpu": "x64",
         "libc": "musl"
       },
-      "sha512-23T5lMds4fckZxOiLs3INU6Sg5MmSes31li9Oh43bZixD03q0q7dlaD38RetK0RqUhrhlqyDdkcNpcRf9p0U2w=="
+      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
     ],
     "@opentui/core-win32-arm64": [
-      "@opentui/core-win32-arm64@0.9.2",
+      "@opentui/core-win32-arm64@0.9.7",
       "",
       {
         "os": "win32",
         "cpu": "arm64"
       },
-      "sha512-chqxvz7+SXdVLMva7vvfmOogLNn4t9LfeyvUrkc0QLiL4pJyKaR7KxnkI59ykd7A9PlMwzx+Jeb03l6J6kZhVA=="
+      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
     ],
     "@opentui/core-win32-x64": [
-      "@opentui/core-win32-x64@0.9.2",
+      "@opentui/core-win32-x64@0.9.7",
       "",
       {
         "os": "win32",
         "cpu": "x64"
       },
-      "sha512-1DlQEOwM8vOoipAJa/IA4VvtAzpQtbdSjZ9iLA0918HP24iZOAhSfjzH+KkEmRTtPECVL8mk7eFBENS6DtoEwQ=="
+      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
     ],
     "@opentui/solid": [
-      "@opentui/solid@0.9.2",
+      "@opentui/solid@0.9.7",
       "",
       {
         "dependencies": {
           "@babel/core": "7.29.7",
           "@babel/preset-typescript": "7.27.1",
-          "@opentui/core": "0.9.2",
+          "@opentui/core": "0.9.7",
           "babel-plugin-module-resolver": "5.0.2",
           "babel-preset-solid": "1.9.16",
           "entities": "7.0.1",
@@ -28348,7 +28371,7 @@ var TUI_LOCK = `{
           "solid-js": "^1.9.12"
         }
       },
-      "sha512-HzfUiUUqJnbnuxp1PpfmhDT6Gn/zkrm7GaajTJ0LbznkgKfs5jtJM+kZEwvbbpyToV9lS9N+QkfzCHvxN6BwbQ=="
+      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
     ],
     "ansi-regex": [
       "ansi-regex@6.6.0",
@@ -28405,14 +28428,14 @@ var TUI_LOCK = `{
       "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
     ],
     "baseline-browser-mapping": [
-      "baseline-browser-mapping@2.11.38",
+      "baseline-browser-mapping@2.11.39",
       "",
       {
         "bin": {
           "baseline-browser-mapping": "dist/cli.cjs"
         }
       },
-      "sha512-rMgy5YW7x28SMfXHLlVZDBqlWzYZ0x2rVR/6FWrNBF0chjigARK1H6nM0hKA1Um3kPOlkQFVtjJs00d2N1ezuw=="
+      "sha512-Q9buOYhr2ggrEZpImICecZTJHCCd8yXkRUokFlUEQ8uiD6oP82F4W4jWnhOHZYV+wlvrC51V7Wy0ULyWjil5Wg=="
     ],
     "browserslist": [
       "browserslist@4.29.6",
@@ -28442,10 +28465,10 @@ var TUI_LOCK = `{
       "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
     ],
     "caniuse-lite": [
-      "caniuse-lite@1.0.30001826",
+      "caniuse-lite@1.0.30001827",
       "",
       {},
-      "sha512-wTB+9tIbLro/BCXwLuNV1meHE4L9dS6dArMDwgYfNBPMYScqClHyGunhkCSDtHhe/69Xl0sHlKgBVZ+fNsYtWA=="
+      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
     ],
     "convert-source-map": [
       "convert-source-map@2.0.0",
@@ -28482,10 +28505,10 @@ var TUI_LOCK = `{
       "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
     ],
     "electron-to-chromium": [
-      "electron-to-chromium@1.5.487",
+      "electron-to-chromium@1.5.492",
       "",
       {},
-      "sha512-qWotOhQYeYEj+DK4+Y+cfPj44qiC6ETIiWtJLfmDJydED2BJJ7loPA4SfBbbrMI6X/X3tryJgxnY9nxsO545Zw=="
+      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
     ],
     "emoji-regex": [
       "emoji-regex@10.6.0",
@@ -28716,7 +28739,7 @@ var TUI_LOCK = `{
       "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
     ],
     "solid-js": [
-      "solid-js@1.9.19",
+      "solid-js@1.9.20",
       "",
       {
         "dependencies": {
@@ -28725,7 +28748,7 @@ var TUI_LOCK = `{
           "seroval-plugins": "~1.6.8"
         }
       },
-      "sha512-NIrV/6o1FtmrA9iuAAYvnQJZaHrGcaH3LKSVj4kCiZfwqjCtJNDgIgR9XcqYl6KR/Lb3oRx1HrlyswPWR8SRvw=="
+      "sha512-7zEbPxRU5/hHX8O/rYtQ34p/wq44w09gv0u4+myOW5Ode8unKhoG5FbcGlqRXKqqDuDW9yOJ1OXoHgUUl/1f3Q=="
     ],
     "string-width": [
       "string-width@7.2.0",
@@ -29143,7 +29166,7 @@ var loadSetupTui = (env, options = {}) => gen2(function* () {
 
 var AppliedSchema = Struct({
   ok: Boolean3,
-  lines: ArraySchema(String4)
+  lines: ArraySchema(String5)
 });
 var TuiOutcomeSchema = Union2([
   Struct({ _tag: Literal2("Applied"), applied: AppliedSchema }),
@@ -29668,7 +29691,7 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
   return yield* decodeJsonInputBy(text, pick, source);
 });
 
-var RELEASE = String4.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
+var RELEASE = String5.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
 var VERSION_RESPONSE = fromJsonString2(RELEASE);
 var REGISTRY = "https://registry.npmjs.org/";
 var USAGE = "update [--version <0.x.y>] [--dry-run]";

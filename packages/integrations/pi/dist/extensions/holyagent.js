@@ -163,6 +163,37 @@ var addBackEdge = () => {
   backEdges++;
 };
 
+function ownEnumerableKeys(self) {
+  const keys = Object.keys(self);
+  for (const key of Object.getOwnPropertySymbols(self)) {
+    if (Object.prototype.propertyIsEnumerable.call(self, key)) {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+function assignProperty(self, key, value) {
+  if (key === "__proto__") {
+    Object.defineProperty(self, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+  } else {
+    self[key] = value;
+  }
+}
+function assignProperties(self, source) {
+  if (!Object.hasOwn(source, "__proto__")) {
+    Object.assign(self, source);
+    return;
+  }
+  for (const key of ownEnumerableKeys(source)) {
+    assignProperty(self, key, source[key]);
+  }
+}
+
 function isString(input) {
   return typeof input === "string";
 }
@@ -792,30 +823,6 @@ var pickInternalCall = () => {
 };
 var internalCall = /* @__PURE__ */ pickInternalCall();
 
-function assignProperty(self, key, value) {
-  if (key === "__proto__") {
-    Object.defineProperty(self, key, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true
-    });
-  } else {
-    self[key] = value;
-  }
-}
-function assignProperties(self, source) {
-  if (!Object.hasOwn(source, "__proto__")) {
-    Object.assign(self, source);
-    return;
-  }
-  for (const key of Reflect.ownKeys(source)) {
-    if (Object.prototype.propertyIsEnumerable.call(source, key)) {
-      assignProperty(self, key, source[key]);
-    }
-  }
-}
-
 var EffectTypeId = `~effect/Effect`;
 var ExitTypeId = `~effect/Exit`;
 var effectVariance = {
@@ -851,11 +858,11 @@ var PipeInspectableProto = {
 };
 var StructuralProto = {
   [symbol]() {
-    return structureKeys(this, Object.keys(this));
+    return structureKeys(this, ownEnumerableKeys(this));
   },
   [symbol2](that) {
-    const selfKeys = Object.keys(this);
-    if (selfKeys.length !== Object.keys(that).length)
+    const selfKeys = ownEnumerableKeys(this);
+    if (selfKeys.length !== ownEnumerableKeys(that).length)
       return false;
     for (const key of selfKeys) {
       if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
@@ -1335,7 +1342,7 @@ var SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(C
     return {
       _id: "Result",
       _tag: this._tag,
-      value: toJson(this.success)
+      success: toJson(this.success)
     };
   }
 });
@@ -2567,6 +2574,7 @@ class FiberImpl {
     }
     const interruptChildren = fiberMiddleware.interruptChildren && fiberMiddleware.interruptChildren(this);
     if (interruptChildren !== undefined) {
+      this.interruptible = false;
       return this.evaluate(flatMap(interruptChildren, () => exit));
     }
     this._exit = exit;
@@ -3119,7 +3127,7 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
       if (done)
         break;
       const index = i++;
-      const fiber = forkUnsafe(parent, effect, true, true, false);
+      const fiber = new FiberImpl(parent.context);
       fibers.add(fiber);
       fiber.addObserver((exit) => {
         fibers.delete(fiber);
@@ -3135,6 +3143,12 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
           });
         }
       });
+      if (done)
+        fiber.interruptUnsafe(parent.id, fiberStackAnnotations(parent));
+      else
+        fiber.evaluate(effect);
+      if (done)
+        break;
     }
   });
 });
@@ -3431,10 +3445,13 @@ var uninterruptibleMask = (f) => withFiber((fiber) => {
 var all = (arg, options) => {
   if (isIterable(arg)) {
     return options?.mode === "result" ? forEach(arg, result, options) : forEach(arg, identity, options);
-  } else if (options?.discard) {
-    return options.mode === "result" ? forEach(Object.values(arg), result, options) : forEach(Object.values(arg), identity, options);
   }
-  return suspend(() => map2(forEach(Object.entries(arg), ([key, effect]) => map2(options?.mode === "result" ? result(effect) : effect, (value) => [key, value]), {
+  const fields = arg;
+  if (options?.discard) {
+    const effects = ownEnumerableKeys(fields).map((key) => fields[key]);
+    return options.mode === "result" ? forEach(effects, result, options) : forEach(effects, identity, options);
+  }
+  return suspend(() => map2(forEach(ownEnumerableKeys(fields).map((key) => [key, fields[key]]), ([key, effect]) => map2(options?.mode === "result" ? result(effect) : effect, (value) => [key, value]), {
     concurrency: options?.concurrency
   }), Object.fromEntries));
 };
@@ -4099,6 +4116,10 @@ var succeed5 = function() {
 var succeedContext = (context) => fromBuildUnsafe(constant(succeed3(context)));
 
 var currentTimeMillis2 = currentTimeMillis;
+
+var String2 = globalThis.String;
+var loneSurrogate = /[\uD800-\uDFFF]/u;
+var isWellFormed = (self) => self.isWellFormed?.() ?? !loneSurrogate.test(self);
 
 var Random = /* @__PURE__ */ Reference("effect/Random", {
   defaultValue: () => ({
@@ -4816,9 +4837,6 @@ function withDefault(defaultValue) {
     return isSome2(filtered) ? succeed6(filtered) : mapEager2(defaultValue, some2);
   });
 }
-function String2() {
-  return transform(globalThis.String);
-}
 function Number3() {
   return transform(globalThis.Number);
 }
@@ -4844,8 +4862,13 @@ function stringifyJson(options) {
     }, input, parseOptions)
   }));
 }
+function encodeWithWellFormedString(encode) {
+  return transformEffect((input, options) => typeof input === "string" && !isWellFormed(input) ? fail5(new InvalidValue({
+    expected: "a well-formed Unicode string"
+  }, input, options)) : succeed6(encode(input)));
+}
 function encodeBase64() {
-  return transform(encode);
+  return encodeWithWellFormedString(encode);
 }
 function decodeBase64() {
   return transformEffect((input, options) => mapErrorEager2(fromResult2(decode(input)), () => new InvalidValue({
@@ -4898,7 +4921,7 @@ var passthrough_2 = /* @__PURE__ */ new Transformation(/* @__PURE__ */ passthrou
 function passthrough3() {
   return passthrough_2;
 }
-var numberFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ Number3(), /* @__PURE__ */ String2());
+var numberFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ Number3(), /* @__PURE__ */ transform((n) => Object.is(n, -0) ? "-0" : globalThis.String(n)));
 var urlFromString = /* @__PURE__ */ transformEffect2({
   decode: (s, options) => URL.canParse(s) ? succeed6(new URL(s)) : fail5(new InvalidValue({
     expected: "a valid URL string"
@@ -5081,7 +5104,7 @@ function literalToString(ast) {
   const literalAsString = globalThis.String(ast.literal);
   return replaceEncoding(ast, [new Link(new Literal(literalAsString), new Transformation(transform(() => ast.literal), transform(() => literalAsString)))]);
 }
-var String3 = class extends ASTNodeImpl {
+var String4 = class extends ASTNodeImpl {
   _tag = "String";
   getParser() {
     return fromRefinement(this, isString);
@@ -5094,7 +5117,7 @@ var String3 = class extends ASTNodeImpl {
     return "string";
   }
 };
-var string2 = /* @__PURE__ */ new String3;
+var string2 = /* @__PURE__ */ new String4;
 var Number4 = class extends ASTNodeImpl {
   _tag = "Number";
   getParser() {
@@ -5506,10 +5529,10 @@ var Objects = class extends ASTNodeImpl {
                 coveredKeys.add(key);
             }
           }
-          const inputKeys = Reflect.ownKeys(record);
+          const inputKeys = ownEnumerableKeys(record);
           for (let i = 0;i < inputKeys.length; i++) {
             const key = inputKeys[i];
-            if (!coveredKeys.has(key) && Object.prototype.propertyIsEnumerable.call(record, key)) {
+            if (!coveredKeys.has(key)) {
               const unexpected = new UnexpectedKey(ast, record[key], options);
               const issue = new Pointer([key], unexpected);
               if (errorsAllOption) {
@@ -5700,7 +5723,7 @@ function combineChecks(a, b) {
   return [...a, ...b];
 }
 function struct(fields, checks, annotations) {
-  return new Objects(Reflect.ownKeys(fields).map((key) => {
+  return new Objects(ownEnumerableKeys(fields).map((key) => {
     return new PropertySignature(key, fields[key].ast);
   }), [], annotations, checks);
 }
@@ -8094,7 +8117,9 @@ function compileJsonSchema(representations, rootPaths, references, options) {
           return pattern;
         }
         case "Literal":
-          return escape(globalThis.String(part.literal));
+          return getLiteralPattern(part.literal);
+        case "Enum":
+          return getAlternationPattern(part.enums.map(([_, value]) => getLiteralPattern(value)));
         case "String":
           return STRING_PATTERN;
         case "Number":
@@ -8104,16 +8129,20 @@ function compileJsonSchema(representations, rootPaths, references, options) {
         case "TemplateLiteral":
           return part.parts.map(getPartPattern).join("");
         case "Union":
-          if (part.types.length === 0)
-            return "(?!)";
-          if (part.options?.mode === "oneOf")
+          if (part.types.length > 0 && part.options?.mode === "oneOf")
             exact = false;
-          return `(?:${part.types.map(getPartPattern).join("|")})`;
+          return getAlternationPattern(part.types.map(getPartPattern));
         default:
           throw errorWithPath(`Invalid TemplateLiteral part ${part._tag}`, []);
       }
     }
   }
+}
+function getLiteralPattern(value) {
+  return escape(globalThis.String(value));
+}
+function getAlternationPattern(patterns) {
+  return patterns.length === 0 ? "(?!)" : `(?:${patterns.join("|")})`;
 }
 function isJsonSchemaType(input) {
   return input === "string" || input === "number" || input === "boolean" || input === "array" || input === "object" || input === "null" || input === "integer";
@@ -8582,7 +8611,7 @@ var Never2 = /* @__PURE__ */ make7(never2);
 var Unknown2 = /* @__PURE__ */ make7(unknown);
 var Null2 = /* @__PURE__ */ make7(null_);
 var Undefined2 = /* @__PURE__ */ make7(undefined_2);
-var String4 = /* @__PURE__ */ make7(string2);
+var String5 = /* @__PURE__ */ make7(string2);
 var Number5 = /* @__PURE__ */ make7(number2);
 var Boolean3 = /* @__PURE__ */ make7(boolean);
 function makeStruct(ast, fields) {
@@ -8845,8 +8874,8 @@ var RegExp3 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
   }),
   expected: "RegExp",
   toCodecJson: () => link()(Struct({
-    source: String4,
-    flags: String4
+    source: String5,
+    flags: String5
   }), transformEffect2({
     decode: (e, options) => try_2({
       try: () => new globalThis.RegExp(e.source, e.flags),
@@ -8860,7 +8889,7 @@ var RegExp3 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
     })
   }))
 });
-var URLString = /* @__PURE__ */ String4.annotate({
+var URLString = /* @__PURE__ */ String5.annotate({
   expected: "a string that will be decoded as a URL"
 });
 var URL2 = /* @__PURE__ */ instanceOf(globalThis.URL, {
@@ -8875,7 +8904,7 @@ var URL2 = /* @__PURE__ */ instanceOf(globalThis.URL, {
   expected: "URL",
   toCodecJson: () => link()(URLString, urlFromString)
 });
-var JsonString = /* @__PURE__ */ String4.annotate({
+var JsonString = /* @__PURE__ */ String5.annotate({
   expected: "a string that will be decoded as JSON"
 });
 function fromJsonString2(schema, options) {
@@ -8892,9 +8921,9 @@ var File = /* @__PURE__ */ instanceOf(globalThis.File, {
   }),
   expected: "File",
   toCodecJson: () => link()(Struct({
-    data: String4.check(isBase64()),
-    type: String4,
-    name: String4,
+    data: String5.check(isBase64()),
+    type: String5,
+    name: String5,
     lastModified: Int
   }), transformEffect2({
     decode: (e, options) => match(decode(e.data), {
@@ -8935,17 +8964,17 @@ var URLSearchParams2 = /* @__PURE__ */ instanceOf(globalThis.URLSearchParams, {
     Type: `globalThis.URLSearchParams`
   }),
   expected: "URLSearchParams",
-  toCodecJson: () => link()(String4.annotate({
+  toCodecJson: () => link()(String5.annotate({
     expected: "a query string that will be decoded as URLSearchParams"
   }), transform2({
     decode: (e) => new globalThis.URLSearchParams(e),
     encode: (params) => params.toString()
   }))
 });
-var NumberFromString = /* @__PURE__ */ String4.annotate({
+var NumberFromString = /* @__PURE__ */ String5.annotate({
   expected: "a string that will be decoded as a number"
 }).pipe(/* @__PURE__ */ decodeTo2(Number5, numberFromString));
-var Base64String = /* @__PURE__ */ String4.annotate({
+var Base64String = /* @__PURE__ */ String5.annotate({
   expected: "a base64 encoded string that will be decoded as Uint8Array",
   format: "byte",
   contentEncoding: "base64"
@@ -9110,11 +9139,11 @@ var Model = Literals(["haiku", "sonnet"]);
 var Effort = Literals(["medium", "high", "xhigh"]);
 var IntendedLaunch = Struct({
   host: Literals(["pi", "claude"]),
-  provider: String4,
-  model: String4,
-  effort: String4,
+  provider: String5,
+  model: String5,
+  effort: String5,
   profile: Literals(["normal", "fast"]),
-  evidenceRevision: optionalKey2(String4)
+  evidenceRevision: optionalKey2(String5)
 });
 var Mutability = Literals(["ReadOnly", "ScopedWrite"]);
 var Independence = Literals([
@@ -9164,7 +9193,7 @@ var ROUTES = RoleTask.literals.map(routeFor);
 var isWriter = (roleTask) => SPECS[roleTask].mutability === "ScopedWrite";
 var isReviewer = (roleTask) => SPECS[roleTask].role === "Reviewer";
 
-var Slug = String4.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
+var Slug = String5.check(isPattern2(/^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$/));
 var MAX_LENGTH = 40;
 var READ_LENGTH = 512;
 var slugOf = (text) => {
@@ -9247,35 +9276,35 @@ var screenRoute = (row) => {
 
 var EvidenceDataset = Struct({
   version: Literal2(1),
-  revision: String4,
-  retrievedAt: String4,
-  generatedAt: String4,
+  revision: String5,
+  retrievedAt: String5,
+  generatedAt: String5,
   rows: ArraySchema(Struct({
-    role: String4,
-    harness: String4,
-    provider: String4,
-    model: String4,
-    effort: String4,
-    plan: String4,
-    region: String4,
+    role: String5,
+    harness: String5,
+    provider: String5,
+    model: String5,
+    effort: String5,
+    plan: String5,
+    region: String5,
     monthlyUsd: Number5,
-    allowance: String4,
-    utilization: String4,
-    cacheAssumptions: String4,
+    allowance: String5,
+    utilization: String5,
+    cacheAssumptions: String5,
     tier: Literals(["normal", "fast"]),
-    benchmark: String4,
-    benchmarkVersion: String4,
-    benchmarkHarness: String4,
-    qualityUnit: String4,
+    benchmark: String5,
+    benchmarkVersion: String5,
+    benchmarkHarness: String5,
+    qualityUnit: String5,
     direction: Literals(["higher", "lower"]),
     quality: Number5,
     taskCostUsd: Number5,
     costKind: Literals(["subscription", "api-fallback"]),
-    measuredAt: String4,
-    sourceUrl: String4,
-    planSourceUrl: String4,
-    planSourceDate: String4,
-    confidence: String4
+    measuredAt: String5,
+    sourceUrl: String5,
+    planSourceUrl: String5,
+    planSourceDate: String5,
+    confidence: String5
   }))
 });
 var rankCandidates = (dataset, candidates, comparison) => {
@@ -9385,22 +9414,22 @@ var FFF_NATIVE_HOSTS = [
 
 var pi_packages_default = {
   "pi-provider-kimi-code": "0.6.14",
-  "@tintinweb/pi-subagents": "0.26.0",
+  "@tintinweb/pi-subagents": "0.26.2",
   "billion-context": "0.1.216",
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
-  "@aliou/pi-processes": "0.13.6",
-  "@amaster.ai/pi-computer-use": "0.1.38",
+  "@aliou/pi-processes": "0.13.8",
+  "@amaster.ai/pi-computer-use": "0.1.40",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.1.3"
+  "@opencode/browse": "0.1.5"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 var piPackageSource = (name) => `npm:${name}@${PI_PACKAGE_VERSIONS[name]}`;
 
 var pypi_packages_default = {
-  "browser-use": "1.0.6"
+  "browser-use": "1.0.8"
 };
 
 var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
@@ -9747,12 +9776,12 @@ var managedCapabilityPackages = (definitions = CAPABILITIES) => [
 var defaulted = (schema, value) => schema.pipe(withDecodingDefaultKey(succeed6(value)));
 var VcsSettings = Struct({
   api: optionalKey2(Boolean3),
-  allowWords: optionalKey2(ArraySchema(String4)),
-  stateBranch: optionalKey2(String4)
+  allowWords: optionalKey2(ArraySchema(String5)),
+  stateBranch: optionalKey2(String5)
 });
 var PiProvider = Literals(["kimi-coding-global", "openai-codex"]);
 var Thinking = Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-var ModelId = String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
+var ModelId = String5.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/));
 var KIMI_ROOT = "k3.1-pro";
 var KIMI_SPECIALIST = "kimi-for-coding";
 var kimi = (model, thinking) => ({ model, thinking });
@@ -9792,8 +9821,8 @@ var CodemodeMode = Literals(["on", "only"]);
 var T3Scope = Literals(["global", "project"]);
 var Enabled = Boolean3;
 var AutoReviewPolicy = Struct({
-  policy: optionalKey2(String4),
-  extraPolicy: optionalKey2(String4)
+  policy: optionalKey2(String5),
+  extraPolicy: optionalKey2(String5)
 });
 var capabilitySwitch = (on) => defaulted(Enabled, on);
 var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, capabilitySwitch(capability.defaultOn)]));
@@ -9824,7 +9853,7 @@ var PiResolved = toType2(Struct({
     key,
     Struct({
       provider: optionalKey2(PiProvider),
-      model: String4,
+      model: String5,
       thinking: Thinking
     })
   ])))
@@ -9857,21 +9886,21 @@ var DeclaredCandidate = Struct({
   provider: Literals(["kimi-coding-global", "openai-codex", "anthropic"]),
   model: ModelId,
   effort: Thinking,
-  plan: String4,
+  plan: String5,
   tier: Literals(["normal", "fast"]),
   availability: Literals(["yes", "no", "unknown"]),
-  capabilities: Record(String4, Literals(["yes", "no", "unknown"])),
-  requiredCapabilities: ArraySchema(String4),
+  capabilities: Record(String5, Literals(["yes", "no", "unknown"])),
+  requiredCapabilities: ArraySchema(String5),
   identityStable: Boolean3
 });
 var RoutingBenchmark = Struct({
   role: RoleTask,
   harness: Literals(["pi", "claude"]),
-  benchmark: String4,
-  benchmarkVersion: String4,
-  benchmarkHarness: String4,
-  qualityUnit: String4,
-  requiredCapabilities: ArraySchema(String4)
+  benchmark: String5,
+  benchmarkVersion: String5,
+  benchmarkHarness: String5,
+  qualityUnit: String5,
+  requiredCapabilities: ArraySchema(String5)
 });
 var RoutingSettings = Struct({
   version: Literal2(1),
@@ -9880,7 +9909,7 @@ var RoutingSettings = Struct({
   benchmarks: ArraySchema(RoutingBenchmark),
   maxAgeDays: Int.check(isBetween({ minimum: 1, maximum: 365 }))
 });
-var ClaudeSection = defaulted(Record(String4, Never2), {});
+var ClaudeSection = defaulted(Record(String5, Never2), {});
 var Config = Struct({
   vcs: defaulted(VcsSettings, {}),
   pi: PiSection,
@@ -10030,7 +10059,7 @@ class SpecialistNotRecorded extends TaggedError2("SpecialistNotRecorded") {
 
 var decodeInput = (schema, input) => decodeUnknownEffect2(schema, { onExcessProperty: "error" })(input).pipe(mapError2((error) => new InvalidDraft({ message: error.message })));
 
-var Text = String4.check(isPattern2(/\S/));
+var Text = String5.check(isPattern2(/\S/));
 var Revision = Int.check(isGreaterThanOrEqualTo2(1));
 var INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
 var isInstant = (text) => {
@@ -10041,7 +10070,7 @@ var isInstant = (text) => {
   const date = new Date(text);
   return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day && date.getUTCHours() === hour && date.getUTCMinutes() === minute && date.getUTCSeconds() === second;
 };
-var Timestamp = String4.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
+var Timestamp = String5.check(makeFilter2((text) => isInstant(text) || "a real UTC instant such as 2026-01-02T03:04:05Z"));
 var TextList = ArraySchema(Text);
 
 var findIntent = (project, id) => {
@@ -10126,12 +10155,12 @@ var accept = (project, assignmentId, input) => gen2(function* () {
 
 import { isAbsolute } from "node:path";
 
-var identifier2 = (kind) => String4.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
+var identifier2 = (kind) => String5.check(isPattern2(new RegExp(`^${kind}-[a-z0-9]+(?:-[a-z0-9]+)*$`)));
 var IntentId = identifier2("intent");
 var AssignmentId = identifier2("assignment");
 var BranchId = identifier2("branch");
 var PullId = identifier2("pull");
-var AgentId = String4.check(isPattern2(/\S/));
+var AgentId = String5.check(isPattern2(/\S/));
 var newId = (kind) => gen2(function* () {
   const time = (yield* currentTimeMillis2).toString(36).padStart(9, "0");
   const digits = yield* forEach2([0, 1, 2, 3], () => nextIntBetween(0, 35));
@@ -10155,7 +10184,7 @@ var pathProblem = (path) => {
   }
   return;
 };
-var PortablePath = String4.check(makeFilter2((path) => pathProblem(path) ?? undefined));
+var PortablePath = String5.check(makeFilter2((path) => pathProblem(path) ?? undefined));
 var pathsOverlap = (a, b) => {
   const left = a.toLowerCase();
   const right = b.toLowerCase();
@@ -10947,7 +10976,7 @@ import { link as link2, lstat as lstat3, mkdir as mkdir3, open as open2, rename 
 import { dirname as dirname3 } from "node:path";
 var LockOwner = Struct({
   pid: Int,
-  token: String4,
+  token: String5,
   acquiredAt: Int
 });
 var UNREADABLE_STALE_MS = 30000;
@@ -11037,15 +11066,15 @@ import { link as link3, lstat as lstat4, mkdir as mkdir4, open as open3, readdir
 import { basename as basename2, dirname as dirname4, isAbsolute as isAbsolute3, join as join5, resolve as resolve4 } from "node:path";
 import { promisify } from "node:util";
 var MigrationJournalFile = Struct({
-  path: String4,
-  before: NullOr(String4),
-  after: String4,
-  content: String4,
+  path: String5,
+  before: NullOr(String5),
+  after: String5,
+  content: String5,
   mode: Int
 });
 var MigrationJournalSource = Struct({
-  path: String4,
-  digest: String4,
+  path: String5,
+  digest: String5,
   tracked: Boolean3
 });
 var MigrationJournalPhase = Literals([
@@ -11056,15 +11085,15 @@ var MigrationJournalPhase = Literals([
 ]);
 var MigrationJournal = Struct({
   version: Literal2(1),
-  transaction: String4,
-  sourceRoot: String4,
-  targetRoot: String4,
-  branch: String4,
-  parent: String4,
-  commit: String4,
-  tree: String4,
-  indexBefore: String4,
-  indexAfter: String4,
+  transaction: String5,
+  sourceRoot: String5,
+  targetRoot: String5,
+  branch: String5,
+  parent: String5,
+  commit: String5,
+  tree: String5,
+  indexBefore: String5,
+  indexAfter: String5,
   files: ArraySchema(MigrationJournalFile),
   source: ArraySchema(MigrationJournalSource),
   phase: MigrationJournalPhase
@@ -13451,14 +13480,14 @@ var resolveIntent = (snapshot) => {
 var oneLine = (text) => text.replace(/\s+/g, " ").trim();
 var REPORT_FIELDS = Struct({
   status: Literals(["done", "partial", "blocked"]),
-  changed_paths: ArraySchema(String4),
-  checks: ArraySchema(Struct({ command: String4, exit: Int })),
-  blockers: ArraySchema(String4),
-  notes: ArraySchema(String4),
-  evidence: ArraySchema(Struct({ key: String4, support: String4 }))
+  changed_paths: ArraySchema(String5),
+  checks: ArraySchema(Struct({ command: String5, exit: Int })),
+  blockers: ArraySchema(String5),
+  notes: ArraySchema(String5),
+  evidence: ArraySchema(Struct({ key: String5, support: String5 }))
 });
 var JsonReport = StructWithRest(REPORT_FIELDS, [
-  Record(String4, Unknown2)
+  Record(String5, Unknown2)
 ]);
 var section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine(line)}`)];
 var KNOWN = new Set(Object.keys(REPORT_FIELDS.fields));
@@ -13497,9 +13526,9 @@ class InvalidPiRecord extends TaggedError2("InvalidPiRecord") {
 }
 var JournalEntry = Struct({
   index: Int.check(isGreaterThanOrEqualTo2(0)),
-  key: String4,
+  key: String5,
   ok: Boolean3,
-  text: optionalKey2(String4),
+  text: optionalKey2(String5),
   resumed: optionalKey2(Literal2(true))
 });
 var JournalLine = fromJsonString2(JournalEntry);
@@ -13545,9 +13574,9 @@ var matchJournal = (entries, expected) => {
 };
 var AGENT_RECORD_ENTRY_TYPE = "subagents:record";
 var AgentRecordData = Struct({
-  id: String4,
-  type: String4,
-  description: String4,
+  id: String5,
+  type: String5,
+  description: String5,
   status: Literals([
     "queued",
     "running",
@@ -13557,25 +13586,25 @@ var AgentRecordData = Struct({
     "stopped",
     "error"
   ]),
-  result: optionalKey2(String4),
-  error: optionalKey2(String4),
+  result: optionalKey2(String5),
+  error: optionalKey2(String5),
   startedAt: Number5,
   completedAt: optionalKey2(Number5),
-  sessionFile: optionalKey2(String4),
-  handle: optionalKey2(String4),
-  alias: optionalKey2(String4),
+  sessionFile: optionalKey2(String5),
+  handle: optionalKey2(String5),
+  alias: optionalKey2(String5),
   worktreeLost: optionalKey2(Boolean3)
 });
 var RecordEntry = Struct({
   type: Literal2("custom"),
   customType: Literal2(AGENT_RECORD_ENTRY_TYPE),
   data: AgentRecordData,
-  id: String4,
-  parentId: NullOr(String4),
-  timestamp: String4
+  id: String5,
+  parentId: NullOr(String5),
+  timestamp: String5
 });
 var RecordLine = fromJsonString2(RecordEntry);
-var SessionLine = fromJsonString2(Struct({ type: String4, customType: optionalKey2(String4) }));
+var SessionLine = fromJsonString2(Struct({ type: String5, customType: optionalKey2(String5) }));
 
 class PiRecordMissing extends TaggedError2("PiRecordMissing") {
   get message() {
@@ -13794,18 +13823,18 @@ ${body}` : body;
 };
 var Started = Struct({
   type: Literal2("started"),
-  key: String4,
-  agentId: String4,
-  label: String4
+  key: String5,
+  agentId: String5,
+  label: String5
 });
 var Resulted = Struct({
   type: Literal2("result"),
-  key: String4,
-  agentId: String4,
+  key: String5,
+  agentId: String5,
   result: Unknown2
 });
 var Other = Struct({
-  type: String4.check(isPattern2(/^(?!(?:started|result)$)/))
+  type: String5.check(isPattern2(/^(?!(?:started|result)$)/))
 });
 var JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
 var journalResults = (journal, source) => gen2(function* () {
@@ -13880,28 +13909,28 @@ var schemas = {
   create: Draft,
   dispatch: Union2([Reference2, Draft]),
   record: Union2([
-    Struct({ id: AssignmentId, agent: String4 }),
+    Struct({ id: AssignmentId, agent: String5 }),
     Struct({ id: AssignmentId, failed: Literal2(true) })
   ]),
   close: Struct({
     id: AssignmentId,
     outcome: Literals(["success", "failure", "errored", "interrupted", "stopped"]),
-    accept: optionalKey2(String4),
-    report: optionalKey2(String4),
+    accept: optionalKey2(String5),
+    report: optionalKey2(String5),
     reportJson: optionalKey2(JsonReport)
   }),
   accept: Struct({
     id: AssignmentId,
-    rationale: String4,
+    rationale: String5,
     carryForward: optionalKey2(Boolean3),
-    report: optionalKey2(String4)
+    report: optionalKey2(String5)
   }),
   show: Reference2,
   list: Struct({
     state: optionalKey2(AssignmentState),
     all: optionalKey2(Boolean3)
   }),
-  reports: Struct({ source: String4 })
+  reports: Struct({ source: String5 })
 };
 
 class MissingAsset extends TaggedError2("MissingAsset") {
@@ -14318,27 +14347,27 @@ var changedState = gen2(function* () {
 
 class GitHub extends Service()("holyagent/vcs/GitHub") {
 }
-var ErrorBody = fromJsonString2(Struct({ message: String4 }));
+var ErrorBody = fromJsonString2(Struct({ message: String5 }));
 var Json2 = fromJsonString2(Unknown2);
 
 var nowIso = currentTimeMillis2.pipe(map4((millis) => new Date(millis).toISOString()));
 
 var Created = Struct({
   number: Int,
-  html_url: String4,
-  head: Struct({ ref: String4 })
+  html_url: String5,
+  head: Struct({ ref: String5 })
 });
 var MAX_BODY_BYTES = 256 * 1024;
 var schemas3 = {
   commit: Struct({
-    messages: ArraySchema(String4),
-    paths: ArraySchema(String4)
+    messages: ArraySchema(String5),
+    paths: ArraySchema(String5)
   }),
-  identity: Struct({ name: String4, email: String4 }),
+  identity: Struct({ name: String5, email: String5 }),
   pr: Struct({
-    base: optional2(String4),
-    title: optional2(String4),
-    bodyFile: optional2(String4),
+    base: optional2(String5),
+    title: optional2(String5),
+    bodyFile: optional2(String5),
     update: optional2(Int)
   })
 };
@@ -14461,7 +14490,7 @@ var userFiles = (env) => {
 };
 
 import { basename as basename6, dirname as dirname7, join as join13 } from "node:path";
-var JsonObjectText = fromJsonString2(Record(String4, Unknown2), {
+var JsonObjectText = fromJsonString2(Record(String5, Unknown2), {
   space: 2
 });
 var strict2 = { onExcessProperty: "error" };
@@ -14569,15 +14598,15 @@ var browseDataDirectory = (env) => {
   return join14(data !== undefined && isAbsolute7(data) ? data : join14(homeDirectory2(env), ".local", "share"), "browse");
 };
 var browsePairingFile = (env) => join14(browseDataDirectory(env), "browser-tokens.json");
-var Open = Record(String4, Unknown2);
+var Open = Record(String5, Unknown2);
 var Pairing = StructWithRest(Struct({
-  token: String4.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
+  token: String5.check(isPattern2(/^[A-Za-z0-9_-]{43}$/)),
   pairedAt: optionalKey2(Number5),
   lastSeen: optionalKey2(Number5),
-  id: optionalKey2(String4),
-  name: optionalKey2(String4)
+  id: optionalKey2(String5),
+  name: optionalKey2(String5)
 }), [Open]);
-var PairingFile = fromJsonString2(Record(String4, Unknown2));
+var PairingFile = fromJsonString2(Record(String5, Unknown2));
 var readBrowsePairing = (env) => gen2(function* () {
   const text = yield* readJsonText(browsePairingFile(env));
   if (text === undefined || text.trim() === "")
@@ -14645,10 +14674,10 @@ var browserDirectories = (env, platform = process.platform) => {
   ].map(([name = "", folder = ""]) => ({ name, directory: join14(config, folder) }));
 };
 var LocalState = fromJsonString2(StructWithRest(Struct({
-  profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String4, Open)) }), [Open]))
+  profile: optionalKey2(StructWithRest(Struct({ info_cache: optionalKey2(Record(String5, Open)) }), [Open]))
 }), [Open]));
 var Preferences = fromJsonString2(StructWithRest(Struct({
-  extensions: optionalKey2(StructWithRest(Struct({ settings: optionalKey2(Record(String4, Open)) }), [Open]))
+  extensions: optionalKey2(StructWithRest(Struct({ settings: optionalKey2(Record(String5, Open)) }), [Open]))
 }), [Open]));
 var readOptional = (file) => readJsonText(file).pipe(orElseSucceed2(() => {
   return;
@@ -14935,10 +14964,10 @@ var checkNode = (env) => checkVersioned(env, "node", "node", {
     detail: `${shown} at ${path} is older than ${PI_MINIMUM_NODE}, which Pi needs; ${NODE_FIX}`
   } : { ok: true, detail: `${shown} (${path})` }
 });
-var Open2 = Record(String4, Unknown2);
+var Open2 = Record(String5, Unknown2);
 var PackageEntry = Union2([
-  String4,
-  StructWithRest(Struct({ source: String4 }), [Open2])
+  String5,
+  StructWithRest(Struct({ source: String5 }), [Open2])
 ]);
 var PiSettings = StructWithRest(Struct({ packages: optionalKey2(ArraySchema(PackageEntry)) }), [Open2]);
 var GIT_LEAD = /^(?:git:|[a-z][a-z0-9+.-]*:\/\/)(?:[^/@]*@)?|^[^/@:\s]+@[^/@:\s]+:/i;
@@ -15227,11 +15256,11 @@ var toolSettings = (config, _profile = providerProfile(config), form = "normal",
 
 import { join as join17, resolve as resolve9 } from "node:path";
 var RecordedKey = Struct({
-  path: NonEmptyArray(String4),
+  path: NonEmptyArray(String5),
   value: Unknown2
 });
 var RecordFile = Struct({
-  files: Record(String4, Struct({ keys: ArraySchema(RecordedKey) }))
+  files: Record(String5, Struct({ keys: ArraySchema(RecordedKey) }))
 });
 var recordPath = (env) => join17(userFiles(env).claudeDir, "holyagent", "setup-records.json");
 var keyOf = (file) => resolve9(file);
@@ -16594,7 +16623,7 @@ var doctor = fn2("doctor")(function* (env, options) {
 var Form = Struct({
   form: Literals(FORM_CHOICES),
   source: Literals(["flag", "detected", "default"]),
-  reason: String4
+  reason: String5
 });
 var Choices = Struct({
   subagents: optionalKey2(Boolean3),
@@ -18530,23 +18559,23 @@ var LEGACY_FOLDERS = {
 };
 var strict3 = { onExcessProperty: "error" };
 var collapse = (message) => message.replace(/\s+/g, " ").trim();
-var strings = ArraySchema(String4);
+var strings = ArraySchema(String5);
 var optionalStrings = optionalKey2(strings);
 var HolyclaudeIntent = Struct({
-  id: String4,
-  objective: String4,
-  requirements: String4,
+  id: String5,
+  objective: String5,
+  requirements: String5,
   revision: Int,
   state: optionalKey2(Literals(["open", "closed"])),
-  close_reason: optionalKey2(String4),
-  closed_at: optionalKey2(String4)
+  close_reason: optionalKey2(String5),
+  closed_at: optionalKey2(String5)
 });
 var HolyclaudeAssignment = Struct({
-  id: String4,
-  intent_id: String4,
+  id: String5,
+  intent_id: String5,
   intent_revision: Int,
-  role: String4,
-  objective: String4,
+  role: String5,
+  objective: String5,
   scope: optionalStrings,
   constraints: optionalStrings,
   acceptance_criteria: optionalStrings,
@@ -18560,14 +18589,14 @@ var HolyclaudeAssignment = Struct({
     related_assignments: optionalStrings,
     independent_from: optionalStrings
   })),
-  clone_id: optionalKey2(String4),
+  clone_id: optionalKey2(String5),
   state: Literals(["Ready", "Running", "Succeeded", "Failed", "Cancelled"]),
-  result: optionalKey2(NullOr(String4)),
+  result: optionalKey2(NullOr(String5)),
   acceptance: optionalKey2(NullOr(Struct({
     intent_revision: Int,
-    rationale: String4,
-    criteria_evidence: Record(String4, String4),
-    required_evidence: Record(String4, String4)
+    rationale: String5,
+    criteria_evidence: Record(String5, String5),
+    required_evidence: Record(String5, String5)
   })))
 });
 var CodexIntentState = Literals([
@@ -18582,26 +18611,26 @@ var CodexIntentState = Literals([
   "abandoned"
 ]);
 var codexIntentFields = {
-  toon_compatibility: String4,
-  id: String4,
-  slug: String4,
-  title: String4,
-  goal: String4,
+  toon_compatibility: String5,
+  id: String5,
+  slug: String5,
+  title: String5,
+  goal: String5,
   acceptance_criteria: strings,
   state: CodexIntentState,
   revision: Int,
   baseline: Unknown2,
-  created_at: String4,
-  updated_at: String4
+  created_at: String5,
+  updated_at: String5
 };
 var HolycodexIntent = Struct({
   ...codexIntentFields,
   schema_version: Literals(["holycodex-intent-1"]),
   plan_required: Boolean3,
   active_plan_revision: optionalKey2(Int),
-  active_plan_digest: optionalKey2(String4),
+  active_plan_digest: optionalKey2(String5),
   blockers: strings,
-  resume_state: optionalKey2(String4),
+  resume_state: optionalKey2(String5),
   verification: Unknown2,
   review: Unknown2,
   acceptance_met: Boolean3,
@@ -18614,23 +18643,23 @@ var HolycodexIntentV0 = Struct({
   schema_version: Literals(["holycodex-intent-0"])
 });
 var CodexInvocation = Struct({
-  id: String4,
-  outcome: String4,
-  started_at: String4,
-  finished_at: String4,
-  summary: String4,
+  id: String5,
+  outcome: String5,
+  started_at: String5,
+  finished_at: String5,
+  summary: String5,
   evidence: ArraySchema(Unknown2),
   context7: optionalKey2(Unknown2),
-  blocker: optionalKey2(String4),
+  blocker: optionalKey2(String5),
   remaining_risk: strings
 });
 var HolycodexAssignment = Struct({
   schema_version: Literals(["holycodex-assignment-1"]),
-  toon_compatibility: String4,
-  intent_id: String4,
-  id: String4,
-  objective: String4,
-  owner: Struct({ role: String4, task: String4 }),
+  toon_compatibility: String5,
+  intent_id: String5,
+  id: String5,
+  objective: String5,
+  owner: Struct({ role: String5, task: String5 }),
   scope: strings,
   constraints: strings,
   exclusions: strings,
@@ -18647,19 +18676,19 @@ var HolycodexAssignment = Struct({
   ]),
   revision: Int,
   invocations: ArraySchema(CodexInvocation),
-  active_invocation_id: optionalKey2(String4),
-  active_started_at: optionalKey2(String4),
-  supersedes: optionalKey2(String4),
-  superseded_by: optionalKey2(String4),
-  supersession_reason: optionalKey2(String4),
-  supersession_provenance: optionalKey2(String4),
+  active_invocation_id: optionalKey2(String5),
+  active_started_at: optionalKey2(String5),
+  supersedes: optionalKey2(String5),
+  superseded_by: optionalKey2(String5),
+  supersession_reason: optionalKey2(String5),
+  supersession_provenance: optionalKey2(String5),
   evidence: ArraySchema(Unknown2),
-  blocker: optionalKey2(String4),
+  blocker: optionalKey2(String5),
   remaining_risk: strings,
-  created_at: String4,
-  updated_at: String4,
-  active_invocation_capability_verifier: optionalKey2(String4),
-  active_invocation_capability: optionalKey2(String4)
+  created_at: String5,
+  updated_at: String5,
+  active_invocation_capability_verifier: optionalKey2(String5),
+  active_invocation_capability: optionalKey2(String5)
 });
 var parseText = (format, text) => try_2({
   try: () => format === "json" ? JSON.parse(text) : decode4(text, { strict: true }),
@@ -19479,7 +19508,7 @@ function codePointToString(code) {
   code -= 65536;
   return String.fromCharCode((code >> 10) + 55296, (code & 1023) + 56320);
 }
-var loneSurrogate = /(?:[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])/;
+var loneSurrogate2 = /(?:[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])/;
 var Position = function Position(line, col) {
   this.line = line;
   this.column = col;
@@ -21036,7 +21065,7 @@ pp$8.parseImportAttribute = function() {
 pp$8.parseModuleExportName = function() {
   if (this.options.ecmaVersion >= 13 && this.type === types$1.string) {
     var stringLiteral = this.parseLiteral(this.value);
-    if (loneSurrogate.test(stringLiteral.value)) {
+    if (loneSurrogate2.test(stringLiteral.value)) {
       this.raise(stringLiteral.start, "An export name cannot include a lone surrogate.");
     }
     return stringLiteral;
@@ -27708,7 +27737,7 @@ class OutputUnreadable extends TaggedError2("OutputUnreadable") {
     return `the output of \`holyagent ${this.command}\` could not be read: ${this.reason}`;
   }
 }
-var Fields = Record(String4, Unknown2);
+var Fields = Record(String5, Unknown2);
 var withReminder = (text, replacement) => {
   if (!text.endsWith(SESSION_REMINDER))
     return text;
@@ -27729,23 +27758,23 @@ import { stat as stat5 } from "node:fs/promises";
 var hasStateFolder = (directory) => io(directory, () => stat5(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var SHELL_BUNDLE = "just-bash.js";
 var ShellRequest = Struct({
-  command: String4,
-  cwd: String4,
-  env: Record(String4, String4)
+  command: String5,
+  cwd: String5,
+  env: Record(String5, String5)
 });
 var EnvChanges = Struct({
-  set: Record(String4, String4),
-  unset: ArraySchema(String4)
+  set: Record(String5, String5),
+  unset: ArraySchema(String5)
 });
 var ShellFrame = Union2([
-  Struct({ type: Literal2("data"), data: String4 }),
+  Struct({ type: Literal2("data"), data: String5 }),
   Struct({
     type: Literal2("end"),
     exitCode: Number5,
-    cwd: String4,
+    cwd: String5,
     changes: EnvChanges
   }),
-  Struct({ type: Literal2("failure"), message: String4 })
+  Struct({ type: Literal2("failure"), message: String5 })
 ]);
 
 class ProtocolError extends TaggedError2("ProtocolError") {
@@ -27831,7 +27860,7 @@ class ModelsNotInCatalog extends TaggedError2("ModelsNotInCatalog") {
     return `Provider ${this.provider} does not list: ${list}. ${MODELS_FIX}`;
   }
 }
-var Id = String4.check(isPattern2(/^\S+$/));
+var Id = String5.check(isPattern2(/^\S+$/));
 var CatalogRow = Struct({ provider: Id, model: Id });
 var decodeRow = decodeUnknownOption2(CatalogRow, { onExcessProperty: "error" });
 var columnsOf = (text) => text.split(/\r?\n/).map((line) => line.trim().split(/\s+/)).filter((columns) => columns[0] !== "");
@@ -28177,7 +28206,7 @@ var GuardianAssessment = Struct({
   risk_level: Literals(RISK_LEVELS),
   user_authorization: Literals(AUTHORIZATION_LEVELS),
   outcome: Literals(["allow", "deny"]),
-  rationale: String4
+  rationale: String5
 });
 var ASSESSMENT_JSON_SCHEMA = {
   type: "object",
@@ -28320,16 +28349,16 @@ var manualApprovalEntry = (actionJson) => ({
 Approved action:
 ${actionJson}`
 });
-var TextBlock = Struct({ type: Literal2("text"), text: String4 });
+var TextBlock = Struct({ type: Literal2("text"), text: String5 });
 var ToolCallBlock = Struct({
   type: Literal2("toolCall"),
-  id: String4,
-  name: String4,
+  id: String5,
+  name: String5,
   arguments: Unknown2
 });
 var UserMessage = Struct({
   role: Literal2("user"),
-  content: Union2([String4, ArraySchema(Unknown2)])
+  content: Union2([String5, ArraySchema(Unknown2)])
 });
 var AssistantMessage = Struct({
   role: Literal2("assistant"),
@@ -28337,8 +28366,8 @@ var AssistantMessage = Struct({
 });
 var ToolResultMessage = Struct({
   role: Literal2("toolResult"),
-  toolCallId: String4,
-  toolName: optionalKey2(String4),
+  toolCallId: String5,
+  toolName: optionalKey2(String5),
   content: ArraySchema(Unknown2)
 });
 var isText = is2(TextBlock);
@@ -28702,7 +28731,7 @@ var STATUS_TIMEOUT_MS = 1e4;
 var USAGE_LIMIT = /usage[ _]limit|usage_not_included|rate_limit_exceeded|hit your .* limit/i;
 var endedOnUsageLimit = (message) => message.role === "assistant" && message.stopReason === "error" && USAGE_LIMIT.test(message.errorMessage ?? "");
 var UsageStatus = Struct({
-  rate_limit_upsell: optionalKey2(NullOr(Struct({ banner_type: optionalKey2(NullOr(String4)) })))
+  rate_limit_upsell: optionalKey2(NullOr(Struct({ banner_type: optionalKey2(NullOr(String5)) })))
 });
 var readStatus = decodeUnknownOption2(UsageStatus);
 var reserveOffered = (status) => {
@@ -28716,7 +28745,7 @@ class UsageStatusUnavailable extends TaggedError2("UsageStatusUnavailable") {
   }
 }
 var JwtClaims = Struct({
-  "https://api.openai.com/auth": optionalKey2(Struct({ chatgpt_account_id: optionalKey2(String4) }))
+  "https://api.openai.com/auth": optionalKey2(Struct({ chatgpt_account_id: optionalKey2(String5) }))
 });
 var readClaims = decodeUnknownOption2(fromJsonString2(JwtClaims));
 var accountIdOf = (token) => {
@@ -28911,13 +28940,13 @@ var reviewerHeaders = (token) => {
   };
 };
 var StreamEvent = Struct({
-  type: String4,
-  delta: optionalKey2(String4),
-  text: optionalKey2(String4),
-  message: optionalKey2(String4),
+  type: String5,
+  delta: optionalKey2(String5),
+  text: optionalKey2(String5),
+  message: optionalKey2(String5),
   response: optionalKey2(Struct({
-    error: optionalKey2(NullOr(Struct({ message: optionalKey2(String4) }))),
-    incomplete_details: optionalKey2(NullOr(Struct({ reason: optionalKey2(String4) })))
+    error: optionalKey2(NullOr(Struct({ message: optionalKey2(String5) }))),
+    incomplete_details: optionalKey2(NullOr(Struct({ reason: optionalKey2(String5) })))
   }))
 });
 var readEvent = decodeUnknownOption2(fromJsonString2(StreamEvent));
@@ -29115,10 +29144,10 @@ var FALLBACK_CONTEXT_WINDOW = 272000;
 var MINIMUM_THRESHOLD = 1000;
 var compactThreshold = (contextWindow) => Math.max(MINIMUM_THRESHOLD, Math.floor((contextWindow ?? FALLBACK_CONTEXT_WINDOW) * COMPACT_THRESHOLD_SHARE));
 var contextManagementOn = (config) => (config.pi.provider === "openai-codex" || Object.values(config.pi.routes).some((row) => row.provider === "openai-codex")) && config.pi.features.contextManagement && !config.pi.features.contextCompression;
-var Request = Struct({ model: String4, input: ArraySchema(Unknown2) });
+var Request = Struct({ model: String5, input: ArraySchema(Unknown2) });
 var CompactionItem = Struct({
   type: Literal2("compaction"),
-  encrypted_content: String4
+  encrypted_content: String5
 });
 var OutputItemDone = Struct({
   type: Literal2("response.output_item.done"),
