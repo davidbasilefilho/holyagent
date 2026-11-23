@@ -41,6 +41,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "model_route",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-23T10:48:43.557Z"
