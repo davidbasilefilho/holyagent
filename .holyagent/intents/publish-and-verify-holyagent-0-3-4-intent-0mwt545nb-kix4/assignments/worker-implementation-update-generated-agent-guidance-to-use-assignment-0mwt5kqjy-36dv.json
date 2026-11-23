@@ -1,0 +1,37 @@
+{
+  "id": "assignment-0mwt5kqjy-36dv",
+  "intentId": "intent-0mwt545nb-kix4",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "update-generated-agent-guidance-to-use",
+  "objective": "Update generated agent guidance to use holyagent-cli and its typed flags and preserve distinct user setup instructions.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Agent guidance teaches the internal executable and typed flags with valid structured results",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Requirements coverage and T3-only user setup guidance are preserved",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "docs/usage.md",
+    "docs/agent-cli-output.md"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-23T10:58:49.582Z"
+  },
+  "createdAt": "2026-11-23T10:58:49.582Z"
+}
