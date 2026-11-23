@@ -48,6 +48,7 @@ export const assignmentView = (assignment: Assignment) =>
     criteria: assignment.criteria,
     evidence: assignment.evidence,
     paths: assignment.ownershipPaths,
+    operationalResources: assignment.operationalResources,
     dependsOn: assignment.dependencies,
     independentFrom: assignment.independentFrom,
     followUpOf: assignment.followUpOf,

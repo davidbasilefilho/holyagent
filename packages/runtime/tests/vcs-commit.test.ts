@@ -223,6 +223,20 @@ const commitA = (dir: string, env: Record<string, string>) =>
   vcs(dir, ["vcs", "commit", "-m", "Change a", "--", "a.txt"], github().layer, undefined, env)
 
 describe("vcs identity", () => {
+  test("Pi cannot use the Claude Code author setup, even with a Claude cloud marker", async () => {
+    const dir = await cloudRepo()
+    const before = await sh(dir, ["git", "config", "--local", "--list"])
+    const result = await vcs(
+      dir,
+      ["vcs", "identity", "--name", "Octo Cat", "--email", USER_EMAIL],
+      github().layer,
+      undefined,
+      { ...CLOUD, HOLYAGENT_HOST: "pi" },
+    )
+    expect(result.code).not.toBe(0)
+    expect(await sh(dir, ["git", "config", "--local", "--list"])).toBe(before)
+  })
+
   test("writes exactly author.name and author.email to the local git config and no file of the tree", async () => {
     const dir = await cloudRepo()
     const before = await sh(dir, ["git", "config", "--local", "--list"])
@@ -340,7 +354,12 @@ describe("vcs commit outside a claude.ai cloud session", () => {
   // Four repositories, each with its own git and CLI spawns: about 5s on a Windows runner, where
   // spawning is slow, so the 5s default is too tight. Linux takes well under 1s.
   test("the author setting is ignored: an agent's user identity is still refused, and the user's is used", async () => {
-    for (const env of [{}, { CLAUDE_CODE_REMOTE: "false" }, { CLAUDE_CODE_REMOTE: "1" }]) {
+    for (const env of [
+      {},
+      { CLAUDE_CODE_REMOTE: "false" },
+      { CLAUDE_CODE_REMOTE: "1" },
+      { ...CLOUD, HOLYAGENT_HOST: "pi" },
+    ]) {
       const dir = await cloudRepo()
       await sh(dir, ["git", "config", "author.name", "Octo Cat"])
       await sh(dir, ["git", "config", "author.email", USER_EMAIL])

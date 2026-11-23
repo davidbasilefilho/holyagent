@@ -1,0 +1,65 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "promise"],
+  "jsPlugins": [
+    {
+      "name": "jsdoc-js",
+      "specifier": "eslint-plugin-jsdoc"
+    },
+    "./scripts/oxlint-effect-rules.mjs"
+  ],
+  "options": {
+    "typeAware": true,
+    "maxWarnings": 0
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "jsdoc-js/require-jsdoc": [
+      "error",
+      {
+        "publicOnly": true,
+        "enableFixer": false,
+        "require": {
+          "FunctionDeclaration": true,
+          "ClassDeclaration": true,
+          "MethodDefinition": true
+        },
+        "contexts": [
+          "TSInterfaceDeclaration",
+          "TSTypeAliasDeclaration",
+          "TSEnumDeclaration",
+          "ExportNamedDeclaration > VariableDeclaration"
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["packages/runtime/src/**"],
+      "rules": {
+        "oxc/no-async-await": "error",
+        "promise/avoid-new": "error",
+        "holyagent-effect/use-effect": "error"
+      }
+    },
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "typescript/await-thenable": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "/.claude-plugin/marketplace.json",
+    "/packages/integrations/claude/dist/**",
+    "/packages/integrations/pi/dist/**",
+    "/packages/integrations/claude/src/wrapper.sh",
+    "/.holyagent/**",
+    "/.agents/skills/**"
+  ]
+}

@@ -136,3 +136,33 @@ describe.each(FAMILIES)("family %s", (family) => {
     }
   })
 })
+
+describe("commit workflow by harness", () => {
+  test("requires the commit wrapper only in Claude Code and scopes author setup to its web sessions", async () => {
+    const claude = folderOf("claude-5.5")
+    expect(await Bun.file(join(claude, "root/identity.md")).text()).toContain(
+      "Claude Code: commit with `holyagent-cli vcs commit`",
+    )
+    expect(await Bun.file(join(claude, "session-cloud-identity.md")).text()).toContain(
+      "holyagent-cli vcs identity --name",
+    )
+    for (const family of FAMILIES.filter((name) => name !== "claude-5.5")) {
+      const folder = folderOf(family)
+      expect(await Bun.file(join(folder, "root/identity.md")).text()).toContain(
+        "record accepted work according to the Version control rules",
+      )
+      expect(await Bun.file(join(folder, "root/version-control.md")).text()).toMatch(
+        /Use (?:`git commit` for commits|plain Git for commits)/,
+      )
+      for (const path of [
+        "root/identity.md",
+        "root/version-control.md",
+        "root/user-messages.md",
+        "session-cloud-identity.md",
+        "skills/state-mode/SKILL.md",
+      ]) {
+        expect(await Bun.file(join(folder, path)).text()).not.toMatch(/vcs (commit|identity)\b/)
+      }
+    }
+  })
+})

@@ -56,16 +56,16 @@ A repository's convention does not waive a rule that needs the user's approval (
 
 The root owns the branch, the PR and the state records, and records your changed paths from your report. Nothing blocks a stray write, and a stray write corrupts the shared tree, so keeping to these lists rests on you.
 
-Leave to the root every command that changes git, GitHub or holyagent state:
+Leave to the root every command that changes git, GitHub or holyagent-cli state:
 
 - `git commit`, `branch`, `push`, `checkout`, `stash`, `merge` and `reset`;
 - `gh` writes;
-- `holyagent vcs`, `assignment` and `intent` commands;
+- `holyagent-cli vcs`, `assignment` and `intent` commands;
 - any edit under `.git/` or `.holyagent/`.
 
 When you need such a change, say so in the report.
 
-Open to you, because they only read: `git status`, `diff`, `log`, `show`, `blame` and `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`.
+Open to you, because they only read: `git status`, `diff`, `log`, `show`, `blame` and `fetch`, and `holyagent-cli status`, `plan`, `assignment show` and `assignment list`.
 
 Never change HEAD, a branch, the index or the working tree of a checkout other workers share, reviewers included, with `checkout`, `switch`, `stash`, `reset`, `restore`, `clean`, `add`, `commit`, `merge`, `rebase` or `cherry-pick`: they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the system temp area. To undo your own edit, edit the file back.
 
@@ -142,6 +142,10 @@ This text owns the severity of those findings. A finding blocks only when the ch
 - leaves a duplicate that already disagrees with its original.
 
 Every other finding is optional, as is anything already on the base.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- writing or reviewing model-facing instructions: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/instruction-writing/SKILL.md`
 
 ## Headless screen
 

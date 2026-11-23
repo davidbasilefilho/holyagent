@@ -16,8 +16,8 @@ import type { FlagSpec, Parsed } from "./args.ts"
 import type { StdinMissing, Usage } from "./errors.ts"
 
 /**
- * A result printed as TOON fields, then a line `<label>:` alone, then the text verbatim to the end
- * of the output. TOON has no multi-line string, so text meant to be copied as it is goes here.
+ * A result with text the caller copies as it is. The agent surface encodes it as a TOON string
+ * field. The retained host protocol prints it verbatim after a line with the label.
  */
 export class WithTrailer {
   /** Builds a result from its TOON fields, the trailer label and the verbatim text. */
@@ -29,8 +29,8 @@ export class WithTrailer {
 }
 
 /**
- * A result printed exactly as it is, with its own exit code, for a caller that reads stdout as
- * something other than TOON, such as a host hook.
+ * A result with its own stdout, stderr and exit code. The agent surface encodes them in TOON; the
+ * public and retained host surfaces use the streams directly.
  */
 export class Verbatim {
   /** Builds a result from the text of stdout and stderr and the exit code. */
@@ -56,6 +56,9 @@ export type SetupTuiLoader = (
   notify: (text: string) => Effect.Effect<void>,
 ) => Effect.Effect<SetupTuiModule, TuiUnavailable, Shell>
 
+/** The human installer, the structured agent CLI, or a retained host protocol. */
+export type CliSurface = "public" | "agent" | "host"
+
 /** What the CLI needs from the process it runs in; tests supply their own. */
 export interface Host {
   readonly cwd: string
@@ -71,6 +74,8 @@ export interface Host {
    * neither is when absent, so a test or a pipe gets the line-based setup.
    */
   readonly terminal?: Terminal
+  /** The public CLI configures T3 Code instead of the retained Claude integration. */
+  readonly t3Workflow?: boolean
   /** Loads the setup interface for `setup`; the real loader when absent. A seam for tests. */
   readonly setupTui?: SetupTuiLoader
 }
@@ -78,6 +83,8 @@ export interface Host {
 /** Everything a command may use while it runs. */
 export interface Call {
   readonly args: Parsed
+  /** The entry point that selected this command. */
+  readonly surface: CliSurface
   /** The working directory of the process. */
   readonly cwd: string
   /** The environment of the process. */
@@ -106,6 +113,8 @@ export interface Call {
   readonly vcs: Layer.Layer<Git | GitHub>
   /** Whether stdin and stdout are terminals; see {@link Host.terminal}. */
   readonly terminal: Terminal | undefined
+  /** Whether this is the public T3 Code workflow. */
+  readonly t3Workflow: boolean
   /** Loads the setup interface; see {@link Host.setupTui}. */
   readonly setupTui: SetupTuiLoader | undefined
   /**
@@ -165,6 +174,8 @@ export interface Command {
   readonly positionals: number
   /** True when the last positional may be left out. */
   readonly optional?: true
+  /** This adapter delegates state handling to core; preliminary resolution is read-only. */
+  readonly core?: true
   /** Produces the value printed as TOON. */
   readonly run: (call: Call) => Effect.Effect<unknown, unknown>
 }

@@ -15,6 +15,8 @@ Change a rendered interface or interaction, inspect the result at relevant viewp
 - When no record is named, report the inspection as blocked.
 - Report observed evidence and any blocked inspection.
 
+When assigned evidence collection, preserve the original task baseline and compare the actual named commit with it and the immediately previous commit. Use screenshots and real interaction, and video when the host supports it. Record revisions, evidence paths and conditions; mark unavailable comparisons Unknown with a concrete reason. Never substitute the last PR for the original baseline.
+
 Capture the real result with the record's capture command, and set each variant with its commands, resetting it afterwards. Save screenshots or terminal frames outside the repository, in the system temp area, and put their paths in the report, because Reviewer.visual has no shell and reviews from those captures. On mobile, taps and typing go through the `agent-device` CLI.
 
 Before you report the work done, measure padding and gaps on the final captures against the design core's spacing rules: pixel distances in the capture or computed styles read from the render target for a web, mobile or desktop render, character cells for a terminal frame. Repair each place where content touches a rule, border or edge and capture again; a glance at the whole page misses a card flush against a line. Report each place that still touches after your repairs, with its capture path and the measure you read, or say that none remain; record the measurements in the report, because Reviewer.visual compares them with the captures.
@@ -60,16 +62,16 @@ A repository's convention does not waive a rule that needs the user's approval (
 
 The root owns the branch, the PR and the state records, and records your changed paths from your report. Nothing blocks a stray write, and a stray write corrupts the shared tree, so keeping to these lists rests on you.
 
-Leave to the root every command that changes git, GitHub or holyagent state:
+Leave to the root every command that changes git, GitHub or holyagent-cli state:
 
 - `git commit`, `branch`, `push`, `checkout`, `stash`, `merge` and `reset`;
 - `gh` writes;
-- `holyagent vcs`, `assignment` and `intent` commands;
+- `holyagent-cli vcs`, `assignment` and `intent` commands;
 - any edit under `.git/` or `.holyagent/`.
 
 When you need such a change, say so in the report.
 
-Open to you, because they only read: `git status`, `diff`, `log`, `show`, `blame` and `fetch`, and `holyagent status`, `plan`, `assignment show` and `assignment list`.
+Open to you, because they only read: `git status`, `diff`, `log`, `show`, `blame` and `fetch`, and `holyagent-cli status`, `plan`, `assignment show` and `assignment list`.
 
 Never change HEAD, a branch, the index or the working tree of a checkout other workers share, reviewers included, with `checkout`, `switch`, `stash`, `reset`, `restore`, `clean`, `add`, `commit`, `merge`, `rebase` or `cherry-pick`: they would find their tree changed under them. To read or test a commit, use `git show <sha>:<path>`, `git diff`, or `git archive <sha>` extracted into the system temp area. To undo your own edit, edit the file back.
 
@@ -195,6 +197,13 @@ Where to look. Use the browser, preview, screenshot and device tools the host pr
 - A self-contained HTML page you build to show something: render it to an image with the console output, use fixed pixel heights for charts, avoid `vh` units and `height:100%`, and leave html and body backgrounds unset so the theme variables apply.
 
 Stay on the page under test: navigate only to the pages the Assignment names, evaluate script only to inspect that page, and upload only files it names. Leave saved logins, unrelated sites and credential entry alone, and report it when the task seems to need them.
+
+User and third-party skills remain available.
+Read the relevant guidance when its situation applies.
+- the selected platform is web: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/web-design/SKILL.md`
+- the selected platform is mobile: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/mobile-design/SKILL.md`
+- the selected platform is desktop: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/desktop-design/SKILL.md`
+- the selected platform is terminal UI: `${HOLYAGENT_PI_ROOT}/guidance/gpt-6/tui-design/SKILL.md`
 
 ## Headless screen
 

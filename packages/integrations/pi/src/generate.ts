@@ -6,7 +6,7 @@ import { bundleModule } from "../../../runtime/src/bundle.ts"
 import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { jsonText } from "../../../runtime/src/instructions/generated.ts"
-import { skillFiles } from "../../../runtime/src/instructions/skills.ts"
+import { skillFiles, validateOwnedGuidance } from "../../../runtime/src/instructions/skills.ts"
 import { SHELL_EXTERNAL, withoutSqlite } from "../../../runtime/src/pi/bash/bundle.ts"
 import { SHELL_BUNDLE } from "../../../runtime/src/pi/bash/protocol.ts"
 import { PROMPT_TEMPLATES } from "../../../runtime/src/prompts/index.ts"
@@ -16,7 +16,7 @@ import { frontmatter } from "../../claude/src/agents.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { agentFiles } from "./agents.ts"
 import { bunFlags } from "./bun-flags.ts"
-import { EXTRA_PI_FAMILIES, FAMILIES_FOLDER, familyAgents, familySkills } from "./families.ts"
+import { EXTRA_PI_FAMILIES, FAMILIES_FOLDER, familyAgents } from "./families.ts"
 import {
   DIST_DIRECTORY,
   type GeneratedFile,
@@ -51,6 +51,16 @@ export const DESCRIPTION =
  */
 export const RUNTIME_SOURCE = "packages/runtime/src/hooks/pi-entry.ts"
 
+/** The public CLI entry, which enables interactive setup. */
+export const PUBLIC_SOURCE = "packages/runtime/src/hooks/pi-public-entry.ts"
+
+/** The noninteractive agent CLI shipped beside the public installer. */
+export const AGENT_SOURCE = "packages/runtime/src/hooks/pi-agent-entry.ts"
+
+const AGENT_BIN_SOURCE = `${SOURCES}/agent-bin.js`
+const PUBLIC_BIN_SOURCE = `${SOURCES}/public-bin.js`
+const LAUNCHER_SOURCE = `${SOURCES}/launcher.js`
+
 /**
  * The entry the package bundles as `scripts/just-bash.js` (see `SHELL_BUNDLE`): the shell process
  * the extension starts with Bun for each bash call, with just-bash inside. A bundle of its own,
@@ -65,7 +75,7 @@ export const PACKAGE_FILES: ReadonlyArray<string> = [
   FAMILIES_FOLDER,
   "prompts",
   "scripts",
-  "skills",
+  "guidance",
 ]
 
 // The wrapper and its empty Bun config are the Claude plugin's, shared so the two cannot differ.
@@ -107,13 +117,16 @@ export const manifest = (): GeneratedFile => ({
       directory: "packages/integrations/pi/dist",
     },
     type: "module",
+    bin: {
+      holyagent: "./scripts/holyagent-public-bin.js",
+      "holyagent-cli": "./scripts/holyagent-cli-bin.js",
+    },
     keywords: ["pi-package"],
     files: PACKAGE_FILES,
     pi: {
       extensions: ["./extensions"],
       // The first-pass review templates, which a person runs as `/code-review` and `/security-review`.
       prompts: ["./prompts"],
-      skills: ["./skills"],
       // `@tintinweb/pi-subagents` loads the specialists from the folder this key names.
       subagents: { agents: ["./agents"] },
     },
@@ -161,11 +174,11 @@ const shell = (): Promise<string> =>
  * go, so the text is the same on every machine, and the note that names the source follows Bun's
  * `// @bun` pragma, which stays first after the shebang.
  */
-const runtime = (): Promise<string> =>
+const runtime = (source: string): Promise<string> =>
   Effect.runPromise(
-    bundleModule(join(REPOSITORY, RUNTIME_SOURCE), {
+    bundleModule(join(REPOSITORY, source), {
       target: "bun",
-      note: generatedNote(RUNTIME_SOURCE),
+      note: generatedNote(source),
     }),
   )
 
@@ -184,6 +197,14 @@ const wrapperExecLine = (): string =>
 
 const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
   const [shebang = "", ...wrapper] = (await readSource(WRAPPER_SOURCE)).split("\n")
+  const bin = async (name: string, source: string): Promise<GeneratedFile> => {
+    const [first = "", ...body] = (await readSource(source)).split("\n")
+    return {
+      path: inPackage(`scripts/${name}`),
+      content: [first, `// ${generatedNote(source)}`, ...body].join("\n"),
+      executable: true,
+    }
+  }
   if (!WRAPPER_EXEC.test(wrapper.join("\n")))
     throw new Error(`${WRAPPER_SOURCE} no longer has the line that starts Bun for the generator`)
   const text = wrapper.join("\n").replace(WRAPPER_EXEC, wrapperExecLine)
@@ -205,7 +226,23 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       path: inPackage("scripts/empty-bunfig.toml"),
       content: `# ${generatedNote(BUNFIG_SOURCE)}\n${await readSource(BUNFIG_SOURCE)}`,
     },
-    { path: inPackage("scripts/holyagent.js"), content: await runtime() },
+    { path: inPackage("scripts/holyagent.js"), content: await runtime(RUNTIME_SOURCE) },
+    {
+      path: inPackage("scripts/holyagent-public.js"),
+      content: await runtime(PUBLIC_SOURCE),
+      executable: true,
+    },
+    {
+      path: inPackage("scripts/holyagent-cli.js"),
+      content: await runtime(AGENT_SOURCE),
+      executable: true,
+    },
+    await bin("holyagent-cli-bin.js", AGENT_BIN_SOURCE),
+    await bin("holyagent-public-bin.js", PUBLIC_BIN_SOURCE),
+    {
+      path: inPackage("scripts/launcher.js"),
+      content: `// ${generatedNote(LAUNCHER_SOURCE)}\n${await readSource(LAUNCHER_SOURCE)}`,
+    },
     { path: inPackage(`scripts/${SHELL_BUNDLE}`), content: await shell() },
     {
       path: inPackage(`scripts/${TUI_BUNDLE}`),
@@ -231,11 +268,14 @@ const promptFiles = (): ReadonlyArray<GeneratedFile> =>
     content: `${frontmatter(generatedNote(`${PROMPTS_SOURCE}/${name}.md`), head)}\n${body}\n`,
   }))
 
-const skills = async (family: Family, folder = "skills"): Promise<ReadonlyArray<GeneratedFile>> =>
-  (await Effect.runPromise(skillFiles(family, generatedNote))).map(({ path, content }) => ({
-    path: inPackage(`${folder}/${path}`),
-    content,
-  }))
+const skills = async (
+  family: Family,
+  folder = `guidance/${family}`,
+): Promise<ReadonlyArray<GeneratedFile>> =>
+  Effect.runPromise(skillFiles(family, generatedNote)).then((files) => {
+    validateOwnedGuidance(files)
+    return files.map(({ path, content }) => ({ path: inPackage(`${folder}/${path}`), content }))
+  })
 
 /**
  * The specialist prompts and skills of the families a provider can run besides the package's own,
@@ -247,7 +287,7 @@ const otherFamilies = async (family: Family): Promise<ReadonlyArray<GeneratedFil
     await Promise.all(
       EXTRA_PI_FAMILIES.filter((extra) => extra !== family).map(async (extra) => [
         ...(await agentFiles(extra, undefined, familyAgents(extra))),
-        ...(await skills(extra, familySkills(extra))),
+        ...(await skills(extra)),
       ]),
     )
   ).flat()

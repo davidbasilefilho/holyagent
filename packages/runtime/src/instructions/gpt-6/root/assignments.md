@@ -17,7 +17,7 @@ Duplication and performance findings carry the severity the specialists' code qu
 
 ### The screen capability
 
-Set `screen: true` in the draft of an Assignment whose work has to see or drive a screen: a desktop application or native browser chrome (computer use), a page in the user's real browser (browser use), or the page shown in T3 (its preview and HTML render tools). The dispatch then prints an agent whose name ends in `-screen`: pass it as printed. That specialist has the computer-use, browser-use and T3 preview tools, and under the Codex provider it runs on GPT-6.1 Terra at medium or higher effort, whatever its role. This is the pi host only. Leave `screen` off every other Assignment, because the tools stay out of the specialists that do not need them. <!-- O1: state the result and the context; the method is the specialist's. -->
+Pass `--screen` in the draft of an Assignment whose work has to see or drive a screen: a desktop application or native browser chrome (computer use), a page in the user's real browser (browser use), or the page shown in T3 (its preview and HTML render tools). The dispatch then prints an agent whose name ends in `-screen`: pass it as printed. That specialist has the computer-use, browser-use and T3 preview tools, and under the Codex provider it runs on GPT-6.1 Terra at medium or higher effort, whatever its role. This is the pi host only. Leave `screen` off every other Assignment, because the tools stay out of the specialists that do not need them. <!-- O1: state the result and the context; the method is the specialist's. -->
 
 ### Acceptance
 

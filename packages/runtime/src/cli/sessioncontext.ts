@@ -81,7 +81,7 @@ const render = (
 
 /**
  * The context of a session on legacy state: the core of the root rules when given, a notice that
- * names the legacy folders found and `holyagent migrate` (a dry run first), and the
+ * names the legacy folders found and `holyagent-cli migrate` (a dry run first), and the
  * {@link SESSION_REMINDER}. There is no status to show, since there is no `.holyagent` folder. The
  * `cloud` text, when given, follows the core, and the setup `notice`, when given, follows that.
  */
@@ -95,7 +95,7 @@ export const legacyContext = (
     ...(core === undefined ? [] : [core]),
     ...(cloud === undefined ? [] : [cloud]),
     ...(notice === undefined ? [] : [notice]),
-    `This project holds the legacy state folder ${folders.map((name) => `\`${name}/\``).join(" and ")} and no \`.holyagent/\`. Run \`holyagent migrate --dry-run\` to preview the conversion, then \`holyagent migrate\` to convert it; there are no Intents or Assignments to read until then.`,
+    `This project holds the legacy state folder ${folders.map((name) => `\`${name}/\``).join(" and ")} and no \`.holyagent/\`. Run \`holyagent-cli migrate --dry-run\` to preview the conversion, then \`holyagent-cli migrate\` to convert it; there are no Intents or Assignments to read until then.`,
     SESSION_REMINDER,
   ].join("\n\n")
 
@@ -130,7 +130,7 @@ const renderRequirements = (intent: IntentRequirements, shown: number) =>
     }),
     ...(shown < intent.requirements.length
       ? [
-          `+${intent.requirements.length - shown} more requirements; run \`holyagent intent show\` for all of them`,
+          `+${intent.requirements.length - shown} more requirements; run \`holyagent-cli intent show\` for all of them`,
         ]
       : []),
   ].join("\n")
@@ -144,8 +144,8 @@ const renderRequirements = (intent: IntentRequirements, shown: number) =>
  * before the reminder. The state is narrowed (fewer rows, shorter objectives, at last counts only)
  * until the whole stays within {@link CONTEXT_BUDGET}; the requirements stay whole while the status
  * can still give way, and only then are cut to the first ones that fit, with a note naming
- * `holyagent intent show`. The `cloud` text, when given, is static and follows the core, and the
- * setup `notice`, when given, follows that; both count against the budget.
+ * `holyagent-cli intent show`. The `cloud` text, when given, is static and follows the core, and
+ * the setup `notice`, when given, follows that; both count against the budget.
  */
 export const sessionContext = (
   status: Readonly<Record<string, unknown>>,

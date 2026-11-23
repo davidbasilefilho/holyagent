@@ -18,7 +18,13 @@ import {
 } from "../../../runtime/src/instructions/claude-5.5/root-core.ts"
 import { REQUIREMENT_COVERAGE } from "../../../runtime/src/instructions/coverage.ts"
 import { parseRequirements } from "../../../runtime/src/instructions/requirements.ts"
-import { embedMateriality } from "../../../runtime/src/instructions/skills.ts"
+import {
+  DESIGN_SKILLS,
+  embedMateriality,
+  GUIDANCE_MARKER,
+  guidanceRouter,
+  OWNED_GUIDANCE,
+} from "../../../runtime/src/instructions/skills.ts"
 import { build } from "../build.ts"
 import packageJson from "../package.json" with { type: "json" }
 import {
@@ -37,7 +43,7 @@ import {
 } from "../src/agents.ts"
 import { DIST_DIRECTORY } from "../src/files.ts"
 import { DESCRIPTION, generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
-import { field, fresh, PLUGIN, ROOT } from "./built.ts"
+import { field, fresh, freshPlugin, PLUGIN, ROOT } from "./built.ts"
 import { isExecutable } from "./host.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
@@ -58,9 +64,11 @@ const SKILLS = [
   "ci-watch",
   "desktop-design",
   "dev-server",
+  "documentation-lookup",
   "evidence-judging",
   "instruction-writing",
   "mobile-design",
+  "performance-iteration",
   "state-mode",
   "tui-design",
   "user-busy",
@@ -143,20 +151,35 @@ describe("the generated plugin is in step with its sources", () => {
     ])
   })
 
+  test("the bundled agent CLI keeps the Claude host when a parent supplied the Pi host", async () => {
+    const plugin = await freshPlugin
+    const executable = join(plugin, "scripts/holyagent-cli.js")
+    const bunfig = join(plugin, "scripts/empty-bunfig.toml")
+    const result = await $`bun --no-env-file --config=${bunfig} ${executable} vcs identity --help`
+      .env({ ...process.env, HOLYAGENT_HOST: "pi" })
+      .quiet()
+      .nothrow()
+    expect(result.exitCode).toBe(0)
+    expect(result.text()).toContain("vcs identity --name")
+    expect(result.stderr.toString()).toBe("")
+  })
+
   test("the commit hook stages exactly the generated paths", () => {
-    const stage = (read("lefthook.yml").split("git add -A --")[1] ?? "").split("- name:")[0] ?? ""
-    expect(
-      stage
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line !== "" && !line.startsWith("#")),
-    ).toEqual([...GENERATED_PATHS])
+    const step = read("hk.pkl").split('["generated"]')[1]?.split('["versions"]')[0] ?? ""
+    const paths = [...step.matchAll(/"((?:\.claude-plugin|packages\/integrations)\/[^"]+)"/g)].map(
+      (match) => match[1],
+    )
+    expect(step).toContain('"git", "add", "-A", "--"')
+    expect(paths).toEqual([...GENERATED_PATHS, "packages/integrations/pi/dist"])
   })
 
   test("the commit hook stages the copies of the version and the lockfile that the build rewrites", () => {
-    const job = read("lefthook.yml").split("- name: versions")[1] ?? ""
-    const staged = /git add -- (.*)/.exec(job)?.[1]?.trim().split(/\s+/)
-    expect(staged).toEqual([...VERSION_COPIES, LOCKFILE])
+    const step = read("hk.pkl").split('["versions"]')[1]?.split('["commit-msg"]')[0] ?? ""
+    const paths = [...step.matchAll(/"((?:packages\/[^"]+\/package\.json)|bun\.lock)"/g)].map(
+      (match) => match[1],
+    )
+    expect(step).toContain('any(git.staged_files, {# == "package.json"})')
+    expect(paths).toEqual([...VERSION_COPIES, LOCKFILE])
   })
 
   test("generated files carry the note where their format allows one", () => {
@@ -310,9 +333,9 @@ describe("hooks", () => {
       "env X=1 git commit -m x",
       "bash -c 'git push origin main'",
       "timeout 5 git push",
-      "holyagent vcs commit -m x a",
-      "bun --no-env-file holyagent.js vcs commit -m x a",
-      "holyagent vcs pr --base main",
+      "holyagent-cli vcs commit -m x a",
+      "bun --no-env-file holyagent-cli.js vcs commit -m x a",
+      "holyagent-cli vcs pr --base main",
     ])
       expect(rules.some((rule) => rule.test(text))).toBe(true)
     for (const text of [
@@ -321,8 +344,8 @@ describe("hooks", () => {
       "bun check",
       "ls -la",
       "git log --oneline",
-      "holyagent vcs status",
-      "holyagent vcs identity",
+      "holyagent-cli vcs status",
+      "holyagent-cli vcs identity",
     ])
       expect(rules.some((rule) => rule.test(text))).toBe(false)
   })
@@ -383,7 +406,15 @@ describe("agents", () => {
     // The history rules continue the bullet list before them; every other section is a paragraph.
     const body = ROOT_SECTIONS.map(
       (name, at) =>
-        `${at === 0 ? "" : name === HISTORY_RULES_FILE ? "\n" : "\n\n"}${read(`${CLAUDE}/root`, name).trim()}`,
+        `${at === 0 ? "" : name === HISTORY_RULES_FILE ? "\n" : "\n\n"}${read(
+          `${CLAUDE}/root`,
+          name,
+        )
+          .trim()
+          .replace(
+            GUIDANCE_MARKER,
+            guidanceRouter("root", "claude-5.5", "${CLAUDE_PLUGIN_ROOT}"),
+          )}`,
     ).join("")
     expect(agent("holyagent")?.content.endsWith(`\n---\n\n${body}\n`)).toBe(true)
     expect(ROOT_SECTIONS.slice(0, ROOT_CORE_FILES.length)).toEqual([...ROOT_CORE_FILES])
@@ -407,7 +438,7 @@ describe("agents", () => {
     const content = agent("holyagent")?.content ?? ""
     for (const rule of [
       "Run no gates, probes or data checks yourself",
-      "never open or re-emit the brief",
+      "Keep the brief out of context",
       "no polling, steering, scheduled check-ins or wait loops",
       "Never force-push",
       "Ignore hook and harness noise",
@@ -569,7 +600,7 @@ describe("agents", () => {
     ])
       expect({ part, found: content.includes(part) }).toEqual({ part, found: true })
     const ciWatch = generated.find((file) =>
-      file.path.endsWith("skills/ci-watch/SKILL.md"),
+      file.path.endsWith("guidance/claude-5.5/ci-watch/SKILL.md"),
     )?.content
     expect(ciWatch).toContain("report the PR as ready to merge and do not ask whether to merge")
     expect(ciWatch).not.toContain("merging still needs the user's approval")
@@ -637,7 +668,7 @@ describe("agents", () => {
     for (const rule of [
       "AskUserQuestion",
       "After a denial, stop",
-      "holyagent vcs commit",
+      "holyagent-cli vcs commit",
       "otherwise write only for decisions, blockers and the final report",
     ])
       expect({ rule, found: reminder.includes(rule) }).toEqual({ rule, found: false })
@@ -655,6 +686,7 @@ describe("agents", () => {
       ...SPECIALIST_SECTIONS.map((name) => toPosix(normalize(`specialist/${name}`))),
       ...CONDITIONAL_SECTIONS.map(({ file }) => `specialist/${file}`),
       "shared/materiality.md",
+      "design-core/core.md",
       ...Object.entries(ROLE_SECTIONS).flatMap(([role, names]) =>
         names.map((name) => `roles/${role}/${name}`),
       ),
@@ -667,8 +699,23 @@ describe("agents", () => {
       expect({ id, assembled: assembled.includes(section) }).toEqual({ id, assembled: true })
       expect({ id, holds: read(CLAUDE, section).includes(phrase) }).toEqual({ id, holds: true })
       const conditional = CONDITIONAL_SECTIONS.find(({ file }) => section === `specialist/${file}`)
+      if (section === "design-core/core.md") {
+        for (const name of DESIGN_SKILLS) {
+          const skill = generated.find((file) =>
+            file.path.endsWith(`guidance/claude-5.5/${name}/SKILL.md`),
+          )
+          expect({ id, name, reaches: skill?.content.includes(phrase) }).toEqual({
+            id,
+            name,
+            reaches: true,
+          })
+        }
+        continue
+      }
       if (section.startsWith("skills/")) {
-        const skill = generated.find((file) => file.path.endsWith(section))
+        const skill = generated.find((file) =>
+          file.path.endsWith(section.replace("skills/", "guidance/claude-5.5/")),
+        )
         expect({ id, skill: skill?.content.includes(phrase) }).toEqual({ id, skill: true })
         continue
       }
@@ -737,11 +784,11 @@ describe("agents", () => {
     }
   })
 
-  test("the root carries the instruction guidelines and the stacking and task list defaults", () => {
+  test("the root carries the instruction guidelines and the integration-base and task list defaults", () => {
     const text = agent("holyagent")?.content ?? ""
     expect(text).toContain(read(`${CLAUDE}/root`, "instruction-guidelines.md").trim())
-    expect(text).toContain("Every PR of one delivery stacks in work order by default")
-    expect(text).not.toContain("only on a real code dependency")
+    expect(text).toContain("open one ordinary PR back to that base")
+    expect(text).toContain("Stack PRs only when the project or user explicitly requires it.")
     expect(text).toContain("Create the task list first")
   })
 
@@ -863,17 +910,17 @@ describe("agents", () => {
     const text = agent("holyagent")?.content ?? ""
     for (const part of [
       "Run no gates, probes or data checks yourself",
-      "never open or re-emit the brief",
-      "`assignment close <id> --outcome <o> < <report-file>`",
+      "Keep the brief out of context",
+      "`assignment close <id> --outcome <o> --report-file <path>`",
       "a cap on the report",
       "no polling, steering, scheduled check-ins or wait loops",
-      "a wake changing nothing gets one short line",
+      "A wake changing nothing gets one short line",
       "The route table, not the brief, sets model and effort",
       "data, list or count corrections",
       "resolving conflicts in tests or generated files",
       "Worker.validation for gate runs",
       "builds and screenshot capture",
-      "`holyagent assignment reports <journal.jsonl>`",
+      "`holyagent-cli assignment reports <journal.jsonl>`",
       "`{ done: [ids] }`",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
@@ -932,14 +979,14 @@ describe("agents", () => {
     for (const part of [
       "The base is the branch the conventions or the user name as the work's target, else the default branch",
       "supply only the remote and the default branch, so the base (see the identity rules) comes from the conventions or the user first",
-      "settle its PR's target (the open stack's top, or the base, which the conventions may point at an integration branch)",
-      "check it against the conventions' rules on which branches may open PRs into which",
-      "if the check bars the stack's top, start from the base",
+      "start the work branch from the intended integration base",
+      "check the intended PR target against the repository’s branch rules",
+      "If a requested stack target is barred, use the permitted integration base instead",
       "which also decides any other branch the plan needs (an integration branch, where it is cut from and who cuts it)",
       "cut from the start the convention gives, carrying only that start, and pushed as part of this plan without asking (Precedence)",
       "Pushing commits onto an existing base needs the user's approval",
       "Creating and pushing a convention-named base absent remotely is not such a push; pushing commits to an existing base is",
-      "`git diff <target>...HEAD` (the PR's actual target: its predecessor in the stack or the base)",
+      "`git diff <target>...HEAD` (the PR's actual target: the integration base, or its named predecessor in a required stack)",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
     expect(text).not.toContain("git diff <base>...HEAD")
@@ -1037,7 +1084,8 @@ describe("agents", () => {
       "a small named palette (four to six colors, each with a value and a role)",
       "rough ASCII wireframes",
       "start coding only from the revised plan",
-      "Strip ornament that does nothing for the brief",
+      "Keep expressive elements that already serve the brief",
+      "remove decoration when it competes with the user’s task",
       "Numbers mark a real sequence",
       "An eyebrow over every heading, all-caps labels and labels that say nothing",
       "invent specific copy from the subject",
@@ -1065,15 +1113,15 @@ describe("agents", () => {
       "a warm paper-cream ground",
     ]
     for (const name of ["web-design", "mobile-design", "desktop-design", "tui-design"]) {
-      const text = read(`packages/integrations/claude/dist/skills/${name}/SKILL.md`)
+      const text = read(`packages/integrations/claude/dist/guidance/claude-5.5/${name}/SKILL.md`)
       for (const phrase of core)
         expect({ name, phrase, has: text.includes(phrase) }).toEqual({ name, phrase, has: true })
     }
-    const skill = read("packages/integrations/claude/dist/skills/web-design/SKILL.md")
+    const skill = read("packages/integrations/claude/dist/guidance/claude-5.5/web-design/SKILL.md")
     for (const phrase of web)
       expect({ phrase, has: skill.includes(phrase) }).toEqual({ phrase, has: true })
     for (const name of ["mobile-design", "desktop-design", "tui-design"]) {
-      const text = read(`packages/integrations/claude/dist/skills/${name}/SKILL.md`)
+      const text = read(`packages/integrations/claude/dist/guidance/claude-5.5/${name}/SKILL.md`)
       for (const phrase of web)
         expect({ name, phrase, has: text.includes(phrase) }).toEqual({ name, phrase, has: false })
     }
@@ -1085,6 +1133,17 @@ describe("agents", () => {
         word: String(word),
         copies: 1,
       })
+  })
+
+  test("specialists read routed guidance when relevant without repeating it for the root", () => {
+    const directive = "Read the relevant guidance when its situation applies."
+    for (const route of ROUTES) {
+      const prompt = agent(route.agent)?.content ?? ""
+      expect(prompt.includes(directive)).toBe(
+        OWNED_GUIDANCE.some((entry) => entry.roles.includes(route.roleTask)),
+      )
+    }
+    expect(agent("holyagent")?.content).not.toContain(directive)
   })
 
   test("each agent description stands alone, without pointing at text below it", () => {
@@ -1099,7 +1158,7 @@ describe("agents", () => {
 
   test("the dev-server skill is generated, opens with the situation, and covers the target record, every platform, blocked targets and owner-only stop", () => {
     const skill = generated.find((file) =>
-      file.path.endsWith("skills/dev-server/SKILL.md"),
+      file.path.endsWith("guidance/claude-5.5/dev-server/SKILL.md"),
     )?.content
     expect(skill).toBeDefined()
     expect(field(skill ?? "", "name")).toBe("dev-server")
@@ -1127,7 +1186,9 @@ describe("agents", () => {
       "a web build of a native app is not the native render",
     ])
       expect({ part, found: skill?.includes(part) }).toEqual({ part, found: true })
-    expect(read("packages/integrations/claude/dist/skills/dev-server/SKILL.md")).toBe(skill ?? "")
+    expect(read("packages/integrations/claude/dist/guidance/claude-5.5/dev-server/SKILL.md")).toBe(
+      skill ?? "",
+    )
     const roleParts: Record<string, ReadonlyArray<string>> = {
       "worker-operations": [
         "the target record",
@@ -1153,7 +1214,7 @@ describe("agents", () => {
 
   test("the evidence-judging skill opens with the situation, gives each rule its reason, and the root points to it", () => {
     const skill = generated.find((file) =>
-      file.path.endsWith("skills/evidence-judging/SKILL.md"),
+      file.path.endsWith("guidance/claude-5.5/evidence-judging/SKILL.md"),
     )?.content
     expect(skill).toBeDefined()
     expect(field(skill ?? "", "name")).toBe("evidence-judging")
@@ -1174,25 +1235,25 @@ describe("agents", () => {
       "a reproduction, the cause it shows, and a fix that makes the reproduction pass",
     ])
       expect({ part, found: skill?.includes(part) }).toEqual({ part, found: true })
-    expect(read("packages/integrations/claude/dist/skills/evidence-judging/SKILL.md")).toBe(
-      skill ?? "",
-    )
+    expect(
+      read("packages/integrations/claude/dist/guidance/claude-5.5/evidence-judging/SKILL.md"),
+    ).toBe(skill ?? "")
     const root = agent("holyagent")?.content ?? ""
-    expect(root).toContain(
-      "`evidence-judging`: a specialist report carries a verdict you must accept or reject",
-    )
+    expect(root).toContain("a specialist verdict needs acceptance or rejection")
   })
 
   test("the root loads visual-judging before the first visual dispatch and points to it for the repair-round rules", () => {
     const root = agent("holyagent")?.content ?? ""
     for (const part of [
-      "`visual-judging`: load it before the first Worker.visual or Reviewer.visual dispatch",
+      "before any visual-task writer, source edit or visual specialist dispatch",
       "loaded before the first visual dispatch",
       "starts a repair and a re-review once it carries the evidence `evidence-judging` requires",
       "a web app or served static build, a terminal UI, a desktop or mobile app",
     ])
       expect({ part, found: root.includes(part) }).toEqual({ part, found: true })
-    const skill = generated.find((file) => file.path.endsWith("skills/visual-judging/SKILL.md"))
+    const skill = generated.find((file) =>
+      file.path.endsWith("guidance/claude-5.5/visual-judging/SKILL.md"),
+    )
     expect(field(skill?.content ?? "", "description")).toStartWith(
       "Use before the first Worker.visual or Reviewer.visual dispatch",
     )
@@ -1200,7 +1261,7 @@ describe("agents", () => {
       "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
       "inform the decision and do not make it",
       "`web-design`, `mobile-design`, `desktop-design` or `tui-design`",
-      "`skills/<name>/SKILL.md` under the plugin folder",
+      "`guidance/<family>/<name>/SKILL.md` under the plugin folder",
       "repeat your final pass on the captures that changed",
       "a web page that Reviewer.visual inspected live and for which Worker.visual saved no captures, have Worker.visual or Worker.operations save the final captures at the listed sizes and variants, which Reviewer.visual then lists",
     ])
@@ -1209,7 +1270,10 @@ describe("agents", () => {
     // body and the session-start core alike) say a brief names a plugin file by its absolute path
     // and where the plugin folder is read from; the skill points to them and does not repeat why.
     for (const text of [root, ROOT_CORE])
-      for (const part of ["A brief that names a plugin file", "the directory above `scripts/`"])
+      for (const part of [
+        "Name plugin files by literal absolute path",
+        "the directory above `scripts/`",
+      ])
         expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
     expect(skill?.content).not.toContain("the directory above `scripts/`")
     for (const name of ["worker-visual", "reviewer-visual"]) {
@@ -1222,10 +1286,12 @@ describe("agents", () => {
     expect(agent("reviewer-visual")?.content).toContain(
       "For a web page you inspect live, list the paths of the final captures that Worker.visual or Worker.operations saved",
     )
-    const pointers = read(`${CLAUDE}/root`, "skills.md")
+    const pointers = agent("holyagent")?.content ?? ""
     for (const name of ["web-design", "mobile-design", "desktop-design", "tui-design"])
-      expect({ name, found: pointers.includes(`\`${name}\``) }).toEqual({ name, found: true })
-    const devServer = generated.find((file) => file.path.endsWith("skills/dev-server/SKILL.md"))
+      expect({ name, found: pointers.includes(`/${name}/SKILL.md`) }).toEqual({ name, found: true })
+    const devServer = generated.find((file) =>
+      file.path.endsWith("guidance/claude-5.5/dev-server/SKILL.md"),
+    )
     expect(field(devServer?.content ?? "", "description")).toContain(
       "a terminal UI, a desktop app, or an Android or iOS app",
     )
@@ -1271,21 +1337,23 @@ describe("agents", () => {
         "`<example>` tags",
       ],
       "state-mode": [
-        "set the mode with `holyagent state mode <mode>`",
+        "set the mode with `holyagent-cli state mode <mode>`",
         "`git ls-files .holyagent ':!.holyagent/config.json'`",
         "in one shared worktree",
       ],
     }
     expect(ROOT_SECTIONS).not.toContain("visual.md")
     expect(ROOT_SECTIONS).not.toContain("ci.md")
-    const pointers = read(`${CLAUDE}/root`, "skills.md")
+    const pointers = agent("holyagent")?.content ?? ""
     for (const [name, parts] of Object.entries(extracted)) {
-      const skill = generated.find((file) => file.path.endsWith(`skills/${name}/SKILL.md`))?.content
+      const skill = generated.find((file) =>
+        file.path.endsWith(`guidance/claude-5.5/${name}/SKILL.md`),
+      )?.content
       expect({ name, generated: skill !== undefined }).toEqual({ name, generated: true })
       expect(field(skill ?? "", "name")).toBe(name)
       expect(field(skill ?? "", "description")).toStartWith("Use ")
-      expect(pointers).toContain(`\`${name}\``)
-      expect(root).toContain(`\`${name}\``)
+      expect(pointers).toContain(`/${name}/SKILL.md`)
+      expect(root).toContain(`/${name}/SKILL.md`)
       for (const part of parts) {
         expect({ name, part, inSkill: skill?.includes(part) }).toEqual({
           name,
@@ -1299,8 +1367,11 @@ describe("agents", () => {
     const briefs = read(`${CLAUDE}/root`, "instruction-guidelines.md")
     for (const part of ["Keep working until everything asked is done", "A real check before"])
       expect(briefs).toContain(part)
-    expect(read("packages/integrations/claude/dist/skills/visual-judging/SKILL.md")).toBe(
-      generated.find((file) => file.path.endsWith("skills/visual-judging/SKILL.md"))?.content ?? "",
+    expect(
+      read("packages/integrations/claude/dist/guidance/claude-5.5/visual-judging/SKILL.md"),
+    ).toBe(
+      generated.find((file) => file.path.endsWith("guidance/claude-5.5/visual-judging/SKILL.md"))
+        ?.content ?? "",
     )
   })
 
@@ -1322,9 +1393,9 @@ describe("agents", () => {
     const dispatch = read(`${CLAUDE}/root`, "dispatch.md")
     expect(dispatch).toContain("only for conflicting new requirements or information")
     expect(dispatch).toContain(
-      "let it finish if finishing and repairing costs less than stopping and relaunching",
+      "Let work finish when repairing is cheaper than stopping and relaunching",
     )
-    expect(dispatch).toContain("Close the stopped Assignment with `--outcome stopped`")
+    expect(dispatch).toContain("Close stopped work with `--outcome stopped`")
     expect(dispatch).not.toMatch(/no polling, steering or stopping/)
     expect(REQUIREMENTS).not.toContain("steering or stopping")
   })
@@ -1420,7 +1491,7 @@ describe("agents", () => {
     }
     expect(agent("holyagent")?.content.includes(rule)).toBe(false)
     const skill = generated.find((file) =>
-      file.path.endsWith("skills/instruction-writing/SKILL.md"),
+      file.path.endsWith("guidance/claude-5.5/instruction-writing/SKILL.md"),
     )
     expect(skill?.content).toContain(rule)
     expect(skill?.content).toContain(
@@ -1520,48 +1591,20 @@ describe("agents", () => {
   })
 })
 
-describe("claude plugin validate", () => {
-  // The pinned Claude Code of the `@anthropic-ai/claude-code` devDependency (the version in
-  // bun.lock, which the CI validation step runs too), started through Bun so a `claude` on PATH of
-  // another version never decides. A missing install fails the test: nothing is skipped.
-  // The external claude CLI starts a fresh process per check; on a loaded machine (the parallel
-  // verify gates, other workers) that can outlast the 5 s default, so the checks get a longer one.
-  const VALIDATE_TIMEOUT = 30_000
-  const check = async (directory: string) => {
-    const result = await $`bun run claude plugin validate --strict ${directory}`
-      .cwd(ROOT)
-      .quiet()
-      .nothrow()
-    return { code: result.exitCode, text: `${result.stdout.toString()}${result.stderr.toString()}` }
+test("Claude role routers use private guidance and preserve normal host skill discovery", () => {
+  const root = agent("holyagent")?.content ?? ""
+  for (const route of ROUTES) {
+    const prompt = agent(route.agent)?.content ?? ""
+    for (const entry of OWNED_GUIDANCE)
+      expect(prompt.includes(`/guidance/claude-5.5/${entry.name}/SKILL.md`)).toBe(
+        entry.roles.includes(route.roleTask),
+      )
+    expect(prompt).not.toContain("# Library documentation lookup")
   }
-  // The "plugin directory" block (README, license, icon) is about listing in Anthropic's catalog and
-  // does not change the result, so it is cut before checking for errors and warnings.
-  const clean = (text: string) => {
-    const own = text.replace(
-      /Plugin directory checks for[\s\S]*?The directory also runs[^\n]*\n/,
-      "",
-    )
-    expect(own).toContain("Validation passed")
-    expect(own).not.toMatch(/×|Found \d+ (?:error|warning)/)
-  }
-
-  test(
-    "the built plugin passes strict validation with the pinned Claude Code",
-    async () => {
-      const { code, text } = await check(PLUGIN)
-      expect(code).toBe(0)
-      clean(text)
-    },
-    VALIDATE_TIMEOUT,
-  )
-
-  test(
-    "the repository root marketplace passes strict validation with the pinned Claude Code",
-    async () => {
-      const { code, text } = await check(ROOT)
-      expect(code).toBe(0)
-      clean(text)
-    },
-    VALIDATE_TIMEOUT,
-  )
+  expect(root).toContain("/guidance/claude-5.5/visual-judging/SKILL.md")
+  expect(root).not.toContain("# Library documentation lookup")
+  expect(generated.some((file) => file.path.startsWith(`${DIST_DIRECTORY}/skills/`))).toBe(false)
+  const plugin =
+    generated.find((file) => file.path.endsWith(".claude-plugin/plugin.json"))?.content ?? "{}"
+  expect(JSON.parse(plugin)).not.toHaveProperty("skills")
 })

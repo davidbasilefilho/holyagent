@@ -36,8 +36,9 @@ import {
   UsageStatusUnavailable,
 } from "../../../runtime/src/pi/codex/luna-reserve.ts"
 import { CODEX_PROVIDER_ID } from "../../../runtime/src/pi/codex/routes.ts"
-import { providerProfile } from "../../../runtime/src/pi/provider.ts"
+import { PROVIDERS, routeModel } from "../../../runtime/src/pi/provider.ts"
 import { toolArgs } from "../../../runtime/src/pi/tools.ts"
+import { codexFamily } from "./families.ts"
 
 /**
  * What a config decides for the Codex provider's module: nothing at all (`undefined`) unless the
@@ -45,8 +46,8 @@ import { toolArgs } from "../../../runtime/src/pi/tools.ts"
  * every session, so each of the module's behaviors is one of these fields.
  */
 export interface CodexSettings {
-  /** The instruction family the root and the specialists run on. */
-  readonly family: PiFamily
+  /** The configured root model’s instruction family, for hosts that omit the active model. */
+  readonly rootFamily: PiFamily
   /** Whether requests carry `context_management` (the provider selected, Billion Context off). */
   readonly contextManagement: boolean
   /** Whether the Luna Reserve fallback is on (`pi.features.lunaReserve`). */
@@ -60,10 +61,15 @@ export interface CodexSettings {
  * provider runs exactly as before.
  */
 export const codexSettings = (config: Config): CodexSettings | undefined => {
-  if (config.pi.provider !== "openai-codex") return undefined
-  const profile = providerProfile(config)
+  if (
+    config.pi.provider !== "openai-codex" &&
+    !Object.values(config.pi.routes).some((row) => row.provider === "openai-codex")
+  )
+    return undefined
+  const profile = PROVIDERS["openai-codex"]
+  const root = routeModel(config, "root")
   return {
-    family: profile.family,
+    rootFamily: root.provider === CODEX_PROVIDER_ID ? codexFamily(root.model) : "gpt-6",
     contextManagement: contextManagementOn(config),
     lunaReserve: config.pi.features.lunaReserve,
     applyPatchAgents: RoleTask.literals.flatMap((roleTask) =>

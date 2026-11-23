@@ -74,9 +74,7 @@ describe("holyagent setup", () => {
     const report = await Effect.runPromise(setup(env(), BOTH).pipe(Effect.provide(shell.layer)))
     expect(shell.lines()).toEqual([bunAdd("ctx7")])
     expect(report.ok).toBe(true)
-    expect(report.lines.filter((line) => line.startsWith("- "))).toEqual([
-      "- ctx7 skill: no CONTEXT7_API_KEY and no saved login; run `ctx7 login` or export CONTEXT7_API_KEY, then re-run",
-    ])
+    expect(report.lines.filter((line) => line.startsWith("- "))).toEqual([])
     for (const key of SETTINGS_KEYS) {
       expect(report.lines.some((line) => line.startsWith(`+ ${key}:`))).toBe(true)
     }
@@ -119,7 +117,7 @@ describe("holyagent setup", () => {
     await Effect.runPromise(
       setup(env({ CONTEXT7_API_KEY: "ctx7sk-test" }), BOTH).pipe(Effect.provide(shell.layer)),
     )
-    expect(shell.calls.map((call) => call.command)).toEqual(["bun", "ctx7"])
+    expect(shell.calls.map((call) => call.command)).toEqual(["bun"])
     for (const call of shell.calls) expect(call.cwd).toBe(home)
     for (const call of shell.calls.filter((entry) => entry.command === "bun"))
       expect(call.args.slice(0, 3)).toEqual(["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add"])
@@ -140,7 +138,7 @@ describe("holyagent setup", () => {
     expect(run2.ok).toBe(true)
     expect(run2.lines.filter((line) => /^[+!~-] /.test(line))).toEqual([])
     expect(run2.lines.filter((line) => line.startsWith("= "))).toHaveLength(
-      SETTINGS_KEYS.length + 2,
+      SETTINGS_KEYS.length + 1,
     )
     expect(run2.lines.at(-1)).toBe("no changes")
     expect(await read(settingsFile())).toBe(settingsAfterFirst)
@@ -208,7 +206,6 @@ describe("holyagent setup", () => {
     expect(shell.calls).toEqual([])
     expect(report.ok).toBe(true)
     expect(report.lines).toContain("+ ctx7: would install with bun add -g ctx7")
-    expect(report.lines).toContain("+ ctx7 skill: would install with ctx7 setup --cli --claude")
     expect(report.lines.at(-1)).toBe(`dry run: would add ${SETTINGS_KEYS.length}, nothing written`)
     expect(await tree(home)).toEqual([])
   })
@@ -247,50 +244,19 @@ describe("holyagent setup", () => {
     expect(report.lines).toContain("- ctx7: skipped by flag")
   })
 
-  describe("the ctx7 skill", () => {
-    const options = BOTH
-    const setupLine = (lines: ReadonlyArray<string>) =>
-      lines.find((line) => line.startsWith("ctx7 setup"))
-
-    test("uses CONTEXT7_API_KEY when set", async () => {
-      const shell = fakeShell({ commands: ["bun", "ctx7"] })
-      await Effect.runPromise(
-        setup(env({ CONTEXT7_API_KEY: "ctx7sk-test" }), options).pipe(Effect.provide(shell.layer)),
-      )
-      expect(setupLine(shell.lines())).toBe("ctx7 setup --cli --claude --yes --api-key ctx7sk-test")
-    })
-
-    test("uses a saved login when there is no key", async () => {
-      await write(".config/context7/credentials.json", "{}")
-      const shell = fakeShell({ commands: ["bun", "ctx7"] })
-      await Effect.runPromise(setup(env(), options).pipe(Effect.provide(shell.layer)))
-      expect(setupLine(shell.lines())).toBe("ctx7 setup --cli --claude --yes")
-    })
-
-    test("is skipped with a hint when there is neither, and an empty key counts as unset", async () => {
-      const shell = fakeShell({ commands: ["bun", "ctx7"] })
-      const report = await Effect.runPromise(
-        setup(env({ CONTEXT7_API_KEY: "" }), options).pipe(Effect.provide(shell.layer)),
-      )
-      expect(setupLine(shell.lines())).toBeUndefined()
-      expect(report.ok).toBe(true)
-      expect(report.lines.find((line) => line.startsWith("- ctx7 skill"))).toContain(
-        "no CONTEXT7_API_KEY",
-      )
-    })
-
-    test("a failing ctx7 setup is a ! line", async () => {
-      const shell = fakeShell({
-        commands: ["bun", "ctx7"],
-        respond: (line) =>
-          line.startsWith("ctx7 setup") ? { exitCode: 1, stderr: "denied" } : undefined,
-      })
-      const report = await Effect.runPromise(
-        setup(env({ CONTEXT7_API_KEY: "k" }), options).pipe(Effect.provide(shell.layer)),
-      )
-      expect(report.ok).toBe(false)
-      expect(report.lines).toContain("! ctx7 setup: failed (exit 1): denied")
-    })
+  test("leaves existing Context7 instructions and credentials untouched", async () => {
+    await markCtx7Skill()
+    await write(".config/context7/credentials.json", "credentials")
+    await write(".agents/skills/context7-cli/SKILL.md", "user skill")
+    const shell = fakeShell({ commands: ["bun", "ctx7"] })
+    await Effect.runPromise(
+      setup(env({ CONTEXT7_API_KEY: "secret" }), BOTH).pipe(Effect.provide(shell.layer)),
+    )
+    expect(shell.calls).toEqual([])
+    expect(await read(join(home, ".config/context7/credentials.json"))).toBe("credentials")
+    expect(await read(join(home, ".agents/skills/context7-cli/SKILL.md"))).toBe("user skill")
+    expect(await read(join(home, ".claude/skills/find-docs/SKILL.md"))).toBe("x")
+    expect(await read(join(home, ".claude/rules/context7.md"))).toBe("x")
   })
 
   test("in a claude.ai cloud session skips ctx7 with a - line and still merges the settings", async () => {
@@ -465,10 +431,7 @@ describe("holyagent doctor", () => {
         Effect.provide(shell.layer),
       ),
     )
-    expect(shell.lines()).toEqual([
-      bunAdd("ctx7"),
-      "ctx7 setup --cli --claude --yes --api-key ctx7sk-test",
-    ])
+    expect(shell.lines()).toEqual([bunAdd("ctx7")])
     expect(report.ok).toBe(true)
     expect(withoutSearchTools(report).lines.slice(-4)).toEqual([
       "ok   bun: /fake/bin/bun",

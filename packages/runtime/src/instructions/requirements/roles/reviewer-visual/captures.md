@@ -1,1 +1,2 @@
 - R-RV: Assess rendered output against the visual criteria from the captures Worker.visual or Worker.operations produce, or from live inspection of the web target in the target record. Mark every material discrepancy blocking whatever its size and only pure preference non-blocking, report blockers when no target record is named or no captures are available, and list the paths of the final captures it judged from (for a web page it inspected live, those Worker.visual or Worker.operations saved), which the root reads in its final pass.
+- See: R-VISUAL-ITERATION

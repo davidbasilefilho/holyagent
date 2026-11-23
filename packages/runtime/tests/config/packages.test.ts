@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
+import piPins from "../../../core/src/config/pi-packages.json" with { type: "json" }
+import pypiPins from "../../../core/src/config/pypi-packages.json" with { type: "json" }
 import { BROWSE_PACKAGE, FEATURE_PACKAGES } from "../../src/config/capabilities.ts"
 import { piPackages, WEB_KIT_PACKAGE } from "../../src/config/packages.ts"
 import {
@@ -33,14 +35,14 @@ const packagesOnLinux = (config: Config) =>
 describe("piPackages", () => {
   test("the default config loads the provider and every feature's package, each pinned", () => {
     expect(packagesOnLinux(DEFAULT_CONFIG)).toEqual([
-      "npm:pi-provider-kimi-code@0.6.13",
-      "npm:@tintinweb/pi-subagents@0.23.2",
-      "npm:billion-context@0.1.213",
-      "npm:@juicesharp/rpiv-todo@2.15.0",
-      "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
-      "npm:@aliou/pi-processes@0.13.6",
-      "npm:@amaster.ai/pi-computer-use@0.1.38",
-      "npm:@ff-labs/pi-fff@0.11.0",
+      `npm:pi-provider-kimi-code@${piPins["pi-provider-kimi-code"]}`,
+      `npm:@tintinweb/pi-subagents@${piPins["@tintinweb/pi-subagents"]}`,
+      `npm:billion-context@${piPins["billion-context"]}`,
+      `npm:@juicesharp/rpiv-todo@${piPins["@juicesharp/rpiv-todo"]}`,
+      `npm:@juicesharp/rpiv-ask-user-question@${piPins["@juicesharp/rpiv-ask-user-question"]}`,
+      `npm:@aliou/pi-processes@${piPins["@aliou/pi-processes"]}`,
+      `npm:@amaster.ai/pi-computer-use@${piPins["@amaster.ai/pi-computer-use"]}`,
+      `npm:@ff-labs/pi-fff@${piPins["@ff-labs/pi-fff"]}`,
     ])
   })
 
@@ -127,7 +129,10 @@ describe("the pin table", () => {
   })
 
   test("the PyPI table pins browser-use exactly and names nothing Pi installs", () => {
-    expect(PYPI_PACKAGE_VERSIONS).toEqual({ "browser-use": "1.0.2" })
+    expect(PYPI_PACKAGE_VERSIONS).toEqual({ "browser-use": pypiPins["browser-use"] })
+    expect(PYPI_PACKAGE_VERSIONS["browser-use"]).toMatch(
+      /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/,
+    )
     for (const name of Object.keys(PYPI_PACKAGE_VERSIONS))
       expect(Object.keys(PI_PACKAGE_VERSIONS)).not.toContain(name)
   })

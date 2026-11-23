@@ -1,11 +1,25 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync as createTemp, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { Cause, Effect, Exit } from "effect"
 
 import { type NpmResult, type NpmRunner, publishArtifact, PublishError } from "./npm-publishing.ts"
+
+// Refuse fixtures under an existing repository, even when the system temp directory is overridden.
+const mkdtempSync = (prefix: string) => {
+  const dir = createTemp(prefix)
+  const probe = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--show-toplevel"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  if (probe.exitCode !== 128) {
+    rmSync(dir, { recursive: true, force: true })
+    throw new Error("Fixture temp directory is inside a Git repository or Git is unavailable")
+  }
+  return dir
+}
 
 const ok = (stdout = "{}"): NpmResult => ({ exitCode: 0, stdout, stderr: "" })
 const fail = (stdout: string, stderr = ""): NpmResult => ({ exitCode: 1, stdout, stderr })

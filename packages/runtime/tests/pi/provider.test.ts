@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { Effect, Schema } from "effect"
 
+import piPins from "../../../core/src/config/pi-packages.json" with { type: "json" }
 import { piPackages } from "../../src/config/packages.ts"
 import { PI_PACKAGE_VERSIONS } from "../../src/config/pi-packages.ts"
 import { Config, PiProvider } from "../../src/config/schema.ts"
@@ -101,7 +102,9 @@ describe("the provider profile", () => {
     expect(providerSource(DEFAULT_CONFIG)).toBe(
       `npm:pi-provider-kimi-code@${PI_PACKAGE_VERSIONS["pi-provider-kimi-code"]}`,
     )
-    expect(providerSource(DEFAULT_CONFIG)).toBe("npm:pi-provider-kimi-code@0.6.13")
+    expect(providerSource(DEFAULT_CONFIG)).toBe(
+      `npm:pi-provider-kimi-code@${piPins["pi-provider-kimi-code"]}`,
+    )
   })
 
   test("selecting the provider loads its pinned extension; pi.enable off loads nothing", () => {

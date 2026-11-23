@@ -1,9 +1,10 @@
-import { $ } from "bun"
+import { spawn } from "@holyagent/core/state/process.ts"
 import { Data, Effect, Option } from "effect"
 
 import { definedEnv } from "../setup/environment.ts"
 import { installAdvice, locateTool, SEARCH_TOOLS, type Tool } from "../setup/search-tools.ts"
 import { findCommand } from "../setup/shell.ts"
+import { Usage } from "./errors.ts"
 import { type Command, Verbatim } from "./types.ts"
 
 /** A search program is not installed: none of its executables is on PATH. */
@@ -17,27 +18,125 @@ export class ToolMissing extends Data.TaggedError("ToolMissing")<{
   }
 }
 
-/**
- * Runs a search program found on PATH in a directory with the stdio of this process and returns its
- * exit code. The arguments reach the program unchanged. Fails with ToolMissing when none of the
- * program's executables is on the PATH of `env`.
- */
+// Preserve other bytes, including non-UTF-8 data, while rendering terminal controls visibly.
+const visibleBytes = (bytes: Uint8Array, previous: number, final: boolean) => {
+  const result: Array<number> = []
+  const escape = (code: number) => {
+    for (const character of `\\u${code.toString(16).padStart(4, "0")}`)
+      result.push(character.charCodeAt(0))
+  }
+  // -1 holds C2 until the next byte identifies a UTF-8 C1 control. Positive values count the
+  // remaining bytes of another UTF-8 character, whose continuation bytes are ordinary data.
+  let pending = previous
+  for (const byte of bytes) {
+    if (pending === -1) {
+      pending = 0
+      if (byte >= 0x80 && byte <= 0x9f) {
+        escape(byte)
+        continue
+      }
+      result.push(0xc2)
+      if (byte >= 0xa0 && byte <= 0xbf) {
+        result.push(byte)
+        continue
+      }
+    }
+    if (pending > 0 && byte >= 0x80 && byte <= 0xbf) {
+      result.push(byte)
+      pending--
+      continue
+    }
+    pending = 0
+    if (byte === 0xc2) pending = -1
+    else if (byte >= 0xc3 && byte <= 0xdf) {
+      result.push(byte)
+      pending = 1
+    } else if (byte >= 0xe0 && byte <= 0xef) {
+      result.push(byte)
+      pending = 2
+    } else if (byte >= 0xf0 && byte <= 0xf4) {
+      result.push(byte)
+      pending = 3
+    } else if ((byte < 0x20 && byte !== 0x09 && byte !== 0x0a) || (byte >= 0x7f && byte <= 0x9f))
+      escape(byte)
+    else result.push(byte)
+  }
+  if (final && pending === -1) result.push(0xc2)
+  return { bytes: Uint8Array.from(result), pending: final ? 0 : pending }
+}
+
+const forward = (stream: ReadableStream<Uint8Array>, target: NodeJS.WriteStream) => {
+  const reader = stream.getReader()
+  const read = (pending: number): Effect.Effect<void, unknown> =>
+    Effect.tryPromise(() => reader.read()).pipe(
+      Effect.flatMap(({ done, value }) => {
+        const output = visibleBytes(value ?? new Uint8Array(), pending, done)
+        return Effect.callback<void, Error>((resume) => {
+          target.write(output.bytes, (error) => resume(error ? Effect.fail(error) : Effect.void))
+        }).pipe(Effect.andThen(done ? Effect.void : Effect.suspend(() => read(output.pending))))
+      }),
+    )
+  return read(0)
+}
+
+// These fd switches take no value, so an exec option can follow them in a short cluster.
+// A value-bearing flag ends the cluster. For example, -ejsx and -tx use x as part of a value.
+const FD_EXEC = /^-[HIusigFalLp0q1hV]*[xX]/
+const runsExternalCommand = (tool: Tool, args: ReadonlyArray<string>) => {
+  const separator = args.indexOf("--")
+  const options = separator < 0 ? args : args.slice(0, separator)
+  return options.some((arg) =>
+    tool === "rg"
+      ? arg === "--pre" || arg.startsWith("--pre=")
+      : /^--exec(?:-batch)?(?:=|$)/.test(arg) || FD_EXEC.test(arg),
+  )
+}
+
+/** Runs a search program without terminal styling and returns its own exit code. */
 const runTool = (options: {
   readonly tool: Tool
   readonly args: ReadonlyArray<string>
   readonly cwd: string
   readonly env: Readonly<Record<string, string | undefined>>
+  readonly agent: boolean
 }) =>
   Effect.gen(function* () {
+    if (options.agent && runsExternalCommand(options.tool, options.args))
+      return yield* new Usage({
+        message: `${options.tool} cannot run a user-supplied subprocess through holyagent-cli`,
+        hint: `Pass search arguments to holyagent-cli ${options.tool}.`,
+      })
     const found = yield* locateTool(options.tool, options.cwd, (command, whichOptions) =>
       Effect.sync(() => findCommand(options.env, command, whichOptions)),
     )
     if (Option.isNone(found)) return yield* new ToolMissing({ tool: options.tool })
     const path = found.value
-    const output = yield* Effect.promise(() =>
-      $`${path} ${options.args}`.cwd(options.cwd).env(definedEnv(options.env)).nothrow(),
+    const env = { ...definedEnv(options.env), NO_COLOR: "1", FORCE_COLOR: "0", CLICOLOR_FORCE: "0" }
+    if (options.agent) {
+      // Ignore a user rg config that could inject a preprocessor. The subprocess adapter closes
+      // stdin, captures both streams and runs detached from the terminal on POSIX.
+      const args = options.tool === "rg" ? ["--no-config", ...options.args] : options.args
+      const result = yield* spawn(path, args, { cwd: options.cwd, env })
+      return new Verbatim(new TextDecoder().decode(result.stdout), result.stderr, result.code)
+    }
+    const child = yield* Effect.try(() =>
+      Bun.spawn([path, ...options.args], {
+        cwd: options.cwd,
+        env,
+        stdin: "inherit",
+        stdout: "pipe",
+        stderr: "pipe",
+      }),
     )
-    return output.exitCode
+    const [code] = yield* Effect.all(
+      [
+        Effect.promise(() => child.exited),
+        forward(child.stdout, process.stdout),
+        forward(child.stderr, process.stderr),
+      ],
+      { concurrency: "unbounded" },
+    ).pipe(Effect.ensuring(Effect.sync(() => child.kill())))
+    return new Verbatim("", "", code)
   })
 
 const toolCommand = (tool: Tool, summary: string): Command => ({
@@ -45,7 +144,7 @@ const toolCommand = (tool: Tool, summary: string): Command => ({
   usage: `${tool} <${SEARCH_TOOLS[tool].title} arguments…>`,
   summary,
   notes: [
-    `the arguments, stdin, stdout, stderr and exit code are the program's own, so \`holyagent ${tool} --help\` prints its help and its exit codes keep their meaning`,
+    `arguments and exit codes follow ${tool}; terminal control bytes in output are displayed as escapes`,
     "the program is the one on PATH (fd also as fdfind, its name on Debian and Ubuntu); when it is not installed, holyagent itself fails with ToolMissing, exits 4 and prints an `error:` line on stderr with the install commands",
   ],
   flags: {},
@@ -54,9 +153,13 @@ const toolCommand = (tool: Tool, summary: string): Command => ({
   passthrough: true,
   positionals: 0,
   run: (call) =>
-    runTool({ tool, args: call.args.positionals, cwd: call.cwd, env: call.env }).pipe(
-      Effect.map((code) => new Verbatim("", "", code)),
-    ),
+    runTool({
+      tool,
+      args: call.args.positionals,
+      cwd: call.cwd,
+      env: call.env,
+      agent: call.surface === "agent",
+    }),
 })
 
 /**

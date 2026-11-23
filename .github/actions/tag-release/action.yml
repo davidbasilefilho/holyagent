@@ -1,8 +1,8 @@
 name: Tag and release
 description: >-
   Use in a job with contents: write, after checking out the commit being built. Reads the version
-  from the root package.json and creates the tag holyagent-<version> (holyagent-<version>-dev-<short
-  hash> for a pre-release) on that commit, then a GitHub Release for it. Re-running on the same
+  from the root package.json and creates the tag holyagent-<version> (with commit UTC time and short
+  hash for a pre-release) on that commit, then a GitHub Release for it. Re-running on the same
   commit changes nothing; a tag on another commit fails the job.
 
 inputs:
@@ -47,8 +47,9 @@ runs:
         TAG="holyagent-${version}"
         TITLE="HolyAgent ${version}"
         if [ "$PRERELEASE" = "true" ]; then
-          TAG="${TAG}-dev-${SHA::7}"
-          TITLE="${TITLE} dev ${SHA::7}"
+          version="$(bash .github/actions/tag-release/dev-version.sh)"
+          TAG="holyagent-${version}"
+          TITLE="HolyAgent ${version}"
         fi
 
         # Only a 404 means the tag is absent: any other failure must not look like "absent".

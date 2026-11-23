@@ -1,4 +1,4 @@
-import { Console, Data, Effect, Option, Schema } from "effect"
+import { Console, Data, Effect, Schema } from "effect"
 
 import {
   compareVersions,
@@ -10,7 +10,7 @@ import {
 
 /** A pull request breaks the release-branch model of this repository (see AGENTS.md). */
 export class BranchModelViolation extends Data.TaggedError("BranchModelViolation")<{
-  readonly rule: "main-base" | "branch-version" | "release-base"
+  readonly rule: "main-base" | "integration-version"
   readonly base: string
   readonly head: string
   readonly detail: string
@@ -47,16 +47,12 @@ export interface PullRequest {
   readonly version: string
 }
 
-/** `release/<v>/<rest>`: the release a branch belongs to and the rest of its name. */
-const RELEASE_BRANCH = /^release\/([^/]+)\/(.+)$/
 const REPAIR_BRANCH = /^release\/([^/]+)\/fix\/publication-repair$/
+const TRANSITION_VERSION = "0.3.4"
+const TRANSITION_PREFIX = `release/${TRANSITION_VERSION}/`
+const TRANSITION_INTEGRATION = `${TRANSITION_PREFIX}integration`
 
-/**
- * Checks a pull request against the release-branch model: into `main` only from
- * `release/<v>/integration`, a release branch's `<v>` equal to the version of its head, and into a
- * `release/<v>/...` branch only from a branch of the same release. Fails with the first rule
- * broken.
- */
+/** Checks promotions, publication repairs, and the 0.3.4 transition from the old branch model. */
 export const checkBranchModel = ({
   base,
   head,
@@ -64,32 +60,20 @@ export const checkBranchModel = ({
 }: PullRequest): Effect.Effect<void, BranchModelViolation | InvalidVersion> => {
   const violation = (rule: BranchModelViolation["rule"], detail: string) =>
     Effect.fail(new BranchModelViolation({ rule, base, head, detail }))
-  const headRelease = RELEASE_BRANCH.exec(head)
-  const baseRelease = RELEASE_BRANCH.exec(base)
   return Effect.gen(function* () {
-    if (headRelease !== null) {
-      // Compared as versions, not strings, so `0.02.1` or a legacy `-Z` suffix is not a mismatch
-      // by spelling alone and a malformed package.json fails here rather than on `main` only.
-      const headVersion = yield* parseVersion(version)
-      const named = yield* Effect.option(parseVersion(headRelease[1] ?? ""))
-      if (Option.isNone(named) || compareVersions(named.value, headVersion) !== 0)
-        return yield* violation(
-          "branch-version",
-          `the branch names release ${headRelease[1]} but the head carries version ${version}`,
-        )
-    }
     if (
-      base === "main" &&
-      !(headRelease !== null && (headRelease[2] === "integration" || REPAIR_BRANCH.test(head)))
+      base === TRANSITION_INTEGRATION &&
+      (version !== TRANSITION_VERSION || !head.startsWith(TRANSITION_PREFIX))
     )
       return yield* violation(
-        "main-base",
-        "only release/<v>/integration or release/<v>/fix/publication-repair may open a pull request into main",
+        "integration-version",
+        `only ${TRANSITION_PREFIX} work branches carrying version ${TRANSITION_VERSION} may target this integration branch`,
       )
-    if (baseRelease !== null && headRelease?.[1] !== baseRelease[1])
+    const transition = head === TRANSITION_INTEGRATION && version === TRANSITION_VERSION
+    if (base === "main" && head !== "dev" && !REPAIR_BRANCH.test(head) && !transition)
       return yield* violation(
-        "release-base",
-        `a pull request into a release/${baseRelease[1]}/... branch must come from a branch of release ${baseRelease[1]}`,
+        "main-base",
+        `only dev, ${TRANSITION_INTEGRATION} at version ${TRANSITION_VERSION}, or a publication-repair branch may open a pull request into main`,
       )
   })
 }
@@ -116,15 +100,9 @@ export class RegistryError extends Data.TaggedError("RegistryError")<{ readonly 
 const Fields = Schema.Record(Schema.String, Schema.Unknown)
 const open = <F extends Schema.Struct.Fields>(fields: F) =>
   Schema.StructWithRest(Schema.Struct(fields), [Fields])
-const Packument = open({
-  name: Schema.Literal("holyagent"),
-  versions: Schema.Record(
-    Schema.String,
-    open({ name: Schema.Literal("holyagent"), version: Schema.String }),
-  ),
-})
+const RegistryVersion = open({ name: Schema.Literal("holyagent"), version: Schema.String })
 
-/** Queries the public npm registry and fails closed on unavailable or malformed metadata. */
+/** Queries the exact public npm version and fails closed on unavailable or malformed metadata. */
 export const lookupPublished = (
   version: string,
   request: (url: string, init: RequestInit) => Promise<Response> = fetch,
@@ -132,14 +110,15 @@ export const lookupPublished = (
   Effect.gen(function* () {
     const response = yield* Effect.tryPromise({
       try: () =>
-        request("https://registry.npmjs.org/holyagent", {
-          headers: { Accept: "application/vnd.npm.install-v1+json" },
+        request(`https://registry.npmjs.org/holyagent/${encodeURIComponent(version)}`, {
+          headers: { Accept: "application/json" },
           redirect: "error",
           signal: AbortSignal.timeout(10000),
         }),
       catch: (cause) =>
         new RegistryError({ detail: `Public npm registry request failed: ${String(cause)}` }),
     })
+    if (response.status === 404) return false
     if (!response.ok)
       return yield* new RegistryError({ detail: `Public npm registry returned ${response.status}` })
     const body = yield* Effect.tryPromise({
@@ -147,17 +126,16 @@ export const lookupPublished = (
       catch: (cause) =>
         new RegistryError({ detail: `Invalid npm registry JSON: ${String(cause)}` }),
     })
-    const packument = yield* Schema.decodeUnknownEffect(Packument, { onExcessProperty: "error" })(
-      body,
-    ).pipe(
+    const metadata = yield* Schema.decodeUnknownEffect(RegistryVersion, {
+      onExcessProperty: "error",
+    })(body).pipe(
       Effect.mapError(
         (cause) => new RegistryError({ detail: `Invalid npm registry metadata: ${String(cause)}` }),
       ),
     )
-    const entries = Object.entries(packument.versions)
-    if (entries.length === 0 || entries.some(([key, value]) => key !== value.version))
-      return yield* new RegistryError({ detail: "Invalid npm registry version identities" })
-    return Object.hasOwn(packument.versions, version)
+    if (metadata.version !== version)
+      return yield* new RegistryError({ detail: "Invalid npm registry version identity" })
+    return true
   })
 
 /** Allows an equal version only for the exact repair branch and an unpublished npm version. */

@@ -1,4 +1,22 @@
 import type { PiFamily } from "../instructions/families.ts"
+import gpt62Asking from "../instructions/gpt-6.2/root/asking.md" with { type: "text" }
+import gpt62Assignments from "../instructions/gpt-6.2/root/assignments.md" with { type: "text" }
+import gpt62Context from "../instructions/gpt-6.2/root/context.md" with { type: "text" }
+import gpt62Delegating from "../instructions/gpt-6.2/root/delegating.md" with { type: "text" }
+import gpt62Dispatch from "../instructions/gpt-6.2/root/dispatch.md" with { type: "text" }
+import gpt62Identity from "../instructions/gpt-6.2/root/identity.md" with { type: "text" }
+import gpt62InstructionGuidelines from "../instructions/gpt-6.2/root/instruction-guidelines.md" with { type: "text" }
+import gpt62PrText from "../instructions/gpt-6.2/root/pr-text.md" with { type: "text" }
+import gpt62Routing from "../instructions/gpt-6.2/root/routing.md" with { type: "text" }
+import gpt62Search from "../instructions/gpt-6.2/root/search.md" with { type: "text" }
+import gpt62Skills from "../instructions/gpt-6.2/root/skills.md" with { type: "text" }
+import gpt62StackPlan from "../instructions/gpt-6.2/root/stack-plan.md" with { type: "text" }
+import gpt62TaskList from "../instructions/gpt-6.2/root/task-list.md" with { type: "text" }
+import gpt62UserMessages from "../instructions/gpt-6.2/root/user-messages.md" with { type: "text" }
+import gpt62VersionControl from "../instructions/gpt-6.2/root/version-control.md" with { type: "text" }
+import gpt62Workflows from "../instructions/gpt-6.2/root/workflows.md" with { type: "text" }
+import gpt62HistoryRules from "../instructions/gpt-6.2/shared/history-rules.md" with { type: "text" }
+import gpt62Precedence from "../instructions/gpt-6.2/shared/precedence.md" with { type: "text" }
 import gptAsking from "../instructions/gpt-6/root/asking.md" with { type: "text" }
 import gptAssignments from "../instructions/gpt-6/root/assignments.md" with { type: "text" }
 import gptContext from "../instructions/gpt-6/root/context.md" with { type: "text" }
@@ -35,7 +53,7 @@ import kimiVersionControl from "../instructions/kimi-k3.1/root/version-control.m
 import kimiWorkflows from "../instructions/kimi-k3.1/root/workflows.md" with { type: "text" }
 import kimiHistoryRules from "../instructions/kimi-k3.1/shared/history-rules.md" with { type: "text" }
 import kimiPrecedence from "../instructions/kimi-k3.1/shared/precedence.md" with { type: "text" }
-import { stripCitations } from "../instructions/skills.ts"
+import { GUIDANCE_MARKER, guidanceRouter, stripCitations } from "../instructions/skills.ts"
 
 /**
  * The sections of the root prompt as files of a family's `root/` folder, in prompt order: the same
@@ -105,10 +123,36 @@ const TEXTS: Readonly<Record<PiFamily, Readonly<Record<string, string>>>> = {
     "../shared/precedence.md": gptPrecedence,
     "../shared/history-rules.md": gptHistoryRules,
   },
+  "gpt-6.2": {
+    "asking.md": gpt62Asking,
+    "assignments.md": gpt62Assignments,
+    "context.md": gpt62Context,
+    "delegating.md": gpt62Delegating,
+    "dispatch.md": gpt62Dispatch,
+    "identity.md": gpt62Identity,
+    "instruction-guidelines.md": gpt62InstructionGuidelines,
+    "pr-text.md": gpt62PrText,
+    "routing.md": gpt62Routing,
+    "search.md": gpt62Search,
+    "skills.md": gpt62Skills,
+    "stack-plan.md": gpt62StackPlan,
+    "task-list.md": gpt62TaskList,
+    "user-messages.md": gpt62UserMessages,
+    "version-control.md": gpt62VersionControl,
+    "workflows.md": gpt62Workflows,
+    "../shared/precedence.md": gpt62Precedence,
+    "../shared/history-rules.md": gpt62HistoryRules,
+  },
 }
 
+/** Renders the selected family’s source section with its final private guidance paths. */
+export const piRootSection = (family: PiFamily, file: string): string =>
+  stripCitations(TEXTS[family][file] ?? "")
+    .replace(GUIDANCE_MARKER, guidanceRouter("root", family, "${HOLYAGENT_PI_ROOT}"))
+    .trim()
+
 const promptOf = (family: PiFamily): string =>
-  PI_ROOT_SECTIONS.map((file) => stripCitations(TEXTS[family][file] ?? "").trim()).reduce(
+  PI_ROOT_SECTIONS.map((file) => piRootSection(family, file)).reduce(
     (text, section, at) =>
       at === 0
         ? section
@@ -125,6 +169,7 @@ const promptOf = (family: PiFamily): string =>
 export const PI_ROOT_PROMPTS: Readonly<Record<PiFamily, string>> = {
   "kimi-k3.1": promptOf("kimi-k3.1"),
   "gpt-6": promptOf("gpt-6"),
+  "gpt-6.2": promptOf("gpt-6.2"),
 }
 
 /** The root prompt for the Kimi family, the Pi package's default family. */

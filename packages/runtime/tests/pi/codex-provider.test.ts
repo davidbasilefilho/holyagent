@@ -28,7 +28,7 @@ const CODEX = await decode({ pi: { provider: "openai-codex" } })
 
 /** The approved Codex table, row by row, as `--model` values. */
 const APPROVED: Readonly<Record<string, string>> = {
-  root: "openai-codex/gpt-6.1-sol:high",
+  root: "openai-codex/gpt-6.2-sol:high",
   "Explorer.map": "openai-codex/gpt-6-luna:low",
   "Explorer.lookup": "openai-codex/gpt-6-luna:low",
   "Librarian.lookup": "openai-codex/gpt-6-luna:low",
@@ -129,14 +129,14 @@ describe("the Codex provider profile", () => {
     expect(PROVIDERS["kimi-coding-global"].writeTools).toEqual([])
   })
 
-  test("selecting Codex loads no provider package; the web kit stands in for the provider's tools", () => {
+  test("selecting Codex loads no provider package or implicit fallback", () => {
     expect(piPackages(CODEX)).not.toContain(piPackages(DEFAULT_CONFIG)[0])
     expect(piPackages(CODEX)[0]).toStartWith("npm:@tintinweb/pi-subagents@")
     expect(piPackages(CODEX).filter((source) => source.includes("pi-provider-kimi-code"))).toEqual(
       [],
     )
-    expect(webChoice(providerProfile(CODEX), "provider").source).toBe("pi-web-kit")
-    expect(piPackages(CODEX).some((source) => source.includes("pi-web-kit"))).toBe(true)
+    expect(webChoice(providerProfile(CODEX), "provider").source).toBe("provider")
+    expect(piPackages(CODEX).some((source) => source.includes("pi-web-kit"))).toBe(false)
     expect(toolSettings(CODEX).some((patch) => patch.file.includes("providers/"))).toBe(false)
   })
 

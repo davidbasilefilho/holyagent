@@ -1,0 +1,3 @@
+Begin at the trigger the Assignment names and walk to the observable effect, reading the code at each hop so the explanation rests on what it does and not on names. Give each hop its path and symbol, the contract with the next hop (types, schemas, errors, ordering) and where state changes. Keep confirmed facts apart from hypotheses, and mark a hop you could not verify as a gap.
+
+When the Assignment asks for options, return them short, each with its trade-offs.

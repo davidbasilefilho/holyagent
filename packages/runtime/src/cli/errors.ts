@@ -1,13 +1,11 @@
+import { Usage } from "@holyagent/core/api/usage.ts"
 import { Data } from "effect"
 
 import { CLAUDE_WORDS, type HostWords } from "../domain/host.ts"
 import { VCS_HINTS, VCS_REFUSED_ERRORS } from "../vcs/errors.ts"
 
 /** The command line does not match the command's usage. */
-export class Usage extends Data.TaggedError("Usage")<{
-  readonly message: string
-  readonly hint: string
-}> {}
+export { Usage }
 
 /** A command that reads stdin found a terminal or nothing. */
 export class StdinMissing extends Data.TaggedError("StdinMissing")<{
@@ -89,11 +87,12 @@ const REFUSED_ERRORS = new Set([
   "MigrationRefused",
   "NothingToMigrate",
   "StateModeRefused",
+  "Unauthorized",
   ...VCS_REFUSED_ERRORS,
 ])
 
-const insufficientAcceptanceHint = (words: HostWords) =>
-  `Nothing was recorded. ${words.askForSupport} for the missing support the message names, then run \`holyagent assignment close <id> --outcome success --accept <rationale>\` again with the corrected report on stdin (also for a Succeeded Assignment that is not accepted yet), or \`holyagent assignment accept <id> --rationale <text> --report\` with it; a workflow agent cannot be messaged, so draft a follow-up with followUpOf.`
+const insufficientAcceptanceHint = (words: HostWords, id: string) =>
+  `Nothing was recorded. ${words.askForSupport} for the missing support, then run \`holyagent assignment close ${id} --outcome success --accept <rationale>\` with the corrected report on stdin. For a succeeded, unaccepted assignment, you can instead run \`holyagent assignment accept ${id} --rationale <text> --report\` with the report on stdin. For a workflow agent, draft a follow-up with followUpOf.`
 
 const HINTS: Readonly<Record<string, string>> = {
   StdinMissing:
@@ -103,7 +102,8 @@ const HINTS: Readonly<Record<string, string>> = {
   InvalidDraft:
     "Send JSON in the shape `holyagent <command> --help` shows; unknown fields are refused.",
   InvalidPath: "Use relative portable paths such as packages/runtime/src.",
-  MissingOwnership: "Give a writing role task at least one ownershipPaths entry.",
+  MissingOwnership:
+    "Give a writing role task an ownershipPaths entry or operationalResources entry.",
   UnknownRecord: "List ids with `holyagent intent list` or `holyagent assignment list --all`.",
   DuplicateRecord: "Retry the command; ids are generated.",
   StaleRevision:
@@ -120,11 +120,11 @@ const HINTS: Readonly<Record<string, string>> = {
   SpecialistNotRecorded:
     "Run `holyagent assignment record <id> --agent <agentId>` first, or close with another outcome.",
   MigrationRefused:
-    "Run `holyagent migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
+    "Run `holyagent-cli migrate --dry-run` to see everything that blocks it. Settle a Running legacy Assignment with the legacy tool first; the command never overwrites an existing .holyagent record.",
   NothingToMigrate:
     "Run it in a project that has a .holyclaude or .holycodex folder with state in it, or check that you are in the project root.",
   MigrationUnverified:
-    "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent migrate --dry-run` again.",
+    "The records were written but do not load back: delete the files this run wrote (git status lists them), fix the cause the message names and run `holyagent-cli migrate --dry-run` again.",
   ToolMissing:
     "Install the program with the command the message gives for your platform; until then search with the system grep or find and report the missing program.",
   BrowserLaunchFailed:
@@ -132,8 +132,9 @@ const HINTS: Readonly<Record<string, string>> = {
   StateModeRefused:
     "Leave the mode as it is and work with it. To change it deliberately, move the records by hand first: the command never moves or deletes them.",
   StateLocked: "Another process holds the state lock; retry in a moment.",
+  Unauthorized: "Use the operation only through a host that grants the required authority.",
   StateIo:
-    "Check what the message names: the permissions of the .holyagent folder of the state worktree (under the git directory, or in the project outside git), that git runs there, and that no branch already uses a name the state branch needs (holyagent/state needs no branch called holyagent; git config holyagent.stateBranch picks another name).",
+    "Check the path, permissions and Git state named in the error. Resolve any branch name conflict and retry.",
   CorruptRecord: "Fix or delete the file the message names, or restore it from version control.",
   ConfigInvalid:
     "Fix the field the message names in that config.json (the keys and values are listed in docs/pi/configuration.md), or delete the file to use the defaults.",
@@ -146,6 +147,19 @@ export interface Failure {
   readonly message: string
   readonly hint: string
   readonly code: number
+}
+
+/** Renders terminal controls visibly while keeping line breaks and tabs. */
+export const plainText = (text: string): string => {
+  let result = ""
+  for (const character of text) {
+    const code = character.charCodeAt(0)
+    result +=
+      (code < 32 && code !== 9 && code !== 10) || (code >= 127 && code <= 159)
+        ? `\\u${code.toString(16).padStart(4, "0")}`
+        : character
+  }
+  return result
 }
 
 /**
@@ -164,13 +178,19 @@ export const describeFailure = (error: unknown, words: HostWords = CLAUDE_WORDS)
     .trim()
   return {
     tag,
-    message,
-    hint:
+    message: plainText(message),
+    hint: plainText(
       error instanceof Usage
         ? error.hint
         : tag === "InsufficientAcceptance"
-          ? insufficientAcceptanceHint(words)
+          ? insufficientAcceptanceHint(
+              words,
+              typeof error === "object" && error !== null && "id" in error
+                ? String(error.id)
+                : "<id>",
+            )
           : (HINTS[tag] ?? "Run `holyagent --help` for the commands."),
+    ),
     code: USAGE_ERRORS.has(tag) ? EXIT.usage : REFUSED_ERRORS.has(tag) ? EXIT.refused : EXIT.state,
   }
 }

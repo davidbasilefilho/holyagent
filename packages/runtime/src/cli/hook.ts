@@ -134,8 +134,9 @@ const HAND_BACK: Readonly<Record<string, string>> = {
   AgentMismatch:
     "The wrong agent was launched: dispatch the Assignment again with the printed agent.",
   StateFolderMissing: "Run the command from the project that holds the Assignment.",
-  InvalidTransition: "Check the Assignment with `holyagent assignment show`; it is not Running.",
-  UnknownRecord: "Check the id with `holyagent assignment list --all`.",
+  InvalidTransition:
+    "Check the Assignment with `holyagent-cli assignment show`; it is not Running.",
+  UnknownRecord: "Check the id with `holyagent-cli assignment list --all`.",
 }
 
 const postToolUse = (additionalContext: string) =>
@@ -160,11 +161,11 @@ const HISTORY_RULES: string = historyRules
 
 /**
  * The one-line reminder a PreToolUse hook adds to a Bash command that mentions git commit or push,
- * or `holyagent vcs commit` or `vcs pr`. Its first sentence is the short form of the root's
+ * or `holyagent-cli vcs commit` or `vcs pr`. Its first sentence is the short form of the root's
  * identity rules and of the specialist state-change rule; the rest is the {@link HISTORY_RULES} the
  * root prompt holds in the same words.
  */
-const VCS_REMINDER = `Version control is the root's: it commits with \`holyagent vcs commit\`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. ${HISTORY_RULES}`
+const VCS_REMINDER = `Version control is the root's: it commits with \`holyagent-cli vcs commit\`, never force-pushes and pushes to a protected branch only with the user's approval; a specialist makes no version-control writes. ${HISTORY_RULES}`
 
 /**
  * The sentence the reminder gains when a commit, push or PR concerns a branch the platform assigned
@@ -185,8 +186,8 @@ const isSpecialist = (type: string | undefined): boolean =>
 /**
  * The text the host's `if` rules of the hook (`Bash(*git*commit*)`, `Bash(*git*push*)`,
  * `Bash(*vcs*commit*)`, `Bash(*vcs*pr*)`) can match: `git` followed somewhere by `commit` or
- * `push`, or `vcs commit` or `vcs pr`, the commands of `holyagent vcs`, which commit and open PRs
- * without the word `git` in the command line. A command without it gets no reminder.
+ * `push`, or `vcs commit` or `vcs pr`, the commands of `holyagent-cli vcs`, which commit and open
+ * PRs without the word `git` in the command line. A command without it gets no reminder.
  */
 const MENTIONS_VCS_WRITE = /git[\s\S]*(?:commit|push)|\bvcs\s+(?:commit|pr)\b/i
 
@@ -246,7 +247,7 @@ const isMainThread = (payload: typeof Payload.Type): boolean =>
 export const HOOK_COMMANDS: ReadonlyArray<Command> = [
   hook(
     "session-start",
-    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user, and one line when the primary checkout is on a detached HEAD or on a branch other than the one it started on), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
+    "SessionStart: add the status of the open Intents as context, with the reconcile result and the requirements of the Intent in use after a resume or compaction (and the core root rules with a line that makes the main thread the root, when the holyagent agent is not the main thread, and in a claude.ai cloud session, `CLAUDE_CODE_REMOTE=true`, the steps that set the commit author to the user, and one line when the primary checkout is on a detached HEAD or on a branch other than the one it started on), always ending with a short block of the rules the core root rules leave out; one line that offers /holyagent:setup when ctx7 or a recommended settings key is missing from the user settings and from the project and local settings of the session's folder (nothing in a cloud session, nothing installed or written); for a project with no .holyagent and a .holyclaude or .holycodex folder that holds state to convert, a notice naming the folder and `holyagent-cli migrate`, with the same rules; for a project with none of the three, the core root rules with that line and the reminder when the holyagent agent is not the main thread, otherwise nothing",
     (payload, call) => {
       const core = rootCore(payload, call)
       // How the commit author is set matters only where git's committer is the platform's.
@@ -300,7 +301,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
                   hookEventName: "SessionStart",
                   additionalContext: [
                     bareContext(core, cloud),
-                    `holyagent: the project state could not be read (${describeFailure(error).tag}), so no status is shown. Run \`holyagent status\` to see the error.`,
+                    `holyagent: the project state could not be read (${describeFailure(error).tag}), so no status is shown. Run \`holyagent-cli status\` to see the error.`,
                   ].join("\n\n"),
                 }),
               ),
@@ -379,7 +380,7 @@ export const HOOK_COMMANDS: ReadonlyArray<Command> = [
           const { tag } = describeFailure(error)
           const next =
             HAND_BACK[tag] ??
-            `Run \`holyagent assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`
+            `Run \`holyagent-cli assignment record ${id} --agent ${agentId ?? "<agentId>"}\` yourself.`
           return Effect.succeed(
             postToolUse(`holyagent: could not record the launch of ${id} (${tag}). ${next}`),
           )
