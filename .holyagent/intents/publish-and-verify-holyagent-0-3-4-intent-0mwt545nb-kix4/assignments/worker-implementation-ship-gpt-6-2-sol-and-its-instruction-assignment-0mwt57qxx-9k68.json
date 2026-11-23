@@ -1,0 +1,49 @@
+{
+  "id": "assignment-0mwt57qxx-9k68",
+  "intentId": "intent-0mwt545nb-kix4",
+  "intentRevision": 2,
+  "roleTask": "Worker.implementation",
+  "slug": "ship-gpt-6-2-sol-and-its-instruction",
+  "objective": "Ship GPT-6.2 Sol and its instruction family on the current T3 Code Pi Codex provider from the existing work.",
+  "state": "Running",
+  "scope": [
+    "Reuse the relevant source, tests and documentation from ee2531f8."
+  ],
+  "constraints": [
+    "Preserve GPT-6, 6.1 and unrelated model defaults. Special commit author behavior applies to Claude Code only. No native Codex host or questions."
+  ],
+  "criteria": [
+    {
+      "text": "The existing Pi Codex provider defaults to GPT-6.2 Sol and selects GPT-6.2 instructions for Sol and Astra",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Older models, other providers and harness-specific authorship retain their intended behavior",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [
+    "focused-verification"
+  ],
+  "ownershipPaths": [
+    "docs",
+    "packages/core/src/pi",
+    "packages/integrations/pi/src",
+    "packages/integrations/pi/tests",
+    "packages/integrations/pi/dist",
+    "packages/runtime/src",
+    "packages/runtime/tests",
+    "scripts/stop-slop-policy.test.ts",
+    "scripts/search-policy.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-23T10:48:43.557Z"
+  },
+  "createdAt": "2026-11-23T10:48:43.557Z"
+}
