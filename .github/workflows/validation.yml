@@ -1,6 +1,6 @@
 name: Validation
 
-# Runs on pull requests, and publish.yml calls it for every branch push so nothing is tagged
+# Runs on pull requests, and publish.yml calls it for main and dev pushes so nothing is tagged
 # unvalidated. The job names below (check, windows, installers, branch-model, version) are the
 # status check contexts of pull requests; the rulesets in docs/development.md require them by name.
 on:
