@@ -21,8 +21,6 @@ const toon = (result: Result, code = 0) => {
   return decode(result.stdout)
 }
 
-const quote = (part: string) => `'${part.replaceAll("'", "'\\''")}'`
-
 test("the packed npm package installs distinct human and structured agent CLIs", async () => {
   const directory = await mkdtemp(join(tmpdir(), "holyagent npm-"))
   try {
@@ -49,7 +47,7 @@ test("the packed npm package installs distinct human and structured agent CLIs",
       .env(env)
       .quiet()
 
-    // Invoke npm's native Windows shim or the POSIX link with the packaged Bun shebang.
+    // Invoke npm's native Windows shim or the POSIX link to the packaged launcher.
     const command = (name: "holyagent" | "holyagent-cli") =>
       windows
         ? ["cmd.exe", "/d", "/c", `prefix\\${name}.cmd`]
@@ -129,22 +127,34 @@ test("the packed npm package installs distinct human and structured agent CLIs",
     expect(await new Response(pendingInput.stdout).text()).toBe(missing.stdout)
     expect(await new Response(pendingInput.stderr).text()).toBe("")
 
-    if (!windows && Bun.which("script") !== null) {
-      const tty = (args: string[], expected: Result) => {
-        const line = [...command("holyagent-cli"), ...args].map(quote).join(" ")
-        const words =
-          process.platform === "darwin"
-            ? ["script", "-q", "/dev/null", "sh", "-c", line]
-            : ["script", "-q", "-e", "-c", line, "/dev/null"]
-        const child = Bun.spawnSync(words, { cwd: directory, env, timeout: 10_000 })
-        expect(child.stderr.toString()).toBe("")
-        if (process.platform === "linux") expect(child.exitCode).toBe(expected.code)
-        expect(child.stdout.toString().replaceAll("\r\n", "\n")).toBe(expected.stdout)
+    if (!windows) {
+      const tty = async (args: string[], expected: Result) => {
+        const terminalClosed = Promise.withResolvers<void>()
+        const decoder = new TextDecoder()
+        let output = ""
+        const child = Bun.spawn([...command("holyagent-cli"), ...args], {
+          cwd: directory,
+          env,
+          timeout: 10_000,
+          terminal: {
+            data: (_terminal, data) => {
+              output += decoder.decode(data, { stream: true })
+            },
+            exit: () => terminalClosed.resolve(),
+          },
+        })
+        try {
+          expect(await child.exited).toBe(expected.code)
+          await terminalClosed.promise
+          expect((output + decoder.decode()).replaceAll("\r\n", "\n")).toBe(expected.stdout)
+        } finally {
+          child.terminal?.close()
+        }
       }
-      tty(["--help"], help)
-      tty(["--version"], agentVersion)
-      tty(["intent", "create"], missing)
-      tty(["setup"], agentSetup)
+      await tty(["--help"], help)
+      await tty(["--version"], agentVersion)
+      await tty(["intent", "create"], missing)
+      await tty(["setup"], agentSetup)
     }
 
     // Record written by the bundled CLI in the published 0.3.3 tarball.
