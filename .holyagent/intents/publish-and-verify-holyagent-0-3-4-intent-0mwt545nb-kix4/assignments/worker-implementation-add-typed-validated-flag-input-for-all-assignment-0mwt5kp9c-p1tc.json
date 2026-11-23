@@ -1,0 +1,36 @@
+{
+  "id": "assignment-0mwt5kp9c-p1tc",
+  "intentId": "intent-0mwt545nb-kix4",
+  "intentRevision": 3,
+  "roleTask": "Worker.implementation",
+  "slug": "add-typed-validated-flag-input-for-all",
+  "objective": "Add typed validated flag input for all agent CLI operations, preserving the existing schemas and host-only callers.",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "All agent operations accept flags without hand-written JSON payloads",
+      "blocking": true,
+      "dimension": "behavior"
+    },
+    {
+      "text": "Unknown, conflicting and ill-typed flags fail closed",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/agent-input.ts",
+    "packages/runtime/tests/agent-input.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-23T10:58:47.904Z"
+  },
+  "createdAt": "2026-11-23T10:58:47.904Z"
+}
