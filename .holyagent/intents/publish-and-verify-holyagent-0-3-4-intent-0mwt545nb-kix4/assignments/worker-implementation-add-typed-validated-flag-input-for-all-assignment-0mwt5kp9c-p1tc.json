@@ -28,6 +28,7 @@
   "dependencies": [],
   "independentFrom": [],
   "specialist": {
+    "agentId": "typed_flags",
     "model": "sonnet",
     "effort": "high",
     "startedAt": "2026-11-23T10:58:47.904Z"
