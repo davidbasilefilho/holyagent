@@ -1,0 +1,34 @@
+{
+  "id": "assignment-0mwt54rs6-7gg7",
+  "intentId": "intent-0mwt545nb-kix4",
+  "intentRevision": 1,
+  "roleTask": "Reviewer.code",
+  "slug": "determine-whether-a-normal-protected-pr",
+  "objective": "Determine whether a normal protected PR can promote 0.3.4 after the main and dev branches diverged, while preserving the main publication repair.",
+  "state": "Running",
+  "scope": [
+    "Read-only review of PR 138, release policy, and Git ancestry."
+  ],
+  "constraints": [
+    "Use authorized reads only. Leave Git and GitHub unchanged. Scope ends at 0.3.4."
+  ],
+  "criteria": [
+    {
+      "text": "Identify a protected promotion path or the exact preventing rule",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [
+    "git-and-github-evidence"
+  ],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-23T10:46:24.679Z"
+  },
+  "createdAt": "2026-11-23T10:46:24.679Z"
+}
