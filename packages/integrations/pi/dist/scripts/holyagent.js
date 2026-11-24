@@ -32575,7 +32575,7 @@ var init_public_maintenance = __esm(() => {
 import { constants as constants6, fstatSync } from "fs";
 import { open as open8, stat as stat7 } from "fs/promises";
 import { resolve as resolve14 } from "path";
-var renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
+var PackageIdentity, cliVersion = (manifest) => manifest === undefined ? succeed6(version) : tryPromise2(() => Bun.file(manifest).json()).pipe(flatMap2(decodeUnknownEffect2(PackageIdentity)), map5(({ version: version2 }) => Bun.semver.satisfies(version2, version2) ? version2 : version), orElseSucceed2(() => version)), renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
 ${plainText(output.label)}:
 ${plainText(output.text)}
 ` : `${encodeRecord(output)}
@@ -32745,6 +32745,7 @@ ${plainText(output.text)}
         message: "The version flag takes no arguments",
         hint: "Run holyagent-cli --version."
       });
+    const version = yield* cliVersion(host.packageManifest);
     return surface === "agent" ? toon({ version }) : { stdout: `${version}
 `, stderr: "", code: 0 };
   }
@@ -32865,6 +32866,7 @@ var init_program = __esm(() => {
   init_public_maintenance();
   init_setup2();
   init_toon();
+  PackageIdentity = Struct({ name: Literal2("holyagent"), version: String6 });
   [, hostDoctor] = SETUP_COMMANDS;
   publicCommands = [
     ...PUBLIC_SETUP_COMMANDS,
@@ -32889,6 +32891,7 @@ var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write2 = (stream, te
     stdin: surface === "agent" ? fail5(new StdinMissing({ reason: "stdin is unavailable" })) : stdin,
     ...surface === "agent" ? {} : { emit: (text) => write2(process.stdout, text) },
     ...surface === "public" && installedPackageRoot !== undefined ? { installedPackageRoot } : {},
+    ...surface === "host" ? {} : { packageManifest: new URL("../package.json", import.meta.url) },
     ...interactiveSetup ? {
       t3Workflow: true,
       terminal: {

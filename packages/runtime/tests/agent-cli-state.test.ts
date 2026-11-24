@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, stat } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -7,7 +7,6 @@ import { decode } from "@toon-format/toon"
 import { $ } from "bun"
 
 const dist = join(import.meta.dir, "../../integrations/pi/dist")
-const rootManifest = join(import.meta.dir, "../../../package.json")
 const windows = process.platform === "win32"
 
 type Result = { code: number; stdout: string; stderr: string }
@@ -27,8 +26,14 @@ test("the packed npm package installs distinct human and structured agent CLIs",
     const git = await $`git rev-parse --show-toplevel`.cwd(directory).quiet().nothrow()
     expect(git.exitCode).toBe(128)
 
-    const { version } = (await Bun.file(rootManifest).json()) as { readonly version: string }
-    await $`bun pm pack --destination ${directory}`.cwd(dist).quiet()
+    const staging = join(directory, "package")
+    await cp(dist, staging, { recursive: true })
+    const stagedManifest = join(staging, "package.json")
+    const manifest = (await Bun.file(stagedManifest).json()) as { readonly version: string }
+    // The dev publisher stamps the manifest after building the CLI bundles.
+    const version = `${manifest.version}-dev.2000-01-01.00-00-00.g1234567`
+    await Bun.write(stagedManifest, JSON.stringify({ ...manifest, version }, null, 2))
+    await $`bun pm pack --destination ${directory}`.cwd(staging).quiet()
     const archive = `./holyagent-${version}.tgz`
     const env = {
       ...process.env,
@@ -97,6 +102,7 @@ test("the packed npm package installs distinct human and structured agent CLIs",
     const humanVersion = await publicCli("--version")
     expect(humanVersion.code).toBe(0)
     expect(humanVersion.stdout.trim()).toBe(version)
+    expect(await publicCli("-v")).toEqual(humanVersion)
     const publicHelp = await publicCli("--help")
     expect(publicHelp.code).toBe(0)
     for (const operation of ["install", "setup", "doctor", "update"])

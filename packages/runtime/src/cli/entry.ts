@@ -52,6 +52,9 @@ export const main = (
           ...(surface === "public" && installedPackageRoot !== undefined
             ? { installedPackageRoot }
             : {}),
+          ...(surface === "host"
+            ? {}
+            : { packageManifest: new URL("../package.json", import.meta.url) }),
           ...(interactiveSetup
             ? {
                 t3Workflow: true,

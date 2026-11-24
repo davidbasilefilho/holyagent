@@ -29,6 +29,8 @@ T3 Code is the only supported user-facing interface. The supported workflow uses
 
    With Bun, use `bun add -g holyagent@<version>` in place of the npm install command. Both managers install `holyagent` and `holyagent-cli`. Setup registers the installed package with the Pi already on `PATH`. Use a fresh terminal if the new commands are missing. The T3 Code backend uses [`holyagent-cli`](agent-cli-output.md) for agent operations.
 
+   With mise's npm backend, run `MISE_NPM_PACKAGE_MANAGER=npm mise use --global npm:holyagent@<version>` in a POSIX shell. Then run `mise exec -- holyagent --version` and `mise exec -- holyagent setup pi --scope user`. [mise npm backend settings](https://mise.jdx.dev/configuration/settings.html#npm-package-manager)
+
 3. Review the [setup screen](#the-t3-code-setup-screen), then run `holyagent doctor --scope user`. Restart T3 Code after setup. If Pi is missing from the provider picker, check that it is enabled and that T3 Code can find the same `pi` executable as your terminal.
 4. [Sign in to the provider selected in your HolyAgent configuration](pi/providers.md), then open a thread using the Pi provider in T3 Code. Work in a repository you trust. HolyAgent's [Full access requirement](pi/t3-code.md#full-access-is-required) applies to that thread; leave it off if you cannot give the thread that level of access.
 5. Ask the root to do a small task in the repository. The [T3 Code integration notes](pi/t3-code.md) describe expected behavior and [known limitations](pi/t3-code.md#to-verify), including that the Pi live todo widget is not shown in T3 Code. Ask the root for its task list instead.

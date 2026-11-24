@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 
 import { Cause, Effect, Schema } from "effect"
 
-import { version } from "../../../../package.json" with { type: "json" }
+import { version as bundledVersion } from "../../../../package.json" with { type: "json" }
 import { type AgentHost, type HostWords, wordsFor } from "../domain/host.ts"
 import { PI_PROJECT_FLAG, projectOf } from "../hooks/pi-project.ts"
 import { renderSetupResult, SetupResult } from "../setup/tui/result-file.ts"
@@ -41,6 +41,19 @@ export interface Result {
 }
 
 export { encodeRecord } from "../toon.ts"
+
+const PackageIdentity = Schema.Struct({ name: Schema.Literal("holyagent"), version: Schema.String })
+
+const cliVersion = (manifest: URL | undefined) =>
+  manifest === undefined
+    ? Effect.succeed(bundledVersion)
+    : Effect.tryPromise((): Promise<unknown> => Bun.file(manifest).json()).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(PackageIdentity)),
+        Effect.map(({ version }) =>
+          Bun.semver.satisfies(version, version) ? version : bundledVersion,
+        ),
+        Effect.orElseSucceed(() => bundledVersion),
+      )
 
 /** Renders a structured command result and its optional plain-text trailer. */
 export const renderRecord = (output: unknown): string =>
@@ -346,6 +359,7 @@ const execute = (given: ReadonlyArray<string>, initialHost: Host, surface: CliSu
           message: "The version flag takes no arguments",
           hint: "Run holyagent-cli --version.",
         })
+      const version = yield* cliVersion(host.packageManifest)
       return surface === "agent"
         ? toon({ version })
         : { stdout: `${version}\n`, stderr: "", code: 0 }

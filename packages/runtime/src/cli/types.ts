@@ -78,6 +78,8 @@ export interface Host {
   readonly t3Workflow?: boolean
   /** The installed package supplied by the public launcher for Pi registration. */
   readonly installedPackageRoot?: string
+  /** Manifest beside the packaged public or agent entry, read only for the version command. */
+  readonly packageManifest?: URL
   /** Loads the setup interface for `setup`; the real loader when absent. A seam for tests. */
   readonly setupTui?: SetupTuiLoader
 }
