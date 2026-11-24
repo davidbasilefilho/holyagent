@@ -1,0 +1,31 @@
+{
+  "id": "assignment-0mwursvn8-3ncy",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "correct-pi-setup-and-doctor-surface",
+  "objective": "Correct Pi setup and doctor surface-specific prerequisite requirements",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Headless T3 Preview and working FFF never require the standalone browser or search binaries",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/core/src/setup/doctor.ts",
+    "packages/core/src/setup/pi-check.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:08:47.156Z"
+  },
+  "createdAt": "2026-11-24T14:08:47.156Z"
+}
