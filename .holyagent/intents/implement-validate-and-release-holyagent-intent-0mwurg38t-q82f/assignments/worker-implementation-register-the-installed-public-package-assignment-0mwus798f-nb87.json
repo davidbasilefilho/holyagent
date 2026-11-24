@@ -1,0 +1,30 @@
+{
+  "id": "assignment-0mwus798f-nb87",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "register-the-installed-public-package",
+  "objective": "Register the installed public package through Pi setup without creating duplicate registrations",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Two setup runs register the installed HolyAgent release once without replacing Pi or user sources",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/core/src/setup/pi-install.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:19:57.951Z"
+  },
+  "createdAt": "2026-11-24T14:19:57.951Z"
+}
