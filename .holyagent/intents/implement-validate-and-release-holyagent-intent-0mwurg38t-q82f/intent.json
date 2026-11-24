@@ -1,0 +1,14 @@
+{
+  "id": "intent-0mwurg38t-q82f",
+  "slug": "implement-validate-and-release-holyagent",
+  "objective": "Implement, validate and release HolyAgent 0.4.0 under issue #140",
+  "requirements": [
+    "Audit Core, integrations and the native Codex contracts before implementation.",
+    "Use independent pull requests directly against dev and the protected release workflow.",
+    "Preserve published 0.3.4, local opt-outs and native approval boundaries. Verify each claimed surface independently.",
+    "Include the Codex CLI 0.172.0 Windows migration fixture without changing personal configuration."
+  ],
+  "revision": 1,
+  "state": "Open",
+  "createdAt": "2026-11-24T13:58:50.477Z"
+}
