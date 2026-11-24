@@ -1,0 +1,28 @@
+{
+  "id": "assignment-0mwurgqf0-s0p7",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Explorer.map",
+  "slug": "audit-pi-and-t3-tool-surfaces-and-cli",
+  "objective": "Audit Pi and T3 tool surfaces and CLI package installation before changes",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Inventory evidence and supported interfaces for Pi and T3 with smallest implementation route.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-24T13:59:20.508Z"
+  },
+  "createdAt": "2026-11-24T13:59:20.508Z"
+}
