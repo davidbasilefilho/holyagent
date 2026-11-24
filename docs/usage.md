@@ -19,23 +19,23 @@ The root checks small, low-risk requests directly. It uses Assignments for work 
 T3 Code is the only supported user-facing interface. The supported workflow uses T3 Code's Pi provider. Pi's command line below installs and configures the backend; start your HolyAgent work in T3 Code, not in a standalone Pi session.
 
 1. Install and open [T3 Code](https://github.com/pingdotgg/t3code) once so it creates its settings directory. Install [Bun](https://bun.sh), Node.js 22.19 or newer, Git and an authenticated GitHub CLI (`gh`). On Windows install Git for Windows with Git Bash. See [requirements](requirements.md).
-2. Install the Pi backend and the HolyAgent package at user scope. Use a version published to npm for this workflow. Open [the HolyAgent npm package](https://www.npmjs.com/package/holyagent?activeTab=versions) and the corresponding [GitHub release](https://github.com/davidbasilefilho/holyagent/releases); replace `<version>` in both commands with the same published version.
+2. Keep a compatible Pi already on `PATH`. If Pi is missing, install the tested backend with `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0`. Install the HolyAgent package at user scope. Replace `<version>` with the published version you want. Use the [0.3.4 quickstart](https://github.com/davidbasilefilho/holyagent/blob/holyagent-0.3.4/docs/usage.md#install) for that release. [npm versions](https://www.npmjs.com/package/holyagent?activeTab=versions) · [GitHub releases](https://github.com/davidbasilefilho/holyagent/releases)
 
    ```sh
-   npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0
-   pi install npm:holyagent@<version>
-   npm install -g --ignore-scripts --legacy-peer-deps holyagent@<version>
+   npm install -g holyagent@<version>
+   holyagent --version
+   holyagent setup pi --scope user
    ```
 
-   Pi registers the extension in its own package store. The separate npm command installs `holyagent` and `holyagent-cli` on your npm global PATH without reinstalling the Pi host peers. Open a fresh terminal and run `holyagent --version` to check the installed version. The T3 Code backend uses [`holyagent-cli`](agent-cli-output.md) for agent operations.
+   The npm command installs `holyagent` and `holyagent-cli`. Setup registers the installed package with the Pi already on `PATH`. Use a fresh terminal if the new commands are missing. The T3 Code backend uses [`holyagent-cli`](agent-cli-output.md) for agent operations.
 
-3. Run `holyagent setup --scope user` from a terminal. Review the [setup screen](#the-t3-code-setup-screen), then run `holyagent doctor --scope user` to check the prerequisites, packages and T3 Code settings. If T3 Code was open, restart it after setup. If Pi is not listed in T3 Code's provider picker, check that the provider is enabled and that T3 Code can find the same `pi` executable as your terminal.
+3. Review the [setup screen](#the-t3-code-setup-screen), then run `holyagent doctor --scope user`. Restart T3 Code after setup. If Pi is missing from the provider picker, check that it is enabled and that T3 Code can find the same `pi` executable as your terminal.
 4. [Sign in to the provider selected in your HolyAgent configuration](pi/providers.md), then open a thread using the Pi provider in T3 Code. Work in a repository you trust. HolyAgent's [Full access requirement](pi/t3-code.md#full-access-is-required) applies to that thread; leave it off if you cannot give the thread that level of access.
 5. Ask the root to do a small task in the repository. The [T3 Code integration notes](pi/t3-code.md) describe expected behavior and [known limitations](pi/t3-code.md#to-verify), including that the Pi live todo widget is not shown in T3 Code. Ask the root for its task list instead.
 
 ### Maintain the installation
 
-`holyagent install` opens the same configuration flow as `holyagent setup`. Run `holyagent doctor` to check the installation and `holyagent update --dry-run` to preview an update. `holyagent update` installs the latest stable version in both the Pi package store and the global npm prefix. Use `--version <version>` to select an exact stable version. Restart T3 Code after an update.
+`holyagent install` is an alias for `holyagent setup`. Run `holyagent doctor` to check the installation and `holyagent update --dry-run` to preview an update. For a package registered by setup from npm's global prefix, `holyagent update` keeps that registration and updates the installed package. The existing `npm:` Pi registration updates both package stores. Use `--version <version>` to select an exact stable version. Restart T3 Code after an update.
 
 Use `holyagent setup pi` to configure the T3 Code/Pi integration directly. It registers your installed HolyAgent package with Pi when a registration is missing. If another HolyAgent package is already registered, setup reports the conflict and keeps that entry. The `install` alias accepts the same arguments.
 
