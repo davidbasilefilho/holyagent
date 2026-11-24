@@ -718,7 +718,7 @@ describe("refusals", () => {
     const error = refusal(await cli(["migrate"]))
 
     expect(error).toContain("MigrationRefused")
-    expect(error).toContain("hint: Run `holyagent migrate --dry-run`")
+    expect(error).toContain("hint: Run `holyagent-cli migrate --dry-run`")
     expect(error).toContain("already exists")
     expect(await readJson(`${NEW_A}/intent.json`)).toEqual(before)
     expect(await Bun.file(join(project, NEW_A, "resume-notes.md")).text()).toBe(
@@ -838,7 +838,7 @@ describe("refusals", () => {
   test("hints at the way out of a failed reload", () => {
     const failure = describeFailure(new MigrationUnverified({ detail: "boom" }))
     expect(failure.hint).toContain("git status")
-    expect(failure.hint).toContain("holyagent migrate --dry-run")
+    expect(failure.hint).toContain("holyagent-cli migrate --dry-run")
   })
 })
 

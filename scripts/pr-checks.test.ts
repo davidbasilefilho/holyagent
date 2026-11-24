@@ -45,6 +45,8 @@ describe("checkBranchModel", () => {
   test.each([
     ["dev", "main", "0.2.1"],
     ["release/0.2.1/fix/publication-repair", "main", "0.2.1"],
+    ["release/0.3.4/integration", "main", "0.3.4"],
+    ["release/0.3.4/fix/install", "release/0.3.4/integration", "0.3.4"],
 
     ["feature/x", "dev", "0.2.1"],
     ["feature/x", "feature/y", "0.2.1"],
@@ -69,6 +71,18 @@ describe("checkBranchModel", () => {
     expect(error).toBeInstanceOf(BranchModelViolation)
     expect(error.message).toContain("main-base")
     expect(error.message).toContain("feature/x")
+  })
+
+  test("the transition is limited to the exact branch and version", () => {
+    const integration = "release/0.3.4/integration"
+    expect(rule({ base: "main", head: integration, version: "0.4.0" })).toBe("main-base")
+    expect(rule({ base: "main", head: `${integration}-extra`, version: "0.3.4" })).toBe("main-base")
+    expect(rule({ base: integration, head: "release/0.4.0/fix/install", version: "0.3.4" })).toBe(
+      "integration-version",
+    )
+    expect(rule({ base: integration, head: "release/0.3.4/fix/install", version: "0.4.0" })).toBe(
+      "integration-version",
+    )
   })
 })
 

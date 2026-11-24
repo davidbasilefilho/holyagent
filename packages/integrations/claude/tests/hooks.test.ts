@@ -280,7 +280,7 @@ describe("hook vcs-reminder", () => {
         const { text, output } = await reminder(command, repo)
         expect(Object.keys(output ?? {}).toSorted()).toEqual(["additionalContext", "hookEventName"])
         expect(output?.hookEventName).toBe("PreToolUse")
-        expect(text).toContain("holyagent vcs commit")
+        expect(text).toContain("holyagent-cli vcs commit")
         expect(text).toContain(PLATFORM)
         expect(text).toContain("only on your own conventional branch")
         expect(text.trim().split("\n")).toHaveLength(1)
@@ -301,21 +301,21 @@ describe("hook vcs-reminder", () => {
         }).toEqual({ command, platform: true })
     })
 
-    test("adds it for a holyagent vcs commit or vcs pr made while HEAD is on claude/*", async () => {
+    test("adds it for an agent CLI commit or PR made while HEAD is on claude/*", async () => {
       const repo = await onBranch("claude/confident-mayer-4aznof")
       for (const command of [
-        "holyagent vcs commit -m 'feat: x' a",
-        "bun --no-env-file holyagent.js vcs commit 'feat: x' a",
-        "holyagent vcs pr --base main",
+        "holyagent-cli vcs commit -m 'feat: x' a",
+        "bun --no-env-file holyagent-cli.js vcs commit 'feat: x' a",
+        "holyagent-cli vcs pr --base main",
       ]) {
         const { text } = await reminder(command, repo)
         expect({ command, platform: text.includes(PLATFORM) }).toEqual({ command, platform: true })
         expect(text).toContain("unless the user named it as the work branch")
       }
       const other = await onBranch("release/0.2.1/feat/x")
-      for (const command of ["holyagent vcs commit -m 'feat: x' a", "holyagent vcs pr"]) {
+      for (const command of ["holyagent-cli vcs commit -m 'feat: x' a", "holyagent-cli vcs pr"]) {
         const { text } = await reminder(command, other)
-        expect({ command, plain: text.includes("holyagent vcs commit") }).toEqual({
+        expect({ command, plain: text.includes("holyagent-cli vcs commit") }).toEqual({
           command,
           plain: true,
         })
@@ -376,7 +376,7 @@ describe("hook vcs-reminder", () => {
         }).toEqual({ command, platform: false })
       // `project` is no repository: git cannot answer, and the plain reminder stays.
       const plain = await reminder("git push", project)
-      expect(plain.text).toContain("holyagent vcs commit")
+      expect(plain.text).toContain("holyagent-cli vcs commit")
       expect(plain.text).not.toContain(PLATFORM)
     })
 
@@ -394,10 +394,10 @@ describe("hook vcs-reminder", () => {
       "ls -la",
       "commit push git",
       "python3 -c 'print(1)'",
-      "holyagent vcs identity",
-      "holyagent vcs --help",
-      "holyagent vcs prune",
-      "holyagent vcs status",
+      "holyagent-cli vcs identity",
+      "holyagent-cli vcs --help",
+      "holyagent-cli vcs prune",
+      "holyagent-cli vcs status",
     ])
       expect(await hook("vcs-reminder", bash(command))).toEqual(nothing)
     expect(
@@ -1319,7 +1319,7 @@ describe("hook session-start", () => {
         ),
       )
       expect(text).toContain(
-        '`holyagent <command>` means `bun --no-env-file --config="/opt/plugin/scripts/empty-bunfig.toml" "/opt/plugin/scripts/holyagent.js" <command>`',
+        '`holyagent-cli <command>` means `bun --no-env-file --config="/opt/plugin/scripts/empty-bunfig.toml" "/opt/plugin/scripts/holyagent-cli.js" <command>`',
       )
       expect(text).toContain(
         "read `/opt/plugin/agents/holyagent.md` with the Read tool before acting",
@@ -1416,7 +1416,7 @@ describe("hook session-start", () => {
         // A legacy folder with no state to convert is neither announced nor migrated.
         expect((await hook("session-start", start("holyagent"), legacyOnly)).stdout).toBe("")
         expect(additional((await hook("session-start", start(), legacyOnly)).stdout)).not.toContain(
-          "holyagent migrate",
+          "holyagent-cli migrate",
         )
         await writeLegacyState(legacyOnly, legacy)
         for (const payload of [start(), start("general-purpose")]) {
@@ -1425,8 +1425,8 @@ describe("hook session-start", () => {
           const text = additional(result.stdout)
           expect(text).toStartWith(`${core}\n\n${ROOT_TAKEOVER}\n\nThis project holds the legacy`)
           expect(text).toContain(`\`${legacy}/\``)
-          expect(text).toContain("holyagent migrate --dry-run")
-          expect(text).toContain("`holyagent migrate`")
+          expect(text).toContain("holyagent-cli migrate --dry-run")
+          expect(text).toContain("`holyagent-cli migrate`")
           expect(text.endsWith(`\n\n${SESSION_REMINDER}`)).toBe(true)
           expect(text).not.toContain("holyagent status:")
         }
@@ -1434,14 +1434,14 @@ describe("hook session-start", () => {
         const root = additional(
           (await hook("session-start", start("holyagent"), legacyOnly)).stdout,
         )
-        expect(root).toContain("holyagent migrate --dry-run")
+        expect(root).toContain("holyagent-cli migrate --dry-run")
         expect(root).not.toContain("You are the root.")
         expect(root.endsWith(`\n\n${SESSION_REMINDER}`)).toBe(true)
         // A legacy folder ignored once `.holyagent` exists.
         await mkdir(join(legacyOnly, ".holyagent"))
         const migrated = additional((await hook("session-start", start(), legacyOnly)).stdout)
         expect(migrated).toContain("holyagent status:")
-        expect(migrated).not.toContain("holyagent migrate")
+        expect(migrated).not.toContain("holyagent-cli migrate")
       } finally {
         await rm(legacyOnly, { recursive: true, force: true })
       }
@@ -1598,7 +1598,7 @@ describe("hook session-start, after a resume or compaction", () => {
     }
   })
 
-  test("cuts requirements that exceed the budget and names holyagent intent show", async () => {
+  test("cuts requirements that exceed the budget and names holyagent-cli intent show", async () => {
     const stated = await mkdtemp(join(tmpdir(), "holyagent-hook-requirements-big-"))
     try {
       const requirements = Array.from(
@@ -1612,7 +1612,7 @@ describe("hook session-start, after a resume or compaction", () => {
         expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
         expect(text).toContain("Requirement 0:")
         expect(text).not.toContain("Requirement 39:")
-        expect(text).toMatch(/\+\d+ more requirements; run `holyagent intent show`/)
+        expect(text).toMatch(/\+\d+ more requirements; run `holyagent-cli intent show`/)
         expect(text.endsWith(SESSION_REMINDER)).toBe(true)
       }
     } finally {
@@ -1757,7 +1757,7 @@ describe("hook agent-launch", () => {
           JSON.parse(result.stdout) as { hookSpecificOutput: { additionalContext: string } }
         ).hookSpecificOutput.additionalContext
         expect(text).toContain(`could not record the launch of ${id} (AgentIdMissing)`)
-        expect(text).toContain(`holyagent assignment record ${id} --agent ${shown}\` yourself.`)
+        expect(text).toContain(`holyagent-cli assignment record ${id} --agent ${shown}\` yourself.`)
         expect(text.length).toBeLessThan(300)
         expect(await agentRow(dir, id)).not.toContain("agent:")
       } finally {
@@ -1929,7 +1929,7 @@ describe("hook session-start, size", () => {
       expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
       expect(text).toContain("You are the root.")
       expect(text).not.toContain("## Assignments and acceptance")
-      expect(text).toContain('"/plugins/holyagent/scripts/holyagent.js"')
+      expect(text).toContain('"/plugins/holyagent/scripts/holyagent-cli.js"')
       expect(text).not.toContain("${CLAUDE_PLUGIN_ROOT}")
       expect(text).toMatch(/\+\d+ more intents/)
       expect(text).toContain(
@@ -2234,7 +2234,7 @@ describe("hook session-start, when the project state cannot be read", () => {
         "read `/opt/plugin/agents/holyagent.md` with the Read tool before acting",
       )
       expect(text).toContain("the project state could not be read (CorruptRecord)")
-      expect(text).toContain("Run `holyagent status`")
+      expect(text).toContain("Run `holyagent-cli status`")
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
@@ -2290,7 +2290,7 @@ describe("hook session-start, in a claude.ai cloud session", () => {
       for (const agent of ["holyagent", undefined]) {
         const cloud = await text(agent, legacy, CLOUD)
         expect(cloud).toContain(CLOUD_IDENTITY)
-        expect(cloud).toContain("holyagent migrate")
+        expect(cloud).toContain("holyagent-cli migrate")
         expect(await text(agent, legacy, {})).not.toContain("vcs identity")
       }
     } finally {
@@ -2355,7 +2355,7 @@ describe("the built wrapper", () => {
     expect(reminder).toMatchObject({ code: 0, stderr: "" })
     expect(addedContext(reminder.stdout)?.hookEventName).toBe("PreToolUse")
     expect(String(addedContext(reminder.stdout)?.additionalContext)).toContain(
-      "holyagent vcs commit",
+      "holyagent-cli vcs commit",
     )
     const start = await call("subagent-start", { agent_type: "holyagent:reviewer-code" }, env)
     expect(start).toMatchObject({ code: 0, stderr: "" })

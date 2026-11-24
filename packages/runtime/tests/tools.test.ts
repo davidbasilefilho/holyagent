@@ -3,6 +3,7 @@ import { chmod, mkdtemp, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { delimiter, dirname, join } from "node:path"
 
+import { decode } from "@toon-format/toon"
 import { Effect, Option } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
@@ -27,13 +28,17 @@ afterEach(() =>
 )
 
 /** Runs one command line in-process in the temp project with `bin` as the whole PATH. */
-const cli = (argv: ReadonlyArray<string>, path: string = bin) =>
+const cli = (argv: ReadonlyArray<string>, path: string = bin, surface: "host" | "agent" = "host") =>
   Effect.runPromise(
-    run(argv, {
-      cwd: project,
-      env: { HOME: project, PATH: path },
-      stdin: Effect.fail(new StdinMissing({ reason: "no stdin in this test" })),
-    }),
+    run(
+      argv,
+      {
+        cwd: project,
+        env: { HOME: project, PATH: path },
+        stdin: Effect.fail(new StdinMissing({ reason: "no stdin in this test" })),
+      },
+      surface,
+    ),
   )
 
 describe("finding a search program", () => {
@@ -128,6 +133,46 @@ describe.skipIf(!posix)("the command line passes through to the program on PATH"
     const fd = await cli(["fd", "nothing"])
     expect(fd.code).toBe(7)
     expect(fd.stderr).toBe("")
+  })
+
+  test("agent search closes stdin and captures both streams in a single TOON document", async () => {
+    const path = join(bin, "rg")
+    await Bun.write(
+      path,
+      '#!/bin/sh\nif IFS= read -r line; then exit 42; fi\nprintf "%s\\n" "$@"\nprintf "search diagnostic\\n" >&2\nexit 1\n',
+    )
+    await chmod(path, 0o755)
+    const result = await cli(["rg", "needle", "."], bin, "agent")
+    expect(result.code).toBe(1)
+    expect(result.stderr).toBe("")
+    expect(decode(result.stdout)).toEqual({
+      exitCode: 1,
+      stdout: "--no-config\nneedle\n.\n",
+      stderr: "search diagnostic\n",
+    })
+  })
+
+  test("agent search refuses command execution flags without mistaking values for flags", async () => {
+    for (const args of [
+      ["rg", "--pre=interactive-helper"],
+      ["fd", "--exec", "interactive-helper"],
+      ["fd", "--exec-batch=interactive-helper"],
+      ["fd", "-ix", "interactive-helper"],
+      ["fd", "-X", "interactive-helper"],
+    ]) {
+      const refused = await cli(args, bin, "agent")
+      expect(refused.code).toBe(2)
+      expect(refused.stderr).toBe("")
+      expect(decode(refused.stdout)).toMatchObject({ error: { tag: "Usage", code: 2 } })
+    }
+    await fake("fd", 0)
+    expect((await cli(["fd", "-ejsx", "-tx", "--", "--exec"], bin, "agent")).code).toBe(0)
+    expect((await Bun.file(join(bin, "fd.args")).text()).trim().split("\n")).toEqual([
+      "-ejsx",
+      "-tx",
+      "--",
+      "--exec",
+    ])
   })
 
   test("fd runs fdfind when there is no fd, and prefers fd when both exist", async () => {

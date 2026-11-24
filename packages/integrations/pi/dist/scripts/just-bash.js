@@ -65857,6 +65857,37 @@ var addBackEdge = () => {
   backEdges++;
 };
 
+function ownEnumerableKeys(self2) {
+  const keys = Object.keys(self2);
+  for (const key of Object.getOwnPropertySymbols(self2)) {
+    if (Object.prototype.propertyIsEnumerable.call(self2, key)) {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+function assignProperty(self2, key, value) {
+  if (key === "__proto__") {
+    Object.defineProperty(self2, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+  } else {
+    self2[key] = value;
+  }
+}
+function assignProperties(self2, source) {
+  if (!Object.hasOwn(source, "__proto__")) {
+    Object.assign(self2, source);
+    return;
+  }
+  for (const key of ownEnumerableKeys(source)) {
+    assignProperty(self2, key, source[key]);
+  }
+}
+
 function isString(input) {
   return typeof input === "string";
 }
@@ -66390,30 +66421,6 @@ var pickInternalCall = () => {
 };
 var internalCall = /* @__PURE__ */ pickInternalCall();
 
-function assignProperty(self2, key, value) {
-  if (key === "__proto__") {
-    Object.defineProperty(self2, key, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true
-    });
-  } else {
-    self2[key] = value;
-  }
-}
-function assignProperties(self2, source) {
-  if (!Object.hasOwn(source, "__proto__")) {
-    Object.assign(self2, source);
-    return;
-  }
-  for (const key of Reflect.ownKeys(source)) {
-    if (Object.prototype.propertyIsEnumerable.call(source, key)) {
-      assignProperty(self2, key, source[key]);
-    }
-  }
-}
-
 var EffectTypeId = `~effect/Effect`;
 var ExitTypeId = `~effect/Exit`;
 var effectVariance = {
@@ -66449,11 +66456,11 @@ var PipeInspectableProto = {
 };
 var StructuralProto = {
   [symbol]() {
-    return structureKeys(this, Object.keys(this));
+    return structureKeys(this, ownEnumerableKeys(this));
   },
   [symbol2](that) {
-    const selfKeys = Object.keys(this);
-    if (selfKeys.length !== Object.keys(that).length)
+    const selfKeys = ownEnumerableKeys(this);
+    if (selfKeys.length !== ownEnumerableKeys(that).length)
       return false;
     for (const key of selfKeys) {
       if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
@@ -66923,7 +66930,7 @@ var SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(C
     return {
       _id: "Result",
       _tag: this._tag,
-      value: toJson(this.success)
+      success: toJson(this.success)
     };
   }
 });
@@ -67493,6 +67500,7 @@ class FiberImpl {
     }
     const interruptChildren = fiberMiddleware.interruptChildren && fiberMiddleware.interruptChildren(this);
     if (interruptChildren !== undefined) {
+      this.interruptible = false;
       return this.evaluate(flatMap(interruptChildren, () => exit));
     }
     this._exit = exit;
@@ -68284,10 +68292,13 @@ var uninterruptibleMask = (f) => withFiber((fiber) => {
 var all = (arg, options) => {
   if (isIterable(arg)) {
     return options?.mode === "result" ? forEach(arg, result, options) : forEach(arg, identity, options);
-  } else if (options?.discard) {
-    return options.mode === "result" ? forEach(Object.values(arg), result, options) : forEach(Object.values(arg), identity, options);
   }
-  return suspend(() => map2(forEach(Object.entries(arg), ([key, effect]) => map2(options?.mode === "result" ? result(effect) : effect, (value) => [key, value]), {
+  const fields = arg;
+  if (options?.discard) {
+    const effects = ownEnumerableKeys(fields).map((key) => fields[key]);
+    return options.mode === "result" ? forEach(effects, result, options) : forEach(effects, identity, options);
+  }
+  return suspend(() => map2(forEach(ownEnumerableKeys(fields).map((key) => [key, fields[key]]), ([key, effect]) => map2(options?.mode === "result" ? result(effect) : effect, (value) => [key, value]), {
     concurrency: options?.concurrency
   }), Object.fromEntries));
 };
@@ -68640,6 +68651,10 @@ var isSuccess3 = exitIsSuccess;
 var makeUnsafe2 = scopeMakeUnsafe;
 var addFinalizer = scopeAddFinalizer;
 var close = scopeClose;
+
+var String2 = globalThis.String;
+var loneSurrogate = /[\uD800-\uDFFF]/u;
+var isWellFormed = (self2) => self2.isWellFormed?.() ?? !loneSurrogate.test(self2);
 
 var catchDone = /* @__PURE__ */ dual(2, (effect, f) => catchCauseFilter(effect, filterDoneLeftover, (l) => f(l)));
 var isDoneFailure = (failure) => failure._tag === "Fail" && isDone2(failure.error);
@@ -69142,9 +69157,6 @@ function transformEffect(f) {
     transform: f
   });
 }
-function String2() {
-  return transform(globalThis.String);
-}
 function Number2() {
   return transform(globalThis.Number);
 }
@@ -69170,8 +69182,13 @@ function stringifyJson(options) {
     }, input, parseOptions)
   }));
 }
+function encodeWithWellFormedString(encode) {
+  return transformEffect((input, options) => typeof input === "string" && !isWellFormed(input) ? fail5(new InvalidValue({
+    expected: "a well-formed Unicode string"
+  }, input, options)) : succeed5(encode(input)));
+}
 function encodeBase64() {
-  return transform(encode);
+  return encodeWithWellFormedString(encode);
 }
 function decodeBase64() {
   return transformEffect((input, options) => mapErrorEager2(fromResult2(decode(input)), () => new InvalidValue({
@@ -69221,7 +69238,7 @@ var passthrough_2 = /* @__PURE__ */ new Transformation(/* @__PURE__ */ passthrou
 function passthrough2() {
   return passthrough_2;
 }
-var numberFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ Number2(), /* @__PURE__ */ String2());
+var numberFromString = /* @__PURE__ */ new Transformation(/* @__PURE__ */ Number2(), /* @__PURE__ */ transform((n) => Object.is(n, -0) ? "-0" : globalThis.String(n)));
 var urlFromString = /* @__PURE__ */ transformEffect2({
   decode: (s, options) => URL.canParse(s) ? succeed5(new URL(s)) : fail5(new InvalidValue({
     expected: "a valid URL string"
@@ -69368,7 +69385,7 @@ function literalToString(ast) {
   const literalAsString = globalThis.String(ast.literal);
   return replaceEncoding(ast, [new Link(new Literal(literalAsString), new Transformation(transform(() => ast.literal), transform(() => literalAsString)))]);
 }
-var String3 = class extends ASTNodeImpl {
+var String4 = class extends ASTNodeImpl {
   _tag = "String";
   getParser() {
     return fromRefinement(this, isString);
@@ -69381,7 +69398,7 @@ var String3 = class extends ASTNodeImpl {
     return "string";
   }
 };
-var string2 = /* @__PURE__ */ new String3;
+var string2 = /* @__PURE__ */ new String4;
 var Number3 = class extends ASTNodeImpl {
   _tag = "Number";
   getParser() {
@@ -69783,10 +69800,10 @@ var Objects = class extends ASTNodeImpl {
                 coveredKeys.add(key);
             }
           }
-          const inputKeys = Reflect.ownKeys(record);
+          const inputKeys = ownEnumerableKeys(record);
           for (let i = 0;i < inputKeys.length; i++) {
             const key = inputKeys[i];
-            if (!coveredKeys.has(key) && Object.prototype.propertyIsEnumerable.call(record, key)) {
+            if (!coveredKeys.has(key)) {
               const unexpected = new UnexpectedKey(ast, record[key], options);
               const issue = new Pointer([key], unexpected);
               if (errorsAllOption) {
@@ -69977,7 +69994,7 @@ function combineChecks(a, b) {
   return [...a, ...b];
 }
 function struct(fields, checks, annotations) {
-  return new Objects(Reflect.ownKeys(fields).map((key) => {
+  return new Objects(ownEnumerableKeys(fields).map((key) => {
     return new PropertySignature(key, fields[key].ast);
   }), [], annotations, checks);
 }
@@ -71310,7 +71327,7 @@ function Literal2(literal) {
   });
   return out;
 }
-var String4 = /* @__PURE__ */ make4(string2);
+var String5 = /* @__PURE__ */ make4(string2);
 var Number4 = /* @__PURE__ */ make4(number2);
 function makeStruct(ast, fields) {
   return make4(ast, {
@@ -71419,8 +71436,8 @@ var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
   }),
   expected: "RegExp",
   toCodecJson: () => link()(Struct({
-    source: String4,
-    flags: String4
+    source: String5,
+    flags: String5
   }), transformEffect2({
     decode: (e, options) => try_2({
       try: () => new globalThis.RegExp(e.source, e.flags),
@@ -71434,7 +71451,7 @@ var RegExp2 = /* @__PURE__ */ instanceOf(globalThis.RegExp, {
     })
   }))
 });
-var URLString = /* @__PURE__ */ String4.annotate({
+var URLString = /* @__PURE__ */ String5.annotate({
   expected: "a string that will be decoded as a URL"
 });
 var URL2 = /* @__PURE__ */ instanceOf(globalThis.URL, {
@@ -71449,7 +71466,7 @@ var URL2 = /* @__PURE__ */ instanceOf(globalThis.URL, {
   expected: "URL",
   toCodecJson: () => link()(URLString, urlFromString)
 });
-var JsonString = /* @__PURE__ */ String4.annotate({
+var JsonString = /* @__PURE__ */ String5.annotate({
   expected: "a string that will be decoded as JSON"
 });
 function fromJsonString2(schema, options) {
@@ -71466,9 +71483,9 @@ var File2 = /* @__PURE__ */ instanceOf(globalThis.File, {
   }),
   expected: "File",
   toCodecJson: () => link()(Struct({
-    data: String4.check(isBase64()),
-    type: String4,
-    name: String4,
+    data: String5.check(isBase64()),
+    type: String5,
+    name: String5,
     lastModified: Int
   }), transformEffect2({
     decode: (e, options) => match(decode(e.data), {
@@ -71509,14 +71526,14 @@ var URLSearchParams2 = /* @__PURE__ */ instanceOf(globalThis.URLSearchParams, {
     Type: `globalThis.URLSearchParams`
   }),
   expected: "URLSearchParams",
-  toCodecJson: () => link()(String4.annotate({
+  toCodecJson: () => link()(String5.annotate({
     expected: "a query string that will be decoded as URLSearchParams"
   }), transform2({
     decode: (e) => new globalThis.URLSearchParams(e),
     encode: (params) => params.toString()
   }))
 });
-var Base64String = /* @__PURE__ */ String4.annotate({
+var Base64String = /* @__PURE__ */ String5.annotate({
   expected: "a base64 encoded string that will be decoded as Uint8Array",
   format: "byte",
   contentEncoding: "base64"
@@ -71640,23 +71657,23 @@ var runForEach2 = /* @__PURE__ */ dual(2, (self2, f) => runForEach(self2.channel
   });
 }));
 var ShellRequest = Struct({
-  command: String4,
-  cwd: String4,
-  env: Record(String4, String4)
+  command: String5,
+  cwd: String5,
+  env: Record(String5, String5)
 });
 var EnvChanges = Struct({
-  set: Record(String4, String4),
-  unset: ArraySchema(String4)
+  set: Record(String5, String5),
+  unset: ArraySchema(String5)
 });
 var ShellFrame = Union2([
-  Struct({ type: Literal2("data"), data: String4 }),
+  Struct({ type: Literal2("data"), data: String5 }),
   Struct({
     type: Literal2("end"),
     exitCode: Number4,
-    cwd: String4,
+    cwd: String5,
     changes: EnvChanges
   }),
-  Struct({ type: Literal2("failure"), message: String4 })
+  Struct({ type: Literal2("failure"), message: String5 })
 ]);
 
 class ProtocolError extends TaggedError2("ProtocolError") {

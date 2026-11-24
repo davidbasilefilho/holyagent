@@ -56,7 +56,12 @@ export interface Context {
 /** A host did not establish authority for an operation. */
 export class Unauthorized extends Data.TaggedError("Unauthorized")<{
   readonly capability: Capability
-}> {}
+}> {
+  /** Names the specific operation whose authority the host did not establish. */
+  override get message() {
+    return `The current host does not authorize ${this.capability}.`
+  }
+}
 
 /** Checks current host authority at an operation boundary. */
 export const requireCapability = (context: Context, capability: Capability) =>

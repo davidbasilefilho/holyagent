@@ -14,8 +14,8 @@ export interface ProviderProfile {
    */
   readonly package?: PiPackageName
   /**
-   * The model family whose instruction text the root and the specialists run on under this provider
-   * (a folder of `instructions/`).
+   * The default instruction family when the provider has no model-specific family (a folder of
+   * `instructions/`).
    */
   readonly family: PiFamily
   /**
@@ -51,7 +51,8 @@ export interface ProviderProfile {
  * overseas host. Codex is Pi's built-in `openai-codex` provider (ChatGPT sign-in) with nothing on
  * top: it needs no package, its models are in Pi's catalog, and what HolyAgent adds (`apply_patch`,
  * `context_management`, Luna Reserve) is the extension's `pi/codex` module. The GPT-6 instruction
- * family runs under it, and its web tools come from `pi-web-kit`, since the provider has none.
+ * family is the fallback for Codex, and its web tools come from `pi-web-kit`, since the provider
+ * has none.
  */
 export const PROVIDERS: Readonly<Record<PiProvider, ProviderProfile>> = {
   "kimi-coding-global": {

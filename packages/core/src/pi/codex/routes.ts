@@ -3,8 +3,8 @@ import type { RouteChoice, RouteKey, Thinking } from "../../config/schema.ts"
 /** Pi's provider id for the ChatGPT-subscription Codex backend, the `<provider>` of `--model`. */
 export const CODEX_PROVIDER_ID = "openai-codex"
 
-/** GPT-6.1 Sol, the root's model. */
-export const SOL = "gpt-6.1-sol"
+/** GPT-6.2 Sol, the root's model. */
+export const SOL = "gpt-6.2-sol"
 /** GPT-6.1 Terra, the model of the specialists that write, trace, review and see. */
 export const TERRA = "gpt-6.1-terra"
 /** GPT-6 Luna, the model of the light specialists; it never runs at `xhigh`. */

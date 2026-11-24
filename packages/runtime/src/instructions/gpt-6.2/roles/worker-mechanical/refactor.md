@@ -1,0 +1,1 @@
+For a refactor, keep observable behavior and interfaces stable and restructure only the named seam. A mechanical change normally needs no new test: the project's existing checks that exercise the changed sites are the evidence.

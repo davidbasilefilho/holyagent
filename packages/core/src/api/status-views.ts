@@ -75,7 +75,7 @@ export const reconcileRows = (rows: Snapshot["project"]["assignments"], words: H
       next:
         running.length === 0
           ? undefined
-          : `close as interrupted only an agent confirmed gone (${words.confirmGone}; an exited parent session proves nothing): holyagent assignment close <id> --outcome interrupted`,
+          : `close as interrupted only an agent confirmed gone (${words.confirmGone}; an exited parent session proves nothing): holyagent-cli assignment close <id> --outcome interrupted`,
     }),
   }
 }

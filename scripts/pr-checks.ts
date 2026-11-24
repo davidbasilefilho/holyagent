@@ -10,7 +10,7 @@ import {
 
 /** A pull request breaks the release-branch model of this repository (see AGENTS.md). */
 export class BranchModelViolation extends Data.TaggedError("BranchModelViolation")<{
-  readonly rule: "main-base"
+  readonly rule: "main-base" | "integration-version"
   readonly base: string
   readonly head: string
   readonly detail: string
@@ -48,20 +48,32 @@ export interface PullRequest {
 }
 
 const REPAIR_BRANCH = /^release\/([^/]+)\/fix\/publication-repair$/
+const TRANSITION_VERSION = "0.3.4"
+const TRANSITION_PREFIX = `release/${TRANSITION_VERSION}/`
+const TRANSITION_INTEGRATION = `${TRANSITION_PREFIX}integration`
 
-/** Requires pull requests into main to come from dev or the focused repair branch. */
+/** Checks promotions, publication repairs, and the 0.3.4 transition from the old branch model. */
 export const checkBranchModel = ({
   base,
   head,
-  version: _version,
+  version,
 }: PullRequest): Effect.Effect<void, BranchModelViolation | InvalidVersion> => {
   const violation = (rule: BranchModelViolation["rule"], detail: string) =>
     Effect.fail(new BranchModelViolation({ rule, base, head, detail }))
   return Effect.gen(function* () {
-    if (base === "main" && head !== "dev" && !REPAIR_BRANCH.test(head))
+    if (
+      base === TRANSITION_INTEGRATION &&
+      (version !== TRANSITION_VERSION || !head.startsWith(TRANSITION_PREFIX))
+    )
+      return yield* violation(
+        "integration-version",
+        `only ${TRANSITION_PREFIX} work branches carrying version ${TRANSITION_VERSION} may target this integration branch`,
+      )
+    const transition = head === TRANSITION_INTEGRATION && version === TRANSITION_VERSION
+    if (base === "main" && head !== "dev" && !REPAIR_BRANCH.test(head) && !transition)
       return yield* violation(
         "main-base",
-        "only dev or a publication-repair branch may open a pull request into main",
+        `only dev, ${TRANSITION_INTEGRATION} at version ${TRANSITION_VERSION}, or a publication-repair branch may open a pull request into main`,
       )
   })
 }

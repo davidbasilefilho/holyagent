@@ -1,4 +1,4 @@
 #!/usr/bin/env bun
-import { piEntry } from "./pi-runtime.ts"
+import { main } from "../cli/entry.ts"
 
-await piEntry(true)
+await main(true, "public")

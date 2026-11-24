@@ -1,3 +1,3 @@
 ## Searching
 
-Search file contents with `holyagent rg` and file names with `holyagent fd`, never with grep, find or the Grep and Glob tools. They run the ripgrep and fd installed on the machine and take those programs' own arguments. Always pass the path, for example `.`: with no path and a piped or redirected stdin, rg reads stdin and reports no matches. When either fails with ToolMissing, the program is not installed: search with the system grep or find, and report the missing program so the user can install it.
+Search file contents with `holyagent-cli rg` and file names with `holyagent-cli fd`. They take the installed programs' own arguments. Always pass the path, for example `.`, and read their output from the TOON `stdout` field. On `ToolMissing`, use the system grep or find and report the missing program so the user can install it.

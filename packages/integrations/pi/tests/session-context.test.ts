@@ -52,7 +52,9 @@ describe("the core of the root rules for Pi", () => {
     expect(PI_ROOT_CORE).toContain(PI_ROOT_PLACEHOLDER)
     const filled = piRootCore("/pkg")
     expect(filled).not.toContain(PI_ROOT_PLACEHOLDER)
-    expect(filled).toContain("/pkg/scripts/holyagent status")
+    expect(filled).toContain(
+      "bun --no-env-file --config='/pkg/scripts/empty-bunfig.toml' '/pkg/scripts/holyagent-cli.js' <command>",
+    )
   })
 })
 

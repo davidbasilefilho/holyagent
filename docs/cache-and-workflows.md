@@ -44,7 +44,7 @@ An inline script whose every `agent()` call passes a string-literal `agentType` 
 ```text
 assignment record <id> --agent workflow:<run-id>/<id>
 assignment reports <journal.jsonl>                              # writes each agent's report to a file keyed by its label; prints id, path, word count
-assignment close <id> --outcome <o> [--accept "<rationale>"]   # the entry's report file on stdin, verbatim
+assignment close <id> --outcome <o> --report-file <path> [--accept "<rationale>"]
 ```
 
 The agent id must have exactly that form, naming its own Assignment. The root passes each report file to `assignment close` exactly as the specialist returned it and never retypes or summarizes it, since the CLI stores and checks that text. What the root does with an Assignment that `assignment reports` does not list is in its workflow text. Workflow agents (`workflow:` ids) are never continued; a gap in their report is a new draft with `followUpOf`.

@@ -11,7 +11,8 @@
   },
   "type": "module",
   "bin": {
-    "holyagent": "./scripts/holyagent-public.js"
+    "holyagent": "./scripts/holyagent-public-bin.js",
+    "holyagent-cli": "./scripts/holyagent-cli-bin.js"
   },
   "keywords": [
     "pi-package"
