@@ -1,6 +1,6 @@
 ## Task list and messages
 
-Create the task list first with the task list tool and keep all progress in it: a task for each PR and Assignment, updated at every dispatch, close and verdict, plus waits and blockers. Write to the user only for a decision, a blocker only they can clear, and the final report, plus a brief acknowledgment (User messages); the list shows state.
+Use a task list for delegated or multi-step work and handoffs (the task list tool). Track each PR and Assignment, with updates at every dispatch, close and verdict, plus waits and blockers. Write to the user only for a decision, a blocker only they can clear, and the final report, plus a brief acknowledgment (User messages); the list shows state.
 
 Every pending decision goes through the structured question tool (options, a recommended default), never as a plain-text list. Ask only when the answer would change what you do (requirements, behavior, architecture, trust boundaries, security, contracts, dependencies) and nothing already settles it (the Asking section lists what does); otherwise act and record the default.
 

@@ -141,24 +141,17 @@ describe("toolArgs for the specialists", () => {
 })
 
 describe("toolArgs for the root", () => {
-  test("adds codemode to the default selection and takes write, edit, computer use and web away", () => {
+  test("keeps ordinary edits and excludes computer-use and web tools", () => {
     expect(toolArgs(DEFAULT_CONFIG, "root")).toEqual({
       tools: ["+codemode", ...FFF_TOOLS.map((name) => `+${name}`)],
-      excludeTools: [
-        "write",
-        "edit",
-        ...COMPUTER_USE_TOOLS,
-        ...BROWSE_TOOLS,
-        ...BROWSER_USE_ALL_TOOLS,
-        ...MOONSHOT,
-      ],
+      excludeTools: [...COMPUTER_USE_TOOLS, ...BROWSE_TOOLS, ...BROWSER_USE_ALL_TOOLS, ...MOONSHOT],
       noMcp: false,
       env: { PI_CODEMODE_MAX_WORKERS: "4", ...BILLION_CONTEXT_GUARDRAILS_OFF },
       argv: [
         "--tools",
         "+codemode,+grep,+find,+multi_grep,+ffgrep,+fffind,+fff-multi-grep",
         "--exclude-tools",
-        "write,edit,computer_use_*,mcp__browse__*,mcp__browser_use__*,moonshot_search,moonshot_fetch",
+        "computer_use_*,mcp__browse__*,mcp__browser_use__*,moonshot_search,moonshot_fetch",
       ],
     })
   })
@@ -172,8 +165,8 @@ describe("toolArgs for the root", () => {
       withFeatures({ computerUse: false, fff: false, browserUse: false, web: "off" }),
       "root",
     )
-    expect(on.excludeTools).toEqual(["write", "edit", ...COMPUTER_USE_TOOLS])
-    expect(off.excludeTools).toEqual(["write", "edit"])
+    expect(on.excludeTools).toEqual([...COMPUTER_USE_TOOLS])
+    expect(off.excludeTools).toEqual([])
   })
 
   test("excludes the tools of the web choice: pi-web-kit, the provider's, or none", () => {
@@ -183,14 +176,10 @@ describe("toolArgs for the root", () => {
         "root",
         profile,
       ).excludeTools
-    expect(exclusions("pi-web-kit")).toEqual(["write", "edit", ...MOONSHOT, ...WEB_KIT])
-    expect(exclusions("provider", PROVIDERS["kimi-coding-global"])).toEqual([
-      "write",
-      "edit",
-      ...MOONSHOT,
-    ])
-    expect(exclusions("provider", NO_WEB_PROVIDER)).toEqual(["write", "edit", ...MOONSHOT])
-    expect(exclusions("off")).toEqual(["write", "edit"])
+    expect(exclusions("pi-web-kit")).toEqual([...MOONSHOT, ...WEB_KIT])
+    expect(exclusions("provider", PROVIDERS["kimi-coding-global"])).toEqual([...MOONSHOT])
+    expect(exclusions("provider", NO_WEB_PROVIDER)).toEqual([...MOONSHOT])
+    expect(exclusions("off")).toEqual([])
   })
 
   test("allows the FFF tools for root and specialists only while the capability is on", () => {
@@ -202,10 +191,10 @@ describe("toolArgs for the root", () => {
       withFeatures({ fff: false, computerUse: false, browserUse: false, web: "off" }),
       "root",
     )
-    expect(on.excludeTools).toEqual(["write", "edit"])
+    expect(on.excludeTools).toEqual([])
     expect(on.tools).toEqual(["+codemode", ...FFF_TOOLS.map((name) => `+${name}`)])
     expect(off.tools).toEqual(["+codemode"])
-    expect(off.excludeTools).toEqual(["write", "edit"])
+    expect(off.excludeTools).toEqual([])
     for (const role of RoleTask.literals)
       expect(toolArgs(DEFAULT_CONFIG, role).tools).toEqual([
         ...toolArgs(withFeatures({ fff: false }), role).tools.slice(0, 4),
@@ -562,7 +551,7 @@ describe("rootActiveTools", () => {
         ["read", "bash", "write", "edit", "todo", "moonshot_search"],
         registered,
       ),
-    ).toEqual(["read", "bash", "todo", "codemode"])
+    ).toEqual(["read", "bash", "write", "edit", "todo", "codemode"])
   })
 
   test("a pattern excludes every active tool it matches, and keeps the rest", () => {

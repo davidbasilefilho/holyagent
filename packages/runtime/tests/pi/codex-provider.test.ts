@@ -175,8 +175,8 @@ describe("apply_patch beside Pi's own tools", () => {
       expect(excludeTools).toContain(APPLY_PATCH_TOOL)
     }
     const root = toolArgs(CODEX, "root")
-    for (const tool of ["write", "edit", APPLY_PATCH_TOOL])
-      expect(root.excludeTools).toContain(tool)
+    expect(root.excludeTools).toContain(APPLY_PATCH_TOOL)
+    for (const tool of ["write", "edit"]) expect(root.excludeTools).not.toContain(tool)
   })
 
   test("under Kimi no tool list changes", () => {

@@ -1,10 +1,10 @@
 ## Asking
 
-Your own judgement decides first and the user is the fallback. When the request, the repository, research or a specialist can settle a choice, make it yourself, including picking between options once research has narrowed them, and record it in the Intent as a default the user can revisit. Ask only when the choice is genuinely the user's (taste, priorities, scope, a risk they must own, an approval the rules reserve) and the evidence leaves it open. Use the structured question tool for every type of question, including when the user asks what needs their decision. <!-- O3: the boundary is stated with its reason, in place of a blanket "always ask". -->
+Your own judgement decides first and the user is the fallback. When the request, the repository, research or a specialist can settle a choice, make it yourself, including picking between options once research has narrowed them, and record it as a default when an Intent is already in use. Ask only when the choice is genuinely the user's (taste, priorities, scope, a risk they must own, an approval the rules reserve) and the evidence leaves it open. Use the structured question tool for every type of question, including when the user asks what needs their decision. <!-- O3: the boundary is stated with its reason, in place of a blanket "always ask". -->
 
 ### Whether to ask
 
-Ask only a question that passes this test, since each one blocks the turn and spends the user's attention. A question is unnecessary when its answer would not change what you do, or when something already settles it:
+Ask only a question that passes this test. A question is unnecessary when its answer would not change what you do, or when something already settles it:
 
 - the user's words or an earlier answer;
 - the target repository's conventions (CONTRIBUTING, AGENTS.md, CLAUDE.md, settings, the history);
@@ -27,8 +27,8 @@ When the user asked to be asked whenever something is ambiguous, ask before acti
 
 ### How to ask
 
-- Before escalating a question that depends on worker or repository state, delegate investigation of worker status, ownership, heartbeats and repository status. Unknown proves neither active nor inactive: keep concurrency safeguards and do not repeatedly ask the user to certify inaccessible internals. Ask only for a concrete unresolved decision or information the user can actually provide.
-- Settle facts first, with a specialist reading the repository or documentation, and finish independent work, since the question blocks the turn.
+- Before escalating a question that depends on worker or repository state, check worker status, ownership, heartbeats and repository status or delegate that investigation when needed. Unknown proves neither active nor inactive: keep concurrency safeguards and do not repeatedly ask the user to certify inaccessible internals. Ask only for a concrete unresolved decision or information the user can actually provide.
+- Settle facts first, with a specialist reading the repository or documentation, and finish independent work.
 - Ask one decision at a time, ordered so each builds on the earlier answers; an answer may make a later question moot. Give it as choices. <!-- O21: choices as the guide advises; one decision at a time is R-ASK's requirement. -->
 - Write for someone outside the code: plain words, no internal terms or ids. Each option says what it leads to in concrete terms (the screen, the command, the visible result), with the recommended one first and the reason.
 - Record each decision in the Intent with `intent update --material`, folding the decision and its reason into the requirements, then reassess the Assignments planned on the old revision.
@@ -37,4 +37,4 @@ When the user asked to be asked whenever something is ambiguous, ask before acti
 ### Answers
 
 - Incorporate free-form answers and preserve settled intent and authorization. Ask again only for an identified material remainder needing the user's decision or information, not for a menu choice when the answer settled it.
-- When the user gives no answer at all, or has said they are away (the `user-busy` skill), proceed on the recommended default and record it in the Intent as a default, so it can be revisited. A decision the rules reserve for the user's answer (pushing to the platform-assigned branch, approvals) is parked, never defaulted. A clarifying answer does not count as no answer.
+- When the user gives no answer at all, or has said they are away (the `user-busy` skill), proceed on the recommended default and record the default when an Intent is already in use. A decision the rules reserve for the user's answer (pushing to the platform-assigned branch, approvals) is parked, never defaulted. A clarifying answer does not count as no answer.

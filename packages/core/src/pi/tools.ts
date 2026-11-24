@@ -127,12 +127,11 @@ const has = (capabilities: ReadonlyArray<Capability>, capability: Capability) =>
  * `PI_CODEMODE_MAX_WORKERS` from `pi.codemode.maxWorkers` in `env`. The root keeps the default
  * selection (`read` and `bash`, the extension tools of the enabled packages, `todo`,
  * `ask_user_question`, the process and subagent tools) and adds `+codemode`; on Windows the
- * extension also adds {@link POWERSHELL_ENTRY}. It excludes `write` and `edit`, since it writes no
- * files, and, while each is enabled, the computer-use tools and the web choice's tools: `+codemode`
- * keeps every enabled extension's tools, but the root delegates research to the Librarian roles and
- * visual inspection to the visual specialists, as the Claude root does. A specialist gets an
- * allowlist: the read tools, then what its route grants, then `codemode`, and `--exclude-tools`
- * repeats as a floor the write tools it must not have:
+ * extension also adds {@link POWERSHELL_ENTRY}. The root can use Pi's ordinary `write` and `edit`
+ * for bounded direct work. Provider-specific write tools, the enabled computer-use tools and the
+ * web choice's tools remain excluded. A specialist gets an allowlist: the read tools, then what its
+ * route grants, then `codemode`, and `--exclude-tools` repeats as a floor the write tools it must
+ * not have:
  *
  * - Write: `write`, `edit`, `bash` and `powershell`;
  * - Shell: `bash` and `powershell` (Worker.operations, Worker.validation, Reviewer.testing), and
@@ -177,8 +176,6 @@ export const toolArgs = (
   }
   if (key === "root") {
     const excluded = [
-      "write",
-      "edit",
       ...profile.writeTools,
       ...enabled.flatMap((capability) => capability.tools.rootExclude),
       ...webChoice(profile, features.web).tools,

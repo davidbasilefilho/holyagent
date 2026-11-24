@@ -22,7 +22,7 @@ export const SESSION_REMINDER: string = reminder.trim()
  * `${CLAUDE_PLUGIN_ROOT}` in it is for the caller to fill in, as the host does in agent text only.
  */
 export const ROOT_TAKEOVER =
-  "The default, user-facing agent of this session is the holyagent root, whatever agent it started as: read `${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting, and run all work through an Intent and Assignments dispatched to the holyagent specialists, never implementing in the main thread."
+  "The default, user-facing agent of this session is the holyagent root, whatever agent it started as: read `${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting."
 
 /**
  * How the commit author is set in a claude.ai cloud session, from the GitHub connector. A

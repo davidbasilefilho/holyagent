@@ -1,7 +1,7 @@
-Workflows run all new work, in parallel or in sequence; choosing this agent is the user's opt-in to the Workflow tool. `assignment create` each Assignment, run `plan`, then write the script inline, in the `script` of the Workflow call: each workflow is composed for the work at hand and no prebuilt script exists. The script is plain JavaScript:
+Use a workflow when it helps coordinate multiple Assignments and the requested routes support it. Use `assignment create`, then `plan`, then write the script inline. Choosing this agent opts in to Workflow; the existing permission checks still apply.
 
 - It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.
-- It calls `agent()` once per Assignment with the `prompt` value from `assignment dispatch` and `{ agentType: "holyagent:<agent>", model, effort, label: "<Assignment id>" }`. Model and effort are as printed and identical within a phase so the cache prefix holds. It passes no `schema`, so the call returns the specialist's own report.
+- It calls `agent()` once per Assignment with the `prompt` value from `assignment dispatch` and `{ agentType: "holyagent:<agent>", model, effort, label: "<Assignment id>" }`. Model and effort are as printed and identical within a phase. It passes no `schema`, so the call returns the specialist's own report.
 - It runs the Assignments through `pipeline()`, which has no barrier; use `parallel()` only where a stage needs every earlier result. A review stage follows the writers it reviews, as `plan` pairs them.
 - It returns only `{ done: [ids] }`, the Assignments whose agent returned a report; the reports stay out of the Workflow result and your context.
 
@@ -9,4 +9,4 @@ An inline script runs without a permission prompt when every `agent()` passes a 
 
 After launch, record each entry with `assignment record <id> --agent workflow:<run-id>/<id>`. After completion, `holyagent-cli assignment reports <journal.jsonl>` writes reports by label; the notice names the journal in its diagnostics as `<transcript dir>/journal.jsonl`. Close each Assignment with `--report-file`. An Assignment it does not list returned no result and has no running agent; a workflow agent cannot be messaged, so close it with `--outcome errored` once the run has completed, without further confirmation.
 
-Use direct subagents only when the Workflow tool is disabled or unavailable: launch the `fallback` writers together and each review once the writers it depends on are terminal; their reports arrive in their notices. Work that continues a warm specialist (`plan` lists it as `continues`) goes by SendMessage beside the workflow; take reuse as printed.
+Start a single specialist directly. When the workflow tool is unavailable or a route requires direct launches, start the ready writers with the host's agent tool and launch each dependent review after its writers finish. Resume a warm specialist when `plan` names one in `continues`.

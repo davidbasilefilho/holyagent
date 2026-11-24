@@ -25,7 +25,7 @@ import {
 export const PLUGIN_NAME = "holyagent"
 
 const ROOT_DESCRIPTION =
-  "Use as the main-thread agent: it plans the work as an Intent with Assignments, dispatches the holyagent specialists through the CLI, judges their reports, accepts work on evidence and owns version control."
+  "Use as the main-thread agent: it handles small, low-risk work directly, dispatches specialists when warranted, judges results on evidence and owns version control."
 
 /**
  * The built-in tools of Claude Code that an agent definition can grant or deny: the ones a
@@ -80,9 +80,9 @@ const WRITING = ["Write", "Edit", "Bash"]
 
 /**
  * The built-in tools of the root: dispatch, ask, tasks (TaskStop stops a running agent or workflow
- * when new information conflicts with it) and reading; it writes no files. It has no Grep or Glob,
- * since a role with a shell searches with `holyagent rg` and `holyagent fd` (the ripgrep and fd
- * installed on the machine) and falls back to the system grep or find through Bash.
+ * when new information conflicts with it), reading and ordinary file edits. It has no Grep or Glob,
+ * since a role with a shell searches with `holyagent-cli rg` and `holyagent-cli fd` (the ripgrep
+ * and fd installed on the machine) and falls back to the system grep or find through Bash.
  */
 const ROOT_BUILTINS = [
   "Agent",
@@ -97,6 +97,8 @@ const ROOT_BUILTINS = [
   "TaskGet",
   "TaskStop",
   "Read",
+  "Edit",
+  "Write",
   "Bash",
 ]
 

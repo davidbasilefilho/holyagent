@@ -169,7 +169,7 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
     const skills = await Effect.runPromise(skillFiles(family, () => "test source"))
     expect(read(join(FAMILY, "root/delegating.md"))).toContain("load `performance-iteration`")
     expect(read(join(FAMILY, "root/delegating.md"))).toContain(
-      "accept the collected baseline before any task source-writing dispatch",
+      "preserve the original baseline before source changes",
     )
     const routing = read(join(FAMILY, "root/skills.md"))
     expect(routing).toContain("load it at visual task start")
@@ -178,11 +178,10 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
     )
     expect(routing).toContain("the baseline collector may be dispatched first")
     const performance = skills.find((skill) => skill.path === "performance-iteration/SKILL.md")
-    expect(performance?.content).toContain("immediately previous commit")
-    expect(performance?.content).toContain("Before any task source edits")
-    expect(performance?.content).toContain("After the root creates each source commit")
-    expect(performance?.content).toContain("before independent review, acceptance or push")
-    expect(performance?.content).toContain("outside the source commit")
+    expect(performance?.content).toContain("Measure the relevant workload before changing source")
+    expect(performance?.content).toContain("Compare the final revision with that baseline")
+    expect(performance?.content).toContain("Rerun an intermediate revision when behavior changes")
+    expect(performance?.content).not.toContain("each source commit")
     const visual = skills.find((skill) => skill.path === "visual-judging/SKILL.md")
     expect(visual?.content).toContain("Before any task source edits")
     expect(visual?.content).toContain("After the root creates each source commit")

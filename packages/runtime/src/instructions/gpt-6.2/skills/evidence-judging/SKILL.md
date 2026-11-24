@@ -5,19 +5,18 @@ description: "Use when a specialist report carries a verdict the root must accep
 
 # Judging on evidence
 
-You stay the judge and specialists do the heavy work. Judge from compact evidence a specialist produced (a reproduction, trace, quoted source, screenshot verdict or diff summary), never from raw logs or whole files: the evidence is small enough to weigh, and the tokens go to the cheaper models.
-
-Find the verdict's kind below and apply its rule.
+Use specific evidence to decide whether a reported finding warrants a change. Read the source, diff or log detail when it affects the verdict.
 
 ## Review findings
 
-A blocking finding starts a repair only with evidence:
+Record the finding's scope, base and head or inspected revision, severity and evidence. Choose the evidence by claim:
 
-- a reproduction, from a reviewer with a shell;
-- a file:line trace (for a vulnerability, source to sink), from a reviewer without one;
-- for a visual finding, a Reviewer.visual observation (viewport, interaction, visible result) or a finding of your own final pass that cites the capture path and what it shows.
+- Observed behavior: a reproduction or failing check.
+- Demonstrable duplication, complexity or a broken invariant: a source trace with the relevant paths and symbols.
+- Measured performance: comparable runs on a stated baseline and workload.
+- Visual behavior: a capture or observation with the viewport, interaction and visible result.
 
-Send an unproven finding back to the same reviewer for that evidence, since a claim that cannot be reproduced or traced is a guess and a repair on it risks a regression.
+Request missing evidence before treating the finding as blocking. Keep Unknown and skipped checks distinct from Passed.
 
 ## Research
 

@@ -61,13 +61,13 @@ describe("the core of the root rules", () => {
     const core = ROOT_CORE
     for (const part of [
       "AskUserQuestion",
-      "For worker or repository state, delegate investigation first",
+      "For worker or repository state, check available evidence first",
       "Unknown proves neither active nor inactive",
       "keep concurrency safeguards and ask only for actionable user decisions or information",
       "recommended default",
       "confirmed gone",
       "exited parent session proves nothing",
-      "one-entry workflow",
+      "Start a single specialist with Agent",
       "--follow-up-of",
       "literal absolute path",
       "scripts/holyagent-cli.js",
@@ -84,7 +84,7 @@ describe("the core of the root rules", () => {
 
   test("makes the task list the place for progress and keeps messages for decisions, blockers and the report", () => {
     for (const part of [
-      "Create the task list first",
+      "Use a task list for delegated or multi-step work and handoffs",
       "at every dispatch, close and verdict",
       "a decision, a blocker only they can clear, and the final report",
     ])
@@ -363,10 +363,9 @@ describe("the takeover line and the legacy context", () => {
       "default, user-facing agent of this session is the holyagent root",
       "whatever agent it started as",
       "${CLAUDE_PLUGIN_ROOT}/agents/holyagent.md` with the Read tool before acting",
-      "all work through an Intent and Assignments dispatched to the holyagent specialists",
-      "never implementing in the main thread",
     ])
       expect(ROOT_TAKEOVER).toContain(part)
+    expect(ROOT_TAKEOVER).not.toMatch(/run all work through an Intent|never implement/i)
   })
 
   test("the takeover line does not repeat the core's rule to follow the rules without a reminder", () => {
