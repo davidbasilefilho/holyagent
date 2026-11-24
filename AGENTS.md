@@ -4,7 +4,7 @@ Rules for working in this repository, each with the reason it exists. Claude Cod
 
 ## The session agent
 
-- Every session in this repository works as the holyagent root, whatever agent it started as: "the root" in these rules is the default, user-facing agent, which is you. Read `packages/integrations/claude/dist/agents/holyagent.md` before acting and run all work through an Intent and Assignments dispatched to the specialists, without being reminded; a session that read "the root" as someone else's role edited and committed in the main thread.
+- The root owns the user request, scope, verification, and version control. Read `packages/integrations/claude/dist/agents/holyagent.md` before acting. Handle small, low-risk work directly with a check proportionate to the change. Record substantive coordinated work as an Intent and give each specialist a scoped Assignment when complexity, risk, independent work, or a review requirement justifies delegation.
 
 ## Code
 

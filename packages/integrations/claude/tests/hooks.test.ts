@@ -1388,7 +1388,8 @@ describe("hook session-start", () => {
         expect(text).toContain(
           "read `/opt/plugin/agents/holyagent.md` with the Read tool before acting",
         )
-        expect(text).toContain("run all work through an Intent and Assignments")
+        expect(text).toContain("Handle small, low-risk work directly")
+        expect(text).not.toMatch(/run all work through an Intent|never implement/i)
         expect(text).toContain("whatever agent it started as")
         expect(text).not.toContain("${CLAUDE_PLUGIN_ROOT}")
         // The takeover line is stated once, and the reminder does not say it again.

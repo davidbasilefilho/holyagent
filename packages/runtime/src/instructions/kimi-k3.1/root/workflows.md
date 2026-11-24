@@ -1,6 +1,6 @@
 ## Workflows
 
-Workflows run all new work; choosing this agent opts in to `SubagentWorkflow` without confirmation. `assignment create` each Assignment, run `plan`, then write the script inline: no prebuilt script exists. The script is plain JavaScript:
+Use a workflow when it helps coordinate multiple Assignments and the requested routes support it. Use `assignment create`, then `plan`, then write the script inline. The script is plain JavaScript:
 
 - It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.
 - It calls `agent()` once per Assignment with the `prompt` value from `assignment dispatch` and `{ agentType, model, effort, label: "<Assignment id>" }`, the `agentType`, model and effort as printed. Model and effort are identical within a phase. It passes no `schema`, so the call returns the specialist's own report.
@@ -35,6 +35,6 @@ return { done }
 
 Right after launch, take the run id from the `SubagentWorkflow` result and record each entry with `assignment record <id> --agent pi-workflow:<run-id>/<id>`. The completion notice identifies the journal; `assignment reports <journal>` writes reports by label. Close each Assignment with `--report-file`. Once the run completes, an Assignment it does not list returned no result and has no running agent; close it errored without further confirmation because workflow agents cannot be resumed.
 
-If `SubagentWorkflow` is unavailable, launch `fallback` writers together and each review after its writers are terminal; reports arrive in completion notices. For a warm specialist, use the `Agent` tool's `resume` as `plan` prints.
+Start a single specialist directly. When the workflow tool is unavailable or a route requires direct launches, start the ready writers with the host's agent tool and launch each dependent review after its writers finish. Resume a warm specialist when `plan` names one in `continues`.
 
-The example's literal type is for worker-implementation; put the dispatched specialist's name as a literal in each call. Use `agent` and `subagent_workflow` when offered, else their original names. After ready root work, use `wait_for_agents` if available for top-level agents or submitted input. Its timeout has unknown cache retention. Workflow completion has no public wait event: return to host notifications. When wait is unavailable, use host notifications.
+The example's literal type is for worker-implementation; put the dispatched specialist's name as a literal in each call. Use `agent` and `subagent_workflow` when offered, else their original names. After ready root work, use `wait_for_agents` if available for top-level agents or submitted input. Workflow completion has no public wait event: return to host notifications. When wait is unavailable, use host notifications.

@@ -437,13 +437,13 @@ describe("agents", () => {
   test("the root text states the rules that two sections once shared in one section only", () => {
     const content = agent("holyagent")?.content ?? ""
     for (const rule of [
-      "Run no gates, probes or data checks yourself",
+      "Handle small, low-risk work directly",
       "Keep the brief out of context",
       "no polling, steering, scheduled check-ins or wait loops",
       "Never force-push",
       "Ignore hook and harness noise",
-      "push once the reviews accept",
-      "Read only what a decision needs",
+      "recheck the affected evidence on the final head before pushing",
+      "Read the detail you need to verify the result",
     ])
       expect({ rule, count: content.split(rule).length - 1 }).toEqual({ rule, count: 1 })
     expect(content).not.toContain("Push only after the reviews accept")
@@ -505,12 +505,12 @@ describe("agents", () => {
     )
     const rules = read(`${CLAUDE}/specialist`, "code-quality.md")
     for (const part of [
-      "No duplication: reuse existing code, helpers, abstractions and instructions",
-      "extract a shared piece when the same logic or text appears twice",
+      "Reuse existing code and instructions",
+      "the occurrences enforce the same invariant and sharing makes the result simpler",
       "repeated I/O, quadratic loops over data that grows, unbounded memory, blocking calls on hot paths and redundant process spawns",
       "Skip micro-optimization that costs readability without a measured or obvious gain",
       "comments that explain why, not what",
-      "A writer extracts inside its ownership paths and reports duplication elsewhere under `notes:`",
+      "Report duplication outside them as a note",
       "A reviewer reports duplication of logic or instructions that the change introduces, and a performance problem with its evidence",
       "a finding blocks only when the change also makes existing behavior or performance worse, fails a gate, breaks a stated repository rule or leaves a duplicate that already disagrees with its original",
       "otherwise it is optional, as is anything already on the base",
@@ -789,7 +789,7 @@ describe("agents", () => {
     expect(text).toContain(read(`${CLAUDE}/root`, "instruction-guidelines.md").trim())
     expect(text).toContain("open one ordinary PR back to that base")
     expect(text).toContain("Stack PRs only when the project or user explicitly requires it.")
-    expect(text).toContain("Create the task list first")
+    expect(text).toContain("Use a task list for delegated or multi-step work and handoffs")
   })
 
   test("the language rule is stated by the root and the specialists, and nothing contradicts it", () => {
@@ -852,6 +852,8 @@ describe("agents", () => {
         "TaskGet",
         "TaskStop",
         "Read",
+        "Write",
+        "Edit",
         "Bash",
       ],
       "explorer-map": reading,
@@ -906,13 +908,17 @@ describe("agents", () => {
       expect(field(agent(route.agent)?.content ?? "", "effort")).toBe(route.effort)
   })
 
-  test("the root keeps its context small, never polls, and routes mechanical work to haiku", () => {
+  test("the root can act directly, avoids polling and uses the specialist routes when needed", () => {
     const text = agent("holyagent")?.content ?? ""
     for (const part of [
-      "Run no gates, probes or data checks yourself",
+      "Handle small, low-risk work directly",
       "Keep the brief out of context",
       "`assignment close <id> --outcome <o> --report-file <path>`",
-      "a cap on the report",
+      "Start a single specialist with Agent",
+      "paths for authorized direct edits or accepted Assignments",
+      "Use an independent reviewer when task complexity, material risk, the user or repository policy warrants it",
+      "Address optional changes only when materially useful and within scope",
+      "A validated vulnerability introduced or worsened",
       "no polling, steering, scheduled check-ins or wait loops",
       "A wake changing nothing gets one short line",
       "The route table, not the brief, sets model and effort",
@@ -924,7 +930,9 @@ describe("agents", () => {
       "`{ done: [ids] }`",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
-    expect(text).not.toContain("read the image in the main thread")
+    expect(text).not.toMatch(
+      /Run no gates|one-entry workflow|one more repair round|cap on the report|read the image in the main thread|leave implementation to specialists|never implement/i,
+    )
     expect(text).not.toContain("Read screenshots yourself")
   })
 
@@ -1222,11 +1230,11 @@ describe("agents", () => {
       "Use when a specialist report carries a verdict the root must accept or reject: a blocking review finding, a research claim with conflicting sources or numbers, prose written for people, or a material design choice.",
     )
     for (const part of [
-      "never from raw logs or whole files",
-      "starts a repair only with evidence:",
-      "a file:line trace (for a vulnerability, source to sink) from one without",
-      "a Reviewer.visual observation (viewport, interaction, visible result) or a finding of your own final pass that cites the capture path and what it shows",
-      "back to the same reviewer for that evidence",
+      "Choose the evidence by claim",
+      "a source trace with the relevant paths and symbols",
+      "comparable runs on a stated baseline and workload",
+      "with the viewport, interaction and visible result",
+      "Keep Unknown and skipped checks distinct from Passed",
       "have a specialist re-derive any number before it is published or decided on",
       "keep inference labeled as inference",
       "Reviewer.artifact reviews it and you judge the excerpts it flags",
@@ -1246,8 +1254,7 @@ describe("agents", () => {
     const root = agent("holyagent")?.content ?? ""
     for (const part of [
       "before any visual-task writer, source edit or visual specialist dispatch",
-      "loaded before the first visual dispatch",
-      "starts a repair and a re-review once it carries the evidence `evidence-judging` requires",
+      "Use `visual-judging` for material visual findings",
       "a web app or served static build, a terminal UI, a desktop or mobile app",
     ])
       expect({ part, found: root.includes(part) }).toEqual({ part, found: true })

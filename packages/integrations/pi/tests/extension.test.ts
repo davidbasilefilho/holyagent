@@ -2080,9 +2080,11 @@ describe("a Windows package root", () => {
       allTools: ["read", "bash", "write", "edit", "powershell", "codemode"],
     })
     const windows = await run(healthy("/missing"), { ...WINDOWS, ...options() })
-    expect(windows.api.toolSets).toEqual([["read", "bash", "codemode", "powershell"]])
+    expect(windows.api.toolSets).toEqual([
+      ["read", "bash", "write", "edit", "codemode", "powershell"],
+    ])
     const elsewhere = await run(healthy("/missing"), options())
-    expect(elsewhere.api.toolSets).toEqual([["read", "bash", "codemode"]])
+    expect(elsewhere.api.toolSets).toEqual([["read", "bash", "write", "edit", "codemode"]])
   })
 
   test("the session role's core names the package folder with / only too", async () => {
@@ -3018,7 +3020,7 @@ describe("the root's tools", () => {
       activeTools: [...ACTIVE],
       allTools: [...ACTIVE, "codemode", "moonshot_fetch"],
     })
-    expect(api.toolSets).toEqual([["read", "bash", "todo", "codemode"]])
+    expect(api.toolSets).toEqual([["read", "bash", "write", "edit", "todo", "codemode"]])
   })
 
   test("are set before the first run reads them, once per start", async () => {
@@ -3095,7 +3097,7 @@ describe("the root's tools", () => {
       { activeTools: [...ACTIVE], allTools: [...ACTIVE, "codemode", "moonshot_fetch"] },
     )
     expect(delivered?.message?.customType).toBe(NOTICE_MESSAGE)
-    expect(api.toolSets).toEqual([["read", "bash", "todo", "codemode"]])
+    expect(api.toolSets).toEqual([["read", "bash", "write", "edit", "todo", "codemode"]])
   })
 
   test("a compaction that stops the start's collection does the start's work, once", async () => {
@@ -3123,7 +3125,7 @@ describe("the root's tools", () => {
     await api.emit("session_compact", { reason: "threshold" })
     await started
     await probesEnded(api, 2)
-    expect(api.toolSets).toEqual([["read", "bash", "todo", "codemode"]])
+    expect(api.toolSets).toEqual([["read", "bash", "write", "edit", "todo", "codemode"]])
     expect(piCalls(api)).toEqual(["auth check --provider kimi-coding --json", "--list-models"])
     await api.emit("session_compact", { reason: "threshold" })
     await Bun.sleep(20)
@@ -3151,7 +3153,7 @@ describe("the root's excluded tools", () => {
   // fff's tools under both name sets: override mode's, and the default mode's, which the package also
   // registers under `--fff-mode`, `PI_FFF_MODE` and a working directory it does not index.
   const FFF = ["grep", "find", "multi_grep", "ffgrep", "fffind", "fff-multi-grep"]
-  const EXCLUDED = ["write", "edit", "computer_use_click", "moonshot_search", "moonshot_fetch"]
+  const EXCLUDED = ["computer_use_click", "moonshot_search", "moonshot_fetch"]
   const webKit = JSON.stringify({
     ...DEFAULTS,
     pi: { ...DEFAULTS.pi, features: { ...DEFAULTS.pi.features, web: "pi-web-kit" } },
@@ -3166,8 +3168,12 @@ describe("the root's excluded tools", () => {
         blocked,
       )
     }
-    for (const name of ["read", "bash", "codemode", "todo", ...FFF])
+    for (const name of ["read", "bash", "write", "edit", "codemode", "todo", ...FFF])
       expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+    for (const name of ["write", "edit"])
+      expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual([
+        undefined,
+      ])
   })
 
   test("the reason says which tool and what to do instead", async () => {
@@ -3456,13 +3462,13 @@ describe("the root's excluded tools", () => {
         ? { stdout: enabled ? CONFIG : DISABLED }
         : healthy("/missing")(callOf, runtime),
     )
-    expect(await api.emit("tool_call", call("write"))).toEqual(blocked)
+    expect(await api.emit("tool_call", call("computer_use_click"))).toEqual(blocked)
     enabled = false
     await api.emit("session_compact", {})
-    expect(await api.emit("tool_call", call("write"))).toEqual([undefined])
+    expect(await api.emit("tool_call", call("computer_use_click"))).toEqual([undefined])
     enabled = true
     await api.emit("session_compact", {})
-    expect(await api.emit("tool_call", call("write"))).toEqual(blocked)
+    expect(await api.emit("tool_call", call("computer_use_click"))).toEqual(blocked)
   })
 
   test("refuseExcludedTool matches names and patterns, and an empty list refuses nothing", () => {
@@ -3728,8 +3734,8 @@ describe("under T3 Code", () => {
     "mcp__t3-code__t3_pending_request",
     "mcp__t3-code__something_new",
   ]
-  const OTHERS = ["read", "bash", "todo", "tool_search", "mcp__other__lookup"]
-  const ALL = [...OTHERS, "write", "edit", "codemode", ...KEPT_T3, ...DROPPED_T3]
+  const OTHERS = ["read", "bash", "todo", "tool_search", "mcp__other__lookup", "write", "edit"]
+  const ALL = [...OTHERS, "codemode", ...KEPT_T3, ...DROPPED_T3]
   const call = (toolName: string) => ({ toolName, toolCallId: "call-1/1", input: {} })
 
   /** A `ctx.ui` that records every member the extension reads and every call it makes. */
@@ -3763,7 +3769,6 @@ describe("under T3 Code", () => {
   test("the root's tools lose every T3 tool but the kept families, in both spellings, once at the start", async () => {
     const { api } = await t3("full-access")
     expect(api.toolSets).toEqual([[...OTHERS, "codemode", ...KEPT_T3]])
-    expect(api.toolSets[0]).not.toContain("write")
     for (const name of DROPPED_T3) expect(api.pi.getActiveTools()).not.toContain(name)
   })
 
@@ -3896,7 +3901,7 @@ describe("under T3 Code", () => {
         activeTools: [...ALL],
         startOnly: true,
       })
-      expect(api.toolSets).toEqual([ALL.filter((name) => name !== "write" && name !== "edit")])
+      expect(api.toolSets).toEqual([ALL])
       for (const name of DROPPED_T3)
         expect(await api.emit("tool_call", call(name))).toEqual([undefined])
       const messages = await nextMessages(api)
@@ -4068,7 +4073,7 @@ describe("under the Codex provider", () => {
       pi: codexPi,
     })
     for (const set of root.api.toolSets) expect(set).not.toContain("apply_patch")
-    expect(root.api.toolSets.at(-1)).not.toContain("write")
+    expect(root.api.toolSets.at(-1)).toContain("write")
   })
 
   test("under the Kimi provider no specialist gets apply_patch and no prompt is swapped", async () => {

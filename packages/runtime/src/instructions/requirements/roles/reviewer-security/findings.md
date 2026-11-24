@@ -1,1 +1,1 @@
-- R-RS: Substantiate each finding from source to sink and separate validated vulnerabilities from suspicions.
+- R-RS: Substantiate each finding from source to sink and separate validated vulnerabilities from suspicions. Apply the introduced-or-worsened boundary in R-REVIEW.

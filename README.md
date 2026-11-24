@@ -1,8 +1,8 @@
 # HolyAgent
 
-HolyAgent turns your coding agent into a root that plans work as Intents and Assignments and delegates it to eighteen specialists. A small CLI keeps the state, commits as the account owner and keeps the prompt cache warm, so the model never has to reason about any of it.
+HolyAgent gives your coding agent a workflow for direct fixes and larger deliveries. It carries out small, low-risk work directly and coordinates independent specialists when complexity, risk or review warrants it.
 
-You state what you want. The root writes it down as an Intent, splits it into bounded Assignments, dispatches each to the specialist that fits (implementation, review, validation, research, visual work and more), and accepts nothing without a check run on the current head. It speaks to you only for a decision, a blocker and the final report, apart from a brief acknowledgment of each of your messages.
+Describe what you want. For coordinated work, the root records an Intent, gives specialists scoped Assignments, and checks the result against evidence before accepting it.
 
 [T3 Code](https://github.com/pingdotgg/t3code) is the only supported interface. HolyAgent runs through its Pi provider; Pi is the backend, not a separate supported interface.
 

@@ -148,8 +148,8 @@ describe("commit workflow by harness", () => {
     )
     for (const family of FAMILIES.filter((name) => name !== "claude-5.5")) {
       const folder = folderOf(family)
-      expect(await Bun.file(join(folder, "root/identity.md")).text()).toContain(
-        "record accepted work according to the Version control rules",
+      expect(await Bun.file(join(folder, "root/identity.md")).text()).toMatch(
+        /record accepted work according to the version control rules/i,
       )
       expect(await Bun.file(join(folder, "root/version-control.md")).text()).toMatch(
         /Use (?:`git commit` for commits|plain Git for commits)/,

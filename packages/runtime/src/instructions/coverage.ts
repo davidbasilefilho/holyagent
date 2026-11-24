@@ -50,11 +50,11 @@ const EXISTING_COVERAGE = {
     },
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",
-      phrase: "immediately previous commit",
+      phrase: "Compare the final revision with that baseline",
     },
     "R-PERFORMANCE-ORDER": {
       section: "skills/performance-iteration/SKILL.md",
-      phrase: "After the root creates each source commit",
+      phrase: "Preserve the original revision, conditions and results as the baseline",
     },
     "R-SKILLS": {
       section: "root/skills.md",
@@ -73,7 +73,10 @@ const EXISTING_COVERAGE = {
       section: "root/stack-plan.md",
       phrase: "Stack PRs only when the project or user explicitly requires it.",
     },
-    "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
+    "R-TASKLIST": {
+      section: "root/task-list.md",
+      phrase: "Use a task list for delegated or multi-step work and handoffs",
+    },
     "R-TURN": {
       section: "root/task-list.md",
       phrase: "End your turn only when done or nothing can move",
@@ -115,24 +118,27 @@ const EXISTING_COVERAGE = {
       phrase: "free of filler, redundant summaries and boilerplate",
     },
     "R-OUTWARD": { section: "root/identity.md", phrase: "need user approval" },
-    "R-DELEGATE": {
-      section: "root/delegating.md",
-      phrase: "Delegate edits, runs, checks, reviews, research and investigation to specialists",
-    },
-    "R-LEAN": {
-      section: "root/context.md",
-      phrase: "Run no gates, probes or data checks yourself",
-    },
+    "R-DELEGATE": { section: "root/delegating.md", phrase: "Handle small, low-risk work directly" },
+    "R-LEAN": { section: "root/context.md", phrase: "Keep long logs in files" },
     "R-SEARCH": {
       section: "root/search.md",
       phrase: "Search file contents with `holyagent-cli rg`",
     },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
-    "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
+    "R-ROUTE": {
+      section: "root/routing.md",
+      phrase: "Pick a specialist whose agent description fits and whose result you can verify",
+    },
     "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
-    "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
-    "R-WAIT": { section: "root/dispatch.md", phrase: "A timeout does not guarantee cache reuse" },
+    "R-WORKFLOW": {
+      section: "root/workflows.md",
+      phrase: "Use a workflow when it helps coordinate multiple Assignments",
+    },
+    "R-WAIT": {
+      section: "root/dispatch.md",
+      phrase: "respond to completion, submitted input or a supported bounded wait timeout",
+    },
     "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
     "R-WAKE": {
       section: "root/dispatch.md",
@@ -144,12 +150,16 @@ const EXISTING_COVERAGE = {
     },
     "R-RESUME": { section: "root/dispatch.md", phrase: "confirmed gone" },
     "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
-    "R-ACCEPT": {
+    "R-ACCEPT": { section: "root/assignments.md", phrase: "Match the evidence to the claim" },
+    "R-REVIEW": {
       section: "root/assignments.md",
-      phrase: "judged from the diff summary and the check output",
+      phrase:
+        "Use an independent reviewer when task complexity, material risk, the user or repository policy warrants it",
     },
-    "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
-    "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
+    "R-FINISH": {
+      section: "root/assignments.md",
+      phrase: "Address optional changes only when materially useful and within scope",
+    },
     "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
     "R-VISUAL": {
       section: "skills/visual-judging/SKILL.md",
@@ -169,7 +179,7 @@ const EXISTING_COVERAGE = {
     },
     "R-EVIDENCE": {
       section: "skills/evidence-judging/SKILL.md",
-      phrase: "starts a repair only with evidence",
+      phrase: "Choose the evidence by claim",
     },
     "R-VCS": {
       section: "root/version-control.md",
@@ -258,8 +268,7 @@ const EXISTING_COVERAGE = {
     },
     "R-QUALITY": {
       section: "specialist/code-quality.md",
-      phrase:
-        "a finding blocks only when the change also makes existing behavior or performance worse",
+      phrase: "the occurrences enforce the same invariant and sharing makes the result simpler",
     },
     "R-EL": { section: "roles/explorer-lookup/method.md", phrase: "Locate with Grep and Glob" },
     "R-EM": { section: "roles/explorer-map/method.md", phrase: "Cite a path" },
@@ -363,7 +372,7 @@ const EXISTING_COVERAGE = {
     "R-CTX-ENV": { carriedBy: "docs/usage.md", phrase: "Never set `CLAUDE_CODE_EFFORT_LEVEL`" },
     "R-CTX-READ": {
       section: "root/context.md",
-      phrase: "Open a report file or a diff only to settle a concrete doubt",
+      phrase: "Read the detail you need to verify the result",
     },
     "R-MERGE-DIMENSIONS": {
       section: "specialist/merge-ready.md",
@@ -406,11 +415,11 @@ const EXISTING_COVERAGE = {
     },
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",
-      phrase: "immediately previous commit",
+      phrase: "Compare the final revision with that baseline",
     },
     "R-PERFORMANCE-ORDER": {
       section: "skills/performance-iteration/SKILL.md",
-      phrase: "After the root creates each source commit",
+      phrase: "Preserve the original revision, conditions and results as the baseline",
     },
     "R-SKILLS": {
       section: "root/skills.md",
@@ -462,17 +471,18 @@ const EXISTING_COVERAGE = {
     },
     "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
     "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
-    "R-ACCEPT": {
+    "R-ACCEPT": { section: "root/assignments.md", phrase: "Match the evidence to the claim" },
+    "R-REVIEW": {
       section: "root/assignments.md",
-      phrase: "Judge delegated work from the diff summary and the check output",
+      phrase:
+        "Use an independent reviewer when task complexity, material risk, the user or repository policy warrants it",
     },
-    "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
-    "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
+    "R-FINISH": {
+      section: "root/assignments.md",
+      phrase: "Address optional changes only when materially useful and within scope",
+    },
     "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
-    "R-LEAN": {
-      section: "root/context.md",
-      phrase: "Run no gates, probes or data checks yourself",
-    },
+    "R-LEAN": { section: "root/context.md", phrase: "Keep long logs in files" },
     "R-CACHE-STATIC": {
       carriedBy: "packages/runtime/tests/instructions.test.ts",
       phrase: "hold no dates, times or other time-varying text",
@@ -489,8 +499,11 @@ const EXISTING_COVERAGE = {
       section: "root/context.md",
       phrase: "set no environment variable or flag that overrides it",
     },
-    "R-CTX-READ": { section: "root/context.md", phrase: "Read only what a decision needs" },
-    "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
+    "R-CTX-READ": {
+      section: "root/context.md",
+      phrase: "Read the detail you need to verify the result",
+    },
+    "R-DELEGATE": { section: "root/delegating.md", phrase: "Handle small, low-risk work directly" },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
     "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
@@ -512,7 +525,10 @@ const EXISTING_COVERAGE = {
       section: "root/pr-text.md",
       phrase: "Say what changed and why, how it was checked",
     },
-    "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
+    "R-ROUTE": {
+      section: "root/routing.md",
+      phrase: "Pick a specialist whose agent description fits and whose result you can verify",
+    },
     "R-SEARCH": {
       section: "root/search.md",
       phrase: "search through the available shell with `rg` and `fd`",
@@ -537,7 +553,10 @@ const EXISTING_COVERAGE = {
       section: "root/stack-plan.md",
       phrase: "gets a review of that head before any push",
     },
-    "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
+    "R-TASKLIST": {
+      section: "root/task-list.md",
+      phrase: "Use a task list for delegated or multi-step work and handoffs",
+    },
     "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
     "R-DECIDE": {
       section: "root/task-list.md",
@@ -572,11 +591,14 @@ const EXISTING_COVERAGE = {
       section: "root/version-control.md",
       phrase: "each commit on a branch is atomic",
     },
-    "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
+    "R-WORKFLOW": {
+      section: "root/workflows.md",
+      phrase: "Use a workflow when it helps coordinate multiple Assignments",
+    },
     "R-WAIT": { section: "root/workflows.md", phrase: "use `wait_for_agents` if available" },
     "R-QUALITY": {
       section: "specialist/code-quality.md",
-      phrase: "No duplication: reuse existing code",
+      phrase: "the occurrences enforce the same invariant and sharing makes the result simpler",
     },
     "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
     "R-S-DATA": {
@@ -722,7 +744,7 @@ const EXISTING_COVERAGE = {
     },
     "R-EVIDENCE": {
       section: "skills/evidence-judging/SKILL.md",
-      phrase: "starts a repair only with evidence",
+      phrase: "Choose the evidence by claim",
     },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
@@ -776,11 +798,11 @@ const EXISTING_COVERAGE = {
     },
     "R-PERFORMANCE": {
       section: "skills/performance-iteration/SKILL.md",
-      phrase: "immediately previous commit",
+      phrase: "Compare the final revision with that baseline",
     },
     "R-PERFORMANCE-ORDER": {
       section: "skills/performance-iteration/SKILL.md",
-      phrase: "After the root creates each source commit",
+      phrase: "Preserve the original revision, conditions and results as the baseline",
     },
     "R-SKILLS": {
       section: "root/skills.md",
@@ -832,17 +854,18 @@ const EXISTING_COVERAGE = {
     },
     "R-ASK": { section: "root/asking.md", phrase: "Ask one decision at a time" },
     "R-CRITERIA": { section: "root/assignments.md", phrase: "constraints go in verbatim" },
-    "R-ACCEPT": {
+    "R-ACCEPT": { section: "root/assignments.md", phrase: "Match the evidence to the claim" },
+    "R-REVIEW": {
       section: "root/assignments.md",
-      phrase: "Judge delegated work from the diff summary and the check output",
+      phrase:
+        "Use an independent reviewer when task complexity, material risk, the user or repository policy warrants it",
     },
-    "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
-    "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
+    "R-FINISH": {
+      section: "root/assignments.md",
+      phrase: "Address optional changes only when materially useful and within scope",
+    },
     "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
-    "R-LEAN": {
-      section: "root/context.md",
-      phrase: "Run no gates, probes or data checks yourself",
-    },
+    "R-LEAN": { section: "root/context.md", phrase: "Keep long logs in files" },
     "R-CACHE-STATIC": {
       carriedBy: "packages/runtime/tests/instructions.test.ts",
       phrase: "hold no dates, times or other time-varying text",
@@ -859,8 +882,11 @@ const EXISTING_COVERAGE = {
       section: "root/context.md",
       phrase: "set no environment variable or flag that overrides it",
     },
-    "R-CTX-READ": { section: "root/context.md", phrase: "Read only what a decision needs" },
-    "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
+    "R-CTX-READ": {
+      section: "root/context.md",
+      phrase: "Read the detail you need to verify the result",
+    },
+    "R-DELEGATE": { section: "root/delegating.md", phrase: "Handle small, low-risk work directly" },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
     "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
@@ -882,7 +908,10 @@ const EXISTING_COVERAGE = {
       section: "root/pr-text.md",
       phrase: "Say what changed and why, how it was checked",
     },
-    "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
+    "R-ROUTE": {
+      section: "root/routing.md",
+      phrase: "Pick a specialist whose agent description fits and whose result you can verify",
+    },
     "R-SEARCH": {
       section: "root/search.md",
       phrase: "search through the available shell with `rg` and `fd`",
@@ -907,7 +936,10 @@ const EXISTING_COVERAGE = {
       section: "root/stack-plan.md",
       phrase: "gets a review of that head before any push",
     },
-    "R-TASKLIST": { section: "root/task-list.md", phrase: "Create the task list first" },
+    "R-TASKLIST": {
+      section: "root/task-list.md",
+      phrase: "Use a task list for delegated or multi-step work and handoffs",
+    },
     "R-TURN": { section: "root/task-list.md", phrase: "End your turn only when the work is done" },
     "R-DECIDE": {
       section: "root/task-list.md",
@@ -942,11 +974,14 @@ const EXISTING_COVERAGE = {
       section: "root/version-control.md",
       phrase: "each commit on a branch is atomic",
     },
-    "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
+    "R-WORKFLOW": {
+      section: "root/workflows.md",
+      phrase: "Use a workflow when it helps coordinate multiple Assignments",
+    },
     "R-WAIT": { section: "root/workflows.md", phrase: "use `wait_for_agents` if offered" },
     "R-QUALITY": {
       section: "specialist/code-quality.md",
-      phrase: "No duplication: reuse existing code",
+      phrase: "the occurrences enforce the same invariant and sharing makes the result simpler",
     },
     "R-TERSE": { section: "specialist/conduct.md", phrase: "Respond tersely." },
     "R-S-DATA": {
@@ -1092,7 +1127,7 @@ const EXISTING_COVERAGE = {
     },
     "R-EVIDENCE": {
       section: "skills/evidence-judging/SKILL.md",
-      phrase: "starts a repair only with evidence",
+      phrase: "Choose the evidence by claim",
     },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",

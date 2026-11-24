@@ -21,26 +21,26 @@ Pass `--screen` in the draft of an Assignment whose work has to see or drive a s
 
 ### Acceptance
 
-Proof is command, exit code and counts; long logs sit in files. Judge delegated work from the diff summary and the check output, not the report's claims, and accept nothing as done, nor report it done, without a check run now on the current head (a specialist runs it). Accepted work and its evidence survive follow-ups, resume and compaction; evidence goes stale only when a later change touches what it established, and then only that part is refreshed. <!-- O7: done means run, inspected and fixed. -->
+Match the evidence to the claim. Run checks for the changed behavior and refresh affected evidence after a material change. Identify the relevant base and head or inspected scope, severity and supporting evidence. Report an Unknown or skipped check as such.
 
 ### Review
 
-- Work that changes code or artifacts gets an independent reviewer: Reviewer.code for code, Reviewer.artifact for documents and instruction text, Reviewer.audit against stated requirements, Reviewer.testing for test coverage, Reviewer.visual for what renders (with Worker.visual, per `visual-judging`, loaded before the first visual dispatch; logic-only work skips that loop). Trust boundaries, authentication, privileged operations, sensitive data and external integrations also get Reviewer.security before the push; hooks, wrappers and CI files are privileged surfaces.
+- Use an independent reviewer when task complexity, material risk, the user or repository policy warrants it. Use Reviewer.code for code, Reviewer.artifact for prose or instructions, Reviewer.audit for requirements, Reviewer.testing for tests, and Reviewer.visual for rendered behavior. Give a read-only Reviewer.security changes to trust boundaries, authentication, privileged operations, sensitive data and external integrations. Hooks, wrappers and CI files are privileged surfaces.
 - A review starts after the writers on the paths under review are terminal and names the work to be independent from (`independentFrom`). Reviewers without a shell (audit, security, artifact) read the diff file a writer lists as `diff-file` evidence.
-- A blocking finding (a visual one when material) starts a repair and a re-review once it carries the evidence `evidence-judging` requires; visual repairs run as `visual-judging` says (rounds, render target, images). The re-review gets the previous findings and only the repair's diff, so it closes. Non-blocking findings other than visual preference ride along when the writer is already repairing a blocker, with no review of their own.
-- A validated vulnerability the change introduced holds the push until repaired or the user accepts the risk; a security repair and a code repair each invalidate the other's review.
+- Repair and recheck supported blockers. Use `visual-judging` for material visual findings. Address optional changes only when materially useful and within scope.
+- A validated vulnerability introduced or worsened by the change blocks pushing until fixed or the user explicitly accepts the risk. Check the affected trust boundary on the final head when the repair diff omits relevant context.
 
 ### Order of work
 
-Implement, commit locally, review that commit (reviewers judge a committed range, so they see the work), repair as new local commits and re-review, validate the final head once (specialists run the changed-scope gates themselves), then push once the reviews accept.
+Implement, commit locally when a committed range is needed, run any required review, repair blockers and recheck the affected evidence on the final head before pushing.
 
 Resume an accidentally interrupted specialist through the host's resume control; relaunching its brief in parallel doubles the work and the writes. Split long mechanical work (hundreds of calls, such as paging or exporting) into batches across fresh specialists. Each such Assignment names the file its results go to, outside `.holyagent/` (specialists must not write there); you read that file.
 
 ### Finishing
 
-Before finishing, run one more repair round, with the same re-review, for every open item a specialist can fix other than visual preference: non-blocking findings, doc nits, checks that can be run or added (its brief names the checks and tests it adds as requested work). A blocking finding from that re-review gets one repair and re-review; one still open after that is a blocker for the user. Name unrequested features and refactors; build none.
+Finish when the requested work, applicable checks and required reviews are complete. Report Unknown results, waived gates and relevant review and merge state. Leave unrequested features and refactors out of the change.
 
-Finish when every Assignment has returned, failed gates are addressed, reviewable work is reviewed and the last repair round is done. Counting an Unknown result or a waived gate as Passed ends the work early.
+Resolve or report remaining blockers and pending Assignments before closing the work.
 
 The final report opens with the outcome and says what changed, what was checked and what still needs attention, with the reason for each: <!-- O12, O13 -->
 
