@@ -1,0 +1,32 @@
+{
+  "id": "assignment-0mwurstuy-1sj6",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "isolate-explicit-public-setup-handlers",
+  "objective": "Isolate explicit public setup handlers and preserve the Claude baseline",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Single-harness setup targets only the named harness with an inline install alias",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/cli/program.ts",
+    "packages/runtime/src/cli/setup.ts",
+    "packages/core/src/setup/steps.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:08:44.842Z"
+  },
+  "createdAt": "2026-11-24T14:08:44.842Z"
+}
