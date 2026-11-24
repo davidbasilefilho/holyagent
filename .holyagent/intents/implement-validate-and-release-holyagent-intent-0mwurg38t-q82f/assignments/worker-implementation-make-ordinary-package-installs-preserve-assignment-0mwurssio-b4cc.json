@@ -1,0 +1,31 @@
+{
+  "id": "assignment-0mwurssio-b4cc",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-ordinary-package-installs-preserve",
+  "objective": "Make ordinary package installs preserve the existing Pi host",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Packed ordinary installs preserve existing Pi and do not install a nested host",
+      "blocking": true,
+      "dimension": "tests"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/generate.ts",
+    "packages/integrations/pi/publishing.test.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:08:43.105Z"
+  },
+  "createdAt": "2026-11-24T14:08:43.105Z"
+}
