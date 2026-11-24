@@ -89,7 +89,7 @@ describe("the capability registry", () => {
     for (const capability of CAPABILITIES)
       expect(features[capability.feature]).toBe(capability.defaultOn)
     expect(Object.entries(FEATURE_DEFAULTS)).toEqual(
-      CAPABILITIES.map((capability) => [capability.feature, true]),
+      CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]),
     )
   })
 
@@ -140,7 +140,7 @@ describe("the capability registry", () => {
       ...written.pi.features,
       lunaReserve: true,
       contextManagement: true,
-      autoReview: true,
+      autoReview: false,
       justBash: true,
       fff: true,
       browserUse: true,

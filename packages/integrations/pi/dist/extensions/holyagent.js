@@ -9682,11 +9682,11 @@ var CAPABILITIES = [
   {
     name: "auto-review",
     feature: "autoReview",
-    description: "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+    description: "Optionally reviews risky tool calls before they run (Codex provider only)",
     provider: "openai-codex",
     skills: [],
     applicability: "both",
-    defaultOn: true,
+    defaultOn: false,
     needs: [],
     forms: sameForm([]),
     tools: { rootExclude: [], visual: [], screen: [] },
@@ -18161,6 +18161,9 @@ var RawString = class {
     this.value = value;
   }
 };
+function rawString(value) {
+  return new RawString(value);
+}
 function isRawString(value) {
   return value instanceof RawString;
 }
@@ -27786,6 +27789,10 @@ var PI_ROOT_PROMPTS = {
 };
 var PI_ROOT_PROMPT = PI_ROOT_PROMPTS["kimi-k3.1"];
 
+var encodeRecord = (value) => encode2(value, {
+  replacer: (_key, item) => typeof item === "string" && /[\u007f-\u009f]/.test(item) ? rawString(`"${escapeString(item)}"`) : item
+}).replace(/[\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
+
 var PI_ROLES = ["root", "specialist", "session"];
 var DEFAULT_PI_ROLE = "root";
 var PiRoleSchema = Literals(PI_ROLES);
@@ -29259,18 +29266,19 @@ var observeStreamEvent = (state, data) => state.pending !== undefined && isCompa
 } : state;
 var isCodexProvider = (provider) => provider === CODEX_PROVIDER_ID;
 
-var AUTO_REVIEW_ON = { settings: {} };
-var autoReviewChoice = (user) => user === undefined ? AUTO_REVIEW_ON : { settings: user.pi.enable && user.pi.features.autoReview ? user.pi.autoReview : undefined };
+var autoReviewChoice = (user) => ({
+  settings: user?.pi.enable === true && user.pi.features.autoReview ? user.pi.autoReview : undefined
+});
 var createAutoReviewSettings = () => {
-  let current = AUTO_REVIEW_ON;
+  let settings;
   let fixed = false;
   return {
-    settings: () => current.settings,
+    settings: () => settings,
     fix: (choice) => {
       if (fixed)
         return;
       fixed = true;
-      current = choice;
+      settings = choice.settings;
     }
   };
 };
@@ -29872,7 +29880,7 @@ var registerNativeTools = (pi, host) => {
   const active = new Map;
   const rootFlag = () => {
     try {
-      return VERSION2 === "1.5.0" && pi.getFlag(NATIVE_ROOT_FLAG) === true;
+      return VERSION2 === "1.5.0" && pi.getFlag(NATIVE_ROOT_FLAG) === true && host.isRoot();
     } catch {
       return false;
     }
@@ -29940,7 +29948,7 @@ var registerNativeTools = (pi, host) => {
           try {
             const result = await work;
             const cancelled = effectiveSignal.aborted;
-            const text = cancelled ? "Cancelled; a state update may have completed. Reconcile state before retrying." : result.ok ? JSON.stringify(result.data, null, 2) : result.message;
+            const text = cancelled ? "Cancelled; a state update may have completed. Reconcile state before retrying." : result.ok ? encodeRecord(result.data) : result.message;
             return {
               content: [{ type: "text", text: safeText(text) }],
               details: result,
@@ -30327,9 +30335,9 @@ var createAgentWait = (bus) => {
     }
   };
 };
-var registerAgentWait = (pi, registerRootFlag = true, hostVersion = VERSION4) => {
+var registerAgentWait = (pi, isRoot, registerRootFlag = true, hostVersion = VERSION4) => {
   if (registerRootFlag)
-    pi.registerFlag("holyagent-native-root", {
+    pi.registerFlag(NATIVE_ROOT_FLAG, {
       type: "boolean",
       description: "Enable root-only HolyAgent tools"
     });
@@ -30366,10 +30374,15 @@ var registerAgentWait = (pi, registerRootFlag = true, hostVersion = VERSION4) =>
       pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "wait_for_agents"));
     }
   };
+  const allowed = () => {
+    try {
+      return pi.getFlag(NATIVE_ROOT_FLAG) === true && isRoot();
+    } catch {
+      return false;
+    }
+  };
   const enable = () => {
-    if (pi.getFlag("holyagent-native-root") !== true)
-      return;
-    if (!waiting.available()) {
+    if (!allowed() || !waiting.available()) {
       disable();
       return;
     }
@@ -30393,7 +30406,7 @@ var registerAgentWait = (pi, registerRootFlag = true, hostVersion = VERSION4) =>
         workflow_pending: Type3.Optional(Type3.Boolean())
       }),
       execute: async (_id, args, signal) => {
-        const result = permitted && pi.getFlag("holyagent-native-root") === true ? await waiting.wait({
+        const result = permitted && allowed() ? await waiting.wait({
           timeoutMs: args.timeout_ms ?? 30000,
           ...signal === undefined ? {} : { signal },
           workflowPending: workflowPending || args.workflow_pending === true
@@ -30401,7 +30414,7 @@ var registerAgentWait = (pi, registerRootFlag = true, hostVersion = VERSION4) =>
           reason: "unavailable",
           detail: "root capability or enabled Pi configuration is unavailable"
         };
-        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+        return { content: [{ type: "text", text: encodeRecord(result) }], details: result };
       }
     });
   };
@@ -30771,8 +30784,9 @@ var createExtension = ({
     const agent = childAgent(pi.getSessionName());
     return isScreenAgent(agent) ? screenFormOf(agent) : detectForm(env, platform).form;
   };
+  const sessionRole = () => isChild() ? "specialist" : pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
   const roleOf = suspend2(() => {
-    const flag = isChild() ? "specialist" : pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE;
+    const flag = sessionRole();
     return decodeUnknownEffect2(PiRoleSchema)(flag).pipe(mapError2(() => new UnknownRole({ value: String(flag) })));
   });
   const closedSettings = (config, user) => gen2(function* () {
@@ -30784,8 +30798,9 @@ var createExtension = ({
     const role = yield* roleOf.pipe(orElseSucceed2(() => DEFAULT_PI_ROLE));
     return role === "root" ? rootExclusions([yield* defaultConfig]) : [];
   }).pipe(orDie2);
-  const native = registerNativeTools(pi, { env });
-  const agentWait = registerAgentWait(pi, false);
+  const isRoot = () => sessionRole() === "root";
+  const native = registerNativeTools(pi, { env, isRoot });
+  const agentWait = registerAgentWait(pi, isRoot, false);
   let aliasesAllowed = false;
   let ownedAliases = [];
   let suppressedAliases = [];
@@ -31017,11 +31032,11 @@ var createExtension = ({
         ownedAliases = [
           ...new Set([...ownedAliases, ...registerToolAliases(pi, () => aliasesAllowed)])
         ];
-      if (coreServices === undefined && result?.aliases === true)
+      if (coreServices === undefined && isRoot() && result?.aliases === true)
         agentWait.enable();
       else {
         disableAgentWait();
-        if (result?.enabled !== false && pi.getFlag(NATIVE_ROOT_FLAG) === true)
+        if (isRoot() && result?.enabled !== false && pi.getFlag(NATIVE_ROOT_FLAG) === true)
           taken.setupNotice = joinNotices(taken.setupNotice, notice("wait_for_agents unavailable: enabled Pi configuration could not be verified"));
       }
       native.setEnabled(coreServices === undefined && result?.nativeEnabled === true);
@@ -31216,7 +31231,7 @@ ${event.systemPrompt}` : undefined;
     }
   });
   registerAutoReview(pi, {
-    settings: () => held === undefined ? {} : held.autoReview.settings()
+    settings: () => held?.autoReview.settings()
   });
 };
 var extension_default = createExtension();

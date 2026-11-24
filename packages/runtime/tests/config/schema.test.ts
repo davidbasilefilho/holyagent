@@ -66,7 +66,7 @@ describe("default config", () => {
       subagents: true,
       lunaReserve: true,
       contextManagement: true,
-      autoReview: true,
+      autoReview: false,
       justBash: true,
       fff: true,
       browserUse: true,

@@ -2,6 +2,8 @@ import { type ExtensionAPI, VERSION } from "@earendil-works/pi-coding-agent"
 import { Type } from "typebox"
 
 import { canonicalPiToolName } from "../../../runtime/src/domain/host.ts"
+import { encodeRecord } from "../../../runtime/src/toon.ts"
+import { NATIVE_ROOT_FLAG } from "./native-tools.ts"
 
 /** A wait result; completion details remain with the host's ordinary notification. */
 export type WaitResult =
@@ -176,14 +178,15 @@ export const createAgentWait = (bus: WaitBus | undefined) => {
     },
   }
 }
-/** Register the explicitly authorized root wait without relying on a session display name. */
+/** Register the wait tool behind the current session role and explicit root flag. */
 export const registerAgentWait = (
   pi: ExtensionAPI,
+  isRoot: () => boolean,
   registerRootFlag = true,
   hostVersion = VERSION,
 ): { readonly enable: () => void; readonly disable: () => void } => {
   if (registerRootFlag)
-    pi.registerFlag("holyagent-native-root", {
+    pi.registerFlag(NATIVE_ROOT_FLAG, {
       type: "boolean",
       description: "Enable root-only HolyAgent tools",
     })
@@ -220,9 +223,15 @@ export const registerAgentWait = (
       pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "wait_for_agents"))
     }
   }
+  const allowed = () => {
+    try {
+      return pi.getFlag(NATIVE_ROOT_FLAG) === true && isRoot()
+    } catch {
+      return false
+    }
+  }
   const enable = () => {
-    if (pi.getFlag("holyagent-native-root") !== true) return
-    if (!waiting.available()) {
+    if (!allowed() || !waiting.available()) {
       disable()
       return
     }
@@ -246,7 +255,7 @@ export const registerAgentWait = (
       }),
       execute: async (_id, args, signal) => {
         const result =
-          permitted && pi.getFlag("holyagent-native-root") === true
+          permitted && allowed()
             ? await waiting.wait({
                 timeoutMs: args.timeout_ms ?? 30_000,
                 ...(signal === undefined ? {} : { signal }),
@@ -256,7 +265,7 @@ export const registerAgentWait = (
                 reason: "unavailable" as const,
                 detail: "root capability or enabled Pi configuration is unavailable",
               }
-        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result }
+        return { content: [{ type: "text", text: encodeRecord(result) }], details: result }
       },
     })
   }

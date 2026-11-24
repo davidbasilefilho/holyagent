@@ -30,7 +30,7 @@ beforeEach(async () => {
 afterEach(() => rm(fixtureRoot, { recursive: true, force: true }))
 
 const enabledFixture = (pi: ExtensionAPI) => {
-  const guard = registerAgentWait(pi)
+  const guard = registerAgentWait(pi, () => true)
   pi.on("session_start", () => guard.enable())
 }
 
@@ -40,7 +40,7 @@ test("an unknown host version does not register the wait tool", () => {
     events: createEventBus(),
     registerTool: (tool: { readonly name: string }) => registered.push(tool.name),
   } as unknown as ExtensionAPI
-  const wait = registerAgentWait(pi, false, "unknown")
+  const wait = registerAgentWait(pi, () => true, false, "unknown")
   wait.enable()
   expect(registered).toEqual([])
 })
@@ -149,7 +149,7 @@ test("real Pi SDK queues RPC input while the wait tool is executing", async () =
     eventBus: bus,
     extensionFactories: [
       (pi) => {
-        guard = registerAgentWait(pi)
+        guard = registerAgentWait(pi, () => true)
         pi.on("session_start", () => guard?.enable())
       },
     ],
@@ -254,9 +254,7 @@ test("real Pi SDK queues RPC input while the wait tool is executing", async () =
     session.messages.some(
       (message) =>
         message.role === "toolResult" &&
-        message.content.some(
-          (part) => part.type === "text" && part.text.includes('"reason":"input"'),
-        ),
+        message.content.some((part) => part.type === "text" && part.text === "reason: input"),
     ),
   ).toBe(true)
   expect(
@@ -353,7 +351,7 @@ test("malformed callable buses cannot crash registration or repeated session shu
         tool = value
       },
     } as unknown as ExtensionAPI
-    const guard = registerAgentWait(pi, false, "1.5.0")
+    const guard = registerAgentWait(pi, () => true, false, "1.5.0")
     guard.enable()
     expect(tool).toBeUndefined()
     if (tool !== undefined)
@@ -389,7 +387,7 @@ test("absent or unreadable event buses remain unavailable and safe to dispose", 
   ]) {
     const pi = { events } as unknown as ExtensionAPI
     expect(() => {
-      const guard = registerAgentWait(pi, false, "1.5.0")
+      const guard = registerAgentWait(pi, () => true, false, "1.5.0")
       guard.enable()
       guard.disable()
       guard.disable()
@@ -420,7 +418,7 @@ test("a restarted session suppresses a registered wait when its bus breaks and r
       active.push("wait_for_agents")
     },
   } as unknown as ExtensionAPI
-  const guard = registerAgentWait(pi, false, "1.5.0")
+  const guard = registerAgentWait(pi, () => true, false, "1.5.0")
   guard.enable()
   expect(active).toContain("wait_for_agents")
   handlers.get("session_shutdown")?.()
@@ -472,7 +470,7 @@ test("untrusted workflow events do not establish workflow completion", async () 
       tool = value
     },
   } as unknown as ExtensionAPI
-  const guard = registerAgentWait(pi, false, "1.5.0")
+  const guard = registerAgentWait(pi, () => true, false, "1.5.0")
   guard.enable()
   bus.emit("subagents:ready", {})
   bus.emit("subagents:started", { id: "top-level" })

@@ -548,10 +548,7 @@ interface Held {
   uniformCodex: boolean
   webMode: Config["pi"]["features"]["web"] | undefined
   profileRouting: boolean
-  /**
-   * The session's auto-review settings: on with the default policy from the start, fixed once by
-   * the first collection to the user-level config's choice. The project's config has no part.
-   */
+  /** The session's auto-review settings: off until the first collection fixes the user's choice. */
   autoReview: AutoReviewSettings
   /** True once the config is read and runs the bash tool on just-bash. */
   justBash: boolean
@@ -1105,8 +1102,10 @@ export const createExtension =
 
     // The session's role: a child the package launched is a specialist whatever the flag says, since
     // the flag defaults to the root in every Pi session and a child has no launch line of its own.
+    const sessionRole = () =>
+      isChild() ? "specialist" : (pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE)
     const roleOf = Effect.suspend(() => {
-      const flag = isChild() ? "specialist" : (pi.getFlag(ROLE_FLAG) ?? DEFAULT_PI_ROLE)
+      const flag = sessionRole()
       return Schema.decodeUnknownEffect(PiRoleSchema)(flag).pipe(
         Effect.mapError(() => new UnknownRole({ value: String(flag) })),
       )
@@ -1133,8 +1132,9 @@ export const createExtension =
       return role === "root" ? rootExclusions([yield* defaultConfig]) : []
     }).pipe(Effect.orDie)
 
-    const native = registerNativeTools(pi, { env })
-    const agentWait = registerAgentWait(pi, false)
+    const isRoot = () => sessionRole() === "root"
+    const native = registerNativeTools(pi, { env, isRoot })
+    const agentWait = registerAgentWait(pi, isRoot, false)
     let aliasesAllowed = false
     let ownedAliases: ReadonlyArray<string> = []
     let suppressedAliases: ReadonlyArray<string> = []
@@ -1172,8 +1172,7 @@ export const createExtension =
       // config and the state folder: only it may lift the gates, and its exclusions stay whatever a
       // project says, so no failure of those (a project's malformed `.git` among them) may keep
       // it from being used. A file that cannot be read, or that is still being read at the
-      // deadline, counts for nothing, which leaves the gates on and the defaults' exclusions, and
-      // is reported.
+      // deadline is reported. It keeps the default exclusions and supplies no auto-review opt-in.
       const readUser = (project: string) =>
         (coreServices === undefined
           ? loadHolyagentConfig({ projectDirectories: [], env })
@@ -1323,9 +1322,7 @@ export const createExtension =
           Effect.catch((error) => failed(error.message)),
           Effect.catchCause((cause) => failed(Cause.pretty(cause))),
         )
-        // Both the success and every failure path of `collected` end after the user's read, so
-        // `user` is settled here; it is `undefined` when the file could not be read, which leaves
-        // auto-review on.
+        // Only a verified opt-in read from the user's file can enable auto-review.
         const decided = { ...collected, autoReview: autoReviewChoice(user) }
         return homeNotice === undefined ? decided : { ...decided, homeNotice }
       })
@@ -1583,10 +1580,10 @@ export const createExtension =
           ownedAliases = [
             ...new Set([...ownedAliases, ...registerToolAliases(pi, () => aliasesAllowed)]),
           ]
-        if (coreServices === undefined && result?.aliases === true) agentWait.enable()
+        if (coreServices === undefined && isRoot() && result?.aliases === true) agentWait.enable()
         else {
           disableAgentWait()
-          if (result?.enabled !== false && pi.getFlag(NATIVE_ROOT_FLAG) === true)
+          if (isRoot() && result?.enabled !== false && pi.getFlag(NATIVE_ROOT_FLAG) === true)
             taken.setupNotice = joinNotices(
               taken.setupNotice,
               notice("wait_for_agents unavailable: enabled Pi configuration could not be verified"),
@@ -1901,12 +1898,10 @@ export const createExtension =
         if (held !== undefined) held.setupNotice = joinNotices(held.setupNotice, notice(text))
       },
     })
-    // After every other gate, so a call they refuse is never sent to review. Auto-review is a
-    // security control: it is on from the session's start, whatever the config says or fails to
-    // say, and only the user's own config turns it off (see `autoReviewChoice`). The gate applies
-    // whenever the active model is served by Codex, not only when the config selects it.
+    // After every other gate, so a call they refuse is never sent to review. When the user opts in,
+    // the gate applies whenever the active model is served by Codex.
     registerAutoReview(pi, {
-      settings: () => (held === undefined ? {} : held.autoReview.settings()),
+      settings: () => held?.autoReview.settings(),
     })
   }
 

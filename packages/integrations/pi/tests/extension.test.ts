@@ -4431,7 +4431,8 @@ describe("auto-review under the extension", () => {
         autoReview: review.autoReview ?? DEFAULTS.pi.autoReview,
       },
     })
-  const ON = withReview({})
+  const UNSET = withReview({})
+  const ON = withReview({ features: { autoReview: true } })
   const OFF = withReview({ features: { autoReview: false } })
   const PROJECT_OFF = withReview({
     features: { autoReview: false },
@@ -4465,12 +4466,12 @@ describe("auto-review under the extension", () => {
       | { block?: boolean; reason?: string }
       | undefined
 
-  test("is on from the session's start, before any config is read", async () => {
+  test("stays off until a verified user opt-in is read", async () => {
     const hold = gate()
     const api = fakeApi(
       (callOf, runtime) =>
         runtime[0] === "config"
-          ? gated(hold, { stdout: `${OFF}\n` }, callOf.signal)
+          ? gated(hold, { stdout: `${ON}\n` }, callOf.signal)
           : healthy("/missing")(callOf, runtime),
       undefined,
       SESSION_CWD,
@@ -4482,11 +4483,13 @@ describe("auto-review under the extension", () => {
       platform: "linux",
       bunSearch: BUN_SEARCH,
     })(api.pi)
+    expect(await reviewed(api)).toBeUndefined()
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
-    expect((await reviewed(api))?.block).toBe(true)
+    expect(await reviewed(api)).toBeUndefined()
     hold.open()
     await started
+    expect((await reviewed(api))?.block).toBe(true)
   })
 
   test("a project config that turns it off or rewrites its policy changes nothing", async () => {
@@ -4507,20 +4510,22 @@ describe("auto-review under the extension", () => {
     expect((await reviewed(api))?.block).toBe(true)
   })
 
-  test("a user config that cannot be read keeps it on", async () => {
+  test("a user config that cannot be read cannot opt in", async () => {
     const { api } = await session(
       () => "",
-      () => mergedOf(OFF),
-    )
-    expect((await reviewed(api))?.block).toBe(true)
-  })
-
-  test("only the user's own config turns it off", async () => {
-    const { api } = await session(
-      () => OFF,
       () => mergedOf(ON),
     )
     expect(await reviewed(api)).toBeUndefined()
+  })
+
+  test("a project cannot enable auto-review when the user has not set it or has turned it off", async () => {
+    for (const user of [UNSET, OFF]) {
+      const { api } = await session(
+        () => user,
+        () => mergedOf(ON),
+      )
+      expect(await reviewed(api)).toBeUndefined()
+    }
   })
 
   test("is fixed for the session: a config written later, read by a compaction, changes nothing", async () => {

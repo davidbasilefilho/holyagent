@@ -13,7 +13,6 @@ import type {
   ReviewerRequest,
 } from "../../../runtime/src/pi/codex/auto-review/review.ts"
 import {
-  AUTO_REVIEW_ON,
   autoReviewChoice,
   createAutoReviewSettings,
   registerAutoReview,
@@ -136,42 +135,53 @@ const recording = (...texts: Array<string>) => {
 const RISKY = { command: "rm -rf build" }
 
 describe("what decides the auto-review settings", () => {
-  test("the user's config decides: on by default, its policy text, and off only when it says so", async () => {
-    expect(autoReviewChoice(await decode({}))).toEqual({ settings: {} })
+  test("the user must opt in before any policy takes effect", async () => {
+    expect(autoReviewChoice(await decode({}))).toEqual({ settings: undefined })
+    const policy = { policy: "Own.", extraPolicy: "More." }
+    expect(autoReviewChoice(await decode({ pi: { autoReview: policy } }))).toEqual({
+      settings: undefined,
+    })
     expect(
       autoReviewChoice(
-        await decode({ pi: { autoReview: { policy: "Own.", extraPolicy: "More." } } }),
+        await decode({ pi: { features: { autoReview: true }, autoReview: policy } }),
       ),
-    ).toEqual({ settings: { policy: "Own.", extraPolicy: "More." } })
+    ).toEqual({ settings: policy })
+    expect(autoReviewChoice(await decode({ pi: { features: { autoReview: true } } }))).toEqual({
+      settings: {},
+    })
     expect(autoReviewChoice(await decode({ pi: { features: { autoReview: false } } }))).toEqual({
       settings: undefined,
     })
-    expect(autoReviewChoice(await decode({ pi: { enable: false } }))).toEqual({
+    expect(
+      autoReviewChoice(await decode({ pi: { enable: false, features: { autoReview: true } } })),
+    ).toEqual({
       settings: undefined,
     })
   })
 
-  test("a user config that could not be read leaves it on with the default policy", () => {
-    expect(autoReviewChoice(undefined)).toEqual({ settings: {} })
-    expect(AUTO_REVIEW_ON).toEqual({ settings: {} })
+  test("a user config that could not be read supplies no opt-in", () => {
+    expect(autoReviewChoice(undefined)).toEqual({ settings: undefined })
   })
 
   test("is not tied to the config's provider: the Codex module's settings no longer carry it", async () => {
     const codex = codexSettings(await decode({ pi: { provider: "openai-codex" } }))
     expect(codex).toBeDefined()
     expect(codex).not.toHaveProperty("autoReview")
-    expect(autoReviewChoice(await decode({ pi: { provider: "kimi-coding-global" } }))).toEqual({
+    expect(
+      autoReviewChoice(
+        await decode({ pi: { provider: "kimi-coding-global", features: { autoReview: true } } }),
+      ),
+    ).toEqual({
       settings: {},
     })
   })
 
   test("is fixed for the session by the first choice: a later one, from a rewritten config or a compaction, changes nothing", () => {
     const session = createAutoReviewSettings()
-    // Before any config is read it is on with the default policy.
-    expect(session.settings()).toEqual({})
+    expect(session.settings()).toBeUndefined()
     session.fix({ settings: { policy: "First." } })
     session.fix({ settings: undefined })
-    session.fix(AUTO_REVIEW_ON)
+    session.fix({ settings: {} })
     expect(session.settings()).toEqual({ policy: "First." })
 
     const off = createAutoReviewSettings()
