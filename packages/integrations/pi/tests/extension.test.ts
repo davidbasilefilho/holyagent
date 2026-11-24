@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import nodePath, { isAbsolute, join, posix, resolve, win32 } from "node:path"
 
@@ -28,6 +28,7 @@ import {
   PI_ROOT_CORE,
   PI_ROOT_PLACEHOLDER,
   PI_SESSION_REMINDER,
+  piRootCore,
 } from "../../../runtime/src/hooks/pi-context.ts"
 import { PI_PROJECT_FLAG } from "../../../runtime/src/hooks/pi-project.ts"
 import { cmdExeArguments } from "../../../runtime/src/pi/bash/cmd.ts"
@@ -201,8 +202,6 @@ const createExtension =
   }
 
 const PACKAGE_ROOT = join(REPOSITORY, DIST_DIRECTORY)
-// The model reads the wrapper's path with `/` only, drive letter included on Windows.
-const WRAPPER = toPosix(join(PACKAGE_ROOT, "scripts", "holyagent"))
 // What the extension starts Bun with: the bundled CLI, never the `sh` wrapper.
 const RUNTIME = runtimeArgs(PACKAGE_ROOT)
 // A machine with Bun on its PATH, and a Windows one: the program the extension starts is the
@@ -322,7 +321,7 @@ const fakeApi = (
     /** The context's `ui`, likewise only for a session that uses it. */
     readonly ui?: object
     /** The context's active model; none by default. */
-    readonly model?: { readonly provider: string }
+    readonly model?: { readonly provider: string; readonly id?: string }
     /** Other members of the context a test gives (a session manager, a model registry). */
     readonly members?: Readonly<Record<string, unknown>>
     /** Makes `registerMcpServer` throw this. */
@@ -461,7 +460,7 @@ const run = async (
     toolsFailOnce?: Error
     mode?: ExtensionContext["mode"]
     ui?: object
-    model?: { readonly provider: string }
+    model?: { readonly provider: string; readonly id?: string }
     members?: Readonly<Record<string, unknown>>
     mcpFail?: Error
     deadlineMs?: number
@@ -655,7 +654,7 @@ describe("the role flag", () => {
 
   test("root and specialist get the status without the core; session adds the core", async () => {
     const { directory, done } = await projects()
-    const core = PI_ROOT_CORE.split(PI_ROOT_PLACEHOLDER)[0] ?? ""
+    const core = piRootCore(toPosix(PACKAGE_ROOT))
     const text = async (flag: string) =>
       (await run(healthy(directory), { flag })).delivered?.message?.content ?? ""
     const [root, specialist, session] = [
@@ -667,7 +666,7 @@ describe("the role flag", () => {
     expect(root).not.toContain(core)
     expect(specialist).not.toContain(core)
     expect(session).toContain(core)
-    expect(session).toContain(WRAPPER)
+    expect(session).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent-cli.js`)
     expect(session).not.toContain(PI_ROOT_PLACEHOLDER)
     // The reminder restates root rules: the root and the session role end with the Pi block, the
     // specialist with none, and nobody gets the Claude block.
@@ -2088,7 +2087,7 @@ describe("a Windows package root", () => {
 
   test("the session role's core names the package folder with / only too", async () => {
     const directory = await mkdtemp(join(tmpdir(), "holyagent-pi-win-"))
-    const wrapper = "C:/Users/me/pkg/scripts/holyagent"
+    const agentCli = "C:/Users/me/pkg/scripts/holyagent-cli.js"
     const { delivered } = await run(
       (call) =>
         call.command === "git"
@@ -2102,7 +2101,7 @@ describe("a Windows package root", () => {
                 : { code: 2 },
       { ...WINDOWS, flag: "session" },
     )
-    expect(delivered?.message?.content).toContain(wrapper)
+    expect(delivered?.message?.content).toContain(agentCli)
     expect(delivered?.message?.content).not.toContain("C:\\Users")
     await removeTemporary(directory)
   })
@@ -2146,7 +2145,7 @@ describe("telling a child from the root", () => {
   })
 
   test("a child fills the package folder into its prompt and leaves the root's process variables alone", async () => {
-    const prompt = `run ${PI_ROOT_PLACEHOLDER}/scripts/holyagent status, then ${PI_ROOT_PLACEHOLDER}/scripts/holyagent rg x .`
+    const prompt = `run ${PI_ROOT_PLACEHOLDER}/scripts/holyagent-cli.js status, then ${PI_ROOT_PLACEHOLDER}/scripts/holyagent-cli.js rg x .`
     const { delivered, env } = await run(healthy("/missing"), {
       sessionName: "worker-implementation#a1b2c3d4",
       activeTools: ["SubagentWorkflow", "codemode"],
@@ -2156,7 +2155,7 @@ describe("telling a child from the root", () => {
     })
     expect(delivered?.systemPrompt).toBe(fillPackageRoot(prompt, "C:\\Users\\me\\pkg", win32))
     expect(delivered?.systemPrompt).toBe(
-      "run bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent.js' status, then bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent.js' rg x .",
+      "run bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent-cli.js' status, then bun --no-env-file --config='C:/Users/me/pkg/scripts/empty-bunfig.toml' 'C:/Users/me/pkg/scripts/holyagent-cli.js' rg x .",
     )
     // The wrapper of a Windows root is not the one the fake answers for, so the config is
     // unreadable and the provider's variables are the defaults'; the host and the worker cap are
@@ -2171,25 +2170,27 @@ describe("telling a child from the root", () => {
   })
 
   test("host-neutral CLI examples are wired to the installed package too", () => {
-    expect(fillPackageRoot("Run \u0060holyagent status\u0060.", "C:\\pkg", win32)).toBe(
-      "Run \u0060bun --no-env-file --config='C:/pkg/scripts/empty-bunfig.toml' 'C:/pkg/scripts/holyagent.js' status\u0060.",
+    expect(fillPackageRoot("Run \u0060holyagent-cli status\u0060.", "C:\\pkg", win32)).toBe(
+      "Run \u0060bun --no-env-file --config='C:/pkg/scripts/empty-bunfig.toml' 'C:/pkg/scripts/holyagent-cli.js' status\u0060.",
     )
   })
 
   test.skipIf(process.platform === "win32")(
-    "Unix prompt commands execute the installed wrapper with their arguments",
+    "Unix prompt commands execute the installed agent bundle with their arguments",
     async () => {
       const directory = await mkdtemp(join(tmpdir(), "holyagent-prompt-"))
       try {
         const root = join(directory, "My Apps' $(touch injected); package")
         const scripts = join(root, "scripts")
         await mkdir(scripts, { recursive: true })
-        const wrapper = join(scripts, "holyagent")
-        await Bun.write(wrapper, '#!/bin/sh\nprintf "%s\\n" "$@"\n')
-        await chmod(wrapper, 0o755)
+        await Bun.write(join(scripts, "empty-bunfig.toml"), "")
+        await Bun.write(
+          join(scripts, "holyagent-cli.js"),
+          'console.log(Bun.argv.slice(2).join("\\n"))',
+        )
         for (const prompt of [
-          "`holyagent status --project 'my project'`",
-          `${PI_ROOT_PLACEHOLDER}/scripts/holyagent status --project 'my project'`,
+          "`holyagent-cli status --project 'my project'`",
+          `${PI_ROOT_PLACEHOLDER}/scripts/holyagent-cli.js status --project 'my project'`,
         ]) {
           const command = fillPackageRoot(prompt, root).replaceAll("`", "")
           const child = Bun.spawn(["sh", "-c", command], {
@@ -2209,12 +2210,12 @@ describe("telling a child from the root", () => {
 
   test("Windows CLI prompts use isolated Bun rather than a non-executable shell wrapper", () => {
     const prompt = fillPackageRoot(
-      PI_ROOT_PLACEHOLDER + "/scripts/holyagent --version",
+      PI_ROOT_PLACEHOLDER + "/scripts/holyagent-cli.js --version",
       "C:\\Program Files\\holyagent",
       win32,
     )
     expect(prompt).toBe(
-      "bun --no-env-file --config='C:/Program Files/holyagent/scripts/empty-bunfig.toml' 'C:/Program Files/holyagent/scripts/holyagent.js' --version",
+      "bun --no-env-file --config='C:/Program Files/holyagent/scripts/empty-bunfig.toml' 'C:/Program Files/holyagent/scripts/holyagent-cli.js' --version",
     )
   })
 
@@ -2891,7 +2892,7 @@ describe("the root's system prompt", () => {
     const { delivered } = await run(healthy("/missing"), { systemPrompt: PI_PROMPT })
     expect(delivered?.systemPrompt).toBe(`${filledPrompt}\n\n${PI_PROMPT}`)
     expect(delivered?.systemPrompt).not.toContain(PI_ROOT_PLACEHOLDER)
-    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent`)
+    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent-cli.js`)
   })
 
   test("is returned on every run, since Pi starts each run from its own prompt", async () => {
@@ -3231,7 +3232,7 @@ describe("the root's excluded tools", () => {
   test("a project's pi.enable false keeps the exclusions, the gate and the root prompt", async () => {
     const { api, delivered } = await run(configs(project({ enable: false })))
     expect(delivered?.message).toBeUndefined()
-    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent`)
+    expect(delivered?.systemPrompt).toContain(`${toPosix(PACKAGE_ROOT)}/scripts/holyagent-cli.js`)
     for (const name of EXCLUDED)
       expect(await api.emit("tool_call", call(name, { parentToolCallId: "call-1" }))).toEqual(
         blocked,
@@ -3946,29 +3947,47 @@ describe("under the Codex provider", () => {
   const PI_PROMPT = "Pi's own prompt, with AGENTS.md and the skills"
   const body = (path: string) => promptBody(readFileSync(join(PACKAGE_ROOT, path), "utf8"))
 
-  test("the root's prompt is the GPT-6 family's, in front of Pi's own", async () => {
-    const { delivered } = await run(codexConfig(), { systemPrompt: PI_PROMPT, pi: codexPi })
+  test.each([
+    [undefined, "gpt-6.2"],
+    ["gpt-6.2-sol", "gpt-6.2"],
+    ["gpt-6.2-astra", "gpt-6.2"],
+    ["gpt-6.1-sol", "gpt-6"],
+    ["gpt-6.1-terra", "gpt-6"],
+    ["gpt-6-luna", "gpt-6"],
+    ["gpt-6.20-sol", "gpt-6"],
+  ] as const)("the root’s active model %s gets the %s family", async (id, family) => {
+    const { delivered } = await run(codexConfig(), {
+      systemPrompt: PI_PROMPT,
+      pi: codexPi,
+      ...(id === undefined ? {} : { model: { provider: "openai-codex", id } }),
+    })
     expect(delivered?.systemPrompt).toBe(
-      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6"], PACKAGE_ROOT)}\n\n${PI_PROMPT}`,
+      `${fillPackageRoot(PI_ROOT_PROMPTS[family], PACKAGE_ROOT)}\n\n${PI_PROMPT}`,
     )
-    expect(PI_ROOT_PROMPTS["gpt-6"]).not.toBe(PI_ROOT_PROMPT)
     expect(delivered?.systemPrompt).not.toContain(fillPackageRoot(PI_ROOT_PROMPT, PACKAGE_ROOT))
   })
 
-  test("a specialist's own prompt is swapped for the family's, and what Pi adds around it stays", async () => {
-    const agent = "worker-implementation"
-    const own = body(`agents/${agent}.md`)
-    const gpt = body(`families/gpt-6/agents/${agent}.md`)
-    expect(gpt).not.toBe(own)
-    const { delivered } = await run(codexConfig(), {
-      sessionName: `${agent}#a1b2c3d4`,
-      systemPrompt: `${own}\n\nPi appended this`,
-      pi: codexPi,
-    })
-    expect(delivered?.systemPrompt).toBe(
-      `${fillPackageRoot(gpt, PACKAGE_ROOT)}\n\nPi appended this`,
-    )
-  })
+  test.each([
+    ["gpt-6.1-terra", "gpt-6"],
+    ["gpt-6.2-sol", "gpt-6.2"],
+  ] as const)(
+    "a specialist on %s gets the %s prompt without losing Pi’s text",
+    async (id, family) => {
+      const agent = "worker-implementation"
+      const own = body(`agents/${agent}.md`)
+      const gpt = body(`families/${family}/agents/${agent}.md`)
+      expect(gpt).not.toBe(own)
+      const { delivered } = await run(codexConfig(), {
+        sessionName: `${agent}#a1b2c3d4`,
+        model: { provider: "openai-codex", id },
+        systemPrompt: `${own}\n\nPi appended this`,
+        pi: codexPi,
+      })
+      expect(delivered?.systemPrompt).toBe(
+        `${fillPackageRoot(gpt, PACKAGE_ROOT)}\n\nPi appended this`,
+      )
+    },
+  )
 
   test("every specialist, with and without the screen tools, has a GPT-6 prompt the swap finds", () => {
     for (const agent of AGENT_TYPES) {
@@ -3980,24 +3999,47 @@ describe("under the Codex provider", () => {
     }
   })
 
+  test.each(["startup", "resume", "compact"] as const)(
+    "the session’s %s context uses the active family’s core and reminder",
+    async (reason) => {
+      const { delivered } = await run(codexConfig(), {
+        flag: "session",
+        pi: codexPi,
+        model: { provider: "openai-codex", id: "gpt-6.2-astra" },
+        start: { reason: reason === "compact" ? "startup" : reason },
+        ...(reason === "compact"
+          ? {
+              afterwards: async (api: ReturnType<typeof fakeApi>) => {
+                await api.emit("before_agent_start", { prompt: "first" })
+                await api.emit("session_compact", { reason: "threshold" })
+              },
+            }
+          : {}),
+      })
+      expect(delivered?.message?.content).toContain(piRootCore(PACKAGE_ROOT, "gpt-6.2"))
+      expect(delivered?.message?.content).toContain("Make the task list tool callable")
+      expect(delivered?.message?.content).not.toContain(PI_SESSION_REMINDER)
+    },
+  )
+
   test("the root routes to the chosen family's private guidance and preserves unrelated skills", async () => {
     // Model-facing paths keep forward slashes even when the package lives on a Windows drive.
-    const guidance = (family: "gpt-6" | "kimi-k3.1") =>
+    const guidance = (family: "gpt-6.2" | "kimi-k3.1") =>
       `${toPosix(PACKAGE_ROOT)}/guidance/${family}/ci-watch/SKILL.md`
     const unrelated = "<skill><location>/user/skills/unrelated/SKILL.md</location></skill>"
     const input = `${PI_PROMPT}\n${unrelated}`
     const gpt = await run(codexConfig(), { systemPrompt: input, pi: codexPi })
     expect(gpt.delivered?.systemPrompt).toBe(
-      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6"], PACKAGE_ROOT)}\n\n${input}`,
+      `${fillPackageRoot(PI_ROOT_PROMPTS["gpt-6.2"], PACKAGE_ROOT)}\n\n${input}`,
     )
-    expect(gpt.delivered?.systemPrompt).toContain(guidance("gpt-6"))
+    expect(gpt.delivered?.systemPrompt).toContain(guidance("gpt-6.2"))
     expect(gpt.delivered?.systemPrompt).not.toContain(guidance("kimi-k3.1"))
     const kimi = await run(healthy("/missing"), { systemPrompt: input })
     expect(kimi.delivered?.systemPrompt).toBe(
       `${fillPackageRoot(PI_ROOT_PROMPT, PACKAGE_ROOT)}\n\n${input}`,
     )
     expect(kimi.delivered?.systemPrompt).toContain(guidance("kimi-k3.1"))
-    expect(kimi.delivered?.systemPrompt).not.toContain(guidance("gpt-6"))
+    expect(kimi.delivered?.systemPrompt).not.toContain(guidance("gpt-6.2"))
   })
 
   test("a specialist that writes gets apply_patch beside the tools it has; the others and the root do not", async () => {

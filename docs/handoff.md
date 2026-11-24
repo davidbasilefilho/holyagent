@@ -1,6 +1,6 @@
 # Handoff
 
-Run `holyagent handoff` to read the local record of every open Intent and its Assignments. It includes each complete objective and requirement, including any status and open items, and each Assignment's state, recorded outcome, acceptance and dependencies. Ready and Running work has no outcome yet. Use `holyagent handoff --intent <id>` to limit the output to one open Intent. An unknown or closed id is refused.
+Run `holyagent-cli handoff` to read the local record of every open Intent and its Assignments. It includes each complete objective and requirement, including any status and open items, and each Assignment's state, recorded outcome, acceptance and dependencies. Ready and Running work has no outcome yet. Use `holyagent-cli handoff --intent <id>` to limit the output to one open Intent. An unknown or closed id is refused.
 
 Branch and pull request entries are recorded events, with their recorded timestamps; they do not establish the current branch, PR, merge or CI status. Check those separately when needed. Status and open items in requirements and outcomes are recorded statements, not live checks. The command uses local state only and does not update it or contact a network service. A corrupt or unreadable record is reported as an error rather than silently omitted.
 

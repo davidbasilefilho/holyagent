@@ -35,16 +35,32 @@ const frontmatterKeys = (text: string): ReadonlyArray<string> | undefined => {
 }
 
 /** The placeholder through which the Kimi text names the HolyAgent CLI; the Pi extension fills it. */
-const PI_CLI = "${HOLYAGENT_PI_ROOT}/scripts/holyagent"
+const PI_CLI = "${HOLYAGENT_PI_ROOT}/scripts/holyagent-cli.js"
 
 /**
  * The checks of how a family's text starts the bundled CLI, given the family's files. Each family
  * names the CLI in one form only, so a project's `.env` and `bunfig.toml` stay out of it.
  */
+const bareHolyAgentCli = (files: ReadonlyArray<string>) => {
+  // GPT source text uses the bare CLI without wrappers or other hosts’ placeholders.
+  const invoking = files.filter((path) =>
+    /`holyagent-cli (?:rg|fd|vcs|assignment)\b/.test(read(path)),
+  )
+  expect(invoking.length).toBeGreaterThanOrEqual(2)
+  for (const path of files)
+    expect({
+      path,
+      found:
+        /scripts\/holyagent|holyagent\.js|--no-env-file|CLAUDE_PLUGIN_ROOT|HOLYAGENT_PI_ROOT/.exec(
+          read(path),
+        )?.[0],
+    }).toEqual({ path, found: undefined })
+}
+
 const CLI_CHECKS: Record<Family, (files: ReadonlyArray<string>) => void> = {
   "claude-5.5": (files) => {
     const invocations = files.flatMap((path) =>
-      [...read(path).matchAll(/\bbun\b([^`\n]*?)\s"[^"\n]*holyagent\.js"/g)].map((match) => ({
+      [...read(path).matchAll(/\bbun\b([^`\n]*?)\s"[^"\n]*holyagent-cli\.js"/g)].map((match) => ({
         path,
         flags: match[1] ?? "",
       })),
@@ -65,20 +81,20 @@ const CLI_CHECKS: Record<Family, (files: ReadonlyArray<string>) => void> = {
     }
     // Every mention of the script is one of the invocations checked above.
     for (const path of files)
-      expect({ path, mentions: read(path).match(/holyagent\.js/g)?.length ?? 0 }).toEqual({
+      expect({ path, mentions: read(path).match(/holyagent-cli\.js/g)?.length ?? 0 }).toEqual({
         path,
         mentions: invocations.filter((invocation) => invocation.path === path).length,
       })
   },
   "kimi-k3.1": (files) => {
-    // The wrapper sets the flags, so the text only has to reach it through the one placeholder.
+    // Pi fills the CLI placeholder with the absolute path and the isolated Bun invocation.
     const mentions = files.flatMap((path) =>
       [...read(path).matchAll(/\S*scripts\/holyagent\S*/g)].map((match) => ({
         path,
         form: match[0].replace(/^["'`(]+|[`"').,;:]+$/g, ""),
       })),
     )
-    expect(mentions.length).toBeGreaterThanOrEqual(3)
+    expect(mentions.length).toBeGreaterThanOrEqual(2)
     for (const { path, form } of mentions) expect({ path, form }).toEqual({ path, form: PI_CLI })
     // Skills are shipped as written and nothing fills a placeholder in them; the wrapper's own
     // flags and Claude's path variable have no place in this text.
@@ -98,22 +114,8 @@ const CLI_CHECKS: Record<Family, (files: ReadonlyArray<string>) => void> = {
         })
     }
   },
-  "gpt-6": (files) => {
-    // The host that runs this family is not wired yet, so the text names the CLI as a bare
-    // `holyagent <command>` and carries no wrapper path, flag or placeholder of another host.
-    const invoking = files.filter((path) =>
-      /`holyagent (?:rg|fd|vcs|assignment)\b/.test(read(path)),
-    )
-    expect(invoking.length).toBeGreaterThanOrEqual(3)
-    for (const path of files)
-      expect({
-        path,
-        found:
-          /scripts\/holyagent|holyagent\.js|--no-env-file|CLAUDE_PLUGIN_ROOT|HOLYAGENT_PI_ROOT/.exec(
-            read(path),
-          )?.[0],
-      }).toEqual({ path, found: undefined })
-  },
+  "gpt-6": bareHolyAgentCli,
+  "gpt-6.2": bareHolyAgentCli,
 }
 
 describe.each(FAMILIES)("instruction sources of family %s", (family) => {
@@ -192,6 +194,16 @@ describe.each(FAMILIES)("instruction sources of family %s", (family) => {
 
   test("start the bundled CLI only in the form the family documents", () => {
     CLI_CHECKS[family](instructionFiles(FAMILY))
+  })
+
+  test("teach structured agent CLI results, typed flags, and report files", () => {
+    const dispatch = read(join(FAMILY, "root/dispatch.md"))
+    expect(dispatch).toContain("holyagent-cli")
+    expect(dispatch).toContain("TOON")
+    expect(dispatch).toContain("typed flags")
+    expect(dispatch).toContain("`prompt` value")
+    expect(dispatch).toContain("--report-file <path>")
+    expect(dispatch).not.toMatch(/--input|\bstdin\b/)
   })
 })
 

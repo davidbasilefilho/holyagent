@@ -241,16 +241,12 @@ describe("publish.yml", () => {
     jobs: Record<string, { uses?: string; needs?: string; if?: string }>
   }
 
-  test("runs on branch pushes and never on tags", () => {
+  test("runs on main and dev pushes only, leaving work branches to pull-request validation", () => {
     expect(Object.keys(publish.on)).toEqual(["push"])
-    expect(Object.keys(publish.on.push)).toEqual(["branches-ignore"])
+    expect(publish.on.push).toEqual({ branches: ["main", "dev"] })
   })
 
-  test("skips holyagent/state, which has no package.json to validate or tag", () => {
-    expect(publish.on.push["branches-ignore"]).toEqual(["holyagent/state"])
-  })
-
-  test("calls stable on protected main and dev on protected integration branches, only after validation", () => {
+  test("calls stable on protected main and prerelease on protected dev, only after validation", () => {
     expect(publish.jobs["validation"]?.uses).toBe("./.github/workflows/validation.yml")
     expect(publish.jobs["stable"]).toMatchObject({
       needs: "validation",

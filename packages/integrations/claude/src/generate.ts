@@ -37,8 +37,9 @@ export const GENERATED_PATHS: ReadonlyArray<string> = [MARKETPLACE_PATH, DIST_DI
 
 const SOURCES = `${PLUGIN_DIRECTORY}/src`
 
-// The CLI the plugin bundles as `scripts/holyagent.js`.
+// Private host entry for hooks and the retained plugin setup command.
 const CLI_SOURCE = "packages/runtime/src/cli/main.ts"
+const AGENT_CLI_SOURCE = "packages/runtime/src/cli/agent-main.ts"
 
 /** The English words for the counts a specialist roster can have, indexed by the count. */
 const COUNT_WORDS: ReadonlyArray<string> = [
@@ -219,11 +220,11 @@ const skills = async (): Promise<ReadonlyArray<GeneratedFile>> =>
   })
 
 /** The CLI as one file for Bun, bundled the way every generated runtime is. */
-const bundle = (): Promise<string> =>
+const bundle = (source: string): Promise<string> =>
   Effect.runPromise(
-    bundleModule(join(REPOSITORY, CLI_SOURCE), {
+    bundleModule(join(REPOSITORY, source), {
       target: "bun",
-      note: generatedNote(CLI_SOURCE),
+      note: generatedNote(source),
     }),
   )
 
@@ -240,7 +241,8 @@ const scripts = async (): Promise<ReadonlyArray<GeneratedFile>> => {
       path: inPlugin("scripts/empty-bunfig.toml"),
       content: `# ${generatedNote(`${SOURCES}/empty-bunfig.toml`)}\n${toml}`,
     },
-    { path: inPlugin("scripts/holyagent.js"), content: await bundle() },
+    { path: inPlugin("scripts/holyagent.js"), content: await bundle(CLI_SOURCE) },
+    { path: inPlugin("scripts/holyagent-cli.js"), content: await bundle(AGENT_CLI_SOURCE) },
     {
       path: inPlugin(`scripts/${TUI_BUNDLE}`),
       content: await Effect.runPromise(bundleSetupTui(REPOSITORY, generatedNote(TUI_SOURCE))),

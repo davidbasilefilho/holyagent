@@ -1,8 +1,10 @@
+import { spawn } from "@holyagent/core/state/process.ts"
 import { Data, Effect, Option } from "effect"
 
 import { definedEnv } from "../setup/environment.ts"
 import { installAdvice, locateTool, SEARCH_TOOLS, type Tool } from "../setup/search-tools.ts"
 import { findCommand } from "../setup/shell.ts"
+import { Usage } from "./errors.ts"
 import { type Command, Verbatim } from "./types.ts"
 
 /** A search program is not installed: none of its executables is on PATH. */
@@ -77,20 +79,46 @@ const forward = (stream: ReadableStream<Uint8Array>, target: NodeJS.WriteStream)
   return read(0)
 }
 
+// These fd switches take no value, so an exec option can follow them in a short cluster.
+// A value-bearing flag ends the cluster. For example, -ejsx and -tx use x as part of a value.
+const FD_EXEC = /^-[HIusigFalLp0q1hV]*[xX]/
+const runsExternalCommand = (tool: Tool, args: ReadonlyArray<string>) => {
+  const separator = args.indexOf("--")
+  const options = separator < 0 ? args : args.slice(0, separator)
+  return options.some((arg) =>
+    tool === "rg"
+      ? arg === "--pre" || arg.startsWith("--pre=")
+      : /^--exec(?:-batch)?(?:=|$)/.test(arg) || FD_EXEC.test(arg),
+  )
+}
+
 /** Runs a search program without terminal styling and returns its own exit code. */
 const runTool = (options: {
   readonly tool: Tool
   readonly args: ReadonlyArray<string>
   readonly cwd: string
   readonly env: Readonly<Record<string, string | undefined>>
+  readonly agent: boolean
 }) =>
   Effect.gen(function* () {
+    if (options.agent && runsExternalCommand(options.tool, options.args))
+      return yield* new Usage({
+        message: `${options.tool} cannot run a user-supplied subprocess through holyagent-cli`,
+        hint: `Pass search arguments to holyagent-cli ${options.tool}.`,
+      })
     const found = yield* locateTool(options.tool, options.cwd, (command, whichOptions) =>
       Effect.sync(() => findCommand(options.env, command, whichOptions)),
     )
     if (Option.isNone(found)) return yield* new ToolMissing({ tool: options.tool })
     const path = found.value
     const env = { ...definedEnv(options.env), NO_COLOR: "1", FORCE_COLOR: "0", CLICOLOR_FORCE: "0" }
+    if (options.agent) {
+      // Ignore a user rg config that could inject a preprocessor. The subprocess adapter closes
+      // stdin, captures both streams and runs detached from the terminal on POSIX.
+      const args = options.tool === "rg" ? ["--no-config", ...options.args] : options.args
+      const result = yield* spawn(path, args, { cwd: options.cwd, env })
+      return new Verbatim(new TextDecoder().decode(result.stdout), result.stderr, result.code)
+    }
     const child = yield* Effect.try(() =>
       Bun.spawn([path, ...options.args], {
         cwd: options.cwd,
@@ -108,7 +136,7 @@ const runTool = (options: {
       ],
       { concurrency: "unbounded" },
     ).pipe(Effect.ensuring(Effect.sync(() => child.kill())))
-    return code
+    return new Verbatim("", "", code)
   })
 
 const toolCommand = (tool: Tool, summary: string): Command => ({
@@ -125,9 +153,13 @@ const toolCommand = (tool: Tool, summary: string): Command => ({
   passthrough: true,
   positionals: 0,
   run: (call) =>
-    runTool({ tool, args: call.args.positionals, cwd: call.cwd, env: call.env }).pipe(
-      Effect.map((code) => new Verbatim("", "", code)),
-    ),
+    runTool({
+      tool,
+      args: call.args.positionals,
+      cwd: call.cwd,
+      env: call.env,
+      agent: call.surface === "agent",
+    }),
 })
 
 /**

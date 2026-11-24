@@ -32,7 +32,9 @@ export class MigrationRefused extends Data.TaggedError("MigrationRefused")<{
     const shown = this.problems.slice(0, 10)
     const more = this.problems.length - shown.length
     return `Nothing was written, ${this.problems.length} problem(s) stop the migration: ${shown.join("; ")}${
-      more > 0 ? `; and ${more} more (run \`holyagent migrate --dry-run\` for the full list)` : ""
+      more > 0
+        ? `; and ${more} more (run \`holyagent-cli migrate --dry-run\` for the full list)`
+        : ""
     }. Fix them and run the command again`
   }
 }

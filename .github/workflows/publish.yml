@@ -1,12 +1,10 @@
 name: Publish
 
-# Runs on branch pushes only: with a branch filter and no `tags` filter, a pushed tag never starts
-# it, so the tags it creates cannot loop back in. Nothing is tagged until validation passes for the
-# pushed commit. The holyagent/state branch holds records, not the project, so it has nothing to
-# validate or tag.
+# Pull requests validate work branches. Only the publishing refs need validation on push, before
+# publication can use their pushed commit. Pushed tags never start this workflow.
 on:
   push:
-    branches-ignore: [holyagent/state]
+    branches: [main, dev]
 
 permissions:
   contents: read

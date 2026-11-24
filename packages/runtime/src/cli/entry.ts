@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import { hasCode } from "../state/files.ts"
 import { StdinMissing } from "./errors.ts"
 import { run } from "./program.ts"
+import type { CliSurface } from "./types.ts"
 
 /** The `holyagent` entry point: runs the command line of the process and sets its exit code. */
 const stdin = Effect.suspend(() =>
@@ -30,29 +31,34 @@ const write = (stream: NodeJS.WriteStream, text: string) =>
     ),
   )
 
-/** Runs the process CLI; only a public entry opts into the interactive setup screen. */
-export const main = (interactiveSetup = false) =>
+/** Runs one CLI entry. Only the public entry can display the interactive setup screen. */
+export const main = (interactiveSetup = false, surface: CliSurface = "host") =>
   Effect.runPromise(
-    run(Bun.argv.slice(2), {
-      cwd: process.cwd(),
-      env: process.env,
-      stdin,
-      emit: (text) => write(process.stdout, text),
-      ...(interactiveSetup
-        ? {
-            t3Workflow: true,
-            terminal: {
-              stdin: Boolean(process.stdin.isTTY),
-              stdout: Boolean(process.stdout.isTTY),
-            },
-          }
-        : {}),
-    }).pipe(
-      Effect.tap((result) =>
-        write(process.stdout, result.stdout).pipe(
-          Effect.andThen(write(process.stderr, result.stderr)),
-          Effect.andThen(Effect.sync(() => void (process.exitCode = result.code))),
-        ),
-      ),
-    ),
+    Effect.gen(function* () {
+      const result = yield* run(
+        Bun.argv.slice(2),
+        {
+          cwd: process.cwd(),
+          env: process.env,
+          stdin:
+            surface === "agent"
+              ? Effect.fail(new StdinMissing({ reason: "stdin is unavailable" }))
+              : stdin,
+          ...(surface === "agent" ? {} : { emit: (text: string) => write(process.stdout, text) }),
+          ...(interactiveSetup
+            ? {
+                t3Workflow: true,
+                terminal: {
+                  stdin: Boolean(process.stdin.isTTY),
+                  stdout: Boolean(process.stdout.isTTY),
+                },
+              }
+            : {}),
+        },
+        surface,
+      )
+      yield* write(process.stdout, result.stdout)
+      yield* write(process.stderr, result.stderr)
+      process.exitCode = result.code
+    }),
   )

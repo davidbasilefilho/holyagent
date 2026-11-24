@@ -435,7 +435,9 @@ describe("PyPI package pins", () => {
   test("the repository pins browser-use exactly, in the form the updater writes", async () => {
     const repository = join(import.meta.dir, "..")
     const text = await Bun.file(join(repository, PYPI_PACKAGE_PINS)).text()
-    expect(JSON.parse(text)).toEqual({ "browser-use": "1.0.6" })
+    expect(JSON.parse(text)).toEqual({
+      "browser-use": expect.stringMatching(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/),
+    })
     expect(await Effect.runPromise(renderPypiPins(repository, new Map()))).toBe(text)
   })
 

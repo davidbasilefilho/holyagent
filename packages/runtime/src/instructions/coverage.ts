@@ -18,7 +18,7 @@ export type Coverage =
  * stands in for tags inside the files, which would add text to every generated agent. A family
  * joins `FAMILIES` together with its entry here, which the type requires.
  */
-export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<string, Coverage>>>> = {
+const EXISTING_COVERAGE = {
   "claude-5.5": {
     "R-HANDOFF": {
       section: "skills/state-mode/SKILL.md",
@@ -123,13 +123,17 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",
     },
-    "R-SEARCH": { section: "root/search.md", phrase: "Search file contents with `holyagent rg`" },
+    "R-SEARCH": {
+      section: "root/search.md",
+      phrase: "Search file contents with `holyagent-cli rg`",
+    },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
     "R-ROUTE": { section: "root/routing.md", phrase: "cheapest specialist" },
-    "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch --input '<json>'`" },
+    "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
+    "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
     "R-WORKFLOW": { section: "root/workflows.md", phrase: "no prebuilt script exists" },
     "R-WAIT": { section: "root/dispatch.md", phrase: "A timeout does not guarantee cache reuse" },
-    "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
+    "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
     "R-WAKE": {
       section: "root/dispatch.md",
       phrase: "respond to completion, submitted input or a supported bounded wait timeout",
@@ -146,7 +150,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
     "R-VISUAL": {
       section: "skills/visual-judging/SKILL.md",
       phrase: "Your own final pass, after Worker.visual and Reviewer.visual, decides acceptance",
@@ -185,7 +189,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
-      phrase: "set the mode with `holyagent state mode <mode>`",
+      phrase: "set the mode with `holyagent-cli state mode <mode>`",
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",
@@ -464,7 +468,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
     "R-LEAN": {
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",
@@ -488,8 +492,9 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-CTX-READ": { section: "root/context.md", phrase: "Read only what a decision needs" },
     "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
+    "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
-    "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
+    "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
     "R-WAKE": {
       section: "root/dispatch.md",
       phrase: "respond to completion, submitted input or a supported bounded wait timeout",
@@ -721,7 +726,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
-      phrase: "set the mode with `holyagent state mode <mode>`",
+      phrase: "set the mode with `holyagent-cli state mode <mode>`",
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",
@@ -833,7 +838,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-REVIEW": { section: "root/assignments.md", phrase: "gets an independent reviewer" },
     "R-FINISH": { section: "root/assignments.md", phrase: "one more repair round" },
-    "R-SCREEN": { section: "root/assignments.md", phrase: "Set `screen: true` in the draft" },
+    "R-SCREEN": { section: "root/assignments.md", phrase: "Pass `--screen` in the draft" },
     "R-LEAN": {
       section: "root/context.md",
       phrase: "Run no gates, probes or data checks yourself",
@@ -857,8 +862,9 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     "R-CTX-READ": { section: "root/context.md", phrase: "Read only what a decision needs" },
     "R-DELEGATE": { section: "root/delegating.md", phrase: "go to specialists" },
     "R-NORESOLVE": { section: "root/delegating.md", phrase: "stop and report it" },
+    "R-AGENT-CLI": { section: "root/dispatch.md", phrase: "The CLI runs without prompts" },
     "R-DISPATCH": { section: "root/dispatch.md", phrase: "`assignment dispatch`" },
-    "R-REPORT": { section: "root/dispatch.md", phrase: "never retyped or summarized" },
+    "R-REPORT": { section: "root/dispatch.md", phrase: "--report-file <path>" },
     "R-WAKE": {
       section: "root/dispatch.md",
       phrase: "respond to completion, submitted input or a supported bounded wait timeout",
@@ -1090,7 +1096,7 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
     },
     "R-STATE": {
       section: "skills/state-mode/SKILL.md",
-      phrase: "set the mode with `holyagent state mode <mode>`",
+      phrase: "set the mode with `holyagent-cli state mode <mode>`",
     },
     "R-CI": {
       section: "skills/ci-watch/SKILL.md",
@@ -1109,4 +1115,10 @@ export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<strin
       phrase: "leave out content that changes or that the agent can discover from the repository",
     },
   },
+} satisfies Readonly<Record<Exclude<Family, "gpt-6.2">, Readonly<Record<string, Coverage>>>>
+
+/** Requirement anchors for each family; GPT-6.2 overrides only wording it changed. */
+export const REQUIREMENT_COVERAGE: Readonly<Record<Family, Readonly<Record<string, Coverage>>>> = {
+  ...EXISTING_COVERAGE,
+  "gpt-6.2": EXISTING_COVERAGE["gpt-6"],
 }

@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, normalize, win32 } from "node:path"
 
+import { $ } from "bun"
 import { Effect } from "effect"
 
 import { LOCKFILE, VERSION_COPIES } from "../../../../scripts/bump-version.ts"
@@ -42,7 +43,7 @@ import {
 } from "../src/agents.ts"
 import { DIST_DIRECTORY } from "../src/files.ts"
 import { DESCRIPTION, generate, GENERATED_PATHS, MARKETPLACE_PATH } from "../src/generate.ts"
-import { field, fresh, PLUGIN, ROOT } from "./built.ts"
+import { field, fresh, freshPlugin, PLUGIN, ROOT } from "./built.ts"
 import { isExecutable } from "./host.ts"
 
 const read = (...path: Array<string>) => readFileSync(join(ROOT, ...path), "utf8")
@@ -148,6 +149,19 @@ describe("the generated plugin is in step with its sources", () => {
     expect(generated.filter((file) => file.executable).map((file) => file.path)).toEqual([
       "packages/integrations/claude/dist/scripts/holyagent",
     ])
+  })
+
+  test("the bundled agent CLI keeps the Claude host when a parent supplied the Pi host", async () => {
+    const plugin = await freshPlugin
+    const executable = join(plugin, "scripts/holyagent-cli.js")
+    const bunfig = join(plugin, "scripts/empty-bunfig.toml")
+    const result = await $`bun --no-env-file --config=${bunfig} ${executable} vcs identity --help`
+      .env({ ...process.env, HOLYAGENT_HOST: "pi" })
+      .quiet()
+      .nothrow()
+    expect(result.exitCode).toBe(0)
+    expect(result.text()).toContain("vcs identity --name")
+    expect(result.stderr.toString()).toBe("")
   })
 
   test("the commit hook stages exactly the generated paths", () => {
@@ -319,9 +333,9 @@ describe("hooks", () => {
       "env X=1 git commit -m x",
       "bash -c 'git push origin main'",
       "timeout 5 git push",
-      "holyagent vcs commit -m x a",
-      "bun --no-env-file holyagent.js vcs commit -m x a",
-      "holyagent vcs pr --base main",
+      "holyagent-cli vcs commit -m x a",
+      "bun --no-env-file holyagent-cli.js vcs commit -m x a",
+      "holyagent-cli vcs pr --base main",
     ])
       expect(rules.some((rule) => rule.test(text))).toBe(true)
     for (const text of [
@@ -330,8 +344,8 @@ describe("hooks", () => {
       "bun check",
       "ls -la",
       "git log --oneline",
-      "holyagent vcs status",
-      "holyagent vcs identity",
+      "holyagent-cli vcs status",
+      "holyagent-cli vcs identity",
     ])
       expect(rules.some((rule) => rule.test(text))).toBe(false)
   })
@@ -424,7 +438,7 @@ describe("agents", () => {
     const content = agent("holyagent")?.content ?? ""
     for (const rule of [
       "Run no gates, probes or data checks yourself",
-      "never open or re-emit the brief",
+      "Keep the brief out of context",
       "no polling, steering, scheduled check-ins or wait loops",
       "Never force-push",
       "Ignore hook and harness noise",
@@ -654,7 +668,7 @@ describe("agents", () => {
     for (const rule of [
       "AskUserQuestion",
       "After a denial, stop",
-      "holyagent vcs commit",
+      "holyagent-cli vcs commit",
       "otherwise write only for decisions, blockers and the final report",
     ])
       expect({ rule, found: reminder.includes(rule) }).toEqual({ rule, found: false })
@@ -896,17 +910,17 @@ describe("agents", () => {
     const text = agent("holyagent")?.content ?? ""
     for (const part of [
       "Run no gates, probes or data checks yourself",
-      "never open or re-emit the brief",
-      "`assignment close <id> --outcome <o> < <report-file>`",
+      "Keep the brief out of context",
+      "`assignment close <id> --outcome <o> --report-file <path>`",
       "a cap on the report",
       "no polling, steering, scheduled check-ins or wait loops",
-      "a wake changing nothing gets one short line",
+      "A wake changing nothing gets one short line",
       "The route table, not the brief, sets model and effort",
       "data, list or count corrections",
       "resolving conflicts in tests or generated files",
       "Worker.validation for gate runs",
       "builds and screenshot capture",
-      "`holyagent assignment reports <journal.jsonl>`",
+      "`holyagent-cli assignment reports <journal.jsonl>`",
       "`{ done: [ids] }`",
     ])
       expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
@@ -1256,7 +1270,10 @@ describe("agents", () => {
     // body and the session-start core alike) say a brief names a plugin file by its absolute path
     // and where the plugin folder is read from; the skill points to them and does not repeat why.
     for (const text of [root, ROOT_CORE])
-      for (const part of ["A brief that names a plugin file", "the directory above `scripts/`"])
+      for (const part of [
+        "Name plugin files by literal absolute path",
+        "the directory above `scripts/`",
+      ])
         expect({ part, found: text.includes(part) }).toEqual({ part, found: true })
     expect(skill?.content).not.toContain("the directory above `scripts/`")
     for (const name of ["worker-visual", "reviewer-visual"]) {
@@ -1320,7 +1337,7 @@ describe("agents", () => {
         "`<example>` tags",
       ],
       "state-mode": [
-        "set the mode with `holyagent state mode <mode>`",
+        "set the mode with `holyagent-cli state mode <mode>`",
         "`git ls-files .holyagent ':!.holyagent/config.json'`",
         "in one shared worktree",
       ],
@@ -1376,9 +1393,9 @@ describe("agents", () => {
     const dispatch = read(`${CLAUDE}/root`, "dispatch.md")
     expect(dispatch).toContain("only for conflicting new requirements or information")
     expect(dispatch).toContain(
-      "let it finish if finishing and repairing costs less than stopping and relaunching",
+      "Let work finish when repairing is cheaper than stopping and relaunching",
     )
-    expect(dispatch).toContain("Close the stopped Assignment with `--outcome stopped`")
+    expect(dispatch).toContain("Close stopped work with `--outcome stopped`")
     expect(dispatch).not.toMatch(/no polling, steering or stopping/)
     expect(REQUIREMENTS).not.toContain("steering or stopping")
   })

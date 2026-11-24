@@ -8,7 +8,13 @@ import { prepareMessage } from "../vcs/message.ts"
 import { pullRequest } from "../vcs/pr.ts"
 import { recordBranch, type VcsState } from "../vcs/record.ts"
 import { readSettings } from "../vcs/settings.ts"
-import { type Capability, type Context, decode, requireCapability } from "./context.ts"
+import {
+  type Capability,
+  type Context,
+  decode,
+  requireCapability,
+  Unauthorized,
+} from "./context.ts"
 import { Usage } from "./usage.ts"
 
 /** Strict inputs shared by host adapters. */
@@ -63,7 +69,7 @@ export const commit = (
     const done = yield* commitGit({
       message,
       paths: request.paths,
-      cloud: inCloudSession(context.env),
+      cloud: context.host === "claude" && inCloudSession(context.env),
     })
     return { ...done, ...(yield* recordBranch(guardedState(context, "vcs.commit", state), done)) }
   })
@@ -72,6 +78,7 @@ export const commit = (
 export const identity = (context: Context, input: typeof schemas.identity.Encoded) =>
   Effect.gen(function* () {
     const request = yield* decode(schemas.identity, input)
+    if (context.host !== "claude") return yield* new Unauthorized({ capability: "vcs.identity" })
     yield* requireCapability(context, "vcs.identity")
     return yield* setAuthor(request)
   })

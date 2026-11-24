@@ -126,6 +126,37 @@ var addBackEdge = () => {
   backEdges++;
 };
 
+function ownEnumerableKeys(self) {
+  const keys = Object.keys(self);
+  for (const key of Object.getOwnPropertySymbols(self)) {
+    if (Object.prototype.propertyIsEnumerable.call(self, key)) {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+function assignProperty(self, key, value) {
+  if (key === "__proto__") {
+    Object.defineProperty(self, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+  } else {
+    self[key] = value;
+  }
+}
+function assignProperties(self, source) {
+  if (!Object.hasOwn(source, "__proto__")) {
+    Object.assign(self, source);
+    return;
+  }
+  for (const key of ownEnumerableKeys(source)) {
+    assignProperty(self, key, source[key]);
+  }
+}
+
 function isNumber(input) {
   return typeof input === "number";
 }
@@ -721,30 +752,6 @@ var pickInternalCall = () => {
 };
 var internalCall = /* @__PURE__ */ pickInternalCall();
 
-function assignProperty(self, key, value) {
-  if (key === "__proto__") {
-    Object.defineProperty(self, key, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true
-    });
-  } else {
-    self[key] = value;
-  }
-}
-function assignProperties(self, source) {
-  if (!Object.hasOwn(source, "__proto__")) {
-    Object.assign(self, source);
-    return;
-  }
-  for (const key of Reflect.ownKeys(source)) {
-    if (Object.prototype.propertyIsEnumerable.call(source, key)) {
-      assignProperty(self, key, source[key]);
-    }
-  }
-}
-
 var EffectTypeId = `~effect/Effect`;
 var ExitTypeId = `~effect/Exit`;
 var effectVariance = {
@@ -780,11 +787,11 @@ var PipeInspectableProto = {
 };
 var StructuralProto = {
   [symbol]() {
-    return structureKeys(this, Object.keys(this));
+    return structureKeys(this, ownEnumerableKeys(this));
   },
   [symbol2](that) {
-    const selfKeys = Object.keys(this);
-    if (selfKeys.length !== Object.keys(that).length)
+    const selfKeys = ownEnumerableKeys(this);
+    if (selfKeys.length !== ownEnumerableKeys(that).length)
       return false;
     for (const key of selfKeys) {
       if (!Object.prototype.propertyIsEnumerable.call(that, key) || !equals(this[key], that[key])) {
@@ -1240,7 +1247,7 @@ var SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(C
     return {
       _id: "Result",
       _tag: this._tag,
-      value: toJson(this.success)
+      success: toJson(this.success)
     };
   }
 });
@@ -2383,6 +2390,7 @@ class FiberImpl {
     }
     const interruptChildren = fiberMiddleware.interruptChildren && fiberMiddleware.interruptChildren(this);
     if (interruptChildren !== undefined) {
+      this.interruptible = false;
       return this.evaluate(flatMap(interruptChildren, () => exit));
     }
     this._exit = exit;
@@ -2752,7 +2760,7 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
       if (done)
         break;
       const index = i++;
-      const fiber = forkUnsafe(parent, effect, true, true, false);
+      const fiber = new FiberImpl(parent.context);
       fibers.add(fiber);
       fiber.addObserver((exit) => {
         fibers.delete(fiber);
@@ -2768,6 +2776,12 @@ var raceAllFirst = (all, options) => withFiber((parent) => {
           });
         }
       });
+      if (done)
+        fiber.interruptUnsafe(parent.id, fiberStackAnnotations(parent));
+      else
+        fiber.evaluate(effect);
+      if (done)
+        break;
     }
   });
 });
@@ -2979,22 +2993,6 @@ var whileLoop = /* @__PURE__ */ makePrimitive({
     return exitVoid;
   }
 });
-var forkUnsafe = (parent, effect, immediate = false, daemon = false, uninterruptible = false) => {
-  const parentRuntime = parent;
-  const interruptible = uninterruptible === "inherit" ? parentRuntime.interruptible : !uninterruptible;
-  const child = new FiberImpl(parentRuntime.context, interruptible);
-  if (!daemon) {
-    parentRuntime.children().add(child);
-    child._parent = parentRuntime;
-  }
-  if (immediate) {
-    child.evaluate(effect);
-  } else {
-    child._asyncContext = captureAsyncContext();
-    parentRuntime.currentDispatcher.scheduleTask(() => child.evaluate(effect), 0);
-  }
-  return child;
-};
 var runForkWith = (context) => (effect, options) => {
   const fiber = new FiberImpl(options?.scheduler ? add(context, Scheduler, options.scheduler) : context, options?.uninterruptible !== true);
   fiber.evaluate(effect);
@@ -3420,21 +3418,21 @@ var FFF_NATIVE_HOSTS = [
 
 var pi_packages_default = {
   "pi-provider-kimi-code": "0.6.14",
-  "@tintinweb/pi-subagents": "0.26.0",
+  "@tintinweb/pi-subagents": "0.26.2",
   "billion-context": "0.1.216",
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
-  "@aliou/pi-processes": "0.13.6",
-  "@amaster.ai/pi-computer-use": "0.1.38",
+  "@aliou/pi-processes": "0.13.8",
+  "@amaster.ai/pi-computer-use": "0.1.40",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
-  "@opencode/browse": "0.1.3"
+  "@opencode/browse": "0.1.5"
 };
 
 var PI_PACKAGE_VERSIONS = pi_packages_default;
 
 var pypi_packages_default = {
-  "browser-use": "1.0.6"
+  "browser-use": "1.0.8"
 };
 
 var PYPI_PACKAGE_VERSIONS = pypi_packages_default;

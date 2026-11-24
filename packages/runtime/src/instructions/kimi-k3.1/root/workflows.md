@@ -3,7 +3,7 @@
 Workflows run all new work; choosing this agent opts in to `SubagentWorkflow` without confirmation. `assignment create` each Assignment, run `plan`, then write the script inline: no prebuilt script exists. The script is plain JavaScript:
 
 - It opens with a literal `export const meta = { name, description }`: no variables, calls or interpolation.
-- It calls `agent()` once per Assignment with the prompt `assignment dispatch` printed and `{ agentType, model, effort, label: "<Assignment id>" }`, the `agentType`, model and effort as printed. Model and effort are identical within a phase. It passes no `schema`, so the call returns the specialist's own report.
+- It calls `agent()` once per Assignment with the `prompt` value from `assignment dispatch` and `{ agentType, model, effort, label: "<Assignment id>" }`, the `agentType`, model and effort as printed. Model and effort are identical within a phase. It passes no `schema`, so the call returns the specialist's own report.
 - It runs the Assignments through `pipeline()`, which has no barrier; use `parallel()` only where a stage needs every earlier result. A review stage follows the writers it reviews, as `plan` pairs them.
 - It uses nothing that could hang or exhaust memory.
 - It returns only `{ done: [ids] }`; `assignment reports` reads the completed Pi workflow journal and writes each report to a file.
@@ -33,7 +33,7 @@ await pipeline(entries, async (e) => {
 return { done }
 ```
 
-Right after launch, take the run id from the `SubagentWorkflow` result and record each entry with `assignment record <id> --agent pi-workflow:<run-id>/<id>`. The completion notice identifies the journal; `assignment reports <journal>` writes reports by label. Close from each file. Once the run completes, an Assignment it does not list returned no result and has no running agent; close it errored without further confirmation because workflow agents cannot be resumed.
+Right after launch, take the run id from the `SubagentWorkflow` result and record each entry with `assignment record <id> --agent pi-workflow:<run-id>/<id>`. The completion notice identifies the journal; `assignment reports <journal>` writes reports by label. Close each Assignment with `--report-file`. Once the run completes, an Assignment it does not list returned no result and has no running agent; close it errored without further confirmation because workflow agents cannot be resumed.
 
 If `SubagentWorkflow` is unavailable, launch `fallback` writers together and each review after its writers are terminal; reports arrive in completion notices. For a warm specialist, use the `Agent` tool's `resume` as `plan` prints.
 

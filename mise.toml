@@ -2,13 +2,13 @@
 # ctx7 runs on Node.
 node = "lts"
 # Bun remains the runtime, package manager and test runner.
-bun = "1.4.4"
+bun = "1.4.5"
 hk = "2.13.0"
 # The search tools behind `holyagent rg` and `holyagent fd`, which HolyAgent does not bundle. The
 # aqua backend is named so that mise installs the upstream release assets, with the checksum the aqua
 # registry records for them where it records one; the bare names would pick a backend by mise's own
 # order. The updater moves both with the other pinned tools.
-"aqua:BurntSushi/ripgrep" = "15.2.0"
+"aqua:BurntSushi/ripgrep" = "16.0.0"
 "aqua:sharkdp/fd" = "10.5.2"
 
 # Package scripts and hk delegate to these tasks. Tools resolve from the frozen lockfile.

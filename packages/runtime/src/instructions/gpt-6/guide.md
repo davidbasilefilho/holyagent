@@ -68,7 +68,7 @@ OpenAI publishes one prompting section for the whole family, written from observ
 
 ## Applying the points
 
-- The text names the CLI as `holyagent <command>` and every host tool by its function (the structured question tool, the task list tool, the patch tool), because no source names the tools of the host that will run this set. The integration that wires the family supplies the host's names.
+- The text names the CLI as `holyagent-cli <command>` and every host tool by its function (the structured question tool, the task list tool, the patch tool), because no source names the tools of the host that will run this set. The integration that wires the family supplies the host's names.
 - A requirement outranks a point of this guide: where they differ, the requirement stands and the file carries the point as far as the requirement allows. R-ASK keeps one decision at a time against O21's bundling, and R-TASKLIST and R-ACK keep progress narration out of replies against O23's commentary updates.
 - Several points correct habits of the earlier model (O14, O15, the bias to action of O4). They are carried only where a requirement leaves room, so a rule is not repeated for a habit this family lacks.
 
