@@ -1,0 +1,28 @@
+{
+  "id": "assignment-0mwurgptn-zdcu",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Explorer.trace",
+  "slug": "audit-the-existing-codex-cli-protocol",
+  "objective": "Audit the existing Codex CLI protocol and hosted bootstrap contracts for HolyAgent",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Verify actual available version and upstream native questions and delegation capability; separate Cloud acceptance.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-24T13:59:19.739Z"
+  },
+  "createdAt": "2026-11-24T13:59:19.739Z"
+}
