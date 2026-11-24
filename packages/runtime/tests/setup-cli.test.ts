@@ -136,12 +136,15 @@ describe("public setup harnesses", () => {
   })
 
   test("explicit Claude dry-run and non-interactive Pi undo exit with stdin held open", async () => {
-    const entry = join(import.meta.dir, "../src/hooks/pi-public-entry.ts")
+    const entry = join(import.meta.dir, "../../integrations/pi/dist/scripts/holyagent-public.js")
     for (const [args, report] of [
-      [["setup", "claude", "--dry-run", "--non-interactive", "--skip-ctx7"], "nothing written"],
+      [
+        ["setup", "claude", "--scope", "user", "--dry-run", "--non-interactive", "--skip-ctx7"],
+        "nothing written",
+      ],
       [["install", "pi", "--undo", "--dry-run", "--non-interactive"], "--undo only removes"],
     ] as const) {
-      const child = Bun.spawn([process.execPath, entry, ...args], {
+      const child = Bun.spawn([process.execPath, "--no-env-file", "--no-install", entry, ...args], {
         cwd: home,
         env: publicEnv(),
         stdin: "pipe",
@@ -150,12 +153,17 @@ describe("public setup harnesses", () => {
         timeout: 10_000,
       })
       try {
-        expect(await child.exited).toBe(0)
+        const [code, stdout, stderr] = await Promise.all([
+          child.exited,
+          new Response(child.stdout).text(),
+          new Response(child.stderr).text(),
+        ])
+        expect(code, `${args.join(" ")}\n${stdout}\n${stderr}`).toBe(0)
+        expect(stdout).toContain(report)
+        expect(stderr).toBe("")
       } finally {
         await child.stdin.end()
       }
-      expect(await new Response(child.stdout).text()).toContain(report)
-      expect(await new Response(child.stderr).text()).toBe("")
     }
   }, 25_000)
 })
