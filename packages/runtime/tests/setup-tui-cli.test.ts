@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdir } from "node:fs/promises"
+import { mkdir, readdir } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
@@ -100,23 +100,29 @@ const interface_ = (
 }
 
 describe("setup flags for the T3 choices", () => {
-  test("public headless setup omits the standalone browser capability", async () => {
-    await machine()
-    let seen: TuiInput | undefined
-    const shown = interface_(async (input) => {
-      seen = input
-      return { _tag: "Cancelled" }
-    })
-    const result = await cli(["--form", "headless"], {
-      terminal: TERMINAL,
-      setupTui: shown.loader,
-      publicEntry: true,
-    })
-    expect(shown.loaded()).toBe(1)
-    expect(seen?.offer.capabilities.map((offer) => offer.feature)).not.toContain("browserUse")
-    expect(result.stdout).toContain("setup cancelled")
-    expect(await t3Settings()).toEqual({})
-  })
+  test.each([
+    ["headless", []],
+    ["normal", ["computerUse", "browserUse"]],
+  ] as const)(
+    "public %s setup offers only environment-dependent controls",
+    async (form, features) => {
+      await machine()
+      let seen: TuiInput | undefined
+      const shown = interface_(async (input) => {
+        seen = input
+        return { _tag: "Cancelled" }
+      })
+      const result = await cli(["--form", form], {
+        terminal: TERMINAL,
+        setupTui: shown.loader,
+        publicEntry: true,
+      })
+      expect(shown.loaded()).toBe(1)
+      expect(seen?.offer.capabilities.map((offer) => offer.feature)).toEqual([...features])
+      expect(result.stdout).toContain("setup cancelled")
+      expect(await t3Settings()).toEqual({})
+    },
+  )
 
   test("--worktrees off leaves new threads local and keeps device access on, without the interface", async () => {
     await machine()
@@ -181,6 +187,57 @@ describe("setup flags for the T3 choices", () => {
 })
 
 describe("the public setup renderer", () => {
+  test("prints a copyable report path after the screen closes, with no color or raw details", async () => {
+    await machine()
+    const lines = [
+      "+ pi package: installed with npm --global /fixture/package.tgz",
+      "= t3 settings: already configured",
+      "~ pi device: authorize the simulator",
+    ]
+    const shown = interface_(async () => {
+      const directory = join(home, ".holyagent", "setup-reports")
+      expect(await readdir(directory).catch(() => [])).toEqual([])
+      return { _tag: "Applied", applied: { ok: true, lines } }
+    })
+    const result = await cli([], {
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+      env: { NO_COLOR: "1" },
+    })
+    expect(result.code).toBe(0)
+    expect(result.stdout).toContain("Changes\n  pi package")
+    expect(result.stdout).toContain("Warnings\n  pi device")
+    expect(result.stdout).not.toContain("npm --global")
+    expect(result.stdout).not.toContain("already configured")
+    expect(result.stdout).not.toContain("\x1b")
+    const file = /^Full report: (.*)$/m.exec(result.stdout)?.[1]
+    expect(file).toBeDefined()
+    expect(await Bun.file(file ?? "").text()).toContain(lines.join("\n"))
+  })
+
+  test("styles the report link for a terminal and keeps dry runs free of writes", async () => {
+    await machine()
+    const shown = interface_(() =>
+      Promise.resolve({ _tag: "Applied", applied: { ok: true, lines: ["+ pi setup: added"] } }),
+    )
+    const options = {
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+      env: { TERM: "xterm-256color", FORCE_COLOR: "1", NO_COLOR: "" },
+    }
+    const dry = await cli(["--dry-run"], options)
+    expect(dry.stdout).toContain("Dry run finished")
+    expect(dry.stdout).not.toContain("Full report")
+    const directory = join(home, ".holyagent", "setup-reports")
+    expect(await readdir(directory).catch(() => [])).toEqual([])
+    const actual = await cli([], options)
+    expect(actual.stdout).toContain("\x1b]8;;file://")
+    expect(Bun.stripANSI(actual.stdout)).toContain(`Full report: ${directory}`)
+    expect((await readdir(directory)).length).toBe(1)
+  })
+
   test.each([
     ["the bundle cannot load", () => Effect.fail(new TuiUnavailable({ reason: "missing bundle" }))],
     [

@@ -91,9 +91,12 @@ describe("the setup interface, review and apply", () => {
     const text = screen.lines().join("\n")
     expect(text).toContain("RESULT")
     expect(text).toContain("Setup finished.")
-    expect(text).toContain("+ t3 settings: added defaultThreadEnvMode")
+    expect(text).toContain("CHANGES\nt3 settings")
+    expect(text).not.toContain("defaultThreadEnvMode")
     expect(screen.outcomes).toEqual([])
-    await screen.keys("enter")
+    await screen.click(3, 2)
+    expect(screen.lines().join("\n")).toContain("+ t3 settings: added defaultThreadEnvMode")
+    await screen.click(3, 1)
     expect(screen.outcomes).toEqual([
       {
         _tag: "Applied",
@@ -114,9 +117,12 @@ describe("the setup interface, review and apply", () => {
     })
     await screen.keys("enter", "enter")
     const text = screen.lines().join("\n")
-    expect(text).toContain("Setup finished with failures; the lines marked ! failed.")
-    expect(text).toContain("! t3 settings: /t3/settings.json changed")
-    await screen.keys("escape")
+    expect(text).toContain("Setup finished with failures.")
+    expect(text).toContain("WARNINGS\nt3 settings")
+    expect(text).not.toContain("/t3/settings.json")
+    await screen.keys("d")
+    expect(screen.lines().join("\n")).toContain("! t3 settings: /t3/settings.json changed")
+    await screen.keys("q")
     expect(screen.outcomes).toEqual([
       {
         _tag: "Applied",
@@ -134,7 +140,7 @@ describe("the setup interface, review and apply", () => {
       height: 24,
       apply: () => Promise.reject(new Error("the process was killed")),
     })
-    await screen.keys("enter", "enter")
+    await screen.keys("enter", "enter", "d")
     expect(screen.lines().join("\n")).toContain("! setup: the process was killed")
   })
 
@@ -303,13 +309,13 @@ describe("the setup interface, look", () => {
       height: 12,
       apply: () => Promise.resolve({ ok: true, lines }),
     })
-    await screen.keys("enter", "enter")
+    await screen.keys("enter", "enter", "d")
     expect(screen.lines()).toHaveLength(12)
     expect(screen.lines().at(-1)).toBe("Lines 1-5 of 30, PgDn for more")
     const seen = new Set<string>()
     for (let page = 0; page < 8; page += 1) {
       for (const line of screen.lines()) seen.add(line)
-      await screen.keys("pagedown")
+      await screen.wheel(3, 6, "down")
     }
     for (const line of lines) expect(seen.has(line)).toBe(true)
     expect(screen.lines().at(-1)).toBe("Lines 26-30 of 30, PgUp for earlier")
@@ -339,7 +345,7 @@ describe("the setup interface, wrapping", () => {
         height,
         apply: () => Promise.resolve(LONG_APPLIED(false)),
       })
-      await screen.keys("enter", "enter")
+      await screen.keys("enter", "enter", "d")
       const lines = screen.lines()
       expect(lines.join("").includes("…")).toBe(false)
       expect(lines.some((line) => line.startsWith("Lines "))).toBe(false)
@@ -367,9 +373,7 @@ describe("the setup interface, wrapping", () => {
       apply: () => Promise.reject(new Error("the process was killed")),
     })
     await failed.keys("enter", "enter")
-    expect(failed.lines().join(" ").replace(/\s+/g, " ")).toContain(
-      "then run holyagent setup again",
-    )
+    expect(failed.lines().join(" ").replace(/\s+/g, " ")).toContain("before running setup again")
     failed.destroy()
     const unreadable = await shown({
       width: 80,

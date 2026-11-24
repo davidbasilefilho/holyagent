@@ -43,6 +43,10 @@ Use `holyagent setup pi` to configure the T3 Code/Pi integration directly. It re
 
 Use `--non-interactive` for scripts. It skips the setup screen and uses the defaults shown by `holyagent setup --help` or the flags you supplied. Use `--dry-run` to see changes before applying them.
 
+Interactive Pi setup shows controls for the detected environment. General Pi capabilities use their configured values or the documented defaults. Change those in [Pi configuration](pi/configuration.md#capabilities) or pass the corresponding flag.
+
+The result shows changes, warnings and next steps. Use **Full details** or press `d` to see the full report. Use **Close**, Enter or `q` to return to your terminal. The terminal prints a short summary and the path to that run's report under `~/.holyagent/setup-reports/` by default. It makes the path clickable in terminals with hyperlink support. Dry runs leave the report folder untouched.
+
 ## Migrate to T3 Code
 
 - **From standalone Pi:** Follow the quickstart from the T3 Code install step. A user-scope install and the same Pi provider authentication can be reused. Use the same published npm version for the extension and CLI. If switching the extension from Git to npm, remove its old Git source before adding the npm source. A project-local install is subject to Pi's project trust checks in RPC mode; prefer a user-scope install and avoid declaring the same package in both scopes.

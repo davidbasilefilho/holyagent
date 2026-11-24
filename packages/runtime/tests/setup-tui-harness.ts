@@ -152,7 +152,7 @@ export const mount = async (options: Mount) => {
         ...(options.background === undefined ? {} : { background: options.background }),
         done: (outcome) => void outcomes.push(outcome),
       }),
-    { width: options.width, height: options.height, exitOnCtrlC: false },
+    { width: options.width, height: options.height, exitOnCtrlC: false, useMouse: true },
   )
   await setup.renderOnce()
   /** Lets a settled promise reach the screen, then draws. */
@@ -179,6 +179,14 @@ export const mount = async (options: Mount) => {
   const frame = () => setup.captureCharFrame()
   return {
     keys,
+    click: async (x: number, y: number) => {
+      await setup.mockMouse.click(x, y)
+      await settle()
+    },
+    wheel: async (x: number, y: number, direction: "up" | "down") => {
+      await setup.mockMouse.scroll(x, y, direction)
+      await settle()
+    },
     frame,
     lines: () =>
       frame()

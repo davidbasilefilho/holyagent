@@ -1,3 +1,4 @@
+import { resultHeadline, summarizeResult } from "./result.ts"
 import { cells, clip, pad, wrap, wrapItems } from "./text.ts"
 import { glyphs, type Look, type Tone } from "./theme.ts"
 import type { Applied, Choices, Offer, Review, ReviewLine } from "./types.ts"
@@ -8,6 +9,7 @@ const CAPABILITY_ROW = "capability:"
 export interface Segment {
   readonly text: string
   readonly tone?: Tone
+  readonly click?: "close" | "details"
 }
 
 /** One screen line. */
@@ -34,6 +36,7 @@ export interface State {
   /** Why the review could not be read. */
   readonly failure: string | undefined
   readonly applied: Applied | undefined
+  readonly details: boolean
 }
 
 /** What a key asks the screen to do beside changing the state. */
@@ -94,6 +97,7 @@ export const initialState = (choices: Choices): State => ({
   review: undefined,
   failure: undefined,
   applied: undefined,
+  details: false,
 })
 
 /** The actions the review screen offers: Apply only once the review was read. */
@@ -191,6 +195,8 @@ export const press = (
     return key.ctrl && key.name === "c" ? { state, command: "interrupt" } : { state }
   const paged = pagedBy(state, key, scroll)
   if (paged !== undefined) return { state: paged }
+  if (!key.ctrl && key.name === "d")
+    return { state: { ...state, details: !state.details, scroll: 0 } }
   return isQuit(key) || isEnter(key) || key.name === "space"
     ? { state, command: "close" }
     : { state }
@@ -315,8 +321,9 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
     ...keyLines([`${g.arrows} or j/k focus`, "Space toggle", "Enter review", "Esc cancel"], width),
     blank,
     ...group("T3 Code", 0, t3Count),
-    ...group(`Capabilities, ${offer.form} form`, t3Count, rows.length),
+    ...group("Capabilities", t3Count, rows.length),
     ...(focused === undefined ? [] : hintLines(hintOf(focused, offer), width)),
+    ...hintLines(`Environment: ${offer.form}`, width),
   ]
 }
 
@@ -504,31 +511,32 @@ const reportTone = (line: string): Tone =>
         ? "warning"
         : "hint"
 
-const doneHeadline = (ok: boolean, dryRun: boolean): string =>
-  ok
-    ? dryRun
-      ? "Dry run finished; nothing was written."
-      : "Setup finished."
-    : dryRun
-      ? "Dry run finished with failures; the lines marked ! failed. Fix the cause, then run the dry run again."
-      : "Setup finished with failures; the lines marked ! failed. Fix the cause, then run holyagent setup again."
-
 const doneLayout = (state: State, context: Context): Layout => {
   const { width, height } = context
-  const applied = state.applied
-  const ok = applied?.ok !== false
-  const body = (applied?.lines ?? []).flatMap((line) =>
-    wrap(line, width, 2).map((part): Line => [segment(part, reportTone(line))]),
-  )
+  const applied = state.applied ?? { ok: false, lines: [] }
+  const body = state.details
+    ? applied.lines.flatMap((line) =>
+        wrap(line, width, 2).map((part): Line => [segment(part, reportTone(line))]),
+      )
+    : summarizeResult(applied, context.dryRun).flatMap(({ title, lines }) => [
+        ...heading(title, width),
+        ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
+      ])
   const build = (scrolling: boolean): Layout & { readonly fits: boolean } => {
     const top: ReadonlyArray<Line> = [
-      ...keyLines(["Enter close", ...(scrolling ? ["PgUp/PgDn scroll"] : [])], width),
-      blank,
+      [{ text: "Close (Enter or q)", tone: "option", click: "close" }],
+      [
+        {
+          text: state.details ? "Summary (d)" : "Full details (d)",
+          tone: "option",
+          click: "details",
+        },
+      ],
+      ...(scrolling ? keyLines(["PgUp/PgDn scroll"], width) : []),
       ...heading(context.dryRun ? "Result (dry run)" : "Result", width),
-      ...wrap(doneHeadline(ok, context.dryRun), width).map((part): Line => [
-        segment(part, ok ? "success" : "error"),
+      ...wrap(resultHeadline(applied.ok, context.dryRun), width).map((part): Line => [
+        segment(part, applied.ok ? "success" : "error"),
       ]),
-      blank,
     ]
     const page = pageOf(body, height - 1 - top.length, state.scroll)
     return {

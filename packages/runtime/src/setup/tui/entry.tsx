@@ -61,8 +61,7 @@ export const runSetupTui = (input: TuiInput): Promise<TuiOutcome> =>
   Effect.runPromise(
     showSetup(
       Effect.tryPromise({
-        try: () =>
-          createCliRenderer({ exitOnCtrlC: false, useMouse: false, clearOnShutdown: true }),
+        try: () => createCliRenderer({ exitOnCtrlC: false, useMouse: true, clearOnShutdown: true }),
         catch: (cause) => cause,
       }),
       input,
