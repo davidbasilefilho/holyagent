@@ -1,0 +1,28 @@
+{
+  "id": "assignment-0mwurgrjl-8pne",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Explorer.map",
+  "slug": "audit-public-cli-setup-the-archived",
+  "objective": "Audit public CLI setup, the archived setup TUI, and current native integration layout",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Identify reusable setup logic and actual conflict UI requirements for each harness.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "haiku",
+    "effort": "medium",
+    "startedAt": "2026-11-24T13:59:21.969Z"
+  },
+  "createdAt": "2026-11-24T13:59:21.969Z"
+}
