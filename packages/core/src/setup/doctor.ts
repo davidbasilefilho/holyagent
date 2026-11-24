@@ -4,7 +4,13 @@ import { inCloudSession } from "../vcs/identity.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, type FormChoice } from "./form.ts"
-import { piChecks, piInUse } from "./pi-check.ts"
+import {
+  piChecks,
+  type PiExecutionSurface,
+  piExecutionSurface,
+  piInUse,
+  usesStandaloneSearch,
+} from "./pi-check.ts"
 import { checkPiToolSettings } from "./pi-settings.ts"
 import { fail, hint, pass, type Report } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
@@ -75,9 +81,10 @@ const checks = (env: Env, file: string, scope: Scope) =>
  * `ctx7` passes, since setup leaves it out there. With `fix`, the setup steps behind a failing
  * check run first, their lines come before the checks, and the checks then run again; Bun, Pi, Node
  * and the Pi packages are never installed, so the Pi lines are read once and name the command that
- * fixes them. The last lines are those of the user-installed `rg` and `fd` that `holyagent rg` and
- * `holyagent fd` run ({@link searchToolLines}): a missing one is a `~` warning with the install
- * commands, never a failure, and `--fix` installs neither. The report is ok when no check fails.
+ * fixes them. When diagnosing standalone shell search, the last lines describe the user-installed
+ * `rg` and `fd` ({@link searchToolLines}). Pi resolves its own search tools. A missing standalone
+ * command produces a `~` warning and `--fix` installs neither. The report is ok when no check
+ * fails.
  */
 export const doctor = Effect.fn("doctor")(function* (
   env: Env,
@@ -85,6 +92,8 @@ export const doctor = Effect.fn("doctor")(function* (
     readonly fix: boolean
     /** Check the public T3 Code workflow without checking or fixing Claude settings. */
     readonly t3Workflow?: boolean
+    /** The Pi runtime selected by the caller; absence leaves unknown routes conditional. */
+    readonly piSurface?: PiExecutionSurface
     readonly scope?: Scope
     readonly cwd?: string
     /** The form every capability is checked in; the normal form when absent. */
@@ -94,17 +103,23 @@ export const doctor = Effect.fn("doctor")(function* (
   const scope = options.scope ?? "user"
   const cwd = options.cwd ?? process.cwd()
   const form = options.form ?? DEFAULT_FORM_CHOICE
-  const pi = inCloudSession(env)
+  const cloud = inCloudSession(env)
+  const surface = piExecutionSurface(env, options.t3Workflow === true ? "t3" : options.piSurface)
+  const piUsed = !cloud && (yield* piInUse(env))
+  const search = usesStandaloneSearch(env, piUsed, surface)
+    ? searchToolLines(cwd, doctorToolLine)
+    : Effect.succeed<ReadonlyArray<string>>([])
+  const pi = cloud
     ? []
     : [
-        ...(yield* piChecks(env, cwd, scope, form)),
+        ...(yield* piChecks(env, cwd, scope, form, surface)),
         ...(yield* checkPiToolSettings(env, cwd, scope, form.form)),
         ...(scope === "user" || options.t3Workflow === true
           ? yield* checkT3Settings(env, cwd, { required: options.t3Workflow === true })
           : []),
       ]
   if (options.t3Workflow === true) {
-    const blockers = yield* checkT3Prerequisites(env, !inCloudSession(env) && (yield* piInUse(env)))
+    const blockers = yield* checkT3Prerequisites(env, piUsed)
     const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix")
     const ctx7 = yield* checkCtx7
     const fixes =
@@ -131,7 +146,7 @@ export const doctor = Effect.fn("doctor")(function* (
       Effect.succeed(fail("settings", located.message)),
     ])
     return {
-      lines: [...lines, ...pi, ...(yield* searchToolLines(cwd, doctorToolLine))],
+      lines: [...lines, ...pi, ...(yield* search)],
       ok: false,
     } satisfies Report
   }
@@ -142,7 +157,7 @@ export const doctor = Effect.fn("doctor")(function* (
   const before = yield* checks(env, file, scope)
   const failing = (name: string) => before.some((line) => line.startsWith(`FAIL ${name}:`))
   const fixes =
-    options.fix && !inCloudSession(env)
+    options.fix && !cloud
       ? [...(failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : [])]
       : []
   const settingsFixes =
@@ -156,7 +171,7 @@ export const doctor = Effect.fn("doctor")(function* (
   const lines = noted([
     ...(ran.length === 0 ? before : [...ran, ...(yield* checks(env, file, scope))]),
     ...pi,
-    ...(yield* searchToolLines(cwd, doctorToolLine)),
+    ...(yield* search),
   ])
   return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) } satisfies Report
 })

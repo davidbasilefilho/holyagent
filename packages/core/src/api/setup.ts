@@ -4,7 +4,7 @@ import { doctor as runDoctor } from "../setup/doctor.ts"
 import { FORM_CHOICES } from "../setup/form.ts"
 import { SCOPES } from "../setup/scope.ts"
 import { CACHE_TTLS } from "../setup/settings.ts"
-import { setup as runSetup } from "../setup/steps.ts"
+import { setup as runSetup, SETUP_TARGETS } from "../setup/steps.ts"
 import { type Context, decode, requireCapability } from "./context.ts"
 import { Usage } from "./usage.ts"
 
@@ -34,6 +34,8 @@ export const schemas = {
   setup: Schema.Struct({
     subagentCacheTtl: Schema.Literals(CACHE_TTLS),
     t3Workflow: Schema.optionalKey(Schema.Boolean),
+    target: Schema.optionalKey(Schema.Literals(SETUP_TARGETS)),
+    installedPackageRoot: Schema.optionalKey(Schema.String),
     dryRun: Schema.Boolean,
     skipCtx7: Schema.Boolean,
     scope: Schema.optionalKey(Schema.Literals(SCOPES)),

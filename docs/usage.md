@@ -19,23 +19,29 @@ The root checks small, low-risk requests directly. It uses Assignments for work 
 T3 Code is the only supported user-facing interface. The supported workflow uses T3 Code's Pi provider. Pi's command line below installs and configures the backend; start your HolyAgent work in T3 Code, not in a standalone Pi session.
 
 1. Install and open [T3 Code](https://github.com/pingdotgg/t3code) once so it creates its settings directory. Install [Bun](https://bun.sh), Node.js 22.19 or newer, Git and an authenticated GitHub CLI (`gh`). On Windows install Git for Windows with Git Bash. See [requirements](requirements.md).
-2. Install the Pi backend and the HolyAgent package at user scope. Use a version published to npm for this workflow. Open [the HolyAgent npm package](https://www.npmjs.com/package/holyagent?activeTab=versions) and the corresponding [GitHub release](https://github.com/davidbasilefilho/holyagent/releases); replace `<version>` in both commands with the same published version.
+2. Keep a compatible Pi already on `PATH`. If Pi is missing, install the tested backend with `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0`. Install the HolyAgent package at user scope. Replace `<version>` with the published version you want. Use the [0.3.4 quickstart](https://github.com/davidbasilefilho/holyagent/blob/holyagent-0.3.4/docs/usage.md#install) for that release. [npm versions](https://www.npmjs.com/package/holyagent?activeTab=versions) · [GitHub releases](https://github.com/davidbasilefilho/holyagent/releases)
 
    ```sh
-   npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.5.0
-   pi install npm:holyagent@<version>
-   npm install -g --ignore-scripts --legacy-peer-deps holyagent@<version>
+   npm install -g holyagent@<version>
+   holyagent --version
+   holyagent setup pi --scope user
    ```
 
-   Pi registers the extension in its own package store. The separate npm command installs `holyagent` and `holyagent-cli` on your npm global PATH without reinstalling the Pi host peers. Open a fresh terminal and run `holyagent --version` to check the installed version. The T3 Code backend uses [`holyagent-cli`](agent-cli-output.md) for agent operations.
+   The npm command installs `holyagent` and `holyagent-cli`. Setup registers the installed package with the Pi already on `PATH`. Use a fresh terminal if the new commands are missing. The T3 Code backend uses [`holyagent-cli`](agent-cli-output.md) for agent operations.
 
-3. Run `holyagent setup --scope user` from a terminal. Review the [setup screen](#the-t3-code-setup-screen), then run `holyagent doctor --scope user` to check the prerequisites, packages and T3 Code settings. If T3 Code was open, restart it after setup. If Pi is not listed in T3 Code's provider picker, check that the provider is enabled and that T3 Code can find the same `pi` executable as your terminal.
+3. Review the [setup screen](#the-t3-code-setup-screen), then run `holyagent doctor --scope user`. Restart T3 Code after setup. If Pi is missing from the provider picker, check that it is enabled and that T3 Code can find the same `pi` executable as your terminal.
 4. [Sign in to the provider selected in your HolyAgent configuration](pi/providers.md), then open a thread using the Pi provider in T3 Code. Work in a repository you trust. HolyAgent's [Full access requirement](pi/t3-code.md#full-access-is-required) applies to that thread; leave it off if you cannot give the thread that level of access.
 5. Ask the root to do a small task in the repository. The [T3 Code integration notes](pi/t3-code.md) describe expected behavior and [known limitations](pi/t3-code.md#to-verify), including that the Pi live todo widget is not shown in T3 Code. Ask the root for its task list instead.
 
 ### Maintain the installation
 
-`holyagent install` opens the same configuration flow as `holyagent setup`. Run `holyagent doctor` to check the installation and `holyagent update --dry-run` to preview an update. `holyagent update` installs the latest stable version in both the Pi package store and the global npm prefix. Use `--version <version>` to select an exact stable version. Restart T3 Code after an update.
+`holyagent install` is an alias for `holyagent setup`. Run `holyagent doctor` to check the installation and `holyagent update --dry-run` to preview an update. For a package registered by setup from npm's global prefix, `holyagent update` keeps that registration and updates the installed package. The existing `npm:` Pi registration updates both package stores. Use `--version <version>` to select an exact stable version. Restart T3 Code after an update.
+
+Use `holyagent setup pi` to configure the T3 Code/Pi integration directly. It registers your installed HolyAgent package with Pi when a registration is missing. If another HolyAgent package is already registered, setup reports the conflict and keeps that entry. The `install` alias accepts the same arguments.
+
+`holyagent setup claude` applies the existing Claude plugin settings at the selected scope. Install the plugin separately before running this command. It preserves existing values and applies the same scoped behavior with `--undo`.
+
+Use `--non-interactive` for scripts. It skips the setup screen and uses the defaults shown by `holyagent setup --help` or the flags you supplied. Use `--dry-run` to see changes before applying them.
 
 ## Migrate to T3 Code
 
@@ -152,7 +158,7 @@ On Pi the specialists' `find` and `grep` tools are [fff](https://github.com/dmtr
 
 ### The T3 Code setup screen
 
-When Pi is installed and enabled in your config and the run is not `--undo`, `holyagent setup` shows an interactive screen in your terminal with one row for each Pi capability, headed by the form in force (headless or normal, [Capabilities](pi/configuration.md#capabilities)), each starting at what your config decides; Space switches one, and the review lists what each switch does (turned on, turned off, unchanged, or not offered in the form) before the run writes the changed ones to the config and installs or removes their packages. A capability flag (`--todo off`) applies directly and keeps the screen out. When also the scope is `user` and T3 Code is installed (its home folder, `T3CODE_HOME` or `~/.t3`, exists), the screen also covers the choices setup makes in T3's settings, then a review of every key it will change, and applies on confirm. It has two rows to switch beside the fixed Pi provider row: agent device access (offered only where Xcode's iOS simulator or an Android SDK is found and `pi.t3.deviceAccess` is true) and new threads in worktrees (while `pi.t3.worktrees` is true); both start enabled. Up and down (or `j` and `k`) move, Space toggles, Enter opens the review and applies it from there, and Esc, `q` or Ctrl-C cancels and writes nothing. The first time, the screen installs its renderer (OpenTUI and Solid, at the versions of the release) into HolyAgent's cache folder with `bun install`, which needs the network and a Bun that OpenTUI supports (`@opentui/core` declares Bun 1.3.14 or later in its `engines`; HolyAgent checks no Bun version itself). The rows, keys and packaging are in [pi/t3-code.md](pi/t3-code.md#the-setup-screen-and-its-flags).
+When Pi is installed and enabled in your config and the run is not `--undo`, `holyagent setup` shows an interactive screen in your terminal with one row for each Pi capability, headed by the form in force (headless or normal, [Capabilities](pi/configuration.md#capabilities)), each starting at what your config decides; Space switches one, and the review lists what each switch does (turned on, turned off, unchanged, or not offered in the form) before the run writes the changed ones to the config and installs or removes their packages. A capability flag (`--todo off`) applies directly and keeps the screen out. When also the scope is `user` and T3 Code is installed (its home folder, `T3CODE_HOME` or `~/.t3`, exists), the screen also covers the choices setup makes in T3's settings, then a review of every key it will change, and applies on confirm. It has two rows to switch beside the fixed Pi provider row: agent device access (offered only where Xcode's iOS simulator or an Android SDK is found and `pi.t3.deviceAccess` is true) and new threads in worktrees (while `pi.t3.worktrees` is true); both start enabled. Up and down (or `j` and `k`) move, Space toggles, Enter opens the review and applies it from there, and Esc, `q` or Ctrl-C cancels and writes nothing. The public package installs OpenTUI, Solid and the native renderer during the ordinary package install. Opening setup uses those installed files and works without network access. In headless T3 Code, Preview supplies the browser backend. The rows, keys and packaging are in [pi/t3-code.md](pi/t3-code.md#the-setup-screen-and-its-flags).
 
 Three flags make the choices without the screen:
 
@@ -162,7 +168,7 @@ Three flags make the choices without the screen:
 | `--device-access on\|off` | Device access is written where a host is found, or left out                                                    |
 | `--no-tui`                | No screen; both choices on                                                                                     |
 
-Giving `--worktrees` or `--device-access` applies directly and leaves the other choice on. `--no-tui` is the line-based fallback, and setup also falls back to it, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, `CI` is set to a truthy value (not empty, `0`, `false`, `no` or `off`, in any case), `TERM` is `dumb`, a flag above was given, or the screen cannot be installed or started (for example offline). The fallback applies both choices on; nothing about the screen changes the other setup steps, `--dry-run` shows what would change on the review and the result, and `holyagent setup --undo` backs the T3 keys out like the rest.
+Giving `--worktrees` or `--device-access` applies directly and leaves the other choice on. `--no-tui` is the line-based fallback, and setup also falls back to it, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, `CI` is set to a truthy value (not empty, `0`, `false`, `no` or `off`, in any case), `TERM` is `dumb`, a flag above was given. If a selected interactive renderer fails, public setup exits before applying defaults. The fallback applies both choices on; nothing about the screen changes the other setup steps, `--dry-run` shows what would change on the review and the result, and `holyagent setup --undo` backs the T3 keys out like the rest.
 
 ## Opinionated by design
 

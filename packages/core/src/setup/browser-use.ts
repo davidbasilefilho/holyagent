@@ -13,7 +13,13 @@ import { fileSystem } from "../ports/filesystem.ts"
 import { describeBrowseState, readBrowseState } from "./browse.ts"
 import { findChromiumWith } from "./chromium.ts"
 import type { Env } from "./environment.ts"
-import { loadPiConfig, unmetNeed } from "./pi-check.ts"
+import {
+  headlessBrowserRoute,
+  loadPiConfig,
+  type PiExecutionSurface,
+  piExecutionSurface,
+  unmetNeed,
+} from "./pi-check.ts"
 import type { PiInstallOptions } from "./pi-install.ts"
 import { hint, present } from "./report.ts"
 
@@ -87,7 +93,8 @@ const reportOne = (
 /**
  * The browser-use step of `holyagent setup`: one report, and no change, for each enabled capability
  * that registers an MCP server for screen specialists (opencode browse in the normal form, the
- * browser-use MCP server in the headless form). It says the form in force, the MCP server the
+ * browser-use MCP server for standalone headless Pi). Headless T3 uses its Preview tools and an
+ * unknown surface gets conditional prerequisites. It says the form in force, the MCP server the
  * extension registers (or that `pi.features.mcp` is off, so none is), each system need that is not
  * met, in the headless form the Chromium the browser runs on, and in the normal form where browse
  * stands: paired with a browser, installed in one but not paired, or not installed
@@ -99,20 +106,26 @@ const reportOne = (
  */
 export const reportBrowserUse = Effect.fn("reportBrowserUse")(function* (
   env: Env,
-  options: PiInstallOptions,
+  options: PiInstallOptions & { readonly surface?: PiExecutionSurface | undefined },
   platform: string = process.platform,
 ) {
   const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices)
   if (!config.pi.enable) return []
+  const headless =
+    options.form === "headless"
+      ? headlessBrowserRoute(config, piExecutionSurface(env, options.surface))
+      : undefined
   const reporting = enabledCapabilities(config.pi.features, {
     provider: config.pi.provider,
-  }).filter((capability) =>
-    Object.values(capability.forms).some(
-      (form) => "mcpServers" in form && form.mcpServers.length > 0,
-    ),
+  }).filter(
+    (capability) =>
+      (capability.feature !== "browserUse" || headless?.probe !== false) &&
+      Object.values(capability.forms).some(
+        (form) => "mcpServers" in form && form.mcpServers.length > 0,
+      ),
   )
   const lines = yield* Effect.forEach(reporting, (capability) =>
     reportOne(env, capability, config.pi.features, options, platform),
   )
-  return lines.flat()
+  return [...(headless?.lines ?? []), ...lines.flat()]
 })

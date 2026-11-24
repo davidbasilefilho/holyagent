@@ -4313,18 +4313,24 @@ var showSetup = (acquire, input) => acquireUseRelease2(acquire, (renderer) => de
   if (renderer.isDestroyed)
     return destroyed();
   renderer.once("destroy", destroyed);
-  runFork2(tryPromise2(() => render(() => _$createComponent2(SetupApp, {
-    input,
-    background,
-    done: finish
-  }), renderer)).pipe(catch_2((cause) => sync2(() => resume(die2(cause))))));
+  runFork2(tryPromise2({
+    try: () => render(() => _$createComponent2(SetupApp, {
+      input,
+      background,
+      done: finish
+    }), renderer),
+    catch: (cause) => cause
+  }).pipe(catch_2((cause) => sync2(() => resume(die2(cause))))));
   return sync2(() => renderer.off("destroy", destroyed));
 }))), (renderer) => sync2(() => renderer.destroy()).pipe(andThen2(tryPromise2(() => renderer.closed)), ignore2));
-var runSetupTui = (input) => runPromise2(showSetup(tryPromise2(() => createCliRenderer({
-  exitOnCtrlC: false,
-  useMouse: false,
-  clearOnShutdown: true
-})), input));
+var runSetupTui = (input) => runPromise2(showSetup(tryPromise2({
+  try: () => createCliRenderer({
+    exitOnCtrlC: false,
+    useMouse: false,
+    clearOnShutdown: true
+  }),
+  catch: (cause) => cause
+}), input));
 export {
   runSetupTui,
   showSetup

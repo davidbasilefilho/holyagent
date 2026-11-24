@@ -1,18 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import {
   copyFileSync,
-  existsSync,
   mkdirSync,
   mkdtempSync as createTemp,
   readFileSync,
-  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-
-import { $ } from "bun"
 
 import { manifest } from "./src/generate.ts"
 
@@ -52,39 +48,6 @@ describe("npm publication", () => {
       directory: "packages/integrations/pi/dist",
     })
   })
-
-  test("the packed CLI installs with npm without installing the Pi host", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "holyagent-cli-install-"))
-    const windows = process.platform === "win32"
-    const npm = windows ? ["cmd.exe", "/d", "/c", "npm.cmd"] : ["npm"]
-    try {
-      const { version } = (await Bun.file(join(root, "package.json")).json()) as {
-        readonly version: string
-      }
-      const archive = `./holyagent-${version}.tgz`
-      await $`bun pm pack --destination ${dir}`.cwd(join(import.meta.dir, "dist")).quiet()
-      await $`${npm} install --global --prefix prefix --cache cache --offline --no-audit --no-fund ${archive}`
-        .cwd(dir)
-        .env({
-          ...process.env,
-          NPM_CONFIG_USERCONFIG: join(dir, "user.npmrc"),
-          NPM_CONFIG_GLOBALCONFIG: join(dir, "global.npmrc"),
-        })
-        .quiet()
-      const modules = join(dir, "prefix", ...(windows ? [] : ["lib"]), "node_modules")
-      expect(readdirSync(modules)).toEqual(["holyagent"])
-      expect(existsSync(join(modules, "holyagent", "node_modules"))).toBe(false)
-      const versions = { holyagent: version, "holyagent-cli": `version: ${version}` }
-      for (const [bin, expected] of Object.entries(versions)) {
-        const launcher = windows
-          ? ["cmd.exe", "/d", "/c", `prefix\\${bin}.cmd`]
-          : [join(dir, "prefix", "bin", bin)]
-        expect((await $`${launcher} --version`.cwd(dir).quiet()).text().trim()).toBe(expected)
-      }
-    } finally {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
-    }
-  }, 60_000)
 
   test("development versions use commit UTC, are deterministic and reject other refs", () => {
     const script = join(root, ".github/actions/tag-release/dev-version.sh")

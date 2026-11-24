@@ -156,8 +156,16 @@ describe("the package manifest", () => {
     expect(manifest["peerDependencies"]).toEqual(
       Object.fromEntries(PI_HOST_PACKAGES.map((name) => [name, "*"])),
     )
-    expect(manifest).not.toHaveProperty("dependencies")
     expect(HOST_MODULES.toSorted()).toEqual([...PI_HOST_PACKAGES].toSorted())
+  })
+
+  test("installs the public setup renderer and its Solid peer with the package", () => {
+    const rootDependencies = readJson("package.json")["devDependencies"] as Record<string, string>
+    expect(manifest["dependencies"]).toEqual({
+      "@opentui/core": rootDependencies["@opentui/core"],
+      "@opentui/solid": rootDependencies["@opentui/solid"],
+      "solid-js": rootDependencies["solid-js"],
+    })
   })
 
   test("is what a git install of the repository root finds: the root pi key points at the build", () => {

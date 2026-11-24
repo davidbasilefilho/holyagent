@@ -8,6 +8,8 @@ import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
 import type { SetupTuiLoader } from "../src/cli/types.ts"
 import { CAPABILITIES } from "../src/config/capabilities.ts"
+import { piPackages } from "../src/config/packages.ts"
+import { defaultConfig } from "../src/config/schema.ts"
 import { TuiUnavailable } from "../src/setup/tui/load.ts"
 import type { Choices, Review, SetupTuiModule, TuiInput } from "../src/setup/tui/types.ts"
 import { scratch } from "./setup-fixture.ts"
@@ -56,16 +58,21 @@ const cli = (
     env?: Record<string, string>
     terminal?: { stdin: boolean; stdout: boolean }
     setupTui?: SetupTuiLoader
+    publicEntry?: boolean
   } = {},
 ) =>
   Effect.runPromise(
-    run(["setup", "--skip-ctx7", ...argv], {
-      cwd: home,
-      env: environment(options.env),
-      stdin: Effect.fail(new StdinMissing({ reason: "no stdin in this test" })),
-      ...(options.terminal === undefined ? {} : { terminal: options.terminal }),
-      ...(options.setupTui === undefined ? {} : { setupTui: options.setupTui }),
-    }),
+    run(
+      ["setup", "--skip-ctx7", ...argv],
+      {
+        cwd: home,
+        env: environment(options.env),
+        stdin: Effect.fail(new StdinMissing({ reason: "no stdin in this test" })),
+        ...(options.terminal === undefined ? {} : { terminal: options.terminal }),
+        ...(options.setupTui === undefined ? {} : { setupTui: options.setupTui }),
+      },
+      options.publicEntry === true ? "public" : "host",
+    ),
   )
 
 const t3File = () => join(t3Home, "userdata", "settings.json")
@@ -91,6 +98,24 @@ const interface_ = (
 }
 
 describe("setup flags for the T3 choices", () => {
+  test("public headless setup omits the standalone browser capability", async () => {
+    await machine()
+    let seen: TuiInput | undefined
+    const shown = interface_(async (input) => {
+      seen = input
+      return { _tag: "Cancelled" }
+    })
+    const result = await cli(["--form", "headless"], {
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+    })
+    expect(shown.loaded()).toBe(1)
+    expect(seen?.offer.capabilities.map((offer) => offer.feature)).not.toContain("browserUse")
+    expect(result.stdout).toContain("setup cancelled")
+    expect(await t3Settings()).toEqual({})
+  })
+
   test("--worktrees off leaves new threads local and keeps device access on, without the interface", async () => {
     await machine()
     const shown = interface_(() => Promise.reject(new Error("must not run")))
@@ -148,8 +173,72 @@ describe("setup flags for the T3 choices", () => {
     expect(text).toContain("[--worktrees on|off] [--device-access on|off] [--no-tui]")
     expect(text).toContain("--worktrees on|off and --device-access on|off make a choice")
     expect(text).toContain("--no-tui keeps the screen out")
-    expect(text).toContain("XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows")
+    expect(text).toContain("the installed public CLI loads the renderer from its own package")
     expect(text).toContain("Esc or Ctrl-C cancels and writes nothing")
+  })
+})
+
+describe("the public setup renderer", () => {
+  test.each([
+    ["the bundle cannot load", () => Effect.fail(new TuiUnavailable({ reason: "missing bundle" }))],
+    [
+      "the renderer cannot start",
+      interface_(() => Promise.reject(new Error("no native library"))).loader,
+    ],
+    [
+      "the renderer reports an invalid outcome",
+      interface_(() => Promise.resolve({ _tag: "Applied" })).loader,
+    ],
+  ] as const)("stops without writing when %s", async (_, setupTui) => {
+    await machine()
+    const initial = JSON.stringify({ theme: "light" })
+    await Bun.write(t3File(), initial)
+    const result = await cli([], { terminal: TERMINAL, setupTui, publicEntry: true })
+    expect(result.code).toBe(1)
+    expect(result.stdout).toContain("! t3 tui:")
+    expect(result.stdout).toContain("setup changed no settings")
+    expect(result.stdout).not.toContain("using the line-based setup")
+    expect(await Bun.file(t3File()).text()).toBe(initial)
+    expect(await Bun.file(join(home, ".holyagent", "config.json")).exists()).toBe(false)
+  })
+
+  test("a review rejection never applies the line-based defaults", async () => {
+    await machine()
+    const changedByUser = "{"
+    const shown = interface_(async (input) => {
+      await Bun.write(t3File(), changedByUser)
+      return input.review(input.initial)
+    })
+    const result = await cli([], {
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+    })
+    expect(result.code).toBe(1)
+    expect(result.stdout).toContain("setup changed no settings")
+    expect(result.stdout).not.toContain("using the line-based setup")
+    expect(await Bun.file(t3File()).text()).toBe(changedByUser)
+    expect(await Bun.file(join(home, ".holyagent", "config.json")).exists()).toBe(false)
+  })
+
+  test("--no-tui keeps the explicit line-based path even when the renderer is unavailable", async () => {
+    await machine()
+    const shown = interface_(() => Promise.reject(new Error("no native library")))
+    const pi = join(home, "pi")
+    const config = await Effect.runPromise(defaultConfig)
+    await Bun.write(
+      join(pi, "settings.json"),
+      JSON.stringify({ packages: piPackages(config, undefined, "headless") }),
+    )
+    const result = await cli(["--no-tui", "--form", "headless"], {
+      env: { PI_CODING_AGENT_DIR: pi },
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+    })
+    expect(shown.loaded()).toBe(0)
+    expect(result.code).toBe(0)
+    expect((await t3Settings())["defaultThreadEnvMode"]).toBe("worktree")
   })
 })
 

@@ -12,7 +12,7 @@ import { TUI_MANIFEST_NAME } from "./lock.ts"
 import { TUI_LOCK, TUI_PACKAGES } from "./packages.ts"
 import type { SetupTuiModule } from "./types.ts"
 
-/** The setup interface cannot be installed or imported, so the line-based setup runs instead. */
+/** The setup interface could not be loaded. */
 export class TuiUnavailable extends Data.TaggedError("TuiUnavailable")<{
   readonly reason: string
 }> {
@@ -255,6 +255,20 @@ const isSetupTuiModule = (value: unknown): value is SetupTuiModule =>
   "runSetupTui" in value &&
   typeof value.runSetupTui === "function"
 
+/** Loads the renderer and Solid preload relative to the installed public CLI bundle. */
+export const loadPackagedSetupTui = (bundle = join(import.meta.dir, TUI_BUNDLE)) =>
+  Effect.gen(function* () {
+    const preload = yield* Effect.try({
+      try: () => Bun.resolveSync("@opentui/solid/preload", dirname(bundle)),
+      catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause),
+    })
+    yield* importFile(preload)
+    const loaded = yield* importFile(bundle)
+    if (!isSetupTuiModule(loaded))
+      return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` })
+    return loaded
+  })
+
 const fileSystem = <A>(what: string, run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (cause) => unavailable(what, cause) })
 
@@ -483,18 +497,18 @@ const installAtomically = (
 
 /**
  * Makes the setup interface importable and imports it. OpenTUI's native renderer cannot be bundled
- * into the platform-neutral CLI bundle, and neither the plugin nor the Pi package ships
- * `node_modules`, so the interface is its own bundle ({@link TUI_BUNDLE}, built with the Solid
- * plugin) and the packages it runs on are installed on first use, from the lockfile subset the
- * build embedded ({@link TUI_LOCK}), into a per-user cache folder ({@link tuiDirectory}). The cache
- * folders are created private (mode 0700) and are refused when they are another user's or writable
- * by others, and so is the cache home itself (a link to it is followed) unless it is a sticky
- * folder of the user's or, for group write only, belongs to the user's private group. An install
- * goes into a temporary folder that is renamed into place with a completion marker, so a folder
- * without the marker counts as absent. The bundle is copied next to the installed `node_modules`,
- * where its imports resolve, without following a link planted at its path; Solid's preload (which
- * makes Bun load Solid's browser build) is imported, and then the bundle. Any step that fails,
- * offline included, is a {@link TuiUnavailable} naming it.
+ * into the platform-neutral CLI bundle. The private plugin has no npm installation, so its
+ * interface is its own bundle ({@link TUI_BUNDLE}, built with the Solid plugin) and the packages it
+ * runs on are installed on first use, from the lockfile subset the build embedded
+ * ({@link TUI_LOCK}), into a per-user cache folder ({@link tuiDirectory}). The cache folders are
+ * created private (mode 0700) and are refused when they are another user's or writable by others,
+ * and so is the cache home itself (a link to it is followed) unless it is a sticky folder of the
+ * user's or, for group write only, belongs to the user's private group. An install goes into a
+ * temporary folder that is renamed into place with a completion marker, so a folder without the
+ * marker counts as absent. The bundle is copied next to the installed `node_modules`, where its
+ * imports resolve, without following a link planted at its path; Solid's preload (which makes Bun
+ * load Solid's browser build) is imported, and then the bundle. Any step that fails, offline
+ * included, is a {@link TuiUnavailable} naming it.
  */
 export const loadSetupTui = (
   env: Env,

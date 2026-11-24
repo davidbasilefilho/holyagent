@@ -29,12 +29,14 @@ export const showSetup = <E,>(
             if (renderer.isDestroyed) return destroyed()
             renderer.once("destroy", destroyed)
             Effect.runFork(
-              Effect.tryPromise(() =>
-                render(
-                  () => <SetupApp input={input} background={background} done={finish} />,
-                  renderer,
-                ),
-              ).pipe(Effect.catch((cause) => Effect.sync(() => resume(Effect.die(cause))))),
+              Effect.tryPromise({
+                try: () =>
+                  render(
+                    () => <SetupApp input={input} background={background} done={finish} />,
+                    renderer,
+                  ),
+                catch: (cause) => cause,
+              }).pipe(Effect.catch((cause) => Effect.sync(() => resume(Effect.die(cause))))),
             )
             return Effect.sync(() => renderer.off("destroy", destroyed))
           }),
@@ -52,15 +54,17 @@ export const showSetup = <E,>(
 /**
  * Shows the setup interface on the terminal of the process and resolves with how it ended. The
  * renderer is closed before this resolves, so the shell is back to normal when the command prints
- * its report; a renderer that cannot start (no native library for the platform) rejects, and the
- * command falls back to the line-based setup.
+ * its report. The promise rejects when the renderer cannot start, such as when its platform's
+ * native library is missing.
  */
 export const runSetupTui = (input: TuiInput): Promise<TuiOutcome> =>
   Effect.runPromise(
     showSetup(
-      Effect.tryPromise(() =>
-        createCliRenderer({ exitOnCtrlC: false, useMouse: false, clearOnShutdown: true }),
-      ),
+      Effect.tryPromise({
+        try: () =>
+          createCliRenderer({ exitOnCtrlC: false, useMouse: false, clearOnShutdown: true }),
+        catch: (cause) => cause,
+      }),
       input,
     ),
   )

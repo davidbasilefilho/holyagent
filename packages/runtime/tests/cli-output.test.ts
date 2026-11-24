@@ -48,7 +48,7 @@ test("the public entry keeps the private Pi config protocol and agent commands o
 
   const help = launch("pi-public-entry.ts", "--help")
   expect(help.exitCode).toBe(0)
-  expect(help.stdout.toString()).toContain("Manage your HolyAgent installation for T3 Code")
+  expect(help.stdout.toString()).toContain("Manage your HolyAgent installation.")
   expect(help.stdout.toString()).toContain("update")
   expect(help.stdout.toString()).not.toContain("assignment dispatch")
   const setupHelp = launch("pi-public-entry.ts", "setup", "-h")
@@ -200,8 +200,11 @@ test.skipIf(process.platform === "win32" || Bun.which("script") === null)(
       },
     })
     expect(publicChild.exitCode).not.toBeNull()
-    // An unbuilt source tree has no setup bundle; reaching its loader proves this entry opted in.
-    expect(publicChild.stdout.toString()).toContain("the interface bundle")
+    // The source entry has no adjacent setup bundle; it must stop before any line-based changes.
+    const publicOutput = publicChild.stdout.toString()
+    expect(publicOutput).toContain("! t3 tui: unavailable")
+    expect(publicOutput).toContain("setup-tui.js")
+    expect(publicOutput).toContain("setup changed no settings")
   },
   60_000,
 )

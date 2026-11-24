@@ -76,6 +76,8 @@ export interface Host {
   readonly terminal?: Terminal
   /** The public CLI configures T3 Code instead of the retained Claude integration. */
   readonly t3Workflow?: boolean
+  /** The installed package supplied by the public launcher for Pi registration. */
+  readonly installedPackageRoot?: string
   /** Loads the setup interface for `setup`; the real loader when absent. A seam for tests. */
   readonly setupTui?: SetupTuiLoader
 }
@@ -115,6 +117,8 @@ export interface Call {
   readonly terminal: Terminal | undefined
   /** Whether this is the public T3 Code workflow. */
   readonly t3Workflow: boolean
+  /** The installed package supplied by the public launcher, when available. */
+  readonly installedPackageRoot: string | undefined
   /** Loads the setup interface; see {@link Host.setupTui}. */
   readonly setupTui: SetupTuiLoader | undefined
   /**

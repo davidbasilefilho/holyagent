@@ -15,7 +15,7 @@ import { hint, type Report } from "../report.ts"
 import type { Scope } from "../scope.ts"
 import type { Shell } from "../shell.ts"
 import { previewT3Settings, type T3Preview, type T3UnitPreview } from "../t3-settings.ts"
-import { loadSetupTui, plain, TuiUnavailable } from "./load.ts"
+import { loadPackagedSetupTui, loadSetupTui, plain, TuiUnavailable } from "./load.ts"
 import {
   type Applied,
   type CapabilityOffer,
@@ -248,9 +248,11 @@ export interface InteractiveOptions {
   readonly terminal: Terminal | undefined
   readonly noTui: boolean
   readonly choiceFlag: boolean
+  /** Public setup loads the packaged renderer and stops if it fails. */
+  readonly t3Workflow?: boolean
   /** The form in force, which decides what each capability row says it installs. */
   readonly form: FormChoice
-  /** Loads the interface; {@link loadSetupTui} (with a notice before a first install) when absent. */
+  /** Overrides the packaged or private renderer loader, for tests. */
   readonly load?: (
     env: Env,
     notify: (text: string) => Effect.Effect<void>,
@@ -274,6 +276,21 @@ const fallback = (reason: string): Interactive => ({
   notes: [hint(`t3 tui: ${plain(reason)}; using the line-based setup`)],
 })
 
+const stopped = (reason: string, applyStarted = false): Interactive => ({
+  kind: "done",
+  report: {
+    ok: false,
+    lines: [
+      `! t3 tui: ${plain(reason)}`,
+      hint(
+        applyStarted
+          ? "setup stopped after apply began; check your settings before retrying"
+          : "setup changed no settings; fix the installation or rerun with --no-tui",
+      ),
+    ],
+  },
+})
+
 const decodeOutcome = Schema.decodeUnknownEffect(TuiOutcomeSchema, { onExcessProperty: "error" })
 
 /**
@@ -282,9 +299,9 @@ const decodeOutcome = Schema.decodeUnknownEffect(TuiOutcomeSchema, { onExcessPro
  * registry entry while the config loads with `pi.enable` on, and the T3 rows when the T3 part of
  * setup has work. It falls back to the line-based setup when a flag or the terminal rules the
  * interface out (with one note saying why, unless the T3 part has no work and the capability rows
- * are all there was to show), when it cannot be installed or imported (offline), or when it fails
- * to start or answers in a shape the command does not know. Cancelling writes nothing and reports
- * it; an applied run reports the setup it ran.
+ * are all there was to show). Public setup also stops if the selected renderer cannot load, start,
+ * or report its outcome. Before apply, the private workflow retains its legacy fallback. Cancelling
+ * writes nothing and reports it; an applied run reports the setup it ran.
  */
 export const runInteractive = Effect.fn("runInteractive")(function* (options: InteractiveOptions) {
   const line = { kind: "line", notes: [] } satisfies Interactive
@@ -299,18 +316,32 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config })
   const features =
     config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features)
-  const offers = features === undefined ? [] : capabilityOffers(options.form)
+  const offers =
+    features === undefined
+      ? []
+      : capabilityOffers(options.form).filter(
+          (offer) =>
+            options.t3Workflow !== true ||
+            options.form.form !== "headless" ||
+            offer.feature !== "browserUse",
+        )
   if (preview === undefined && offers.length === 0) return line
   const reason = tuiFallbackReason(options)
   // With no T3 work the capability rows are all the screen would hold; a scripted run has nothing
   // to explain then, as before the rows existed.
   if (reason !== undefined) return preview === undefined ? line : fallback(reason)
-  const load = options.load ?? ((env, notify) => loadSetupTui(env, { notify }))
+  const load =
+    options.load ??
+    (options.t3Workflow
+      ? () => loadPackagedSetupTui()
+      : (env, notify) => loadSetupTui(env, { notify }))
   const loaded = yield* load(options.env, options.notify).pipe(
     Effect.catchTag("TuiUnavailable", (error) => Effect.succeed(error)),
   )
-  if (loaded instanceof TuiUnavailable) return fallback(`unavailable (${loaded.reason})`)
+  const fail = options.t3Workflow ? stopped : fallback
+  if (loaded instanceof TuiUnavailable) return fail(`unavailable (${loaded.reason})`)
   const initialSwitches = features === undefined ? {} : features
+  let applyStarted = false
   const input: TuiInput = {
     env: options.env,
     offer: offerOf(preview, offers, options.form),
@@ -335,11 +366,13 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
           )
         }),
       ),
-    apply: (choices, signal) =>
-      Effect.runPromise(
+    apply: (choices, signal) => {
+      applyStarted = true
+      return Effect.runPromise(
         options.apply(choices, changedSwitches(initialSwitches, choices.capabilities)),
         { signal },
-      ),
+      )
+    },
   }
   return yield* Effect.tryPromise({
     try: () => loaded.runSetupTui(input),
@@ -364,7 +397,11 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
               },
       }
     }),
-    Effect.catch((cause) => Effect.succeed(fallback(`failed to start (${oneLine(cause)})`))),
+    Effect.catch((cause) => {
+      const detail = oneLine(cause)
+      if (applyStarted) return Effect.succeed(stopped(`failed (${detail})`, true))
+      return Effect.succeed(fail(`failed to start (${detail})`))
+    }),
   )
 })
 
