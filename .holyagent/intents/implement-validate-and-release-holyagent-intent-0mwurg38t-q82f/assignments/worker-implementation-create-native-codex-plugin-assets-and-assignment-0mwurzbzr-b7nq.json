@@ -1,0 +1,30 @@
+{
+  "id": "assignment-0mwurzbzr-b7nq",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "create-native-codex-plugin-assets-and",
+  "objective": "Create native Codex plugin assets and separately loadable specialist profiles",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Upstream Codex loads native plugin assets and profiles without Pi or Claude control flow",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/integrations/codex"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:13:48.280Z"
+  },
+  "createdAt": "2026-11-24T14:13:48.280Z"
+}
