@@ -1,0 +1,28 @@
+{
+  "id": "assignment-0mwurgqy9-e13e",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Explorer.trace",
+  "slug": "audit-shared-core-and-instruction",
+  "objective": "Audit shared Core and instruction boundaries for proportional work",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "List evidence-linked directive conflicts and simplifications with baseline coverage.",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "medium",
+    "startedAt": "2026-11-24T13:59:21.201Z"
+  },
+  "createdAt": "2026-11-24T13:59:21.201Z"
+}
