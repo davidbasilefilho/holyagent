@@ -31,8 +31,10 @@ afterEach(() => remove())
 
 const TERMINAL = { stdin: true, stdout: true }
 
-/** Every capability on, as the config defaults leave them. */
-const ALL_ON = Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, true]))
+/** The default switches as displayed in the setup form. */
+const DEFAULT_SWITCHES = Object.fromEntries(
+  CAPABILITIES.map((capability) => [capability.feature, capability.defaultOn]),
+)
 
 /** A machine with T3 Code, and an Android SDK unless `sdk` is false. */
 const machine = async (options: { sdk?: boolean; t3?: boolean } = {}) => {
@@ -304,7 +306,11 @@ describe("setup with the interface", () => {
     let review: Review | undefined
     const shown = interface_(async (input) => {
       seen = input
-      const choices: Choices = { worktrees: false, deviceAccess: true, capabilities: ALL_ON }
+      const choices: Choices = {
+        worktrees: false,
+        deviceAccess: true,
+        capabilities: DEFAULT_SWITCHES,
+      }
       review = await input.review(choices)
       const applied = await input.apply(choices, new AbortController().signal)
       return { _tag: "Applied", applied }
@@ -318,7 +324,11 @@ describe("setup with the interface", () => {
     expect(seen?.offer.capabilities.map((capability) => capability.name)).toEqual(
       CAPABILITIES.map((capability) => capability.name),
     )
-    expect(seen?.initial).toEqual({ worktrees: true, deviceAccess: true, capabilities: ALL_ON })
+    expect(seen?.initial).toEqual({
+      worktrees: true,
+      deviceAccess: true,
+      capabilities: DEFAULT_SWITCHES,
+    })
     expect(seen?.dryRun).toBe(false)
     expect(review?.file).toBe(t3File())
     expect(review?.choices.map((line) => [line.mark, line.name])).toEqual([
@@ -363,7 +373,7 @@ describe("setup with the interface", () => {
     expect(seen?.offer.capabilities.map((offer) => offer.name)).toEqual(
       CAPABILITIES.map((capability) => capability.name),
     )
-    expect(seen?.initial.capabilities).toEqual(ALL_ON)
+    expect(seen?.initial.capabilities).toEqual(DEFAULT_SWITCHES)
     // Only the switch the person changed is written; the untouched rows keep their defaults out of the file.
     expect(await Bun.file(join(home, ".holyagent", "config.json")).json()).toEqual({
       pi: { features: { todo: false } },
@@ -421,10 +431,7 @@ describe("setup with the interface", () => {
     await Bun.write(t3File(), "[1]")
     const shown = interface_(async (input) => ({
       _tag: "Applied",
-      applied: await input.apply(
-        { worktrees: true, deviceAccess: true, capabilities: ALL_ON },
-        new AbortController().signal,
-      ),
+      applied: await input.apply(input.initial, new AbortController().signal),
     }))
     const result = await cli([], { terminal: TERMINAL, setupTui: shown.loader })
     expect(t3Line(result.stdout)).toStartWith("! t3 settings:")
@@ -439,10 +446,7 @@ describe("setup with the interface", () => {
       dry = input.dryRun
       return {
         _tag: "Applied",
-        applied: await input.apply(
-          { worktrees: true, deviceAccess: true, capabilities: ALL_ON },
-          new AbortController().signal,
-        ),
+        applied: await input.apply(input.initial, new AbortController().signal),
       }
     })
     const result = await cli(["--dry-run"], { terminal: TERMINAL, setupTui: shown.loader })

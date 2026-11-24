@@ -18,7 +18,8 @@ import { Effect } from "effect"
 import { COMMANDS } from "../../../runtime/src/cli/commands.ts"
 import { run } from "../../../runtime/src/cli/program.ts"
 import { CAPABILITIES, inventory } from "../../../runtime/src/native/catalog.ts"
-import { createExtension } from "../src/extension.ts"
+import { decodeRecord } from "../../../runtime/src/toon.ts"
+import { createExtension, ROLE_FLAG } from "../src/extension.ts"
 import { NATIVE_ROOT_FLAG, type NativeTools, registerNativeTools } from "../src/native-tools.ts"
 
 const assertOutsideGit = (cwd: string) => {
@@ -54,6 +55,7 @@ describe("direct native operation boundaries", () => {
                 factory: (pi) => {
                   const native = registerNativeTools(pi, {
                     env: { ...process.env, HOME: cwd, HOLYAGENT_HOME: cwd },
+                    isRoot: () => root,
                   })
                   if (root) rootTools = native
                   pi.on("session_start", () => native.setEnabled(true))
@@ -152,6 +154,119 @@ describe("direct native operation boundaries", () => {
     }
   }, 15000)
 
+  test("the real Pi SDK grants native wait and Core only to an authorized root", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "holyagent-native-role-"))
+    const home = join(cwd, "home")
+    const project = join(cwd, "project")
+    try {
+      assertOutsideGit(cwd)
+      await mkdir(join(home, ".holyagent"), { recursive: true })
+      await mkdir(project)
+      await writeFile(
+        join(home, ".holyagent", "config.json"),
+        JSON.stringify({ pi: { enable: true } }),
+      )
+      const build = async (role: string) => {
+        const env = { ...process.env, HOME: home, HOLYAGENT_HOME: home }
+        const services = await createAgentSessionServices({
+          cwd: project,
+          agentDir: join(cwd, role),
+          extensionFlagValues: new Map<string, string | boolean>([
+            [NATIVE_ROOT_FLAG, true],
+            [ROLE_FLAG, role],
+          ]),
+          resourceLoaderOptions: {
+            noSkills: true,
+            noPromptTemplates: true,
+            noThemes: true,
+            noContextFiles: true,
+            extensionFactories: [
+              { name: "holyagent", factory: createExtension({ packageRoot: cwd, env }) },
+            ],
+          },
+        })
+        const { session } = await createAgentSessionFromServices({
+          services,
+          sessionManager: SessionManager.inMemory(project),
+        })
+        await session.bindExtensions({ onError: () => {} })
+        return session
+      }
+      const root = await build("root")
+      const specialist = await build("specialist")
+      try {
+        expect(root.getActiveToolNames()).toContain("wait_for_agents")
+        expect(root.getCallableToolNames()).toContain("holyagent_intent_create")
+        expect(specialist.getActiveToolNames()).not.toContain("wait_for_agents")
+        for (const name of ["wait_for_agents", "holyagent_intent_create"]) {
+          expect(specialist.getCallableToolNames()).not.toContain(name)
+          expect(specialist.getToolDefinition(name)).toBeUndefined()
+        }
+
+        const wait = root.getToolDefinition("wait_for_agents")
+        const create = root.getToolDefinition("holyagent_intent_create")
+        if (wait === undefined || create === undefined) throw new Error("root tools unavailable")
+        const callContext = { cwd: project } as never
+        const native = await create.execute(
+          "create",
+          { objective: "SDK native role fixture" },
+          undefined,
+          undefined,
+          callContext,
+        )
+        const block = native.content[0]
+        if (block?.type !== "text") throw new Error("native tool produced no text")
+        expect(native.isError).toBeUndefined()
+        expect(native.details).toMatchObject({
+          ok: true,
+          data: { objective: "SDK native role fixture" },
+        })
+        expect(block.text).toContain("objective: SDK native role fixture")
+        expect(native.details).toEqual({ ok: true, data: decodeRecord(block.text) })
+
+        // The same installed extension may still have stale registered callbacks when its
+        // effective role changes. Neither native operation may run through those references.
+        root.setSessionName("reviewer-code#12345678")
+        const deniedWait = await wait.execute(
+          "stale-wait",
+          { timeout_ms: 1 },
+          undefined,
+          undefined,
+          callContext,
+        )
+        expect(deniedWait.details).toMatchObject({
+          reason: "unavailable",
+          detail: "root capability or enabled Pi configuration is unavailable",
+        })
+        const deniedCreate = await create.execute(
+          "stale-create",
+          { objective: "must never be written" },
+          undefined,
+          undefined,
+          callContext,
+        )
+        expect(deniedCreate.isError).toBe(true)
+        await root.reload()
+        expect(root.getActiveToolNames()).not.toContain("wait_for_agents")
+        expect(root.getCallableToolNames()).not.toContain("holyagent_intent_create")
+
+        root.setSessionName("restored root")
+        await root.reload()
+        expect(root.getActiveToolNames()).toContain("wait_for_agents")
+        expect(root.getCallableToolNames()).toContain("holyagent_intent_create")
+        const list = root.getToolDefinition("holyagent_intent_list")
+        const listed = await list?.execute("list", {}, undefined, undefined, callContext)
+        expect(JSON.stringify(listed?.details)).toContain("SDK native role fixture")
+        expect(JSON.stringify(listed?.details)).not.toContain("must never be written")
+      } finally {
+        specialist.dispose()
+        root.dispose()
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
+    }
+  }, 15000)
+
   test("CLI and native operations preserve the same lifecycle on isolated projects", async () => {
     const left = await mkdtemp(join(tmpdir(), "holyagent-parity-cli-"))
     const right = await mkdtemp(join(tmpdir(), "holyagent-parity-native-"))
@@ -167,6 +282,7 @@ describe("direct native operation boundaries", () => {
       } as unknown as ExtensionAPI
       const native = registerNativeTools(pi, {
         env: { ...process.env, HOME: right, HOLYAGENT_HOME: right },
+        isRoot: () => true,
       })
       native.setEnabled(true)
       const call = async (name: string, input: object) => {

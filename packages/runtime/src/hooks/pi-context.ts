@@ -1,4 +1,3 @@
-import { decode } from "@toon-format/toon"
 import { Data, Effect, Schema } from "effect"
 
 import { bareContext, SESSION_REMINDER, sessionContext } from "../cli/sessioncontext.ts"
@@ -9,6 +8,7 @@ import kimiReminder from "../instructions/kimi-k3.1/session-reminder.md" with { 
 import { stripCitations } from "../instructions/skills.ts"
 import { fillPackageRoot } from "../pi/bun-flags.ts"
 import { piRootSection } from "../pi/root-prompt.ts"
+import { decodeRecord } from "../toon.ts"
 
 export { PI_ROOT_PLACEHOLDER } from "../pi/bun-flags.ts"
 
@@ -84,7 +84,7 @@ export const parseOutput = (
   text: string,
 ): Effect.Effect<CommandOutput, OutputUnreadable> =>
   Effect.try({
-    try: (): unknown => decode(text),
+    try: (): unknown => decodeRecord(text),
     catch: (cause) => new OutputUnreadable({ command, reason: String(cause) }),
   }).pipe(
     Effect.flatMap(Schema.decodeUnknownEffect(Fields)),

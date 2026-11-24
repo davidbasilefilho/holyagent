@@ -576,16 +576,14 @@ export const CAPABILITIES = [
     // Part of the Codex provider (`pi/codex/auto-review/`, gated in the Pi integration's
     // `auto-review.ts`): the extension's behavior, with no package or tool. The gate is keyed on the
     // provider of the active model, whatever `pi.provider` says; `provider` here only decides where
-    // setup and doctor list it. Off (the user's config alone can say it) removes the `tool_call` gate
-    // and the `/approve` command's effect.
+    // setup and doctor list it. The gate and `/approve` stay inert until the user opts in.
     name: "auto-review",
     feature: "autoReview",
-    description:
-      "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+    description: "Optionally reviews risky tool calls before they run (Codex provider only)",
     provider: "openai-codex",
     skills: [],
     applicability: "both",
-    defaultOn: true,
+    defaultOn: false,
     needs: [],
     forms: sameForm([]),
     tools: { rootExclude: [], visual: [], screen: [] },

@@ -378,14 +378,20 @@ describe("auto-review is the user file's alone", () => {
     },
   }
 
-  test("a project file cannot switch it off or set its policy, and its other settings still apply", async () => {
-    const config = await load(await setup({ project: JSON.stringify(PROJECT) }))
-    expect(config.pi.features.autoReview).toBe(true)
+  test("a project file cannot turn it on or set its policy, and its other settings still apply", async () => {
+    const config = await load(
+      await setup({
+        project: JSON.stringify({
+          pi: { ...PROJECT.pi, features: { ...PROJECT.pi.features, autoReview: true } },
+        }),
+      }),
+    )
+    expect(config.pi.features.autoReview).toBe(false)
     expect(config.pi.autoReview).toEqual({})
     expect(config.pi.features.todo).toBe(false)
   })
 
-  test("the user's own file switches it off and sets its policy, whatever the project says", async () => {
+  test("explicit user choices and their policy survive an upgrade, whatever the project says", async () => {
     const off = await load(
       await setup({
         user: JSON.stringify({ pi: { features: { autoReview: false } } }),
@@ -395,12 +401,26 @@ describe("auto-review is the user file's alone", () => {
     expect(off.pi.features.autoReview).toBe(false)
     const own = await load(
       await setup({
-        user: JSON.stringify({ pi: { autoReview: { policy: "Own.", extraPolicy: "More." } } }),
+        user: JSON.stringify({
+          pi: {
+            features: { autoReview: true },
+            autoReview: { policy: "Own.", extraPolicy: "More." },
+          },
+        }),
         project: JSON.stringify(PROJECT),
       }),
     )
     expect(own.pi.autoReview).toEqual({ policy: "Own.", extraPolicy: "More." })
     expect(own.pi.features.autoReview).toBe(true)
+  })
+
+  test("a legacy user file that only supplied policy keeps it but does not opt in", async () => {
+    const user = JSON.stringify({ pi: { autoReview: { policy: "Own." } } })
+    const where = await setup({ user })
+    const config = await load(where)
+    expect(config.pi.features.autoReview).toBe(false)
+    expect(config.pi.autoReview).toEqual({ policy: "Own." })
+    expect(await Bun.file(where.userPath).text()).toBe(user)
   })
 
   test("a project file that holds only these keys leaves the rest of its section alone", async () => {
@@ -411,6 +431,6 @@ describe("auto-review is the user file's alone", () => {
       }),
     )
     expect(config.pi.codemode.maxWorkers).toBe(8)
-    expect(config.pi.features.autoReview).toBe(true)
+    expect(config.pi.features.autoReview).toBe(false)
   })
 })

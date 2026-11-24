@@ -177,14 +177,13 @@ describe("a capability flag in setup", () => {
     }
   })
 
-  test("auto-review is the user config's alone: a choice at project or local scope is refused and points to user scope, and user scope writes it", async () => {
+  test("only a user-scope setup can opt in to auto-review or remove that opt-in", async () => {
     await write(globalSettings(), { packages: ALL })
     for (const scope of ["project", "local"] as const) {
       for (const value of [false, true]) {
         const report = await runSetup(withPi(), { scope, capabilities: { autoReview: value } })
-        // `on` is the default, so a choice for it equals what the config decides there.
-        if (value) {
-          expect(report.lines).toContain("= capability auto-review: already on")
+        if (!value) {
+          expect(report.lines).toContain("= capability auto-review: already off")
           continue
         }
         expect(report.ok).toBe(false)
@@ -194,9 +193,25 @@ describe("a capability flag in setup", () => {
         expect(await Bun.file(projectConfig()).exists()).toBe(false)
       }
     }
-    const report = await runSetup(withPi(), { capabilities: { autoReview: false } })
-    expect(report.ok).toBe(true)
+    const on = await runSetup(withPi(), { capabilities: { autoReview: true } })
+    expect(on.ok).toBe(true)
+    expect(await read(userConfig())).toEqual({ pi: { features: { autoReview: true } } })
+    const off = await runSetup(withPi(), { capabilities: { autoReview: false } })
+    expect(off.ok).toBe(true)
     expect(await read(userConfig())).toEqual({ pi: { features: { autoReview: false } } })
+  })
+
+  test("setup with the flag omitted leaves fresh and existing auto-review choices alone", async () => {
+    await write(globalSettings(), { packages: ALL })
+    expect((await runSetup(withPi())).ok).toBe(true)
+    expect(await Bun.file(userConfig()).exists()).toBe(false)
+
+    for (const features of [{ ask: false }, { autoReview: false }, { autoReview: true }]) {
+      const prior = { pi: { features } }
+      await write(userConfig(), prior)
+      expect((await runSetup(withPi())).ok).toBe(true)
+      expect(await read(userConfig())).toEqual(prior)
+    }
   })
 
   test("a locked capability can still be turned off at project scope, and on in the user file itself", async () => {
@@ -348,17 +363,23 @@ const cli = (argv: ReadonlyArray<string>, env: Record<string, string> = {}) =>
 describe("the setup command line", () => {
   test("each capability of the registry has an on|off flag, which writes the config", async () => {
     for (const capability of CAPABILITIES) {
-      const result = await cli([`--${capability.name}`, "off"])
+      const word = capability.defaultOn ? "off" : "on"
+      const mark = capability.defaultOn ? "-" : "+"
+      const result = await cli([`--${capability.name}`, word])
       expect(result.stderr).toBe("")
       expect(result.stdout).toContain(
-        `- capability ${capability.name}: turned off (pi.features.${capability.feature} in ${userConfig()})`,
+        `${mark} capability ${capability.name}: turned ${word} (pi.features.${capability.feature} in ${userConfig()})`,
       )
     }
     expect(
       Object.fromEntries(
         Object.entries(((await read(userConfig())) as { pi: { features: object } }).pi.features),
       ),
-    ).toEqual(Object.fromEntries(CAPABILITIES.map((capability) => [capability.feature, false])))
+    ).toEqual(
+      Object.fromEntries(
+        CAPABILITIES.map((capability) => [capability.feature, !capability.defaultOn]),
+      ),
+    )
   })
 
   test("--form headless names the form, and detection picks it where the machine has no display or CI is set", async () => {

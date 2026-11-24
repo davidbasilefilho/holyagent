@@ -74,6 +74,7 @@ const services = await createAgentSessionServices({
         factory: (pi) => {
           const native = registerNativeTools(pi, {
             env: { ...process.env, HOME: cwd, HOLYAGENT_HOME: cwd },
+            isRoot: () => true,
           })
           pi.on("session_start", () => native.setEnabled(true))
         },

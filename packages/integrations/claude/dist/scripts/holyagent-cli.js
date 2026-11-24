@@ -8594,11 +8594,11 @@ var CAPABILITIES = [
   {
     name: "auto-review",
     feature: "autoReview",
-    description: "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+    description: "Optionally reviews risky tool calls before they run (Codex provider only)",
     provider: "openai-codex",
     skills: [],
     applicability: "both",
-    defaultOn: true,
+    defaultOn: false,
     needs: [],
     forms: sameForm([]),
     tools: { rootExclude: [], visual: [], screen: [] },
@@ -18745,6 +18745,9 @@ import { resolve as resolve13 } from "path";
 
 var PI_PROJECT_FLAG = "--project";
 var projectOf = (args) => args[0] === PI_PROJECT_FLAG && args[1] !== undefined ? { directory: args[1], rest: args.slice(2) } : { directory: undefined, rest: args };
+var encodeRecord = (value) => encode2(value, {
+  replacer: (_key, item) => typeof item === "string" && /[\u007f-\u009f]/.test(item) ? rawString(`"${escapeString(item)}"`) : item
+}).replace(/[\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
 var vcsLive = (root, env) => merge2(gitLive(root, env), githubLive(root, env));
 var INPUT_FLAG = "input";
 var readFlags = (args, spec, usage) => gen2(function* () {
@@ -29991,9 +29994,6 @@ var PUBLIC_MAINTENANCE_COMMANDS = [
   }
 ];
 
-var encodeRecord = (value) => encode2(value, {
-  replacer: (_key, item) => typeof item === "string" && /[\u007f-\u009f]/.test(item) ? rawString(`"${escapeString(item)}"`) : item
-}).replace(/[\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
 var renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
 ${plainText(output.label)}:
 ${plainText(output.text)}

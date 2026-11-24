@@ -29,23 +29,14 @@ export interface AutoReviewChoice {
 }
 
 /**
- * Auto-review as it stands with no config read: on, with the default policy. A session starts here
- * and a user config that cannot be read leaves it here, so a failure never turns the control off.
+ * Uses the user-level config, read alone. Auto-review stays off until the user explicitly enables
+ * it (`pi.features.autoReview`) while the Pi extension is enabled. A project cannot change the
+ * choice or the policy. The gate checks the active model's provider when a tool is called.
  */
-export const AUTO_REVIEW_ON: AutoReviewChoice = { settings: {} }
-
-/**
- * The choice of the user-level config, read alone. Auto-review is a security control, so the
- * project's `.holyagent/config.json` takes no part: a repository cannot switch it off or replace or
- * extend its policy, and a project file that is malformed changes nothing. Only the user's own file
- * turns it off (`pi.features.autoReview`, or `pi.enable` for the whole extension) or sets its
- * policy; with no readable user config it is on with the default policy. It is not tied to the
- * config's provider: the gate applies whenever the active model is served by Codex.
- */
-export const autoReviewChoice = (user: Config | undefined): AutoReviewChoice =>
-  user === undefined
-    ? AUTO_REVIEW_ON
-    : { settings: user.pi.enable && user.pi.features.autoReview ? user.pi.autoReview : undefined }
+export const autoReviewChoice = (user: Config | undefined): AutoReviewChoice => ({
+  settings:
+    user?.pi.enable === true && user.pi.features.autoReview ? user.pi.autoReview : undefined,
+})
 
 /** The auto-review settings of one Pi session: the default until a choice is fixed, then the choice. */
 export interface AutoReviewSettings {
@@ -58,16 +49,16 @@ export interface AutoReviewSettings {
   readonly fix: (choice: AutoReviewChoice) => void
 }
 
-/** A fresh {@link AutoReviewSettings}, on with the default policy until a choice is fixed. */
+/** A fresh {@link AutoReviewSettings}, off until a user choice is fixed. */
 export const createAutoReviewSettings = (): AutoReviewSettings => {
-  let current = AUTO_REVIEW_ON
+  let settings: PolicyConfig | undefined
   let fixed = false
   return {
-    settings: () => current.settings,
+    settings: () => settings,
     fix: (choice) => {
       if (fixed) return
       fixed = true
-      current = choice
+      settings = choice.settings
     },
   }
 }
@@ -131,9 +122,8 @@ const APPROVE_USAGE =
  * Registers Codex auto-review on Pi: a `tool_call` gate that sends the calls the classifier picks
  * to the Codex reviewer before they run, and the `/approve` command that lifts one denied action
  * for a single retry. The gate is inert (it returns at once, and `/approve` says auto-review is
- * off) while `host.settings()` is `undefined`, which only the user's own config causes, or while
- * the active model is not served by the Codex provider: then no call is classified and none is
- * reviewed.
+ * off) while `host.settings()` is `undefined`, or while the active model is not served by the Codex
+ * provider: then no call is classified and none is reviewed.
  *
  * - `tool_call`: classifies the call; a reviewed call runs on an allow and is blocked on a deny, a
  *   timeout or a failed review, and the breaker interrupts the turn after repeated denials.

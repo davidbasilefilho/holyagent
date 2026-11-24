@@ -6,6 +6,7 @@ import { type TSchema, Type } from "typebox"
 import { canonicalPiToolName } from "../../../runtime/src/domain/host.ts"
 import { CAPABILITIES, executeNative, inventory } from "../../../runtime/src/native/catalog.ts"
 import { firstPassPrompt } from "../../../runtime/src/prompts/index.ts"
+import { encodeRecord } from "../../../runtime/src/toon.ts"
 
 /** Explicit root capability; child sessions do not inherit extension flags on pinned Pi. */
 export const NATIVE_ROOT_FLAG = "holyagent-native-root"
@@ -13,6 +14,7 @@ export const NATIVE_ROOT_FLAG = "holyagent-native-root"
 /** Settings supplied by the extension rather than a model tool input. */
 export interface NativeHost {
   readonly env: Readonly<Record<string, string | undefined>>
+  readonly isRoot: () => boolean
 }
 
 /** Controls current-session native capability and revokes in-flight operations. */
@@ -36,7 +38,7 @@ export const registerNativeTools = (pi: ExtensionAPI, host: NativeHost): NativeT
   const active = new Map<AbortController, Promise<unknown>>()
   const rootFlag = () => {
     try {
-      return VERSION === "1.5.0" && pi.getFlag(NATIVE_ROOT_FLAG) === true
+      return VERSION === "1.5.0" && pi.getFlag(NATIVE_ROOT_FLAG) === true && host.isRoot()
     } catch {
       return false
     }
@@ -110,7 +112,7 @@ export const registerNativeTools = (pi: ExtensionAPI, host: NativeHost): NativeT
             const text = cancelled
               ? "Cancelled; a state update may have completed. Reconcile state before retrying."
               : result.ok
-                ? JSON.stringify(result.data, null, 2)
+                ? encodeRecord(result.data)
                 : result.message
             return {
               content: [{ type: "text" as const, text: safeText(text) }],

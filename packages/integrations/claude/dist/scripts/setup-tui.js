@@ -3683,11 +3683,11 @@ var CAPABILITIES = [
   {
     name: "auto-review",
     feature: "autoReview",
-    description: "Has the codex-auto-review model judge risky tool calls before they run, as Codex's auto-review does (Codex provider only)",
+    description: "Optionally reviews risky tool calls before they run (Codex provider only)",
     provider: "openai-codex",
     skills: [],
     applicability: "both",
-    defaultOn: true,
+    defaultOn: false,
     needs: [],
     forms: sameForm([]),
     tools: { rootExclude: [], visual: [], screen: [] },

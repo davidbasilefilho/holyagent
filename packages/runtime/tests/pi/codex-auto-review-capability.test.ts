@@ -9,10 +9,10 @@ import { DEFAULT_CONFIG } from "../config/defaults.ts"
 describe("the auto-review capability entry", () => {
   const entry = CAPABILITIES.find((capability) => capability.name === "auto-review")
 
-  test("is its own capability, on by default, for the Codex provider only, with no package, tool or setting", () => {
+  test("is its own opt-in capability for the Codex provider only, with no package, tool or setting", () => {
     expect(entry).toMatchObject({
       feature: "autoReview",
-      defaultOn: true,
+      defaultOn: false,
       provider: "openai-codex",
       applicability: "both",
       settings: [],
@@ -20,18 +20,18 @@ describe("the auto-review capability entry", () => {
     })
     expect(entry?.tools).toEqual({ rootExclude: [], visual: [], screen: [] })
     expect(entry?.forms.headless).toEqual({ packages: [], mcpServers: [] })
-    expect(DEFAULT_CONFIG.pi.features.autoReview).toBe(true)
+    expect(DEFAULT_CONFIG.pi.features.autoReview).toBe(false)
   })
 
   test("is listed for the Codex provider, left out under any other, and follows its switch", () => {
     const features = DEFAULT_CONFIG.pi.features
-    const names = (provider: "kimi-coding-global" | "openai-codex", on = true) =>
+    const names = (provider: "kimi-coding-global" | "openai-codex", on = features.autoReview) =>
       enabledCapabilities({ ...features, autoReview: on }, { provider }).map(
         (capability) => capability.name,
       )
-    expect(names("openai-codex")).toContain("auto-review")
-    expect(names("kimi-coding-global")).not.toContain("auto-review")
-    expect(names("openai-codex", false)).not.toContain("auto-review")
+    expect(names("openai-codex")).not.toContain("auto-review")
+    expect(names("openai-codex", true)).toContain("auto-review")
+    expect(names("kimi-coding-global", true)).not.toContain("auto-review")
   })
 })
 
