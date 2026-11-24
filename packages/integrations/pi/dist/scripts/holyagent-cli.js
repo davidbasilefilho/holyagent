@@ -13733,7 +13733,7 @@ var chooseForm = (env, flag, platform = process.platform) => flag === undefined 
 var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
 
 import { join as join16 } from "path";
-var version = "0.3.4";
+var version = "0.4.0";
 var package_default = {
   name: "holyagent",
   version,

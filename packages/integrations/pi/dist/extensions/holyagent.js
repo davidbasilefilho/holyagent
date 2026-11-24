@@ -14399,7 +14399,7 @@ var describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set b
 import { join as join16 } from "node:path";
 var package_default = {
   name: "holyagent",
-  version: "0.3.4",
+  version: "0.4.0",
   private: true,
   description: "HolyAgent: a root agent that plans work as Intents and Assignments and delegates it to specialists.",
   license: "Apache-2.0",

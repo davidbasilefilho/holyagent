@@ -19,7 +19,7 @@
     },
     "packages/core": {
       "name": "@holyagent/core",
-      "version": "0.3.4",
+      "version": "0.4.0",
       "dependencies": {
         "@toon-format/toon": "^4.0.0",
         "effect": "^4.0.0",
@@ -27,11 +27,11 @@
     },
     "packages/integrations/claude": {
       "name": "@holyagent/claude",
-      "version": "0.3.4",
+      "version": "0.4.0",
     },
     "packages/integrations/pi": {
       "name": "@holyagent/pi",
-      "version": "0.3.4",
+      "version": "0.4.0",
       "dependencies": {
         "@holyagent/core": "workspace:*",
       },
@@ -48,7 +48,7 @@
     },
     "packages/runtime": {
       "name": "@holyagent/runtime",
-      "version": "0.3.4",
+      "version": "0.4.0",
       "dependencies": {
         "@holyagent/core": "workspace:*",
         "@toon-format/toon": "^4.0.0",

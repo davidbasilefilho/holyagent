@@ -13409,7 +13409,7 @@ var init_dist2 = __esm(() => {
   NUMERIC_LIKE_PATTERN = /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i;
 });
 
-var version = "0.3.4", package_default;
+var version = "0.4.0", package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "holyagent",
