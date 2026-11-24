@@ -41,11 +41,42 @@ test("the packed npm package installs distinct human and structured agent CLIs",
       NPM_CONFIG_USERCONFIG: join(directory, "user.npmrc"),
       NPM_CONFIG_GLOBALCONFIG: join(directory, "global.npmrc"),
     }
+    const execute = async (argv: string[], timeout = 15_000): Promise<Result> => {
+      const child = Bun.spawn(argv, {
+        cwd: directory,
+        env,
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout,
+      })
+      const [code, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ])
+      return { code, stdout, stderr }
+    }
     const npm = windows ? ["cmd.exe", "/d", "/c", "npm.cmd"] : ["npm"]
-    await $`${npm} install -g --prefix prefix --cache cache --ignore-scripts --no-audit --no-fund ${archive}`
-      .cwd(directory)
-      .env(env)
-      .quiet()
+    // The regular package ships renderer dependencies. A fresh install needs time to
+    // acquire them on CI before the separate launcher and state assertions begin.
+    const installation = await execute(
+      [
+        ...npm,
+        "install",
+        "-g",
+        "--prefix",
+        "prefix",
+        "--cache",
+        "cache",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund",
+        archive,
+      ],
+      90_000,
+    )
+    expect(installation.code, `npm install\n${installation.stdout}\n${installation.stderr}`).toBe(0)
     const modules = join(directory, "prefix", ...(windows ? [] : ["lib"]), "node_modules")
     for (const dependencyRoot of [modules, join(modules, "holyagent", "node_modules")]) {
       const pi = join(dependencyRoot, "@earendil-works", "pi-coding-agent")
@@ -59,14 +90,8 @@ test("the packed npm package installs distinct human and structured agent CLIs",
         : [join(directory, "prefix", "bin", name)]
     const installed =
       (name: "holyagent" | "holyagent-cli") =>
-      async (...args: string[]): Promise<Result> => {
-        const result = await $`${command(name)} ${args}`.cwd(directory).env(env).quiet().nothrow()
-        return {
-          code: result.exitCode,
-          stdout: result.stdout.toString(),
-          stderr: result.stderr.toString(),
-        }
-      }
+      (...args: string[]): Promise<Result> =>
+        execute([...command(name), ...args])
     const publicCli = installed("holyagent")
     const agentCli = installed("holyagent-cli")
     const humanVersion = await publicCli("--version")
@@ -296,4 +321,4 @@ test("the packed npm package installs distinct human and structured agent CLIs",
   } finally {
     await rm(directory, { recursive: true, force: true, maxRetries: 5 })
   }
-}, 60_000)
+}, 180_000)
