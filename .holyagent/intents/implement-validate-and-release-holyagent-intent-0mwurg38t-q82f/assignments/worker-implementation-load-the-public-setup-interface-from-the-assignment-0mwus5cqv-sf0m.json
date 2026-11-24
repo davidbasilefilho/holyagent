@@ -1,0 +1,30 @@
+{
+  "id": "assignment-0mwus5cqv-sf0m",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "load-the-public-setup-interface-from-the",
+  "objective": "Load the public setup interface from the installed package without networking or unsafe fallback",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Public setup opens its packaged renderer with cold cache and renderer failure leaves settings untouched",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/setup/tui"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:18:29.192Z"
+  },
+  "createdAt": "2026-11-24T14:18:29.192Z"
+}
