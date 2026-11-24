@@ -1,0 +1,30 @@
+{
+  "id": "assignment-0mwursuyf-18am",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "implement-a-version-aware-codex-legacy",
+  "objective": "Implement a version-aware Codex legacy feature preflight and migration fixture",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Codex 0.172.0 fixture removes only the redundant true key and preserves existing opt-outs",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/core/src/setup/codex"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:08:46.263Z"
+  },
+  "createdAt": "2026-11-24T14:08:46.263Z"
+}
