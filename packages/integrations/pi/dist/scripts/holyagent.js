@@ -11672,6 +11672,10 @@ var init_load = __esm(() => {
   JsonValue = fromJsonString2(Unknown2);
 });
 
+var init_load2 = __esm(() => {
+  init_load();
+});
+
 var init_errors7 = __esm(() => {
   init_errors5();
 });
@@ -11741,6 +11745,1706 @@ var init_package = __esm(() => {
       "@anthropic-ai/claude-code"
     ]
   };
+});
+
+import { homedir as homedir2 } from "os";
+import { join as join3 } from "path";
+var firstNonEmpty2 = (...values) => values.find((value) => value !== undefined && value !== ""), definedEnv = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0]))), homeDirectory2 = (env, fallback = homedir2) => firstNonEmpty2(env.HOME, env.USERPROFILE) ?? fallback(), claudeConfigDirectory = (env, home = homedir2) => firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? join3(homeDirectory2(env, home), ".claude"), userFiles = (env) => {
+  const home = homeDirectory2(env);
+  const claudeDir = claudeConfigDirectory(env, () => home);
+  return {
+    claudeDir,
+    settings: join3(claudeDir, "settings.json"),
+    ctx7Credentials: join3(home, ".config", "context7", "credentials.json")
+  };
+};
+var init_environment2 = () => {};
+
+var init_environment3 = __esm(() => {
+  init_environment2();
+});
+
+var UNQUOTABLE, BARE_SYNTAX, cmdExeArguments = (command, args) => {
+  for (const word of [command, ...args]) {
+    if (UNQUOTABLE.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
+      };
+    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
+      return {
+        ok: false,
+        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
+      };
+  }
+  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
+}, isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
+var init_cmd = __esm(() => {
+  UNQUOTABLE = /["%^!]|\p{Cc}/u;
+  BARE_SYNTAX = /[&|<>()]/;
+});
+
+import { spawn as spawnChild } from "child_process";
+var spawn = (program, args, options) => callback2((resume) => {
+  const child = spawnChild(program, args, {
+    cwd: options.cwd,
+    env: options.env,
+    detached: process.platform !== "win32",
+    stdio: options.discard === true ? ["ignore", "ignore", "ignore"] : ["pipe", "pipe", "pipe"],
+    windowsHide: true
+  });
+  const stdout = [];
+  const stderr = [];
+  child.stdout?.on("data", (chunk) => stdout.push(chunk));
+  child.stderr?.on("data", (chunk) => stderr.push(chunk));
+  child.stdin?.on("error", () => {});
+  child.once("error", (cause) => resume(die3(cause)));
+  child.once(options.discard === true ? "exit" : "close", (code) => resume(succeed6({
+    code: code ?? -1,
+    stdout: Buffer.concat(stdout),
+    stderr: Buffer.concat(stderr).toString("utf8")
+  })));
+  child.stdin?.end(options.stdin);
+  return suspend2(() => {
+    if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined)
+      return void_3;
+    const killed = process.platform === "win32" ? callback2((done) => {
+      const killer = spawnChild("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true
+      });
+      killer.once("error", () => {
+        child.kill("SIGKILL");
+        done(void_3);
+      });
+      killer.once("close", () => done(void_3));
+    }) : sync2(() => {
+      try {
+        if (child.pid !== undefined)
+          process.kill(-child.pid, "SIGKILL");
+      } catch {
+        child.kill("SIGKILL");
+      }
+    });
+    const exited = callback2((done) => {
+      const finish = () => done(void_3);
+      child.once("exit", finish);
+      if (child.exitCode !== null || child.signalCode !== null)
+        finish();
+      return sync2(() => {
+        child.removeListener("exit", finish);
+      });
+    });
+    return killed.pipe(andThen2(exited), timeoutOption2(2000), asVoid2);
+  });
+});
+var init_process = __esm(() => {
+  init_dist();
+});
+
+import { constants, realpathSync } from "fs";
+import { delimiter, dirname as dirname2, join as join4, posix, win32 } from "path";
+import { fileURLToPath } from "url";
+var whichWith = (fs, command, options) => {
+  const names = process.platform === "win32" && !/\.[^\\/]+$/.test(command) ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`) : [command];
+  for (const directory of options.PATH.split(delimiter)) {
+    for (const name of names) {
+      const candidate = join4(directory || ".", name);
+      try {
+        fs.accessSync(candidate, process.platform === "win32" ? constants.F_OK : constants.X_OK);
+        if (fs.statSync(candidate).isFile())
+          return candidate;
+      } catch {}
+    }
+  }
+  return null;
+}, which = (command, options) => whichWith(nodeFileSystem, command, options), pathKey = (env, insensitive = process.platform === "win32") => {
+  if (!insensitive || env.PATH !== undefined)
+    return "PATH";
+  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+}, pathWithBunBin = (env, options) => {
+  const key = pathKey(env, options.insensitive);
+  const root = options.bunInstall ? options.bunInstall : join4(options.home, ".bun");
+  const bunBin = join4(root, "bin");
+  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
+}, isInside = (api, parent, path) => {
+  const relative = api.relative(parent, path);
+  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
+}, strictWhich = (command, path, strict, lookup = which) => {
+  const windows = (strict.platform ?? process.platform) === "win32";
+  const api = windows ? win32 : posix;
+  if (!api.isAbsolute(strict.cwd))
+    return null;
+  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
+  if (trusted.length === 0)
+    return null;
+  const acceptable = (found) => {
+    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
+      return false;
+    if (windows && !found.toLowerCase().endsWith(".exe"))
+      return false;
+    if (strict.which === undefined) {
+      try {
+        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
+          return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (strict.which !== undefined) {
+    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
+    return acceptable(found) ? found : null;
+  }
+  for (const directory of trusted) {
+    const found = lookup(command, { PATH: directory });
+    if (acceptable(found))
+      return found;
+  }
+  return null;
+}, findCommand = (env, command, options, lookup = which) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
+  return fromNullishOr(options?.strict === undefined ? lookup(command, { PATH: path }) : strictWhich(command, path, options.strict, lookup));
+}, EMPTY_BUNFIG, Shell;
+var init_shell = __esm(() => {
+  init_dist();
+  init_cmd();
+  init_filesystem();
+  init_process();
+  init_environment2();
+  EMPTY_BUNFIG = join4(dirname2(fileURLToPath(import.meta.url)), "empty-bunfig.toml");
+  Shell = class Shell extends Service()("holyagent/Shell") {
+    static live = (env) => {
+      const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+      return succeed5(Shell, Shell.of({
+        which: (command, options) => sync2(() => findCommand(env, command, options)),
+        run: (command, args, options) => {
+          const runEnv = definedEnv({ ...env, ...options.env, [bunBin.key]: bunBin.value });
+          const found = process.platform === "win32" ? which(command, { PATH: runEnv[bunBin.key] ?? "" }) : null;
+          const batch = found !== null && isBatchFile(found) ? cmdExeArguments(found, args) : undefined;
+          if (batch !== undefined && !batch.ok)
+            return succeed6({ exitCode: 127, stdout: "", stderr: batch.reason });
+          return spawn(batch?.ok === true ? "cmd.exe" : command, batch?.ok === true ? batch.args : args, { cwd: options.cwd, env: runEnv }).pipe(map5((result) => ({
+            exitCode: result.code,
+            stdout: new TextDecoder().decode(result.stdout),
+            stderr: result.stderr
+          })), catchDefect2((error) => succeed6({ exitCode: 127, stdout: "", stderr: String(error) })));
+        }
+      }));
+    };
+  };
+});
+
+var {$ } = globalThis.Bun;
+var shellLive = (env) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+  return succeed5(Shell, Shell.of({
+    which: (command, options) => sync2(() => findCommand(env, command, options, Bun.which)),
+    run: (command, args, options) => tryPromise2({
+      try: () => $`${command} ${args}`.cwd(options.cwd).env(definedEnv({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+        exitCode: result.exitCode,
+        stdout: result.stdout.toString(),
+        stderr: result.stderr.toString()
+      })),
+      catch: (error) => String(error)
+    }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+  }));
+};
+var init_shell2 = __esm(() => {
+  init_dist();
+  init_shell();
+  init_environment3();
+  init_shell();
+});
+
+var TUI_BUNDLE = "setup-tui.js";
+
+var TUI_MANIFEST_NAME = "holyagent-setup-tui", Dependencies, Entry, Lock;
+var init_lock = __esm(() => {
+  init_dist();
+  Dependencies = optional2(Record(String6, String6));
+  Entry = TupleWithRest(Tuple([
+    String6,
+    String6,
+    Struct({
+      dependencies: Dependencies,
+      optionalDependencies: Dependencies,
+      peerDependencies: Dependencies
+    })
+  ]), [Unknown2]);
+  Lock = Struct({
+    lockfileVersion: Number6,
+    configVersion: optional2(Number6),
+    packages: Record(String6, Unknown2)
+  });
+});
+
+var TUI_PACKAGES = {
+  "@opentui/core": "0.9.7",
+  "@opentui/solid": "0.9.7",
+  "solid-js": "1.9.20"
+}, TUI_LOCK = `{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "holyagent-setup-tui",
+      "dependencies": {
+        "@opentui/core": "0.9.7",
+        "@opentui/solid": "0.9.7",
+        "solid-js": "1.9.20"
+      }
+    }
+  },
+  "packages": {
+    "@babel/code-frame": [
+      "@babel/code-frame@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "js-tokens": "^4.0.0",
+          "picocolors": "^1.1.1"
+        }
+      },
+      "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="
+    ],
+    "@babel/compat-data": [
+      "@babel/compat-data@7.29.7",
+      "",
+      {},
+      "sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg=="
+    ],
+    "@babel/core": [
+      "@babel/core@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.7",
+          "@babel/helper-compilation-targets": "^7.29.7",
+          "@babel/helper-module-transforms": "^7.29.7",
+          "@babel/helpers": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/template": "^7.29.7",
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7",
+          "@jridgewell/remapping": "^2.3.5",
+          "convert-source-map": "^2.0.0",
+          "debug": "^4.1.0",
+          "gensync": "^1.0.0-beta.2",
+          "json5": "^2.2.3",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
+    ],
+    "@babel/generator": [
+      "@babel/generator@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/parser": "^7.29.15",
+          "@babel/types": "^7.29.15",
+          "@jridgewell/gen-mapping": "^0.3.12",
+          "@jridgewell/trace-mapping": "^0.3.28",
+          "jsesc": "^3.0.2"
+        }
+      },
+      "sha512-gNWJUX0FlevflramOkaInywOMhU1lkln38gAC7TFZv2tsWbLYbN/2WZFGcq8zbX0Z55e4vGa27IB/NaeZoauWQ=="
+    ],
+    "@babel/helper-annotate-as-pure": [
+      "@babel/helper-annotate-as-pure@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-OoK6239jHPuSQOoS0kfTVKn0b/rVTk0seKq4Gd2UMLtmOVLjDC0ki3e+c90Trqv2gMfvJFqkiljrr568+qddiw=="
+    ],
+    "@babel/helper-compilation-targets": [
+      "@babel/helper-compilation-targets@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/compat-data": "^7.29.7",
+          "@babel/helper-validator-option": "^7.29.7",
+          "browserslist": "^4.24.0",
+          "lru-cache": "^5.1.1",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-8WxJ4/Vmes3ghacj8VOJy3NW8eyHiFY/4thU/LSBuBE470+igjR/j1ZTNn8fV5VdNrLx6iXUwig526UdOvfP0w=="
+    ],
+    "@babel/helper-create-class-features-plugin": [
+      "@babel/helper-create-class-features-plugin@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/helper-replace-supers": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.13",
+          "semver": "^6.3.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-fo8/Fr44/DMV71FQjk/HA0Npmu3bo5DFoWTCW1dhUR8Vx3NFfAVeEy0TbcBpt4e+hd2QhdmWgmspHo/9iWj8RA=="
+    ],
+    "@babel/helper-globals": [
+      "@babel/helper-globals@7.29.7",
+      "",
+      {},
+      "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
+    ],
+    "@babel/helper-member-expression-to-functions": [
+      "@babel/helper-member-expression-to-functions@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.14",
+          "@babel/types": "^7.29.14"
+        }
+      },
+      "sha512-FuTSn8mXKAP+aHXnbkCYQsQAdlEIJptEutwc2NaPd28hyVqsjRDmBnI2EPJX6HCodKIqOHfayQHqtxQCkqwthA=="
+    ],
+    "@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
+    ],
+    "@babel/helper-module-transforms": [
+      "@babel/helper-module-transforms@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "^7.29.7",
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "@babel/traverse": "^7.29.14"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-2XDvQVd9JESaOgGc4jT2/jquTAO7ppA5noTZQqH+MmZ89yjCzScLwtCPbWtkPZylL+TLWR49IwWmk+QkRR4GsA=="
+    ],
+    "@babel/helper-optimise-call-expression": [
+      "@babel/helper-optimise-call-expression@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-+kmGVjcT9RGYzoDwdwEqEvGgKe3BYq+O1iGzjFubaNgZHwYHP6lsF2Yghf4kEuv9BV7tYDZ913aBW9am6YKong=="
+    ],
+    "@babel/helper-plugin-utils": [
+      "@babel/helper-plugin-utils@7.29.7",
+      "",
+      {},
+      "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="
+    ],
+    "@babel/helper-replace-supers": [
+      "@babel/helper-replace-supers@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/traverse": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-atfGXWSeCiF4DnKZIfmJfQRkSw9b9gNNXR1kqKjbhG4pGYCOnkp8OcTB8E3NXjBu8NpheSnOeNKz8KT7UNFTmQ=="
+    ],
+    "@babel/helper-skip-transparent-expression-wrappers": [
+      "@babel/helper-skip-transparent-expression-wrappers@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.13",
+          "@babel/types": "^7.29.11"
+        }
+      },
+      "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
+    ],
+    "@babel/helper-string-parser": [
+      "@babel/helper-string-parser@7.29.15",
+      "",
+      {},
+      "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="
+    ],
+    "@babel/helper-validator-identifier": [
+      "@babel/helper-validator-identifier@7.29.7",
+      "",
+      {},
+      "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
+    ],
+    "@babel/helper-validator-option": [
+      "@babel/helper-validator-option@7.29.7",
+      "",
+      {},
+      "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
+    ],
+    "@babel/helpers": [
+      "@babel/helpers@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.15"
+        }
+      },
+      "sha512-l+ezV2czw3t2d2ELq+3CwPL4WLKK5O8IywBXb9/gpmbCOVZFmRYJPmHVqSCv2k+8iKbE30Zf54siOoIZ52XOxA=="
+    ],
+    "@babel/parser": [
+      "@babel/parser@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.15"
+        },
+        "bin": "./bin/babel-parser.js"
+      },
+      "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="
+    ],
+    "@babel/plugin-syntax-jsx": [
+      "@babel/plugin-syntax-jsx@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A=="
+    ],
+    "@babel/plugin-syntax-typescript": [
+      "@babel/plugin-syntax-typescript@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
+    ],
+    "@babel/plugin-transform-modules-commonjs": [
+      "@babel/plugin-transform-modules-commonjs@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-transforms": "^7.29.14",
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
+    ],
+    "@babel/plugin-transform-typescript": [
+      "@babel/plugin-transform-typescript@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-create-class-features-plugin": "^7.29.13",
+          "@babel/helper-plugin-utils": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/plugin-syntax-typescript": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-FFuMssbHj8DFMDsTH8xrgKBiE1eXuDvO9jLqav7/vsIe6YdoyPQbWCgLNzQxkcIkOv5itBD17TvZkHGIjUMzLg=="
+    ],
+    "@babel/preset-typescript": [
+      "@babel/preset-typescript@7.27.1",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.27.1",
+          "@babel/helper-validator-option": "^7.27.1",
+          "@babel/plugin-syntax-jsx": "^7.27.1",
+          "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+          "@babel/plugin-transform-typescript": "^7.27.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ=="
+    ],
+    "@babel/template": [
+      "@babel/template@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
+    ],
+    "@babel/traverse": [
+      "@babel/traverse@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.15",
+          "@babel/helper-globals": "^7.29.7",
+          "@babel/parser": "^7.29.15",
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.15",
+          "debug": "^4.3.1"
+        }
+      },
+      "sha512-ZfawBo2i8vvt+BTt37dWDKBPjUfm/H+bw+ltwsCRhW7gPtyNVwUXuNo54eO2Xo+P4VXpalPFfFISbBTRKC8SOQ=="
+    ],
+    "@babel/types": [
+      "@babel/types@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-string-parser": "^7.29.15",
+          "@babel/helper-validator-identifier": "^7.29.7"
+        }
+      },
+      "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="
+    ],
+    "@jridgewell/gen-mapping": [
+      "@jridgewell/gen-mapping@0.3.13",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/sourcemap-codec": "^1.5.0",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
+    ],
+    "@jridgewell/remapping": [
+      "@jridgewell/remapping@2.3.5",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/gen-mapping": "^0.3.5",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
+    ],
+    "@jridgewell/resolve-uri": [
+      "@jridgewell/resolve-uri@3.1.3",
+      "",
+      {},
+      "sha512-lhTtjtoEArWBjismtfS761S9Hlyn+nIZqOZVYoZ1Xn82PMNMVnk+jj/NhC4fAXGTs7ydONcJiR5vyQBTMDu27g=="
+    ],
+    "@jridgewell/sourcemap-codec": [
+      "@jridgewell/sourcemap-codec@1.6.0",
+      "",
+      {},
+      "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
+    ],
+    "@jridgewell/trace-mapping": [
+      "@jridgewell/trace-mapping@0.3.31",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/resolve-uri": "^3.1.0",
+          "@jridgewell/sourcemap-codec": "^1.4.14"
+        }
+      },
+      "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
+    ],
+    "@opentui/core": [
+      "@opentui/core@0.9.7",
+      "",
+      {
+        "dependencies": {
+          "bun-ffi-structs": "0.3.1",
+          "diff": "9.0.0",
+          "string-width": "7.2.0"
+        },
+        "optionalDependencies": {
+          "@opentui/core-darwin-arm64": "0.9.7",
+          "@opentui/core-darwin-x64": "0.9.7",
+          "@opentui/core-linux-arm64": "0.9.7",
+          "@opentui/core-linux-arm64-musl": "0.9.7",
+          "@opentui/core-linux-x64": "0.9.7",
+          "@opentui/core-linux-x64-musl": "0.9.7",
+          "@opentui/core-win32-arm64": "0.9.7",
+          "@opentui/core-win32-x64": "0.9.7"
+        },
+        "peerDependencies": {
+          "web-tree-sitter": "0.25.10"
+        }
+      },
+      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
+    ],
+    "@opentui/core-darwin-arm64": [
+      "@opentui/core-darwin-arm64@0.9.7",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "arm64"
+      },
+      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
+    ],
+    "@opentui/core-darwin-x64": [
+      "@opentui/core-darwin-x64@0.9.7",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "x64"
+      },
+      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
+    ],
+    "@opentui/core-linux-arm64": [
+      "@opentui/core-linux-arm64@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64"
+      },
+      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
+    ],
+    "@opentui/core-linux-arm64-musl": [
+      "@opentui/core-linux-arm64-musl@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64",
+        "libc": "musl"
+      },
+      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
+    ],
+    "@opentui/core-linux-x64": [
+      "@opentui/core-linux-x64@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64"
+      },
+      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
+    ],
+    "@opentui/core-linux-x64-musl": [
+      "@opentui/core-linux-x64-musl@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64",
+        "libc": "musl"
+      },
+      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
+    ],
+    "@opentui/core-win32-arm64": [
+      "@opentui/core-win32-arm64@0.9.7",
+      "",
+      {
+        "os": "win32",
+        "cpu": "arm64"
+      },
+      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
+    ],
+    "@opentui/core-win32-x64": [
+      "@opentui/core-win32-x64@0.9.7",
+      "",
+      {
+        "os": "win32",
+        "cpu": "x64"
+      },
+      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
+    ],
+    "@opentui/solid": [
+      "@opentui/solid@0.9.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/core": "7.29.7",
+          "@babel/preset-typescript": "7.27.1",
+          "@opentui/core": "0.9.7",
+          "babel-plugin-module-resolver": "5.0.2",
+          "babel-preset-solid": "1.9.16",
+          "entities": "7.0.1",
+          "s-js": "^0.4.9"
+        },
+        "peerDependencies": {
+          "solid-js": "^1.9.12"
+        }
+      },
+      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
+    ],
+    "ansi-regex": [
+      "ansi-regex@6.6.0",
+      "",
+      {},
+      "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
+    ],
+    "babel-plugin-jsx-dom-expressions": [
+      "babel-plugin-jsx-dom-expressions@0.40.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "7.18.6",
+          "@babel/plugin-syntax-jsx": "^7.18.6",
+          "@babel/types": "^7.20.7",
+          "html-entities": "2.3.3",
+          "parse5": "^7.1.2"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.20.12"
+        }
+      },
+      "sha512-5RDcd9lN4eVJyvIrkV7xwuGT+EYVTnWmqO9A8alGRVVLY95aA/U0cNGWv3ThWeI+/ufe2MMS6lILyuWsHmFBgA=="
+    ],
+    "babel-plugin-module-resolver": [
+      "babel-plugin-module-resolver@5.0.2",
+      "",
+      {
+        "dependencies": {
+          "find-babel-config": "^2.1.1",
+          "glob": "^9.3.3",
+          "pkg-up": "^3.1.0",
+          "reselect": "^4.1.7",
+          "resolve": "^1.22.8"
+        }
+      },
+      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
+    ],
+    "babel-preset-solid": [
+      "babel-preset-solid@1.9.16",
+      "",
+      {
+        "dependencies": {
+          "babel-plugin-jsx-dom-expressions": "^0.40.11"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0",
+          "solid-js": "^1.9.16"
+        },
+        "optionalPeers": [
+          "solid-js"
+        ]
+      },
+      "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
+    ],
+    "baseline-browser-mapping": [
+      "baseline-browser-mapping@2.11.39",
+      "",
+      {
+        "bin": {
+          "baseline-browser-mapping": "dist/cli.cjs"
+        }
+      },
+      "sha512-Q9buOYhr2ggrEZpImICecZTJHCCd8yXkRUokFlUEQ8uiD6oP82F4W4jWnhOHZYV+wlvrC51V7Wy0ULyWjil5Wg=="
+    ],
+    "browserslist": [
+      "browserslist@4.29.6",
+      "",
+      {
+        "dependencies": {
+          "baseline-browser-mapping": "^2.11.37",
+          "caniuse-lite": "^1.0.30001826",
+          "electron-to-chromium": "^1.5.486",
+          "node-releases": "^2.0.64",
+          "update-browserslist-db": "^1.4.0"
+        },
+        "bin": {
+          "browserslist": "cli.js"
+        }
+      },
+      "sha512-CmVVIQ3RVc5HxYEc9X84GvxK/C8C1wH8TlKAiO7uTxF8PDwt7r8t9Qk3J9NkMOVzX5O/HbLv3yzxZg9HPrnI9w=="
+    ],
+    "bun-ffi-structs": [
+      "bun-ffi-structs@0.3.1",
+      "",
+      {
+        "peerDependencies": {
+          "typescript": "^5"
+        }
+      },
+      "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
+    ],
+    "caniuse-lite": [
+      "caniuse-lite@1.0.30001827",
+      "",
+      {},
+      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
+    ],
+    "convert-source-map": [
+      "convert-source-map@2.0.0",
+      "",
+      {},
+      "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
+    ],
+    "csstype": [
+      "csstype@3.2.4",
+      "",
+      {},
+      "sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ=="
+    ],
+    "debug": [
+      "debug@4.4.3",
+      "",
+      {
+        "dependencies": {
+          "ms": "^2.1.3"
+        },
+        "peerDependencies": {
+          "supports-color": "*"
+        },
+        "optionalPeers": [
+          "supports-color"
+        ]
+      },
+      "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="
+    ],
+    "diff": [
+      "diff@9.0.0",
+      "",
+      {},
+      "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
+    ],
+    "electron-to-chromium": [
+      "electron-to-chromium@1.5.492",
+      "",
+      {},
+      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
+    ],
+    "emoji-regex": [
+      "emoji-regex@10.6.0",
+      "",
+      {},
+      "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="
+    ],
+    "entities": [
+      "entities@7.0.1",
+      "",
+      {},
+      "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
+    ],
+    "es-errors": [
+      "es-errors@1.3.0",
+      "",
+      {},
+      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
+    ],
+    "escalade": [
+      "escalade@3.2.0",
+      "",
+      {},
+      "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
+    ],
+    "find-babel-config": [
+      "find-babel-config@2.1.2",
+      "",
+      {
+        "dependencies": {
+          "json5": "^2.2.3"
+        }
+      },
+      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
+    ],
+    "fs.realpath": [
+      "fs.realpath@1.0.0",
+      "",
+      {},
+      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
+    ],
+    "function-bind": [
+      "function-bind@1.1.2",
+      "",
+      {},
+      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
+    ],
+    "gensync": [
+      "gensync@1.0.0-beta.2",
+      "",
+      {},
+      "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="
+    ],
+    "get-east-asian-width": [
+      "get-east-asian-width@1.6.0",
+      "",
+      {},
+      "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
+    ],
+    "glob": [
+      "glob@9.3.5",
+      "",
+      {
+        "dependencies": {
+          "fs.realpath": "^1.0.0",
+          "minimatch": "^8.0.2",
+          "minipass": "^4.2.4",
+          "path-scurry": "^1.6.1"
+        }
+      },
+      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
+    ],
+    "hasown": [
+      "hasown@2.0.4",
+      "",
+      {
+        "dependencies": {
+          "function-bind": "^1.1.2"
+        }
+      },
+      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
+    ],
+    "is-core-module": [
+      "is-core-module@2.18.0",
+      "",
+      {
+        "dependencies": {
+          "hasown": "^2.0.4"
+        }
+      },
+      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
+    ],
+    "js-tokens": [
+      "js-tokens@4.0.0",
+      "",
+      {},
+      "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="
+    ],
+    "jsesc": [
+      "jsesc@3.1.0",
+      "",
+      {
+        "bin": {
+          "jsesc": "bin/jsesc"
+        }
+      },
+      "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="
+    ],
+    "json5": [
+      "json5@2.2.3",
+      "",
+      {
+        "bin": {
+          "json5": "lib/cli.js"
+        }
+      },
+      "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
+    ],
+    "minipass": [
+      "minipass@4.2.8",
+      "",
+      {},
+      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
+    ],
+    "ms": [
+      "ms@2.1.3",
+      "",
+      {},
+      "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
+    ],
+    "node-releases": [
+      "node-releases@2.0.65",
+      "",
+      {},
+      "sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA=="
+    ],
+    "p-try": [
+      "p-try@2.2.0",
+      "",
+      {},
+      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
+    ],
+    "parse5": [
+      "parse5@7.3.0",
+      "",
+      {
+        "dependencies": {
+          "entities": "^6.0.0"
+        }
+      },
+      "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
+    ],
+    "path-parse": [
+      "path-parse@1.0.7",
+      "",
+      {},
+      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
+    ],
+    "path-scurry": [
+      "path-scurry@1.11.1",
+      "",
+      {
+        "dependencies": {
+          "lru-cache": "^10.2.0",
+          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
+        }
+      },
+      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
+    ],
+    "picocolors": [
+      "picocolors@1.1.1",
+      "",
+      {},
+      "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
+    ],
+    "pkg-up": [
+      "pkg-up@3.1.0",
+      "",
+      {
+        "dependencies": {
+          "find-up": "^3.0.0"
+        }
+      },
+      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
+    ],
+    "reselect": [
+      "reselect@4.1.8",
+      "",
+      {},
+      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
+    ],
+    "resolve": [
+      "resolve@1.22.14",
+      "",
+      {
+        "dependencies": {
+          "es-errors": "^1.3.0",
+          "is-core-module": "^2.18.0",
+          "path-parse": "^1.0.7",
+          "supports-preserve-symlinks-flag": "^1.0.0"
+        },
+        "bin": {
+          "resolve": "bin/resolve"
+        }
+      },
+      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
+    ],
+    "s-js": [
+      "s-js@0.4.9",
+      "",
+      {},
+      "sha512-RtpOm+cM6O0sHg6IA70wH+UC3FZcND+rccBZpBAHzlUgNO2Bm5BN+FnM8+OBxzXdwpKWFwX11JGF0MFRkhSoIQ=="
+    ],
+    "seroval": [
+      "seroval@1.6.12",
+      "",
+      {},
+      "sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg=="
+    ],
+    "seroval-plugins": [
+      "seroval-plugins@1.6.12",
+      "",
+      {
+        "peerDependencies": {
+          "seroval": "^1.0"
+        }
+      },
+      "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
+    ],
+    "solid-js": [
+      "solid-js@1.9.20",
+      "",
+      {
+        "dependencies": {
+          "csstype": "^3.1.0",
+          "seroval": "~1.6.11",
+          "seroval-plugins": "~1.6.8"
+        }
+      },
+      "sha512-7zEbPxRU5/hHX8O/rYtQ34p/wq44w09gv0u4+myOW5Ode8unKhoG5FbcGlqRXKqqDuDW9yOJ1OXoHgUUl/1f3Q=="
+    ],
+    "string-width": [
+      "string-width@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "emoji-regex": "^10.3.0",
+          "get-east-asian-width": "^1.0.0",
+          "strip-ansi": "^7.1.0"
+        }
+      },
+      "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="
+    ],
+    "strip-ansi": [
+      "strip-ansi@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "ansi-regex": "^6.2.2"
+        }
+      },
+      "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
+    ],
+    "supports-preserve-symlinks-flag": [
+      "supports-preserve-symlinks-flag@1.0.0",
+      "",
+      {},
+      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
+    ],
+    "typescript": [
+      "typescript@5.9.3",
+      "",
+      {
+        "bin": {
+          "tsc": "bin/tsc",
+          "tsserver": "bin/tsserver"
+        }
+      },
+      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    ],
+    "update-browserslist-db": [
+      "update-browserslist-db@1.4.0",
+      "",
+      {
+        "dependencies": {
+          "escalade": "^3.2.0",
+          "picocolors": "^1.1.1"
+        },
+        "peerDependencies": {
+          "browserslist": ">= 4.21.0"
+        },
+        "bin": {
+          "update-browserslist-db": "cli.js"
+        }
+      },
+      "sha512-WPJuOnjI9FWDct4fB+ej4Mz8opLaw5CDcZ2t44tFZ0vIQVYWzBhWR3mkixuUj/A7+vY4V9+ApOZ2YYLwdgq46w=="
+    ],
+    "web-tree-sitter": [
+      "web-tree-sitter@0.25.10",
+      "",
+      {
+        "peerDependencies": {
+          "@types/emscripten": "^1.40.0"
+        },
+        "optionalPeers": [
+          "@types/emscripten"
+        ]
+      },
+      "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="
+    ],
+    "yallist": [
+      "yallist@3.1.1",
+      "",
+      {},
+      "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="
+    ],
+    "@babel/core/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-compilation-targets/lru-cache": [
+      "lru-cache@5.1.1",
+      "",
+      {
+        "dependencies": {
+          "yallist": "^3.0.2"
+        }
+      },
+      "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="
+    ],
+    "@babel/helper-compilation-targets/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-create-class-features-plugin/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "babel-plugin-jsx-dom-expressions/@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.18.6",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.18.6"
+        }
+      },
+      "sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA=="
+    ],
+    "babel-plugin-jsx-dom-expressions/html-entities": [
+      "html-entities@2.3.3",
+      "",
+      {},
+      "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
+    ],
+    "glob/minimatch": [
+      "minimatch@8.0.7",
+      "",
+      {
+        "dependencies": {
+          "brace-expansion": "^2.0.1"
+        }
+      },
+      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
+    ],
+    "parse5/entities": [
+      "entities@6.0.1",
+      "",
+      {},
+      "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
+    ],
+    "path-scurry/lru-cache": [
+      "lru-cache@10.4.3",
+      "",
+      {},
+      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
+    ],
+    "path-scurry/minipass": [
+      "minipass@7.1.3",
+      "",
+      {},
+      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
+    ],
+    "pkg-up/find-up": [
+      "find-up@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "locate-path": "^3.0.0"
+        }
+      },
+      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
+    ],
+    "glob/minimatch/brace-expansion": [
+      "brace-expansion@2.1.8",
+      "",
+      {
+        "dependencies": {
+          "balanced-match": "^1.0.0"
+        }
+      },
+      "sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig=="
+    ],
+    "pkg-up/find-up/locate-path": [
+      "locate-path@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-locate": "^3.0.0",
+          "path-exists": "^3.0.0"
+        }
+      },
+      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
+    ],
+    "glob/minimatch/brace-expansion/balanced-match": [
+      "balanced-match@1.0.2",
+      "",
+      {},
+      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate": [
+      "p-locate@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-limit": "^2.0.0"
+        }
+      },
+      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
+    ],
+    "pkg-up/find-up/locate-path/path-exists": [
+      "path-exists@3.0.0",
+      "",
+      {},
+      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate/p-limit": [
+      "p-limit@2.3.0",
+      "",
+      {
+        "dependencies": {
+          "p-try": "^2.0.0"
+        }
+      },
+      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
+    ]
+  }
+}
+`;
+
+import { lstat as lstat2, mkdir as mkdir3, mkdtemp, readdir, rename as rename3, rm as rm3, stat as stat2, writeFile as writeFile3 } from "fs/promises";
+import { userInfo } from "os";
+import { basename, dirname as dirname3, join as join5, posix as posix2, win32 as win322 } from "path";
+import { pathToFileURL } from "url";
+var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win322 : posix2, cacheHome = (env, platform = process.platform) => {
+  const home = homeDirectory2(env);
+  const { join } = pathModule(platform);
+  if (platform === "win32")
+    return firstNonEmpty2(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
+  const xdg = firstNonEmpty2(env["XDG_CACHE_HOME"]);
+  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
+}, guardedFolders = (env, platform) => {
+  const { join } = pathModule(platform);
+  const holyagent = join(cacheHome(env, platform), "holyagent");
+  return [holyagent, join(holyagent, "setup-tui")];
+}, lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8), tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
+  ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
+  lockHash(lock)
+].join("_")), INSTALLED_MARKER = ".holyagent-installed", markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
+`, FORMAT_CHARACTERS, plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
+  const code = character.codePointAt(0) ?? 0;
+  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
+}).join(""), oneLine = (text) => plain(text.trim().split(`
+`)[0] ?? "").trim(), failureLine = (text) => {
+  const lines = text.split(`
+`).map((line) => plain(line).trim()).filter((line) => line !== "");
+  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
+}, unavailable = (what, cause) => new TuiUnavailable({
+  reason: plain(`${what}: ${oneLine(cause instanceof Error ? cause.message : String(cause))}`)
+}), bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
+  const manifest = `${JSON.stringify({ name: TUI_MANIFEST_NAME, private: true, dependencies: packages }, undefined, 2)}
+`;
+  for (const [file, text] of [
+    ["package.json", manifest],
+    ["bun.lock", lock]
+  ])
+    yield* tryPromise2({
+      try: () => Bun.write(join5(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join5(directory, file)}`, cause)
+    });
+  const shell = yield* Shell;
+  const result = yield* shell.run("bun", [
+    "--no-env-file",
+    `--config=${EMPTY_BUNFIG}`,
+    "install",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ], { cwd: directory });
+  if (result.exitCode !== 0)
+    return yield* new TuiUnavailable({
+      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
+    });
+}), importFile = (path) => tryPromise2({
+  try: () => import(pathToFileURL(path).href),
+  catch: (cause) => unavailable(`cannot import ${path}`, cause)
+}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join5(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+  return;
+})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join5(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+  return;
+}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", loadPackagedSetupTui = (bundle = join5(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
+  const preload = yield* try_2({
+    try: () => Bun.resolveSync("@opentui/solid/preload", dirname3(bundle)),
+    catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause)
+  });
+  yield* importFile(preload);
+  const loaded = yield* importFile(bundle);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
+  return loaded;
+}), fileSystem2 = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
+  if (create)
+    yield* fileSystem2(`cannot create ${folder}`, () => mkdir3(folder, { recursive: true, mode: 448 }));
+  const found = yield* tryPromise2({
+    try: () => lstat2(folder),
+    catch: (cause) => cause
+  }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
+  if (found === undefined || uid === undefined)
+    return;
+  const refuse = (why) => new TuiUnavailable({
+    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
+  });
+  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat2(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
+  if (target.isSymbolicLink() || !target.isDirectory())
+    return yield* refuse("is not a plain directory");
+  if (target.uid !== uid)
+    return yield* refuse("belongs to another user");
+  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
+    return;
+  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
+    return;
+  return yield* refuse("can be written by others");
+}), namesPrivateGroup = (groupFile, gid, userName) => {
+  const entries = groupFile.split(`
+`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
+  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
+}, privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
+  const name = userName ?? (yield* try_2(() => userInfo().username));
+  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
+  return namesPrivateGroup(text, gid, name);
+}).pipe(orElseSucceed2(() => false)), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem2(`cannot write ${target}`, () => writeFile3(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem2(`cannot write ${target}`, () => rename3(temporary, target)))), (temporary) => promise2(() => rm3(temporary, { force: true }))), remove = (path) => promise2(() => rm3(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
+  for (let attempt = 0;attempt < 3; attempt += 1) {
+    const moved = yield* exit2(fileSystem2(`cannot move ${temporary}`, () => rename3(temporary, directory)));
+    if (moved._tag === "Success")
+      return;
+    if (yield* installed(directory, packages, lock))
+      return;
+    yield* remove(directory);
+  }
+  return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
+}), STALE_AFTER_MS, newestChange = (path) => gen2(function* () {
+  const modified = (entry) => tryPromise2(() => lstat2(entry)).pipe(map5((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir(folder)).pipe(map5((names) => names.map((name) => join5(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join5(path, "node_modules"))];
+  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
+  return Math.max(...times);
+}), sweepStale = (directory, uid) => gen2(function* () {
+  const parent = dirname3(directory);
+  const prefix = `.${basename(directory)}-`;
+  const cutoff = Date.now() - STALE_AFTER_MS;
+  const names = yield* tryPromise2(() => readdir(parent));
+  yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
+    const path = join5(parent, name);
+    const found = yield* tryPromise2(() => lstat2(path));
+    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
+      yield* remove(path);
+  }).pipe(ignore2));
+}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp(join5(dirname3(directory), `.${basename(directory)}-`))))), (temporary) => gen2(function* () {
+  yield* install(temporary, packages, lock);
+  if (!(yield* hasPackages(temporary, packages)))
+    return yield* new TuiUnavailable({
+      reason: `the install finished but ${directory} does not hold the expected package versions`
+    });
+  yield* writeFresh(join5(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* promote(temporary, directory, packages, lock);
+}), remove), loadSetupTui = (env, options = {}) => gen2(function* () {
+  const packages = options.packages ?? TUI_PACKAGES;
+  const lock = options.lock ?? TUI_LOCK;
+  const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
+  const source = options.bundle ?? join5(import.meta.dir, TUI_BUNDLE);
+  const install = options.install ?? bunInstall;
+  const importModule = options.importModule ?? importFile;
+  const uid = options.uid ?? process.getuid?.();
+  const text = yield* tryPromise2({
+    try: () => Bun.file(source).text(),
+    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
+  });
+  if (options.directory === undefined)
+    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname3(directory)])
+    yield* privateFolder(folder, uid, true);
+  yield* privateFolder(directory, uid, false);
+  if (!(yield* installed(directory, packages, lock))) {
+    if (options.notify !== undefined)
+      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
+`);
+    yield* installAtomically(directory, packages, lock, install, uid);
+  }
+  const target = join5(directory, TUI_BUNDLE);
+  yield* writeFresh(target, text);
+  yield* importModule(join5(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  const loaded = yield* importModule(target);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
+  return loaded;
+});
+var init_load3 = __esm(() => {
+  init_dist();
+  init_environment3();
+  init_shell2();
+  init_lock();
+  TuiUnavailable = class TuiUnavailable extends TaggedError2("TuiUnavailable") {
+    get message() {
+      return this.reason;
+    }
+  };
+  FORMAT_CHARACTERS = /\p{Cf}/gu;
+  STALE_AFTER_MS = 60 * 60 * 1000;
+});
+
+var subjects = (lines, mark) => {
+  const counts = new Map;
+  for (const line of lines) {
+    if (!line.startsWith(mark))
+      continue;
+    const [label = ""] = line.slice(mark.length).split(": ", 1);
+    const [subject = ""] = label.split(/ (?:\/|[a-z]:[\\/]|\\\\)/i, 1);
+    if (subject === "")
+      continue;
+    counts.set(subject, (counts.get(subject) ?? 0) + 1);
+  }
+  return [...counts].map(([item, count]) => count > 1 ? `${item} (${count})` : item);
+}, resultHeadline = (ok, dryRun) => {
+  if (dryRun)
+    return ok ? "Dry run finished; nothing was written." : "Dry run found failures.";
+  return ok ? "Setup finished." : "Setup finished with failures.";
+}, summarizeResult = (result, dryRun) => {
+  const scope = /^~ (?:scope|form): /;
+  const changes = [
+    ...subjects(result.lines, "+ "),
+    ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
+  ];
+  const warnings = [
+    ...subjects(result.lines, "! "),
+    ...subjects(result.lines.filter((line) => !scope.test(line)), "~ ")
+  ];
+  return [
+    {
+      title: dryRun ? "Planned changes" : "Changes",
+      lines: changes.length === 0 ? ["No changes."] : changes
+    },
+    ...warnings.length > 0 ? [{ title: "Warnings", lines: warnings }] : [],
+    ...warnings.length > 0 || !result.ok ? [
+      {
+        title: "Next steps",
+        lines: [
+          result.ok ? "Check the warnings in the full report." : "Check the failures in the full report before running setup again."
+        ]
+      }
+    ] : []
+  ];
+};
+
+var AGENT_EMAIL = "noreply@anthropic.com", AGENT_NAMES, looksLikeAgent = (identity) => identity.email.trim().toLowerCase() === AGENT_EMAIL || AGENT_NAMES.includes(identity.name.replace(/\s+/g, " ").trim().toLowerCase()), inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true", parseIdent = (line) => {
+  const match = /^(.*) <([^<>]*)> \d+ [+-]\d{4}$/.exec(line.trim());
+  return match === null ? undefined : { name: match[1] ?? "", email: match[2] ?? "" };
+};
+var init_identity = __esm(() => {
+  AGENT_NAMES = ["claude", "claude code"];
+});
+
+var FORM_CHOICES, DEFAULT_FORM_CHOICE, hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== ""), inCi = (env) => {
+  const value = env["CI"]?.trim().toLowerCase();
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
+}, detectForm = (env, platform = process.platform) => {
+  if (inCloudSession(env))
+    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
+  if (inCi(env))
+    return { form: "headless", source: "detected", reason: "CI is set" };
+  if (!hasDisplay(env, platform))
+    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
+  return { form: "normal", source: "detected", reason: "a graphical session is available" };
+}, chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` }, describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
+var init_form = __esm(() => {
+  init_capabilities();
+  init_identity();
+  FORM_CHOICES = CAPABILITY_FORMS;
+  DEFAULT_FORM_CHOICE = {
+    form: "normal",
+    source: "default",
+    reason: "no form was asked for"
+  };
+});
+
+var init_form2 = __esm(() => {
+  init_form();
+});
+
+var BOLD_TONES, set = (value) => value !== undefined && value !== "", colorEnabled = (env, tty) => {
+  if (set(env["NO_COLOR"]) || env["TERM"] === "dumb")
+    return false;
+  if (set(env["FORCE_COLOR"]) && env["FORCE_COLOR"] !== "0")
+    return true;
+  if (inCi(env))
+    return false;
+  return tty;
+};
+var init_theme = __esm(() => {
+  init_form2();
+  BOLD_TONES = new Set(["heading", "focus"]);
+});
+
+import { lstat as lstat3, mkdir as mkdir4, mkdtemp as mkdtemp2, writeFile as writeFile4 } from "fs/promises";
+import { dirname as dirname4, join as join6, resolve as resolve3 } from "path";
+import { pathToFileURL as pathToFileURL2 } from "url";
+
+class SetupResult {
+  title;
+  sections;
+  code;
+  reportFile;
+  failure;
+  constructor(title, sections, code, reportFile, failure) {
+    this.title = title;
+    this.sections = sections;
+    this.code = code;
+    this.reportFile = reportFile;
+    this.failure = failure;
+  }
+}
+var saveSetupResult, renderSetupResult = (result, env, tty) => {
+  const styled = tty && colorEnabled(env, true);
+  const heading = (message) => {
+    const label = plain(message);
+    return styled ? "\x1B[1m" + label + "\x1B[0m" : label;
+  };
+  const lines = [
+    heading(result.title),
+    ...result.sections.flatMap(({ title, lines }) => [
+      heading(title),
+      ...lines.map((line) => "  " + plain(line))
+    ])
+  ];
+  if (result.reportFile !== undefined) {
+    const visible = plain(result.reportFile);
+    const hyperlink = styled ? "\x1B]8;;" + pathToFileURL2(result.reportFile).href + "\x1B\\" + visible + "\x1B]8;;\x1B\\" : visible;
+    lines.push("Full report: " + hyperlink);
+  }
+  if (result.failure !== undefined)
+    lines.push("Could not save the full report: " + plain(result.failure));
+  return lines.join(`
+`) + `
+`;
+};
+var init_result_file = __esm(() => {
+  init_dist();
+  init_load2();
+  init_load3();
+  init_theme();
+  saveSetupResult = fn2("saveSetupResult")(function* (report, dryRun, env) {
+    const directory = resolve3(dirname4(userConfigFile(env)), "setup-reports");
+    const title = resultHeadline(report.ok, dryRun);
+    const sections = summarizeResult(report, dryRun);
+    const code = report.ok ? 0 : 1;
+    if (dryRun)
+      return new SetupResult(title, sections, code);
+    return yield* tryPromise2({
+      try: () => mkdir4(directory, { mode: 448, recursive: true }).then(() => lstat3(directory)).then((metadata) => {
+        if (!metadata.isDirectory())
+          throw new Error("report folder is not a directory");
+        return mkdtemp2(join6(directory, "run-"));
+      }).then((run) => {
+        const file = join6(run, "report.txt");
+        const contents = [title, "", ...report.lines.map(plain), ""].join(`
+`);
+        return writeFile4(file, contents, { flag: "wx", mode: 384 }).then(() => file);
+      }),
+      catch: (cause) => cause instanceof Error ? cause.message : String(cause)
+    }).pipe(match4({
+      onFailure: (failure) => new SetupResult(title, sections, code, undefined, failure),
+      onSuccess: (file) => new SetupResult(title, sections, code, file)
+    }));
+  });
 });
 
 var init_layout2 = __esm(() => {
@@ -12017,24 +13721,24 @@ var init_links = __esm(() => {
   });
 });
 
-import { link as link2, lstat as lstat2, mkdir as mkdir3, open as open2, rename as rename3, rm as rm3, stat as stat2 } from "fs/promises";
-import { dirname as dirname2 } from "path";
+import { link as link2, lstat as lstat4, mkdir as mkdir5, open as open2, rename as rename4, rm as rm4, stat as stat3 } from "fs/promises";
+import { dirname as dirname5 } from "path";
 var LockOwner, UNREADABLE_STALE_MS = 30000, readOwner = (file) => readJson(LockOwner, file).pipe(orElseSucceed2(() => {
   return;
-})), processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ESRCH")))), inTheWay = (file) => tryPromise2({ try: () => lstat2(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT")))), putBack = (taken, file) => io(file, () => link2(taken, file)).pipe(catch_2((error) => hasCode(error.cause, "EEXIST") ? void_3 : inTheWay(file).pipe(flatMap2((present) => present ? void_3 : io(file, () => rename3(taken, file))))), ignore2), breakIfStale = (file, authorize) => gen2(function* () {
+})), processAlive = (pid) => try_2({ try: () => process.kill(pid, 0), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ESRCH")))), inTheWay = (file) => tryPromise2({ try: () => lstat4(file), catch: (cause) => cause }).pipe(as2(true), catch_2((cause) => succeed6(!hasCode(cause, "ENOENT")))), putBack = (taken, file) => io(file, () => link2(taken, file)).pipe(catch_2((error) => hasCode(error.cause, "EEXIST") ? void_3 : inTheWay(file).pipe(flatMap2((present) => present ? void_3 : io(file, () => rename4(taken, file))))), ignore2), breakIfStale = (file, authorize) => gen2(function* () {
   const owner = yield* readOwner(file);
-  const stale = owner ? !(yield* processAlive(owner.pid)) : (yield* currentTimeMillis2) - (yield* io(file, () => stat2(file)).pipe(map5((item) => item.mtimeMs), orElseSucceed2(() => 0))) > UNREADABLE_STALE_MS;
+  const stale = owner ? !(yield* processAlive(owner.pid)) : (yield* currentTimeMillis2) - (yield* io(file, () => stat3(file)).pipe(map5((item) => item.mtimeMs), orElseSucceed2(() => 0))) > UNREADABLE_STALE_MS;
   if (!stale)
     return;
   yield* authorize;
   const taken = `${file}.stale-${crypto.randomUUID()}`;
-  const moved = yield* io(file, () => rename3(file, taken)).pipe(as2(true), catch_2(() => succeed6(false)));
+  const moved = yield* io(file, () => rename4(file, taken)).pipe(as2(true), catch_2(() => succeed6(false)));
   if (!moved)
     return;
   const claimedMeanwhile = (yield* readOwner(taken))?.token !== owner?.token;
   if (claimedMeanwhile)
     yield* putBack(taken, file);
-  yield* io(taken, () => rm3(taken, { force: true }));
+  yield* io(taken, () => rm4(taken, { force: true }));
 }).pipe(catchTag2("StateIo", () => void_3)), BLOCKED_CODES, create = (file, retry = true) => tryPromise2({ try: () => open2(file, "wx"), catch: (cause) => cause }).pipe(catch_2((cause) => {
   if (hasCode(cause, "EEXIST"))
     return fail5(new StateLocked({ lockFile: file }));
@@ -12050,7 +13754,7 @@ var LockOwner, UNREADABLE_STALE_MS = 30000, readOwner = (file) => readJson(LockO
   const content = yield* encodeJson(LockOwner, owner).pipe(orDie2);
   yield* authorize;
   const handle = yield* create(file);
-  yield* io(file, () => handle.writeFile(content)).pipe(tapError2(() => io(file, () => rm3(file, { force: true })).pipe(ignore2)), ensuring2(io(file, () => handle.close()).pipe(ignore2)));
+  yield* io(file, () => handle.writeFile(content)).pipe(tapError2(() => io(file, () => rm4(file, { force: true })).pipe(ignore2)), ensuring2(io(file, () => handle.close()).pipe(ignore2)));
   return owner.token;
 }), HOOK_WAIT_MS = 5000, deadlineIn = (ms) => map5(currentTimeMillis2, (now) => ({ until: now + ms })), STATE_PATIENCE = "short", WORKTREE_PATIENCE = "long", WAITS, DEADLINE_WAIT, holderBusy = (file, limit) => gen2(function* () {
   const owner = yield* readOwner(file);
@@ -12069,8 +13773,8 @@ var LockOwner, UNREADABLE_STALE_MS = 30000, readOwner = (file) => readJson(LockO
       return stuck ? yield* holderBusy(file, limit) : true;
     })
   }));
-}, release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm3(file, { force: true })) : void_3), ignore2), withFileLock = (file, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(authorize.pipe(andThen2(io(file, () => mkdir3(dirname2(file), { recursive: true }))), andThen2(acquire(file, patience, authorize))), () => use, (token) => release(file, token)), withStateLock = (directory, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(ensureLocalDirectory(directory, authorize).pipe(andThen2(acquire(localFile(directory, "lock"), patience, authorize))), () => use, (token) => release(localFile(directory, "lock"), token));
-var init_lock = __esm(() => {
+}, release = (file, token) => readOwner(file).pipe(flatMap2((owner) => owner?.token === token ? io(file, () => rm4(file, { force: true })) : void_3), ignore2), withFileLock = (file, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(authorize.pipe(andThen2(io(file, () => mkdir5(dirname5(file), { recursive: true }))), andThen2(acquire(file, patience, authorize))), () => use, (token) => release(file, token)), withStateLock = (directory, use, patience = STATE_PATIENCE, authorize = void_3) => acquireUseRelease2(ensureLocalDirectory(directory, authorize).pipe(andThen2(acquire(localFile(directory, "lock"), patience, authorize))), () => use, (token) => release(localFile(directory, "lock"), token));
+var init_lock2 = __esm(() => {
   init_dist();
   init_errors5();
   init_files();
@@ -12089,11 +13793,11 @@ var init_lock = __esm(() => {
   DEADLINE_WAIT = { delay: 25, limit: HOOK_WAIT_MS, stuck: true };
 });
 
-import { readdir } from "fs/promises";
-import { join as join3 } from "path";
+import { readdir as readdir2 } from "fs/promises";
+import { join as join7 } from "path";
 var scanFiles = async (directory) => {
   const visit = async (prefix) => {
-    const entries = await readdir(join3(directory, prefix), { withFileTypes: true });
+    const entries = await readdir2(join7(directory, prefix), { withFileTypes: true });
     const rows = await Promise.all(entries.map(async (entry) => {
       const path = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
       return entry.isDirectory() ? visit(path) : entry.isFile() ? [path] : [];
@@ -12110,7 +13814,7 @@ var scanFiles = async (directory) => {
     const segment = parts[index];
     if (segment === undefined)
       return [];
-    const entries = await readdir(join3(directory, prefix), { withFileTypes: true }).catch((error) => {
+    const entries = await readdir2(join7(directory, prefix), { withFileTypes: true }).catch((error) => {
       if (error.code === "ENOENT" || error.code === "ENOTDIR")
         return [];
       throw error;
@@ -12135,11 +13839,11 @@ var sameMigrationIdentity = (left, right) => left.ino !== 0n && left.dev === rig
 
 import { execFile } from "child_process";
 import { createHash as createHash2 } from "crypto";
-import { constants } from "fs";
-import { link as link3, lstat as lstat3, mkdir as mkdir4, open as open3, readdir as readdir2, realpath as realpath2, rename as rename4, rm as rm4 } from "fs/promises";
-import { basename, dirname as dirname3, isAbsolute as isAbsolute2, join as join4, resolve as resolve3 } from "path";
+import { constants as constants2 } from "fs";
+import { link as link3, lstat as lstat5, mkdir as mkdir6, open as open3, readdir as readdir3, realpath as realpath2, rename as rename5, rm as rm5 } from "fs/promises";
+import { basename as basename2, dirname as dirname6, isAbsolute as isAbsolute2, join as join8, resolve as resolve4 } from "path";
 import { promisify } from "util";
-var MigrationJournalFile, MigrationJournalSource, MigrationJournalPhase, MigrationJournal, MigrationJournalError, MAX_BYTES, OID, FINGERPRINT, PHASES, decode2, invalid3 = (location, reason) => new MigrationJournalError({ path: location.path, reason }), canonicalAbsolute = (path) => isAbsolute2(path) && resolve3(path) === path, isMissing = (cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT", validate2 = (location, value) => {
+var MigrationJournalFile, MigrationJournalSource, MigrationJournalPhase, MigrationJournal, MigrationJournalError, MAX_BYTES, OID, FINGERPRINT, PHASES, decode2, invalid3 = (location, reason) => new MigrationJournalError({ path: location.path, reason }), canonicalAbsolute = (path) => isAbsolute2(path) && resolve4(path) === path, isMissing = (cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT", validate2 = (location, value) => {
   let record;
   try {
     record = decode2(value);
@@ -12239,7 +13943,7 @@ exit 0
   if (system === undefined || !isAbsolute2(system))
     return "missing Windows system directory";
   try {
-    const { stdout } = await runWindowsAcl(join4(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), [
+    const { stdout } = await runWindowsAcl(join8(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), [
       "-NoLogo",
       "-NoProfile",
       "-NonInteractive",
@@ -12275,28 +13979,28 @@ exit 0
 }, ensureMigrationJournalDirectory = async (directory) => {
   if (process.platform !== "win32") {
     try {
-      await mkdir4(directory, { mode: 448 });
+      await mkdir6(directory, { mode: 448 });
     } catch (cause) {
       if (!(typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "EEXIST"))
         throw cause;
     }
     return;
   }
-  const ancestor = dirname3(directory);
+  const ancestor = dirname6(directory);
   if (!canonicalAbsolute(directory) || await realpath2(ancestor) !== ancestor)
     throw new Error("journal directory ancestor is not a canonical directory");
   const problem = await windowsAclProblem(directory, { create: true });
   if (problem !== undefined)
     throw new Error(`cannot create private journal directory: ${problem}`);
 }, temporaryAlias = async (location, info) => {
-  const prefix = `${basename(location.path)}.`;
-  const names = await readdir2(dirname3(location.path));
+  const prefix = `${basename2(location.path)}.`;
+  const names = await readdir3(dirname6(location.path));
   const candidates = names.filter((name) => name.startsWith(prefix) && /^[0-9a-f-]{36}\.tmp$/.test(name.slice(prefix.length)));
   const aliases = [];
   for (const name of candidates) {
-    const path = join4(dirname3(location.path), name);
+    const path = join8(dirname6(location.path), name);
     try {
-      const entry = await lstat3(path, { bigint: true });
+      const entry = await lstat5(path, { bigint: true });
       if (entry.isFile() && !entry.isSymbolicLink() && sameMigrationIdentity(entry, info))
         aliases.push(path);
     } catch (cause) {
@@ -12306,25 +14010,25 @@ exit 0
   }
   return aliases;
 }, removeTemporaryAlias = async (location) => {
-  const info = await lstat3(location.path, { bigint: true });
+  const info = await lstat5(location.path, { bigint: true });
   if (info.nlink === 2n) {
     const aliases = await temporaryAlias(location, info);
     if (aliases.length !== 1)
       throw invalid3(location, "journal has an unexpected hard link");
-    await rm4(aliases[0]);
+    await rm5(aliases[0]);
   }
 }, checkLocation = async (location) => {
   if (![location.path, location.sourceRoot, location.targetRoot].every(canonicalAbsolute))
     throw invalid3(location, "journal path and trusted roots must be canonical absolute paths");
   try {
-    const parent = dirname3(location.path);
+    const parent = dirname6(location.path);
     const [directory, actualParent, source, target, sourceInfo, targetInfo] = await Promise.all([
-      lstat3(parent, { bigint: true }),
+      lstat5(parent, { bigint: true }),
       realpath2(parent),
       realpath2(location.sourceRoot),
       realpath2(location.targetRoot),
-      lstat3(location.sourceRoot, { bigint: true }),
-      lstat3(location.targetRoot, { bigint: true })
+      lstat5(location.sourceRoot, { bigint: true }),
+      lstat5(location.targetRoot, { bigint: true })
     ]);
     if (!directory.isDirectory() || directory.isSymbolicLink() || actualParent !== parent || !sourceInfo.isDirectory() || !targetInfo.isDirectory() || source !== location.sourceRoot || target !== location.targetRoot || process.platform !== "win32" && !owner(directory))
       throw invalid3(location, "journal parent or trusted roots are not private canonical directories");
@@ -12337,7 +14041,7 @@ exit 0
   await checkLocation(location);
   let handle;
   try {
-    handle = await open3(location.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    handle = await open3(location.path, constants2.O_RDONLY | (constants2.O_NOFOLLOW ?? 0));
   } catch (cause) {
     if (isMissing(cause))
       return;
@@ -12346,17 +14050,17 @@ exit 0
   try {
     const [info, pathInfo] = await Promise.all([
       handle.stat({ bigint: true }),
-      lstat3(location.path, { bigint: true })
+      lstat5(location.path, { bigint: true })
     ]);
     if (!info.isFile() || !pathInfo.isFile() || pathInfo.isSymbolicLink() || process.platform !== "win32" && (!owner(info) || (info.mode & 0o077n) !== 0n) || !sameMigrationIdentity(info, pathInfo) || info.size > MAX_BYTES)
       throw invalid3(location, "journal is not an owned private regular file");
     if (info.nlink !== 1n && !(info.nlink === 2n && (await temporaryAlias(location, info)).length === 1))
       throw invalid3(location, "journal has an unexpected hard link");
     if (process.platform === "win32") {
-      const problem = await windowsAclProblem(dirname3(location.path), { file: location.path });
+      const problem = await windowsAclProblem(dirname6(location.path), { file: location.path });
       if (problem !== undefined)
         throw invalid3(location, `journal or its parent does not have a private access list: ${problem}`);
-      const checkedPath = await lstat3(location.path, { bigint: true });
+      const checkedPath = await lstat5(location.path, { bigint: true });
       if (checkedPath.isSymbolicLink() || !sameMigrationIdentity(checkedPath, info))
         throw invalid3(location, "journal changed while verifying its access list");
     }
@@ -12376,7 +14080,7 @@ exit 0
 }, syncDirectory = async (location) => {
   if (process.platform === "win32")
     return;
-  const directory = await open3(dirname3(location.path), "r");
+  const directory = await open3(dirname6(location.path), "r");
   try {
     await directory.sync();
   } finally {
@@ -12398,12 +14102,12 @@ exit 0
       await checkLocation(location);
     handle = await open3(temporary, "wx", 384);
     if (process.platform === "win32") {
-      const problem = await windowsAclProblem(dirname3(location.path), { file: temporary });
+      const problem = await windowsAclProblem(dirname6(location.path), { file: temporary });
       if (problem !== undefined)
         throw invalid3(location, `cannot create a private journal in this directory: ${problem}`);
       const [info, checkedPath] = await Promise.all([
         handle.stat({ bigint: true }),
-        lstat3(temporary, { bigint: true })
+        lstat5(temporary, { bigint: true })
       ]);
       if (checkedPath.isSymbolicLink() || !sameMigrationIdentity(checkedPath, info))
         throw invalid3(location, "temporary journal changed while verifying its access list");
@@ -12414,13 +14118,13 @@ exit 0
     handle = undefined;
     if (create) {
       await link3(temporary, location.path);
-      await rm4(temporary);
+      await rm5(temporary);
     } else
-      await rename4(temporary, location.path);
+      await rename5(temporary, location.path);
     await syncDirectory(location);
   } finally {
     await handle?.close().catch(() => {});
-    await rm4(temporary, { force: true }).catch(() => {});
+    await rm5(temporary, { force: true }).catch(() => {});
   }
 }, operation = (location, run) => tryPromise2({
   try: run,
@@ -12461,7 +14165,7 @@ exit 0
     if (latest === undefined || JSON.stringify(latest) !== JSON.stringify(current))
       throw invalid3(location, "journal changed during authorization; reload recovery state");
     await removeTemporaryAlias(location);
-    await rm4(location.path);
+    await rm5(location.path);
     await syncDirectory(location);
   }));
 });
@@ -12520,22 +14224,22 @@ var init_migration_journal = __esm(() => {
 });
 
 import { createHash as createHash3, randomUUID } from "crypto";
-import { constants as constants2 } from "fs";
-import { link as link4, lstat as lstat4, mkdir as mkdir5, open as open4, realpath as realpath3, rename as rename5, rm as rm5, unlink } from "fs/promises";
-import { dirname as dirname4, isAbsolute as isAbsolute3, join as join5, resolve as resolve4 } from "path";
+import { constants as constants3 } from "fs";
+import { link as link4, lstat as lstat6, mkdir as mkdir7, open as open4, realpath as realpath3, rename as rename6, rm as rm6, unlink } from "fs/promises";
+import { dirname as dirname7, isAbsolute as isAbsolute3, join as join9, resolve as resolve5 } from "path";
 var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ path, reason }), oid, blob = (bytes, id) => createHash3(id.length === 40 ? "sha1" : "sha256").update(`blob ${bytes.length}\x00`).update(bytes).digest("hex"), operation2 = (path, run) => tryPromise2({
   try: run,
   catch: (cause) => cause instanceof MigrationFilesError ? cause : fail6(path, "filesystem operation failed; inspect and retry")
 }), missing2 = (cause) => hasCode(cause, "ENOENT"), infoOrMissing = async (path) => {
   try {
-    return await lstat4(path, { bigint: true });
+    return await lstat6(path, { bigint: true });
   } catch (cause) {
     if (missing2(cause))
       return;
     throw cause;
   }
 }, validatePaths = (root, paths) => {
-  if (!isAbsolute3(root) || resolve4(root) !== root)
+  if (!isAbsolute3(root) || resolve5(root) !== root)
     throw fail6(root, "root must be canonical and absolute");
   for (const [i, path] of paths.entries())
     if (pathProblem(path) !== undefined || paths.slice(0, i).some((other) => pathsOverlap(path, other)))
@@ -12571,13 +14275,13 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
       throw fail6(file.path, "invalid source digest");
   return source;
 }, parents = async (root, path) => {
-  const rootInfo = await lstat4(root, { bigint: true });
+  const rootInfo = await lstat6(root, { bigint: true });
   if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || await realpath3(root) !== root)
     throw fail6(root, "root is not a canonical directory");
   const checked = [{ path: root, info: rootInfo }];
   let current = root;
   for (const part of path.split("/").slice(0, -1)) {
-    current = join5(current, part);
+    current = join9(current, part);
     const info = await infoOrMissing(current);
     if (info === undefined)
       break;
@@ -12588,7 +14292,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
   return checked;
 }, recheck = async (checked, path) => {
   for (const entry of checked) {
-    const latest = await lstat4(entry.path, { bigint: true });
+    const latest = await lstat6(entry.path, { bigint: true });
     if (!latest.isDirectory() || latest.isSymbolicLink() || !sameMigrationIdentity(entry.info, latest) || await realpath3(entry.path) !== entry.path)
       throw fail6(path, "parent changed");
   }
@@ -12598,10 +14302,10 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
     return;
   if (!before.isFile() || before.isSymbolicLink())
     throw fail6(path, "path is not a regular file");
-  const handle = await open4(path, constants2.O_RDONLY | (constants2.O_NOFOLLOW ?? 0));
+  const handle = await open4(path, constants3.O_RDONLY | (constants3.O_NOFOLLOW ?? 0));
   try {
     const info = await handle.stat({ bigint: true });
-    const latest = await lstat4(path, { bigint: true });
+    const latest = await lstat6(path, { bigint: true });
     if (!info.isFile() || !latest.isFile() || latest.isSymbolicLink() || !sameMigrationIdentity(before, info) || !sameMigrationIdentity(info, latest))
       throw fail6(path, "file changed while reading");
     return { bytes: await handle.readFile(), info };
@@ -12622,7 +14326,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
   yield* initialTerminal(options.root, options.authorize, "terminalAuthorize" in options, options.terminalAuthorize);
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
   for (const file of files) {
-    const path = join5(options.root, file.path);
+    const path = join9(options.root, file.path);
     let checked = yield* operation2(path, () => parents(options.root, file.path));
     const existing = yield* operation2(path, () => readRegular(path));
     if (existing !== undefined) {
@@ -12636,13 +14340,13 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
       return yield* fail6(file.path, "preexisting file was deleted");
     const components = file.path.split("/").slice(0, -1);
     for (let i = checked.length - 1;i < components.length; i++) {
-      const dir = join5(options.root, ...components.slice(0, i + 1));
+      const dir = join9(options.root, ...components.slice(0, i + 1));
       yield* options.authorize;
       yield* operation2(dir, () => recheck(checked, path));
       yield* operation2(dir, async () => {
         terminal(dir, options.authorize, options.terminalAuthorize);
         try {
-          await mkdir5(dir);
+          await mkdir7(dir);
         } catch (cause) {
           if (!hasCode(cause, "EEXIST"))
             throw cause;
@@ -12652,7 +14356,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
     }
     yield* options.authorize;
     yield* operation2(path, () => recheck(checked, path));
-    const temporary = join5(dirname4(path), `.holyagent-migration-${randomUUID()}.tmp`);
+    const temporary = join9(dirname7(path), `.holyagent-migration-${randomUUID()}.tmp`);
     let identity;
     yield* acquireUseRelease2(sync2(() => {
       const preparation = (async () => {
@@ -12682,7 +14386,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
       }
       yield* operation2(path, () => {
         terminal(path, options.authorize, options.terminalAuthorize);
-        return existing === undefined ? link4(temporary, path) : rename5(temporary, path);
+        return existing === undefined ? link4(temporary, path) : rename6(temporary, path);
       }).pipe(uninterruptible2);
     }), (preparation) => sync2(() => {
       preparation.catch(() => {}).then(async () => {
@@ -12692,7 +14396,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
           return;
         });
         if (current?.isFile() && !current.isSymbolicLink() && sameMigrationIdentity(identity, current))
-          await rm5(temporary, { force: true }).catch(() => {});
+          await rm6(temporary, { force: true }).catch(() => {});
       });
     }));
   }
@@ -12702,7 +14406,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
   const removed = [];
   const retained = [];
   for (const file of source) {
-    const path = join5(options.root, file.path);
+    const path = join9(options.root, file.path);
     const checked = yield* operation2(path, () => parents(options.root, file.path));
     const current = yield* operation2(path, () => readRegular(path));
     if (current === undefined)
@@ -12741,7 +14445,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
 }), verifyMigrationFiles = (options) => gen2(function* () {
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
   for (const file of files) {
-    const path = join5(options.root, file.path);
+    const path = join9(options.root, file.path);
     yield* operation2(path, async () => {
       const checked = await parents(options.root, file.path);
       const actual = await readRegular(path);
@@ -12753,7 +14457,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
 }), verifyMigrationFilePreimages = (options) => gen2(function* () {
   const files = yield* operation2(options.root, () => Promise.resolve().then(() => validateFiles(options.root, options.files)));
   for (const file of files) {
-    const path = join5(options.root, file.path);
+    const path = join9(options.root, file.path);
     yield* operation2(path, async () => {
       const checked = await parents(options.root, file.path);
       const actual = await readRegular(path);
@@ -12765,7 +14469,7 @@ var MigrationFilesError, fail6 = (path, reason) => new MigrationFilesError({ pat
 }), readMigrationSource = (options) => operation2(options.root, async () => {
   validatePaths(options.root, [options.path]);
   const checked = await parents(options.root, options.path);
-  const value = await readRegular(join5(options.root, options.path));
+  const value = await readRegular(join9(options.root, options.path));
   if (value === undefined)
     throw fail6(options.path, "source disappeared during preparation");
   await recheck(checked, options.path);
@@ -12787,69 +14491,11 @@ var init_migration_files = __esm(() => {
   oid = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 });
 
-import { spawn as spawnChild } from "child_process";
-var spawn = (program, args, options) => callback2((resume) => {
-  const child = spawnChild(program, args, {
-    cwd: options.cwd,
-    env: options.env,
-    detached: process.platform !== "win32",
-    stdio: options.discard === true ? ["ignore", "ignore", "ignore"] : ["pipe", "pipe", "pipe"],
-    windowsHide: true
-  });
-  const stdout = [];
-  const stderr = [];
-  child.stdout?.on("data", (chunk) => stdout.push(chunk));
-  child.stderr?.on("data", (chunk) => stderr.push(chunk));
-  child.stdin?.on("error", () => {});
-  child.once("error", (cause) => resume(die3(cause)));
-  child.once(options.discard === true ? "exit" : "close", (code) => resume(succeed6({
-    code: code ?? -1,
-    stdout: Buffer.concat(stdout),
-    stderr: Buffer.concat(stderr).toString("utf8")
-  })));
-  child.stdin?.end(options.stdin);
-  return suspend2(() => {
-    if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined)
-      return void_3;
-    const killed = process.platform === "win32" ? callback2((done) => {
-      const killer = spawnChild("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
-        stdio: "ignore",
-        windowsHide: true
-      });
-      killer.once("error", () => {
-        child.kill("SIGKILL");
-        done(void_3);
-      });
-      killer.once("close", () => done(void_3));
-    }) : sync2(() => {
-      try {
-        if (child.pid !== undefined)
-          process.kill(-child.pid, "SIGKILL");
-      } catch {
-        child.kill("SIGKILL");
-      }
-    });
-    const exited = callback2((done) => {
-      const finish = () => done(void_3);
-      child.once("exit", finish);
-      if (child.exitCode !== null || child.signalCode !== null)
-        finish();
-      return sync2(() => {
-        child.removeListener("exit", finish);
-      });
-    });
-    return killed.pipe(andThen2(exited), timeoutOption2(2000), asVoid2);
-  });
-});
-var init_process = __esm(() => {
-  init_dist();
-});
-
 import { createHash as createHash4, randomUUID as randomUUID2 } from "crypto";
-import { constants as constants3 } from "fs";
-import { copyFile, mkdtemp, open as open5, readFile as readFile3, rename as rename6, rm as rm6, writeFile as writeFile3 } from "fs/promises";
+import { constants as constants4 } from "fs";
+import { copyFile, mkdtemp as mkdtemp3, open as open5, readFile as readFile3, rename as rename7, rm as rm7, writeFile as writeFile5 } from "fs/promises";
 import { tmpdir } from "os";
-import { isAbsolute as isAbsolute4, join as join6, resolve as resolve5 } from "path";
+import { isAbsolute as isAbsolute4, join as join10, resolve as resolve6 } from "path";
 var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env, stdin }).pipe(catchDefect2((cause) => fail5(new StateIo({ path: cwd, cause })))), repositoryVariables, fail7 = (path, cause) => new StateIo({ path, cause }), validPath = (path) => path !== "" && !isAbsolute4(path) && !path.includes("\\") && !path.includes("\x00") && path.split("/").every((part) => part !== "" && part !== "." && part !== ".."), oidPattern, validContent = (content) => Buffer.from(content, "base64").toString("base64") === content, validMode = (mode) => mode === 33188 || mode === 33261, validate3 = (cwd, files) => {
   const seen = new Set;
   for (const file of files) {
@@ -12860,7 +14506,7 @@ var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env
     seen.add(file.path);
   }
   return;
-}, environment = (env, index) => {
+}, environment2 = (env, index) => {
   const result = {};
   for (const [key, value] of Object.entries({ ...process.env, ...env }))
     if (value !== undefined && !repositoryVariables.has(key))
@@ -12872,7 +14518,7 @@ var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env
 }, git = (options, args, index, stdin) => (options.runGit ?? defaultRunner)({
   cwd: options.cwd,
   args,
-  env: environment(options.env, index),
+  env: environment2(options.env, index),
   ...stdin === undefined ? {} : { stdin }
 }).pipe(flatMap2((result) => result.code === 0 ? try_2({
   try: () => new TextDecoder("utf-8", { ignoreBOM: true, fatal: true }).decode(result.stdout),
@@ -12895,12 +14541,12 @@ var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env
   file.path,
   after ? file.after : file.before,
   after || file.before !== null ? file.mode : null
-]))).digest("hex"), temporary = (options, use) => acquireUseRelease2(options.authorize.pipe(andThen2(io(tmpdir(), () => mkdtemp(join6(tmpdir(), "holyagent-migration-"))))), use, (dir) => io(dir, () => rm6(dir, { recursive: true, force: true })).pipe(ignore2)), prepareMigrationCommit = (options) => gen2(function* () {
+]))).digest("hex"), temporary = (options, use) => acquireUseRelease2(options.authorize.pipe(andThen2(io(tmpdir(), () => mkdtemp3(join10(tmpdir(), "holyagent-migration-"))))), use, (dir) => io(dir, () => rm7(dir, { recursive: true, force: true })).pipe(ignore2)), prepareMigrationCommit = (options) => gen2(function* () {
   const invalid = validate3(options.cwd, options.files);
   if (invalid !== undefined)
     return yield* invalid;
   return yield* temporary(options, (dir) => gen2(function* () {
-    const index = join6(dir, "index");
+    const index = join10(dir, "index");
     const parent = (yield* git(options, ["rev-parse", "--verify", "HEAD"])).trim();
     if (!oidPattern.test(parent))
       return yield* fail7(options.cwd, "invalid HEAD object id");
@@ -12910,9 +14556,9 @@ var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env
     const live = yield* entries(options);
     const files = [];
     for (const file of options.files) {
-      const contentPath = join6(dir, randomUUID2());
+      const contentPath = join10(dir, randomUUID2());
       yield* options.authorize;
-      yield* io(contentPath, () => writeFile3(contentPath, Buffer.from(file.content, "base64")));
+      yield* io(contentPath, () => writeFile5(contentPath, Buffer.from(file.content, "base64")));
       yield* options.authorize;
       const after = (yield* git(options, [
         "hash-object",
@@ -12976,14 +14622,14 @@ var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env
   ])).trim();
   if (!isAbsolute4(name))
     return yield* fail7(options.cwd, "git returned a relative index path");
-  const index = resolve5(name);
+  const index = resolve6(name);
   const lock = `${index}.lock`;
   let published = false;
   return yield* acquireUseRelease2(options.authorize.pipe(andThen2(tryPromise2({
-    try: () => open5(lock, constants3.O_WRONLY | constants3.O_CREAT | constants3.O_EXCL | (constants3.O_NOFOLLOW ?? 0), 438),
+    try: () => open5(lock, constants4.O_WRONLY | constants4.O_CREAT | constants4.O_EXCL | (constants4.O_NOFOLLOW ?? 0), 438),
     catch: (cause) => hasCode(cause, "EEXIST") ? new StateLocked({ lockFile: lock }) : new StateIo({ path: lock, cause })
   }))), (handle) => temporary(options, (dir) => gen2(function* () {
-    const copy = join6(dir, "index");
+    const copy = join10(dir, "index");
     yield* options.authorize;
     const copied = yield* io(index, () => copyFile(index, copy)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
     if (!copied) {
@@ -13008,10 +14654,10 @@ var defaultRunner = ({ cwd, args, env, stdin }) => spawn("git", args, { cwd, env
     });
     yield* options.authorize;
     yield* io(index, async () => {
-      await rename6(lock, index);
+      await rename7(lock, index);
       published = true;
     }).pipe(uninterruptible2);
-  })), (handle) => io(lock, () => handle.close()).pipe(ignore2, andThen2(suspend2(() => published ? void_3 : io(lock, () => rm6(lock, { force: true })).pipe(ignore2)))));
+  })), (handle) => io(lock, () => handle.close()).pipe(ignore2, andThen2(suspend2(() => published ? void_3 : io(lock, () => rm7(lock, { force: true })).pipe(ignore2)))));
 }), treeEntries = (options, tree) => git(options, ["ls-tree", "-r", "-t", "-z", "--full-tree", tree]).pipe(flatMap2((output) => {
   const found = new Map;
   for (const record of output.split("\x00")) {
@@ -13203,25 +14849,25 @@ var init_mode = __esm(() => {
   StateMode = Literals(["branch", "work", "local"]);
 });
 
-var definedEnv = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0]))), looksLikeAgent = ({
+var definedEnv2 = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0]))), looksLikeAgent2 = ({
   name,
   email
 }) => email.trim().toLowerCase() === "noreply@anthropic.com" || ["claude", "claude code"].includes(name.replace(/\s+/g, " ").trim().toLowerCase());
 
 import { createHash as createHash5 } from "crypto";
 import {
-  lstat as lstat5,
-  mkdir as mkdir6,
+  lstat as lstat7,
+  mkdir as mkdir8,
   open as open6,
-  readdir as readdir3,
+  readdir as readdir4,
   readFile as readFile4,
   realpath as realpath4,
-  rm as rm7,
+  rm as rm8,
   rmdir,
-  stat as stat3,
-  writeFile as writeFile4
+  stat as stat4,
+  writeFile as writeFile6
 } from "fs/promises";
-import { basename as basename2, dirname as dirname5, join as join7, relative, sep as sep2 } from "path";
+import { basename as basename3, dirname as dirname8, join as join11, relative, sep as sep2 } from "path";
 function resolveState(cwd, env, ensure, online = true, patience, authorize = void_3, terminalAuthorize) {
   const guardSupplied = arguments.length >= 7;
   return gen2(function* () {
@@ -13263,7 +14909,7 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
     const resolved = { mode, branch };
     const listed = yield* listWorktrees(top, env);
     const found = yield* checkedOut(listed, branch);
-    const standard = join7(common, "holyagent", worktreeFolder(branch));
+    const standard = join11(common, "holyagent", worktreeFolder(branch));
     const settled = found !== undefined && (!(yield* samePath(found, standard)) || (yield* fileExists(readyMarker(standard))));
     if (ensure === "peek" && found !== undefined && !settled)
       return yield* new StateIo({
@@ -13285,7 +14931,7 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
     const worktree = ensured.path;
     const directory = stateDirectory(worktree);
     if (ensure !== "peek") {
-      yield* withFileLock(join7(common, "holyagent", "migration-sweep.lock"), gen2(function* () {
+      yield* withFileLock(join11(common, "holyagent", "migration-sweep.lock"), gen2(function* () {
         const pending = yield* pendingMigration(common);
         let sweeping = (yield* kindAt(migrationSweepPath(common, branch))) !== undefined;
         if (pending && !sweeping) {
@@ -13300,9 +14946,9 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
           return;
         }
         const sweepPath = migrationSweepPath(common, branch);
-        yield* io(sweepPath, async () => checkSweepFile(sweepPath, await lstat5(sweepPath)));
+        yield* io(sweepPath, async () => checkSweepFile(sweepPath, await lstat7(sweepPath)));
         const registered = yield* listWorktrees(top, env);
-        const own = join7(yield* io(common, () => realpath4(common)), "holyagent");
+        const own = join11(yield* io(common, () => realpath4(common)), "holyagent");
         const commonRoot = yield* io(common, () => realpath4(common));
         const candidates = [];
         for (const entry of registered) {
@@ -13345,7 +14991,7 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
           let recorded;
           for (const sourceRoot of candidates) {
             const matches = yield* readMigrationJournal({
-              path: join7(commonRoot, "holyagent", "migration", "journal.json"),
+              path: join11(commonRoot, "holyagent", "migration", "journal.json"),
               sourceRoot,
               targetRoot
             }).pipe(match4({
@@ -13372,7 +15018,7 @@ function resolveState(cwd, env, ensure, online = true, patience, authorize = voi
     return { root: top, directory, resolved };
   });
 }
-var DEFAULT_STATE_BRANCH = "holyagent/state", BRANCH_KEY = "holyagent.stateBranch", REPOSITORY_VARIABLES, gitEnvironment = (env) => definedEnv({ ...process.env, ...env }, REPOSITORY_VARIABLES), git2 = (cwd, env, args, input) => spawn("git", process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args, {
+var DEFAULT_STATE_BRANCH = "holyagent/state", BRANCH_KEY = "holyagent.stateBranch", REPOSITORY_VARIABLES, gitEnvironment = (env) => definedEnv2({ ...process.env, ...env }, REPOSITORY_VARIABLES), git2 = (cwd, env, args, input) => spawn("git", process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args, {
   cwd,
   env: gitEnvironment(env),
   stdin: input
@@ -13400,7 +15046,7 @@ ${ran.stdout}`.trim().split(`
   const path = yield* excludePath(top, env);
   if (done?.(linesOf(yield* readText(path))) === true)
     return;
-  yield* withFileLock(join7(common, "holyagent", "exclude.lock"), gen2(function* () {
+  yield* withFileLock(join11(common, "holyagent", "exclude.lock"), gen2(function* () {
     const before = linesOf(yield* readText(path));
     const lines = yield* edit(before);
     if (lines.join(`
@@ -13413,7 +15059,7 @@ ${ran.stdout}`.trim().split(`
     yield* authorize;
     yield* commitFile(path, body);
   }), patience, authorize);
-}), ensureExcluded = (top, common, env, patience, authorize) => editExclude(top, common, env, (lines) => authorize.pipe(andThen2(stateModeOf(top, env)), map5((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry, patience, authorize), excludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withEntry(lines))), unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withoutMarked(lines))), isDirectory = (path) => io(path, () => stat3(path)).pipe(map5((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), stateBranch = (top, env) => gen2(function* () {
+}), ensureExcluded = (top, common, env, patience, authorize) => editExclude(top, common, env, (lines) => authorize.pipe(andThen2(stateModeOf(top, env)), map5((mode) => mode === "local" ? withEntry(lines) : lines)), hasEntry, patience, authorize), excludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withEntry(lines))), unexcludeState = (top, common, env) => editExclude(top, common, env, (lines) => succeed6(withoutMarked(lines))), isDirectory = (path) => io(path, () => stat4(path)).pipe(map5((info) => info.isDirectory()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), stateBranch = (top, env) => gen2(function* () {
   const configured = yield* git2(top, env, ["config", "--get", BRANCH_KEY]);
   const fromGit = configured.code === 0 ? configured.stdout.trim() : "";
   const branch = fromGit !== "" ? fromGit : DEFAULT_STATE_BRANCH;
@@ -13443,7 +15089,7 @@ ${ran.stdout}`.trim().split(`
   return;
 }), refExists = (cwd, env, ref) => gitSucceeds(cwd, env, ["show-ref", "--verify", "--quiet", ref]), NEUTRAL_IDENTITY, committing = (cwd, env) => git2(cwd, env, ["var", "GIT_COMMITTER_IDENT"]).pipe(map5((ran) => {
   const ident = /^(.*) <(.*)> \d+ [+-]\d{4}$/.exec(ran.stdout.trim());
-  return ran.code === 0 && ident !== null && !looksLikeAgent({ name: ident[1] ?? "", email: ident[2] ?? "" }) ? env : { ...env, ...NEUTRAL_IDENTITY };
+  return ran.code === 0 && ident !== null && !looksLikeAgent2({ name: ident[1] ?? "", email: ident[2] ?? "" }) ? env : { ...env, ...NEUTRAL_IDENTITY };
 })), baseStart = (top, env) => gen2(function* () {
   const head = yield* git2(top, env, ["symbolic-ref", "-q", "refs/remotes/origin/HEAD"]);
   const named = head.code === 0 ? head.stdout.trim().replace("refs/remotes/origin/", "") : "";
@@ -13466,7 +15112,7 @@ ${ran.stdout}`.trim().split(`
     const folder = stateDirectory(entry);
     if (!(yield* isDirectory(folder)))
       continue;
-    const names = yield* io(folder, () => readdir3(folder));
+    const names = yield* io(folder, () => readdir4(folder));
     if (names.some((name) => name !== CONFIG_FILE))
       return true;
   }
@@ -13514,13 +15160,13 @@ ${ran.stdout}`.trim().split(`
   "--no-tags",
   "origin",
   `+refs/heads/${branch}:refs/remotes/origin/${branch}`
-], timeout)))), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false))), migrationSweepPath = (common, branch) => join7(common, "holyagent", `${worktreeFolder(branch)}.migration-sweep`), checkSweepFile = (path, info) => {
+], timeout)))), flatMap2((code) => code === 0 ? refExists(top, env, `refs/remotes/origin/${branch}`) : succeed6(false))), migrationSweepPath = (common, branch) => join11(common, "holyagent", `${worktreeFolder(branch)}.migration-sweep`), checkSweepFile = (path, info) => {
   if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || process.platform !== "win32" && ((info.mode & 63) !== 0 || typeof process.getuid === "function" && info.uid !== process.getuid()))
     throw new Error(`unsafe migration sweep marker: ${path}`);
 }, syncSweepDirectory = async (path) => {
   if (process.platform === "win32")
     return;
-  const dir = await open6(dirname5(path), "r");
+  const dir = await open6(dirname8(path), "r");
   try {
     await dir.sync();
   } finally {
@@ -13528,11 +15174,11 @@ ${ran.stdout}`.trim().split(`
   }
 }, beginMigrationSweep = (common, branch, authorize) => gen2(function* () {
   const path = migrationSweepPath(common, branch);
-  const parent = dirname5(path);
+  const parent = dirname8(path);
   const commonRoot = yield* io(common, () => realpath4(common));
-  const info = yield* io(parent, () => lstat5(parent));
+  const info = yield* io(parent, () => lstat7(parent));
   const actual = yield* io(parent, () => realpath4(parent));
-  if (!info.isDirectory() || info.isSymbolicLink() || actual !== join7(commonRoot, "holyagent"))
+  if (!info.isDirectory() || info.isSymbolicLink() || actual !== join11(commonRoot, "holyagent"))
     return yield* new StateIo({
       path: parent,
       cause: "migration marker parent is not a canonical directory"
@@ -13549,7 +15195,7 @@ ${ran.stdout}`.trim().split(`
       }
       if (handle !== undefined)
         await handle.sync();
-      const marker = await lstat5(path);
+      const marker = await lstat7(path);
       checkSweepFile(path, marker);
     } finally {
       await handle?.close();
@@ -13559,29 +15205,29 @@ ${ran.stdout}`.trim().split(`
 }), finishMigrationSweep = (common, branch, authorize, terminalAuthorize) => gen2(function* () {
   const path = migrationSweepPath(common, branch);
   const before = yield* io(path, async () => {
-    const info = await lstat5(path);
+    const info = await lstat7(path);
     checkSweepFile(path, info);
     return { dev: info.dev, ino: info.ino };
   });
   yield* authorize;
   yield* io(path, async () => {
-    const current = await lstat5(path);
+    const current = await lstat7(path);
     checkSweepFile(path, current);
     if (current.dev !== before.dev || current.ino !== before.ino)
       throw new Error("migration sweep marker changed during authorization");
     if (terminalAuthorize() !== true)
       throw new Error("terminal migration authority is unavailable or revoked");
-    await rm7(path);
+    await rm8(path);
     await syncSweepDirectory(path);
   }).pipe(uninterruptible2);
-}), readyMarker = (path) => `${path}.ready`, ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join7(common, "holyagent", "worktree.lock"), gen2(function* () {
+}), readyMarker = (path) => `${path}.ready`, ensureWorktree = (top, common, env, branch, path, options, patience = WORKTREE_PATIENCE, authorize = void_3) => withFileLock(join11(common, "holyagent", "worktree.lock"), gen2(function* () {
   yield* authorize;
   const ready = readyMarker(path);
   const again = yield* checkedOut(yield* listWorktrees(top, env), branch);
   if (again !== undefined) {
     if (!options.peek && (yield* samePath(again, path)) && !(yield* fileExists(ready))) {
       yield* authorize;
-      yield* io(ready, () => mkdir6(dirname5(ready), { recursive: true }).then(() => writeFile4(ready, "")));
+      yield* io(ready, () => mkdir8(dirname8(ready), { recursive: true }).then(() => writeFile6(ready, "")));
     }
     return { kind: "ready", path: again, created: false };
   }
@@ -13603,30 +15249,30 @@ ${ran.stdout}`.trim().split(`
     return { kind: "deferred" };
   yield* beginMigrationSweep(common, branch, authorize);
   yield* authorize;
-  yield* io(ready, () => rm7(ready, { force: true }));
+  yield* io(ready, () => rm8(ready, { force: true }));
   yield* authorize;
-  yield* io(path, () => rm7(path, { recursive: true, force: true }));
+  yield* io(path, () => rm8(path, { recursive: true, force: true }));
   yield* authorize;
-  yield* io(path, () => mkdir6(dirname5(path), { recursive: true }));
+  yield* io(path, () => mkdir8(dirname8(path), { recursive: true }));
   yield* authorize;
   yield* gitText(top, env, [...add, ...target]);
-  yield* uninterruptible2(io(ready, () => mkdir6(dirname5(ready), { recursive: true }).then(() => writeFile4(ready, ""))));
+  yield* uninterruptible2(io(ready, () => mkdir8(dirname8(ready), { recursive: true }).then(() => writeFile6(ready, ""))));
   return { kind: "ready", path, created: true };
-}), patience, authorize), LOCAL_FILES, sameBytes = (a, b) => all2([io(a, () => readFile4(a)), io(b, () => readFile4(b))]).pipe(map5(([left, right]) => Buffer.from(left).equals(Buffer.from(right)))), fileExists = (path) => io(path, () => stat3(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), kindAt = (path) => io(path, () => lstat5(path)).pipe(map5((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined))), realStateFolder = (root) => canonical(dirname5(root)).pipe(map5((parent) => join7(parent, basename2(root)))), requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
+}), patience, authorize), LOCAL_FILES, sameBytes = (a, b) => all2([io(a, () => readFile4(a)), io(b, () => readFile4(b))]).pipe(map5(([left, right]) => Buffer.from(left).equals(Buffer.from(right)))), fileExists = (path) => io(path, () => stat4(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), kindAt = (path) => io(path, () => lstat7(path)).pipe(map5((info) => info.isSymbolicLink() ? "link" : info.isFile() ? "file" : info.isDirectory() ? "directory" : "other"), catchIf2((error) => hasCode(error.cause, "ENOENT") || hasCode(error.cause, "ENOTDIR"), () => succeed6(undefined))), realStateFolder = (root) => canonical(dirname8(root)).pipe(map5((parent) => join11(parent, basename3(root)))), requireStateFolder = (root) => kindAt(root).pipe(flatMap2((kind) => kind === undefined || kind === "directory" ? void_3 : fail5(new StateIo({
   path: root,
   cause: `a ${kind} stands where the state folder is to be; the state worktree must hold a real folder, so remove it`
 })))), isPlainFile = (root, relative) => gen2(function* () {
-  const path = join7(root, relative);
+  const path = join11(root, relative);
   if ((yield* kindAt(root)) !== "directory" || (yield* kindAt(path)) !== "file")
     return false;
   const [real, base] = yield* all2([canonical(path), realStateFolder(root)]);
-  return real === join7(base, relative);
+  return real === join11(base, relative);
 }), requirePlainTarget = (root, relative) => gen2(function* () {
   yield* requireStateFolder(root);
   const parts = relative.split("/");
   let current = root;
   for (const [index, part] of parts.entries()) {
-    current = join7(current, part);
+    current = join11(current, part);
     const kind = yield* kindAt(current);
     if (kind === undefined)
       return;
@@ -13663,7 +15309,7 @@ ${ran.stdout}`.trim().split(`
       index++;
   }
   return files.filter((path) => path !== CONFIG_FILE).filter((path) => !path.startsWith("local/") || LOCAL_FILES.has(path)).toSorted().map((path) => ({ path, status: status.get(path) }));
-}), migrationMarker = (common, top) => io(top, () => realpath4(top)).pipe(map5((real) => join7(common, "holyagent", "migrated", createHash5("sha1").update(real).digest("hex").slice(0, 16)))), migrationJournalPath = (common) => join7(common, "holyagent", "migration", "journal.json"), pendingMigration = (common) => kindAt(migrationJournalPath(common)).pipe(map5((kind) => kind !== undefined)), pendingReadMigration = (common, branch) => gen2(function* () {
+}), migrationMarker = (common, top) => io(top, () => realpath4(top)).pipe(map5((real) => join11(common, "holyagent", "migrated", createHash5("sha1").update(real).digest("hex").slice(0, 16)))), migrationJournalPath = (common) => join11(common, "holyagent", "migration", "journal.json"), pendingMigration = (common) => kindAt(migrationJournalPath(common)).pipe(map5((kind) => kind !== undefined)), pendingReadMigration = (common, branch) => gen2(function* () {
   if (yield* pendingMigration(common))
     return true;
   return (yield* kindAt(migrationSweepPath(common, branch))) !== undefined;
@@ -13688,22 +15334,22 @@ ${ran.stdout}`.trim().split(`
       return;
     if (!(yield* pendingMigration(common)) && (yield* workTreeEntries(top, env)).length === 0) {
       yield* authorize;
-      yield* io(marker, () => mkdir6(dirname5(marker), { recursive: true }).then(() => writeFile4(marker, "")));
+      yield* io(marker, () => mkdir8(dirname8(marker), { recursive: true }).then(() => writeFile6(marker, "")));
       return;
     }
     const sourceRoot = yield* io(top, () => realpath4(top));
     const targetRoot = yield* io(worktree, () => realpath4(worktree));
     const journalPath = migrationJournalPath(common);
     const commonRoot = yield* io(common, () => realpath4(common));
-    const privateRoot = join7(commonRoot, "holyagent");
-    for (const directory of [privateRoot, join7(privateRoot, "migration")]) {
+    const privateRoot = join11(commonRoot, "holyagent");
+    for (const directory of [privateRoot, join11(privateRoot, "migration")]) {
       yield* authorize;
       if (directory === privateRoot) {
-        yield* io(directory, () => mkdir6(directory, { mode: 448 })).pipe(catchIf2((error) => hasCode(error.cause, "EEXIST"), () => void_3));
+        yield* io(directory, () => mkdir8(directory, { mode: 448 })).pipe(catchIf2((error) => hasCode(error.cause, "EEXIST"), () => void_3));
       } else {
         yield* io(directory, () => ensureMigrationJournalDirectory(directory));
       }
-      const info = yield* io(directory, () => lstat5(directory));
+      const info = yield* io(directory, () => lstat7(directory));
       const actual = yield* io(directory, () => realpath4(directory));
       if (!info.isDirectory() || info.isSymbolicLink() || actual !== directory)
         return yield* new StateIo({
@@ -13712,7 +15358,7 @@ ${ran.stdout}`.trim().split(`
         });
     }
     const location = {
-      path: join7(commonRoot, "holyagent", "migration", "journal.json"),
+      path: join11(commonRoot, "holyagent", "migration", "journal.json"),
       sourceRoot,
       targetRoot
     };
@@ -13744,7 +15390,7 @@ ${ran.stdout}`.trim().split(`
               continue;
             yield* requirePlainTarget(target, entry.path);
             const path = `${STATE_DIRECTORY}/${entry.path}`;
-            const to = join7(target, entry.path);
+            const to = join11(target, entry.path);
             const there = (yield* kindAt(to)) !== undefined;
             const dirty = entry.status !== undefined && !entry.status.includes("D");
             if (local(path) && there)
@@ -13831,19 +15477,19 @@ ${ran.stdout}`.trim().split(`
               cause: "source state changed during migration; inspect and retry"
             });
           for (const path of cleaned.removed) {
-            let folder = dirname5(join7(sourceRoot, path));
+            let folder = dirname8(join11(sourceRoot, path));
             while (folder.startsWith(`${source}${sep2}`)) {
               yield* begin;
               const removed = yield* io(folder, () => rmdir(folder)).pipe(as2(true), orElseSucceed2(() => false));
               if (!removed)
                 break;
-              folder = dirname5(folder);
+              folder = dirname8(folder);
             }
           }
           yield* begin;
           yield* io(source, () => rmdir(source)).pipe(ignore2);
           yield* begin;
-          yield* io(marker, () => mkdir6(dirname5(marker), { recursive: true }).then(() => writeFile4(marker, "")));
+          yield* io(marker, () => mkdir8(dirname8(marker), { recursive: true }).then(() => writeFile6(marker, "")));
         })
       }
     });
@@ -13869,7 +15515,7 @@ ${ran.stdout}`.trim().split(`
     yield* gitText(worktree, env, ["--literal-pathspecs", "add", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"], wanted.map((path) => `${path}\x00`).join(""));
   }
 }), commitState = (directory, env, message, copied = [], resolved, begin = void_3) => gen2(function* () {
-  const worktree = dirname5(directory);
+  const worktree = dirname8(directory);
   if (!(yield* isDirectory(worktree)))
     return false;
   const top = yield* git2(worktree, env, ["rev-parse", "--show-toplevel"]);
@@ -13968,13 +15614,13 @@ ${ran.stdout}`.trim().split(`
       path: directory,
       cause: `the recorded state branch ${branch} is not checked out; run a state command to make it available, then retry handoff`
     });
-  const own = join7(common, "holyagent");
+  const own = join11(common, "holyagent");
   for (const entry of listed) {
     if (entry.prunable || stateWorktree !== undefined && (yield* samePath(entry.path, stateWorktree)) || entry.path.startsWith(`${own}${sep2}`))
       continue;
     const source = stateDirectory(entry.path);
     yield* requireStateFolder(source);
-    const records = join7(source, "intents");
+    const records = join11(source, "intents");
     const kind = yield* kindAt(records);
     if (kind === undefined)
       continue;
@@ -14001,8 +15647,8 @@ ${ran.stdout}`.trim().split(`
       return yield* failed(entry.path, ["ls-files", "--cached", "-z", "--", `${STATE_DIRECTORY}/intents`], trackedResult);
     const tracked = new Set(trackedResult.stdout.split("\x00").map((path) => path.slice(STATE_DIRECTORY.length + 1)));
     for (const file of entries.filter((item) => item.path.startsWith("intents/"))) {
-      const target = join7(directory, file.path);
-      if (!(yield* isPlainFile(source, file.path)) || !(yield* isPlainFile(directory, file.path)) || (file.status !== undefined || !tracked.has(file.path)) && !(yield* sameBytes(join7(source, file.path), target)))
+      const target = join11(directory, file.path);
+      if (!(yield* isPlainFile(source, file.path)) || !(yield* isPlainFile(directory, file.path)) || (file.status !== undefined || !tracked.has(file.path)) && !(yield* sameBytes(join11(source, file.path), target)))
         return yield* new StateIo({
           path: source,
           cause: "recorded state differs from the shared state; inspect and reconcile this worktree before retrying handoff"
@@ -14020,7 +15666,7 @@ ${ran.stdout}`.trim().split(`
   return { mode, configured, directory };
 }), modeRestore = (top, env, previous) => gitSucceeds(top, env, ["config", "--local", "--get", STATE_MODE_KEY]).pipe(map5((configured) => configured ? gitText(top, env, ["config", "--local", STATE_MODE_KEY, previous]) : gitText(top, env, ["config", "--local", "--unset", STATE_MODE_KEY]))), setStateMode = (cwd, env, mode) => gen2(function* () {
   const { top, common } = yield* requireRepository(cwd, env);
-  return yield* withFileLock(join7(common, "holyagent", "worktree.lock"), gen2(function* () {
+  return yield* withFileLock(join11(common, "holyagent", "worktree.lock"), gen2(function* () {
     const previous = yield* stateModeOf(top, env);
     if (previous === "branch" && mode !== "branch") {
       const branch = yield* stateBranch(top, env);
@@ -14058,7 +15704,7 @@ var init_tree = __esm(() => {
   init_errors5();
   init_files();
   init_layout();
-  init_lock();
+  init_lock2();
   init_migration_files();
   init_migration_index();
   init_migration_journal();
@@ -14091,10 +15737,10 @@ var init_tree = __esm(() => {
   STATE_FILE = /^(?:config\.json|intents\/[^/]+\/(?:intent\.json|(?:assignments|branches|pulls)\/[^/]+\.json|resume-notes\.md|notes\/(?:.+\/)?[^/]+(?<!\.tmp)))$/;
 });
 
-import { join as join8, relative as relative2, sep as sep3 } from "path";
+import { join as join12, relative as relative2, sep as sep3 } from "path";
 var globBelow = (folder, pattern, separator = sep3) => `${toPosix(folder, separator)}/${pattern}`, scan = (directory, pattern) => io(directory, () => scanMatching(directory, pattern)).pipe(map5((paths) => paths.map((path) => toPosix(path)).toSorted()), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6([]))), requireLocation = (path, expected) => path === expected ? void_3 : fail5(new CorruptRecord({ path, reason: `the record belongs in ${expected}` })), READ_CONCURRENCY = 16, loadIntents = (directory) => gen2(function* () {
   const read = yield* forEach2(yield* scan(directory, "intents/*/intent.json"), (file) => gen2(function* () {
-    const path = join8(directory, file);
+    const path = join12(directory, file);
     const intent = yield* readJson(Intent, path);
     if (intent === undefined)
       return [];
@@ -14104,7 +15750,7 @@ var globBelow = (folder, pattern, separator = sep3) => `${toPosix(folder, separa
   return read.flat();
 }), loadAssignments = (directory, relatives, intents) => gen2(function* () {
   const read = yield* forEach2(relatives, (file) => gen2(function* () {
-    const path = join8(directory, file);
+    const path = join12(directory, file);
     const assignment = yield* readJson(Assignment, path);
     if (assignment === undefined)
       return [];
@@ -14125,7 +15771,7 @@ var globBelow = (folder, pattern, separator = sep3) => `${toPosix(folder, separa
     const folder = intentFolder(directory, intent);
     const prefix = relative2(directory, folder);
     for (const file of yield* scan(directory, globBelow(prefix, "branches/*.json"))) {
-      const path = join8(directory, file);
+      const path = join12(directory, file);
       const record = yield* readJson(BranchRecord, path);
       if (record === undefined)
         continue;
@@ -14135,7 +15781,7 @@ var globBelow = (folder, pattern, separator = sep3) => `${toPosix(folder, separa
       branches.push(record);
     }
     for (const file of yield* scan(directory, globBelow(prefix, "pulls/*.json"))) {
-      const path = join8(directory, file);
+      const path = join12(directory, file);
       const record = yield* readJson(PullRecord, path);
       if (record === undefined)
         continue;
@@ -14264,7 +15910,7 @@ var init_store = __esm(() => {
   init_files();
   init_layout();
   init_local();
-  init_lock();
+  init_lock2();
   init_scan();
   init_tree();
   retryCorrupt = {
@@ -16016,7 +17662,7 @@ var init_toon = __esm(() => {
   init_dist2();
 });
 
-var spawn2 = (program, args, options) => spawn(program, args, { ...options, env: definedEnv(options.env) }).pipe(catchDefect2((cause) => succeed6({ code: 127, stdout: new Uint8Array, stderr: String(cause) })));
+var spawn2 = (program, args, options) => spawn(program, args, { ...options, env: definedEnv2(options.env) }).pipe(catchDefect2((cause) => succeed6({ code: 127, stdout: new Uint8Array, stderr: String(cause) })));
 var init_process2 = __esm(() => {
   init_dist();
   init_process();
@@ -16508,25 +18154,25 @@ var init_selection = __esm(() => {
   init_evidence();
 });
 
-import { lstat as lstat6, realpath as realpath5 } from "fs/promises";
-import { basename as basename3, dirname as dirname6, isAbsolute as isAbsolute5, join as join9, resolve as resolve6, sep as sep4 } from "path";
+import { lstat as lstat8, realpath as realpath5 } from "fs/promises";
+import { basename as basename4, dirname as dirname9, isAbsolute as isAbsolute5, join as join13, resolve as resolve7, sep as sep4 } from "path";
 var canonical2 = (path) => io(path, () => realpath5(path)).pipe(catch_2((error) => {
   if (!hasCode(error.cause, "ENOENT"))
     return fail5(new InvalidDraft({
       message: `Cannot resolve operational target ${path}: ${error.message}`
     }));
-  return io(path, () => lstat6(path)).pipe(flatMap2(() => fail5(new InvalidDraft({
+  return io(path, () => lstat8(path)).pipe(flatMap2(() => fail5(new InvalidDraft({
     message: `Cannot resolve operational target ${path}: dangling symlink or inaccessible path`
   }))), catch_2((problem) => {
     if (problem instanceof InvalidDraft)
       return fail5(problem);
-    if (!hasCode(problem.cause, "ENOENT") || dirname6(path) === path)
+    if (!hasCode(problem.cause, "ENOENT") || dirname9(path) === path)
       return fail5(new InvalidDraft({
         message: `Cannot inspect operational target ${path}: ${problem.message}`
       }));
-    return canonical2(dirname6(path)).pipe(map5((parent) => join9(parent, basename3(path))));
+    return canonical2(dirname9(path)).pipe(map5((parent) => join13(parent, basename4(path))));
   }));
-})), comparable = (path) => resolve6(path).split(sep4).join("/").toLowerCase(), contains = (parent, child) => child === parent || child.startsWith(parent.endsWith("/") ? parent : `${parent}/`), overlaps = (a, b) => contains(a, b) || contains(b, a), validateOperationalResources = (resources, worktrees) => gen2(function* () {
+})), comparable = (path) => resolve7(path).split(sep4).join("/").toLowerCase(), contains = (parent, child) => child === parent || child.startsWith(parent.endsWith("/") ? parent : `${parent}/`), overlaps = (a, b) => contains(a, b) || contains(b, a), validateOperationalResources = (resources, worktrees) => gen2(function* () {
   if (resources.length === 0)
     return;
   const roots = yield* forEach2(worktrees, (root) => canonical2(root));
@@ -16549,13 +18195,13 @@ var init_operational = __esm(() => {
   init_files();
 });
 
-import { isAbsolute as isAbsolute6, join as join10, resolve as resolve7 } from "path";
+import { isAbsolute as isAbsolute6, join as join14, resolve as resolve8 } from "path";
 var artifactFile = (context, root, directory, kind, id) => spawn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
   cwd: root,
   env: gitEnvironment(context.env)
 }).pipe(catchDefect2(() => succeed6({ code: -1, stdout: new Uint8Array, stderr: "" })), map5(({ code, stdout }) => {
   const common = new TextDecoder().decode(stdout).trim();
-  return code === 0 && isAbsolute6(common) ? join10(resolve7(common), "holyagent", kind, `${id}.md`) : localFile(directory, `${kind}/${id}.md`);
+  return code === 0 && isAbsolute6(common) ? join14(resolve8(common), "holyagent", kind, `${id}.md`) : localFile(directory, `${kind}/${id}.md`);
 }));
 var init_artifacts = __esm(() => {
   init_dist();
@@ -16630,14 +18276,14 @@ var init_context = __esm(() => {
   };
 });
 
-var oneLine = (text) => text.replace(/\s+/g, " ").trim(), REPORT_FIELDS, JsonReport, section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine(line)}`)], KNOWN, extraLines = (report) => Object.entries(report).filter(([name]) => !KNOWN.has(name)).map(([name, value]) => `${name}: ${oneLine(typeof value === "string" ? value : JSON.stringify(value) ?? "")}`), renderJsonReport = (report) => [
+var oneLine2 = (text) => text.replace(/\s+/g, " ").trim(), REPORT_FIELDS, JsonReport, section = (heading, lines) => lines.length === 0 ? [] : [`${heading}:`, ...lines.map((line) => `- ${oneLine2(line)}`)], KNOWN, extraLines = (report) => Object.entries(report).filter(([name]) => !KNOWN.has(name)).map(([name, value]) => `${name}: ${oneLine2(typeof value === "string" ? value : JSON.stringify(value) ?? "")}`), renderJsonReport = (report) => [
   `status: ${report.status}`,
   ...section("changed", report.changed_paths),
   ...section("checks", report.checks.map(({ command, exit }) => `${command} -> exit ${exit}`)),
   ...section("blockers", report.blockers),
   ...section("notes", report.notes),
   ...extraLines(report),
-  ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine(key)}: ${support}`))
+  ...section("evidence", report.evidence.map(({ key, support }) => `${oneLine2(key)}: ${support}`))
 ].join(`
 `);
 var init_jsonreport = __esm(() => {
@@ -16807,7 +18453,7 @@ var init_journal = __esm(() => {
   };
 });
 
-import { basename as basename4 } from "path";
+import { basename as basename5 } from "path";
 var EVIDENCE_HEADING, indentOf = (line) => line.length - line.trimStart().length, LIST_MARKER, evidenceEntries = (report) => {
   const lines = report.split(/\r?\n/);
   const heading = lines.findLastIndex((line) => EVIDENCE_HEADING.test(line));
@@ -16977,7 +18623,7 @@ ${body}` : body;
   })
 }), refused = (_hint) => (error) => new InvalidDraft({ message: error.message }), piJournalReports = (journal, source, calls) => decodePiJournal(journal, source).pipe(mapError2(refused("Pass the <run id>.workflow.jsonl of the workflow run, unedited.")), map5((entries) => {
   const { reports, notReported } = matchJournal(entries, calls);
-  const run = basename4(source).replace(/\.workflow\.jsonl$/, "");
+  const run = basename5(source).replace(/\.workflow\.jsonl$/, "");
   return {
     reports: reports.map(({ id, report }) => ({ id, report })),
     notAssignmentIds: notReported.map(({ id, index, reason }) => ({
@@ -17035,8 +18681,8 @@ var init_report = __esm(() => {
   JournalLine2 = fromJsonString2(Union2([Started, Resulted, Other]));
 });
 
-import { readFile as readFile5, realpath as realpath6, stat as stat4 } from "fs/promises";
-import { basename as basename5, resolve as resolve8 } from "path";
+import { readFile as readFile5, realpath as realpath6, stat as stat5 } from "fs/promises";
+import { basename as basename6, resolve as resolve9 } from "path";
 var Draft, Reference2, schemas, MissingAsset, now, complete = (snapshot, input) => gen2(function* () {
   const { intentId, intentRevision, ...rest } = input;
   if (intentId !== undefined && intentRevision !== undefined)
@@ -17176,9 +18822,9 @@ var Draft, Reference2, schemas, MissingAsset, now, complete = (snapshot, input) 
   if (request.source.trim() === "" || request.source.includes("\x00") || /^[a-z][a-z0-9+.-]*:\/\//i.test(request.source))
     return yield* new InvalidDraft({ message: "Report source must name a local file" });
   return yield* withState(context, "assignment.reports", "peek", ({ root, directory, read }) => gen2(function* () {
-    const path = resolve8(context.cwd, request.source);
+    const path = resolve9(context.cwd, request.source);
     const source = yield* io(path, () => realpath6(path));
-    if (!(yield* io(source, () => stat4(source))).isFile())
+    if (!(yield* io(source, () => stat5(source))).isFile())
       return yield* new InvalidDraft({ message: "Report source must be a regular local file" });
     const text = yield* io(source, () => readFile5(source, "utf8"));
     const snapshot = yield* read(directory);
@@ -17197,7 +18843,7 @@ var Draft, Reference2, schemas, MissingAsset, now, complete = (snapshot, input) 
         reports: [...selected].map(([id, report]) => ({ id, report })),
         notAssignmentIds: rejected
       };
-    } else if (!basename5(source).endsWith(".workflow.jsonl")) {
+    } else if (!basename6(source).endsWith(".workflow.jsonl")) {
       found = yield* piRecordReports(text, source, snapshot.project.assignments.flatMap(({ id, specialist }) => specialist?.agentId !== undefined && (specialist.agentId.startsWith("pi:") || specialist.agentId.startsWith("pi-workflow:")) ? [{ id, agentId: specialist.agentId }] : []));
     } else {
       const settings = yield* loadConfigWithSource({
@@ -17288,7 +18934,7 @@ var init_assignment2 = __esm(() => {
   now = currentTimeMillis2.pipe(map5((millis) => new Date(millis).toISOString()));
 });
 
-import { rm as rm8 } from "fs/promises";
+import { rm as rm9 } from "fs/promises";
 var schemas2, now2, create3 = (context, input) => gen2(function* () {
   const draft = yield* decode4(schemas2.create, input);
   const id = yield* newId("intent");
@@ -17324,7 +18970,7 @@ var schemas2, now2, create3 = (context, input) => gen2(function* () {
     const change = yield* apply((snapshot) => resolveIntent(snapshot).pipe(flatMap2((current) => closeIntent(snapshot.project, snapshot.specialists, current.id, request, at).pipe(map5((closed) => ({
       ...closed,
       owned: snapshot.project.assignments.filter((row) => row.intentId === current.id).map((row) => row.id)
-    }))))), (closed) => forEach2(closed.owned, (id) => forEach2(["briefs", "reports"], (kind) => artifactFile(context, root, directory, kind, id).pipe(flatMap2((path) => io(path, () => rm8(path, { force: true })).pipe(catch_2((error) => sync2(() => {
+    }))))), (closed) => forEach2(closed.owned, (id) => forEach2(["briefs", "reports"], (kind) => artifactFile(context, root, directory, kind, id).pipe(flatMap2((path) => io(path, () => rm9(path, { force: true })).pipe(catch_2((error) => sync2(() => {
       unremoved.push(error.message);
     }))))))).pipe(asVoid2));
     return { ...change, unremoved };
@@ -17371,14 +19017,6 @@ var init_intent2 = __esm(() => {
   };
 });
 
-var AGENT_EMAIL = "noreply@anthropic.com", AGENT_NAMES, looksLikeAgent2 = (identity) => identity.email.trim().toLowerCase() === AGENT_EMAIL || AGENT_NAMES.includes(identity.name.replace(/\s+/g, " ").trim().toLowerCase()), inCloudSession = (env) => env["CLAUDE_CODE_REMOTE"] === "true", parseIdent = (line) => {
-  const match = /^(.*) <([^<>]*)> \d+ [+-]\d{4}$/.exec(line.trim());
-  return match === null ? undefined : { name: match[1] ?? "", email: match[2] ?? "" };
-};
-var init_identity = __esm(() => {
-  AGENT_NAMES = ["claude", "claude code"];
-});
-
 var IDENTITY_USAGE = "vcs identity --name <name> --email <email>", setAuthor = (request) => gen2(function* () {
   const name = request.name.trim();
   const email = request.email.trim();
@@ -17388,7 +19026,7 @@ var IDENTITY_USAGE = "vcs identity --name <name> --email <email>", setAuthor = (
     return yield* refuse("--name needs the user's name, without angle brackets or control characters");
   if (!/^[^\s<>@]+@[^\s<>@]+$/.test(email) || !plain(email))
     return yield* refuse("--email needs an email address such as 1234+login@users.noreply.github.com");
-  if (looksLikeAgent2({ name, email }))
+  if (looksLikeAgent({ name, email }))
     return yield* refuse(`${name} <${email}> is the agent's own identity, not the user's`);
   yield* git3(["config", "--local", "author.name", name]);
   yield* git3(["config", "--local", "author.email", email]);
@@ -17490,7 +19128,7 @@ var init_commit = __esm(() => {
       name: (yield* gitMaybe(["config", "user.name"])) ?? "",
       email: (yield* gitMaybe(["config", "user.email"])) ?? ""
     };
-    if (looksLikeAgent2(identity))
+    if (looksLikeAgent(identity))
       return yield* new AgentIdentity({ identity: `${identity.name} <${identity.email}>` });
   });
   requireOwnAuthor = gen2(function* () {
@@ -17498,7 +19136,7 @@ var init_commit = __esm(() => {
     const author = line === undefined ? undefined : parseIdent(line);
     if (author === undefined)
       return yield* new CloudAuthor({ author: "(none set)" });
-    if (author.name === "" || author.email === "" || looksLikeAgent2(author))
+    if (author.name === "" || author.email === "" || looksLikeAgent(author))
       return yield* new CloudAuthor({ author: `${author.name} <${author.email}>` });
   });
   stagedPaths = git3(["diff", "--cached", "--name-only", "--no-renames", "-z"]).pipe(map5((names) => names.split("\x00").filter((path) => path !== "")));
@@ -17525,7 +19163,7 @@ var init_commit = __esm(() => {
   });
 });
 
-var SESSION_TRAILER, GENERATED_FOOTER, PI_GENERATED_FOOTER, CO_AUTHOR, SESSION_LINK, PI_SESSION_LINK, PI_AGENT_NAME, namesAgent = (coAuthor) => looksLikeAgent2({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim()), isAttribution = (line) => {
+var SESSION_TRAILER, GENERATED_FOOTER, PI_GENERATED_FOOTER, CO_AUTHOR, SESSION_LINK, PI_SESSION_LINK, PI_AGENT_NAME, namesAgent = (coAuthor) => looksLikeAgent({ name: coAuthor.replace(/<.*$/, ""), email: "" }) || /@(?:[\w-]+\.)*(?:anthropic\.com|pi\.dev)\b/i.test(coAuthor) || PI_AGENT_NAME.test(coAuthor.replace(/<.*$/, "").replace(/\s+/g, " ").trim()), isAttribution = (line) => {
   if (SESSION_TRAILER.test(line) || GENERATED_FOOTER.test(line) || PI_GENERATED_FOOTER.test(line))
     return true;
   const coAuthor = CO_AUTHOR.exec(line);
@@ -17620,8 +19258,8 @@ var init_record = __esm(() => {
   nowIso = currentTimeMillis2.pipe(map5((millis) => new Date(millis).toISOString()));
 });
 
-import { constants as constants4 } from "fs";
-import { join as join11, relative as relative3, sep as sep6 } from "path";
+import { constants as constants5 } from "fs";
+import { join as join15, relative as relative3, sep as sep6 } from "path";
 var Created, MAX_BODY_BYTES, hasGitSegment = (path) => path.split(/[\\/]/).some((segment) => segment.toLowerCase() === ".git"), readBodyFile = (root, file) => {
   const refuse = (why) => new Usage({
     message: `--body-file ${file} ${why}`,
@@ -17634,7 +19272,7 @@ var Created, MAX_BODY_BYTES, hasGitSegment = (path) => path.split(/[\\/]/).some(
       return yield* refuse(`is not a project path (${problem})`);
     if (hasGitSegment(file))
       return yield* refuse("is inside .git");
-    const path = join11(root, toPosix(file));
+    const path = join15(root, toPosix(file));
     const resolve = io(path, () => fs.realpath(path));
     const real = yield* resolve.pipe(catchIf2((error) => hasCode(error.cause, "ENOENT"), () => fail5(refuse("does not exist"))));
     const base = yield* io(root, () => fs.realpath(root));
@@ -17652,7 +19290,7 @@ var Created, MAX_BODY_BYTES, hasGitSegment = (path) => path.split(/[\\/]/).some(
         code: ignored.code,
         output: ignored.stderr.trim()
       });
-    const text = yield* acquireUseRelease2(io(real, () => fs.open(real, constants4.O_RDONLY | constants4.O_NOFOLLOW)), (handle) => gen2(function* () {
+    const text = yield* acquireUseRelease2(io(real, () => fs.open(real, constants5.O_RDONLY | constants5.O_NOFOLLOW)), (handle) => gen2(function* () {
       const info = yield* io(real, () => handle.stat());
       if (!info.isFile())
         return yield* refuse("is not a regular file");
@@ -17827,29 +19465,6 @@ var init_errors8 = __esm(() => {
   };
 });
 
-var FORM_CHOICES, DEFAULT_FORM_CHOICE, hasDisplay = (env, platform = process.platform) => platform === "darwin" || platform === "win32" || [env["DISPLAY"], env["WAYLAND_DISPLAY"]].some((value) => value !== undefined && value !== ""), inCi = (env) => {
-  const value = env["CI"]?.trim().toLowerCase();
-  return value !== undefined && !["", "0", "false", "no", "off"].includes(value);
-}, detectForm = (env, platform = process.platform) => {
-  if (inCloudSession(env))
-    return { form: "headless", source: "detected", reason: "a claude.ai cloud session" };
-  if (inCi(env))
-    return { form: "headless", source: "detected", reason: "CI is set" };
-  if (!hasDisplay(env, platform))
-    return { form: "headless", source: "detected", reason: "no DISPLAY or WAYLAND_DISPLAY is set" };
-  return { form: "normal", source: "detected", reason: "a graphical session is available" };
-}, chooseForm = (env, flag, platform = process.platform) => flag === undefined ? detectForm(env, platform) : { form: flag, source: "flag", reason: `--form ${flag}` }, describeForm = (choice) => choice.source === "flag" ? `${choice.form} (set by ${choice.reason})` : choice.source === "detected" ? `${choice.form} (detected: ${choice.reason})` : choice.form;
-var init_form = __esm(() => {
-  init_capabilities();
-  init_identity();
-  FORM_CHOICES = CAPABILITY_FORMS;
-  DEFAULT_FORM_CHOICE = {
-    form: "normal",
-    source: "default",
-    reason: "no form was asked for"
-  };
-});
-
 var WEB_KIT_PACKAGE = "pi-web-kit", piPackages = (config, profile = providerProfile(config), form = "normal", definitions = CAPABILITIES, platform) => {
   const { enable, features } = config.pi;
   if (!enable)
@@ -17870,20 +19485,7 @@ var init_packages = __esm(() => {
   init_pi_packages2();
 });
 
-import { homedir as homedir2 } from "os";
-import { join as join12 } from "path";
-var firstNonEmpty2 = (...values) => values.find((value) => value !== undefined && value !== ""), definedEnv2 = (env, omit = new Set) => Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined && !omit.has(entry[0]))), homeDirectory2 = (env, fallback = homedir2) => firstNonEmpty2(env.HOME, env.USERPROFILE) ?? fallback(), claudeConfigDirectory = (env, home = homedir2) => firstNonEmpty2(env.CLAUDE_CONFIG_DIR) ?? join12(homeDirectory2(env, home), ".claude"), userFiles = (env) => {
-  const home = homeDirectory2(env);
-  const claudeDir = claudeConfigDirectory(env, () => home);
-  return {
-    claudeDir,
-    settings: join12(claudeDir, "settings.json"),
-    ctx7Credentials: join12(home, ".config", "context7", "credentials.json")
-  };
-};
-var init_environment2 = () => {};
-
-import { basename as basename6, dirname as dirname7, join as join13 } from "path";
+import { basename as basename7, dirname as dirname10, join as join16 } from "path";
 var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPromise2({
   try: run,
   catch: (cause) => new SetupFailure({
@@ -17915,8 +19517,8 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
   const mode = options?.mode ?? (exists ? (yield* fileOperation(target, "write", () => fs.stat(target))).mode & 511 : undefined);
   const text = (yield* encodeEffect(JsonObjectText)(value, strict2).pipe(mapError2((error) => new SetupFailure({ message: `cannot encode ${path}: ${error.message}` })))) + `
 `;
-  const temporary = join13(dirname7(target), `.${basename6(target)}.${process.pid}.tmp`);
-  yield* fileOperation(dirname7(target), "write", () => fs.mkdir(dirname7(target), { recursive: true }));
+  const temporary = join16(dirname10(target), `.${basename7(target)}.${process.pid}.tmp`);
+  yield* fileOperation(dirname10(target), "write", () => fs.mkdir(dirname10(target), { recursive: true }));
   yield* tryPromise2({
     try: () => fs.writeFile(temporary, text, { flag: "wx", ...mode === undefined ? {} : { mode } }),
     catch: (cause) => cause
@@ -17974,14 +19576,14 @@ var init_json_file = __esm(() => {
   empty4 = {};
 });
 
-import { isAbsolute as isAbsolute7, join as join14 } from "path";
+import { isAbsolute as isAbsolute7, join as join17 } from "path";
 var BROWSE_VERSION, BROWSE_COMMAND, BROWSE_PAIR_FIX, BROWSE_INSTALL_FIX, browseDataDirectory = (env) => {
   const home = firstNonEmpty2(env["OPENCODE_BROWSER_HOME"]);
   if (home !== undefined)
     return home;
   const data = firstNonEmpty2(env["XDG_DATA_HOME"]);
-  return join14(data !== undefined && isAbsolute7(data) ? data : join14(homeDirectory2(env), ".local", "share"), "browse");
-}, browsePairingFile = (env) => join14(browseDataDirectory(env), "browser-tokens.json"), Open, Pairing, PairingFile, readBrowsePairing = (env) => gen2(function* () {
+  return join17(data !== undefined && isAbsolute7(data) ? data : join17(homeDirectory2(env), ".local", "share"), "browse");
+}, browsePairingFile = (env) => join17(browseDataDirectory(env), "browser-tokens.json"), Open, Pairing, PairingFile, readBrowsePairing = (env) => gen2(function* () {
   const text = yield* readJsonText(browsePairingFile(env));
   if (text === undefined || text.trim() === "")
     return { state: "unpaired" };
@@ -18003,7 +19605,7 @@ var BROWSE_VERSION, BROWSE_COMMAND, BROWSE_PAIR_FIX, BROWSE_INSTALL_FIX, browseD
 }), seen = (browser) => browser.lastSeen === undefined ? "not connected yet" : `last seen ${new Date(browser.lastSeen).toISOString()}`, describePairing = (pairing) => pairing.state === "unpaired" ? "no browser is paired with browse (the extension is not installed or not paired; browse cannot tell which)" : `${pairing.browsers.length === 1 ? "1 browser" : `${pairing.browsers.length} browsers`} paired with browse (the extension is installed): ${pairing.browsers.map((browser) => `${browser.name ?? browser.id ?? browser.key}, ${seen(browser)}`).join("; ")}`, BROWSE_EXTENSION_IDS, browserDirectories = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
   if (platform === "darwin") {
-    const support = join14(home, "Library", "Application Support");
+    const support = join17(home, "Library", "Application Support");
     return [
       ["Google Chrome", "Google/Chrome"],
       ["Google Chrome Beta", "Google/Chrome Beta"],
@@ -18014,21 +19616,21 @@ var BROWSE_VERSION, BROWSE_COMMAND, BROWSE_PAIR_FIX, BROWSE_INSTALL_FIX, browseD
       ["Opera", "com.operasoftware.Opera"],
       ["Vivaldi", "Vivaldi"],
       ["Arc", "Arc/User Data"]
-    ].map(([name = "", folder = ""]) => ({ name, directory: join14(support, folder) }));
+    ].map(([name = "", folder = ""]) => ({ name, directory: join17(support, folder) }));
   }
   if (platform === "win32") {
-    const local = firstNonEmpty2(env["LOCALAPPDATA"]) ?? join14(home, "AppData", "Local");
-    const roaming = firstNonEmpty2(env["APPDATA"]) ?? join14(home, "AppData", "Roaming");
+    const local = firstNonEmpty2(env["LOCALAPPDATA"]) ?? join17(home, "AppData", "Local");
+    const roaming = firstNonEmpty2(env["APPDATA"]) ?? join17(home, "AppData", "Roaming");
     return [
-      { name: "Google Chrome", directory: join14(local, "Google", "Chrome", "User Data") },
-      { name: "Microsoft Edge", directory: join14(local, "Microsoft", "Edge", "User Data") },
-      { name: "Brave", directory: join14(local, "BraveSoftware", "Brave-Browser", "User Data") },
-      { name: "Vivaldi", directory: join14(local, "Vivaldi", "User Data") },
-      { name: "Opera", directory: join14(roaming, "Opera Software", "Opera Stable") }
+      { name: "Google Chrome", directory: join17(local, "Google", "Chrome", "User Data") },
+      { name: "Microsoft Edge", directory: join17(local, "Microsoft", "Edge", "User Data") },
+      { name: "Brave", directory: join17(local, "BraveSoftware", "Brave-Browser", "User Data") },
+      { name: "Vivaldi", directory: join17(local, "Vivaldi", "User Data") },
+      { name: "Opera", directory: join17(roaming, "Opera Software", "Opera Stable") }
     ];
   }
   const configured = firstNonEmpty2(env["XDG_CONFIG_HOME"]);
-  const config = configured !== undefined && isAbsolute7(configured) ? configured : join14(home, ".config");
+  const config = configured !== undefined && isAbsolute7(configured) ? configured : join17(home, ".config");
   return [
     ["Google Chrome", "google-chrome"],
     ["Google Chrome Beta", "google-chrome-beta"],
@@ -18038,19 +19640,19 @@ var BROWSE_VERSION, BROWSE_COMMAND, BROWSE_PAIR_FIX, BROWSE_INSTALL_FIX, browseD
     ["Brave", "BraveSoftware/Brave-Browser"],
     ["Opera", "opera"],
     ["Vivaldi", "vivaldi"]
-  ].map(([name = "", folder = ""]) => ({ name, directory: join14(config, folder) }));
+  ].map(([name = "", folder = ""]) => ({ name, directory: join17(config, folder) }));
 }, LocalState, Preferences, readOptional = (file) => readJsonText(file).pipe(orElseSucceed2(() => {
   return;
 })), isDisabled = (setting) => {
   const reasons = setting["disable_reasons"];
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 }, findBrowseExtension = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
-  const state = yield* readOptional(join14(directory, "Local State"));
+  const state = yield* readOptional(join17(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
-    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join14(directory, profile, file)).pipe(map5((text) => {
+    const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join17(directory, profile, file)).pipe(map5((text) => {
       const parsed = text === undefined ? undefined : decodeUnknownOption2(Preferences)(text, {
         onExcessProperty: "error"
       });
@@ -18113,124 +19715,9 @@ var init_browse = __esm(() => {
   }), [Open]));
 });
 
-var UNQUOTABLE, BARE_SYNTAX, cmdExeArguments = (command, args) => {
-  for (const word of [command, ...args]) {
-    if (UNQUOTABLE.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as syntax (a quote, %, ^, ! or control character)`
-      };
-    if (BARE_SYNTAX.test(word) && !/[ \t]/.test(word))
-      return {
-        ok: false,
-        reason: `cmd.exe would read part of ${JSON.stringify(word)} as an operator (& | < > or a parenthesis), since it holds no space to be quoted for`
-      };
-  }
-  return { ok: true, args: ["/d", "/s", "/c", "call", command, ...args] };
-}, isBatchFile = (path) => /\.(?:cmd|bat)$/i.test(path);
-var init_cmd = __esm(() => {
-  UNQUOTABLE = /["%^!]|\p{Cc}/u;
-  BARE_SYNTAX = /[&|<>()]/;
-});
-
-import { constants as constants5, realpathSync } from "fs";
-import { delimiter, dirname as dirname8, join as join15, posix, win32 } from "path";
-import { fileURLToPath } from "url";
-var whichWith = (fs, command, options) => {
-  const names = process.platform === "win32" && !/\.[^\\/]+$/.test(command) ? [".exe", ".cmd", ".bat", ""].map((suffix) => `${command}${suffix}`) : [command];
-  for (const directory of options.PATH.split(delimiter)) {
-    for (const name of names) {
-      const candidate = join15(directory || ".", name);
-      try {
-        fs.accessSync(candidate, process.platform === "win32" ? constants5.F_OK : constants5.X_OK);
-        if (fs.statSync(candidate).isFile())
-          return candidate;
-      } catch {}
-    }
-  }
-  return null;
-}, which = (command, options) => whichWith(nodeFileSystem, command, options), pathKey = (env, insensitive = process.platform === "win32") => {
-  if (!insensitive || env.PATH !== undefined)
-    return "PATH";
-  return Object.keys(env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
-}, pathWithBunBin = (env, options) => {
-  const key = pathKey(env, options.insensitive);
-  const root = options.bunInstall ? options.bunInstall : join15(options.home, ".bun");
-  const bunBin = join15(root, "bin");
-  return { key, value: `${env[key] ?? ""}${options.delimiter ?? delimiter}${bunBin}`, bunBin };
-}, isInside = (api, parent, path) => {
-  const relative = api.relative(parent, path);
-  return relative === "" || relative !== ".." && !relative.startsWith(`..${api.sep}`) && !api.isAbsolute(relative);
-}, strictWhich = (command, path, strict, lookup = which) => {
-  const windows = (strict.platform ?? process.platform) === "win32";
-  const api = windows ? win32 : posix;
-  if (!api.isAbsolute(strict.cwd))
-    return null;
-  const trusted = path.split(windows ? ";" : ":").filter((entry) => api.isAbsolute(entry) && !isInside(api, strict.cwd, entry));
-  if (trusted.length === 0)
-    return null;
-  const acceptable = (found) => {
-    if (found === null || !api.isAbsolute(found) || isInside(api, strict.cwd, found))
-      return false;
-    if (windows && !found.toLowerCase().endsWith(".exe"))
-      return false;
-    if (strict.which === undefined) {
-      try {
-        if (isInside(api, realpathSync(strict.cwd), realpathSync(found)))
-          return false;
-      } catch {
-        return false;
-      }
-    }
-    return true;
-  };
-  if (strict.which !== undefined) {
-    const found = strict.which(command, { PATH: trusted.join(windows ? ";" : ":") });
-    return acceptable(found) ? found : null;
-  }
-  for (const directory of trusted) {
-    const found = lookup(command, { PATH: directory });
-    if (acceptable(found))
-      return found;
-  }
-  return null;
-}, findCommand = (env, command, options, lookup = which) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-  const path = options?.includeBunBin ? bunBin.value : env[bunBin.key] ?? "";
-  return fromNullishOr(options?.strict === undefined ? lookup(command, { PATH: path }) : strictWhich(command, path, options.strict, lookup));
-}, EMPTY_BUNFIG, Shell;
-var init_shell = __esm(() => {
-  init_dist();
-  init_cmd();
-  init_filesystem();
-  init_process();
-  init_environment2();
-  EMPTY_BUNFIG = join15(dirname8(fileURLToPath(import.meta.url)), "empty-bunfig.toml");
-  Shell = class Shell extends Service()("holyagent/Shell") {
-    static live = (env) => {
-      const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-      return succeed5(Shell, Shell.of({
-        which: (command, options) => sync2(() => findCommand(env, command, options)),
-        run: (command, args, options) => {
-          const runEnv = definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value });
-          const found = process.platform === "win32" ? which(command, { PATH: runEnv[bunBin.key] ?? "" }) : null;
-          const batch = found !== null && isBatchFile(found) ? cmdExeArguments(found, args) : undefined;
-          if (batch !== undefined && !batch.ok)
-            return succeed6({ exitCode: 127, stdout: "", stderr: batch.reason });
-          return spawn(batch?.ok === true ? "cmd.exe" : command, batch?.ok === true ? batch.args : args, { cwd: options.cwd, env: runEnv }).pipe(map5((result) => ({
-            exitCode: result.code,
-            stdout: new TextDecoder().decode(result.stdout),
-            stderr: result.stderr
-          })), catchDefect2((error) => succeed6({ exitCode: 127, stdout: "", stderr: String(error) })));
-        }
-      }));
-    };
-  };
-});
-
 import { existsSync as existsSync2, readdirSync as readdirSync2 } from "fs";
-import { posix as posix2, win32 as win322 } from "path";
-var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win322 : posix2, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
+import { posix as posix3, win32 as win323 } from "path";
+var CHROMIUM_EXECUTABLE_VARIABLE = "HOLYAGENT_CHROMIUM_PATH", LEGACY_CHROMIUM_EXECUTABLE_VARIABLE = "PLAYWRIGHT_MCP_EXECUTABLE_PATH", PREINSTALLED_BROWSERS = "/opt/pw-browsers", BUILD_EXECUTABLES, pathsOf = (platform) => platform === "win32" ? win323 : posix3, revisionOf = (name) => Number(/^chromium-(\d+)$/.exec(name)?.[1] ?? Number.NaN), inFolder = (folder, platform, exists, list) => {
   const { join } = pathsOf(platform);
   const entry = join(folder, "chromium");
   if (exists(entry))
@@ -18287,7 +19774,7 @@ var added = (text) => `+ ${text}`, present = (text) => `= ${text}`, skipped = (t
   return `! ${what}: failed (exit ${result.exitCode})${detail === "" ? "" : `: ${detail}`}`;
 }, show3 = (value) => JSON.stringify(value) ?? String(value), pass = (name, detail) => `ok   ${name}: ${detail}`, fail8 = (name, detail) => `FAIL ${name}: ${detail}`;
 
-import { join as join16 } from "path";
+import { join as join18 } from "path";
 var PI_HOST_VERSION = "1.5.0", PI_MINIMUM_NODE = "22.19.0", PI_INSTALL, NODE_FIX, PI_FIX, PACKAGE_COMMAND, packageFix = (scope) => scope === "user" ? `install it with \`${PACKAGE_COMMAND}\`` : `install it with \`${PACKAGE_COMMAND}\` (add -l for this project only)`, VERSION, releaseIn = (text) => {
   const [, major, minor, patch] = VERSION.exec(text) ?? [];
   return major === undefined || minor === undefined || patch === undefined ? undefined : [Number(major), Number(minor), Number(patch)];
@@ -18334,8 +19821,8 @@ ${result.stderr}`;
   const home = homeDirectory2(env);
   const set = firstNonEmpty2(env["PI_CODING_AGENT_DIR"]);
   if (set === undefined)
-    return join16(home, ".pi", "agent");
-  return set === "~" ? home : /^~[/\\]/.test(set) ? join16(home, set.slice(2)) : set;
+    return join18(home, ".pi", "agent");
+  return set === "~" ? home : /^~[/\\]/.test(set) ? join18(home, set.slice(2)) : set;
 }, piSettingsSources = (file) => gen2(function* () {
   const fs = yield* fileSystem;
   const exists = yield* fileOperation(file, "read", () => fs.stat(file).then(() => true, (error) => error.code === "ENOENT" ? false : Promise.reject(error)));
@@ -18348,7 +19835,7 @@ ${result.stderr}`;
     onExcessProperty: "error"
   }).pipe(mapError2((error) => new SetupFailure({ message: `${file} is not valid Pi settings: ${error.message}` })));
   return (settings.packages ?? []).map((entry) => typeof entry === "string" ? entry : entry.source);
-}), piSettingsFiles = (env, cwd) => [join16(piAgentDirectory(env), "settings.json"), join16(cwd, ".pi", "settings.json")], piPresenceFiles = (env, cwd, scope) => {
+}), piSettingsFiles = (env, cwd) => [join18(piAgentDirectory(env), "settings.json"), join18(cwd, ".pi", "settings.json")], piPresenceFiles = (env, cwd, scope) => {
   const [globalFile, projectFile] = piSettingsFiles(env, cwd);
   return scope === "user" ? [globalFile] : [globalFile, projectFile];
 }, parseNpmSource = (source) => {
@@ -18563,8 +20050,8 @@ var init_tools = __esm(() => {
   T3_VISUAL = T3_VISUAL_TOOLS.map(patternRegExp);
 });
 
-import { join as join17, resolve as resolve9 } from "path";
-var RecordedKey, RecordFile, recordPath = (env) => join17(userFiles(env).claudeDir, "holyagent", "setup-records.json"), keyOf = (file) => resolve9(file), load2 = (env) => gen2(function* () {
+import { join as join19, resolve as resolve10 } from "path";
+var RecordedKey, RecordFile, recordPath = (env) => join19(userFiles(env).claudeDir, "holyagent", "setup-records.json"), keyOf = (file) => resolve10(file), load2 = (env) => gen2(function* () {
   const path = recordPath(env);
   const raw = yield* readJsonObject(path);
   if (Object.keys(raw).length === 0)
@@ -18767,7 +20254,7 @@ var init_settings4 = __esm(() => {
   });
 });
 
-import { dirname as dirname9, isAbsolute as isAbsolute8, join as join18, relative as relative4, resolve as resolve10, sep as sep7 } from "path";
+import { dirname as dirname11, isAbsolute as isAbsolute8, join as join20, relative as relative4, resolve as resolve11, sep as sep7 } from "path";
 var SCOPES, within = (parent, child) => {
   const path = relative4(parent, child);
   return path === "" || path !== ".." && !path.startsWith(`..${sep7}`) && !isAbsolute8(path);
@@ -18802,7 +20289,7 @@ var init_scope = __esm(() => {
       return;
     const parts = relative4(cwd, file).split(sep7);
     for (let depth = 1;depth <= parts.length; depth++) {
-      const path = join18(cwd, ...parts.slice(0, depth));
+      const path = join20(cwd, ...parts.slice(0, depth));
       if (yield* isSymlink(path)) {
         return yield* new SetupFailure({
           message: `${path} is a symlink; refusing to ${action} through it in the ${scope} scope. Replace it with a real ${depth === parts.length ? "file" : "folder"} and run again`
@@ -18814,19 +20301,19 @@ var init_scope = __esm(() => {
     const shell = yield* Shell;
     const top = yield* shell.run("git", ["rev-parse", "--show-toplevel"], { cwd });
     const line = top.stdout.trim();
-    const named = top.exitCode === 0 && line !== "" ? resolve10(line) : undefined;
+    const named = top.exitCode === 0 && line !== "" ? resolve11(line) : undefined;
     const realTop = named === undefined ? undefined : yield* real(named);
     const realCwd = yield* real(cwd);
-    const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join18(named, ".git")));
+    const trusted = named !== undefined && realTop !== undefined && realCwd !== undefined && within(realTop, realCwd) && (yield* present2(join20(named, ".git")));
     const root = trusted ? named : cwd;
     const notice = trusted ? undefined : named === undefined ? `not inside a git repository; using ${cwd}` : `git names ${named} as the top-level, which is not the current directory or an ancestor holding a .git entry; using ${cwd}`;
-    return { folder: join18(root, ".claude"), root, trusted, notice };
+    return { folder: join20(root, ".claude"), root, trusted, notice };
   });
   settingsFile = fn2("settingsFile")(function* (env, scope, cwd) {
     if (scope === "user")
       return { file: userFiles(env).settings };
     const { folder, notice } = yield* claudeFolder(cwd);
-    const file = join18(folder, fileName(scope));
+    const file = join20(folder, fileName(scope));
     for (const path of [folder, file]) {
       if (yield* isSymlink(path)) {
         return yield* new SetupFailure({
@@ -18837,19 +20324,19 @@ var init_scope = __esm(() => {
     return { file, ...notice === undefined ? {} : { notice } };
   });
   projectSettingsFiles = fn2("projectSettingsFiles")(function* (cwd) {
-    const roots = [resolve10(cwd)];
-    for (let folder = resolve10(cwd);; folder = dirname9(folder)) {
-      if (yield* present2(join18(folder, ".git"))) {
+    const roots = [resolve11(cwd)];
+    for (let folder = resolve11(cwd);; folder = dirname11(folder)) {
+      if (yield* present2(join20(folder, ".git"))) {
         if (folder !== roots[0])
           roots.push(folder);
         break;
       }
-      if (dirname9(folder) === folder)
+      if (dirname11(folder) === folder)
         break;
     }
     return roots.flatMap((root) => [
-      join18(root, ".claude", "settings.json"),
-      join18(root, ".claude", "settings.local.json")
+      join20(root, ".claude", "settings.json"),
+      join20(root, ".claude", "settings.local.json")
     ]);
   });
   enablement = fn2("enablement")(function* (folder, file) {
@@ -18880,7 +20367,7 @@ var init_scope = __esm(() => {
     const own = yield* identity3(file);
     if (own !== undefined) {
       for (const entry of tracked) {
-        if ((yield* identity3(join18(root, entry))) === own)
+        if ((yield* identity3(join20(root, entry))) === own)
           return "git tracks it";
       }
     }
@@ -18892,7 +20379,7 @@ var init_scope = __esm(() => {
         if (component === folderName || seen.has(component))
           continue;
         seen.add(component);
-        if ((yield* identity3(join18(root, component))) === home)
+        if ((yield* identity3(join20(root, component))) === home)
           return `git tracks ${component} as ${folderName}`;
       }
     }
@@ -18905,8 +20392,8 @@ var init_scope = __esm(() => {
   });
   installedScope = fn2("installedScope")(function* (cwd) {
     const { folder, root, trusted } = yield* claudeFolder(cwd);
-    const local = join18(folder, fileName("local"));
-    const project = join18(folder, fileName("project"));
+    const local = join20(folder, fileName("local"));
+    const project = join20(folder, fileName("project"));
     const notices = [];
     const found = yield* enablement(folder, local);
     if (found === "enabled") {
@@ -18930,7 +20417,7 @@ var init_scope = __esm(() => {
   });
 });
 
-import { join as join19, resolve as resolve11 } from "path";
+import { join as join21, resolve as resolve12 } from "path";
 var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => isJsonObject2(current) ? current[key] : undefined, node), leaves = (content, prefix = []) => Object.entries(content).flatMap(([key, child]) => isJsonObject2(child) ? leaves(child, [...prefix, key]) : [{ path: [...prefix, key], value: child }]), KNOWN_FILES, AGENT_PREFIX = "~/.pi/agent/", PI_PREFIX = "~/.pi/", locate2 = (env, cwd, scope, logical) => {
   const project = scope !== "user";
   const home = homeDirectory2(env);
@@ -18939,21 +20426,21 @@ var PACKAGE_DEFAULTS, valueAt3 = (node, path) => path.reduce((current, key) => i
       return;
     const explicit = firstNonEmpty2(env["BILI_CONFIG_FILE"]);
     if (explicit !== undefined)
-      return resolve11(cwd, explicit);
-    const base = firstNonEmpty2(env["XDG_CONFIG_HOME"]) ?? join19(home, ".config");
-    return join19(base, "billion-context", "billion-context.json");
+      return resolve12(cwd, explicit);
+    const base = firstNonEmpty2(env["XDG_CONFIG_HOME"]) ?? join21(home, ".config");
+    return join21(base, "billion-context", "billion-context.json");
   }
   if (logical === PI_FFF_FILE)
-    return project ? undefined : join19(piAgentDirectory(env), "pi-fff.json");
+    return project ? undefined : join21(piAgentDirectory(env), "pi-fff.json");
   if (logical.startsWith(AGENT_PREFIX)) {
     const name = logical.slice(AGENT_PREFIX.length);
-    return project ? join19(cwd, ".pi", name) : join19(piAgentDirectory(env), name);
+    return project ? join21(cwd, ".pi", name) : join21(piAgentDirectory(env), name);
   }
   if (logical.startsWith(PI_PREFIX)) {
     const name = logical.slice(PI_PREFIX.length);
-    return project ? join19(cwd, ".pi", name) : join19(home, ".pi", name);
+    return project ? join21(cwd, ".pi", name) : join21(home, ".pi", name);
   }
-  return project || !logical.startsWith("~/") ? undefined : join19(home, logical.slice(2));
+  return project || !logical.startsWith("~/") ? undefined : join21(home, logical.slice(2));
 }, keyName = ({ path }) => path.join("."), inPair = (leaf) => ROOT_MODEL_PAIR.includes(keyName(leaf)), routeLeaves = (config) => leaves(rootModelSettings(config)), planFor = (env, cwd, scope, config, form) => {
   const byFile = new Map;
   for (const patch of toolSettings(config, undefined, form)) {
@@ -19310,8 +20797,8 @@ var init_browser_use = __esm(() => {
   });
 });
 
-import { join as join20 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join20(stateDirectory(cwd), CONFIG_FILE), objectAt = (parent, key, file, path) => {
+import { join as join22 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join22(stateDirectory(cwd), CONFIG_FILE), objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
     return succeed6({});
@@ -19389,7 +20876,7 @@ var init_capabilities2 = __esm(() => {
   });
 });
 
-import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute9, join as join21, relative as relative5, resolve as resolve12 } from "path";
+import { basename as basename8, dirname as dirname12, isAbsolute as isAbsolute9, join as join23, relative as relative5, resolve as resolve13 } from "path";
 var MANAGED_NAMES, staleManagedNames = (listed, wanted, managed = MANAGED_NAMES) => {
   const wantedNames = new Set(wanted.map((source) => parseNpmSource(source)?.name));
   return [
@@ -19400,15 +20887,15 @@ var MANAGED_NAMES, staleManagedNames = (listed, wanted, managed = MANAGED_NAMES)
   ];
 }, realPath = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.realpath(path))), orElseSucceed2(() => {
   return;
-})), installedLayout = (path) => basename7(path) === "holyagent" && basename7(dirname10(path)) === "node_modules", installedPackage, piLocalSourcePath = (env, file, source) => {
+})), installedLayout = (path) => basename8(path) === "holyagent" && basename8(dirname12(path)) === "node_modules", installedPackage, piLocalSourcePath = (env, file, source) => {
   if (isAbsolute9(source))
-    return resolve12(source);
+    return resolve13(source);
   if (/^(?:[a-z][a-z0-9+.-]*:|[^/\\]+@[^/\\]+:)/i.test(source))
     return;
   if (source === "~" || /^~[/\\]/.test(source))
-    return resolve12(homeDirectory2(env), source.slice(2));
-  return resolve12(dirname10(file), source);
-}, sourcePackageRoot = (path) => basename7(path) === "holyagent.js" && basename7(dirname10(path)) === "extensions" ? dirname10(dirname10(path)) : path, localHolyagentPackageAt = (path) => readJsonObject(join21(sourcePackageRoot(path), "package.json")).pipe(map5((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false)), registration, installPiPackages;
+    return resolve13(homeDirectory2(env), source.slice(2));
+  return resolve13(dirname12(file), source);
+}, sourcePackageRoot = (path) => basename8(path) === "holyagent.js" && basename8(dirname12(path)) === "extensions" ? dirname12(dirname12(path)) : path, localHolyagentPackageAt = (path) => readJsonObject(join23(sourcePackageRoot(path), "package.json")).pipe(map5((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false)), registration, installPiPackages;
 var init_pi_install = __esm(() => {
   init_dist();
   init_package();
@@ -19433,12 +20920,12 @@ var init_pi_install = __esm(() => {
     });
     if (!isAbsolute9(path) || !installedLayout(path))
       return yield* invalid;
-    const root = resolve12(path);
+    const root = resolve13(path);
     const physical = yield* realPath(root);
     if (physical === undefined || !installedLayout(physical))
       return yield* invalid;
-    const manifest = yield* readJsonObject(join21(root, "package.json"));
-    if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join21(root, "extensions", "holyagent.js"))))
+    const manifest = yield* readJsonObject(join23(root, "package.json"));
+    if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join23(root, "extensions", "holyagent.js"))))
       return yield* invalid;
     return { root, physical };
   });
@@ -19536,7 +21023,7 @@ var init_pi_install = __esm(() => {
   });
 });
 
-import { join as join22 } from "path";
+import { join as join24 } from "path";
 var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 = "t3 settings", needsNotice = (entry) => entry.status === "kept" && !(entry.path === "branchNamingMode" && (entry.value === "semantic" || entry.value === "static")), restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false)), writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 })))), checkT3Prerequisites = (env, piUsed) => gen2(function* () {
@@ -19545,7 +21032,7 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
     ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`],
     ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
   ];
-}), t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join22(homeDirectory2(env), ".t3"), t3SettingsFile = (env) => join22(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
+}), t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join24(homeDirectory2(env), ".t3"), t3SettingsFile = (env) => join24(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
   {
     name: "Pi provider",
     choice: "pi",
@@ -19710,14 +21197,14 @@ var init_t3_settings = __esm(() => {
     const home = homeDirectory2(env);
     if (platform === "darwin") {
       const developer = firstNonEmpty2(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-      const simulator = join22(developer, "Platforms", "iPhoneSimulator.platform");
+      const simulator = join24(developer, "Platforms", "iPhoneSimulator.platform");
       if (yield* isDirectory2(simulator))
         return `Xcode (${developer})`;
     }
     const sdkFolders = [
       firstNonEmpty2(env["ANDROID_HOME"]),
       firstNonEmpty2(env["ANDROID_SDK_ROOT"]),
-      platform === "darwin" ? join22(home, "Library", "Android", "sdk") : platform === "win32" ? join22(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join22(home, "AppData", "Local"), "Android", "Sdk") : join22(home, "Android", "Sdk")
+      platform === "darwin" ? join24(home, "Library", "Android", "sdk") : platform === "win32" ? join24(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join24(home, "AppData", "Local"), "Android", "Sdk") : join24(home, "Android", "Sdk")
     ];
     for (const folder of sdkFolders) {
       if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -20313,7 +21800,7 @@ var init_overview = __esm(() => {
   };
 });
 
-import { join as join23 } from "path";
+import { join as join25 } from "path";
 var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " ").trim(), strings, optionalStrings, HolyclaudeIntent, HolyclaudeAssignment, CodexIntentState, codexIntentFields, HolycodexIntent, _compatibility, legacyIntentFields, HolycodexIntentV0, CodexInvocation, HolycodexAssignment, parseText = (format, text) => try_2({
   try: () => format === "json" ? JSON.parse(text) : decode3(text, { strict: true }),
   catch: (cause) => `not valid ${format === "json" ? "JSON" : "TOON"}: ${String(cause)}`
@@ -20327,7 +21814,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     folders.set(folder, [...folders.get(folder) ?? [], path.slice(slash + 1)]);
   }
   return folders;
-}, convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith("."))), legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join23(root, LEGACY_FOLDERS[source])).pipe(map5((files) => convertibleFolders(source, files).size > 0))).pipe(map5((sources) => sources.map((source) => LEGACY_FOLDERS[source]))), isoOf = (millis) => {
+}, convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith("."))), legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join25(root, LEGACY_FOLDERS[source])).pipe(map5((files) => convertibleFolders(source, files).size > 0))).pipe(map5((sources) => sources.map((source) => LEGACY_FOLDERS[source]))), isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }, EPOCH, idTime = (id) => {
@@ -20432,13 +21919,13 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
   return { value: assignment };
 }, gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join23(root, folderName);
+  const legacy = join25(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join23(legacy, "intents", folder);
+    const base = join25(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -20446,7 +21933,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join23(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join25(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -20457,10 +21944,10 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join23(base, path), to: join23(target, path) });
+      state.notes.push({ from: join25(base, path), to: join25(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join23(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join25(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -20550,13 +22037,13 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
   return { value: assignment };
 }, TRANSACTION_FILE = ".holycodex-transaction.toon", gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join23(root, folderName);
+  const legacy = join25(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join23(legacy, folder);
+    const base = join25(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -20570,7 +22057,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join23(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join25(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -20581,10 +22068,10 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join23(base, path), to: join23(target, path) });
+      state.notes.push({ from: join25(base, path), to: join25(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join23(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join25(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -20784,9 +22271,9 @@ var init_legacy = __esm(() => {
   };
 });
 
-import { copyFile as copyFile2, lstat as lstat7, mkdir as mkdir7, readdir as readdir4 } from "fs/promises";
-import { dirname as dirname11, join as join24, relative as relative6 } from "path";
-var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => io(path, () => lstat7(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), countsOf = (gathered) => ({
+import { copyFile as copyFile2, lstat as lstat9, mkdir as mkdir9, readdir as readdir5 } from "fs/promises";
+import { dirname as dirname13, join as join26, relative as relative6 } from "path";
+var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => io(path, () => lstat9(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), countsOf = (gathered) => ({
   intents: gathered.records.filter((record) => record.kind === "intent").length,
   assignments: gathered.records.filter((record) => record.kind === "assignment").length,
   notes: gathered.notes.length
@@ -20822,7 +22309,7 @@ var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => 
       yield* commitFile(record.file.path, record.file.content);
   const notes = found.flatMap((gathered) => gathered.notes);
   for (const note of notes) {
-    yield* io(note.to, () => mkdir7(dirname11(note.to), { recursive: true }));
+    yield* io(note.to, () => mkdir9(dirname13(note.to), { recursive: true }));
     yield* io(note.to, () => copyFile2(note.from, note.to));
   }
   return { records, copied: notes.map((note) => note.to) };
@@ -20845,10 +22332,10 @@ var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => 
   if (output.code === 0 || output.code === 1)
     return new TextDecoder().decode(output.stdout).split(`
 `).filter((line) => line !== "").toSorted();
-  const names = yield* io(root, () => readdir4(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
+  const names = yield* io(root, () => readdir5(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join24(root, name));
+    const text = yield* readText(join26(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -20894,7 +22381,7 @@ var init_migrate = __esm(() => {
   init_files();
   init_layout();
   init_legacy();
-  init_lock();
+  init_lock2();
   init_process();
   init_store();
   init_tree();
@@ -20919,7 +22406,7 @@ var init_migrate = __esm(() => {
   schema = Struct({ dryRun: optionalKey2(Boolean3) });
 });
 
-import { join as join25 } from "path";
+import { join as join27 } from "path";
 var setting = (raw) => raw?.trim() || undefined, WorkflowSettings, disables = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map5((value) => value.disableWorkflows === true || value.enableWorkflows === false))), orElseSucceed2(() => false)), screenForm = (env) => {
   const ci = setting(env.CI)?.toLowerCase();
   const inCi = ci !== undefined && !["0", "false", "no", "off"].includes(ci);
@@ -20938,11 +22425,11 @@ var setting = (raw) => raw?.trim() || undefined, WorkflowSettings, disables = (p
     return options.workflowsAvailable;
   if (host === "pi" || env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return false;
-  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join25(homeDirectory(env), ".claude");
+  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join27(homeDirectory(env), ".claude");
   return !(yield* forEach2([
-    join25(claudeDir, "settings.json"),
-    join25(root, ".claude", "settings.json"),
-    join25(root, ".claude", "settings.local.json")
+    join27(claudeDir, "settings.json"),
+    join27(root, ".claude", "settings.json"),
+    join27(root, ".claude", "settings.local.json")
   ], disables)).includes(true);
 }), executionConfig = (options, root) => gen2(function* () {
   const { env, host } = options;
@@ -21306,7 +22793,7 @@ var init_links2 = __esm(() => {
   init_links();
 });
 
-var present3 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0))), oneLine2 = (text) => text.replace(/\s+/g, " ").trim(), intentView = (intent, links) => present3({
+var present3 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0))), oneLine3 = (text) => text.replace(/\s+/g, " ").trim(), intentView = (intent, links) => present3({
   id: intent.id,
   revision: intent.revision,
   state: intent.state,
@@ -21350,13 +22837,13 @@ var present3 = (record) => Object.fromEntries(Object.entries(record).filter(([, 
   rev: assignment.intentRevision,
   accepted: assignment.acceptance !== undefined,
   agent: assignment.specialist?.agentId ?? null,
-  objective: oneLine2(assignment.objective)
+  objective: oneLine3(assignment.objective)
 }), intentRow = (intent, inUse) => ({
   id: intent.id,
   state: intent.state,
   revision: intent.revision,
   inUse,
-  objective: oneLine2(intent.objective)
+  objective: oneLine3(intent.objective)
 }), byId = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 var init_views = __esm(() => {
   init_links2();
@@ -21606,20 +23093,16 @@ var init_prompts = __esm(() => {
   ARGUMENTS_DEFAULT = /\$\{@:-([^}]*)\}/g;
 });
 
-var init_form2 = __esm(() => {
-  init_form();
-});
-
 var init_mode2 = __esm(() => {
   init_mode();
 });
 
-var present4 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0))), oneLine3 = (text) => text.replace(/\s+/g, " ").trim(), byId2 = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0), assignmentRow2 = (row) => ({
+var present4 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0))), oneLine4 = (text) => text.replace(/\s+/g, " ").trim(), byId2 = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0), assignmentRow2 = (row) => ({
   id: row.id,
   role: row.roleTask,
   rev: row.intentRevision,
   agent: row.specialist?.agentId ?? null,
-  objective: oneLine3(row.objective)
+  objective: oneLine4(row.objective)
 }), statusFrom = (snapshot) => {
   const open = byId2(snapshot.project.intents.filter((intent) => intent.state === "Open"));
   const openIds = new Set(open.map((intent) => intent.id));
@@ -21634,7 +23117,7 @@ var present4 = (record) => Object.fromEntries(Object.entries(record).filter(([, 
     intents: open.map(({ id, revision, objective }) => ({
       id,
       revision,
-      objective: oneLine3(objective),
+      objective: oneLine4(objective),
       ...id === inUse ? {} : {
         running: waiting(id).filter(isRunning).length,
         unaccepted: waiting(id).filter(isUnaccepted).length
@@ -22159,13 +23642,9 @@ var init_capabilities3 = __esm(() => {
   init_capabilities();
 });
 
-var init_environment3 = __esm(() => {
-  init_environment2();
-});
-
-import { mkdir as mkdir8, mkdtemp as mkdtemp2, rm as rm9 } from "fs/promises";
+import { mkdir as mkdir10, mkdtemp as mkdtemp4, rm as rm10 } from "fs/promises";
 import { tmpdir as tmpdir2 } from "os";
-import { join as join26 } from "path";
+import { join as join28 } from "path";
 var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS = 3000, FOLDERS, chromiumArguments = (profile, sandbox) => [
   "--headless=new",
   "--remote-debugging-port=0",
@@ -22180,7 +23659,7 @@ var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS 
   const upper = name.toUpperCase();
   return ALLOWED_NAMES.has(upper) || upper.startsWith("LC_");
 }, serverEnvironment = (inherited, port, folders) => ({
-  ...Object.fromEntries(Object.entries(definedEnv2(inherited)).filter(([name]) => reachesServer(name))),
+  ...Object.fromEntries(Object.entries(definedEnv(inherited)).filter(([name]) => reachesServer(name))),
   BU_CDP_URL: `http://127.0.0.1:${port}`,
   BU_NAME: `holyagent-${port}`,
   ANONYMIZED_TELEMETRY: "0",
@@ -22206,13 +23685,13 @@ var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS 
     return yield* failed3(`no Chromium was found; ${options.chromiumFix}`);
   const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
   const folders = {
-    profile: join26(base, FOLDERS.profile),
-    config: join26(base, FOLDERS.config),
-    harness: join26(base, FOLDERS.harness)
+    profile: join28(base, FOLDERS.profile),
+    config: join28(base, FOLDERS.config),
+    harness: join28(base, FOLDERS.harness)
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
-  const inherited = definedEnv2(options.env);
+  const inherited = definedEnv(options.env);
   const chromium = yield* acquireRelease2(host.spawn({
     command: executable,
     args: chromiumArguments(folders.profile, !host.root),
@@ -22315,19 +23794,19 @@ var init_browser_launch = __esm(() => {
       },
       catch: (cause) => failed3(`cannot start ${spec.command}: ${reason(cause)}`)
     }),
-    devToolsPort: (profile) => tryPromise2(() => Bun.file(join26(profile, "DevToolsActivePort")).text()).pipe(map5(parseDevToolsActivePort), orElseSucceed2(() => {
+    devToolsPort: (profile) => tryPromise2(() => Bun.file(join28(profile, "DevToolsActivePort")).text()).pipe(map5(parseDevToolsActivePort), orElseSucceed2(() => {
       return;
     })),
     answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map5((response) => response.ok), orElseSucceed2(() => false)),
     temporaryDirectory: (prefix) => tryPromise2({
-      try: () => mkdtemp2(join26(tmpdir2(), prefix)),
+      try: () => mkdtemp4(join28(tmpdir2(), prefix)),
       catch: (cause) => failed3(`cannot create a temporary directory: ${reason(cause)}`)
     }),
     makeDirectory: (path) => tryPromise2({
-      try: () => mkdir8(path, { recursive: true }),
+      try: () => mkdir10(path, { recursive: true }),
       catch: (cause) => failed3(`cannot create ${path}: ${reason(cause)}`)
     }).pipe(asVoid2),
-    removeDirectory: (path) => tryPromise2(() => rm9(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
+    removeDirectory: (path) => tryPromise2(() => rm10(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
     signals: acquireRelease2(sync2(() => {
       const received = makeUnsafe2();
       const handlers = SIGNALS.map(([name, code]) => {
@@ -22376,8 +23855,8 @@ var init_browser_server = __esm(() => {
   ];
 });
 
-import { stat as stat5 } from "fs/promises";
-var hasStateFolder = (directory) => io(directory, () => stat5(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+import { stat as stat6 } from "fs/promises";
+var hasStateFolder = (directory) => io(directory, () => stat6(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 var init_state_folder = __esm(() => {
   init_dist();
   init_files2();
@@ -22479,13 +23958,13 @@ var init_check2 = __esm(() => {
   init_check();
 });
 
-import { lstat as lstat8, mkdir as mkdir9, open as open7 } from "fs/promises";
-import { tmpdir as tmpdir3, userInfo } from "os";
-import { join as join27 } from "path";
-var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id), markers = () => join27(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`), markerOf = (sessionId) => join27(markers(), sessionId), ensureMarkers = () => {
+import { lstat as lstat10, mkdir as mkdir11, open as open7 } from "fs/promises";
+import { tmpdir as tmpdir3, userInfo as userInfo2 } from "os";
+import { join as join29 } from "path";
+var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id), markers = () => join29(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo2().username).toString().replace(/[^\w.-]/g, "_")}`), markerOf = (sessionId) => join29(markers(), sessionId), ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir9(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat8(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir11(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat10(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -22506,8 +23985,8 @@ var init_legacy2 = __esm(() => {
   init_legacy();
 });
 
-var init_lock2 = __esm(() => {
-  init_lock();
+var init_lock3 = __esm(() => {
+  init_lock2();
 });
 
 var init_message2 = __esm(() => {
@@ -22681,7 +24160,7 @@ var openIntents = (snapshot) => byId(snapshot.project.intents.filter((intent) =>
   return chosen === undefined ? fail5(new NoActiveIntent({
     open: openIntents(snapshot).map(({ id, objective }) => ({
       id,
-      objective: oneLine2(objective)
+      objective: oneLine3(objective)
     }))
   })) : succeed6(chosen);
 }, INTENT_COMMANDS;
@@ -30082,7 +31561,7 @@ var init_hook = __esm(() => {
   init_files2();
   init_layout2();
   init_legacy2();
-  init_lock2();
+  init_lock3();
   init_store2();
   init_tree2();
   init_errors3();
@@ -30316,1357 +31795,12 @@ var init_settings6 = __esm(() => {
   init_settings4();
 });
 
-var {$ } = globalThis.Bun;
-var shellLive = (env) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-  return succeed5(Shell, Shell.of({
-    which: (command, options) => sync2(() => findCommand(env, command, options, Bun.which)),
-    run: (command, args, options) => tryPromise2({
-      try: () => $`${command} ${args}`.cwd(options.cwd).env(definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
-        exitCode: result.exitCode,
-        stdout: result.stdout.toString(),
-        stderr: result.stderr.toString()
-      })),
-      catch: (error) => String(error)
-    }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-  }));
-};
-var init_shell2 = __esm(() => {
-  init_dist();
-  init_shell();
-  init_environment3();
-  init_shell();
-});
-
 var init_pi_check2 = __esm(() => {
   init_pi_check();
 });
 
 var init_t3_settings2 = __esm(() => {
   init_t3_settings();
-});
-
-var TUI_BUNDLE = "setup-tui.js";
-
-var TUI_MANIFEST_NAME = "holyagent-setup-tui", Dependencies, Entry, Lock;
-var init_lock3 = __esm(() => {
-  init_dist();
-  Dependencies = optional2(Record(String6, String6));
-  Entry = TupleWithRest(Tuple([
-    String6,
-    String6,
-    Struct({
-      dependencies: Dependencies,
-      optionalDependencies: Dependencies,
-      peerDependencies: Dependencies
-    })
-  ]), [Unknown2]);
-  Lock = Struct({
-    lockfileVersion: Number6,
-    configVersion: optional2(Number6),
-    packages: Record(String6, Unknown2)
-  });
-});
-
-var TUI_PACKAGES = {
-  "@opentui/core": "0.9.7",
-  "@opentui/solid": "0.9.7",
-  "solid-js": "1.9.20"
-}, TUI_LOCK = `{
-  "lockfileVersion": 2,
-  "configVersion": 1,
-  "workspaces": {
-    "": {
-      "name": "holyagent-setup-tui",
-      "dependencies": {
-        "@opentui/core": "0.9.7",
-        "@opentui/solid": "0.9.7",
-        "solid-js": "1.9.20"
-      }
-    }
-  },
-  "packages": {
-    "@babel/code-frame": [
-      "@babel/code-frame@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-validator-identifier": "^7.29.7",
-          "js-tokens": "^4.0.0",
-          "picocolors": "^1.1.1"
-        }
-      },
-      "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="
-    ],
-    "@babel/compat-data": [
-      "@babel/compat-data@7.29.7",
-      "",
-      {},
-      "sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg=="
-    ],
-    "@babel/core": [
-      "@babel/core@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.7",
-          "@babel/helper-compilation-targets": "^7.29.7",
-          "@babel/helper-module-transforms": "^7.29.7",
-          "@babel/helpers": "^7.29.7",
-          "@babel/parser": "^7.29.7",
-          "@babel/template": "^7.29.7",
-          "@babel/traverse": "^7.29.7",
-          "@babel/types": "^7.29.7",
-          "@jridgewell/remapping": "^2.3.5",
-          "convert-source-map": "^2.0.0",
-          "debug": "^4.1.0",
-          "gensync": "^1.0.0-beta.2",
-          "json5": "^2.2.3",
-          "semver": "^6.3.1"
-        }
-      },
-      "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
-    ],
-    "@babel/generator": [
-      "@babel/generator@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/parser": "^7.29.15",
-          "@babel/types": "^7.29.15",
-          "@jridgewell/gen-mapping": "^0.3.12",
-          "@jridgewell/trace-mapping": "^0.3.28",
-          "jsesc": "^3.0.2"
-        }
-      },
-      "sha512-gNWJUX0FlevflramOkaInywOMhU1lkln38gAC7TFZv2tsWbLYbN/2WZFGcq8zbX0Z55e4vGa27IB/NaeZoauWQ=="
-    ],
-    "@babel/helper-annotate-as-pure": [
-      "@babel/helper-annotate-as-pure@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-OoK6239jHPuSQOoS0kfTVKn0b/rVTk0seKq4Gd2UMLtmOVLjDC0ki3e+c90Trqv2gMfvJFqkiljrr568+qddiw=="
-    ],
-    "@babel/helper-compilation-targets": [
-      "@babel/helper-compilation-targets@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/compat-data": "^7.29.7",
-          "@babel/helper-validator-option": "^7.29.7",
-          "browserslist": "^4.24.0",
-          "lru-cache": "^5.1.1",
-          "semver": "^6.3.1"
-        }
-      },
-      "sha512-8WxJ4/Vmes3ghacj8VOJy3NW8eyHiFY/4thU/LSBuBE470+igjR/j1ZTNn8fV5VdNrLx6iXUwig526UdOvfP0w=="
-    ],
-    "@babel/helper-create-class-features-plugin": [
-      "@babel/helper-create-class-features-plugin@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-annotate-as-pure": "^7.29.7",
-          "@babel/helper-member-expression-to-functions": "^7.29.7",
-          "@babel/helper-optimise-call-expression": "^7.29.7",
-          "@babel/helper-replace-supers": "^7.29.7",
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/traverse": "^7.29.13",
-          "semver": "^6.3.1"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-fo8/Fr44/DMV71FQjk/HA0Npmu3bo5DFoWTCW1dhUR8Vx3NFfAVeEy0TbcBpt4e+hd2QhdmWgmspHo/9iWj8RA=="
-    ],
-    "@babel/helper-globals": [
-      "@babel/helper-globals@7.29.7",
-      "",
-      {},
-      "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
-    ],
-    "@babel/helper-member-expression-to-functions": [
-      "@babel/helper-member-expression-to-functions@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/traverse": "^7.29.14",
-          "@babel/types": "^7.29.14"
-        }
-      },
-      "sha512-FuTSn8mXKAP+aHXnbkCYQsQAdlEIJptEutwc2NaPd28hyVqsjRDmBnI2EPJX6HCodKIqOHfayQHqtxQCkqwthA=="
-    ],
-    "@babel/helper-module-imports": [
-      "@babel/helper-module-imports@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/traverse": "^7.29.7",
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
-    ],
-    "@babel/helper-module-transforms": [
-      "@babel/helper-module-transforms@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-imports": "^7.29.7",
-          "@babel/helper-validator-identifier": "^7.29.7",
-          "@babel/traverse": "^7.29.14"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-2XDvQVd9JESaOgGc4jT2/jquTAO7ppA5noTZQqH+MmZ89yjCzScLwtCPbWtkPZylL+TLWR49IwWmk+QkRR4GsA=="
-    ],
-    "@babel/helper-optimise-call-expression": [
-      "@babel/helper-optimise-call-expression@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-+kmGVjcT9RGYzoDwdwEqEvGgKe3BYq+O1iGzjFubaNgZHwYHP6lsF2Yghf4kEuv9BV7tYDZ913aBW9am6YKong=="
-    ],
-    "@babel/helper-plugin-utils": [
-      "@babel/helper-plugin-utils@7.29.7",
-      "",
-      {},
-      "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="
-    ],
-    "@babel/helper-replace-supers": [
-      "@babel/helper-replace-supers@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-member-expression-to-functions": "^7.29.7",
-          "@babel/helper-optimise-call-expression": "^7.29.7",
-          "@babel/traverse": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-atfGXWSeCiF4DnKZIfmJfQRkSw9b9gNNXR1kqKjbhG4pGYCOnkp8OcTB8E3NXjBu8NpheSnOeNKz8KT7UNFTmQ=="
-    ],
-    "@babel/helper-skip-transparent-expression-wrappers": [
-      "@babel/helper-skip-transparent-expression-wrappers@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/traverse": "^7.29.13",
-          "@babel/types": "^7.29.11"
-        }
-      },
-      "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
-    ],
-    "@babel/helper-string-parser": [
-      "@babel/helper-string-parser@7.29.15",
-      "",
-      {},
-      "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="
-    ],
-    "@babel/helper-validator-identifier": [
-      "@babel/helper-validator-identifier@7.29.7",
-      "",
-      {},
-      "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
-    ],
-    "@babel/helper-validator-option": [
-      "@babel/helper-validator-option@7.29.7",
-      "",
-      {},
-      "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
-    ],
-    "@babel/helpers": [
-      "@babel/helpers@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.15"
-        }
-      },
-      "sha512-l+ezV2czw3t2d2ELq+3CwPL4WLKK5O8IywBXb9/gpmbCOVZFmRYJPmHVqSCv2k+8iKbE30Zf54siOoIZ52XOxA=="
-    ],
-    "@babel/parser": [
-      "@babel/parser@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.15"
-        },
-        "bin": "./bin/babel-parser.js"
-      },
-      "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="
-    ],
-    "@babel/plugin-syntax-jsx": [
-      "@babel/plugin-syntax-jsx@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A=="
-    ],
-    "@babel/plugin-syntax-typescript": [
-      "@babel/plugin-syntax-typescript@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
-    ],
-    "@babel/plugin-transform-modules-commonjs": [
-      "@babel/plugin-transform-modules-commonjs@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-transforms": "^7.29.14",
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
-    ],
-    "@babel/plugin-transform-typescript": [
-      "@babel/plugin-transform-typescript@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-annotate-as-pure": "^7.29.7",
-          "@babel/helper-create-class-features-plugin": "^7.29.13",
-          "@babel/helper-plugin-utils": "^7.29.7",
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/plugin-syntax-typescript": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-FFuMssbHj8DFMDsTH8xrgKBiE1eXuDvO9jLqav7/vsIe6YdoyPQbWCgLNzQxkcIkOv5itBD17TvZkHGIjUMzLg=="
-    ],
-    "@babel/preset-typescript": [
-      "@babel/preset-typescript@7.27.1",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.27.1",
-          "@babel/helper-validator-option": "^7.27.1",
-          "@babel/plugin-syntax-jsx": "^7.27.1",
-          "@babel/plugin-transform-modules-commonjs": "^7.27.1",
-          "@babel/plugin-transform-typescript": "^7.27.1"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ=="
-    ],
-    "@babel/template": [
-      "@babel/template@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/parser": "^7.29.7",
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
-    ],
-    "@babel/traverse": [
-      "@babel/traverse@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.15",
-          "@babel/helper-globals": "^7.29.7",
-          "@babel/parser": "^7.29.15",
-          "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.15",
-          "debug": "^4.3.1"
-        }
-      },
-      "sha512-ZfawBo2i8vvt+BTt37dWDKBPjUfm/H+bw+ltwsCRhW7gPtyNVwUXuNo54eO2Xo+P4VXpalPFfFISbBTRKC8SOQ=="
-    ],
-    "@babel/types": [
-      "@babel/types@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-string-parser": "^7.29.15",
-          "@babel/helper-validator-identifier": "^7.29.7"
-        }
-      },
-      "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="
-    ],
-    "@jridgewell/gen-mapping": [
-      "@jridgewell/gen-mapping@0.3.13",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/sourcemap-codec": "^1.5.0",
-          "@jridgewell/trace-mapping": "^0.3.24"
-        }
-      },
-      "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
-    ],
-    "@jridgewell/remapping": [
-      "@jridgewell/remapping@2.3.5",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/gen-mapping": "^0.3.5",
-          "@jridgewell/trace-mapping": "^0.3.24"
-        }
-      },
-      "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
-    ],
-    "@jridgewell/resolve-uri": [
-      "@jridgewell/resolve-uri@3.1.3",
-      "",
-      {},
-      "sha512-lhTtjtoEArWBjismtfS761S9Hlyn+nIZqOZVYoZ1Xn82PMNMVnk+jj/NhC4fAXGTs7ydONcJiR5vyQBTMDu27g=="
-    ],
-    "@jridgewell/sourcemap-codec": [
-      "@jridgewell/sourcemap-codec@1.6.0",
-      "",
-      {},
-      "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
-    ],
-    "@jridgewell/trace-mapping": [
-      "@jridgewell/trace-mapping@0.3.31",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/resolve-uri": "^3.1.0",
-          "@jridgewell/sourcemap-codec": "^1.4.14"
-        }
-      },
-      "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
-    ],
-    "@opentui/core": [
-      "@opentui/core@0.9.7",
-      "",
-      {
-        "dependencies": {
-          "bun-ffi-structs": "0.3.1",
-          "diff": "9.0.0",
-          "string-width": "7.2.0"
-        },
-        "optionalDependencies": {
-          "@opentui/core-darwin-arm64": "0.9.7",
-          "@opentui/core-darwin-x64": "0.9.7",
-          "@opentui/core-linux-arm64": "0.9.7",
-          "@opentui/core-linux-arm64-musl": "0.9.7",
-          "@opentui/core-linux-x64": "0.9.7",
-          "@opentui/core-linux-x64-musl": "0.9.7",
-          "@opentui/core-win32-arm64": "0.9.7",
-          "@opentui/core-win32-x64": "0.9.7"
-        },
-        "peerDependencies": {
-          "web-tree-sitter": "0.25.10"
-        }
-      },
-      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
-    ],
-    "@opentui/core-darwin-arm64": [
-      "@opentui/core-darwin-arm64@0.9.7",
-      "",
-      {
-        "os": "darwin",
-        "cpu": "arm64"
-      },
-      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
-    ],
-    "@opentui/core-darwin-x64": [
-      "@opentui/core-darwin-x64@0.9.7",
-      "",
-      {
-        "os": "darwin",
-        "cpu": "x64"
-      },
-      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
-    ],
-    "@opentui/core-linux-arm64": [
-      "@opentui/core-linux-arm64@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "arm64"
-      },
-      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
-    ],
-    "@opentui/core-linux-arm64-musl": [
-      "@opentui/core-linux-arm64-musl@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "arm64",
-        "libc": "musl"
-      },
-      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
-    ],
-    "@opentui/core-linux-x64": [
-      "@opentui/core-linux-x64@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "x64"
-      },
-      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
-    ],
-    "@opentui/core-linux-x64-musl": [
-      "@opentui/core-linux-x64-musl@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "x64",
-        "libc": "musl"
-      },
-      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
-    ],
-    "@opentui/core-win32-arm64": [
-      "@opentui/core-win32-arm64@0.9.7",
-      "",
-      {
-        "os": "win32",
-        "cpu": "arm64"
-      },
-      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
-    ],
-    "@opentui/core-win32-x64": [
-      "@opentui/core-win32-x64@0.9.7",
-      "",
-      {
-        "os": "win32",
-        "cpu": "x64"
-      },
-      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
-    ],
-    "@opentui/solid": [
-      "@opentui/solid@0.9.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/core": "7.29.7",
-          "@babel/preset-typescript": "7.27.1",
-          "@opentui/core": "0.9.7",
-          "babel-plugin-module-resolver": "5.0.2",
-          "babel-preset-solid": "1.9.16",
-          "entities": "7.0.1",
-          "s-js": "^0.4.9"
-        },
-        "peerDependencies": {
-          "solid-js": "^1.9.12"
-        }
-      },
-      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
-    ],
-    "ansi-regex": [
-      "ansi-regex@6.6.0",
-      "",
-      {},
-      "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
-    ],
-    "babel-plugin-jsx-dom-expressions": [
-      "babel-plugin-jsx-dom-expressions@0.40.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-imports": "7.18.6",
-          "@babel/plugin-syntax-jsx": "^7.18.6",
-          "@babel/types": "^7.20.7",
-          "html-entities": "2.3.3",
-          "parse5": "^7.1.2"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.20.12"
-        }
-      },
-      "sha512-5RDcd9lN4eVJyvIrkV7xwuGT+EYVTnWmqO9A8alGRVVLY95aA/U0cNGWv3ThWeI+/ufe2MMS6lILyuWsHmFBgA=="
-    ],
-    "babel-plugin-module-resolver": [
-      "babel-plugin-module-resolver@5.0.2",
-      "",
-      {
-        "dependencies": {
-          "find-babel-config": "^2.1.1",
-          "glob": "^9.3.3",
-          "pkg-up": "^3.1.0",
-          "reselect": "^4.1.7",
-          "resolve": "^1.22.8"
-        }
-      },
-      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
-    ],
-    "babel-preset-solid": [
-      "babel-preset-solid@1.9.16",
-      "",
-      {
-        "dependencies": {
-          "babel-plugin-jsx-dom-expressions": "^0.40.11"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0",
-          "solid-js": "^1.9.16"
-        },
-        "optionalPeers": [
-          "solid-js"
-        ]
-      },
-      "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
-    ],
-    "baseline-browser-mapping": [
-      "baseline-browser-mapping@2.11.39",
-      "",
-      {
-        "bin": {
-          "baseline-browser-mapping": "dist/cli.cjs"
-        }
-      },
-      "sha512-Q9buOYhr2ggrEZpImICecZTJHCCd8yXkRUokFlUEQ8uiD6oP82F4W4jWnhOHZYV+wlvrC51V7Wy0ULyWjil5Wg=="
-    ],
-    "browserslist": [
-      "browserslist@4.29.6",
-      "",
-      {
-        "dependencies": {
-          "baseline-browser-mapping": "^2.11.37",
-          "caniuse-lite": "^1.0.30001826",
-          "electron-to-chromium": "^1.5.486",
-          "node-releases": "^2.0.64",
-          "update-browserslist-db": "^1.4.0"
-        },
-        "bin": {
-          "browserslist": "cli.js"
-        }
-      },
-      "sha512-CmVVIQ3RVc5HxYEc9X84GvxK/C8C1wH8TlKAiO7uTxF8PDwt7r8t9Qk3J9NkMOVzX5O/HbLv3yzxZg9HPrnI9w=="
-    ],
-    "bun-ffi-structs": [
-      "bun-ffi-structs@0.3.1",
-      "",
-      {
-        "peerDependencies": {
-          "typescript": "^5"
-        }
-      },
-      "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
-    ],
-    "caniuse-lite": [
-      "caniuse-lite@1.0.30001827",
-      "",
-      {},
-      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
-    ],
-    "convert-source-map": [
-      "convert-source-map@2.0.0",
-      "",
-      {},
-      "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
-    ],
-    "csstype": [
-      "csstype@3.2.4",
-      "",
-      {},
-      "sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ=="
-    ],
-    "debug": [
-      "debug@4.4.3",
-      "",
-      {
-        "dependencies": {
-          "ms": "^2.1.3"
-        },
-        "peerDependencies": {
-          "supports-color": "*"
-        },
-        "optionalPeers": [
-          "supports-color"
-        ]
-      },
-      "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="
-    ],
-    "diff": [
-      "diff@9.0.0",
-      "",
-      {},
-      "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
-    ],
-    "electron-to-chromium": [
-      "electron-to-chromium@1.5.492",
-      "",
-      {},
-      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
-    ],
-    "emoji-regex": [
-      "emoji-regex@10.6.0",
-      "",
-      {},
-      "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="
-    ],
-    "entities": [
-      "entities@7.0.1",
-      "",
-      {},
-      "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
-    ],
-    "es-errors": [
-      "es-errors@1.3.0",
-      "",
-      {},
-      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
-    ],
-    "escalade": [
-      "escalade@3.2.0",
-      "",
-      {},
-      "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
-    ],
-    "find-babel-config": [
-      "find-babel-config@2.1.2",
-      "",
-      {
-        "dependencies": {
-          "json5": "^2.2.3"
-        }
-      },
-      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
-    ],
-    "fs.realpath": [
-      "fs.realpath@1.0.0",
-      "",
-      {},
-      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
-    ],
-    "function-bind": [
-      "function-bind@1.1.2",
-      "",
-      {},
-      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
-    ],
-    "gensync": [
-      "gensync@1.0.0-beta.2",
-      "",
-      {},
-      "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="
-    ],
-    "get-east-asian-width": [
-      "get-east-asian-width@1.6.0",
-      "",
-      {},
-      "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
-    ],
-    "glob": [
-      "glob@9.3.5",
-      "",
-      {
-        "dependencies": {
-          "fs.realpath": "^1.0.0",
-          "minimatch": "^8.0.2",
-          "minipass": "^4.2.4",
-          "path-scurry": "^1.6.1"
-        }
-      },
-      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
-    ],
-    "hasown": [
-      "hasown@2.0.4",
-      "",
-      {
-        "dependencies": {
-          "function-bind": "^1.1.2"
-        }
-      },
-      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
-    ],
-    "is-core-module": [
-      "is-core-module@2.18.0",
-      "",
-      {
-        "dependencies": {
-          "hasown": "^2.0.4"
-        }
-      },
-      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
-    ],
-    "js-tokens": [
-      "js-tokens@4.0.0",
-      "",
-      {},
-      "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="
-    ],
-    "jsesc": [
-      "jsesc@3.1.0",
-      "",
-      {
-        "bin": {
-          "jsesc": "bin/jsesc"
-        }
-      },
-      "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="
-    ],
-    "json5": [
-      "json5@2.2.3",
-      "",
-      {
-        "bin": {
-          "json5": "lib/cli.js"
-        }
-      },
-      "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
-    ],
-    "minipass": [
-      "minipass@4.2.8",
-      "",
-      {},
-      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
-    ],
-    "ms": [
-      "ms@2.1.3",
-      "",
-      {},
-      "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
-    ],
-    "node-releases": [
-      "node-releases@2.0.65",
-      "",
-      {},
-      "sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA=="
-    ],
-    "p-try": [
-      "p-try@2.2.0",
-      "",
-      {},
-      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
-    ],
-    "parse5": [
-      "parse5@7.3.0",
-      "",
-      {
-        "dependencies": {
-          "entities": "^6.0.0"
-        }
-      },
-      "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
-    ],
-    "path-parse": [
-      "path-parse@1.0.7",
-      "",
-      {},
-      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
-    ],
-    "path-scurry": [
-      "path-scurry@1.11.1",
-      "",
-      {
-        "dependencies": {
-          "lru-cache": "^10.2.0",
-          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
-        }
-      },
-      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
-    ],
-    "picocolors": [
-      "picocolors@1.1.1",
-      "",
-      {},
-      "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
-    ],
-    "pkg-up": [
-      "pkg-up@3.1.0",
-      "",
-      {
-        "dependencies": {
-          "find-up": "^3.0.0"
-        }
-      },
-      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
-    ],
-    "reselect": [
-      "reselect@4.1.8",
-      "",
-      {},
-      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
-    ],
-    "resolve": [
-      "resolve@1.22.14",
-      "",
-      {
-        "dependencies": {
-          "es-errors": "^1.3.0",
-          "is-core-module": "^2.18.0",
-          "path-parse": "^1.0.7",
-          "supports-preserve-symlinks-flag": "^1.0.0"
-        },
-        "bin": {
-          "resolve": "bin/resolve"
-        }
-      },
-      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
-    ],
-    "s-js": [
-      "s-js@0.4.9",
-      "",
-      {},
-      "sha512-RtpOm+cM6O0sHg6IA70wH+UC3FZcND+rccBZpBAHzlUgNO2Bm5BN+FnM8+OBxzXdwpKWFwX11JGF0MFRkhSoIQ=="
-    ],
-    "seroval": [
-      "seroval@1.6.12",
-      "",
-      {},
-      "sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg=="
-    ],
-    "seroval-plugins": [
-      "seroval-plugins@1.6.12",
-      "",
-      {
-        "peerDependencies": {
-          "seroval": "^1.0"
-        }
-      },
-      "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
-    ],
-    "solid-js": [
-      "solid-js@1.9.20",
-      "",
-      {
-        "dependencies": {
-          "csstype": "^3.1.0",
-          "seroval": "~1.6.11",
-          "seroval-plugins": "~1.6.8"
-        }
-      },
-      "sha512-7zEbPxRU5/hHX8O/rYtQ34p/wq44w09gv0u4+myOW5Ode8unKhoG5FbcGlqRXKqqDuDW9yOJ1OXoHgUUl/1f3Q=="
-    ],
-    "string-width": [
-      "string-width@7.2.0",
-      "",
-      {
-        "dependencies": {
-          "emoji-regex": "^10.3.0",
-          "get-east-asian-width": "^1.0.0",
-          "strip-ansi": "^7.1.0"
-        }
-      },
-      "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="
-    ],
-    "strip-ansi": [
-      "strip-ansi@7.2.0",
-      "",
-      {
-        "dependencies": {
-          "ansi-regex": "^6.2.2"
-        }
-      },
-      "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
-    ],
-    "supports-preserve-symlinks-flag": [
-      "supports-preserve-symlinks-flag@1.0.0",
-      "",
-      {},
-      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
-    ],
-    "typescript": [
-      "typescript@5.9.3",
-      "",
-      {
-        "bin": {
-          "tsc": "bin/tsc",
-          "tsserver": "bin/tsserver"
-        }
-      },
-      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
-    ],
-    "update-browserslist-db": [
-      "update-browserslist-db@1.4.0",
-      "",
-      {
-        "dependencies": {
-          "escalade": "^3.2.0",
-          "picocolors": "^1.1.1"
-        },
-        "peerDependencies": {
-          "browserslist": ">= 4.21.0"
-        },
-        "bin": {
-          "update-browserslist-db": "cli.js"
-        }
-      },
-      "sha512-WPJuOnjI9FWDct4fB+ej4Mz8opLaw5CDcZ2t44tFZ0vIQVYWzBhWR3mkixuUj/A7+vY4V9+ApOZ2YYLwdgq46w=="
-    ],
-    "web-tree-sitter": [
-      "web-tree-sitter@0.25.10",
-      "",
-      {
-        "peerDependencies": {
-          "@types/emscripten": "^1.40.0"
-        },
-        "optionalPeers": [
-          "@types/emscripten"
-        ]
-      },
-      "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="
-    ],
-    "yallist": [
-      "yallist@3.1.1",
-      "",
-      {},
-      "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="
-    ],
-    "@babel/core/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "@babel/helper-compilation-targets/lru-cache": [
-      "lru-cache@5.1.1",
-      "",
-      {
-        "dependencies": {
-          "yallist": "^3.0.2"
-        }
-      },
-      "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="
-    ],
-    "@babel/helper-compilation-targets/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "@babel/helper-create-class-features-plugin/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "babel-plugin-jsx-dom-expressions/@babel/helper-module-imports": [
-      "@babel/helper-module-imports@7.18.6",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.18.6"
-        }
-      },
-      "sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA=="
-    ],
-    "babel-plugin-jsx-dom-expressions/html-entities": [
-      "html-entities@2.3.3",
-      "",
-      {},
-      "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
-    ],
-    "glob/minimatch": [
-      "minimatch@8.0.7",
-      "",
-      {
-        "dependencies": {
-          "brace-expansion": "^2.0.1"
-        }
-      },
-      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
-    ],
-    "parse5/entities": [
-      "entities@6.0.1",
-      "",
-      {},
-      "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
-    ],
-    "path-scurry/lru-cache": [
-      "lru-cache@10.4.3",
-      "",
-      {},
-      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
-    ],
-    "path-scurry/minipass": [
-      "minipass@7.1.3",
-      "",
-      {},
-      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
-    ],
-    "pkg-up/find-up": [
-      "find-up@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "locate-path": "^3.0.0"
-        }
-      },
-      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
-    ],
-    "glob/minimatch/brace-expansion": [
-      "brace-expansion@2.1.8",
-      "",
-      {
-        "dependencies": {
-          "balanced-match": "^1.0.0"
-        }
-      },
-      "sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig=="
-    ],
-    "pkg-up/find-up/locate-path": [
-      "locate-path@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "p-locate": "^3.0.0",
-          "path-exists": "^3.0.0"
-        }
-      },
-      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
-    ],
-    "glob/minimatch/brace-expansion/balanced-match": [
-      "balanced-match@1.0.2",
-      "",
-      {},
-      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
-    ],
-    "pkg-up/find-up/locate-path/p-locate": [
-      "p-locate@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "p-limit": "^2.0.0"
-        }
-      },
-      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
-    ],
-    "pkg-up/find-up/locate-path/path-exists": [
-      "path-exists@3.0.0",
-      "",
-      {},
-      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
-    ],
-    "pkg-up/find-up/locate-path/p-locate/p-limit": [
-      "p-limit@2.3.0",
-      "",
-      {
-        "dependencies": {
-          "p-try": "^2.0.0"
-        }
-      },
-      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
-    ]
-  }
-}
-`;
-
-import { lstat as lstat9, mkdir as mkdir10, mkdtemp as mkdtemp3, readdir as readdir5, rename as rename7, rm as rm10, stat as stat6, writeFile as writeFile5 } from "fs/promises";
-import { userInfo as userInfo2 } from "os";
-import { basename as basename8, dirname as dirname12, join as join28, posix as posix3, win32 as win323 } from "path";
-import { pathToFileURL } from "url";
-var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : posix3, cacheHome = (env, platform = process.platform) => {
-  const home = homeDirectory2(env);
-  const { join } = pathModule(platform);
-  if (platform === "win32")
-    return firstNonEmpty2(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
-  const xdg = firstNonEmpty2(env["XDG_CACHE_HOME"]);
-  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
-}, guardedFolders = (env, platform) => {
-  const { join } = pathModule(platform);
-  const holyagent = join(cacheHome(env, platform), "holyagent");
-  return [holyagent, join(holyagent, "setup-tui")];
-}, lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8), tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
-  ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
-  lockHash(lock)
-].join("_")), INSTALLED_MARKER = ".holyagent-installed", markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
-`, FORMAT_CHARACTERS, plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
-  const code = character.codePointAt(0) ?? 0;
-  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
-}).join(""), oneLine4 = (text) => plain(text.trim().split(`
-`)[0] ?? "").trim(), failureLine = (text) => {
-  const lines = text.split(`
-`).map((line) => plain(line).trim()).filter((line) => line !== "");
-  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
-}, unavailable = (what, cause) => new TuiUnavailable({
-  reason: plain(`${what}: ${oneLine4(cause instanceof Error ? cause.message : String(cause))}`)
-}), bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
-  const manifest = `${JSON.stringify({ name: TUI_MANIFEST_NAME, private: true, dependencies: packages }, undefined, 2)}
-`;
-  for (const [file, text] of [
-    ["package.json", manifest],
-    ["bun.lock", lock]
-  ])
-    yield* tryPromise2({
-      try: () => Bun.write(join28(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join28(directory, file)}`, cause)
-    });
-  const shell = yield* Shell;
-  const result = yield* shell.run("bun", [
-    "--no-env-file",
-    `--config=${EMPTY_BUNFIG}`,
-    "install",
-    "--frozen-lockfile",
-    "--ignore-scripts"
-  ], { cwd: directory });
-  if (result.exitCode !== 0)
-    return yield* new TuiUnavailable({
-      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
-    });
-}), importFile = (path) => tryPromise2({
-  try: () => import(pathToFileURL(path).href),
-  catch: (cause) => unavailable(`cannot import ${path}`, cause)
-}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join28(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
-  return;
-})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join28(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
-  return;
-}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", loadPackagedSetupTui = (bundle = join28(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
-  const preload = yield* try_2({
-    try: () => Bun.resolveSync("@opentui/solid/preload", dirname12(bundle)),
-    catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause)
-  });
-  yield* importFile(preload);
-  const loaded = yield* importFile(bundle);
-  if (!isSetupTuiModule(loaded))
-    return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
-  return loaded;
-}), fileSystem2 = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
-  if (create)
-    yield* fileSystem2(`cannot create ${folder}`, () => mkdir10(folder, { recursive: true, mode: 448 }));
-  const found = yield* tryPromise2({
-    try: () => lstat9(folder),
-    catch: (cause) => cause
-  }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
-  if (found === undefined || uid === undefined)
-    return;
-  const refuse = (why) => new TuiUnavailable({
-    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
-  });
-  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat6(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
-  if (target.isSymbolicLink() || !target.isDirectory())
-    return yield* refuse("is not a plain directory");
-  if (target.uid !== uid)
-    return yield* refuse("belongs to another user");
-  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
-    return;
-  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
-    return;
-  return yield* refuse("can be written by others");
-}), namesPrivateGroup = (groupFile, gid, userName) => {
-  const entries = groupFile.split(`
-`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
-  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
-}, privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
-  const name = userName ?? (yield* try_2(() => userInfo2().username));
-  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
-  return namesPrivateGroup(text, gid, name);
-}).pipe(orElseSucceed2(() => false)), writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem2(`cannot write ${target}`, () => writeFile5(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem2(`cannot write ${target}`, () => rename7(temporary, target)))), (temporary) => promise2(() => rm10(temporary, { force: true }))), remove = (path) => promise2(() => rm10(path, { recursive: true, force: true })), promote = (temporary, directory, packages, lock) => gen2(function* () {
-  for (let attempt = 0;attempt < 3; attempt += 1) {
-    const moved = yield* exit2(fileSystem2(`cannot move ${temporary}`, () => rename7(temporary, directory)));
-    if (moved._tag === "Success")
-      return;
-    if (yield* installed(directory, packages, lock))
-      return;
-    yield* remove(directory);
-  }
-  return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
-}), STALE_AFTER_MS, newestChange = (path) => gen2(function* () {
-  const modified = (entry) => tryPromise2(() => lstat9(entry)).pipe(map5((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map5((names) => names.map((name) => join28(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join28(path, "node_modules"))];
-  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
-  return Math.max(...times);
-}), sweepStale = (directory, uid) => gen2(function* () {
-  const parent = dirname12(directory);
-  const prefix = `.${basename8(directory)}-`;
-  const cutoff = Date.now() - STALE_AFTER_MS;
-  const names = yield* tryPromise2(() => readdir5(parent));
-  yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join28(parent, name);
-    const found = yield* tryPromise2(() => lstat9(path));
-    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
-      yield* remove(path);
-  }).pipe(ignore2));
-}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp3(join28(dirname12(directory), `.${basename8(directory)}-`))))), (temporary) => gen2(function* () {
-  yield* install(temporary, packages, lock);
-  if (!(yield* hasPackages(temporary, packages)))
-    return yield* new TuiUnavailable({
-      reason: `the install finished but ${directory} does not hold the expected package versions`
-    });
-  yield* writeFresh(join28(temporary, INSTALLED_MARKER), markerText(packages, lock));
-  yield* promote(temporary, directory, packages, lock);
-}), remove), loadSetupTui = (env, options = {}) => gen2(function* () {
-  const packages = options.packages ?? TUI_PACKAGES;
-  const lock = options.lock ?? TUI_LOCK;
-  const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join28(import.meta.dir, TUI_BUNDLE);
-  const install = options.install ?? bunInstall;
-  const importModule = options.importModule ?? importFile;
-  const uid = options.uid ?? process.getuid?.();
-  const text = yield* tryPromise2({
-    try: () => Bun.file(source).text(),
-    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
-  });
-  if (options.directory === undefined)
-    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
-  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname12(directory)])
-    yield* privateFolder(folder, uid, true);
-  yield* privateFolder(directory, uid, false);
-  if (!(yield* installed(directory, packages, lock))) {
-    if (options.notify !== undefined)
-      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
-`);
-    yield* installAtomically(directory, packages, lock, install, uid);
-  }
-  const target = join28(directory, TUI_BUNDLE);
-  yield* writeFresh(target, text);
-  yield* importModule(join28(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
-  const loaded = yield* importModule(target);
-  if (!isSetupTuiModule(loaded))
-    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
-  return loaded;
-});
-var init_load2 = __esm(() => {
-  init_dist();
-  init_environment3();
-  init_shell2();
-  init_lock3();
-  TuiUnavailable = class TuiUnavailable extends TaggedError2("TuiUnavailable") {
-    get message() {
-      return this.reason;
-    }
-  };
-  FORMAT_CHARACTERS = /\p{Cf}/gu;
-  STALE_AFTER_MS = 60 * 60 * 1000;
 });
 
 var AppliedSchema, TuiOutcomeSchema;
@@ -31783,7 +31917,7 @@ var init_session = __esm(() => {
   init_pi_check2();
   init_report3();
   init_t3_settings2();
-  init_load2();
+  init_load3();
   init_types();
   DEFAULT_CHOICES = { worktrees: true, deviceAccess: true, capabilities: {} };
   t3Offer = fn2("t3Offer")(function* (env, cwd, options) {
@@ -31808,7 +31942,7 @@ var init_session = __esm(() => {
     const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
     const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config });
     const features = config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features);
-    const offers = features === undefined ? [] : capabilityOffers(options.form).filter((offer) => options.t3Workflow !== true || options.form.form !== "headless" || offer.feature !== "browserUse");
+    const offers = features === undefined ? [] : capabilityOffers(options.form).filter((offer) => options.t3Workflow !== true || options.form.form === "normal" && offer.unavailable === undefined && (offer.feature === "browserUse" || offer.feature === "computerUse"));
     if (preview === undefined && offers.length === 0)
       return line;
     const reason = tuiFallbackReason(options);
@@ -31846,7 +31980,10 @@ var init_session = __esm(() => {
     }).pipe(flatMap2(decodeOutcome), map5((outcome) => {
       if (outcome._tag === "Applied") {
         const applied = outcome.applied;
-        return { kind: "done", report: { lines: applied.lines, ok: applied.ok } };
+        return {
+          kind: options.t3Workflow === true ? "applied" : "done",
+          report: { lines: applied.lines, ok: applied.ok }
+        };
       }
       return {
         kind: "done",
@@ -31910,7 +32047,17 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
     },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow, installedPackageRoot }) => gen2(function* () {
+    run: ({
+      args,
+      env,
+      cwd,
+      emit,
+      terminal,
+      setupTui,
+      t3Workflow,
+      installedPackageRoot,
+      surface
+    }) => gen2(function* () {
       const resolved = yield* resolveScope(stringFlag(args, "scope"), usage, cwd, target === "pi" || target === undefined && t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
       if (resolved instanceof SetupFailure) {
         return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
@@ -31970,6 +32117,8 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
       });
       if (interactive.kind === "done")
         return printed(interactive.report);
+      if (interactive.kind === "applied")
+        return surface === "public" ? yield* saveSetupResult(interactive.report, booleanFlag(args, "dry-run"), env) : printed(interactive.report);
       return printed(yield* apply(flagged, capabilities, interactive.notes));
     }).pipe(provide4(shellLive(env)))
   };
@@ -32000,6 +32149,7 @@ var init_setup2 = __esm(() => {
   init_scope2();
   init_settings6();
   init_shell2();
+  init_result_file();
   init_session();
   init_args();
   init_errors4();
@@ -32191,7 +32341,7 @@ var ToolMissing, visibleBytes = (bytes, previous, final) => {
   if (isNone2(found))
     return yield* new ToolMissing({ tool: options.tool });
   const path = found.value;
-  const env = { ...definedEnv2(options.env), NO_COLOR: "1", FORCE_COLOR: "0", CLICOLOR_FORCE: "0" };
+  const env = { ...definedEnv(options.env), NO_COLOR: "1", FORCE_COLOR: "0", CLICOLOR_FORCE: "0" };
   if (options.agent) {
     const args = options.tool === "rg" ? ["--no-config", ...options.args] : options.args;
     const result = yield* spawn(path, args, { cwd: options.cwd, env });
@@ -32305,7 +32455,7 @@ var init_json_file2 = __esm(() => {
   init_json_file();
 });
 
-import { isAbsolute as isAbsolute10, join as join29, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute10, join as join30, relative as relative7 } from "path";
 var RELEASE, VERSION_RESPONSE, REGISTRY = "https://registry.npmjs.org/", USAGE = "update [--version <0.x.y>] [--dry-run]", failure = (message, result) => {
   const details = result?.stderr.trim() || result?.stdout.trim();
   return new Verbatim("", details ? `${message}
@@ -32359,7 +32509,7 @@ var init_public_maintenance = __esm(() => {
       if (root.exitCode !== 0)
         return failure("Could not verify npm's global installation path.", root);
       const location = root.stdout.trim();
-      if (!isAbsolute10(location) || relative7(registeredRoot, join29(location, "holyagent")) !== "")
+      if (!isAbsolute10(location) || relative7(registeredRoot, join30(location, "holyagent")) !== "")
         return failure("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
     }
     const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
@@ -32397,7 +32547,7 @@ var init_public_maintenance = __esm(() => {
       source
     ], { cwd });
     if (registeredRoot !== undefined) {
-      const manifest = yield* readJsonObject(join29(registeredRoot, "package.json")).pipe(option2);
+      const manifest = yield* readJsonObject(join30(registeredRoot, "package.json")).pipe(option2);
       if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
         return failure(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
     } else if (npm.exitCode !== 0)
@@ -32424,7 +32574,7 @@ var init_public_maintenance = __esm(() => {
 
 import { constants as constants6, fstatSync } from "fs";
 import { open as open8, stat as stat7 } from "fs/promises";
-import { resolve as resolve13 } from "path";
+import { resolve as resolve14 } from "path";
 var renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
 ${plainText(output.label)}:
 ${plainText(output.text)}
@@ -32568,7 +32718,7 @@ ${plainText(output.text)}
       message: "Missing project directory",
       hint: `Give a directory after ${PI_PROJECT_FLAG}.`
     });
-  const cwd = resolve13(host.cwd, directory);
+  const cwd = resolve14(host.cwd, directory);
   const location = yield* tryPromise2({
     try: () => stat7(cwd),
     catch: (cause) => new StateIo({ path: cwd, cause })
@@ -32635,9 +32785,9 @@ ${plainText(output.text)}
   const capture = (text) => sync2(() => void emitted.push(text));
   const write = surface === "agent" ? capture : host.emit ?? capture;
   const emit = (text) => write(plainText(text));
-  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve13(host.cwd, adapted.reportFile));
+  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve14(host.cwd, adapted.reportFile));
   if (surface === "agent" && command.path.join(" ") === "assignment reports") {
-    const path = resolve13(host.cwd, args.positionals[0] ?? "");
+    const path = resolve14(host.cwd, args.positionals[0] ?? "");
     const source = yield* tryPromise2(() => stat7(path)).pipe(orElseSucceed2(() => {
       return;
     }));
@@ -32648,6 +32798,12 @@ ${plainText(output.text)}
     yield* decodeJsonInputBy(report, () => Unknown2, "--report-file");
   const call = yield* callFor(args, host, emit, command, surface, adapted?.input, report);
   const output = yield* command.run(call).pipe(provideService2(WorkTree, call.root));
+  if (surface === "public" && output instanceof SetupResult)
+    return {
+      stdout: renderSetupResult(output, host.env, host.terminal?.stdout === true),
+      stderr: "",
+      code: output.code
+    };
   if (surface === "agent") {
     const stdout = emitted.join("");
     if (output instanceof Verbatim)
@@ -32692,6 +32848,7 @@ var init_program = __esm(() => {
   init_dist();
   init_package();
   init_host2();
+  init_result_file();
   init_errors7();
   init_layout2();
   init_local2();
@@ -32763,9 +32920,7 @@ var init_entry = __esm(() => {
 
 init_dist();
 init_errors4();
-
-init_load();
-
+init_load2();
 init_errors7();
 var PI_CONFIG_COMMAND = "config";
 var failureResult = (error) => {

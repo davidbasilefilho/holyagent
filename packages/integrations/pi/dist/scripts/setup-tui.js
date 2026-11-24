@@ -3311,6 +3311,51 @@ import { RGBA } from "@opentui/core";
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid";
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 
+var subjects = (lines, mark) => {
+  const counts = new Map;
+  for (const line of lines) {
+    if (!line.startsWith(mark))
+      continue;
+    const [label = ""] = line.slice(mark.length).split(": ", 1);
+    const [subject = ""] = label.split(/ (?:\/|[a-z]:[\\/]|\\\\)/i, 1);
+    if (subject === "")
+      continue;
+    counts.set(subject, (counts.get(subject) ?? 0) + 1);
+  }
+  return [...counts].map(([item, count]) => count > 1 ? `${item} (${count})` : item);
+};
+var resultHeadline = (ok, dryRun) => {
+  if (dryRun)
+    return ok ? "Dry run finished; nothing was written." : "Dry run found failures.";
+  return ok ? "Setup finished." : "Setup finished with failures.";
+};
+var summarizeResult = (result, dryRun) => {
+  const scope = /^~ (?:scope|form): /;
+  const changes = [
+    ...subjects(result.lines, "+ "),
+    ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
+  ];
+  const warnings = [
+    ...subjects(result.lines, "! "),
+    ...subjects(result.lines.filter((line) => !scope.test(line)), "~ ")
+  ];
+  return [
+    {
+      title: dryRun ? "Planned changes" : "Changes",
+      lines: changes.length === 0 ? ["No changes."] : changes
+    },
+    ...warnings.length > 0 ? [{ title: "Warnings", lines: warnings }] : [],
+    ...warnings.length > 0 || !result.ok ? [
+      {
+        title: "Next steps",
+        lines: [
+          result.ok ? "Check the warnings in the full report." : "Check the failures in the full report before running setup again."
+        ]
+      }
+    ] : []
+  ];
+};
+
 var segmenter = new Intl.Segmenter;
 var cells = (text) => Bun.stringWidth(text);
 var graphemes = (text) => Array.from(segmenter.segment(text), (part) => part.segment);
@@ -3828,7 +3873,8 @@ var initialState = (choices) => ({
   choices,
   review: undefined,
   failure: undefined,
-  applied: undefined
+  applied: undefined,
+  details: false
 });
 var reviewActions = (state) => state.review === undefined ? ["back", "cancel"] : ["apply", "back", "cancel"];
 var isCancel = (key) => key.name === "escape" || key.ctrl && key.name === "c";
@@ -3910,6 +3956,8 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
   const paged = pagedBy(state, key, scroll);
   if (paged !== undefined)
     return { state: paged };
+  if (!key.ctrl && key.name === "d")
+    return { state: { ...state, details: !state.details, scroll: 0 } };
   return isQuit(key) || isEnter(key) || key.name === "space" ? { state, command: "close" } : { state };
 };
 var reviewed = (state, review) => state.screen === "review" ? { ...state, review, failure: undefined, action: 0, scroll: 0 } : state;
@@ -3974,8 +4022,9 @@ var chooseLines = (state, context) => {
     ...keyLines([`${g.arrows} or j/k focus`, "Space toggle", "Enter review", "Esc cancel"], width),
     blank,
     ...group("T3 Code", 0, t3Count),
-    ...group(`Capabilities, ${offer.form} form`, t3Count, rows.length),
-    ...focused === undefined ? [] : hintLines(hintOf(focused, offer), width)
+    ...group("Capabilities", t3Count, rows.length),
+    ...focused === undefined ? [] : hintLines(hintOf(focused, offer), width),
+    ...hintLines(`Environment: ${offer.form}`, width)
   ];
 };
 var MARK_TONES = {
@@ -4106,21 +4155,28 @@ var reviewLayout = (state, context) => {
   return plain.fits ? plain : build(true);
 };
 var reportTone = (line) => line.startsWith("+ ") ? "success" : line.startsWith("! ") ? "error" : line.startsWith("~ ") ? "warning" : "hint";
-var doneHeadline = (ok, dryRun) => ok ? dryRun ? "Dry run finished; nothing was written." : "Setup finished." : dryRun ? "Dry run finished with failures; the lines marked ! failed. Fix the cause, then run the dry run again." : "Setup finished with failures; the lines marked ! failed. Fix the cause, then run holyagent setup again.";
 var doneLayout = (state, context) => {
   const { width, height } = context;
-  const applied = state.applied;
-  const ok = applied?.ok !== false;
-  const body = (applied?.lines ?? []).flatMap((line) => wrap(line, width, 2).map((part) => [segment(part, reportTone(line))]));
+  const applied = state.applied ?? { ok: false, lines: [] };
+  const body = state.details ? applied.lines.flatMap((line) => wrap(line, width, 2).map((part) => [segment(part, reportTone(line))])) : summarizeResult(applied, context.dryRun).flatMap(({ title, lines }) => [
+    ...heading(title, width),
+    ...lines.flatMap((line) => hintLines(`  ${line}`, width))
+  ]);
   const build = (scrolling) => {
     const top = [
-      ...keyLines(["Enter close", ...scrolling ? ["PgUp/PgDn scroll"] : []], width),
-      blank,
+      [{ text: "Close (Enter or q)", tone: "option", click: "close" }],
+      [
+        {
+          text: state.details ? "Summary (d)" : "Full details (d)",
+          tone: "option",
+          click: "details"
+        }
+      ],
+      ...scrolling ? keyLines(["PgUp/PgDn scroll"], width) : [],
       ...heading(context.dryRun ? "Result (dry run)" : "Result", width),
-      ...wrap(doneHeadline(ok, context.dryRun), width).map((part) => [
-        segment(part, ok ? "success" : "error")
-      ]),
-      blank
+      ...wrap(resultHeadline(applied.ok, context.dryRun), width).map((part) => [
+        segment(part, applied.ok ? "success" : "error")
+      ])
     ];
     const page = pageOf(body, height - 1 - top.length, state.scroll);
     return {
@@ -4235,28 +4291,45 @@ var SetupApp = (props) => {
       }));
     });
   };
-  useKeyboard((event) => {
+  const keypress = (key) => {
     const before = state();
-    const next = press(before, rows, {
-      name: event.name,
-      ctrl: event.ctrl
-    }, scrollOf(before, context()));
+    const next = press(before, rows, key, scrollOf(before, context()));
     if (next.state.screen !== before.screen && next.state.screen === "choose")
       ticket += 1;
     setState(next.state);
     if (next.command !== undefined)
       run(next.command);
-  });
+  };
+  useKeyboard((event) => keypress({
+    name: event.name,
+    ctrl: event.ctrl
+  }));
   const colorOf = (tone) => tone !== undefined && look.color ? palette[tone] : RGBA.defaultForeground();
   return (() => {
     var _el$ = _$createElement("box");
     _$setProp(_el$, "flexDirection", "column");
+    _$setProp(_el$, "onMouseScroll", (event) => {
+      const direction = event.scroll?.direction;
+      if (direction === "up" || direction === "down")
+        keypress({
+          name: direction === "up" ? "pageup" : "pagedown",
+          ctrl: false
+        });
+    });
     _$insert(_el$, _$createComponent(For, {
       get each() {
         return lines();
       },
       children: (line) => (() => {
         var _el$2 = _$createElement("text");
+        _$setProp(_el$2, "onMouseUp", (event) => {
+          const click = line.find((part) => part.click !== undefined)?.click;
+          if (event.button === 0 && click !== undefined)
+            keypress({
+              name: click === "close" ? "q" : "d",
+              ctrl: false
+            });
+        });
         _$insert(_el$2, (() => {
           var _c$ = _$memo(() => line.length === 0);
           return () => _c$() ? " " : _$createComponent(For, {
@@ -4326,7 +4399,7 @@ var showSetup = (acquire, input) => acquireUseRelease2(acquire, (renderer) => de
 var runSetupTui = (input) => runPromise2(showSetup(tryPromise2({
   try: () => createCliRenderer({
     exitOnCtrlC: false,
-    useMouse: false,
+    useMouse: true,
     clearOnShutdown: true
   }),
   catch: (cause) => cause

@@ -27,10 +27,9 @@ describe("the setup interface, capability rows", () => {
     const screen = await shown({ width: 100, height: 40, capabilities: OFFERS })
     const lines = screen.lines()
     expect(lines.indexOf("T3 CODE")).toBeGreaterThan(-1)
-    const heading = lines.indexOf(
-      "CAPABILITIES, NORMAL (DETECTED: A GRAPHICAL SESSION IS AVAILABLE) FORM",
-    )
+    const heading = lines.indexOf("CAPABILITIES")
     expect(heading).toBeGreaterThan(lines.indexOf("T3 CODE"))
+    expect(lines).toContain("Environment: normal (detected: a graphical session is available)")
     const rows = lines.slice(heading + 1, heading + 1 + CAPABILITIES.length)
     expect(rows.map((row) => row.replace(/^[❯ ] /, "").split(/\s{2,}/)[0])).toEqual(
       CAPABILITIES.map((capability) => capability.name),

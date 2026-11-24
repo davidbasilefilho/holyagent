@@ -27,7 +27,7 @@ T3 Code is the only supported user-facing interface. The supported workflow uses
    holyagent setup pi --scope user
    ```
 
-   The npm command installs `holyagent` and `holyagent-cli`. Setup registers the installed package with the Pi already on `PATH`. Use a fresh terminal if the new commands are missing. The T3 Code backend uses [`holyagent-cli`](agent-cli-output.md) for agent operations.
+   With Bun, use `bun add -g holyagent@<version>` in place of the npm install command. Both managers install `holyagent` and `holyagent-cli`. Setup registers the installed package with the Pi already on `PATH`. Use a fresh terminal if the new commands are missing. The T3 Code backend uses [`holyagent-cli`](agent-cli-output.md) for agent operations.
 
 3. Review the [setup screen](#the-t3-code-setup-screen), then run `holyagent doctor --scope user`. Restart T3 Code after setup. If Pi is missing from the provider picker, check that it is enabled and that T3 Code can find the same `pi` executable as your terminal.
 4. [Sign in to the provider selected in your HolyAgent configuration](pi/providers.md), then open a thread using the Pi provider in T3 Code. Work in a repository you trust. HolyAgent's [Full access requirement](pi/t3-code.md#full-access-is-required) applies to that thread; leave it off if you cannot give the thread that level of access.
@@ -42,6 +42,10 @@ Use `holyagent setup pi` to configure the T3 Code/Pi integration directly. It re
 `holyagent setup claude` applies the existing Claude plugin settings at the selected scope. Install the plugin separately before running this command. It preserves existing values and applies the same scoped behavior with `--undo`.
 
 Use `--non-interactive` for scripts. It skips the setup screen and uses the defaults shown by `holyagent setup --help` or the flags you supplied. Use `--dry-run` to see changes before applying them.
+
+Interactive Pi setup shows controls for the detected environment. General Pi capabilities use their configured values or the documented defaults. Change those in [Pi configuration](pi/configuration.md#capabilities) or pass the corresponding flag.
+
+The result shows changes, warnings and next steps. Use **Full details** or press `d` to see the full report. Use **Close**, Enter or `q` to return to your terminal. The terminal prints a short summary and the path to that run's report under `~/.holyagent/setup-reports/` by default. It makes the path clickable in terminals with hyperlink support. Dry runs leave the report folder untouched.
 
 ## Migrate to T3 Code
 

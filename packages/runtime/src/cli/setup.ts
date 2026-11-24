@@ -17,6 +17,7 @@ import {
 import { CACHE_TTLS } from "../setup/settings.ts"
 import { type Shell, shellLive } from "../setup/shell.ts"
 import type { SetupTarget } from "../setup/steps.ts"
+import { saveSetupResult } from "../setup/tui/result-file.ts"
 import { runInteractive } from "../setup/tui/session.ts"
 import { booleanFlag, choiceFlag, stringFlag } from "./args.ts"
 import { Usage } from "./errors.ts"
@@ -155,7 +156,17 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
     },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow, installedPackageRoot }) =>
+    run: ({
+      args,
+      env,
+      cwd,
+      emit,
+      terminal,
+      setupTui,
+      t3Workflow,
+      installedPackageRoot,
+      surface,
+    }) =>
       Effect.gen(function* () {
         const resolved = yield* resolveScope(
           stringFlag(args, "scope"),
@@ -245,6 +256,10 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           apply: (choices, chosen) => apply(choices, chosen),
         })
         if (interactive.kind === "done") return printed(interactive.report)
+        if (interactive.kind === "applied")
+          return surface === "public"
+            ? yield* saveSetupResult(interactive.report, booleanFlag(args, "dry-run"), env)
+            : printed(interactive.report)
         return printed(yield* apply(flagged, capabilities, interactive.notes))
       }).pipe(Effect.provide(shellLive(env))),
   }

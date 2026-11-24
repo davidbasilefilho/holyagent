@@ -8,6 +8,7 @@ import {
   type Context,
   finished,
   initialState,
+  type Key,
   type Line,
   press,
   reviewed,
@@ -118,19 +119,15 @@ export const SetupApp = (props: SetupAppProps) => {
     )
   }
 
-  useKeyboard((event) => {
+  const keypress = (key: Key) => {
     // A key that goes back to the choices makes any review reply still on its way stale.
     const before = state()
-    const next = press(
-      before,
-      rows,
-      { name: event.name, ctrl: event.ctrl },
-      scrollOf(before, context()),
-    )
+    const next = press(before, rows, key, scrollOf(before, context()))
     if (next.state.screen !== before.screen && next.state.screen === "choose") ticket += 1
     setState(next.state)
     if (next.command !== undefined) run(next.command)
-  })
+  }
+  useKeyboard((event) => keypress({ name: event.name, ctrl: event.ctrl }))
 
   // Added colour is dropped under NO_COLOR, so a segment then draws in the terminal's own
   // foreground (OpenTUI's default would be white); bold stays.
@@ -138,10 +135,22 @@ export const SetupApp = (props: SetupAppProps) => {
     tone !== undefined && look.color ? palette[tone] : RGBA.defaultForeground()
 
   return (
-    <box flexDirection="column">
+    <box
+      flexDirection="column"
+      onMouseScroll={(event) => {
+        const direction = event.scroll?.direction
+        if (direction === "up" || direction === "down")
+          keypress({ name: direction === "up" ? "pageup" : "pagedown", ctrl: false })
+      }}>
       <For each={lines()}>
         {(line) => (
-          <text fg={RGBA.defaultForeground()}>
+          <text
+            fg={RGBA.defaultForeground()}
+            onMouseUp={(event) => {
+              const click = line.find((part) => part.click !== undefined)?.click
+              if (event.button === 0 && click !== undefined)
+                keypress({ name: click === "close" ? "q" : "d", ctrl: false })
+            }}>
             {line.length === 0 ? (
               " "
             ) : (

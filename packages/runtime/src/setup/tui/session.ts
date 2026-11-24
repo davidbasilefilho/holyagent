@@ -270,6 +270,7 @@ export interface InteractiveOptions {
 export type Interactive =
   | { readonly kind: "line"; readonly notes: ReadonlyArray<string> }
   | { readonly kind: "done"; readonly report: Report }
+  | { readonly kind: "applied"; readonly report: Report }
 
 const fallback = (reason: string): Interactive => ({
   kind: "line",
@@ -322,8 +323,9 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
       : capabilityOffers(options.form).filter(
           (offer) =>
             options.t3Workflow !== true ||
-            options.form.form !== "headless" ||
-            offer.feature !== "browserUse",
+            (options.form.form === "normal" &&
+              offer.unavailable === undefined &&
+              (offer.feature === "browserUse" || offer.feature === "computerUse")),
         )
   if (preview === undefined && offers.length === 0) return line
   const reason = tuiFallbackReason(options)
@@ -382,7 +384,10 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     Effect.map((outcome): Interactive => {
       if (outcome._tag === "Applied") {
         const applied: Applied = outcome.applied
-        return { kind: "done", report: { lines: applied.lines, ok: applied.ok } }
+        return {
+          kind: options.t3Workflow === true ? "applied" : "done",
+          report: { lines: applied.lines, ok: applied.ok },
+        }
       }
       return {
         kind: "done",

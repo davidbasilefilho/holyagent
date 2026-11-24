@@ -7,6 +7,7 @@ import { Cause, Effect, Schema } from "effect"
 import { version } from "../../../../package.json" with { type: "json" }
 import { type AgentHost, type HostWords, wordsFor } from "../domain/host.ts"
 import { PI_PROJECT_FLAG, projectOf } from "../hooks/pi-project.ts"
+import { renderSetupResult, SetupResult } from "../setup/tui/result-file.ts"
 import { StateIo } from "../state/errors.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { WorkTree } from "../state/local.ts"
@@ -426,6 +427,12 @@ const execute = (given: ReadonlyArray<string>, initialHost: Host, surface: CliSu
     const call = yield* callFor(args, host, emit, command, surface, adapted?.input, report)
     // The Intent in use is kept per work tree: every read and write of the run resolves it from here.
     const output = yield* command.run(call).pipe(Effect.provideService(WorkTree, call.root))
+    if (surface === "public" && output instanceof SetupResult)
+      return {
+        stdout: renderSetupResult(output, host.env, host.terminal?.stdout === true),
+        stderr: "",
+        code: output.code,
+      }
     if (surface === "agent") {
       const stdout = emitted.join("")
       if (output instanceof Verbatim)

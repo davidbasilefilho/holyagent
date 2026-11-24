@@ -18741,10 +18741,1493 @@ var loadConfig2 = (env, root) => gen2(function* () {
 });
 import { constants as constants6, fstatSync } from "fs";
 import { open as open8, stat as stat7 } from "fs/promises";
-import { resolve as resolve13 } from "path";
+import { resolve as resolve14 } from "path";
 
 var PI_PROJECT_FLAG = "--project";
 var projectOf = (args) => args[0] === PI_PROJECT_FLAG && args[1] !== undefined ? { directory: args[1], rest: args.slice(2) } : { directory: undefined, rest: args };
+
+import { lstat as lstat9, mkdir as mkdir9, mkdtemp as mkdtemp3, writeFile as writeFile6 } from "fs/promises";
+import { dirname as dirname13, join as join27, resolve as resolve13 } from "path";
+import { pathToFileURL as pathToFileURL2 } from "url";
+import { lstat as lstat8, mkdir as mkdir8, mkdtemp as mkdtemp2, readdir as readdir5, rename as rename7, rm as rm9, stat as stat5, writeFile as writeFile5 } from "fs/promises";
+import { userInfo } from "os";
+import { basename as basename8, dirname as dirname12, join as join26, posix as posix3, win32 as win323 } from "path";
+import { pathToFileURL } from "url";
+var {$ } = globalThis.Bun;
+var shellLive = (env) => {
+  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
+  return succeed5(Shell, Shell.of({
+    which: (command, options) => sync2(() => findCommand(env, command, options, Bun.which)),
+    run: (command, args, options) => tryPromise2({
+      try: () => $`${command} ${args}`.cwd(options.cwd).env(definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
+        exitCode: result.exitCode,
+        stdout: result.stdout.toString(),
+        stderr: result.stderr.toString()
+      })),
+      catch: (error) => String(error)
+    }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
+  }));
+};
+
+var TUI_BUNDLE = "setup-tui.js";
+
+var TUI_MANIFEST_NAME = "holyagent-setup-tui";
+var Dependencies = optional2(Record(String5, String5));
+var Entry = TupleWithRest(Tuple([
+  String5,
+  String5,
+  Struct({
+    dependencies: Dependencies,
+    optionalDependencies: Dependencies,
+    peerDependencies: Dependencies
+  })
+]), [Unknown2]);
+var Lock = Struct({
+  lockfileVersion: Number5,
+  configVersion: optional2(Number5),
+  packages: Record(String5, Unknown2)
+});
+
+var TUI_PACKAGES = {
+  "@opentui/core": "0.9.7",
+  "@opentui/solid": "0.9.7",
+  "solid-js": "1.9.20"
+};
+var TUI_LOCK = `{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "holyagent-setup-tui",
+      "dependencies": {
+        "@opentui/core": "0.9.7",
+        "@opentui/solid": "0.9.7",
+        "solid-js": "1.9.20"
+      }
+    }
+  },
+  "packages": {
+    "@babel/code-frame": [
+      "@babel/code-frame@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "js-tokens": "^4.0.0",
+          "picocolors": "^1.1.1"
+        }
+      },
+      "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="
+    ],
+    "@babel/compat-data": [
+      "@babel/compat-data@7.29.7",
+      "",
+      {},
+      "sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg=="
+    ],
+    "@babel/core": [
+      "@babel/core@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.7",
+          "@babel/helper-compilation-targets": "^7.29.7",
+          "@babel/helper-module-transforms": "^7.29.7",
+          "@babel/helpers": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/template": "^7.29.7",
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7",
+          "@jridgewell/remapping": "^2.3.5",
+          "convert-source-map": "^2.0.0",
+          "debug": "^4.1.0",
+          "gensync": "^1.0.0-beta.2",
+          "json5": "^2.2.3",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
+    ],
+    "@babel/generator": [
+      "@babel/generator@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/parser": "^7.29.15",
+          "@babel/types": "^7.29.15",
+          "@jridgewell/gen-mapping": "^0.3.12",
+          "@jridgewell/trace-mapping": "^0.3.28",
+          "jsesc": "^3.0.2"
+        }
+      },
+      "sha512-gNWJUX0FlevflramOkaInywOMhU1lkln38gAC7TFZv2tsWbLYbN/2WZFGcq8zbX0Z55e4vGa27IB/NaeZoauWQ=="
+    ],
+    "@babel/helper-annotate-as-pure": [
+      "@babel/helper-annotate-as-pure@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-OoK6239jHPuSQOoS0kfTVKn0b/rVTk0seKq4Gd2UMLtmOVLjDC0ki3e+c90Trqv2gMfvJFqkiljrr568+qddiw=="
+    ],
+    "@babel/helper-compilation-targets": [
+      "@babel/helper-compilation-targets@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/compat-data": "^7.29.7",
+          "@babel/helper-validator-option": "^7.29.7",
+          "browserslist": "^4.24.0",
+          "lru-cache": "^5.1.1",
+          "semver": "^6.3.1"
+        }
+      },
+      "sha512-8WxJ4/Vmes3ghacj8VOJy3NW8eyHiFY/4thU/LSBuBE470+igjR/j1ZTNn8fV5VdNrLx6iXUwig526UdOvfP0w=="
+    ],
+    "@babel/helper-create-class-features-plugin": [
+      "@babel/helper-create-class-features-plugin@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/helper-replace-supers": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.13",
+          "semver": "^6.3.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-fo8/Fr44/DMV71FQjk/HA0Npmu3bo5DFoWTCW1dhUR8Vx3NFfAVeEy0TbcBpt4e+hd2QhdmWgmspHo/9iWj8RA=="
+    ],
+    "@babel/helper-globals": [
+      "@babel/helper-globals@7.29.7",
+      "",
+      {},
+      "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
+    ],
+    "@babel/helper-member-expression-to-functions": [
+      "@babel/helper-member-expression-to-functions@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/traverse": "^7.29.14",
+          "@babel/types": "^7.29.14"
+        }
+      },
+      "sha512-FuTSn8mXKAP+aHXnbkCYQsQAdlEIJptEutwc2NaPd28hyVqsjRDmBnI2EPJX6HCodKIqOHfayQHqtxQCkqwthA=="
+    ],
+    "@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
+    ],
+    "@babel/helper-module-transforms": [
+      "@babel/helper-module-transforms@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "^7.29.7",
+          "@babel/helper-validator-identifier": "^7.29.7",
+          "@babel/traverse": "^7.29.14"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-2XDvQVd9JESaOgGc4jT2/jquTAO7ppA5noTZQqH+MmZ89yjCzScLwtCPbWtkPZylL+TLWR49IwWmk+QkRR4GsA=="
+    ],
+    "@babel/helper-optimise-call-expression": [
+      "@babel/helper-optimise-call-expression@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-+kmGVjcT9RGYzoDwdwEqEvGgKe3BYq+O1iGzjFubaNgZHwYHP6lsF2Yghf4kEuv9BV7tYDZ913aBW9am6YKong=="
+    ],
+    "@babel/helper-plugin-utils": [
+      "@babel/helper-plugin-utils@7.29.7",
+      "",
+      {},
+      "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="
+    ],
+    "@babel/helper-replace-supers": [
+      "@babel/helper-replace-supers@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-member-expression-to-functions": "^7.29.7",
+          "@babel/helper-optimise-call-expression": "^7.29.7",
+          "@babel/traverse": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0"
+        }
+      },
+      "sha512-atfGXWSeCiF4DnKZIfmJfQRkSw9b9gNNXR1kqKjbhG4pGYCOnkp8OcTB8E3NXjBu8NpheSnOeNKz8KT7UNFTmQ=="
+    ],
+    "@babel/helper-skip-transparent-expression-wrappers": [
+      "@babel/helper-skip-transparent-expression-wrappers@7.29.13",
+      "",
+      {
+        "dependencies": {
+          "@babel/traverse": "^7.29.13",
+          "@babel/types": "^7.29.11"
+        }
+      },
+      "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
+    ],
+    "@babel/helper-string-parser": [
+      "@babel/helper-string-parser@7.29.15",
+      "",
+      {},
+      "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="
+    ],
+    "@babel/helper-validator-identifier": [
+      "@babel/helper-validator-identifier@7.29.7",
+      "",
+      {},
+      "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
+    ],
+    "@babel/helper-validator-option": [
+      "@babel/helper-validator-option@7.29.7",
+      "",
+      {},
+      "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
+    ],
+    "@babel/helpers": [
+      "@babel/helpers@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.15"
+        }
+      },
+      "sha512-l+ezV2czw3t2d2ELq+3CwPL4WLKK5O8IywBXb9/gpmbCOVZFmRYJPmHVqSCv2k+8iKbE30Zf54siOoIZ52XOxA=="
+    ],
+    "@babel/parser": [
+      "@babel/parser@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.29.15"
+        },
+        "bin": "./bin/babel-parser.js"
+      },
+      "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="
+    ],
+    "@babel/plugin-syntax-jsx": [
+      "@babel/plugin-syntax-jsx@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A=="
+    ],
+    "@babel/plugin-syntax-typescript": [
+      "@babel/plugin-syntax-typescript@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
+    ],
+    "@babel/plugin-transform-modules-commonjs": [
+      "@babel/plugin-transform-modules-commonjs@7.29.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-transforms": "^7.29.14",
+          "@babel/helper-plugin-utils": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
+    ],
+    "@babel/plugin-transform-typescript": [
+      "@babel/plugin-transform-typescript@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-annotate-as-pure": "^7.29.7",
+          "@babel/helper-create-class-features-plugin": "^7.29.13",
+          "@babel/helper-plugin-utils": "^7.29.7",
+          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
+          "@babel/plugin-syntax-typescript": "^7.29.7"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-FFuMssbHj8DFMDsTH8xrgKBiE1eXuDvO9jLqav7/vsIe6YdoyPQbWCgLNzQxkcIkOv5itBD17TvZkHGIjUMzLg=="
+    ],
+    "@babel/preset-typescript": [
+      "@babel/preset-typescript@7.27.1",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-plugin-utils": "^7.27.1",
+          "@babel/helper-validator-option": "^7.27.1",
+          "@babel/plugin-syntax-jsx": "^7.27.1",
+          "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+          "@babel/plugin-transform-typescript": "^7.27.1"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0-0"
+        }
+      },
+      "sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ=="
+    ],
+    "@babel/template": [
+      "@babel/template@7.29.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/parser": "^7.29.7",
+          "@babel/types": "^7.29.7"
+        }
+      },
+      "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
+    ],
+    "@babel/traverse": [
+      "@babel/traverse@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/code-frame": "^7.29.7",
+          "@babel/generator": "^7.29.15",
+          "@babel/helper-globals": "^7.29.7",
+          "@babel/parser": "^7.29.15",
+          "@babel/template": "^7.29.7",
+          "@babel/types": "^7.29.15",
+          "debug": "^4.3.1"
+        }
+      },
+      "sha512-ZfawBo2i8vvt+BTt37dWDKBPjUfm/H+bw+ltwsCRhW7gPtyNVwUXuNo54eO2Xo+P4VXpalPFfFISbBTRKC8SOQ=="
+    ],
+    "@babel/types": [
+      "@babel/types@7.29.15",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-string-parser": "^7.29.15",
+          "@babel/helper-validator-identifier": "^7.29.7"
+        }
+      },
+      "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="
+    ],
+    "@jridgewell/gen-mapping": [
+      "@jridgewell/gen-mapping@0.3.13",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/sourcemap-codec": "^1.5.0",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
+    ],
+    "@jridgewell/remapping": [
+      "@jridgewell/remapping@2.3.5",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/gen-mapping": "^0.3.5",
+          "@jridgewell/trace-mapping": "^0.3.24"
+        }
+      },
+      "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
+    ],
+    "@jridgewell/resolve-uri": [
+      "@jridgewell/resolve-uri@3.1.3",
+      "",
+      {},
+      "sha512-lhTtjtoEArWBjismtfS761S9Hlyn+nIZqOZVYoZ1Xn82PMNMVnk+jj/NhC4fAXGTs7ydONcJiR5vyQBTMDu27g=="
+    ],
+    "@jridgewell/sourcemap-codec": [
+      "@jridgewell/sourcemap-codec@1.6.0",
+      "",
+      {},
+      "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
+    ],
+    "@jridgewell/trace-mapping": [
+      "@jridgewell/trace-mapping@0.3.31",
+      "",
+      {
+        "dependencies": {
+          "@jridgewell/resolve-uri": "^3.1.0",
+          "@jridgewell/sourcemap-codec": "^1.4.14"
+        }
+      },
+      "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
+    ],
+    "@opentui/core": [
+      "@opentui/core@0.9.7",
+      "",
+      {
+        "dependencies": {
+          "bun-ffi-structs": "0.3.1",
+          "diff": "9.0.0",
+          "string-width": "7.2.0"
+        },
+        "optionalDependencies": {
+          "@opentui/core-darwin-arm64": "0.9.7",
+          "@opentui/core-darwin-x64": "0.9.7",
+          "@opentui/core-linux-arm64": "0.9.7",
+          "@opentui/core-linux-arm64-musl": "0.9.7",
+          "@opentui/core-linux-x64": "0.9.7",
+          "@opentui/core-linux-x64-musl": "0.9.7",
+          "@opentui/core-win32-arm64": "0.9.7",
+          "@opentui/core-win32-x64": "0.9.7"
+        },
+        "peerDependencies": {
+          "web-tree-sitter": "0.25.10"
+        }
+      },
+      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
+    ],
+    "@opentui/core-darwin-arm64": [
+      "@opentui/core-darwin-arm64@0.9.7",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "arm64"
+      },
+      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
+    ],
+    "@opentui/core-darwin-x64": [
+      "@opentui/core-darwin-x64@0.9.7",
+      "",
+      {
+        "os": "darwin",
+        "cpu": "x64"
+      },
+      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
+    ],
+    "@opentui/core-linux-arm64": [
+      "@opentui/core-linux-arm64@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64"
+      },
+      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
+    ],
+    "@opentui/core-linux-arm64-musl": [
+      "@opentui/core-linux-arm64-musl@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "arm64",
+        "libc": "musl"
+      },
+      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
+    ],
+    "@opentui/core-linux-x64": [
+      "@opentui/core-linux-x64@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64"
+      },
+      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
+    ],
+    "@opentui/core-linux-x64-musl": [
+      "@opentui/core-linux-x64-musl@0.9.7",
+      "",
+      {
+        "os": "linux",
+        "cpu": "x64",
+        "libc": "musl"
+      },
+      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
+    ],
+    "@opentui/core-win32-arm64": [
+      "@opentui/core-win32-arm64@0.9.7",
+      "",
+      {
+        "os": "win32",
+        "cpu": "arm64"
+      },
+      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
+    ],
+    "@opentui/core-win32-x64": [
+      "@opentui/core-win32-x64@0.9.7",
+      "",
+      {
+        "os": "win32",
+        "cpu": "x64"
+      },
+      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
+    ],
+    "@opentui/solid": [
+      "@opentui/solid@0.9.7",
+      "",
+      {
+        "dependencies": {
+          "@babel/core": "7.29.7",
+          "@babel/preset-typescript": "7.27.1",
+          "@opentui/core": "0.9.7",
+          "babel-plugin-module-resolver": "5.0.2",
+          "babel-preset-solid": "1.9.16",
+          "entities": "7.0.1",
+          "s-js": "^0.4.9"
+        },
+        "peerDependencies": {
+          "solid-js": "^1.9.12"
+        }
+      },
+      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
+    ],
+    "ansi-regex": [
+      "ansi-regex@6.6.0",
+      "",
+      {},
+      "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
+    ],
+    "babel-plugin-jsx-dom-expressions": [
+      "babel-plugin-jsx-dom-expressions@0.40.14",
+      "",
+      {
+        "dependencies": {
+          "@babel/helper-module-imports": "7.18.6",
+          "@babel/plugin-syntax-jsx": "^7.18.6",
+          "@babel/types": "^7.20.7",
+          "html-entities": "2.3.3",
+          "parse5": "^7.1.2"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.20.12"
+        }
+      },
+      "sha512-5RDcd9lN4eVJyvIrkV7xwuGT+EYVTnWmqO9A8alGRVVLY95aA/U0cNGWv3ThWeI+/ufe2MMS6lILyuWsHmFBgA=="
+    ],
+    "babel-plugin-module-resolver": [
+      "babel-plugin-module-resolver@5.0.2",
+      "",
+      {
+        "dependencies": {
+          "find-babel-config": "^2.1.1",
+          "glob": "^9.3.3",
+          "pkg-up": "^3.1.0",
+          "reselect": "^4.1.7",
+          "resolve": "^1.22.8"
+        }
+      },
+      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
+    ],
+    "babel-preset-solid": [
+      "babel-preset-solid@1.9.16",
+      "",
+      {
+        "dependencies": {
+          "babel-plugin-jsx-dom-expressions": "^0.40.11"
+        },
+        "peerDependencies": {
+          "@babel/core": "^7.0.0",
+          "solid-js": "^1.9.16"
+        },
+        "optionalPeers": [
+          "solid-js"
+        ]
+      },
+      "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
+    ],
+    "baseline-browser-mapping": [
+      "baseline-browser-mapping@2.11.39",
+      "",
+      {
+        "bin": {
+          "baseline-browser-mapping": "dist/cli.cjs"
+        }
+      },
+      "sha512-Q9buOYhr2ggrEZpImICecZTJHCCd8yXkRUokFlUEQ8uiD6oP82F4W4jWnhOHZYV+wlvrC51V7Wy0ULyWjil5Wg=="
+    ],
+    "browserslist": [
+      "browserslist@4.29.6",
+      "",
+      {
+        "dependencies": {
+          "baseline-browser-mapping": "^2.11.37",
+          "caniuse-lite": "^1.0.30001826",
+          "electron-to-chromium": "^1.5.486",
+          "node-releases": "^2.0.64",
+          "update-browserslist-db": "^1.4.0"
+        },
+        "bin": {
+          "browserslist": "cli.js"
+        }
+      },
+      "sha512-CmVVIQ3RVc5HxYEc9X84GvxK/C8C1wH8TlKAiO7uTxF8PDwt7r8t9Qk3J9NkMOVzX5O/HbLv3yzxZg9HPrnI9w=="
+    ],
+    "bun-ffi-structs": [
+      "bun-ffi-structs@0.3.1",
+      "",
+      {
+        "peerDependencies": {
+          "typescript": "^5"
+        }
+      },
+      "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
+    ],
+    "caniuse-lite": [
+      "caniuse-lite@1.0.30001827",
+      "",
+      {},
+      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
+    ],
+    "convert-source-map": [
+      "convert-source-map@2.0.0",
+      "",
+      {},
+      "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
+    ],
+    "csstype": [
+      "csstype@3.2.4",
+      "",
+      {},
+      "sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ=="
+    ],
+    "debug": [
+      "debug@4.4.3",
+      "",
+      {
+        "dependencies": {
+          "ms": "^2.1.3"
+        },
+        "peerDependencies": {
+          "supports-color": "*"
+        },
+        "optionalPeers": [
+          "supports-color"
+        ]
+      },
+      "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="
+    ],
+    "diff": [
+      "diff@9.0.0",
+      "",
+      {},
+      "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
+    ],
+    "electron-to-chromium": [
+      "electron-to-chromium@1.5.492",
+      "",
+      {},
+      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
+    ],
+    "emoji-regex": [
+      "emoji-regex@10.6.0",
+      "",
+      {},
+      "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="
+    ],
+    "entities": [
+      "entities@7.0.1",
+      "",
+      {},
+      "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
+    ],
+    "es-errors": [
+      "es-errors@1.3.0",
+      "",
+      {},
+      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
+    ],
+    "escalade": [
+      "escalade@3.2.0",
+      "",
+      {},
+      "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
+    ],
+    "find-babel-config": [
+      "find-babel-config@2.1.2",
+      "",
+      {
+        "dependencies": {
+          "json5": "^2.2.3"
+        }
+      },
+      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
+    ],
+    "fs.realpath": [
+      "fs.realpath@1.0.0",
+      "",
+      {},
+      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
+    ],
+    "function-bind": [
+      "function-bind@1.1.2",
+      "",
+      {},
+      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
+    ],
+    "gensync": [
+      "gensync@1.0.0-beta.2",
+      "",
+      {},
+      "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="
+    ],
+    "get-east-asian-width": [
+      "get-east-asian-width@1.6.0",
+      "",
+      {},
+      "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
+    ],
+    "glob": [
+      "glob@9.3.5",
+      "",
+      {
+        "dependencies": {
+          "fs.realpath": "^1.0.0",
+          "minimatch": "^8.0.2",
+          "minipass": "^4.2.4",
+          "path-scurry": "^1.6.1"
+        }
+      },
+      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
+    ],
+    "hasown": [
+      "hasown@2.0.4",
+      "",
+      {
+        "dependencies": {
+          "function-bind": "^1.1.2"
+        }
+      },
+      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
+    ],
+    "is-core-module": [
+      "is-core-module@2.18.0",
+      "",
+      {
+        "dependencies": {
+          "hasown": "^2.0.4"
+        }
+      },
+      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
+    ],
+    "js-tokens": [
+      "js-tokens@4.0.0",
+      "",
+      {},
+      "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="
+    ],
+    "jsesc": [
+      "jsesc@3.1.0",
+      "",
+      {
+        "bin": {
+          "jsesc": "bin/jsesc"
+        }
+      },
+      "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="
+    ],
+    "json5": [
+      "json5@2.2.3",
+      "",
+      {
+        "bin": {
+          "json5": "lib/cli.js"
+        }
+      },
+      "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
+    ],
+    "minipass": [
+      "minipass@4.2.8",
+      "",
+      {},
+      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
+    ],
+    "ms": [
+      "ms@2.1.3",
+      "",
+      {},
+      "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
+    ],
+    "node-releases": [
+      "node-releases@2.0.65",
+      "",
+      {},
+      "sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA=="
+    ],
+    "p-try": [
+      "p-try@2.2.0",
+      "",
+      {},
+      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
+    ],
+    "parse5": [
+      "parse5@7.3.0",
+      "",
+      {
+        "dependencies": {
+          "entities": "^6.0.0"
+        }
+      },
+      "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
+    ],
+    "path-parse": [
+      "path-parse@1.0.7",
+      "",
+      {},
+      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
+    ],
+    "path-scurry": [
+      "path-scurry@1.11.1",
+      "",
+      {
+        "dependencies": {
+          "lru-cache": "^10.2.0",
+          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
+        }
+      },
+      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
+    ],
+    "picocolors": [
+      "picocolors@1.1.1",
+      "",
+      {},
+      "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
+    ],
+    "pkg-up": [
+      "pkg-up@3.1.0",
+      "",
+      {
+        "dependencies": {
+          "find-up": "^3.0.0"
+        }
+      },
+      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
+    ],
+    "reselect": [
+      "reselect@4.1.8",
+      "",
+      {},
+      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
+    ],
+    "resolve": [
+      "resolve@1.22.14",
+      "",
+      {
+        "dependencies": {
+          "es-errors": "^1.3.0",
+          "is-core-module": "^2.18.0",
+          "path-parse": "^1.0.7",
+          "supports-preserve-symlinks-flag": "^1.0.0"
+        },
+        "bin": {
+          "resolve": "bin/resolve"
+        }
+      },
+      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
+    ],
+    "s-js": [
+      "s-js@0.4.9",
+      "",
+      {},
+      "sha512-RtpOm+cM6O0sHg6IA70wH+UC3FZcND+rccBZpBAHzlUgNO2Bm5BN+FnM8+OBxzXdwpKWFwX11JGF0MFRkhSoIQ=="
+    ],
+    "seroval": [
+      "seroval@1.6.12",
+      "",
+      {},
+      "sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg=="
+    ],
+    "seroval-plugins": [
+      "seroval-plugins@1.6.12",
+      "",
+      {
+        "peerDependencies": {
+          "seroval": "^1.0"
+        }
+      },
+      "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
+    ],
+    "solid-js": [
+      "solid-js@1.9.20",
+      "",
+      {
+        "dependencies": {
+          "csstype": "^3.1.0",
+          "seroval": "~1.6.11",
+          "seroval-plugins": "~1.6.8"
+        }
+      },
+      "sha512-7zEbPxRU5/hHX8O/rYtQ34p/wq44w09gv0u4+myOW5Ode8unKhoG5FbcGlqRXKqqDuDW9yOJ1OXoHgUUl/1f3Q=="
+    ],
+    "string-width": [
+      "string-width@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "emoji-regex": "^10.3.0",
+          "get-east-asian-width": "^1.0.0",
+          "strip-ansi": "^7.1.0"
+        }
+      },
+      "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="
+    ],
+    "strip-ansi": [
+      "strip-ansi@7.2.0",
+      "",
+      {
+        "dependencies": {
+          "ansi-regex": "^6.2.2"
+        }
+      },
+      "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
+    ],
+    "supports-preserve-symlinks-flag": [
+      "supports-preserve-symlinks-flag@1.0.0",
+      "",
+      {},
+      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
+    ],
+    "typescript": [
+      "typescript@5.9.3",
+      "",
+      {
+        "bin": {
+          "tsc": "bin/tsc",
+          "tsserver": "bin/tsserver"
+        }
+      },
+      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    ],
+    "update-browserslist-db": [
+      "update-browserslist-db@1.4.0",
+      "",
+      {
+        "dependencies": {
+          "escalade": "^3.2.0",
+          "picocolors": "^1.1.1"
+        },
+        "peerDependencies": {
+          "browserslist": ">= 4.21.0"
+        },
+        "bin": {
+          "update-browserslist-db": "cli.js"
+        }
+      },
+      "sha512-WPJuOnjI9FWDct4fB+ej4Mz8opLaw5CDcZ2t44tFZ0vIQVYWzBhWR3mkixuUj/A7+vY4V9+ApOZ2YYLwdgq46w=="
+    ],
+    "web-tree-sitter": [
+      "web-tree-sitter@0.25.10",
+      "",
+      {
+        "peerDependencies": {
+          "@types/emscripten": "^1.40.0"
+        },
+        "optionalPeers": [
+          "@types/emscripten"
+        ]
+      },
+      "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="
+    ],
+    "yallist": [
+      "yallist@3.1.1",
+      "",
+      {},
+      "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="
+    ],
+    "@babel/core/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-compilation-targets/lru-cache": [
+      "lru-cache@5.1.1",
+      "",
+      {
+        "dependencies": {
+          "yallist": "^3.0.2"
+        }
+      },
+      "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="
+    ],
+    "@babel/helper-compilation-targets/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "@babel/helper-create-class-features-plugin/semver": [
+      "semver@6.3.2",
+      "",
+      {
+        "bin": {
+          "semver": "bin/semver.js"
+        }
+      },
+      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
+    ],
+    "babel-plugin-jsx-dom-expressions/@babel/helper-module-imports": [
+      "@babel/helper-module-imports@7.18.6",
+      "",
+      {
+        "dependencies": {
+          "@babel/types": "^7.18.6"
+        }
+      },
+      "sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA=="
+    ],
+    "babel-plugin-jsx-dom-expressions/html-entities": [
+      "html-entities@2.3.3",
+      "",
+      {},
+      "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
+    ],
+    "glob/minimatch": [
+      "minimatch@8.0.7",
+      "",
+      {
+        "dependencies": {
+          "brace-expansion": "^2.0.1"
+        }
+      },
+      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
+    ],
+    "parse5/entities": [
+      "entities@6.0.1",
+      "",
+      {},
+      "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
+    ],
+    "path-scurry/lru-cache": [
+      "lru-cache@10.4.3",
+      "",
+      {},
+      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
+    ],
+    "path-scurry/minipass": [
+      "minipass@7.1.3",
+      "",
+      {},
+      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
+    ],
+    "pkg-up/find-up": [
+      "find-up@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "locate-path": "^3.0.0"
+        }
+      },
+      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
+    ],
+    "glob/minimatch/brace-expansion": [
+      "brace-expansion@2.1.8",
+      "",
+      {
+        "dependencies": {
+          "balanced-match": "^1.0.0"
+        }
+      },
+      "sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig=="
+    ],
+    "pkg-up/find-up/locate-path": [
+      "locate-path@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-locate": "^3.0.0",
+          "path-exists": "^3.0.0"
+        }
+      },
+      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
+    ],
+    "glob/minimatch/brace-expansion/balanced-match": [
+      "balanced-match@1.0.2",
+      "",
+      {},
+      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate": [
+      "p-locate@3.0.0",
+      "",
+      {
+        "dependencies": {
+          "p-limit": "^2.0.0"
+        }
+      },
+      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
+    ],
+    "pkg-up/find-up/locate-path/path-exists": [
+      "path-exists@3.0.0",
+      "",
+      {},
+      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
+    ],
+    "pkg-up/find-up/locate-path/p-locate/p-limit": [
+      "p-limit@2.3.0",
+      "",
+      {
+        "dependencies": {
+          "p-try": "^2.0.0"
+        }
+      },
+      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
+    ]
+  }
+}
+`;
+
+class TuiUnavailable extends TaggedError2("TuiUnavailable") {
+  get message() {
+    return this.reason;
+  }
+}
+var pathModule = (platform) => platform === "win32" ? win323 : posix3;
+var cacheHome = (env, platform = process.platform) => {
+  const home = homeDirectory2(env);
+  const { join } = pathModule(platform);
+  if (platform === "win32")
+    return firstNonEmpty2(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
+  const xdg = firstNonEmpty2(env["XDG_CACHE_HOME"]);
+  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
+};
+var guardedFolders = (env, platform) => {
+  const { join } = pathModule(platform);
+  const holyagent = join(cacheHome(env, platform), "holyagent");
+  return [holyagent, join(holyagent, "setup-tui")];
+};
+var lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8);
+var tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
+  ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
+  lockHash(lock)
+].join("_"));
+var INSTALLED_MARKER = ".holyagent-installed";
+var markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
+`;
+var FORMAT_CHARACTERS = /\p{Cf}/gu;
+var plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
+  const code = character.codePointAt(0) ?? 0;
+  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
+}).join("");
+var oneLine2 = (text) => plain(text.trim().split(`
+`)[0] ?? "").trim();
+var failureLine = (text) => {
+  const lines = text.split(`
+`).map((line) => plain(line).trim()).filter((line) => line !== "");
+  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
+};
+var unavailable = (what, cause) => new TuiUnavailable({
+  reason: plain(`${what}: ${oneLine2(cause instanceof Error ? cause.message : String(cause))}`)
+});
+var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
+  const manifest = `${JSON.stringify({ name: TUI_MANIFEST_NAME, private: true, dependencies: packages }, undefined, 2)}
+`;
+  for (const [file, text] of [
+    ["package.json", manifest],
+    ["bun.lock", lock]
+  ])
+    yield* tryPromise2({
+      try: () => Bun.write(join26(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join26(directory, file)}`, cause)
+    });
+  const shell = yield* Shell;
+  const result = yield* shell.run("bun", [
+    "--no-env-file",
+    `--config=${EMPTY_BUNFIG}`,
+    "install",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ], { cwd: directory });
+  if (result.exitCode !== 0)
+    return yield* new TuiUnavailable({
+      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
+    });
+});
+var importFile = (path) => tryPromise2({
+  try: () => import(pathToFileURL(path).href),
+  catch: (cause) => unavailable(`cannot import ${path}`, cause)
+});
+var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join26(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+  return;
+}));
+var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
+var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join26(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+  return;
+}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
+var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
+var loadPackagedSetupTui = (bundle = join26(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
+  const preload = yield* try_2({
+    try: () => Bun.resolveSync("@opentui/solid/preload", dirname12(bundle)),
+    catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause)
+  });
+  yield* importFile(preload);
+  const loaded = yield* importFile(bundle);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
+  return loaded;
+});
+var fileSystem2 = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) });
+var STICKY = 512;
+var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined;
+var privateFolder = (folder, uid, create, home) => gen2(function* () {
+  if (create)
+    yield* fileSystem2(`cannot create ${folder}`, () => mkdir8(folder, { recursive: true, mode: 448 }));
+  const found = yield* tryPromise2({
+    try: () => lstat8(folder),
+    catch: (cause) => cause
+  }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
+  if (found === undefined || uid === undefined)
+    return;
+  const refuse = (why) => new TuiUnavailable({
+    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
+  });
+  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat5(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
+  if (target.isSymbolicLink() || !target.isDirectory())
+    return yield* refuse("is not a plain directory");
+  if (target.uid !== uid)
+    return yield* refuse("belongs to another user");
+  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
+    return;
+  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
+    return;
+  return yield* refuse("can be written by others");
+});
+var namesPrivateGroup = (groupFile, gid, userName) => {
+  const entries = groupFile.split(`
+`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
+  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
+};
+var privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
+  const name = userName ?? (yield* try_2(() => userInfo().username));
+  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
+  return namesPrivateGroup(text, gid, name);
+}).pipe(orElseSucceed2(() => false));
+var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem2(`cannot write ${target}`, () => writeFile5(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem2(`cannot write ${target}`, () => rename7(temporary, target)))), (temporary) => promise2(() => rm9(temporary, { force: true })));
+var remove = (path) => promise2(() => rm9(path, { recursive: true, force: true }));
+var promote = (temporary, directory, packages, lock) => gen2(function* () {
+  for (let attempt = 0;attempt < 3; attempt += 1) {
+    const moved = yield* exit2(fileSystem2(`cannot move ${temporary}`, () => rename7(temporary, directory)));
+    if (moved._tag === "Success")
+      return;
+    if (yield* installed(directory, packages, lock))
+      return;
+    yield* remove(directory);
+  }
+  return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
+});
+var STALE_AFTER_MS = 60 * 60 * 1000;
+var newestChange = (path) => gen2(function* () {
+  const modified = (entry) => tryPromise2(() => lstat8(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
+  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map4((names) => names.map((name) => join26(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join26(path, "node_modules"))];
+  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
+  return Math.max(...times);
+});
+var sweepStale = (directory, uid) => gen2(function* () {
+  const parent = dirname12(directory);
+  const prefix = `.${basename8(directory)}-`;
+  const cutoff = Date.now() - STALE_AFTER_MS;
+  const names = yield* tryPromise2(() => readdir5(parent));
+  yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
+    const path = join26(parent, name);
+    const found = yield* tryPromise2(() => lstat8(path));
+    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
+      yield* remove(path);
+  }).pipe(ignore2));
+}).pipe(ignore2);
+var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp2(join26(dirname12(directory), `.${basename8(directory)}-`))))), (temporary) => gen2(function* () {
+  yield* install(temporary, packages, lock);
+  if (!(yield* hasPackages(temporary, packages)))
+    return yield* new TuiUnavailable({
+      reason: `the install finished but ${directory} does not hold the expected package versions`
+    });
+  yield* writeFresh(join26(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* promote(temporary, directory, packages, lock);
+}), remove);
+var loadSetupTui = (env, options = {}) => gen2(function* () {
+  const packages = options.packages ?? TUI_PACKAGES;
+  const lock = options.lock ?? TUI_LOCK;
+  const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
+  const source = options.bundle ?? join26(import.meta.dir, TUI_BUNDLE);
+  const install = options.install ?? bunInstall;
+  const importModule = options.importModule ?? importFile;
+  const uid = options.uid ?? process.getuid?.();
+  const text = yield* tryPromise2({
+    try: () => Bun.file(source).text(),
+    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
+  });
+  if (options.directory === undefined)
+    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname12(directory)])
+    yield* privateFolder(folder, uid, true);
+  yield* privateFolder(directory, uid, false);
+  if (!(yield* installed(directory, packages, lock))) {
+    if (options.notify !== undefined)
+      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
+`);
+    yield* installAtomically(directory, packages, lock, install, uid);
+  }
+  const target = join26(directory, TUI_BUNDLE);
+  yield* writeFresh(target, text);
+  yield* importModule(join26(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  const loaded = yield* importModule(target);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
+  return loaded;
+});
+
+var subjects = (lines, mark) => {
+  const counts = new Map;
+  for (const line of lines) {
+    if (!line.startsWith(mark))
+      continue;
+    const [label = ""] = line.slice(mark.length).split(": ", 1);
+    const [subject = ""] = label.split(/ (?:\/|[a-z]:[\\/]|\\\\)/i, 1);
+    if (subject === "")
+      continue;
+    counts.set(subject, (counts.get(subject) ?? 0) + 1);
+  }
+  return [...counts].map(([item, count]) => count > 1 ? `${item} (${count})` : item);
+};
+var resultHeadline = (ok, dryRun) => {
+  if (dryRun)
+    return ok ? "Dry run finished; nothing was written." : "Dry run found failures.";
+  return ok ? "Setup finished." : "Setup finished with failures.";
+};
+var summarizeResult = (result, dryRun) => {
+  const scope = /^~ (?:scope|form): /;
+  const changes = [
+    ...subjects(result.lines, "+ "),
+    ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
+  ];
+  const warnings = [
+    ...subjects(result.lines, "! "),
+    ...subjects(result.lines.filter((line) => !scope.test(line)), "~ ")
+  ];
+  return [
+    {
+      title: dryRun ? "Planned changes" : "Changes",
+      lines: changes.length === 0 ? ["No changes."] : changes
+    },
+    ...warnings.length > 0 ? [{ title: "Warnings", lines: warnings }] : [],
+    ...warnings.length > 0 || !result.ok ? [
+      {
+        title: "Next steps",
+        lines: [
+          result.ok ? "Check the warnings in the full report." : "Check the failures in the full report before running setup again."
+        ]
+      }
+    ] : []
+  ];
+};
+var BOLD_TONES = new Set(["heading", "focus"]);
+var set = (value) => value !== undefined && value !== "";
+var colorEnabled = (env, tty) => {
+  if (set(env["NO_COLOR"]) || env["TERM"] === "dumb")
+    return false;
+  if (set(env["FORCE_COLOR"]) && env["FORCE_COLOR"] !== "0")
+    return true;
+  if (inCi(env))
+    return false;
+  return tty;
+};
+
+class SetupResult {
+  title;
+  sections;
+  code;
+  reportFile;
+  failure;
+  constructor(title, sections, code, reportFile, failure) {
+    this.title = title;
+    this.sections = sections;
+    this.code = code;
+    this.reportFile = reportFile;
+    this.failure = failure;
+  }
+}
+var saveSetupResult = fn2("saveSetupResult")(function* (report, dryRun, env) {
+  const directory = resolve13(dirname13(userConfigFile(env)), "setup-reports");
+  const title = resultHeadline(report.ok, dryRun);
+  const sections = summarizeResult(report, dryRun);
+  const code = report.ok ? 0 : 1;
+  if (dryRun)
+    return new SetupResult(title, sections, code);
+  return yield* tryPromise2({
+    try: () => mkdir9(directory, { mode: 448, recursive: true }).then(() => lstat9(directory)).then((metadata) => {
+      if (!metadata.isDirectory())
+        throw new Error("report folder is not a directory");
+      return mkdtemp3(join27(directory, "run-"));
+    }).then((run) => {
+      const file = join27(run, "report.txt");
+      const contents = [title, "", ...report.lines.map(plain), ""].join(`
+`);
+      return writeFile6(file, contents, { flag: "wx", mode: 384 }).then(() => file);
+    }),
+    catch: (cause) => cause instanceof Error ? cause.message : String(cause)
+  }).pipe(match4({
+    onFailure: (failure) => new SetupResult(title, sections, code, undefined, failure),
+    onSuccess: (file) => new SetupResult(title, sections, code, file)
+  }));
+});
+var renderSetupResult = (result, env, tty) => {
+  const styled = tty && colorEnabled(env, true);
+  const heading = (message) => {
+    const label = plain(message);
+    return styled ? "\x1B[1m" + label + "\x1B[0m" : label;
+  };
+  const lines = [
+    heading(result.title),
+    ...result.sections.flatMap(({ title, lines }) => [
+      heading(title),
+      ...lines.map((line) => "  " + plain(line))
+    ])
+  ];
+  if (result.reportFile !== undefined) {
+    const visible = plain(result.reportFile);
+    const hyperlink = styled ? "\x1B]8;;" + pathToFileURL2(result.reportFile).href + "\x1B\\" + visible + "\x1B]8;;\x1B\\" : visible;
+    lines.push("Full report: " + hyperlink);
+  }
+  if (result.failure !== undefined)
+    lines.push("Could not save the full report: " + plain(result.failure));
+  return lines.join(`
+`) + `
+`;
+};
 var encodeRecord = (value) => encode2(value, {
   replacer: (_key, item) => typeof item === "string" && /[\u007f-\u009f]/.test(item) ? rawString(`"${escapeString(item)}"`) : item
 }).replace(/[\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`);
@@ -19014,7 +20497,7 @@ var adaptAgentInput = (path, argv) => {
   return reportInput(command, argv, help.usage);
 };
 var present3 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0)));
-var oneLine2 = (text) => text.replace(/\s+/g, " ").trim();
+var oneLine3 = (text) => text.replace(/\s+/g, " ").trim();
 var intentView = (intent, links) => present3({
   id: intent.id,
   revision: intent.revision,
@@ -19061,14 +20544,14 @@ var assignmentRow = (assignment) => ({
   rev: assignment.intentRevision,
   accepted: assignment.acceptance !== undefined,
   agent: assignment.specialist?.agentId ?? null,
-  objective: oneLine2(assignment.objective)
+  objective: oneLine3(assignment.objective)
 });
 var intentRow = (intent, inUse) => ({
   id: intent.id,
   state: intent.state,
   revision: intent.revision,
   inUse,
-  objective: oneLine2(intent.objective)
+  objective: oneLine3(intent.objective)
 });
 var byId = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 var valueOf = (args, name) => args.values[name]?.[0];
@@ -19274,14 +20757,14 @@ var FIRST_PASS = {
 var ARGUMENTS_DEFAULT = /\$\{@:-([^}]*)\}/g;
 var firstPassPrompt = (roleTask) => FIRST_PASS[roleTask]?.body.replace(ARGUMENTS_DEFAULT, (_match, fallback) => fallback);
 var present4 = (record) => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0)));
-var oneLine3 = (text) => text.replace(/\s+/g, " ").trim();
+var oneLine4 = (text) => text.replace(/\s+/g, " ").trim();
 var byId2 = (rows) => rows.toSorted((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 var assignmentRow2 = (row) => ({
   id: row.id,
   role: row.roleTask,
   rev: row.intentRevision,
   agent: row.specialist?.agentId ?? null,
-  objective: oneLine3(row.objective)
+  objective: oneLine4(row.objective)
 });
 var statusFrom = (snapshot) => {
   const open = byId2(snapshot.project.intents.filter((intent) => intent.state === "Open"));
@@ -19297,7 +20780,7 @@ var statusFrom = (snapshot) => {
     intents: open.map(({ id, revision, objective }) => ({
       id,
       revision,
-      objective: oneLine3(objective),
+      objective: oneLine4(objective),
       ...id === inUse ? {} : {
         running: waiting(id).filter(isRunning).length,
         unaccepted: waiting(id).filter(isUnaccepted).length
@@ -19792,9 +21275,9 @@ var ASSIGNMENT_COMMANDS = [
     run: coreCommand("assignment list")
   }
 ];
-import { mkdir as mkdir8, mkdtemp as mkdtemp2, rm as rm9 } from "fs/promises";
+import { mkdir as mkdir10, mkdtemp as mkdtemp4, rm as rm10 } from "fs/promises";
 import { tmpdir as tmpdir2 } from "os";
-import { join as join26 } from "path";
+import { join as join28 } from "path";
 class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
   get message() {
     return this.reason;
@@ -19886,9 +21369,9 @@ var launch = (host, options) => scoped2(gen2(function* () {
     return yield* failed3(`no Chromium was found; ${options.chromiumFix}`);
   const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
   const folders = {
-    profile: join26(base, FOLDERS.profile),
-    config: join26(base, FOLDERS.config),
-    harness: join26(base, FOLDERS.harness)
+    profile: join28(base, FOLDERS.profile),
+    config: join28(base, FOLDERS.config),
+    harness: join28(base, FOLDERS.harness)
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
@@ -19953,19 +21436,19 @@ var liveHost = {
     },
     catch: (cause) => failed3(`cannot start ${spec.command}: ${reason(cause)}`)
   }),
-  devToolsPort: (profile) => tryPromise2(() => Bun.file(join26(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
+  devToolsPort: (profile) => tryPromise2(() => Bun.file(join28(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
     return;
   })),
   answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map4((response) => response.ok), orElseSucceed2(() => false)),
   temporaryDirectory: (prefix) => tryPromise2({
-    try: () => mkdtemp2(join26(tmpdir2(), prefix)),
+    try: () => mkdtemp4(join28(tmpdir2(), prefix)),
     catch: (cause) => failed3(`cannot create a temporary directory: ${reason(cause)}`)
   }),
   makeDirectory: (path) => tryPromise2({
-    try: () => mkdir8(path, { recursive: true }),
+    try: () => mkdir10(path, { recursive: true }),
     catch: (cause) => failed3(`cannot create ${path}: ${reason(cause)}`)
   }).pipe(asVoid2),
-  removeDirectory: (path) => tryPromise2(() => rm9(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
+  removeDirectory: (path) => tryPromise2(() => rm10(path, { recursive: true, force: true, maxRetries: 5 })).pipe(ignore2),
   signals: acquireRelease2(sync2(() => {
     const received = makeUnsafe2();
     const handlers = SIGNALS.map(([name, code]) => {
@@ -20001,8 +21484,8 @@ var BROWSER_SERVER_COMMANDS = [
   }
 ];
 
-import { stat as stat5 } from "fs/promises";
-var hasStateFolder = (directory) => io(directory, () => stat5(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
+import { stat as stat6 } from "fs/promises";
+var hasStateFolder = (directory) => io(directory, () => stat6(directory)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false)));
 
 var delegating_default = `## Delegating
 
@@ -20072,17 +21555,17 @@ var setupNotice = (env, cwd) => {
     return lacking.length === 0 ? undefined : `holyagent: setup is incomplete (missing ${lacking.join(", ")}). Offer the user to run /holyagent:setup, which installs and configures; do not run it unasked.`;
   }));
 };
-import { lstat as lstat8, mkdir as mkdir9, open as open7 } from "fs/promises";
-import { tmpdir as tmpdir3, userInfo } from "os";
-import { join as join27 } from "path";
+import { lstat as lstat10, mkdir as mkdir11, open as open7 } from "fs/promises";
+import { tmpdir as tmpdir3, userInfo as userInfo2 } from "os";
+import { join as join29 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join27(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join27(markers(), sessionId);
+var markers = () => join29(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo2().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join29(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
-  return io(folder, () => mkdir9(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat8(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
+  return io(folder, () => mkdir11(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat10(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
     path: folder,
     cause: new Error("not a private directory owned by the current user")
   })));
@@ -20261,7 +21744,7 @@ var resolveIntent2 = (snapshot) => {
   return chosen === undefined ? fail5(new NoActiveIntent2({
     open: openIntents(snapshot).map(({ id, objective }) => ({
       id,
-      objective: oneLine2(objective)
+      objective: oneLine3(objective)
     }))
   })) : succeed6(chosen);
 };
@@ -27929,1367 +29412,6 @@ var MIGRATE_COMMANDS = [
     run: coreCommand("migrate")
   }
 ];
-var {$ } = globalThis.Bun;
-var shellLive = (env) => {
-  const bunBin = pathWithBunBin({ ...env }, { home: homeDirectory2(env), bunInstall: env.BUN_INSTALL });
-  return succeed5(Shell, Shell.of({
-    which: (command, options) => sync2(() => findCommand(env, command, options, Bun.which)),
-    run: (command, args, options) => tryPromise2({
-      try: () => $`${command} ${args}`.cwd(options.cwd).env(definedEnv2({ ...env, ...options.env, [bunBin.key]: bunBin.value })).quiet().nothrow().then((result) => ({
-        exitCode: result.exitCode,
-        stdout: result.stdout.toString(),
-        stderr: result.stderr.toString()
-      })),
-      catch: (error) => String(error)
-    }).pipe(catch_2((message) => succeed6({ exitCode: 127, stdout: "", stderr: message })))
-  }));
-};
-import { lstat as lstat9, mkdir as mkdir10, mkdtemp as mkdtemp3, readdir as readdir5, rename as rename7, rm as rm10, stat as stat6, writeFile as writeFile5 } from "fs/promises";
-import { userInfo as userInfo2 } from "os";
-import { basename as basename8, dirname as dirname12, join as join28, posix as posix3, win32 as win323 } from "path";
-import { pathToFileURL } from "url";
-
-var TUI_BUNDLE = "setup-tui.js";
-
-var TUI_MANIFEST_NAME = "holyagent-setup-tui";
-var Dependencies = optional2(Record(String5, String5));
-var Entry = TupleWithRest(Tuple([
-  String5,
-  String5,
-  Struct({
-    dependencies: Dependencies,
-    optionalDependencies: Dependencies,
-    peerDependencies: Dependencies
-  })
-]), [Unknown2]);
-var Lock = Struct({
-  lockfileVersion: Number5,
-  configVersion: optional2(Number5),
-  packages: Record(String5, Unknown2)
-});
-
-var TUI_PACKAGES = {
-  "@opentui/core": "0.9.7",
-  "@opentui/solid": "0.9.7",
-  "solid-js": "1.9.20"
-};
-var TUI_LOCK = `{
-  "lockfileVersion": 2,
-  "configVersion": 1,
-  "workspaces": {
-    "": {
-      "name": "holyagent-setup-tui",
-      "dependencies": {
-        "@opentui/core": "0.9.7",
-        "@opentui/solid": "0.9.7",
-        "solid-js": "1.9.20"
-      }
-    }
-  },
-  "packages": {
-    "@babel/code-frame": [
-      "@babel/code-frame@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-validator-identifier": "^7.29.7",
-          "js-tokens": "^4.0.0",
-          "picocolors": "^1.1.1"
-        }
-      },
-      "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="
-    ],
-    "@babel/compat-data": [
-      "@babel/compat-data@7.29.7",
-      "",
-      {},
-      "sha512-locTkQyKvwIEgBzVrn8693ebc97F2U8ZHjbXwDXJ5Fn2TCpNwTlKcaKLkdHop5c/icOFE7qt7Q9JC5hnKNa6Gg=="
-    ],
-    "@babel/core": [
-      "@babel/core@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.7",
-          "@babel/helper-compilation-targets": "^7.29.7",
-          "@babel/helper-module-transforms": "^7.29.7",
-          "@babel/helpers": "^7.29.7",
-          "@babel/parser": "^7.29.7",
-          "@babel/template": "^7.29.7",
-          "@babel/traverse": "^7.29.7",
-          "@babel/types": "^7.29.7",
-          "@jridgewell/remapping": "^2.3.5",
-          "convert-source-map": "^2.0.0",
-          "debug": "^4.1.0",
-          "gensync": "^1.0.0-beta.2",
-          "json5": "^2.2.3",
-          "semver": "^6.3.1"
-        }
-      },
-      "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="
-    ],
-    "@babel/generator": [
-      "@babel/generator@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/parser": "^7.29.15",
-          "@babel/types": "^7.29.15",
-          "@jridgewell/gen-mapping": "^0.3.12",
-          "@jridgewell/trace-mapping": "^0.3.28",
-          "jsesc": "^3.0.2"
-        }
-      },
-      "sha512-gNWJUX0FlevflramOkaInywOMhU1lkln38gAC7TFZv2tsWbLYbN/2WZFGcq8zbX0Z55e4vGa27IB/NaeZoauWQ=="
-    ],
-    "@babel/helper-annotate-as-pure": [
-      "@babel/helper-annotate-as-pure@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-OoK6239jHPuSQOoS0kfTVKn0b/rVTk0seKq4Gd2UMLtmOVLjDC0ki3e+c90Trqv2gMfvJFqkiljrr568+qddiw=="
-    ],
-    "@babel/helper-compilation-targets": [
-      "@babel/helper-compilation-targets@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/compat-data": "^7.29.7",
-          "@babel/helper-validator-option": "^7.29.7",
-          "browserslist": "^4.24.0",
-          "lru-cache": "^5.1.1",
-          "semver": "^6.3.1"
-        }
-      },
-      "sha512-8WxJ4/Vmes3ghacj8VOJy3NW8eyHiFY/4thU/LSBuBE470+igjR/j1ZTNn8fV5VdNrLx6iXUwig526UdOvfP0w=="
-    ],
-    "@babel/helper-create-class-features-plugin": [
-      "@babel/helper-create-class-features-plugin@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-annotate-as-pure": "^7.29.7",
-          "@babel/helper-member-expression-to-functions": "^7.29.7",
-          "@babel/helper-optimise-call-expression": "^7.29.7",
-          "@babel/helper-replace-supers": "^7.29.7",
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/traverse": "^7.29.13",
-          "semver": "^6.3.1"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-fo8/Fr44/DMV71FQjk/HA0Npmu3bo5DFoWTCW1dhUR8Vx3NFfAVeEy0TbcBpt4e+hd2QhdmWgmspHo/9iWj8RA=="
-    ],
-    "@babel/helper-globals": [
-      "@babel/helper-globals@7.29.7",
-      "",
-      {},
-      "sha512-3nQVUAtvkKH9zahfWgw96Jc/uFOmjACE1kQz82E2lqWmHBgjzbNlsC22nuQTfahmWeQtTq5nQ/4Nnd2A1wj4zA=="
-    ],
-    "@babel/helper-member-expression-to-functions": [
-      "@babel/helper-member-expression-to-functions@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/traverse": "^7.29.14",
-          "@babel/types": "^7.29.14"
-        }
-      },
-      "sha512-FuTSn8mXKAP+aHXnbkCYQsQAdlEIJptEutwc2NaPd28hyVqsjRDmBnI2EPJX6HCodKIqOHfayQHqtxQCkqwthA=="
-    ],
-    "@babel/helper-module-imports": [
-      "@babel/helper-module-imports@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/traverse": "^7.29.7",
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-ejHwrQQYcm9xnTivShn2IDOlIzInN34AXskvq9QicvCtEzq1Vzclu/tKF8Jq1Cg8JG2GL6/EmjgsCT7lXepE3g=="
-    ],
-    "@babel/helper-module-transforms": [
-      "@babel/helper-module-transforms@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-imports": "^7.29.7",
-          "@babel/helper-validator-identifier": "^7.29.7",
-          "@babel/traverse": "^7.29.14"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-2XDvQVd9JESaOgGc4jT2/jquTAO7ppA5noTZQqH+MmZ89yjCzScLwtCPbWtkPZylL+TLWR49IwWmk+QkRR4GsA=="
-    ],
-    "@babel/helper-optimise-call-expression": [
-      "@babel/helper-optimise-call-expression@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-+kmGVjcT9RGYzoDwdwEqEvGgKe3BYq+O1iGzjFubaNgZHwYHP6lsF2Yghf4kEuv9BV7tYDZ913aBW9am6YKong=="
-    ],
-    "@babel/helper-plugin-utils": [
-      "@babel/helper-plugin-utils@7.29.7",
-      "",
-      {},
-      "sha512-G7sHYigPY17oO5SYWnfD/0MTBwVR781S/JI643e/JhUYgVgWE/61SoW3NH9KWUKyKq5LVh3npif99Wkt6j86Jw=="
-    ],
-    "@babel/helper-replace-supers": [
-      "@babel/helper-replace-supers@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-member-expression-to-functions": "^7.29.7",
-          "@babel/helper-optimise-call-expression": "^7.29.7",
-          "@babel/traverse": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0"
-        }
-      },
-      "sha512-atfGXWSeCiF4DnKZIfmJfQRkSw9b9gNNXR1kqKjbhG4pGYCOnkp8OcTB8E3NXjBu8NpheSnOeNKz8KT7UNFTmQ=="
-    ],
-    "@babel/helper-skip-transparent-expression-wrappers": [
-      "@babel/helper-skip-transparent-expression-wrappers@7.29.13",
-      "",
-      {
-        "dependencies": {
-          "@babel/traverse": "^7.29.13",
-          "@babel/types": "^7.29.11"
-        }
-      },
-      "sha512-Abm4rKIH0tmCayJLwcoeOkdzpYUphTbO52fHhyEBHn7S0R+ni4epNLI/8nq1L0DN2Bl0u5qmgWm2Og/z4fBb+Q=="
-    ],
-    "@babel/helper-string-parser": [
-      "@babel/helper-string-parser@7.29.15",
-      "",
-      {},
-      "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="
-    ],
-    "@babel/helper-validator-identifier": [
-      "@babel/helper-validator-identifier@7.29.7",
-      "",
-      {},
-      "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
-    ],
-    "@babel/helper-validator-option": [
-      "@babel/helper-validator-option@7.29.7",
-      "",
-      {},
-      "sha512-N9ZErrD+yW5geCDtBqnOoxmR8+tNKiGuxKlDpuJxfsqpa2dFcexaziGAE/qoHLiDDreVNMupxGmSoNlyvsA3gw=="
-    ],
-    "@babel/helpers": [
-      "@babel/helpers@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.15"
-        }
-      },
-      "sha512-l+ezV2czw3t2d2ELq+3CwPL4WLKK5O8IywBXb9/gpmbCOVZFmRYJPmHVqSCv2k+8iKbE30Zf54siOoIZ52XOxA=="
-    ],
-    "@babel/parser": [
-      "@babel/parser@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.29.15"
-        },
-        "bin": "./bin/babel-parser.js"
-      },
-      "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="
-    ],
-    "@babel/plugin-syntax-jsx": [
-      "@babel/plugin-syntax-jsx@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-TSu8+mHCoEaaCDEZ0I3+6mvTBYR4PCxQwf2z9/r5Tbztv6NaLR3B9thGTTxX2WGuGHJqRiAbKPeGTJ5XWXVg6A=="
-    ],
-    "@babel/plugin-syntax-typescript": [
-      "@babel/plugin-syntax-typescript@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-ngr+82Sh0xMz25TPCZi+nC2iTzjfCdWS2ONXTp/PtSCHCgaCNBpdMqgvJ2ccdLlClVZ7sisIgB914j/JFe+RZA=="
-    ],
-    "@babel/plugin-transform-modules-commonjs": [
-      "@babel/plugin-transform-modules-commonjs@7.29.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-transforms": "^7.29.14",
-          "@babel/helper-plugin-utils": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-mbv2yy5dqP6e3DbusCx+5AypXkFbyJD/JhG4/XhA+BIADOw5o7W+X0ewSp/h3w7gRL3oR5yny2/K8ljiydj4uA=="
-    ],
-    "@babel/plugin-transform-typescript": [
-      "@babel/plugin-transform-typescript@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-annotate-as-pure": "^7.29.7",
-          "@babel/helper-create-class-features-plugin": "^7.29.13",
-          "@babel/helper-plugin-utils": "^7.29.7",
-          "@babel/helper-skip-transparent-expression-wrappers": "^7.29.13",
-          "@babel/plugin-syntax-typescript": "^7.29.7"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-FFuMssbHj8DFMDsTH8xrgKBiE1eXuDvO9jLqav7/vsIe6YdoyPQbWCgLNzQxkcIkOv5itBD17TvZkHGIjUMzLg=="
-    ],
-    "@babel/preset-typescript": [
-      "@babel/preset-typescript@7.27.1",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-plugin-utils": "^7.27.1",
-          "@babel/helper-validator-option": "^7.27.1",
-          "@babel/plugin-syntax-jsx": "^7.27.1",
-          "@babel/plugin-transform-modules-commonjs": "^7.27.1",
-          "@babel/plugin-transform-typescript": "^7.27.1"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0-0"
-        }
-      },
-      "sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ=="
-    ],
-    "@babel/template": [
-      "@babel/template@7.29.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/parser": "^7.29.7",
-          "@babel/types": "^7.29.7"
-        }
-      },
-      "sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg=="
-    ],
-    "@babel/traverse": [
-      "@babel/traverse@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/code-frame": "^7.29.7",
-          "@babel/generator": "^7.29.15",
-          "@babel/helper-globals": "^7.29.7",
-          "@babel/parser": "^7.29.15",
-          "@babel/template": "^7.29.7",
-          "@babel/types": "^7.29.15",
-          "debug": "^4.3.1"
-        }
-      },
-      "sha512-ZfawBo2i8vvt+BTt37dWDKBPjUfm/H+bw+ltwsCRhW7gPtyNVwUXuNo54eO2Xo+P4VXpalPFfFISbBTRKC8SOQ=="
-    ],
-    "@babel/types": [
-      "@babel/types@7.29.15",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-string-parser": "^7.29.15",
-          "@babel/helper-validator-identifier": "^7.29.7"
-        }
-      },
-      "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="
-    ],
-    "@jridgewell/gen-mapping": [
-      "@jridgewell/gen-mapping@0.3.13",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/sourcemap-codec": "^1.5.0",
-          "@jridgewell/trace-mapping": "^0.3.24"
-        }
-      },
-      "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="
-    ],
-    "@jridgewell/remapping": [
-      "@jridgewell/remapping@2.3.5",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/gen-mapping": "^0.3.5",
-          "@jridgewell/trace-mapping": "^0.3.24"
-        }
-      },
-      "sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ=="
-    ],
-    "@jridgewell/resolve-uri": [
-      "@jridgewell/resolve-uri@3.1.3",
-      "",
-      {},
-      "sha512-lhTtjtoEArWBjismtfS761S9Hlyn+nIZqOZVYoZ1Xn82PMNMVnk+jj/NhC4fAXGTs7ydONcJiR5vyQBTMDu27g=="
-    ],
-    "@jridgewell/sourcemap-codec": [
-      "@jridgewell/sourcemap-codec@1.6.0",
-      "",
-      {},
-      "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
-    ],
-    "@jridgewell/trace-mapping": [
-      "@jridgewell/trace-mapping@0.3.31",
-      "",
-      {
-        "dependencies": {
-          "@jridgewell/resolve-uri": "^3.1.0",
-          "@jridgewell/sourcemap-codec": "^1.4.14"
-        }
-      },
-      "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="
-    ],
-    "@opentui/core": [
-      "@opentui/core@0.9.7",
-      "",
-      {
-        "dependencies": {
-          "bun-ffi-structs": "0.3.1",
-          "diff": "9.0.0",
-          "string-width": "7.2.0"
-        },
-        "optionalDependencies": {
-          "@opentui/core-darwin-arm64": "0.9.7",
-          "@opentui/core-darwin-x64": "0.9.7",
-          "@opentui/core-linux-arm64": "0.9.7",
-          "@opentui/core-linux-arm64-musl": "0.9.7",
-          "@opentui/core-linux-x64": "0.9.7",
-          "@opentui/core-linux-x64-musl": "0.9.7",
-          "@opentui/core-win32-arm64": "0.9.7",
-          "@opentui/core-win32-x64": "0.9.7"
-        },
-        "peerDependencies": {
-          "web-tree-sitter": "0.25.10"
-        }
-      },
-      "sha512-gSAtchrYg0asP6v8EKDSZEn1lOBokbTsYLxiLtoVyyqGZtT3D3sLiW45hUxCwBviV2CaQm38o1CVC9nrGSjIVg=="
-    ],
-    "@opentui/core-darwin-arm64": [
-      "@opentui/core-darwin-arm64@0.9.7",
-      "",
-      {
-        "os": "darwin",
-        "cpu": "arm64"
-      },
-      "sha512-8BHj4oz0AiVKPT7pm+yfFtsVZHBE3EfT2/2NvAc1IGTY3BZoKQF1thYofy9oOrtHNAr9bZie2gtd0sweZO5xvg=="
-    ],
-    "@opentui/core-darwin-x64": [
-      "@opentui/core-darwin-x64@0.9.7",
-      "",
-      {
-        "os": "darwin",
-        "cpu": "x64"
-      },
-      "sha512-5js5J/0ryQwYcfnzZn7FLkRMP+u0sYk6zANMMnBHeGW0Y/VZRG052bL+HgGflTjVHZNaeMo093dzPjzLIsPZdw=="
-    ],
-    "@opentui/core-linux-arm64": [
-      "@opentui/core-linux-arm64@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "arm64"
-      },
-      "sha512-vuBVygG6hN7msz6EeskKQpz5qIl9AEI73G0BpD3klPyMmtHPS274H2Wsp5lW1EdPvBd1AttJEkLuaCoLAs6OsQ=="
-    ],
-    "@opentui/core-linux-arm64-musl": [
-      "@opentui/core-linux-arm64-musl@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "arm64",
-        "libc": "musl"
-      },
-      "sha512-FHQrQ2Pr7qr75PoQi/v2WborpHQMQ1yXsh9CwLdWrH29ZnXyvfcBT62KHLxgQ9gOwbyyfhGwulwUufLOnPOeig=="
-    ],
-    "@opentui/core-linux-x64": [
-      "@opentui/core-linux-x64@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "x64"
-      },
-      "sha512-aE6dODBqCGKZ63w0q59TQLT9F1CX42d/34O3OVZjOH9zuoGP/BEEhiUWgp59N4NDnRKMFooKMvZRyfFXZvomSA=="
-    ],
-    "@opentui/core-linux-x64-musl": [
-      "@opentui/core-linux-x64-musl@0.9.7",
-      "",
-      {
-        "os": "linux",
-        "cpu": "x64",
-        "libc": "musl"
-      },
-      "sha512-liDYhAxV7Z3D8zoCwxzszmKsECDADWmd++7Y4FMSBIXTPFHp9uXUr7SROtItVDSfKUac05eT6fvGGVRamWcY6w=="
-    ],
-    "@opentui/core-win32-arm64": [
-      "@opentui/core-win32-arm64@0.9.7",
-      "",
-      {
-        "os": "win32",
-        "cpu": "arm64"
-      },
-      "sha512-7HbIsZ/o57k0LAzEQha53OBmFfH77U/tNTun6kKlWnD7Pe082YCL1lKkF+BqLMYN1bCFWfusm7blVDWLulSR8A=="
-    ],
-    "@opentui/core-win32-x64": [
-      "@opentui/core-win32-x64@0.9.7",
-      "",
-      {
-        "os": "win32",
-        "cpu": "x64"
-      },
-      "sha512-F73Q40dQQxsSMvHG1hCW5XDhXOCjlOAxNDhgS2/xx1pcSfVg9IiabmNShB6RJr6etkBGkm/B29LolMghv/DurA=="
-    ],
-    "@opentui/solid": [
-      "@opentui/solid@0.9.7",
-      "",
-      {
-        "dependencies": {
-          "@babel/core": "7.29.7",
-          "@babel/preset-typescript": "7.27.1",
-          "@opentui/core": "0.9.7",
-          "babel-plugin-module-resolver": "5.0.2",
-          "babel-preset-solid": "1.9.16",
-          "entities": "7.0.1",
-          "s-js": "^0.4.9"
-        },
-        "peerDependencies": {
-          "solid-js": "^1.9.12"
-        }
-      },
-      "sha512-mk4m9SU9Uv9XdEL6zjndp+nLkpx/CrLAc5B8wjlHYiQ5NSOLmF/ApCDt7t+XE5iGDDZ8UWhw4bfavqlmp3qY7A=="
-    ],
-    "ansi-regex": [
-      "ansi-regex@6.6.0",
-      "",
-      {},
-      "sha512-XZ5apbzreCbXSKwPjJstu8R0zOi247w3XYwWxtwBXgpZrCyc1Ka7p9/xY0A9/diMewmHbEKz+FIraWaEWjlN5g=="
-    ],
-    "babel-plugin-jsx-dom-expressions": [
-      "babel-plugin-jsx-dom-expressions@0.40.14",
-      "",
-      {
-        "dependencies": {
-          "@babel/helper-module-imports": "7.18.6",
-          "@babel/plugin-syntax-jsx": "^7.18.6",
-          "@babel/types": "^7.20.7",
-          "html-entities": "2.3.3",
-          "parse5": "^7.1.2"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.20.12"
-        }
-      },
-      "sha512-5RDcd9lN4eVJyvIrkV7xwuGT+EYVTnWmqO9A8alGRVVLY95aA/U0cNGWv3ThWeI+/ufe2MMS6lILyuWsHmFBgA=="
-    ],
-    "babel-plugin-module-resolver": [
-      "babel-plugin-module-resolver@5.0.2",
-      "",
-      {
-        "dependencies": {
-          "find-babel-config": "^2.1.1",
-          "glob": "^9.3.3",
-          "pkg-up": "^3.1.0",
-          "reselect": "^4.1.7",
-          "resolve": "^1.22.8"
-        }
-      },
-      "sha512-9KtaCazHee2xc0ibfqsDeamwDps6FZNo5S0Q81dUqEuFzVwPhcT4J5jOqIVvgCA3Q/wO9hKYxN/Ds3tIsp5ygg=="
-    ],
-    "babel-preset-solid": [
-      "babel-preset-solid@1.9.16",
-      "",
-      {
-        "dependencies": {
-          "babel-plugin-jsx-dom-expressions": "^0.40.11"
-        },
-        "peerDependencies": {
-          "@babel/core": "^7.0.0",
-          "solid-js": "^1.9.16"
-        },
-        "optionalPeers": [
-          "solid-js"
-        ]
-      },
-      "sha512-+0h40Qk2oBfkQ4OGDBHIDtvq/XQiOnCfzjNHmMxriAr8MmdsaIbyJgqYglDs4d70sF8O08sSpx61TKdpUt3oRw=="
-    ],
-    "baseline-browser-mapping": [
-      "baseline-browser-mapping@2.11.39",
-      "",
-      {
-        "bin": {
-          "baseline-browser-mapping": "dist/cli.cjs"
-        }
-      },
-      "sha512-Q9buOYhr2ggrEZpImICecZTJHCCd8yXkRUokFlUEQ8uiD6oP82F4W4jWnhOHZYV+wlvrC51V7Wy0ULyWjil5Wg=="
-    ],
-    "browserslist": [
-      "browserslist@4.29.6",
-      "",
-      {
-        "dependencies": {
-          "baseline-browser-mapping": "^2.11.37",
-          "caniuse-lite": "^1.0.30001826",
-          "electron-to-chromium": "^1.5.486",
-          "node-releases": "^2.0.64",
-          "update-browserslist-db": "^1.4.0"
-        },
-        "bin": {
-          "browserslist": "cli.js"
-        }
-      },
-      "sha512-CmVVIQ3RVc5HxYEc9X84GvxK/C8C1wH8TlKAiO7uTxF8PDwt7r8t9Qk3J9NkMOVzX5O/HbLv3yzxZg9HPrnI9w=="
-    ],
-    "bun-ffi-structs": [
-      "bun-ffi-structs@0.3.1",
-      "",
-      {
-        "peerDependencies": {
-          "typescript": "^5"
-        }
-      },
-      "sha512-3gM7PpVWLyrwxWjcilSiGuhWanhZivvo6l0u573NziPH6f/gwk6McbaYgn7oJWov6pKGRTDbrg94W5DcJsKTtQ=="
-    ],
-    "caniuse-lite": [
-      "caniuse-lite@1.0.30001827",
-      "",
-      {},
-      "sha512-YWEDr46gSO81M8w6uPbaIy4++IXsirx2asUqvllNiD4BPf75ibxclUjWEqp8ObCenRv+UM2n5Y8xuRPT8V8FrQ=="
-    ],
-    "convert-source-map": [
-      "convert-source-map@2.0.0",
-      "",
-      {},
-      "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="
-    ],
-    "csstype": [
-      "csstype@3.2.4",
-      "",
-      {},
-      "sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ=="
-    ],
-    "debug": [
-      "debug@4.4.3",
-      "",
-      {
-        "dependencies": {
-          "ms": "^2.1.3"
-        },
-        "peerDependencies": {
-          "supports-color": "*"
-        },
-        "optionalPeers": [
-          "supports-color"
-        ]
-      },
-      "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="
-    ],
-    "diff": [
-      "diff@9.0.0",
-      "",
-      {},
-      "sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw=="
-    ],
-    "electron-to-chromium": [
-      "electron-to-chromium@1.5.492",
-      "",
-      {},
-      "sha512-4uMs7omhajKiud0GqALLTazS/zyvHLTLmDWVTR+e6BnyJo5bSNrph/JoRWEFJJmY75ct9hCiSGsbFF9fLe5gDw=="
-    ],
-    "emoji-regex": [
-      "emoji-regex@10.6.0",
-      "",
-      {},
-      "sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A=="
-    ],
-    "entities": [
-      "entities@7.0.1",
-      "",
-      {},
-      "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="
-    ],
-    "es-errors": [
-      "es-errors@1.3.0",
-      "",
-      {},
-      "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="
-    ],
-    "escalade": [
-      "escalade@3.2.0",
-      "",
-      {},
-      "sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA=="
-    ],
-    "find-babel-config": [
-      "find-babel-config@2.1.2",
-      "",
-      {
-        "dependencies": {
-          "json5": "^2.2.3"
-        }
-      },
-      "sha512-ZfZp1rQyp4gyuxqt1ZqjFGVeVBvmpURMqdIWXbPRfB97Bf6BzdK/xSIbylEINzQ0kB5tlDQfn9HkNXXWsqTqLg=="
-    ],
-    "fs.realpath": [
-      "fs.realpath@1.0.0",
-      "",
-      {},
-      "sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw=="
-    ],
-    "function-bind": [
-      "function-bind@1.1.2",
-      "",
-      {},
-      "sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA=="
-    ],
-    "gensync": [
-      "gensync@1.0.0-beta.2",
-      "",
-      {},
-      "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="
-    ],
-    "get-east-asian-width": [
-      "get-east-asian-width@1.6.0",
-      "",
-      {},
-      "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA=="
-    ],
-    "glob": [
-      "glob@9.3.5",
-      "",
-      {
-        "dependencies": {
-          "fs.realpath": "^1.0.0",
-          "minimatch": "^8.0.2",
-          "minipass": "^4.2.4",
-          "path-scurry": "^1.6.1"
-        }
-      },
-      "sha512-e1LleDykUz2Iu+MTYdkSsuWX8lvAjAcs0Xef0lNIu0S2wOAzuTxCJtcd9S3cijlwYF18EsU3rzb8jPVobxDh9Q=="
-    ],
-    "hasown": [
-      "hasown@2.0.4",
-      "",
-      {
-        "dependencies": {
-          "function-bind": "^1.1.2"
-        }
-      },
-      "sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A=="
-    ],
-    "is-core-module": [
-      "is-core-module@2.18.0",
-      "",
-      {
-        "dependencies": {
-          "hasown": "^2.0.4"
-        }
-      },
-      "sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw=="
-    ],
-    "js-tokens": [
-      "js-tokens@4.0.0",
-      "",
-      {},
-      "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="
-    ],
-    "jsesc": [
-      "jsesc@3.1.0",
-      "",
-      {
-        "bin": {
-          "jsesc": "bin/jsesc"
-        }
-      },
-      "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="
-    ],
-    "json5": [
-      "json5@2.2.3",
-      "",
-      {
-        "bin": {
-          "json5": "lib/cli.js"
-        }
-      },
-      "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="
-    ],
-    "minipass": [
-      "minipass@4.2.8",
-      "",
-      {},
-      "sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ=="
-    ],
-    "ms": [
-      "ms@2.1.3",
-      "",
-      {},
-      "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="
-    ],
-    "node-releases": [
-      "node-releases@2.0.65",
-      "",
-      {},
-      "sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA=="
-    ],
-    "p-try": [
-      "p-try@2.2.0",
-      "",
-      {},
-      "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
-    ],
-    "parse5": [
-      "parse5@7.3.0",
-      "",
-      {
-        "dependencies": {
-          "entities": "^6.0.0"
-        }
-      },
-      "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="
-    ],
-    "path-parse": [
-      "path-parse@1.0.7",
-      "",
-      {},
-      "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="
-    ],
-    "path-scurry": [
-      "path-scurry@1.11.1",
-      "",
-      {
-        "dependencies": {
-          "lru-cache": "^10.2.0",
-          "minipass": "^5.0.0 || ^6.0.2 || ^7.0.0"
-        }
-      },
-      "sha512-Xa4Nw17FS9ApQFJ9umLiJS4orGjm7ZzwUrwamcGQuHSzDyth9boKDaycYdDcZDuqYATXw4HFXgaqWTctW/v1HA=="
-    ],
-    "picocolors": [
-      "picocolors@1.1.1",
-      "",
-      {},
-      "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
-    ],
-    "pkg-up": [
-      "pkg-up@3.1.0",
-      "",
-      {
-        "dependencies": {
-          "find-up": "^3.0.0"
-        }
-      },
-      "sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA=="
-    ],
-    "reselect": [
-      "reselect@4.1.8",
-      "",
-      {},
-      "sha512-ab9EmR80F/zQTMNeneUr4cv+jSwPJgIlvEmVwLerwrWVbpLlBuls9XHzIeTFy4cegU2NHBp3va0LKOzU5qFEYQ=="
-    ],
-    "resolve": [
-      "resolve@1.22.14",
-      "",
-      {
-        "dependencies": {
-          "es-errors": "^1.3.0",
-          "is-core-module": "^2.18.0",
-          "path-parse": "^1.0.7",
-          "supports-preserve-symlinks-flag": "^1.0.0"
-        },
-        "bin": {
-          "resolve": "bin/resolve"
-        }
-      },
-      "sha512-1ZjYvR9sbkiwC5+9QHetqW5HmA2pHRMaoupD01t2HlYnV/vydC2zPwLixhsMieSWVZt0JJRg5LVIk0Ow1D/TrA=="
-    ],
-    "s-js": [
-      "s-js@0.4.9",
-      "",
-      {},
-      "sha512-RtpOm+cM6O0sHg6IA70wH+UC3FZcND+rccBZpBAHzlUgNO2Bm5BN+FnM8+OBxzXdwpKWFwX11JGF0MFRkhSoIQ=="
-    ],
-    "seroval": [
-      "seroval@1.6.12",
-      "",
-      {},
-      "sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg=="
-    ],
-    "seroval-plugins": [
-      "seroval-plugins@1.6.12",
-      "",
-      {
-        "peerDependencies": {
-          "seroval": "^1.0"
-        }
-      },
-      "sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ=="
-    ],
-    "solid-js": [
-      "solid-js@1.9.20",
-      "",
-      {
-        "dependencies": {
-          "csstype": "^3.1.0",
-          "seroval": "~1.6.11",
-          "seroval-plugins": "~1.6.8"
-        }
-      },
-      "sha512-7zEbPxRU5/hHX8O/rYtQ34p/wq44w09gv0u4+myOW5Ode8unKhoG5FbcGlqRXKqqDuDW9yOJ1OXoHgUUl/1f3Q=="
-    ],
-    "string-width": [
-      "string-width@7.2.0",
-      "",
-      {
-        "dependencies": {
-          "emoji-regex": "^10.3.0",
-          "get-east-asian-width": "^1.0.0",
-          "strip-ansi": "^7.1.0"
-        }
-      },
-      "sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ=="
-    ],
-    "strip-ansi": [
-      "strip-ansi@7.2.0",
-      "",
-      {
-        "dependencies": {
-          "ansi-regex": "^6.2.2"
-        }
-      },
-      "sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w=="
-    ],
-    "supports-preserve-symlinks-flag": [
-      "supports-preserve-symlinks-flag@1.0.0",
-      "",
-      {},
-      "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="
-    ],
-    "typescript": [
-      "typescript@5.9.3",
-      "",
-      {
-        "bin": {
-          "tsc": "bin/tsc",
-          "tsserver": "bin/tsserver"
-        }
-      },
-      "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
-    ],
-    "update-browserslist-db": [
-      "update-browserslist-db@1.4.0",
-      "",
-      {
-        "dependencies": {
-          "escalade": "^3.2.0",
-          "picocolors": "^1.1.1"
-        },
-        "peerDependencies": {
-          "browserslist": ">= 4.21.0"
-        },
-        "bin": {
-          "update-browserslist-db": "cli.js"
-        }
-      },
-      "sha512-WPJuOnjI9FWDct4fB+ej4Mz8opLaw5CDcZ2t44tFZ0vIQVYWzBhWR3mkixuUj/A7+vY4V9+ApOZ2YYLwdgq46w=="
-    ],
-    "web-tree-sitter": [
-      "web-tree-sitter@0.25.10",
-      "",
-      {
-        "peerDependencies": {
-          "@types/emscripten": "^1.40.0"
-        },
-        "optionalPeers": [
-          "@types/emscripten"
-        ]
-      },
-      "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="
-    ],
-    "yallist": [
-      "yallist@3.1.1",
-      "",
-      {},
-      "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="
-    ],
-    "@babel/core/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "@babel/helper-compilation-targets/lru-cache": [
-      "lru-cache@5.1.1",
-      "",
-      {
-        "dependencies": {
-          "yallist": "^3.0.2"
-        }
-      },
-      "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="
-    ],
-    "@babel/helper-compilation-targets/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "@babel/helper-create-class-features-plugin/semver": [
-      "semver@6.3.2",
-      "",
-      {
-        "bin": {
-          "semver": "bin/semver.js"
-        }
-      },
-      "sha512-GYrCADwpu6yV5OAvchkQ27Z5wwMxWAEMg5NNWjyHh/5DboFFqbdbvYNIvZouQpxXyeMPoTOh0vdPYKlf0ZswdQ=="
-    ],
-    "babel-plugin-jsx-dom-expressions/@babel/helper-module-imports": [
-      "@babel/helper-module-imports@7.18.6",
-      "",
-      {
-        "dependencies": {
-          "@babel/types": "^7.18.6"
-        }
-      },
-      "sha512-0NFvs3VkuSYbFi1x2Vd6tKrywq+z/cLeYC/RJNFrIX/30Bf5aiGYbtvGXolEktzJH8o5E5KJ3tT+nkxuuZFVlA=="
-    ],
-    "babel-plugin-jsx-dom-expressions/html-entities": [
-      "html-entities@2.3.3",
-      "",
-      {},
-      "sha512-DV5Ln36z34NNTDgnz0EWGBLZENelNAtkiFA4kyNOG2tDI6Mz1uSWiq1wAKdyjnJwyDiDO7Fa2SO1CTxPXL8VxA=="
-    ],
-    "glob/minimatch": [
-      "minimatch@8.0.7",
-      "",
-      {
-        "dependencies": {
-          "brace-expansion": "^2.0.1"
-        }
-      },
-      "sha512-V+1uQNdzybxa14e/p00HZnQNNcTjnRJjDxg2V8wtkjFctq4M7hXFws4oekyTP0Jebeq7QYtpFyOeBAjc88zvYg=="
-    ],
-    "parse5/entities": [
-      "entities@6.0.1",
-      "",
-      {},
-      "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="
-    ],
-    "path-scurry/lru-cache": [
-      "lru-cache@10.4.3",
-      "",
-      {},
-      "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="
-    ],
-    "path-scurry/minipass": [
-      "minipass@7.1.3",
-      "",
-      {},
-      "sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A=="
-    ],
-    "pkg-up/find-up": [
-      "find-up@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "locate-path": "^3.0.0"
-        }
-      },
-      "sha512-1yD6RmLI1XBfxugvORwlck6f75tYL+iR0jqwsOrOxMZyGYqUuDhJ0l4AXdO1iX/FTs9cBAMEk1gWSEx1kSbylg=="
-    ],
-    "glob/minimatch/brace-expansion": [
-      "brace-expansion@2.1.8",
-      "",
-      {
-        "dependencies": {
-          "balanced-match": "^1.0.0"
-        }
-      },
-      "sha512-BnlDzDYQoplTsZSvPi86CNzmbcb07X8ufR8fk1zivaiEJlXJkiq1MQyDCVmlWcsWbj6aWXqHnrwwevbrm/Saig=="
-    ],
-    "pkg-up/find-up/locate-path": [
-      "locate-path@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "p-locate": "^3.0.0",
-          "path-exists": "^3.0.0"
-        }
-      },
-      "sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A=="
-    ],
-    "glob/minimatch/brace-expansion/balanced-match": [
-      "balanced-match@1.0.2",
-      "",
-      {},
-      "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw=="
-    ],
-    "pkg-up/find-up/locate-path/p-locate": [
-      "p-locate@3.0.0",
-      "",
-      {
-        "dependencies": {
-          "p-limit": "^2.0.0"
-        }
-      },
-      "sha512-x+12w/To+4GFfgJhBEpiDcLozRJGegY+Ei7/z0tSLkMmxGZNybVMSfWj9aJn8Z5Fc7dBUNJOOVgPv2H7IwulSQ=="
-    ],
-    "pkg-up/find-up/locate-path/path-exists": [
-      "path-exists@3.0.0",
-      "",
-      {},
-      "sha512-bpC7GYwiDYQ4wYLe+FA8lhRjhQCMcQGuSgGGqDkg/QerRWw9CmGRT0iSOVRSZJ29NMLZgIzqaljJ63oaL4NIJQ=="
-    ],
-    "pkg-up/find-up/locate-path/p-locate/p-limit": [
-      "p-limit@2.3.0",
-      "",
-      {
-        "dependencies": {
-          "p-try": "^2.0.0"
-        }
-      },
-      "sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w=="
-    ]
-  }
-}
-`;
-
-class TuiUnavailable extends TaggedError2("TuiUnavailable") {
-  get message() {
-    return this.reason;
-  }
-}
-var pathModule = (platform) => platform === "win32" ? win323 : posix3;
-var cacheHome = (env, platform = process.platform) => {
-  const home = homeDirectory2(env);
-  const { join } = pathModule(platform);
-  if (platform === "win32")
-    return firstNonEmpty2(env["LOCALAPPDATA"]) ?? join(home, "AppData", "Local");
-  const xdg = firstNonEmpty2(env["XDG_CACHE_HOME"]);
-  return xdg !== undefined && (xdg.startsWith("/") || xdg.startsWith("\\")) ? xdg : join(home, ".cache");
-};
-var guardedFolders = (env, platform) => {
-  const { join } = pathModule(platform);
-  const holyagent = join(cacheHome(env, platform), "holyagent");
-  return [holyagent, join(holyagent, "setup-tui")];
-};
-var lockHash = (lock) => new Bun.CryptoHasher("sha256").update(lock).digest("hex").slice(0, 8);
-var tuiDirectory = (env, packages = TUI_PACKAGES, platform = process.platform, lock = TUI_LOCK) => pathModule(platform).join(guardedFolders(env, platform)[1] ?? "", [
-  ...Object.entries(packages).toSorted(([a], [b]) => a < b ? -1 : 1).map(([name, version]) => `${name.replace(/^@/, "").replace("/", "-")}-${version}`),
-  lockHash(lock)
-].join("_"));
-var INSTALLED_MARKER = ".holyagent-installed";
-var markerText = (packages, lock) => `${JSON.stringify({ packages, lock: lockHash(lock) })}
-`;
-var FORMAT_CHARACTERS = /\p{Cf}/gu;
-var plain = (text) => Array.from(Bun.stripANSI(text).replaceAll(FORMAT_CHARACTERS, "")).filter((character) => {
-  const code = character.codePointAt(0) ?? 0;
-  return code > 31 && (code < 127 || code > 159) && code !== 8232 && code !== 8233;
-}).join("");
-var oneLine4 = (text) => plain(text.trim().split(`
-`)[0] ?? "").trim();
-var failureLine = (text) => {
-  const lines = text.split(`
-`).map((line) => plain(line).trim()).filter((line) => line !== "");
-  return lines.find((line) => /^error/i.test(line)) ?? lines.at(-1) ?? "";
-};
-var unavailable = (what, cause) => new TuiUnavailable({
-  reason: plain(`${what}: ${oneLine4(cause instanceof Error ? cause.message : String(cause))}`)
-});
-var bunInstall = (directory, packages, lock = TUI_LOCK) => gen2(function* () {
-  const manifest = `${JSON.stringify({ name: TUI_MANIFEST_NAME, private: true, dependencies: packages }, undefined, 2)}
-`;
-  for (const [file, text] of [
-    ["package.json", manifest],
-    ["bun.lock", lock]
-  ])
-    yield* tryPromise2({
-      try: () => Bun.write(join28(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join28(directory, file)}`, cause)
-    });
-  const shell = yield* Shell;
-  const result = yield* shell.run("bun", [
-    "--no-env-file",
-    `--config=${EMPTY_BUNFIG}`,
-    "install",
-    "--frozen-lockfile",
-    "--ignore-scripts"
-  ], { cwd: directory });
-  if (result.exitCode !== 0)
-    return yield* new TuiUnavailable({
-      reason: `bun install failed (exit ${result.exitCode}): ${failureLine(result.stderr || result.stdout)}`
-    });
-});
-var importFile = (path) => tryPromise2({
-  try: () => import(pathToFileURL(path).href),
-  catch: (cause) => unavailable(`cannot import ${path}`, cause)
-});
-var installedVersion = (directory, name) => tryPromise2(() => Bun.file(join28(directory, "node_modules", name, "package.json")).json()).pipe(map4((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
-  return;
-}));
-var hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map4((found) => found === version))).pipe(map4((all) => all.every(Boolean)));
-var installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join28(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
-  return;
-}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false)));
-var isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function";
-var loadPackagedSetupTui = (bundle = join28(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
-  const preload = yield* try_2({
-    try: () => Bun.resolveSync("@opentui/solid/preload", dirname12(bundle)),
-    catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause)
-  });
-  yield* importFile(preload);
-  const loaded = yield* importFile(bundle);
-  if (!isSetupTuiModule(loaded))
-    return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
-  return loaded;
-});
-var fileSystem2 = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) });
-var STICKY = 512;
-var errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined;
-var privateFolder = (folder, uid, create, home) => gen2(function* () {
-  if (create)
-    yield* fileSystem2(`cannot create ${folder}`, () => mkdir10(folder, { recursive: true, mode: 448 }));
-  const found = yield* tryPromise2({
-    try: () => lstat9(folder),
-    catch: (cause) => cause
-  }).pipe(catch_2((cause) => errorCode(cause) === "ENOENT" && !create ? succeed6(undefined) : fail5(unavailable(`cannot check ${folder}`, cause))));
-  if (found === undefined || uid === undefined)
-    return;
-  const refuse = (why) => new TuiUnavailable({
-    reason: home !== undefined ? `the cache home ${folder} ${why}; fix it, or point XDG_CACHE_HOME at a folder of yours` : `the cache folder ${folder} ${why}; run chmod 700 on it, or remove it`
-  });
-  const target = home !== undefined && found.isSymbolicLink() ? yield* tryPromise2(() => stat6(folder)).pipe(catch_2(() => fail5(refuse("is not a plain directory")))) : found;
-  if (target.isSymbolicLink() || !target.isDirectory())
-    return yield* refuse("is not a plain directory");
-  if (target.uid !== uid)
-    return yield* refuse("belongs to another user");
-  if ((target.mode & 18) === 0 || home !== undefined && (target.mode & STICKY) !== 0)
-    return;
-  if (home !== undefined && (target.mode & 2) === 0 && (yield* home(target.gid)))
-    return;
-  return yield* refuse("can be written by others");
-});
-var namesPrivateGroup = (groupFile, gid, userName) => {
-  const entries = groupFile.split(`
-`).map((line) => line.split(":")).filter((fields) => fields[2] === String(gid));
-  return entries.length > 0 && entries.every(([name, , , members = ""]) => name === userName && members.split(",").filter((member) => member !== "").every((member) => member === userName));
-};
-var privateGroup = (gid, userName, groupFile) => (homeGid) => gid === undefined || homeGid !== gid ? succeed6(false) : gen2(function* () {
-  const name = userName ?? (yield* try_2(() => userInfo2().username));
-  const text = yield* tryPromise2(() => Bun.file(groupFile).text());
-  return namesPrivateGroup(text, gid, name);
-}).pipe(orElseSucceed2(() => false));
-var writeFresh = (target, text) => acquireUseRelease2(succeed6(`${target}.${crypto.randomUUID()}.tmp`), (temporary) => fileSystem2(`cannot write ${target}`, () => writeFile5(temporary, text, { flag: "wx", mode: 384 })).pipe(andThen2(fileSystem2(`cannot write ${target}`, () => rename7(temporary, target)))), (temporary) => promise2(() => rm10(temporary, { force: true })));
-var remove = (path) => promise2(() => rm10(path, { recursive: true, force: true }));
-var promote = (temporary, directory, packages, lock) => gen2(function* () {
-  for (let attempt = 0;attempt < 3; attempt += 1) {
-    const moved = yield* exit2(fileSystem2(`cannot move ${temporary}`, () => rename7(temporary, directory)));
-    if (moved._tag === "Success")
-      return;
-    if (yield* installed(directory, packages, lock))
-      return;
-    yield* remove(directory);
-  }
-  return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
-});
-var STALE_AFTER_MS = 60 * 60 * 1000;
-var newestChange = (path) => gen2(function* () {
-  const modified = (entry) => tryPromise2(() => lstat9(entry)).pipe(map4((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map4((names) => names.map((name) => join28(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join28(path, "node_modules"))];
-  const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
-  return Math.max(...times);
-});
-var sweepStale = (directory, uid) => gen2(function* () {
-  const parent = dirname12(directory);
-  const prefix = `.${basename8(directory)}-`;
-  const cutoff = Date.now() - STALE_AFTER_MS;
-  const names = yield* tryPromise2(() => readdir5(parent));
-  yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join28(parent, name);
-    const found = yield* tryPromise2(() => lstat9(path));
-    if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
-      yield* remove(path);
-  }).pipe(ignore2));
-}).pipe(ignore2);
-var installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp3(join28(dirname12(directory), `.${basename8(directory)}-`))))), (temporary) => gen2(function* () {
-  yield* install(temporary, packages, lock);
-  if (!(yield* hasPackages(temporary, packages)))
-    return yield* new TuiUnavailable({
-      reason: `the install finished but ${directory} does not hold the expected package versions`
-    });
-  yield* writeFresh(join28(temporary, INSTALLED_MARKER), markerText(packages, lock));
-  yield* promote(temporary, directory, packages, lock);
-}), remove);
-var loadSetupTui = (env, options = {}) => gen2(function* () {
-  const packages = options.packages ?? TUI_PACKAGES;
-  const lock = options.lock ?? TUI_LOCK;
-  const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join28(import.meta.dir, TUI_BUNDLE);
-  const install = options.install ?? bunInstall;
-  const importModule = options.importModule ?? importFile;
-  const uid = options.uid ?? process.getuid?.();
-  const text = yield* tryPromise2({
-    try: () => Bun.file(source).text(),
-    catch: (cause) => unavailable(`the interface bundle ${source} is missing`, cause)
-  });
-  if (options.directory === undefined)
-    yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
-  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname12(directory)])
-    yield* privateFolder(folder, uid, true);
-  yield* privateFolder(directory, uid, false);
-  if (!(yield* installed(directory, packages, lock))) {
-    if (options.notify !== undefined)
-      yield* options.notify(`~ t3 tui: installing the setup interface into ${directory} (first run only)
-`);
-    yield* installAtomically(directory, packages, lock, install, uid);
-  }
-  const target = join28(directory, TUI_BUNDLE);
-  yield* writeFresh(target, text);
-  yield* importModule(join28(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
-  const loaded = yield* importModule(target);
-  if (!isSetupTuiModule(loaded))
-    return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
-  return loaded;
-});
-
 var AppliedSchema = Struct({
   ok: Boolean3,
   lines: ArraySchema(String5)
@@ -29425,7 +29547,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
   const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config });
   const features = config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features);
-  const offers = features === undefined ? [] : capabilityOffers(options.form).filter((offer) => options.t3Workflow !== true || options.form.form !== "headless" || offer.feature !== "browserUse");
+  const offers = features === undefined ? [] : capabilityOffers(options.form).filter((offer) => options.t3Workflow !== true || options.form.form === "normal" && offer.unavailable === undefined && (offer.feature === "browserUse" || offer.feature === "computerUse"));
   if (preview === undefined && offers.length === 0)
     return line;
   const reason = tuiFallbackReason(options);
@@ -29463,7 +29585,10 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   }).pipe(flatMap2(decodeOutcome), map4((outcome) => {
     if (outcome._tag === "Applied") {
       const applied = outcome.applied;
-      return { kind: "done", report: { lines: applied.lines, ok: applied.ok } };
+      return {
+        kind: options.t3Workflow === true ? "applied" : "done",
+        report: { lines: applied.lines, ok: applied.ok }
+      };
     }
     return {
       kind: "done",
@@ -29561,7 +29686,17 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
     },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow, installedPackageRoot }) => gen2(function* () {
+    run: ({
+      args,
+      env,
+      cwd,
+      emit,
+      terminal,
+      setupTui,
+      t3Workflow,
+      installedPackageRoot,
+      surface
+    }) => gen2(function* () {
       const resolved = yield* resolveScope(stringFlag(args, "scope"), usage, cwd, target === "pi" || target === undefined && t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
       if (resolved instanceof SetupFailure) {
         return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
@@ -29621,6 +29756,8 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       });
       if (interactive.kind === "done")
         return printed(interactive.report);
+      if (interactive.kind === "applied")
+        return surface === "public" ? yield* saveSetupResult(interactive.report, booleanFlag(args, "dry-run"), env) : printed(interactive.report);
       return printed(yield* apply(flagged, capabilities, interactive.notes));
     }).pipe(provide3(shellLive(env)))
   };
@@ -29885,7 +30022,7 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
   return yield* decodeJsonInputBy(text, pick, source);
 });
 
-import { isAbsolute as isAbsolute10, join as join29, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute10, join as join30, relative as relative7 } from "path";
 var RELEASE = String5.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
 var VERSION_RESPONSE = fromJsonString2(RELEASE);
 var REGISTRY = "https://registry.npmjs.org/";
@@ -29932,7 +30069,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     if (root.exitCode !== 0)
       return failure("Could not verify npm's global installation path.", root);
     const location = root.stdout.trim();
-    if (!isAbsolute10(location) || relative7(registeredRoot, join29(location, "holyagent")) !== "")
+    if (!isAbsolute10(location) || relative7(registeredRoot, join30(location, "holyagent")) !== "")
       return failure("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
   }
   const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
@@ -29970,7 +30107,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     source
   ], { cwd });
   if (registeredRoot !== undefined) {
-    const manifest = yield* readJsonObject(join29(registeredRoot, "package.json")).pipe(option2);
+    const manifest = yield* readJsonObject(join30(registeredRoot, "package.json")).pipe(option2);
     if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
       return failure(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
   } else if (npm.exitCode !== 0)
@@ -30167,7 +30304,7 @@ var projectContext = (given, host, surface) => gen2(function* () {
       message: "Missing project directory",
       hint: `Give a directory after ${PI_PROJECT_FLAG}.`
     });
-  const cwd = resolve13(host.cwd, directory);
+  const cwd = resolve14(host.cwd, directory);
   const location = yield* tryPromise2({
     try: () => stat7(cwd),
     catch: (cause) => new StateIo({ path: cwd, cause })
@@ -30235,9 +30372,9 @@ var execute = (given, initialHost, surface) => gen2(function* () {
   const capture = (text) => sync2(() => void emitted.push(text));
   const write = surface === "agent" ? capture : host.emit ?? capture;
   const emit = (text) => write(plainText(text));
-  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve13(host.cwd, adapted.reportFile));
+  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve14(host.cwd, adapted.reportFile));
   if (surface === "agent" && command.path.join(" ") === "assignment reports") {
-    const path = resolve13(host.cwd, args.positionals[0] ?? "");
+    const path = resolve14(host.cwd, args.positionals[0] ?? "");
     const source = yield* tryPromise2(() => stat7(path)).pipe(orElseSucceed2(() => {
       return;
     }));
@@ -30248,6 +30385,12 @@ var execute = (given, initialHost, surface) => gen2(function* () {
     yield* decodeJsonInputBy(report, () => Unknown2, "--report-file");
   const call = yield* callFor(args, host, emit, command, surface, adapted?.input, report);
   const output = yield* command.run(call).pipe(provideService2(WorkTree, call.root));
+  if (surface === "public" && output instanceof SetupResult)
+    return {
+      stdout: renderSetupResult(output, host.env, host.terminal?.stdout === true),
+      stderr: "",
+      code: output.code
+    };
   if (surface === "agent") {
     const stdout = emitted.join("");
     if (output instanceof Verbatim)
