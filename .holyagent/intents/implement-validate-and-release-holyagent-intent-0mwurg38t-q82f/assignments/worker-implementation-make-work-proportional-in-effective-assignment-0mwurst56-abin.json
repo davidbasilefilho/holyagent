@@ -1,0 +1,32 @@
+{
+  "id": "assignment-0mwurst56-abin",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "make-work-proportional-in-effective",
+  "objective": "Make work proportional in effective shared and shipped harness instructions",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Small work can proceed directly while material risks and evidence still warrant independent review",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/runtime/src/instructions",
+    "packages/core/src/pi/tools.ts",
+    "packages/integrations/claude/src/agents.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:08:43.915Z"
+  },
+  "createdAt": "2026-11-24T14:08:43.915Z"
+}
