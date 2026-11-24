@@ -13,10 +13,10 @@ Install and open T3 Code, then follow the [T3 Code quickstart](docs/usage.md#ins
 ## Why HolyAgent?
 
 - **It fits the work you have.** From a one-line fix to a stacked multi-PR delivery, through bug hunts, codebase questions, reviews, refactors, UI work and solo or coursework repositories ([docs/usage.md](docs/usage.md#what-it-fits)).
-- **One agent that plans, many that do.** The root owns the relationship with you, the plan and the verdict. Specialists do the work in bounded Assignments, each with acceptance criteria and evidence, so a long request stays reviewable instead of drifting inside one huge context.
+- **A root agent with specialists when needed.** The root handles simple tasks directly and owns the plan and final decision. For complex work, specialists take bounded Assignments with acceptance criteria and evidence.
 - **A warm cache, by design.** Prompts put stable material first, specialists are reused while their cache is alive, and the CLI embeds the timing so the model carries none of that reasoning. See [docs/cache-and-workflows.md](docs/cache-and-workflows.md).
 - **State outside the conversation.** Intents and Assignments live in `.holyagent/`, so a resumed or compacted session picks up exactly where the work stands, through a small, bounded session-start hook ([docs/hooks.md](docs/hooks.md)).
-- **Commits you own.** `holyagent vcs` commits and opens pull requests as the account owner, keeps agent attribution out of the text and refuses the agent's own identity ([docs/commit-authorship.md](docs/commit-authorship.md)).
+- **Commits you own.** The internal `holyagent-cli vcs` records commits and pull requests for the project. The Claude integration applies its own authorship rules. [Commit authorship](docs/commit-authorship.md)
 - **Opinionated on purpose.** The root and specialists get distinct tools and model routes, with configurable capabilities ([docs/pi/configuration.md](docs/pi/configuration.md)).
 - **Every rule has a reason.** The standing decisions and their evidence are written down in [docs/decisions.md](docs/decisions.md), and what the plugin installs and configures is explained in [docs/components.md](docs/components.md).
 
