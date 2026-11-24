@@ -1,0 +1,10 @@
+{
+  "id": "pull-0mwuvyqjw-efsg",
+  "intentId": "intent-0mwurg38t-q82f",
+  "number": 147,
+  "url": "https://github.com/davidbasilefilho/holyagent/pull/147",
+  "branch": "fix/040-auto-review-staged",
+  "base": "dev",
+  "created": true,
+  "recordedAt": "2026-11-24T16:05:18.957Z"
+}
