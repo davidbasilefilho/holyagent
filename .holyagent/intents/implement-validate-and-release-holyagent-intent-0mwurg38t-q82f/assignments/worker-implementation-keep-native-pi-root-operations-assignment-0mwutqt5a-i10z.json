@@ -1,0 +1,32 @@
+{
+  "id": "assignment-0mwutqt5a-i10z",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "keep-native-pi-root-operations",
+  "objective": "Keep native Pi root operations unavailable to specialists and compact model-facing results",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "A specialist with the root flag cannot call wait or protected Core operations and native success text remains decodable TOON",
+      "blocking": true,
+      "dimension": "regressions"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/integrations/pi/src/wait-for-agents.ts",
+    "packages/integrations/pi/src/native-tools.ts",
+    "packages/integrations/pi/src/extension.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T15:03:09.838Z"
+  },
+  "createdAt": "2026-11-24T15:03:09.838Z"
+}
