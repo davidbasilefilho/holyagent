@@ -30124,6 +30124,8 @@ var PUBLIC_MAINTENANCE_COMMANDS = [
   }
 ];
 
+var PackageIdentity = Struct({ name: Literal2("holyagent"), version: String5 });
+var cliVersion = (manifest) => manifest === undefined ? succeed6(version) : tryPromise2(() => Bun.file(manifest).json()).pipe(flatMap2(decodeUnknownEffect2(PackageIdentity)), map4(({ version: version2 }) => Bun.semver.satisfies(version2, version2) ? version2 : version), orElseSucceed2(() => version));
 var renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
 ${plainText(output.label)}:
 ${plainText(output.text)}
@@ -30325,6 +30327,7 @@ var execute = (given, initialHost, surface) => gen2(function* () {
         message: "The version flag takes no arguments",
         hint: "Run holyagent-cli --version."
       });
+    const version = yield* cliVersion(host.packageManifest);
     return surface === "agent" ? toon({ version }) : { stdout: `${version}
 `, stderr: "", code: 0 };
   }
@@ -30447,6 +30450,7 @@ var main = (interactiveSetup = false, surface = "host", installedPackageRoot) =>
     stdin: surface === "agent" ? fail5(new StdinMissing({ reason: "stdin is unavailable" })) : stdin,
     ...surface === "agent" ? {} : { emit: (text) => write2(process.stdout, text) },
     ...surface === "public" && installedPackageRoot !== undefined ? { installedPackageRoot } : {},
+    ...surface === "host" ? {} : { packageManifest: new URL("../package.json", import.meta.url) },
     ...interactiveSetup ? {
       t3Workflow: true,
       terminal: {
