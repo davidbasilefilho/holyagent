@@ -1,0 +1,31 @@
+{
+  "id": "assignment-0mwusgyba-v9sv",
+  "intentId": "intent-0mwurg38t-q82f",
+  "intentRevision": 1,
+  "roleTask": "Worker.implementation",
+  "slug": "require-explicit-opt-in-for-the-optional",
+  "objective": "Require explicit opt-in for the optional Pi tool-call auto-review feature",
+  "state": "Running",
+  "scope": [],
+  "constraints": [],
+  "criteria": [
+    {
+      "text": "Fresh and migrated configurations leave optional auto-review off unless users explicitly enable it",
+      "blocking": true,
+      "dimension": "behavior"
+    }
+  ],
+  "evidence": [],
+  "ownershipPaths": [
+    "packages/core/src/config",
+    "packages/integrations/pi/src/codex.ts"
+  ],
+  "dependencies": [],
+  "independentFrom": [],
+  "specialist": {
+    "model": "sonnet",
+    "effort": "high",
+    "startedAt": "2026-11-24T14:27:30.358Z"
+  },
+  "createdAt": "2026-11-24T14:27:30.358Z"
+}
