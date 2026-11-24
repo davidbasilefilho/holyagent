@@ -264,7 +264,8 @@ describe("holyagent setup, T3 Code settings", () => {
   test("writes the branch naming rule on its own, each key only where unset", async () => {
     await machine()
     await write(settingsFile(), { branchNamingMode: "semantic" })
-    await runSetup()
+    const withSemanticMode = await runSetup()
+    expect(t3Lines(withSemanticMode)[0]).not.toContain("kept branchNamingMode")
     // The mode the user chose stays; the instructions, unset, are written beside it.
     expect(await read(settingsFile())).toMatchObject({
       branchNamingMode: "semantic",

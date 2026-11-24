@@ -9,6 +9,7 @@ export const launch = (surface) => {
   const directory = fileURLToPath(new URL("./", import.meta.url))
   const args = [
     "--no-env-file",
+    ...(agent ? [] : ["--no-install"]),
     `--config=${join(directory, "empty-bunfig.toml")}`,
     join(directory, agent ? "holyagent-cli.js" : "holyagent-public.js"),
     ...process.argv.slice(2),

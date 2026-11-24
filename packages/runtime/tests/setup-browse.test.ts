@@ -80,11 +80,18 @@ const report = (
   commands?: ReadonlyArray<string>,
   node?: string,
   platform?: string,
+  surface: "standalone" | "t3" | "unknown" = "standalone",
 ) =>
   Effect.runPromise(
     reportBrowserUse(
       { HOME: home, ...env },
-      { scope: "user", cwd: project, dryRun: false, form },
+      {
+        scope: "user",
+        cwd: project,
+        dryRun: false,
+        form,
+        ...(surface === "unknown" ? {} : { surface }),
+      },
       platform,
     ).pipe(Effect.provide(shell(commands, node).layer)),
   )
@@ -324,11 +331,18 @@ describe("holyagent doctor on browse", () => {
     env: Record<string, string>,
     commands?: string[],
     node?: string,
+    surface: "standalone" | "t3" | "unknown" = "standalone",
   ) =>
     Effect.runPromise(
       doctor(
         { HOME: home, HOLYAGENT_HOST: "pi", ...env },
-        { fix: false, cwd: project, scope: "user", form: chooseForm(env, form, "linux") },
+        {
+          fix: false,
+          cwd: project,
+          scope: "user",
+          form: chooseForm(env, form, "linux"),
+          ...(surface === "unknown" ? {} : { piSurface: surface }),
+        },
       ).pipe(Effect.provide(shell(commands, node).layer)),
     )
   const lines = (result: { readonly lines: ReadonlyArray<string> }) =>
@@ -420,14 +434,27 @@ describe("holyagent doctor on browse", () => {
     expect(lines(normal)).toContain(
       "~ pi capability browser-use: pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
     )
-    const headless = await run("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })
-    expect(lines(headless)).toContain(
-      "~ pi capability browser-use: pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
-    )
+    const headless = await run("headless", { HOLYAGENT_CHROMIUM_PATH: join(home, "missing") })
+    expect(lines(headless)).toEqual([
+      "~ browser-use: Pi MCP is off, so the headless browser server is not started",
+    ])
     // A note, not a failure: the person switched the extension off.
     expect([...lines(normal), ...lines(headless)].some((line) => line.startsWith("FAIL"))).toBe(
       false,
     )
+  })
+
+  test("an unknown headless surface reports conditional browser needs without failing them", async () => {
+    const result = await run(
+      "headless",
+      { HOLYAGENT_CHROMIUM_PATH: join(home, "missing") },
+      ["bun", "ctx7", "pi", "node"],
+      undefined,
+      "unknown",
+    )
+    expect(lines(result)).toEqual([
+      "~ headless browser: T3-hosted Pi uses T3 Preview; only standalone Pi launches browser-use and needs uvx and Chromium",
+    ])
   })
 
   test("the form is detected from the machine when it is not named", async () => {
@@ -503,8 +530,22 @@ describe("holyagent setup on browse", () => {
       "~ browser-use: normal form; pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
     ])
     expect(await report("headless", { HOLYAGENT_CHROMIUM_PATH: chromiumPath })).toEqual([
-      "~ browser-use: headless form; pi.features.mcp is off, so the MCP server is not registered and screen specialists get none of its tools",
-      `= browser-use: the headless browser is the Chromium at ${chromiumPath}`,
+      "~ browser-use: Pi MCP is off, so the headless browser server is not started",
+    ])
+  })
+
+  test("headless T3 reports its Preview tools without probing a standalone browser", async () => {
+    const env = { HOLYAGENT_CHROMIUM_PATH: join(home, "missing") }
+    const commands = ["bun", "ctx7", "pi", "node"]
+    expect(await report("headless", env, commands, undefined, "linux", "t3")).toEqual([
+      "~ T3 Preview: T3 Code provides the headless browser through the Preview tools in its Pi threads",
+    ])
+    const hosted = { ...env, HOLYAGENT_T3_HOSTED: "1" }
+    expect(await report("headless", hosted, commands, undefined, "linux", "unknown")).toEqual([
+      "~ T3 Preview: T3 Code provides the headless browser through the Preview tools in its Pi threads",
+    ])
+    expect(await report("headless", env, commands, undefined, "linux", "unknown")).toEqual([
+      "~ headless browser: T3-hosted Pi uses T3 Preview; only standalone Pi launches browser-use and needs uvx and Chromium",
     ])
   })
 

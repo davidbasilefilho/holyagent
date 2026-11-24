@@ -97,13 +97,19 @@ describe("holyagent doctor, rg and fd", () => {
     expect(shell.calls).toEqual([])
   })
 
-  test("a Pi host reports them too, after the Pi lines, and a cloud session as well", async () => {
+  test("Pi skips shell search diagnostics and standalone shell consumers keep them", async () => {
     const pi = await runDoctor(fakeShell({ commands: ["bun", "ctx7", "rg"] }), {
       HOLYAGENT_HOST: "pi",
     })
     expect(pi.lines.some((line) => line.startsWith("FAIL pi: not found on PATH"))).toBe(true)
-    expect(searchLines(pi.lines).map((line) => line.slice(0, 8))).toEqual(["ok   rg:", "~ fd: fd"])
-    expect(pi.lines.at(-1)).toStartWith("~ fd: ")
+    expect(searchLines(pi.lines)).toEqual([])
+    const claude = await runDoctor(fakeShell({ commands: ["bun", "ctx7", "pi", "rg"] }), {
+      HOLYAGENT_HOST: "claude",
+    })
+    expect(searchLines(claude.lines).map((line) => line.slice(0, 8))).toEqual([
+      "ok   rg:",
+      "~ fd: fd",
+    ])
     const cloud = await runDoctor(fakeShell({ commands: ["bun"] }), {
       CLAUDE_CODE_REMOTE: "true",
     })
@@ -135,11 +141,11 @@ describe("holyagent setup, rg and fd", () => {
     expect(shell.calls).toEqual([])
   })
 
-  test("a Pi host reports them as well, and --undo does not", async () => {
+  test("a Pi host skips standalone search diagnostics, and --undo does too", async () => {
     const pi = await runSetup(fakeShell({ commands: ["bun", "rg", "fd"] }), {
       env: { HOLYAGENT_HOST: "pi" },
     })
-    expect(searchLines(pi.lines)).toHaveLength(2)
+    expect(searchLines(pi.lines)).toEqual([])
     const undone = await runSetup(fakeShell({ commands: ["bun", "rg", "fd"] }), { undo: true })
     expect(searchLines(undone.lines)).toEqual([])
   })

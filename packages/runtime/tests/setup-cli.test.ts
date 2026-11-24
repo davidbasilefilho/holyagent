@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { Effect } from "effect"
 
 import { StdinMissing } from "../src/cli/errors.ts"
 import { run } from "../src/cli/program.ts"
-import { scratch, writeCompleteSettings } from "./setup-fixture.ts"
+import { piPackages } from "../src/config/packages.ts"
+import { defaultConfig } from "../src/config/schema.ts"
+import { programName, scratch, writeCompleteSettings } from "./setup-fixture.ts"
 
 let home: string
 let remove: () => Promise<void>
@@ -33,6 +36,129 @@ const cli = (argv: ReadonlyArray<string>, extra: Record<string, string> = {}) =>
   )
 
 const settings = () => join(home, "claude", "settings.json")
+
+const publicEnv = () => ({
+  HOME: home,
+  USERPROFILE: home,
+  XDG_CONFIG_HOME: join(home, "config"),
+  CLAUDE_CONFIG_DIR: join(home, "claude"),
+  PI_CODING_AGENT_DIR: join(home, "pi"),
+  T3CODE_HOME: join(home, "t3"),
+  PATH: join(home, "bin"),
+  TERM: "xterm",
+})
+
+const publicCli = (argv: ReadonlyArray<string>) =>
+  Effect.runPromise(
+    run(
+      argv,
+      {
+        cwd: home,
+        env: publicEnv(),
+        terminal: { stdin: true, stdout: true },
+        stdin: Effect.die("non-interactive setup must not read stdin"),
+        setupTui: () => Effect.die("this setup must not open the TUI"),
+      },
+      "public",
+    ),
+  )
+
+describe("public setup harnesses", () => {
+  test("install is shown inline once and uses setup's exact help and validation", async () => {
+    const help = await publicCli(["--help"])
+    const setup = help.stdout.split("\n").filter((line) => line.startsWith("setup "))
+    expect(setup).toHaveLength(1)
+    expect(setup[0]).toContain("(alias: install)")
+    expect(help.stdout).not.toMatch(/^install /m)
+    for (const args of [
+      ["--help"],
+      ["pi", "-h"],
+      ["claude", "--help"],
+      ["claude", "--form", "normal"],
+    ]) {
+      expect(await publicCli(["install", ...args])).toEqual(await publicCli(["setup", ...args]))
+    }
+    expect((await publicCli(["setup", "claude", "--form", "normal"])).code).toBe(2)
+    expect((await publicCli(["setup", "pi", "--subagent-cache-ttl", "5m"])).code).toBe(2)
+    expect((await publicCli(["setup", "codex", "--help"])).code).toBe(2)
+    for (const command of ["doctor", "update"]) {
+      expect((await publicCli([command, "claude"])).code).toBe(2)
+    }
+  })
+
+  test("Pi and Claude setup and undo only touch their own settings even with Pi on PATH", async () => {
+    const bin = join(home, "bin")
+    await mkdir(bin)
+    await writeFile(join(bin, programName("pi")), "", { mode: 0o755 })
+    const config = await Effect.runPromise(defaultConfig)
+    const pi = join(home, "pi", "settings.json")
+    const t3 = join(home, "t3", "userdata", "settings.json")
+    await Bun.write(pi, JSON.stringify({ packages: piPackages(config, undefined, "headless") }))
+    await mkdir(join(home, "t3"), { recursive: true })
+    const piResult = await publicCli([
+      "setup",
+      "pi",
+      "--form",
+      "headless",
+      "--non-interactive",
+      "--skip-ctx7",
+    ])
+    expect(piResult.code).toBe(0)
+    expect(await Bun.file(t3).exists()).toBe(true)
+    expect(await Bun.file(settings()).exists()).toBe(false)
+    const before = await Promise.all([Bun.file(pi).text(), Bun.file(t3).text()])
+
+    const ownClaude = { includeGitInstructions: true, unrelatedSetting: "keep" }
+    await Bun.write(settings(), JSON.stringify(ownClaude))
+    const result = await publicCli([
+      "install",
+      "claude",
+      "--skip-ctx7",
+      "--subagent-cache-ttl",
+      "5m",
+    ])
+    expect(result.code).toBe(0)
+    expect(result.stdout).not.toMatch(/pi packages|tool settings|t3 settings/)
+    expect(await Bun.file(settings()).json()).toMatchObject({
+      ...ownClaude,
+      subagentPromptCacheTtl: "5m",
+    })
+    expect(await Promise.all([Bun.file(pi).text(), Bun.file(t3).text()])).toEqual(before)
+
+    expect((await publicCli(["setup", "claude", "--undo", "--non-interactive"])).code).toBe(0)
+    expect(await Bun.file(settings()).json()).toEqual(ownClaude)
+    expect(await Promise.all([Bun.file(pi).text(), Bun.file(t3).text()])).toEqual(before)
+
+    const piUndo = await publicCli(["setup", "pi", "--undo"])
+    expect(piUndo.code).toBe(0)
+    expect(piUndo.stdout).toContain("t3 settings")
+    expect(await Bun.file(settings()).json()).toEqual(ownClaude)
+  })
+
+  test("explicit Claude dry-run and non-interactive Pi undo exit with stdin held open", async () => {
+    const entry = join(import.meta.dir, "../src/hooks/pi-public-entry.ts")
+    for (const [args, report] of [
+      [["setup", "claude", "--dry-run", "--non-interactive", "--skip-ctx7"], "nothing written"],
+      [["install", "pi", "--undo", "--dry-run", "--non-interactive"], "--undo only removes"],
+    ] as const) {
+      const child = Bun.spawn([process.execPath, entry, ...args], {
+        cwd: home,
+        env: publicEnv(),
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 10_000,
+      })
+      try {
+        expect(await child.exited).toBe(0)
+      } finally {
+        await child.stdin.end()
+      }
+      expect(await new Response(child.stdout).text()).toContain(report)
+      expect(await new Response(child.stderr).text()).toBe("")
+    }
+  }, 25_000)
+})
 
 describe("holyagent setup and doctor as commands", () => {
   test("setup --dry-run prints the report, exits 0 and writes nothing", async () => {

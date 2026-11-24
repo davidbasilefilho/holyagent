@@ -2,6 +2,7 @@ import { join } from "node:path"
 
 import { Effect } from "effect"
 
+import rootPackage from "../../../../package.json" with { type: "json" }
 import { bundleModule } from "../../../runtime/src/bundle.ts"
 import { PI_ROOT_PLACEHOLDER } from "../../../runtime/src/hooks/pi-context.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
@@ -100,7 +101,9 @@ const inPackage = (path: string) => `${DIST_DIRECTORY}/${path}`
  * the built folder looks; Pi ignores `pi.subagents`, which `@tintinweb/pi-subagents` reads for the
  * folder of specialist agent files. The runtime modules remain wildcard peer dependencies supplied
  * by the host. Their optional metadata lets a package manager install the standalone CLI while
- * leaving the existing Pi installation in charge of the extension's runtime modules.
+ * leaving the existing Pi installation in charge of the extension's runtime modules. Runtime
+ * dependencies supply the public setup renderer. Pi features are installed separately according to
+ * the user's configuration.
  */
 export const manifest = (): GeneratedFile => ({
   path: inPackage("package.json"),
@@ -128,6 +131,11 @@ export const manifest = (): GeneratedFile => ({
       prompts: ["./prompts"],
       // `@tintinweb/pi-subagents` loads the specialists from the folder this key names.
       subagents: { agents: ["./agents"] },
+    },
+    dependencies: {
+      "@opentui/core": rootPackage.devDependencies["@opentui/core"],
+      "@opentui/solid": rootPackage.devDependencies["@opentui/solid"],
+      "solid-js": rootPackage.devDependencies["solid-js"],
     },
     peerDependencies: packageJson.peerDependencies,
     peerDependenciesMeta: Object.fromEntries(

@@ -462,6 +462,7 @@ describe("holyagent doctor, capabilities", () => {
           fix: false,
           cwd: project,
           scope: "user",
+          piSurface: "standalone",
           ...(form === undefined ? {} : { form: chooseForm(env, form, "linux") }),
         },
       ).pipe(Effect.provide(shell.layer)),
@@ -496,6 +497,45 @@ describe("holyagent doctor, capabilities", () => {
             : [line.replace("normal form", "headless form")],
       ),
     ])
+  })
+
+  test("headless T3 doctor keeps a configured Pi install healthy without standalone browser or search commands", async () => {
+    await write(globalSettings(), {
+      packages: [SOURCE, ...DEFAULT_SOURCES.filter((source) => !source.includes("computer-use"))],
+    })
+    const t3 = join(home, ".t3")
+    await write(join(t3, "userdata", "settings.json"), {
+      providerInstances: { pi: { driver: "pi", enabled: true } },
+    })
+    const env = { HOME: home, T3CODE_HOME: t3, HOLYAGENT_CHROMIUM_PATH: join(home, "missing") }
+    const shell = shellWith({}, ["bun", "ctx7", "pi", "node"])
+    const diagnose = () =>
+      Effect.runPromise(
+        doctor(env, {
+          fix: false,
+          cwd: project,
+          t3Workflow: true,
+          form: chooseForm(env, "headless", "linux"),
+        }).pipe(Effect.provide(shell.layer)),
+      )
+    const result = await diagnose()
+    expect(result.lines.filter((line) => line.startsWith("FAIL "))).toEqual([])
+    expect(result.lines).toContain(
+      "~ T3 Preview: T3 Code provides the headless browser through the Preview tools in its Pi threads",
+    )
+    expect(lineNamed(result, "pi capability fff")).toStartWith("ok   pi capability fff:")
+    expect(result.lines.some((line) => /browser-use|uvx|Chromium|\b(rg|fd):/.test(line))).toBe(
+      false,
+    )
+    expect(shell.calls.map((call) => call.line)).toEqual(["pi --version", "node --version"])
+
+    await setConfig({ pi: { features: { mcp: false } } })
+    const withoutMcp = await diagnose()
+    expect(withoutMcp.ok).toBe(true)
+    expect(withoutMcp.lines).toContain(
+      "~ T3 Preview: enable Pi MCP to make the Preview tools available in T3 Code",
+    )
+    expect(withoutMcp.lines.some((line) => /browser-use|uvx|Chromium/.test(line))).toBe(false)
   })
 
   test("a capability the config turns off has no line, and one that is on names the package it lacks", async () => {

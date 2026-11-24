@@ -1,11 +1,18 @@
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
+
 import { Effect, Option } from "effect"
 
+import release from "../../../../package.json" with { type: "json" }
 import { type CapabilityForm, managedCapabilityPackages } from "../config/capabilities.ts"
 import { piPackages, WEB_KIT_PACKAGE } from "../config/packages.ts"
 import { PROVIDERS } from "../pi/provider.ts"
+import { fileSystem } from "../ports/filesystem.ts"
 import { type Env, homeDirectory } from "./environment.ts"
+import { SetupFailure } from "./errors.ts"
+import { fileExists, isJsonObject, readJsonObject } from "./json-file.ts"
 import {
   type CapabilityChoices,
+  isHolyagentSource,
   listsAtPin,
   loadPiConfig,
   parseNpmSource,
@@ -15,7 +22,7 @@ import {
   piSettingsSources,
 } from "./pi-check.ts"
 import { added, failed, present, skipped } from "./report.ts"
-import type { Scope } from "./scope.ts"
+import { refuseLinks, type Scope } from "./scope.ts"
 import { Shell } from "./shell.ts"
 
 /**
@@ -51,6 +58,94 @@ export const staleManagedNames = (
   ]
 }
 
+const realPath = (path: string) =>
+  fileSystem.pipe(
+    Effect.flatMap((fs) => Effect.tryPromise(() => fs.realpath(path))),
+    Effect.orElseSucceed(() => undefined),
+  )
+
+const installedLayout = (path: string) =>
+  basename(path) === "holyagent" && basename(dirname(path)) === "node_modules"
+
+const installedPackage = Effect.fn("installedPiPackage")(function* (path: string) {
+  const invalid = new SetupFailure({
+    message: `${JSON.stringify(path)} is not an installed HolyAgent ${release.version} package; install the CLI globally and run it again`,
+  })
+  if (!isAbsolute(path) || !installedLayout(path)) return yield* invalid
+  const root = resolve(path)
+  const physical = yield* realPath(root)
+  if (physical === undefined || !installedLayout(physical)) return yield* invalid
+  const manifest = yield* readJsonObject(join(root, "package.json"))
+  if (
+    manifest.name !== "holyagent" ||
+    (manifest.version !== release.version &&
+      !(
+        typeof manifest.version === "string" &&
+        manifest.version.startsWith(`${release.version}-dev.`)
+      )) ||
+    manifest.private === true ||
+    !isJsonObject(manifest.pi) ||
+    !Array.isArray(manifest.pi.extensions) ||
+    !manifest.pi.extensions.includes("./extensions") ||
+    !(yield* fileExists(join(root, "extensions", "holyagent.js")))
+  )
+    return yield* invalid
+  return { root, physical }
+})
+
+/** Resolves a Pi local package source relative to the settings file that holds it. */
+export const piLocalSourcePath = (env: Env, file: string, source: string): string | undefined => {
+  if (isAbsolute(source)) return resolve(source)
+  if (/^(?:[a-z][a-z0-9+.-]*:|[^/\\]+@[^/\\]+:)/i.test(source)) return undefined
+  if (source === "~" || /^~[/\\]/.test(source)) return resolve(homeDirectory(env), source.slice(2))
+  return resolve(dirname(file), source)
+}
+
+const sourcePackageRoot = (path: string) =>
+  basename(path) === "holyagent.js" && basename(dirname(path)) === "extensions"
+    ? dirname(dirname(path))
+    : path
+
+/** Recognizes a local HolyAgent package, including its directly registered extension file. */
+export const localHolyagentPackageAt = (path: string) =>
+  readJsonObject(join(sourcePackageRoot(path), "package.json")).pipe(
+    Effect.map((manifest) => manifest.name === "holyagent"),
+    Effect.orElseSucceed(() => false),
+  )
+
+interface PackageSources {
+  readonly file: string
+  readonly sources: ReadonlyArray<string>
+}
+
+const registration = Effect.fn("planPiPackageRegistration")(function* (
+  env: Env,
+  path: string,
+  settings: ReadonlyArray<PackageSources>,
+) {
+  const { root, physical } = yield* installedPackage(path)
+  let listedIn: string | undefined
+  for (const { file, sources } of settings) {
+    for (const entry of sources) {
+      const source = entry.trim()
+      const local = piLocalSourcePath(env, file, source)
+      const actual = local === undefined ? undefined : yield* realPath(local)
+      if (actual !== undefined && relative(physical, actual) === "") {
+        listedIn ??= file
+        continue
+      }
+      if (
+        isHolyagentSource(source) ||
+        (actual !== undefined && (yield* localHolyagentPackageAt(actual)))
+      )
+        return yield* new SetupFailure({
+          message: `HolyAgent is already configured as ${JSON.stringify(entry)} in ${file}. To switch to the installed package at ${root}, review and remove the existing Pi package entry, then run setup again`,
+        })
+    }
+  }
+  return listedIn === undefined ? { source: root } : { listedIn }
+})
+
 /** What the Pi step of `holyagent setup` was asked to do. */
 export interface PiInstallOptions {
   /**
@@ -62,6 +157,8 @@ export interface PiInstallOptions {
   readonly cwd: string
   /** Say what would run and run nothing. */
   readonly dryRun: boolean
+  /** Absolute package root supplied by the installed public launcher. */
+  readonly installedPackageRoot?: string
   /** The form every capability is applied in; `normal` when absent. */
   readonly form?: CapabilityForm
   /** Capability switches the run chose, laid over the config (see {@link loadPiConfig}). */
@@ -83,7 +180,9 @@ export interface PiInstallOptions {
  * is installed or removed. On a dry run the lines say what would run. A failing command is a `!`
  * line and the others still run; a settings file of the chosen scope that is not valid Pi settings,
  * or a config that cannot be loaded, is a SetupFailure, while the other scope's file is ignored
- * when it is not valid.
+ * when it is not valid. When the public launcher supplies its installed package root, setup
+ * registers that directory with Pi first. An existing different HolyAgent entry or an unreadable
+ * settings file that could hold one stops registration before running a package command.
  */
 export const installPiPackages = Effect.fn("installPiPackages")(function* (
   env: Env,
@@ -96,17 +195,22 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
   const projectLevel = options.scope !== "user"
   const [globalFile, projectFile] = piSettingsFiles(env, options.cwd)
   const file = projectLevel ? projectFile : globalFile
+  if (options.installedPackageRoot !== undefined)
+    yield* refuseLinks(options.cwd, options.scope, file, "register the installed HolyAgent package")
   const listed = yield* piSettingsSources(file)
   // Project and local scope also count the global file (Pi loads global packages in a project);
   // user scope counts the global file only, so a repository's .pi/settings.json cannot suppress
-  // a global install. The global file is ignored here when it is not valid Pi settings.
+  // a global install. Only the installed-package path needs every relevant file readable to
+  // reject a conflicting HolyAgent registration.
   const counted = piPresenceFiles(env, options.cwd, options.scope).filter((other) => other !== file)
-  const elsewhere = yield* Effect.forEach(counted, (other) =>
-    piSettingsSources(other).pipe(
-      Effect.map((sources) => ({ file: other, sources })),
-      Effect.orElseSucceed(() => ({ file: other, sources: [] as ReadonlyArray<string> })),
-    ),
-  )
+  const elsewhere = yield* Effect.forEach(counted, (other) => {
+    const read = piSettingsSources(other).pipe(
+      Effect.map((sources): PackageSources => ({ file: other, sources })),
+    )
+    return options.installedPackageRoot === undefined
+      ? read.pipe(Effect.orElseSucceed((): PackageSources => ({ file: other, sources: [] })))
+      : read
+  })
   const listedIn = (source: string) =>
     listsAtPin(listed, source)
       ? file
@@ -119,6 +223,15 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
     const where = listedIn(source)
     return where === undefined ? [] : [present(`pi ${source}: already listed in ${where}`)]
   })
+  if (options.installedPackageRoot !== undefined) {
+    const match = yield* registration(env, options.installedPackageRoot, [
+      { file, sources: listed },
+      ...elsewhere,
+    ])
+    if (match.source === undefined)
+      lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`))
+    else installs.unshift(match.source)
+  }
   if (installs.length === 0 && removals.length === 0) return lines
 
   if (Option.isNone(yield* shell.which("pi"))) {

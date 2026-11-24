@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -42,10 +42,15 @@ test("the packed npm package installs distinct human and structured agent CLIs",
       NPM_CONFIG_GLOBALCONFIG: join(directory, "global.npmrc"),
     }
     const npm = windows ? ["cmd.exe", "/d", "/c", "npm.cmd"] : ["npm"]
-    await $`${npm} install -g --prefix prefix --cache cache --offline --ignore-scripts --legacy-peer-deps --no-audit --no-fund ${archive}`
+    await $`${npm} install -g --prefix prefix --cache cache --ignore-scripts --no-audit --no-fund ${archive}`
       .cwd(directory)
       .env(env)
       .quiet()
+    const modules = join(directory, "prefix", ...(windows ? [] : ["lib"]), "node_modules")
+    for (const dependencyRoot of [modules, join(modules, "holyagent", "node_modules")]) {
+      const pi = join(dependencyRoot, "@earendil-works", "pi-coding-agent")
+      await expect(stat(pi)).rejects.toMatchObject({ code: "ENOENT" })
+    }
 
     // Invoke npm's native Windows shim or the POSIX link to the packaged launcher.
     const command = (name: "holyagent" | "holyagent-cli") =>

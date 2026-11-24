@@ -8,8 +8,8 @@ import { TUI_SOURCE } from "./files.ts"
 
 /**
  * The modules the interface bundle leaves as imports: OpenTUI's native renderer cannot be bundled,
- * and Solid and OpenTUI must be one instance each, so all three resolve from the folder setup
- * installs them in.
+ * and Solid and OpenTUI each need a shared instance. The package manager installs them beside the
+ * public CLI. The private plugin resolves them from its own cache.
  */
 export const TUI_EXTERNAL: ReadonlyArray<string> = [
   "@opentui/core",

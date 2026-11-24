@@ -10,6 +10,7 @@ import {
   applyDefaults,
   decodeJsonObject,
   type Default,
+  type Entry,
   isJsonObject,
   type JsonObject,
   type JsonSnapshot,
@@ -121,6 +122,10 @@ export interface T3SettingsOptions {
 }
 
 const label = "t3 settings"
+
+const needsNotice = (entry: Entry): boolean =>
+  entry.status === "kept" &&
+  !(entry.path === "branchNamingMode" && (entry.value === "semantic" || entry.value === "static"))
 
 /**
  * Puts T3's settings file back to `previous`, or removes it when there was none, only while it
@@ -556,7 +561,7 @@ export const installT3Settings = Effect.fn("installT3Settings")(function* (
   const { merged, entries } = applyDefaults(before.value, keys)
   const added = entries.filter((entry) => entry.status === "added")
   const present = entries.filter((entry) => entry.status === "present")
-  const kept = entries.filter((entry) => entry.status === "kept")
+  const kept = entries.filter(needsNotice)
   if (added.length > 0 && !options.dryRun) {
     const written = new Set(added.map((entry) => entry.path))
     // Read the record first, so one that cannot be decoded stops the run before the file changes.
@@ -607,7 +612,7 @@ export interface T3UnitPreview {
   readonly added: ReadonlyArray<string>
   /** The paths of the keys already at the wanted value. */
   readonly present: ReadonlyArray<string>
-  /** `path value` of each key the file sets differently, which setup keeps. */
+  /** `path value` of each kept setting that needs a notice. */
   readonly kept: ReadonlyArray<string>
   /** Why the unit is left out whole, or `undefined`. */
   readonly left?: string
@@ -658,9 +663,7 @@ export const previewT3Settings = Effect.fn("previewT3Settings")(function* (
         .filter((entry) => entry.status === "added")
         .map((entry) => `${entry.path} ${show(entry.value)}`),
       present: entries.filter((entry) => entry.status === "present").map((entry) => entry.path),
-      kept: entries
-        .filter((entry) => entry.status === "kept")
-        .map((entry) => `${entry.path} ${show(entry.value)}`),
+      kept: entries.filter(needsNotice).map((entry) => `${entry.path} ${show(entry.value)}`),
     }
   })
   return { file, device, worktreesAllowed, units }

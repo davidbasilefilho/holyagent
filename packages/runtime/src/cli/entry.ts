@@ -32,7 +32,11 @@ const write = (stream: NodeJS.WriteStream, text: string) =>
   )
 
 /** Runs one CLI entry. Only the public entry can display the interactive setup screen. */
-export const main = (interactiveSetup = false, surface: CliSurface = "host") =>
+export const main = (
+  interactiveSetup = false,
+  surface: CliSurface = "host",
+  installedPackageRoot?: string,
+) =>
   Effect.runPromise(
     Effect.gen(function* () {
       const result = yield* run(
@@ -45,6 +49,9 @@ export const main = (interactiveSetup = false, surface: CliSurface = "host") =>
               ? Effect.fail(new StdinMissing({ reason: "stdin is unavailable" }))
               : stdin,
           ...(surface === "agent" ? {} : { emit: (text: string) => write(process.stdout, text) }),
+          ...(surface === "public" && installedPackageRoot !== undefined
+            ? { installedPackageRoot }
+            : {}),
           ...(interactiveSetup
             ? {
                 t3Workflow: true,

@@ -7,7 +7,12 @@ import { applyCapabilityChoices } from "./capabilities.ts"
 import { type Env, homeDirectory } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import { DEFAULT_FORM_CHOICE, describeForm, type FormChoice } from "./form.ts"
-import { type CapabilityChoices, piInUse } from "./pi-check.ts"
+import {
+  type CapabilityChoices,
+  piExecutionSurface,
+  piInUse,
+  usesStandaloneSearch,
+} from "./pi-check.ts"
 import { installPiPackages } from "./pi-install.ts"
 import { installPiToolSettings, undoPiToolSettings } from "./pi-settings.ts"
 import { added, failed, hint, present, type Report, skipped } from "./report.ts"
@@ -79,6 +84,12 @@ export const asStep = <R>(
     Effect.catchTag("SetupFailure", (error) => Effect.succeed([`! ${label}: ${error.message}`])),
   )
 
+/** Harnesses that can be selected directly for setup. */
+export const SETUP_TARGETS = ["pi", "claude"] as const
+
+/** A directly selected setup harness. */
+export type SetupTarget = (typeof SETUP_TARGETS)[number]
+
 /** What `holyagent setup` was asked to do. */
 export interface SetupOptions {
   readonly subagentCacheTtl: CacheTtl
@@ -86,6 +97,10 @@ export interface SetupOptions {
   readonly skipCtx7: boolean
   /** Run public T3 Code onboarding, not the internal Claude settings step. */
   readonly t3Workflow?: boolean
+  /** Limit setup and undo to one harness. Omitted for legacy callers. */
+  readonly target?: SetupTarget
+  /** The installed public package location to register with Pi. */
+  readonly installedPackageRoot?: string
   /** The settings scope to write, `user` when absent. */
   readonly scope?: Scope
   /** Back out the settings setup wrote instead of writing them; ctx7 is left installed. */
@@ -127,6 +142,9 @@ export interface SetupOptions {
 export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptions) {
   const scope = options.scope ?? "user"
   const label = `${scope} settings`
+  const piOnly =
+    options.target === "pi" || (options.target === undefined && options.t3Workflow === true)
+  const includePi = options.target !== "claude"
   // A target that cannot be used (a symlink) is a failed settings step, not an abort.
   const onSettings = (
     run: (file: string) => Effect.Effect<ReadonlyArray<string>, SetupFailure, Shell>,
@@ -145,27 +163,31 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
     scope,
     cwd: options.cwd ?? process.cwd(),
     dryRun: options.dryRun,
+    ...(piOnly && options.installedPackageRoot !== undefined
+      ? { installedPackageRoot: options.installedPackageRoot }
+      : {}),
     form: form.form,
     choices,
   }
   if (options.undo === true) {
     const lines = [
       hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-      ...(options.t3Workflow === true
+      ...(piOnly
         ? []
         : yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun }))),
       // Only files with a setup record get a line, so a machine that never ran the step prints none.
-      ...(yield* asStep("tool settings", undoPiToolSettings(env, piOptions))),
+      ...(includePi ? yield* asStep("tool settings", undoPiToolSettings(env, piOptions)) : []),
       // T3 Code's settings are the user's, whatever scope was asked for; the step undoes at scope user.
-      ...(scope === "user"
+      ...(includePi && scope === "user"
         ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun }))
         : []),
     ]
     return { lines, ok: !lines.some((line) => line.startsWith("! ")) } satisfies Report
   }
   const cloud = inCloudSession(env)
-  const piUsed = !cloud && (yield* piInUse(env))
-  if (options.t3Workflow === true) {
+  const piUsed = includePi && !cloud && (yield* piInUse(env))
+  const surface = piExecutionSurface(env, piOnly ? "t3" : undefined)
+  if (piOnly) {
     const blockers = yield* checkT3Prerequisites(env, piUsed)
     if (blockers.length > 0)
       return { lines: blockers.map((line) => `! ${line}`), ok: false } satisfies Report
@@ -208,7 +230,9 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
       : []),
     ...(piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : []),
     ...(piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : []),
-    ...(piSteps ? yield* asStep("browser use", reportBrowserUse(env, piOptions)) : []),
+    ...(piSteps
+      ? yield* asStep("browser use", reportBrowserUse(env, { ...piOptions, surface }))
+      : []),
     // T3 Code's server settings are the user's own, so the step runs at scope user only.
     ...(piSteps && scope === "user"
       ? yield* asStep(
@@ -220,8 +244,10 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
           }),
         )
       : []),
-    ...(yield* searchToolLines(piOptions.cwd, setupToolLine)),
-    ...(options.t3Workflow === true
+    ...(usesStandaloneSearch(env, piUsed, surface)
+      ? yield* searchToolLines(piOptions.cwd, setupToolLine)
+      : []),
+    ...(piOnly
       ? []
       : yield* onSettings((file) =>
           mergeUserSettings({

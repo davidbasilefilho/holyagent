@@ -22,6 +22,7 @@ import {
   cacheHome,
   importFile,
   INSTALLED_MARKER,
+  loadPackagedSetupTui,
   loadSetupTui,
   markerText,
   plain,
@@ -882,6 +883,25 @@ describe("the real install and import steps", () => {
       importFile(join(directory, "nothing.js")).pipe(Effect.flip),
     )
     expect(failure.message).toContain("cannot import")
+  })
+
+  test("the public renderer resolves the preload beside the package and imports it first", async () => {
+    const packageRoot = join(directory, "installed")
+    const solid = join(packageRoot, "node_modules", "@opentui", "solid")
+    await Bun.write(
+      join(solid, "package.json"),
+      JSON.stringify({ type: "module", exports: { "./preload": "./preload.js" } }),
+    )
+    await Bun.write(join(solid, "preload.js"), "globalThis.holyagentPackagedPreloaded = true\n")
+    const bundle = join(packageRoot, "scripts", TUI_BUNDLE)
+    await Bun.write(
+      bundle,
+      `if (!globalThis.holyagentPackagedPreloaded) throw new Error("preload did not run first")
+delete globalThis.holyagentPackagedPreloaded
+export const runSetupTui = async () => ({ _tag: "Cancelled" })`,
+    )
+    const loaded = await Effect.runPromise(loadPackagedSetupTui(bundle))
+    expect(typeof loaded.runSetupTui).toBe("function")
   })
 
   test("loads the built TUI bundle for real from a folder that holds the pinned packages", async () => {

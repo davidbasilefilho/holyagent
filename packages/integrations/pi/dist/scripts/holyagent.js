@@ -17882,7 +17882,7 @@ var JsonObjectText, strict2, empty4, fileOperation = (path, what, run) => tryPro
   catch: (cause) => new SetupFailure({
     message: `cannot ${what} ${path}: ${cause instanceof Error ? cause.message : String(cause)}`
   })
-}), isJsonObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value), readJsonObject = (path) => readJsonObjectSnapshot(path).pipe(map5((snapshot) => snapshot.value)), readJsonObjectSnapshot = (path) => gen2(function* () {
+}), isJsonObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value), fileExists2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path).then(() => true, (error) => error.code === "ENOENT" ? false : Promise.reject(error)))), orElseSucceed2(() => false)), readJsonObject = (path) => readJsonObjectSnapshot(path).pipe(map5((snapshot) => snapshot.value)), readJsonObjectSnapshot = (path) => gen2(function* () {
   const text = yield* readJsonText(path);
   if (text === undefined)
     return { value: empty4, text };
@@ -18360,7 +18360,28 @@ ${result.stderr}`;
   if (firstNonEmpty2(env["HOLYAGENT_HOST"]) === "pi")
     return true;
   return isSome2(yield* (yield* Shell).which("pi"));
-}), loadPiConfig = (env, cwd, scope, choices = {}) => loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(map5((config) => ({
+}), piExecutionSurface = (env, selected) => selected ?? (env["HOLYAGENT_T3_HOSTED"] === "1" ? "t3" : undefined), usesStandaloneSearch = (env, piUsed, surface) => surface === undefined && (firstNonEmpty2(env["HOLYAGENT_HOST"]) === "claude" || !piUsed), headlessBrowserRoute = (config, surface) => {
+  const { browserUse, mcp } = config.pi.features;
+  if (surface === "t3") {
+    const detail = mcp ? "T3 Code provides the headless browser through the Preview tools in its Pi threads" : "enable Pi MCP to make the Preview tools available in T3 Code";
+    return { probe: false, lines: [hint(`T3 Preview: ${detail}`)] };
+  }
+  if (!browserUse)
+    return { probe: false, lines: [] };
+  if (!mcp)
+    return {
+      probe: false,
+      lines: [hint("browser-use: Pi MCP is off, so the headless browser server is not started")]
+    };
+  if (surface === undefined)
+    return {
+      probe: false,
+      lines: [
+        hint("headless browser: T3-hosted Pi uses T3 Preview; only standalone Pi launches browser-use and needs uvx and Chromium")
+      ]
+    };
+  return { probe: true, lines: [] };
+}, loadPiConfig = (env, cwd, scope, choices = {}) => loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(map5((config) => ({
   ...config,
   pi: { ...config.pi, features: { ...config.pi.features, ...choices } }
 })), mapError2((error) => new SetupFailure({ message: error.message }))), checkPackage = (env, cwd, scope) => gen2(function* () {
@@ -18443,17 +18464,18 @@ ${result.stderr}`) : undefined;
 }), checkServers = (capability, form, config) => {
   const reason = unavailableIn(capability, form) === undefined ? serversWithheld(capability, form, config.pi.features) : undefined;
   return reason === undefined ? [] : [hint(`pi capability ${capability.name}: ${reason}`)];
-}, checkCapabilities = (env, cwd, scope, config, choice, listed) => gen2(function* () {
+}, checkCapabilities = (env, cwd, scope, config, choice, listed, surface) => gen2(function* () {
   const files = piPresenceFiles(env, cwd, scope);
-  const lines = yield* forEach2(enabledCapabilities(config.pi.features, { provider: config.pi.provider }), (capability) => gen2(function* () {
+  const headless = choice.form === "headless" ? headlessBrowserRoute(config, surface) : undefined;
+  const lines = yield* forEach2(enabledCapabilities(config.pi.features, { provider: config.pi.provider }).filter(({ feature }) => feature !== "browserUse" || headless?.probe !== false), (capability) => gen2(function* () {
     return [
       yield* checkCapability(env, scope, capability, choice.form, listed, files),
       ...yield* checkPairing(env, capability, choice.form),
       ...checkServers(capability, choice.form, config)
     ];
   }));
-  return [pass("pi form", describeForm(choice)), ...lines.flat()];
-}), piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE) => gen2(function* () {
+  return [pass("pi form", describeForm(choice)), ...headless?.lines ?? [], ...lines.flat()];
+}), piChecks = (env, cwd, scope, choice = DEFAULT_FORM_CHOICE, surface = piExecutionSurface(env)) => gen2(function* () {
   if (!(yield* piInUse(env)))
     return [
       hint("pi: not in use (HOLYAGENT_HOST is not pi and pi is not on PATH); Pi checks skipped")
@@ -18473,7 +18495,7 @@ ${result.stderr}`) : undefined;
         node,
         pkg,
         ...checkBasePackages(files, scope, config, listed),
-        ...yield* checkCapabilities(env, cwd, scope, config, choice, listed)
+        ...yield* checkCapabilities(env, cwd, scope, config, choice, listed, surface)
       ];
     }) : succeed6([])
   }));
@@ -19272,11 +19294,12 @@ var init_browser_use = __esm(() => {
     const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices);
     if (!config.pi.enable)
       return [];
+    const headless = options.form === "headless" ? headlessBrowserRoute(config, piExecutionSurface(env, options.surface)) : undefined;
     const reporting = enabledCapabilities(config.pi.features, {
       provider: config.pi.provider
-    }).filter((capability) => Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
+    }).filter((capability) => (capability.feature !== "browserUse" || headless?.probe !== false) && Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
     const lines = yield* forEach2(reporting, (capability) => reportOne(env, capability, config.pi.features, options, platform));
-    return lines.flat();
+    return [...headless?.lines ?? [], ...lines.flat()];
   });
 });
 
@@ -19359,6 +19382,7 @@ var init_capabilities2 = __esm(() => {
   });
 });
 
+import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute9, join as join21, relative as relative5, resolve as resolve12 } from "path";
 var MANAGED_NAMES, staleManagedNames = (listed, wanted, managed = MANAGED_NAMES) => {
   const wantedNames = new Set(wanted.map((source) => parseNpmSource(source)?.name));
   return [
@@ -19367,20 +19391,70 @@ var MANAGED_NAMES, staleManagedNames = (listed, wanted, managed = MANAGED_NAMES)
       return name !== undefined && managed.has(name) && !wantedNames.has(name) ? [name] : [];
     }))
   ];
-}, installPiPackages;
+}, realPath = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.realpath(path))), orElseSucceed2(() => {
+  return;
+})), installedLayout = (path) => basename7(path) === "holyagent" && basename7(dirname10(path)) === "node_modules", installedPackage, piLocalSourcePath = (env, file, source) => {
+  if (isAbsolute9(source))
+    return resolve12(source);
+  if (/^(?:[a-z][a-z0-9+.-]*:|[^/\\]+@[^/\\]+:)/i.test(source))
+    return;
+  if (source === "~" || /^~[/\\]/.test(source))
+    return resolve12(homeDirectory2(env), source.slice(2));
+  return resolve12(dirname10(file), source);
+}, sourcePackageRoot = (path) => basename7(path) === "holyagent.js" && basename7(dirname10(path)) === "extensions" ? dirname10(dirname10(path)) : path, localHolyagentPackageAt = (path) => readJsonObject(join21(sourcePackageRoot(path), "package.json")).pipe(map5((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false)), registration, installPiPackages;
 var init_pi_install = __esm(() => {
   init_dist();
+  init_package();
   init_capabilities();
   init_packages();
   init_provider();
+  init_filesystem();
   init_environment2();
+  init_errors8();
+  init_json_file();
   init_pi_check();
+  init_scope();
   init_shell();
   MANAGED_NAMES = new Set([
     ...managedCapabilityPackages(),
     WEB_KIT_PACKAGE,
     ...Object.values(PROVIDERS).flatMap((profile) => profile.package === undefined ? [] : [profile.package])
   ]);
+  installedPackage = fn2("installedPiPackage")(function* (path) {
+    const invalid = new SetupFailure({
+      message: `${JSON.stringify(path)} is not an installed HolyAgent ${package_default.version} package; install the CLI globally and run it again`
+    });
+    if (!isAbsolute9(path) || !installedLayout(path))
+      return yield* invalid;
+    const root = resolve12(path);
+    const physical = yield* realPath(root);
+    if (physical === undefined || !installedLayout(physical))
+      return yield* invalid;
+    const manifest = yield* readJsonObject(join21(root, "package.json"));
+    if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join21(root, "extensions", "holyagent.js"))))
+      return yield* invalid;
+    return { root, physical };
+  });
+  registration = fn2("planPiPackageRegistration")(function* (env, path, settings) {
+    const { root, physical } = yield* installedPackage(path);
+    let listedIn;
+    for (const { file, sources } of settings) {
+      for (const entry of sources) {
+        const source = entry.trim();
+        const local = piLocalSourcePath(env, file, source);
+        const actual = local === undefined ? undefined : yield* realPath(local);
+        if (actual !== undefined && relative5(physical, actual) === "") {
+          listedIn ??= file;
+          continue;
+        }
+        if (isHolyagentSource(source) || actual !== undefined && (yield* localHolyagentPackageAt(actual)))
+          return yield* new SetupFailure({
+            message: `HolyAgent is already configured as ${JSON.stringify(entry)} in ${file}. To switch to the installed package at ${root}, review and remove the existing Pi package entry, then run setup again`
+          });
+      }
+    }
+    return listedIn === undefined ? { source: root } : { listedIn };
+  });
   installPiPackages = fn2("installPiPackages")(function* (env, options) {
     const shell = yield* Shell;
     const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices);
@@ -19389,9 +19463,14 @@ var init_pi_install = __esm(() => {
     const projectLevel = options.scope !== "user";
     const [globalFile, projectFile] = piSettingsFiles(env, options.cwd);
     const file = projectLevel ? projectFile : globalFile;
+    if (options.installedPackageRoot !== undefined)
+      yield* refuseLinks(options.cwd, options.scope, file, "register the installed HolyAgent package");
     const listed = yield* piSettingsSources(file);
     const counted = piPresenceFiles(env, options.cwd, options.scope).filter((other) => other !== file);
-    const elsewhere = yield* forEach2(counted, (other) => piSettingsSources(other).pipe(map5((sources) => ({ file: other, sources })), orElseSucceed2(() => ({ file: other, sources: [] }))));
+    const elsewhere = yield* forEach2(counted, (other) => {
+      const read = piSettingsSources(other).pipe(map5((sources) => ({ file: other, sources })));
+      return options.installedPackageRoot === undefined ? read.pipe(orElseSucceed2(() => ({ file: other, sources: [] }))) : read;
+    });
     const listedIn = (source) => listsAtPin(listed, source) ? file : elsewhere.find((other) => listsAtPin(other.sources, source))?.file;
     const wanted = piPackages(config, undefined, options.form);
     const installs = wanted.filter((source) => listedIn(source) === undefined);
@@ -19400,6 +19479,16 @@ var init_pi_install = __esm(() => {
       const where = listedIn(source);
       return where === undefined ? [] : [present(`pi ${source}: already listed in ${where}`)];
     });
+    if (options.installedPackageRoot !== undefined) {
+      const match = yield* registration(env, options.installedPackageRoot, [
+        { file, sources: listed },
+        ...elsewhere
+      ]);
+      if (match.source === undefined)
+        lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`));
+      else
+        installs.unshift(match.source);
+    }
     if (installs.length === 0 && removals.length === 0)
       return lines;
     if (isNone2(yield* shell.which("pi"))) {
@@ -19440,8 +19529,8 @@ var init_pi_install = __esm(() => {
   });
 });
 
-import { join as join21 } from "path";
-var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 = "t3 settings", restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false)), writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
+import { join as join22 } from "path";
+var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 = "t3 settings", needsNotice = (entry) => entry.status === "kept" && !(entry.path === "branchNamingMode" && (entry.value === "semantic" || entry.value === "static")), restoreSettings = (path, previous, unchangedSince) => previous === undefined ? removeFileIfUnchanged(path, unchangedSince) : unchangedSince === undefined ? succeed6(false) : writeSettings(path, previous, unchangedSince).pipe(as2(true), orElseSucceed2(() => false)), writeSettings = (path, value, unchangedSince) => unchangedSince === undefined ? writeJsonObject(path, value) : writeJsonObjectIfUnchanged(path, value, unchangedSince).pipe(flatMap2((wrote) => wrote ? void_3 : fail5(new SetupFailure({
   message: `${path} changed while setup was working on it, so nothing was written. Close T3 Code and run setup again`
 })))), checkT3Prerequisites = (env, piUsed) => gen2(function* () {
   const home = t3Home(env);
@@ -19449,7 +19538,7 @@ var T3_STORAGE_CLEANUP, T3_WRITING_INSTRUCTIONS, T3_BRANCH_INSTRUCTIONS, label2 
     ...(yield* isDirectory2(home)) ? [] : [`t3: open T3 Code once to initialize ${home}, then run holyagent setup`],
     ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
   ];
-}), t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join21(homeDirectory2(env), ".t3"), t3SettingsFile = (env) => join21(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
+}), t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join22(homeDirectory2(env), ".t3"), t3SettingsFile = (env) => join22(t3Home(env), "userdata", "settings.json"), isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map5((info) => info.isDirectory()), orElseSucceed2(() => false)), deviceHost, BALANCED, units = (devices, worktrees) => [
   {
     name: "Pi provider",
     choice: "pi",
@@ -19614,14 +19703,14 @@ var init_t3_settings = __esm(() => {
     const home = homeDirectory2(env);
     if (platform === "darwin") {
       const developer = firstNonEmpty2(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-      const simulator = join21(developer, "Platforms", "iPhoneSimulator.platform");
+      const simulator = join22(developer, "Platforms", "iPhoneSimulator.platform");
       if (yield* isDirectory2(simulator))
         return `Xcode (${developer})`;
     }
     const sdkFolders = [
       firstNonEmpty2(env["ANDROID_HOME"]),
       firstNonEmpty2(env["ANDROID_SDK_ROOT"]),
-      platform === "darwin" ? join21(home, "Library", "Android", "sdk") : platform === "win32" ? join21(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join21(home, "AppData", "Local"), "Android", "Sdk") : join21(home, "Android", "Sdk")
+      platform === "darwin" ? join22(home, "Library", "Android", "sdk") : platform === "win32" ? join22(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join22(home, "AppData", "Local"), "Android", "Sdk") : join22(home, "Android", "Sdk")
     ];
     for (const folder of sdkFolders) {
       if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -19692,7 +19781,7 @@ var init_t3_settings = __esm(() => {
     const { merged, entries } = applyDefaults(before.value, keys);
     const added = entries.filter((entry) => entry.status === "added");
     const present = entries.filter((entry) => entry.status === "present");
-    const kept = entries.filter((entry) => entry.status === "kept");
+    const kept = entries.filter(needsNotice);
     if (added.length > 0 && !options.dryRun) {
       const written = new Set(added.map((entry) => entry.path));
       yield* readRecorded(env, file);
@@ -19737,7 +19826,7 @@ var init_t3_settings = __esm(() => {
         ...base,
         added: entries.filter((entry) => entry.status === "added").map((entry) => `${entry.path} ${show3(entry.value)}`),
         present: entries.filter((entry) => entry.status === "present").map((entry) => entry.path),
-        kept: entries.filter((entry) => entry.status === "kept").map((entry) => `${entry.path} ${show3(entry.value)}`)
+        kept: entries.filter(needsNotice).map((entry) => `${entry.path} ${show3(entry.value)}`)
       };
     });
     return { file, device, worktreesAllowed, units };
@@ -19775,7 +19864,7 @@ var init_t3_settings = __esm(() => {
   });
 });
 
-var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on", neutralDirectory = (env) => homeDirectory2(env), ensureGlobal, installCtx7, asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))), setup;
+var CLOUD_SKIP = "skipped in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true), which has no machine of yours to install it on", neutralDirectory = (env) => homeDirectory2(env), ensureGlobal, installCtx7, asStep = (label, step) => step.pipe(catchTag2("SetupFailure", (error) => succeed6([`! ${label}: ${error.message}`]))), SETUP_TARGETS, setup;
 var init_steps = __esm(() => {
   init_dist();
   init_capabilities();
@@ -19818,9 +19907,12 @@ var init_steps = __esm(() => {
     const result = yield* ensureGlobal(env, "ctx7", "ctx7", dryRun);
     return result.lines;
   });
+  SETUP_TARGETS = ["pi", "claude"];
   setup = fn2("setup")(function* (env, options) {
     const scope = options.scope ?? "user";
     const label = `${scope} settings`;
+    const piOnly = options.target === "pi" || options.target === undefined && options.t3Workflow === true;
+    const includePi = options.target !== "claude";
     const onSettings = (run) => asStep(label, gen2(function* () {
       const target = yield* settingsFile(env, scope, options.cwd ?? process.cwd());
       const lines = yield* run(target.file);
@@ -19832,21 +19924,23 @@ var init_steps = __esm(() => {
       scope,
       cwd: options.cwd ?? process.cwd(),
       dryRun: options.dryRun,
+      ...piOnly && options.installedPackageRoot !== undefined ? { installedPackageRoot: options.installedPackageRoot } : {},
       form: form.form,
       choices
     };
     if (options.undo === true) {
       const lines = [
         hint("ctx7: left installed; --undo only removes the settings setup recorded adding"),
-        ...options.t3Workflow === true ? [] : yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
-        ...yield* asStep("tool settings", undoPiToolSettings(env, piOptions)),
-        ...scope === "user" ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun })) : []
+        ...piOnly ? [] : yield* onSettings((file) => undoUserSettings({ env, file, dryRun: options.dryRun })),
+        ...includePi ? yield* asStep("tool settings", undoPiToolSettings(env, piOptions)) : [],
+        ...includePi && scope === "user" ? yield* asStep("t3 settings", undoT3Settings(env, { dryRun: options.dryRun })) : []
       ];
       return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
     }
     const cloud = inCloudSession(env);
-    const piUsed = !cloud && (yield* piInUse(env));
-    if (options.t3Workflow === true) {
+    const piUsed = includePi && !cloud && (yield* piInUse(env));
+    const surface = piExecutionSurface(env, piOnly ? "t3" : undefined);
+    if (piOnly) {
       const blockers = yield* checkT3Prerequisites(env, piUsed);
       if (blockers.length > 0)
         return { lines: blockers.map((line) => `! ${line}`), ok: false };
@@ -19868,14 +19962,14 @@ var init_steps = __esm(() => {
       ] : [],
       ...piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
       ...piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
-      ...piSteps ? yield* asStep("browser use", reportBrowserUse(env, piOptions)) : [],
+      ...piSteps ? yield* asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })) : [],
       ...piSteps && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
         dryRun: options.dryRun,
         ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
         ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
       })) : [],
-      ...yield* searchToolLines(piOptions.cwd, setupToolLine),
-      ...options.t3Workflow === true ? [] : yield* onSettings((file) => mergeUserSettings({
+      ...usesStandaloneSearch(env, piUsed, surface) ? yield* searchToolLines(piOptions.cwd, setupToolLine) : [],
+      ...piOnly ? [] : yield* onSettings((file) => mergeUserSettings({
         env,
         file,
         subagentCacheTtl: options.subagentCacheTtl,
@@ -19918,13 +20012,17 @@ var init_doctor = __esm(() => {
     const scope = options.scope ?? "user";
     const cwd = options.cwd ?? process.cwd();
     const form = options.form ?? DEFAULT_FORM_CHOICE;
-    const pi = inCloudSession(env) ? [] : [
-      ...yield* piChecks(env, cwd, scope, form),
+    const cloud = inCloudSession(env);
+    const surface = piExecutionSurface(env, options.t3Workflow === true ? "t3" : options.piSurface);
+    const piUsed = !cloud && (yield* piInUse(env));
+    const search = usesStandaloneSearch(env, piUsed, surface) ? searchToolLines(cwd, doctorToolLine) : succeed6([]);
+    const pi = cloud ? [] : [
+      ...yield* piChecks(env, cwd, scope, form, surface),
       ...yield* checkPiToolSettings(env, cwd, scope, form.form),
       ...scope === "user" || options.t3Workflow === true ? yield* checkT3Settings(env, cwd, { required: options.t3Workflow === true }) : []
     ];
     if (options.t3Workflow === true) {
-      const blockers = yield* checkT3Prerequisites(env, !inCloudSession(env) && (yield* piInUse(env)));
+      const blockers = yield* checkT3Prerequisites(env, piUsed);
       const checkCtx7 = checkCommand(env, "ctx7", "run holyagent doctor --fix");
       const ctx7 = yield* checkCtx7;
       const fixes = options.fix && ctx7.startsWith("FAIL ") && blockers.length === 0 ? yield* asStep("ctx7", installCtx7(env, false)) : [];
@@ -19945,7 +20043,7 @@ var init_doctor = __esm(() => {
         succeed6(fail8("settings", located.message))
       ]);
       return {
-        lines: [...lines, ...pi, ...yield* searchToolLines(cwd, doctorToolLine)],
+        lines: [...lines, ...pi, ...yield* search],
         ok: false
       };
     }
@@ -19953,13 +20051,13 @@ var init_doctor = __esm(() => {
     const noted = (lines) => notice === undefined ? lines : [hint(`${scope} settings: ${notice}`), ...lines];
     const before = yield* checks(env, file, scope);
     const failing = (name) => before.some((line) => line.startsWith(`FAIL ${name}:`));
-    const fixes = options.fix && !inCloudSession(env) ? [...failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []] : [];
+    const fixes = options.fix && !cloud ? [...failing("ctx7") ? yield* asStep("ctx7", installCtx7(env, false)) : []] : [];
     const settingsFixes = options.fix && failing("settings") ? yield* asStep(`${scope} settings`, mergeUserSettings({ env, file, subagentCacheTtl: "1h", dryRun: false })) : [];
     const ran = [...fixes, ...settingsFixes];
     const lines = noted([
       ...ran.length === 0 ? before : [...ran, ...yield* checks(env, file, scope)],
       ...pi,
-      ...yield* searchToolLines(cwd, doctorToolLine)
+      ...yield* search
     ]);
     return { lines, ok: lines.every((line) => !line.startsWith("FAIL ")) };
   });
@@ -20012,6 +20110,8 @@ var init_setup = __esm(() => {
     setup: Struct({
       subagentCacheTtl: Literals(CACHE_TTLS),
       t3Workflow: optionalKey2(Boolean3),
+      target: optionalKey2(Literals(SETUP_TARGETS)),
+      installedPackageRoot: optionalKey2(String6),
       dryRun: Boolean3,
       skipCtx7: Boolean3,
       scope: optionalKey2(Literals(SCOPES)),
@@ -20206,7 +20306,7 @@ var init_overview = __esm(() => {
   };
 });
 
-import { join as join22 } from "path";
+import { join as join23 } from "path";
 var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " ").trim(), strings, optionalStrings, HolyclaudeIntent, HolyclaudeAssignment, CodexIntentState, codexIntentFields, HolycodexIntent, _compatibility, legacyIntentFields, HolycodexIntentV0, CodexInvocation, HolycodexAssignment, parseText = (format, text) => try_2({
   try: () => format === "json" ? JSON.parse(text) : decode2(text, { strict: true }),
   catch: (cause) => `not valid ${format === "json" ? "JSON" : "TOON"}: ${String(cause)}`
@@ -20220,7 +20320,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     folders.set(folder, [...folders.get(folder) ?? [], path.slice(slash + 1)]);
   }
   return folders;
-}, convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith("."))), legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join22(root, LEGACY_FOLDERS[source])).pipe(map5((files) => convertibleFolders(source, files).size > 0))).pipe(map5((sources) => sources.map((source) => LEGACY_FOLDERS[source]))), isoOf = (millis) => {
+}, convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith("."))), legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join23(root, LEGACY_FOLDERS[source])).pipe(map5((files) => convertibleFolders(source, files).size > 0))).pipe(map5((sources) => sources.map((source) => LEGACY_FOLDERS[source]))), isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }, EPOCH, idTime = (id) => {
@@ -20325,13 +20425,13 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
   return { value: assignment };
 }, gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join22(root, folderName);
+  const legacy = join23(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join22(legacy, "intents", folder);
+    const base = join23(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -20339,7 +20439,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join22(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join23(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -20350,10 +20450,10 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join22(base, path), to: join22(target, path) });
+      state.notes.push({ from: join23(base, path), to: join23(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join22(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join23(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -20443,13 +20543,13 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
   return { value: assignment };
 }, TRANSACTION_FILE = ".holycodex-transaction.toon", gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join22(root, folderName);
+  const legacy = join23(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join22(legacy, folder);
+    const base = join23(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -20463,7 +20563,7 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join22(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join23(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -20474,10 +20574,10 @@ var LEGACY_FOLDERS, strict3, collapse = (message) => message.replace(/\s+/g, " "
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join22(base, path), to: join22(target, path) });
+      state.notes.push({ from: join23(base, path), to: join23(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join22(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join23(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -20678,7 +20778,7 @@ var init_legacy = __esm(() => {
 });
 
 import { copyFile as copyFile2, lstat as lstat7, mkdir as mkdir7, readdir as readdir4 } from "fs/promises";
-import { dirname as dirname10, join as join23, relative as relative5 } from "path";
+import { dirname as dirname11, join as join24, relative as relative6 } from "path";
 var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => io(path, () => lstat7(path)).pipe(as2(true), catchIf2((error) => hasCode(error.cause, "ENOENT"), () => succeed6(false))), countsOf = (gathered) => ({
   intents: gathered.records.filter((record) => record.kind === "intent").length,
   assignments: gathered.records.filter((record) => record.kind === "assignment").length,
@@ -20691,7 +20791,7 @@ var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => 
   ]);
   const seen = new Map;
   const problems = [];
-  const shown = (path) => relative5(root, path);
+  const shown = (path) => relative6(root, path);
   for (const record of found.flatMap((gathered) => gathered.records)) {
     const first = seen.get(record.id);
     seen.set(record.id, record.from);
@@ -20715,7 +20815,7 @@ var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => 
       yield* commitFile(record.file.path, record.file.content);
   const notes = found.flatMap((gathered) => gathered.notes);
   for (const note of notes) {
-    yield* io(note.to, () => mkdir7(dirname10(note.to), { recursive: true }));
+    yield* io(note.to, () => mkdir7(dirname11(note.to), { recursive: true }));
     yield* io(note.to, () => copyFile2(note.from, note.to));
   }
   return { records, copied: notes.map((note) => note.to) };
@@ -20741,7 +20841,7 @@ var NothingToMigrate, MigrationRefused, MigrationUnverified, exists = (path) => 
   const names = yield* io(root, () => readdir4(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join23(root, name));
+    const text = yield* readText(join24(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -20812,7 +20912,7 @@ var init_migrate = __esm(() => {
   schema = Struct({ dryRun: optionalKey2(Boolean3) });
 });
 
-import { join as join24 } from "path";
+import { join as join25 } from "path";
 var setting = (raw) => raw?.trim() || undefined, WorkflowSettings, disables = (path) => readText(path).pipe(flatMap2((text) => text === undefined ? succeed6(false) : decodeUnknownEffect2(fromJsonString2(WorkflowSettings))(text).pipe(map5((value) => value.disableWorkflows === true || value.enableWorkflows === false))), orElseSucceed2(() => false)), screenForm = (env) => {
   const ci = setting(env.CI)?.toLowerCase();
   const inCi = ci !== undefined && !["0", "false", "no", "off"].includes(ci);
@@ -20831,11 +20931,11 @@ var setting = (raw) => raw?.trim() || undefined, WorkflowSettings, disables = (p
     return options.workflowsAvailable;
   if (host === "pi" || env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return false;
-  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join24(homeDirectory(env), ".claude");
+  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join25(homeDirectory(env), ".claude");
   return !(yield* forEach2([
-    join24(claudeDir, "settings.json"),
-    join24(root, ".claude", "settings.json"),
-    join24(root, ".claude", "settings.local.json")
+    join25(claudeDir, "settings.json"),
+    join25(root, ".claude", "settings.json"),
+    join25(root, ".claude", "settings.local.json")
   ], disables)).includes(true);
 }), executionConfig = (options, root) => gen2(function* () {
   const { env, host } = options;
@@ -22058,7 +22158,7 @@ var init_environment3 = __esm(() => {
 
 import { mkdir as mkdir8, mkdtemp as mkdtemp2, rm as rm9 } from "fs/promises";
 import { tmpdir as tmpdir2 } from "os";
-import { join as join25 } from "path";
+import { join as join26 } from "path";
 var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS = 3000, FOLDERS, chromiumArguments = (profile, sandbox) => [
   "--headless=new",
   "--remote-debugging-port=0",
@@ -22099,9 +22199,9 @@ var BrowserLaunchFailed, READY_TIMEOUT_MS = 20000, POLL_MS = 100, STOP_GRACE_MS 
     return yield* failed3(`no Chromium was found; ${options.chromiumFix}`);
   const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
   const folders = {
-    profile: join25(base, FOLDERS.profile),
-    config: join25(base, FOLDERS.config),
-    harness: join25(base, FOLDERS.harness)
+    profile: join26(base, FOLDERS.profile),
+    config: join26(base, FOLDERS.config),
+    harness: join26(base, FOLDERS.harness)
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
@@ -22208,12 +22308,12 @@ var init_browser_launch = __esm(() => {
       },
       catch: (cause) => failed3(`cannot start ${spec.command}: ${reason(cause)}`)
     }),
-    devToolsPort: (profile) => tryPromise2(() => Bun.file(join25(profile, "DevToolsActivePort")).text()).pipe(map5(parseDevToolsActivePort), orElseSucceed2(() => {
+    devToolsPort: (profile) => tryPromise2(() => Bun.file(join26(profile, "DevToolsActivePort")).text()).pipe(map5(parseDevToolsActivePort), orElseSucceed2(() => {
       return;
     })),
     answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map5((response) => response.ok), orElseSucceed2(() => false)),
     temporaryDirectory: (prefix) => tryPromise2({
-      try: () => mkdtemp2(join25(tmpdir2(), prefix)),
+      try: () => mkdtemp2(join26(tmpdir2(), prefix)),
       catch: (cause) => failed3(`cannot create a temporary directory: ${reason(cause)}`)
     }),
     makeDirectory: (path) => tryPromise2({
@@ -22374,8 +22474,8 @@ var init_check2 = __esm(() => {
 
 import { lstat as lstat8, mkdir as mkdir9, open as open7 } from "fs/promises";
 import { tmpdir as tmpdir3, userInfo } from "os";
-import { join as join26 } from "path";
-var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id), markers = () => join26(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`), markerOf = (sessionId) => join26(markers(), sessionId), ensureMarkers = () => {
+import { join as join27 } from "path";
+var SAFE_SESSION, isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id), markers = () => join27(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo().username).toString().replace(/[^\w.-]/g, "_")}`), markerOf = (sessionId) => join27(markers(), sessionId), ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
   return io(folder, () => mkdir9(folder, { recursive: true, mode: 448 })).pipe(andThen2(io(folder, () => lstat8(folder))), filterOrFail2((found) => found.isDirectory() && (uid === undefined || found.uid === uid && (found.mode & 18) === 0), () => new StateIo({
@@ -31385,7 +31485,7 @@ var TUI_PACKAGES = {
 
 import { lstat as lstat9, mkdir as mkdir10, mkdtemp as mkdtemp3, readdir as readdir5, rename as rename7, rm as rm10, stat as stat6, writeFile as writeFile5 } from "fs/promises";
 import { userInfo as userInfo2 } from "os";
-import { basename as basename7, dirname as dirname11, join as join27, posix as posix3, win32 as win323 } from "path";
+import { basename as basename8, dirname as dirname12, join as join28, posix as posix3, win32 as win323 } from "path";
 import { pathToFileURL } from "url";
 var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : posix3, cacheHome = (env, platform = process.platform) => {
   const home = homeDirectory2(env);
@@ -31420,8 +31520,8 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
     ["bun.lock", lock]
   ])
     yield* tryPromise2({
-      try: () => Bun.write(join27(directory, file), text, { createPath: true }),
-      catch: (cause) => unavailable(`cannot write ${join27(directory, file)}`, cause)
+      try: () => Bun.write(join28(directory, file), text, { createPath: true }),
+      catch: (cause) => unavailable(`cannot write ${join28(directory, file)}`, cause)
     });
   const shell = yield* Shell;
   const result = yield* shell.run("bun", [
@@ -31438,11 +31538,21 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
 }), importFile = (path) => tryPromise2({
   try: () => import(pathToFileURL(path).href),
   catch: (cause) => unavailable(`cannot import ${path}`, cause)
-}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join27(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
+}), installedVersion = (directory, name) => tryPromise2(() => Bun.file(join28(directory, "node_modules", name, "package.json")).json()).pipe(map5((manifest) => typeof manifest === "object" && manifest !== null && ("version" in manifest) ? manifest.version : undefined), orElseSucceed2(() => {
   return;
-})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join27(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
+})), hasPackages = (directory, packages) => forEach2(Object.entries(packages), ([name, version]) => installedVersion(directory, name).pipe(map5((found) => found === version))).pipe(map5((all) => all.every(Boolean))), installed = (directory, packages, lock) => tryPromise2(() => Bun.file(join28(directory, INSTALLED_MARKER)).text()).pipe(orElseSucceed2(() => {
   return;
-}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", fileSystem2 = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
+}), flatMap2((marker) => marker === markerText(packages, lock) ? hasPackages(directory, packages) : succeed6(false))), isSetupTuiModule = (value) => typeof value === "object" && value !== null && ("runSetupTui" in value) && typeof value.runSetupTui === "function", loadPackagedSetupTui = (bundle = join28(import.meta.dir, TUI_BUNDLE)) => gen2(function* () {
+  const preload = yield* try_2({
+    try: () => Bun.resolveSync("@opentui/solid/preload", dirname12(bundle)),
+    catch: (cause) => unavailable("cannot resolve the installed OpenTUI Solid preload", cause)
+  });
+  yield* importFile(preload);
+  const loaded = yield* importFile(bundle);
+  if (!isSetupTuiModule(loaded))
+    return yield* new TuiUnavailable({ reason: `${bundle} does not export runSetupTui` });
+  return loaded;
+}), fileSystem2 = (what, run) => tryPromise2({ try: run, catch: (cause) => unavailable(what, cause) }), STICKY = 512, errorCode = (error) => typeof error === "object" && error !== null && ("code" in error) ? error.code : undefined, privateFolder = (folder, uid, create, home) => gen2(function* () {
   if (create)
     yield* fileSystem2(`cannot create ${folder}`, () => mkdir10(folder, { recursive: true, mode: 448 }));
   const found = yield* tryPromise2({
@@ -31484,34 +31594,34 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
   return yield* new TuiUnavailable({ reason: `cannot move the install into ${directory}` });
 }), STALE_AFTER_MS, newestChange = (path) => gen2(function* () {
   const modified = (entry) => tryPromise2(() => lstat9(entry)).pipe(map5((found) => found.mtimeMs), orElseSucceed2(() => 0));
-  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map5((names) => names.map((name) => join27(folder, name))), orElseSucceed2(() => []));
-  const inside = [...yield* children(path), ...yield* children(join27(path, "node_modules"))];
+  const children = (folder) => tryPromise2(() => readdir5(folder)).pipe(map5((names) => names.map((name) => join28(folder, name))), orElseSucceed2(() => []));
+  const inside = [...yield* children(path), ...yield* children(join28(path, "node_modules"))];
   const times = yield* forEach2([path, ...inside], modified, { concurrency: 16 });
   return Math.max(...times);
 }), sweepStale = (directory, uid) => gen2(function* () {
-  const parent = dirname11(directory);
-  const prefix = `.${basename7(directory)}-`;
+  const parent = dirname12(directory);
+  const prefix = `.${basename8(directory)}-`;
   const cutoff = Date.now() - STALE_AFTER_MS;
   const names = yield* tryPromise2(() => readdir5(parent));
   yield* forEach2(names.filter((name) => name.startsWith(prefix)), (name) => gen2(function* () {
-    const path = join27(parent, name);
+    const path = join28(parent, name);
     const found = yield* tryPromise2(() => lstat9(path));
     if (found.isDirectory() && (uid === undefined || found.uid === uid) && (yield* newestChange(path)) < cutoff)
       yield* remove(path);
   }).pipe(ignore2));
-}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp3(join27(dirname11(directory), `.${basename7(directory)}-`))))), (temporary) => gen2(function* () {
+}).pipe(ignore2), installAtomically = (directory, packages, lock, install, uid) => acquireUseRelease2(sweepStale(directory, uid).pipe(andThen2(fileSystem2(`cannot create a folder beside ${directory}`, () => mkdtemp3(join28(dirname12(directory), `.${basename8(directory)}-`))))), (temporary) => gen2(function* () {
   yield* install(temporary, packages, lock);
   if (!(yield* hasPackages(temporary, packages)))
     return yield* new TuiUnavailable({
       reason: `the install finished but ${directory} does not hold the expected package versions`
     });
-  yield* writeFresh(join27(temporary, INSTALLED_MARKER), markerText(packages, lock));
+  yield* writeFresh(join28(temporary, INSTALLED_MARKER), markerText(packages, lock));
   yield* promote(temporary, directory, packages, lock);
 }), remove), loadSetupTui = (env, options = {}) => gen2(function* () {
   const packages = options.packages ?? TUI_PACKAGES;
   const lock = options.lock ?? TUI_LOCK;
   const directory = options.directory ?? tuiDirectory(env, packages, process.platform, lock);
-  const source = options.bundle ?? join27(import.meta.dir, TUI_BUNDLE);
+  const source = options.bundle ?? join28(import.meta.dir, TUI_BUNDLE);
   const install = options.install ?? bunInstall;
   const importModule = options.importModule ?? importFile;
   const uid = options.uid ?? process.getuid?.();
@@ -31521,7 +31631,7 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
   });
   if (options.directory === undefined)
     yield* privateFolder(cacheHome(env, process.platform), uid, false, privateGroup(options.gid ?? process.getgid?.(), options.userName, options.groupFile ?? "/etc/group"));
-  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname11(directory)])
+  for (const folder of options.directory === undefined ? guardedFolders(env, process.platform) : [dirname12(directory)])
     yield* privateFolder(folder, uid, true);
   yield* privateFolder(directory, uid, false);
   if (!(yield* installed(directory, packages, lock))) {
@@ -31530,9 +31640,9 @@ var TuiUnavailable, pathModule = (platform) => platform === "win32" ? win323 : p
 `);
     yield* installAtomically(directory, packages, lock, install, uid);
   }
-  const target = join27(directory, TUI_BUNDLE);
+  const target = join28(directory, TUI_BUNDLE);
   yield* writeFresh(target, text);
-  yield* importModule(join27(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
+  yield* importModule(join28(directory, "node_modules", "@opentui", "solid", "scripts", "preload.js"));
   const loaded = yield* importModule(target);
   if (!isSetupTuiModule(loaded))
     return yield* new TuiUnavailable({ reason: `${target} does not export runSetupTui` });
@@ -31647,6 +31757,15 @@ var DEFAULT_CHOICES, tuiFallbackReason = (options) => {
 }, fallback = (reason) => ({
   kind: "line",
   notes: [hint(`t3 tui: ${plain(reason)}; using the line-based setup`)]
+}), stopped = (reason, applyStarted = false) => ({
+  kind: "done",
+  report: {
+    ok: false,
+    lines: [
+      `! t3 tui: ${plain(reason)}`,
+      hint(applyStarted ? "setup stopped after apply began; check your settings before retrying" : "setup changed no settings; fix the installation or rerun with --no-tui")
+    ]
+  }
 }), decodeOutcome, runInteractive, oneLine5 = (cause) => (cause instanceof Error ? cause.message : String(cause)).trim().split(`
 `)[0] ?? "";
 var init_session = __esm(() => {
@@ -31682,17 +31801,19 @@ var init_session = __esm(() => {
     const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
     const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config });
     const features = config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features);
-    const offers = features === undefined ? [] : capabilityOffers(options.form);
+    const offers = features === undefined ? [] : capabilityOffers(options.form).filter((offer) => options.t3Workflow !== true || options.form.form !== "headless" || offer.feature !== "browserUse");
     if (preview === undefined && offers.length === 0)
       return line;
     const reason = tuiFallbackReason(options);
     if (reason !== undefined)
       return preview === undefined ? line : fallback(reason);
-    const load = options.load ?? ((env, notify) => loadSetupTui(env, { notify }));
+    const load = options.load ?? (options.t3Workflow ? () => loadPackagedSetupTui() : (env, notify) => loadSetupTui(env, { notify }));
     const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
+    const fail = options.t3Workflow ? stopped : fallback;
     if (loaded instanceof TuiUnavailable)
-      return fallback(`unavailable (${loaded.reason})`);
+      return fail(`unavailable (${loaded.reason})`);
     const initialSwitches = features === undefined ? {} : features;
+    let applyStarted = false;
     const input = {
       env: options.env,
       offer: offerOf(preview, offers, options.form),
@@ -31707,7 +31828,10 @@ var init_session = __esm(() => {
           return yield* fail5(new Error("the T3 settings step has nothing to do any more"));
         return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));
       })),
-      apply: (choices, signal) => runPromise2(options.apply(choices, changedSwitches(initialSwitches, choices.capabilities)), { signal })
+      apply: (choices, signal) => {
+        applyStarted = true;
+        return runPromise2(options.apply(choices, changedSwitches(initialSwitches, choices.capabilities)), { signal });
+      }
     };
     return yield* tryPromise2({
       try: () => loaded.runSetupTui(input),
@@ -31726,7 +31850,12 @@ var init_session = __esm(() => {
           ok: false
         }
       };
-    }), catch_2((cause) => succeed6(fallback(`failed to start (${oneLine5(cause)})`))));
+    }), catch_2((cause) => {
+      const detail = oneLine5(cause);
+      if (applyStarted)
+        return succeed6(stopped(`failed (${detail})`, true));
+      return succeed6(fail(`failed to start (${detail})`));
+    }));
   });
 });
 
@@ -31738,7 +31867,121 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
   authorize: () => true
 }), CAPABILITY_FLAGS, printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
-`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]", CAPABILITY_NAMES, switchFlag, capabilitySwitches, formOf, DOCTOR_USAGE = "doctor [--scope user|project|local] [--form headless|normal] [--fix]", SETUP_COMMANDS;
+`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]", CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]", PI_USAGE, CAPABILITY_NAMES, switchFlag, capabilitySwitches, formOf, DOCTOR_USAGE = "doctor [--scope user|project|local] [--form headless|normal] [--fix]", setupCommand = (target, usage = SETUP_USAGE) => {
+  return {
+    path: target === undefined ? ["setup"] : ["setup", target],
+    usage,
+    summary: target === "claude" ? "Configure the existing Claude plugin, preserving your settings" : "Configure HolyAgent for T3 Code, skipping every step already done",
+    output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
+    notes: [
+      "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
+      "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
+      "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
+      "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
+      "internal Claude entry only: --scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
+      "internal Claude entry only: without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
+      "internal Claude settings: setup records their keys, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
+      "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
+      "a failed step is reported and the rest still run; in the internal Claude entry in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
+      `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
+      "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
+      "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
+      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the installed public CLI loads the renderer from its own package",
+      "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults"
+    ],
+    flags: {
+      scope: "string",
+      undo: "boolean",
+      "dry-run": "boolean",
+      "subagent-cache-ttl": "string",
+      "skip-ctx7": "boolean",
+      worktrees: "string",
+      "device-access": "string",
+      "no-tui": "boolean",
+      form: "string",
+      ...CAPABILITY_FLAGS
+    },
+    stateless: true,
+    positionals: 0,
+    run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow, installedPackageRoot }) => gen2(function* () {
+      const resolved = yield* resolveScope(stringFlag(args, "scope"), usage, cwd, target === "pi" || target === undefined && t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
+      if (resolved instanceof SetupFailure) {
+        return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
+      }
+      const subagentCacheTtl = yield* choiceFlag(CacheTtlFlag, "subagent-cache-ttl", stringFlag(args, "subagent-cache-ttl") ?? "1h", usage);
+      const flagged = {
+        worktrees: yield* switchFlag(args, "worktrees", usage),
+        deviceAccess: yield* switchFlag(args, "device-access", usage)
+      };
+      const capabilities = yield* capabilitySwitches(args, usage);
+      const form = yield* formOf(args, env, usage);
+      if (booleanFlag(args, "undo") && (Object.keys(capabilities).length > 0 || stringFlag(args, "form") !== undefined))
+        return yield* new Usage({
+          message: "--undo takes no capability flag and no --form",
+          hint: `Usage: holyagent ${usage}`
+        });
+      const apply = (choices, chosen, notes = []) => gen2(function* () {
+        const report = yield* setup2(coreContext2(cwd, env), {
+          scope: resolved.scope,
+          ...target === undefined ? { t3Workflow } : { target },
+          ...target === "claude" || installedPackageRoot === undefined ? {} : { installedPackageRoot },
+          undo: booleanFlag(args, "undo"),
+          subagentCacheTtl,
+          dryRun: booleanFlag(args, "dry-run"),
+          skipCtx7: booleanFlag(args, "skip-ctx7"),
+          ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
+          ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess },
+          capabilities: chosen,
+          form
+        });
+        return {
+          ...report,
+          lines: [
+            hint(`scope: ${describeScope(resolved)}`),
+            ...scopeNotices(resolved).map((notice) => hint(`scope: ${notice}`)),
+            ...notes,
+            ...report.lines
+          ]
+        };
+      }).pipe(provide4(shellLive(env)), catch_2((error) => succeed6({ lines: [`! setup: ${error.message}`], ok: false })));
+      if (target === "claude")
+        return printed(yield* apply(flagged, capabilities));
+      const interactive = yield* runInteractive({
+        env,
+        cwd,
+        scope: resolved.scope,
+        undo: booleanFlag(args, "undo"),
+        dryRun: booleanFlag(args, "dry-run"),
+        terminal,
+        t3Workflow: t3Workflow || target === "pi",
+        noTui: booleanFlag(args, "no-tui") || booleanFlag(args, "non-interactive"),
+        choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined || Object.keys(capabilities).length > 0,
+        form,
+        ...setupTui === undefined ? {} : { load: setupTui },
+        notify: emit,
+        apply: (choices, chosen) => apply(choices, chosen)
+      });
+      if (interactive.kind === "done")
+        return printed(interactive.report);
+      return printed(yield* apply(flagged, capabilities, interactive.notes));
+    }).pipe(provide4(shellLive(env)))
+  };
+}, SETUP_COMMANDS, publicPiSetup = (target) => {
+  const command = setupCommand(target, target === undefined ? "setup [pi|claude] [options]" : PI_USAGE.replace(/^setup\b/, "setup pi"));
+  const { "subagent-cache-ttl": _claudeOnly, ...flags } = command.flags;
+  return {
+    ...command,
+    summary: target === undefined ? "Configure HolyAgent (alias: install)" : command.summary,
+    flags: { ...flags, "non-interactive": "boolean" },
+    notes: [
+      ...target === undefined ? [
+        "Without a harness, setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options."
+      ] : [],
+      ...command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? [],
+      "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal."
+    ]
+  };
+}, PUBLIC_SETUP_COMMANDS;
 var init_setup2 = __esm(() => {
   init_src();
   init_dist();
@@ -31764,15 +32007,16 @@ var init_setup2 = __esm(() => {
     const scope = yield* choiceFlag(ScopeFlag, "scope", flag, usage);
     return { scope, source: "flag" };
   });
+  PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace("[--no-tui]", "[--no-tui|--non-interactive]");
   CAPABILITY_NAMES = CAPABILITIES.map((capability) => capability.name).join(", ");
-  switchFlag = fn2("switchFlag")(function* (args, name) {
+  switchFlag = fn2("switchFlag")(function* (args, name, usage) {
     const value = stringFlag(args, name);
     if (value === undefined)
       return;
-    return (yield* choiceFlag(SwitchFlag, name, value, SETUP_USAGE)) === "on";
+    return (yield* choiceFlag(SwitchFlag, name, value, usage)) === "on";
   });
-  capabilitySwitches = fn2("capabilitySwitches")(function* (args) {
-    const entries = yield* forEach2(CAPABILITIES, (capability) => switchFlag(args, capability.name).pipe(map5((value) => value === undefined ? [] : [[capability.feature, value]])));
+  capabilitySwitches = fn2("capabilitySwitches")(function* (args, usage) {
+    const entries = yield* forEach2(CAPABILITIES, (capability) => switchFlag(args, capability.name, usage).pipe(map5((value) => value === undefined ? [] : [[capability.feature, value]])));
     const choices = Object.fromEntries(entries.flat());
     return choices;
   });
@@ -31781,100 +32025,7 @@ var init_setup2 = __esm(() => {
     return chooseForm(env, flag === undefined ? undefined : yield* choiceFlag(FormFlag, "form", flag, usage));
   });
   SETUP_COMMANDS = [
-    {
-      path: ["setup"],
-      usage: SETUP_USAGE,
-      summary: "Configure HolyAgent for T3 Code, skipping every step already done",
-      output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
-      notes: [
-        "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
-        "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
-        "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
-        "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
-        "internal Claude entry only: --scope picks the file like Claude Code's scopes: user is CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json; project is .claude/settings.json and local is .claude/settings.local.json, both in the git top-level of the current directory when that is the current directory or above it and holds a .git entry, else in the current directory (a `~` line says so, outside a repository too); project and local refuse a symlinked settings file or .claude folder with a `!` line; ctx7 is installed for the user whatever the scope",
-        "internal Claude entry only: without --scope the scope is user, for the Claude Code settings and the Pi packages alike, unless your own uncommitted .claude/settings.local.json sets holyagent@holyagent to true under enabledPlugins, in a git work tree where git does not track that file, which makes both local (a tracked file, or a folder that is not a trusted git work tree, keeps user and a `~ scope:` line names the file and says --scope local targets it); an explicit false there stops the search and keeps user; a committed .claude/settings.json that enables the plugin never changes the scope, and a `~ scope:` line names the file and says --scope project targets it; the output starts with a `~ scope:` line naming the scope and, when inferred, the file; a symlinked local or project file is not read (a `~ scope:` line says so for local); a local file that is not a JSON object fails with a `!` line naming it and nothing runs",
-        "internal Claude settings: setup records their keys, per settings file, in holyagent/setup-records.json under CLAUDE_CONFIG_DIR (else ~/.claude), outside the project",
-        "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
-        "a failed step is reported and the rest still run; in the internal Claude entry in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
-        `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
-        "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
-        "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
-        "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
-        "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps"
-      ],
-      flags: {
-        scope: "string",
-        undo: "boolean",
-        "dry-run": "boolean",
-        "subagent-cache-ttl": "string",
-        "skip-ctx7": "boolean",
-        worktrees: "string",
-        "device-access": "string",
-        "no-tui": "boolean",
-        form: "string",
-        ...CAPABILITY_FLAGS
-      },
-      stateless: true,
-      positionals: 0,
-      run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow }) => gen2(function* () {
-        const resolved = yield* resolveScope(stringFlag(args, "scope"), SETUP_USAGE, cwd, t3Workflow).pipe(catchTag2("SetupFailure", (error) => succeed6(error)));
-        if (resolved instanceof SetupFailure) {
-          return printed({ lines: [`! scope: ${resolved.message}`], ok: false });
-        }
-        const subagentCacheTtl = yield* choiceFlag(CacheTtlFlag, "subagent-cache-ttl", stringFlag(args, "subagent-cache-ttl") ?? "1h", SETUP_USAGE);
-        const flagged = {
-          worktrees: yield* switchFlag(args, "worktrees"),
-          deviceAccess: yield* switchFlag(args, "device-access")
-        };
-        const capabilities = yield* capabilitySwitches(args);
-        const form = yield* formOf(args, env, SETUP_USAGE);
-        if (booleanFlag(args, "undo") && (Object.keys(capabilities).length > 0 || stringFlag(args, "form") !== undefined))
-          return yield* new Usage({
-            message: "--undo takes no capability flag and no --form",
-            hint: `Usage: holyagent ${SETUP_USAGE}`
-          });
-        const apply = (choices, chosen, notes = []) => gen2(function* () {
-          const report = yield* setup2(coreContext2(cwd, env), {
-            scope: resolved.scope,
-            t3Workflow,
-            undo: booleanFlag(args, "undo"),
-            subagentCacheTtl,
-            dryRun: booleanFlag(args, "dry-run"),
-            skipCtx7: booleanFlag(args, "skip-ctx7"),
-            ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
-            ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess },
-            capabilities: chosen,
-            form
-          });
-          return {
-            ...report,
-            lines: [
-              hint(`scope: ${describeScope(resolved)}`),
-              ...scopeNotices(resolved).map((notice) => hint(`scope: ${notice}`)),
-              ...notes,
-              ...report.lines
-            ]
-          };
-        }).pipe(provide4(shellLive(env)), catch_2((error) => succeed6({ lines: [`! setup: ${error.message}`], ok: false })));
-        const interactive = yield* runInteractive({
-          env,
-          cwd,
-          scope: resolved.scope,
-          undo: booleanFlag(args, "undo"),
-          dryRun: booleanFlag(args, "dry-run"),
-          terminal,
-          noTui: booleanFlag(args, "no-tui"),
-          choiceFlag: flagged.worktrees !== undefined || flagged.deviceAccess !== undefined || Object.keys(capabilities).length > 0,
-          form,
-          ...setupTui === undefined ? {} : { load: setupTui },
-          notify: emit,
-          apply: (choices, chosen) => apply(choices, chosen)
-        });
-        if (interactive.kind === "done")
-          return printed(interactive.report);
-        return printed(yield* apply(flagged, capabilities, interactive.notes));
-      }).pipe(provide4(shellLive(env)))
-    },
+    setupCommand(),
     {
       path: ["doctor"],
       usage: DOCTOR_USAGE,
@@ -31912,6 +32063,29 @@ var init_setup2 = __esm(() => {
         });
       }).pipe(provide4(shellLive(env)))
     }
+  ];
+  PUBLIC_SETUP_COMMANDS = [
+    publicPiSetup("pi"),
+    {
+      ...setupCommand("claude", CLAUDE_USAGE),
+      summary: "Configure an existing Claude Code plugin installation",
+      flags: {
+        scope: "string",
+        undo: "boolean",
+        "dry-run": "boolean",
+        "subagent-cache-ttl": "string",
+        "skip-ctx7": "boolean",
+        "no-tui": "boolean",
+        "non-interactive": "boolean"
+      },
+      notes: [
+        "Install the Claude Code plugin separately. Setup adds missing settings and keeps existing values.",
+        "--scope defaults to local when untracked local settings enable the plugin, and user otherwise. --subagent-cache-ttl defaults to 1h. Context7 is installed if needed unless you pass --skip-ctx7 or setup runs on claude.ai.",
+        "--undo removes only values recorded by setup that are still unchanged. --dry-run previews without writing. Both are off by default.",
+        "Claude Code setup runs without a TUI or stdin prompts. --non-interactive and --no-tui are accepted for scripts."
+      ]
+    },
+    publicPiSetup()
   ];
 });
 
@@ -32120,6 +32294,11 @@ var init_context2 = __esm(() => {
   LITERAL_RUN = /(?:"[^"]*" \| ){4,}"[^"]*"/g;
 });
 
+var init_json_file2 = __esm(() => {
+  init_json_file();
+});
+
+import { isAbsolute as isAbsolute10, join as join29, relative as relative7 } from "path";
 var RELEASE, VERSION_RESPONSE, REGISTRY = "https://registry.npmjs.org/", USAGE = "update [--version <0.x.y>] [--dry-run]", failure = (message, result) => {
   const details = result?.stderr.trim() || result?.stdout.trim();
   return new Verbatim("", details ? `${message}
@@ -32130,13 +32309,15 @@ ${details}
 var init_public_maintenance = __esm(() => {
   init_dist();
   init_package();
+  init_pi_install();
   init_environment3();
+  init_json_file2();
   init_pi_check2();
   init_shell2();
   init_args();
   RELEASE = String6.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
   VERSION_RESPONSE = fromJsonString2(RELEASE);
-  updateInstallation = fn2("updateInstallation")(function* (env, requested, dryRun) {
+  updateInstallation = fn2("updateInstallation")(function* (env, requested, dryRun, installedPackageRoot) {
     const target = requested === undefined ? undefined : yield* choiceFlag(RELEASE, "version", requested, USAGE);
     const shell = yield* Shell;
     if (isNone2(yield* shell.which("npm")))
@@ -32146,8 +32327,34 @@ var init_public_maintenance = __esm(() => {
     const cwd = homeDirectory2(env);
     const [settings] = piSettingsFiles(env, cwd);
     const sources = yield* piSettingsSources(settings);
-    if (sources.some((source) => isHolyagentSource(source) && parseNpmSource(source) === undefined))
-      return failure("Pi is loading HolyAgent from Git or a local path. Remove that source before switching to npm with the HolyAgent quickstart.");
+    let managed = 0;
+    let npmRegistered = false;
+    for (const entry of sources) {
+      const source = entry.trim();
+      const npm = parseNpmSource(source);
+      if (npm !== undefined) {
+        npmRegistered ||= npm.name.trim() === "holyagent";
+        continue;
+      }
+      const local = piLocalSourcePath(env, settings, source);
+      if (local !== undefined && installedPackageRoot !== undefined && isAbsolute10(installedPackageRoot) && relative7(installedPackageRoot, local) === "") {
+        managed++;
+        continue;
+      }
+      if (isHolyagentSource(source) || local !== undefined && (yield* localHolyagentPackageAt(local)))
+        return failure("Pi is loading HolyAgent from Git or a local path. Remove that source before switching to npm with the HolyAgent quickstart.");
+    }
+    if (managed > 1 || managed === 1 && npmRegistered)
+      return failure("Pi has multiple HolyAgent registrations. Keep the intended source and retry.");
+    const registeredRoot = managed === 1 ? installedPackageRoot : undefined;
+    if (registeredRoot !== undefined) {
+      const root = yield* shell.run("npm", ["root", "--global"], { cwd });
+      if (root.exitCode !== 0)
+        return failure("Could not verify npm's global installation path.", root);
+      const location = root.stdout.trim();
+      if (!isAbsolute10(location) || relative7(registeredRoot, join29(location, "holyagent")) !== "")
+        return failure("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
+    }
     const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
     if (selected.exitCode !== 0)
       return failure("Could not resolve the HolyAgent release on npm.", selected);
@@ -32161,18 +32368,32 @@ var init_public_maintenance = __esm(() => {
       return new Verbatim(`Would install HolyAgent ${version2} in Pi and on the npm global PATH.
 `, "", 0);
     const source = `holyagent@${version2}`;
-    const pi = yield* shell.run("pi", ["install", `npm:${source}`], {
-      cwd,
-      env: {
-        PI_CODING_AGENT_DIR: piAgentDirectory(env),
-        npm_config_registry: REGISTRY,
-        npm_config_ignore_scripts: "true"
-      }
-    });
-    if (pi.exitCode !== 0)
-      return failure("The Pi backend update failed. The global commands were left in place.", pi);
-    const npm = yield* shell.run("npm", ["install", "-g", "--ignore-scripts", "--legacy-peer-deps", "--registry", REGISTRY, source], { cwd });
-    if (npm.exitCode !== 0)
+    if (registeredRoot === undefined) {
+      const pi = yield* shell.run("pi", ["install", `npm:${source}`], {
+        cwd,
+        env: {
+          PI_CODING_AGENT_DIR: piAgentDirectory(env),
+          npm_config_registry: REGISTRY,
+          npm_config_ignore_scripts: "true"
+        }
+      });
+      if (pi.exitCode !== 0)
+        return failure("The Pi backend update failed. The global commands were left in place.", pi);
+    }
+    const npm = yield* shell.run("npm", [
+      "install",
+      "-g",
+      "--ignore-scripts",
+      ...registeredRoot === undefined ? ["--legacy-peer-deps"] : [],
+      "--registry",
+      REGISTRY,
+      source
+    ], { cwd });
+    if (registeredRoot !== undefined) {
+      const manifest = yield* readJsonObject(join29(registeredRoot, "package.json")).pipe(option2);
+      if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
+        return failure(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
+    } else if (npm.exitCode !== 0)
       return failure(`Pi has HolyAgent ${version2}. The global command update failed. Retry with holyagent update --version ${version2}.`, npm);
     return new Verbatim(`Installed HolyAgent ${version2} in Pi and on the npm global PATH. Restart T3 Code to load it.
 `, "", 0);
@@ -32189,14 +32410,14 @@ var init_public_maintenance = __esm(() => {
       flags: { version: "string", "dry-run": "boolean" },
       stateless: true,
       positionals: 0,
-      run: ({ args, env }) => updateInstallation(env, stringFlag(args, "version"), booleanFlag(args, "dry-run")).pipe(provide4(shellLive(env)))
+      run: ({ args, env, installedPackageRoot }) => updateInstallation(env, stringFlag(args, "version"), booleanFlag(args, "dry-run"), installedPackageRoot).pipe(provide4(shellLive(env)))
     }
   ];
 });
 
 import { constants as constants6, fstatSync } from "fs";
 import { open as open8, stat as stat7 } from "fs/promises";
-import { resolve as resolve12 } from "path";
+import { resolve as resolve13 } from "path";
 var encodeRecord = (value) => encode2(value, {
   replacer: (_key, item) => typeof item === "string" && /[\u007f-\u009f]/.test(item) ? rawString(`"${escapeString(item)}"`) : item
 }).replace(/[\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`), renderRecord = (output) => output instanceof WithTrailer ? `${encodeRecord(output.fields)}
@@ -32217,12 +32438,12 @@ ${plainText(output.text)}
     ...(notes ?? []).map((note) => `note: ${note}`)
   ].join(`
 `);
-}, publicSetupCommands, install, publicCommands, agentCommands, commandsFor = (surface) => surface === "agent" ? agentCommands : surface === "public" ? publicCommands : COMMANDS, listed = (commands, host) => commands.filter((command) => command.hosts === undefined || command.hosts.includes(host)), topHelp = (commands, words, surface) => [
-  ...surface === "public" ? ["Manage your HolyAgent installation for T3 Code.", "Run holyagent <command> [options]."] : [
+}, hostDoctor, publicCommands, agentCommands, commandsFor = (surface) => surface === "agent" ? agentCommands : surface === "public" ? publicCommands : COMMANDS, listed = (commands, host) => commands.filter((command) => command.hosts === undefined || command.hosts.includes(host)), topHelp = (commands, words, surface) => [
+  ...surface === "public" ? ["Manage your HolyAgent installation.", "Run holyagent <command> [options]."] : [
     "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
     "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure."
   ],
-  ...commands.map((command) => {
+  ...commands.filter((command) => surface !== "public" || command.path.length === 1).map((command) => {
     const { usage, summary } = forWords(command, words);
     return `${usage}  ${summary}`;
   }),
@@ -32315,6 +32536,7 @@ ${plainText(output.text)}
     vcs: host.vcs ?? vcsLive(root, host.env),
     terminal: surface === "agent" ? undefined : host.terminal,
     t3Workflow: surface === "public" || (host.t3Workflow ?? false),
+    installedPackageRoot: surface === "public" ? host.installedPackageRoot : undefined,
     setupTui: host.setupTui,
     input: (schema) => inputBy(() => schema),
     inputBy
@@ -32341,7 +32563,7 @@ ${plainText(output.text)}
       message: "Missing project directory",
       hint: `Give a directory after ${PI_PROJECT_FLAG}.`
     });
-  const cwd = resolve12(host.cwd, directory);
+  const cwd = resolve13(host.cwd, directory);
   const location = yield* tryPromise2({
     try: () => stat7(cwd),
     catch: (cause) => new StateIo({ path: cwd, cause })
@@ -32354,8 +32576,9 @@ ${plainText(output.text)}
   return { argv: rest, host: { ...host, cwd } };
 }), execute = (given, initialHost, surface) => gen2(function* () {
   const { argv: projectArgs, host } = yield* projectContext(given, initialHost, surface);
-  const argv = asFlag(projectArgs);
-  const [first] = argv;
+  const request = asFlag(projectArgs);
+  const argv = surface === "public" && request[0] === "install" ? ["setup", ...request.slice(1)] : request;
+  const [first, second] = argv;
   const commands = commandsFor(surface);
   if (first === undefined || isHelp(first)) {
     const agent = yield* hostForText(host.env);
@@ -32383,6 +32606,11 @@ ${plainText(output.text)}
       hint: group.length > 0 ? `Run \`${program} ${first} --help\` for its commands.` : `Run \`${program} --help\` for the commands.`
     });
   }
+  if (surface === "public" && first === "setup" && command.path.length === 1 && second !== undefined && !second.startsWith("-"))
+    return yield* new Usage({
+      message: `Unknown setup harness ${second}`,
+      hint: "Choose pi or claude. Run `holyagent setup --help` for options."
+    });
   const provided = argv.slice(command.path.length);
   if ((surface === "agent" || command.passthrough !== true) && requestsHelp(provided)) {
     const agent = yield* hostForText(host.env);
@@ -32402,9 +32630,9 @@ ${plainText(output.text)}
   const capture = (text) => sync2(() => void emitted.push(text));
   const write = surface === "agent" ? capture : host.emit ?? capture;
   const emit = (text) => write(plainText(text));
-  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve12(host.cwd, adapted.reportFile));
+  const report = adapted?.reportFile === undefined ? undefined : yield* readAgentReport(resolve13(host.cwd, adapted.reportFile));
   if (surface === "agent" && command.path.join(" ") === "assignment reports") {
-    const path = resolve12(host.cwd, args.positionals[0] ?? "");
+    const path = resolve13(host.cwd, args.positionals[0] ?? "");
     const source = yield* tryPromise2(() => stat7(path)).pipe(orElseSucceed2(() => {
       return;
     }));
@@ -32474,26 +32702,13 @@ var init_program = __esm(() => {
   init_errors4();
   init_public_maintenance();
   init_setup2();
-  publicSetupCommands = SETUP_COMMANDS.map((command) => {
-    const { "subagent-cache-ttl": _claudeOnly, ...flags } = command.flags;
-    return {
-      ...command,
-      flags,
-      usage: command.usage.replace(" [--subagent-cache-ttl 1h|5m]", ""),
-      notes: command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []
-    };
-  });
-  install = publicSetupCommands.find((command) => command.path[0] === "setup");
+  [, hostDoctor] = SETUP_COMMANDS;
   publicCommands = [
-    ...install === undefined ? [] : [
-      {
-        ...install,
-        path: ["install"],
-        usage: install.usage.replace(/^setup\b/, "install"),
-        summary: "Set up the HolyAgent installation for T3 Code"
-      }
-    ],
-    ...publicSetupCommands,
+    ...PUBLIC_SETUP_COMMANDS,
+    {
+      ...hostDoctor,
+      notes: hostDoctor.notes.filter((note) => !/internal Claude|claude\.ai cloud/.test(note))
+    },
     ...PUBLIC_MAINTENANCE_COMMANDS
   ];
   agentCommands = COMMANDS.filter(({ path: [group] }) => group !== "setup" && group !== "doctor" && group !== "hook" && group !== "browser-server");
@@ -32504,12 +32719,13 @@ var exports_entry = {};
 __export(exports_entry, {
   main: () => main
 });
-var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write2 = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause))), main = (interactiveSetup = false, surface = "host") => runPromise2(gen2(function* () {
+var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write2 = (stream, text) => try_2({ try: () => void stream.write(text), catch: (cause) => cause }).pipe(catch_2((cause) => brokenPipe(cause) ? sync2(() => process.exit(0)) : die3(cause))), main = (interactiveSetup = false, surface = "host", installedPackageRoot) => runPromise2(gen2(function* () {
   const result = yield* run2(Bun.argv.slice(2), {
     cwd: process.cwd(),
     env: process.env,
     stdin: surface === "agent" ? fail5(new StdinMissing({ reason: "stdin is unavailable" })) : stdin,
     ...surface === "agent" ? {} : { emit: (text) => write2(process.stdout, text) },
+    ...surface === "public" && installedPackageRoot !== undefined ? { installedPackageRoot } : {},
     ...interactiveSetup ? {
       t3Workflow: true,
       terminal: {

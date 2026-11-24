@@ -16,6 +16,7 @@ import {
 } from "../setup/scope.ts"
 import { CACHE_TTLS } from "../setup/settings.ts"
 import { type Shell, shellLive } from "../setup/shell.ts"
+import type { SetupTarget } from "../setup/steps.ts"
 import { runInteractive } from "../setup/tui/session.ts"
 import { booleanFlag, choiceFlag, stringFlag } from "./args.ts"
 import { Usage } from "./errors.ts"
@@ -63,16 +64,24 @@ const resolveScope = Effect.fn("resolveScope")(function* (
 const SETUP_USAGE =
   "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]"
 
+const CLAUDE_USAGE =
+  "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]"
+const PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replace(
+  "[--no-tui]",
+  "[--no-tui|--non-interactive]",
+)
+
 const CAPABILITY_NAMES = CAPABILITIES.map((capability) => capability.name).join(", ")
 
 /** A `--worktrees` or `--device-access` value as the choice it makes, or `undefined` when not given. */
 const switchFlag = Effect.fn("switchFlag")(function* (
   args: Parameters<typeof stringFlag>[0],
   name: string,
+  usage: string,
 ) {
   const value = stringFlag(args, name)
   if (value === undefined) return undefined
-  return (yield* choiceFlag(SwitchFlag, name, value, SETUP_USAGE)) === "on"
+  return (yield* choiceFlag(SwitchFlag, name, value, usage)) === "on"
 })
 
 /**
@@ -81,9 +90,10 @@ const switchFlag = Effect.fn("switchFlag")(function* (
  */
 const capabilitySwitches = Effect.fn("capabilitySwitches")(function* (
   args: Parameters<typeof stringFlag>[0],
+  usage: string,
 ) {
   const entries = yield* Effect.forEach(CAPABILITIES, (capability) =>
-    switchFlag(args, capability.name).pipe(
+    switchFlag(args, capability.name, usage).pipe(
       Effect.map((value) => (value === undefined ? [] : [[capability.feature, value] as const])),
     ),
   )
@@ -105,17 +115,14 @@ const formOf = Effect.fn("formOf")(function* (
 })
 const DOCTOR_USAGE = "doctor [--scope user|project|local] [--form headless|normal] [--fix]"
 
-/**
- * The `setup` and `doctor` commands, which install and check what HolyAgent needs beside the
- * plugin. Both are stateless: they never read the HolyAgent state, and the settings file they work
- * on is the one `--scope` names, else `local` when the user's own untracked local settings enable
- * the plugin, else `user`.
- */
-export const SETUP_COMMANDS: ReadonlyArray<Command> = [
-  {
-    path: ["setup"],
-    usage: SETUP_USAGE,
-    summary: "Configure HolyAgent for T3 Code, skipping every step already done",
+const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
+  return {
+    path: target === undefined ? ["setup"] : ["setup", target],
+    usage,
+    summary:
+      target === "claude"
+        ? "Configure the existing Claude plugin, preserving your settings"
+        : "Configure HolyAgent for T3 Code, skipping every step already done",
     output:
       "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
@@ -131,8 +138,8 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
       `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
-      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the first time it installs the packages the screen runs on (OpenTUI and Solid, at the versions of this release) with bun install into HolyAgent's cache folder (XDG_CACHE_HOME, else ~/.cache; LOCALAPPDATA on Windows)",
-      "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, a flag above was given, or the screen cannot be installed or started (offline); nothing about the screen changes the other steps",
+      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the installed public CLI loads the renderer from its own package",
+      "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults",
     ],
     flags: {
       scope: "string",
@@ -148,13 +155,13 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
     },
     stateless: true,
     positionals: 0,
-    run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow }) =>
+    run: ({ args, env, cwd, emit, terminal, setupTui, t3Workflow, installedPackageRoot }) =>
       Effect.gen(function* () {
         const resolved = yield* resolveScope(
           stringFlag(args, "scope"),
-          SETUP_USAGE,
+          usage,
           cwd,
-          t3Workflow,
+          target === "pi" || (target === undefined && t3Workflow),
         ).pipe(Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)))
         if (resolved instanceof SetupFailure) {
           return printed({ lines: [`! scope: ${resolved.message}`], ok: false })
@@ -163,21 +170,21 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
           CacheTtlFlag,
           "subagent-cache-ttl",
           stringFlag(args, "subagent-cache-ttl") ?? "1h",
-          SETUP_USAGE,
+          usage,
         )
         const flagged = {
-          worktrees: yield* switchFlag(args, "worktrees"),
-          deviceAccess: yield* switchFlag(args, "device-access"),
+          worktrees: yield* switchFlag(args, "worktrees", usage),
+          deviceAccess: yield* switchFlag(args, "device-access", usage),
         }
-        const capabilities = yield* capabilitySwitches(args)
-        const form = yield* formOf(args, env, SETUP_USAGE)
+        const capabilities = yield* capabilitySwitches(args, usage)
+        const form = yield* formOf(args, env, usage)
         if (
           booleanFlag(args, "undo") &&
           (Object.keys(capabilities).length > 0 || stringFlag(args, "form") !== undefined)
         )
           return yield* new Usage({
             message: "--undo takes no capability flag and no --form",
-            hint: `Usage: holyagent ${SETUP_USAGE}`,
+            hint: `Usage: holyagent ${usage}`,
           })
         const apply = (
           choices: {
@@ -190,7 +197,10 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
           Effect.gen(function* () {
             const report = yield* coreSetup.setup(coreContext(cwd, env), {
               scope: resolved.scope,
-              t3Workflow,
+              ...(target === undefined ? { t3Workflow } : { target }),
+              ...(target === "claude" || installedPackageRoot === undefined
+                ? {}
+                : { installedPackageRoot }),
               undo: booleanFlag(args, "undo"),
               subagentCacheTtl,
               dryRun: booleanFlag(args, "dry-run"),
@@ -215,6 +225,7 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
               Effect.succeed({ lines: [`! setup: ${error.message}`], ok: false }),
             ),
           )
+        if (target === "claude") return printed(yield* apply(flagged, capabilities))
         const interactive = yield* runInteractive({
           env,
           cwd,
@@ -222,7 +233,8 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
           undo: booleanFlag(args, "undo"),
           dryRun: booleanFlag(args, "dry-run"),
           terminal,
-          noTui: booleanFlag(args, "no-tui"),
+          t3Workflow: t3Workflow || target === "pi",
+          noTui: booleanFlag(args, "no-tui") || booleanFlag(args, "non-interactive"),
           choiceFlag:
             flagged.worktrees !== undefined ||
             flagged.deviceAccess !== undefined ||
@@ -235,7 +247,12 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
         if (interactive.kind === "done") return printed(interactive.report)
         return printed(yield* apply(flagged, capabilities, interactive.notes))
       }).pipe(Effect.provide(shellLive(env))),
-  },
+  }
+}
+
+/** Setup and diagnostics retained for the bundled private host entry. */
+export const SETUP_COMMANDS = [
+  setupCommand(),
   {
     path: ["doctor"],
     usage: DOCTOR_USAGE,
@@ -281,4 +298,51 @@ export const SETUP_COMMANDS: ReadonlyArray<Command> = [
         })
       }).pipe(Effect.provide(shellLive(env))),
   },
+] as const satisfies ReadonlyArray<Command>
+
+const publicPiSetup = (target?: "pi"): Command => {
+  const command = setupCommand(
+    target,
+    target === undefined ? "setup [pi|claude] [options]" : PI_USAGE.replace(/^setup\b/, "setup pi"),
+  )
+  const { "subagent-cache-ttl": _claudeOnly, ...flags } = command.flags
+  return {
+    ...command,
+    summary: target === undefined ? "Configure HolyAgent (alias: install)" : command.summary,
+    flags: { ...flags, "non-interactive": "boolean" },
+    notes: [
+      ...(target === undefined
+        ? [
+            "Without a harness, setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options.",
+          ]
+        : []),
+      ...(command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []),
+      "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal.",
+    ],
+  }
+}
+
+/** Explicit harness selectors share the public setup handler and precede the bare command. */
+export const PUBLIC_SETUP_COMMANDS: ReadonlyArray<Command> = [
+  publicPiSetup("pi"),
+  {
+    ...setupCommand("claude", CLAUDE_USAGE),
+    summary: "Configure an existing Claude Code plugin installation",
+    flags: {
+      scope: "string",
+      undo: "boolean",
+      "dry-run": "boolean",
+      "subagent-cache-ttl": "string",
+      "skip-ctx7": "boolean",
+      "no-tui": "boolean",
+      "non-interactive": "boolean",
+    },
+    notes: [
+      "Install the Claude Code plugin separately. Setup adds missing settings and keeps existing values.",
+      "--scope defaults to local when untracked local settings enable the plugin, and user otherwise. --subagent-cache-ttl defaults to 1h. Context7 is installed if needed unless you pass --skip-ctx7 or setup runs on claude.ai.",
+      "--undo removes only values recorded by setup that are still unchanged. --dry-run previews without writing. Both are off by default.",
+      "Claude Code setup runs without a TUI or stdin prompts. --non-interactive and --no-tui are accepted for scripts.",
+    ],
+  },
+  publicPiSetup(),
 ]

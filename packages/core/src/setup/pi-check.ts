@@ -276,6 +276,51 @@ export const piInUse = (env: Env) =>
     return Option.isSome(yield* (yield* Shell).which("pi"))
   })
 
+/** A Pi session either runs under the T3 bridge or launches its standalone screen backend. */
+export type PiExecutionSurface = "t3" | "standalone"
+
+/** Uses explicit selection or the Pi runtime's hosted marker. Pi on PATH alone is inconclusive. */
+export const piExecutionSurface = (
+  env: Env,
+  selected?: PiExecutionSurface,
+): PiExecutionSurface | undefined =>
+  selected ?? (env["HOLYAGENT_T3_HOSTED"] === "1" ? "t3" : undefined)
+
+/** Whether setup or doctor is diagnosing the shell commands used for ordinary search. */
+export const usesStandaloneSearch = (
+  env: Env,
+  piUsed: boolean,
+  surface?: PiExecutionSurface,
+): boolean =>
+  surface === undefined && (firstNonEmpty(env["HOLYAGENT_HOST"]) === "claude" || !piUsed)
+
+/** Describes the selected headless browser route and whether to check the standalone server. */
+export const headlessBrowserRoute = (config: Config, surface?: PiExecutionSurface) => {
+  const { browserUse, mcp } = config.pi.features
+  if (surface === "t3") {
+    const detail = mcp
+      ? "T3 Code provides the headless browser through the Preview tools in its Pi threads"
+      : "enable Pi MCP to make the Preview tools available in T3 Code"
+    return { probe: false, lines: [hint(`T3 Preview: ${detail}`)] }
+  }
+  if (!browserUse) return { probe: false, lines: [] }
+  if (!mcp)
+    return {
+      probe: false,
+      lines: [hint("browser-use: Pi MCP is off, so the headless browser server is not started")],
+    }
+  if (surface === undefined)
+    return {
+      probe: false,
+      lines: [
+        hint(
+          "headless browser: T3-hosted Pi uses T3 Preview; only standalone Pi launches browser-use and needs uvx and Chromium",
+        ),
+      ],
+    }
+  return { probe: true, lines: [] }
+}
+
 /**
  * The capability switches of a run that the config files do not hold yet, by `pi.features` key:
  * what `--<capability> on|off` or the setup screen chose, applied over the loaded config so a dry
@@ -518,11 +563,15 @@ const checkCapabilities = (
   config: Config,
   choice: FormChoice,
   listed: ReadonlyArray<string>,
+  surface: PiExecutionSurface | undefined,
 ) =>
   Effect.gen(function* () {
     const files = piPresenceFiles(env, cwd, scope)
+    const headless = choice.form === "headless" ? headlessBrowserRoute(config, surface) : undefined
     const lines = yield* Effect.forEach(
-      enabledCapabilities(config.pi.features, { provider: config.pi.provider }),
+      enabledCapabilities(config.pi.features, { provider: config.pi.provider }).filter(
+        ({ feature }) => feature !== "browserUse" || headless?.probe !== false,
+      ),
       (capability) =>
         Effect.gen(function* () {
           return [
@@ -532,7 +581,7 @@ const checkCapabilities = (
           ]
         }),
     )
-    return [pass("pi form", describeForm(choice)), ...lines.flat()]
+    return [pass("pi form", describeForm(choice)), ...(headless?.lines ?? []), ...lines.flat()]
   })
 
 /**
@@ -542,20 +591,22 @@ const checkCapabilities = (
  * folder, `PI_CODING_AGENT_DIR` honored), the base packages (provider, web kit) those settings do
  * not list at their pins, then the form in force and one line for each enabled capability: its
  * system needs and its packages at their pins, or why its form does not offer it
- * ({@link checkCapability}). The form is the `choice` (detected or named by `--form`; `normal` when
- * the caller passes none). Scope `project` and `local` also count the project's `.pi/settings.json`
- * ({@link piPresenceFiles}); scope `user` does not. Every failing line ends with the command that
- * fixes it, and nothing is installed or written. The config is the one `setup` reads at the same
- * scope ({@link loadPiConfig}). The checks run only while Pi is in use ({@link piInUse}) and
- * `pi.enable` is on in that config; when Pi is not in use there is one informational `~` line
- * saying so, with `pi.enable` off there are no lines, and a config that cannot be loaded gives one
- * failing `pi config` line.
+ * ({@link checkCapability}). Headless browser requirements follow the selected Pi surface. The form
+ * is the `choice` (detected or named by `--form`; `normal` when the caller passes none). Scope
+ * `project` and `local` also count the project's `.pi/settings.json` ({@link piPresenceFiles});
+ * scope `user` does not. Every failing line ends with the command that fixes it, and nothing is
+ * installed or written. The config is the one `setup` reads at the same scope
+ * ({@link loadPiConfig}). The checks run only while Pi is in use ({@link piInUse}) and `pi.enable`
+ * is on in that config; when Pi is not in use there is one informational `~` line saying so, with
+ * `pi.enable` off there are no lines, and a config that cannot be loaded gives one failing `pi
+ * config` line.
  */
 export const piChecks = (
   env: Env,
   cwd: string,
   scope: Scope,
   choice: FormChoice = DEFAULT_FORM_CHOICE,
+  surface = piExecutionSurface(env),
 ): Effect.Effect<ReadonlyArray<string>, never, Shell> =>
   Effect.gen(function* () {
     if (!(yield* piInUse(env)))
@@ -581,7 +632,7 @@ export const piChecks = (
                   node,
                   pkg,
                   ...checkBasePackages(files, scope, config, listed),
-                  ...(yield* checkCapabilities(env, cwd, scope, config, choice, listed)),
+                  ...(yield* checkCapabilities(env, cwd, scope, config, choice, listed, surface)),
                 ]
               })
             : Effect.succeed<ReadonlyArray<string>>([]),

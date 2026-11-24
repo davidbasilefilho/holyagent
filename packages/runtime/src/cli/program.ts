@@ -21,7 +21,7 @@ import { agentHostOf, loadConfig } from "./config.ts"
 import { decodeInputValueBy, decodeJsonInputBy, readInputBy, readReport } from "./context.ts"
 import { describeFailure, plainText, StdinMissing, Usage } from "./errors.ts"
 import { PUBLIC_MAINTENANCE_COMMANDS } from "./public-maintenance.ts"
-import { SETUP_COMMANDS } from "./setup.ts"
+import { PUBLIC_SETUP_COMMANDS, SETUP_COMMANDS } from "./setup.ts"
 import {
   type Call,
   type CliSurface,
@@ -81,31 +81,15 @@ const help = (command: Command, words: HostWords): string => {
   ].join("\n")
 }
 
-const publicSetupCommands = SETUP_COMMANDS.map((command): Command => {
-  // These are retained for the host's private setup, never for the public T3 Code workflow.
-  const { "subagent-cache-ttl": _claudeOnly, ...flags } = command.flags
-  return {
-    ...command,
-    flags,
-    usage: command.usage.replace(" [--subagent-cache-ttl 1h|5m]", ""),
-    notes: command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? [],
-  }
-})
-const install = publicSetupCommands.find((command) => command.path[0] === "setup")
-const publicCommands = [
-  ...(install === undefined
-    ? []
-    : [
-        {
-          ...install,
-          path: ["install"],
-          usage: install.usage.replace(/^setup\b/, "install"),
-          summary: "Set up the HolyAgent installation for T3 Code",
-        },
-      ]),
-  ...publicSetupCommands,
+const [, hostDoctor] = SETUP_COMMANDS
+const publicCommands: ReadonlyArray<Command> = [
+  ...PUBLIC_SETUP_COMMANDS,
+  {
+    ...hostDoctor,
+    notes: hostDoctor.notes.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)),
+  },
   ...PUBLIC_MAINTENANCE_COMMANDS,
-] satisfies ReadonlyArray<Command>
+]
 const agentCommands = COMMANDS.filter(
   ({ path: [group] }) =>
     group !== "setup" && group !== "doctor" && group !== "hook" && group !== "browser-server",
@@ -120,15 +104,17 @@ const listed = (commands: ReadonlyArray<Command>, host: AgentHost) =>
 const topHelp = (commands: ReadonlyArray<Command>, words: HostWords, surface: CliSurface): string =>
   [
     ...(surface === "public"
-      ? ["Manage your HolyAgent installation for T3 Code.", "Run holyagent <command> [options]."]
+      ? ["Manage your HolyAgent installation.", "Run holyagent <command> [options]."]
       : [
           "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
           "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure.",
         ]),
-    ...commands.map((command) => {
-      const { usage, summary } = forWords(command, words)
-      return `${usage}  ${summary}`
-    }),
+    ...commands
+      .filter((command) => surface !== "public" || command.path.length === 1)
+      .map((command) => {
+        const { usage, summary } = forWords(command, words)
+        return `${usage}  ${summary}`
+      }),
     "Run holyagent help [command] for details.",
   ].join("\n")
 
@@ -294,6 +280,7 @@ const callFor = (
       vcs: host.vcs ?? vcsLive(root, host.env),
       terminal: surface === "agent" ? undefined : host.terminal,
       t3Workflow: surface === "public" || (host.t3Workflow ?? false),
+      installedPackageRoot: surface === "public" ? host.installedPackageRoot : undefined,
       setupTui: host.setupTui,
       input: (schema) => inputBy(() => schema),
       inputBy,
@@ -355,8 +342,10 @@ const projectContext = (given: ReadonlyArray<string>, host: Host, surface: CliSu
 const execute = (given: ReadonlyArray<string>, initialHost: Host, surface: CliSurface) =>
   Effect.gen(function* () {
     const { argv: projectArgs, host } = yield* projectContext(given, initialHost, surface)
-    const argv = asFlag(projectArgs)
-    const [first] = argv
+    const request = asFlag(projectArgs)
+    const argv =
+      surface === "public" && request[0] === "install" ? ["setup", ...request.slice(1)] : request
+    const [first, second] = argv
     const commands = commandsFor(surface)
     if (first === undefined || isHelp(first)) {
       const agent = yield* hostForText(host.env)
@@ -394,6 +383,17 @@ const execute = (given: ReadonlyArray<string>, initialHost: Host, surface: CliSu
             : `Run \`${program} --help\` for the commands.`,
       })
     }
+    if (
+      surface === "public" &&
+      first === "setup" &&
+      command.path.length === 1 &&
+      second !== undefined &&
+      !second.startsWith("-")
+    )
+      return yield* new Usage({
+        message: `Unknown setup harness ${second}`,
+        hint: "Choose pi or claude. Run `holyagent setup --help` for options.",
+      })
     const provided = argv.slice(command.path.length)
     if ((surface === "agent" || command.passthrough !== true) && requestsHelp(provided)) {
       const agent = yield* hostForText(host.env)
