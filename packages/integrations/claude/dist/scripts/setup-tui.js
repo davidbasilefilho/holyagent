@@ -3450,7 +3450,7 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
-var FFF_OVERRIDE_SETTINGS = { mode: "override" };
+var FFF_OVERRIDE_SETTINGS = { mode: "override", enableHomeDirScanning: false };
 var FFF_NATIVE_HOSTS = [
   "darwin-arm64",
   "darwin-x64",

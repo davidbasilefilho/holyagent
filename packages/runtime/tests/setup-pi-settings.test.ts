@@ -118,10 +118,10 @@ const COMPUTER_USE = {
 }
 const SUBAGENTS = { disableDefaultAgents: true, fallbackSubagent: "none" }
 /**
- * `@ff-labs/pi-fff`'s file with the override mode that puts its tools in place of Pi's. Setup
- * leaves `followSymlinks` out, so the package follows directory links by its own default.
+ * Setup's defaults for `@ff-labs/pi-fff`: override Pi's search tools in projects, but do not index
+ * a session started at the home directory itself.
  */
-const PI_FFF = { mode: "override" }
+const PI_FFF = { mode: "override", enableHomeDirScanning: false }
 const BILLION_SUBAGENTS = { pi: { subagents: false } }
 /** What setup writes into Billion Context's file: the subagents setting and the guardrails off. */
 const BILLION = { ...BILLION_SUBAGENTS, ...BILLION_CONTEXT_GUARDRAILS_FILE }
@@ -389,15 +389,55 @@ describe("holyagent setup, Pi tool settings", () => {
   describe("fff", () => {
     const off = { pi: { features: { fff: false } } }
     const ADDED = () => `+ tool settings ${piFff()}: added mode "override"`
-    const REMOVED = () => `- tool settings ${piFff()}: removed mode "override"`
+    const REMOVED = () =>
+      `- tool settings ${piFff()}: removed mode "override", enableHomeDirScanning false`
 
     test("puts pi-fff in override mode in Pi's agent folder, beside what the file holds", async () => {
       await installed()
       await write(piFff(), { enableHomeDirScanning: false })
       const report = await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ enableHomeDirScanning: false, ...PI_FFF })
-      expect(toolLines(report)).toContain(ADDED())
+      expect(await read(piFff())).toEqual(PI_FFF)
+      expect(toolLines(report)).toContain(`${ADDED()}; already set: enableHomeDirScanning`)
     })
+
+    test("adds the home-specific guard to an existing setup once, without touching warnings", async () => {
+      await installed()
+      await write(piFff(), { mode: "override", warnOnHomeDirScan: true })
+      const dry = await runSetup(withPi(), { dryRun: true })
+      expect(toolLines(dry)).toContain(
+        `+ tool settings ${piFff()}: would add enableHomeDirScanning false; already set: mode (dry run, nothing written)`,
+      )
+      expect(await read(piFff())).toEqual({ mode: "override", warnOnHomeDirScan: true })
+      const report = await runSetup(withPi())
+      expect(toolLines(report)).toContain(
+        `+ tool settings ${piFff()}: added enableHomeDirScanning false; already set: mode`,
+      )
+      const configured = { ...PI_FFF, warnOnHomeDirScan: true }
+      expect(await read(piFff())).toEqual(configured)
+      expect(
+        toolLines(await runSetup(withPi())).some(
+          (line) => line.startsWith("+") && line.includes(piFff()),
+        ),
+      ).toBe(false)
+      await runSetup(withPi(), { undo: true })
+      expect(await read(piFff())).toEqual({ mode: "override", warnOnHomeDirScan: true })
+    })
+
+    test.each([true, false])(
+      "keeps an explicit home scan preference (%s) through setup and undo",
+      async (enableHomeDirScanning) => {
+        await installed()
+        const existing = { enableHomeDirScanning, warnOnHomeDirScan: false }
+        await write(piFff(), existing)
+        await runSetup(withPi())
+        expect(await read(piFff())).toEqual({ ...existing, mode: "override" })
+        expect(toolLines(await runDoctor(withPi())).some((line) => line.includes(piFff()))).toBe(
+          false,
+        )
+        await runSetup(withPi(), { undo: true })
+        expect(await read(piFff())).toEqual(existing)
+      },
+    )
 
     test("never writes followSymlinks, so the package follows directory links by its own default", async () => {
       await installed()
@@ -405,7 +445,7 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(piFff())).not.toHaveProperty("followSymlinks")
       await write(piFff(), { followSymlinks: true })
       await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ followSymlinks: true, mode: "override" })
+      expect(await read(piFff())).toEqual({ followSymlinks: true, ...PI_FFF })
     })
 
     test("takes out the followSymlinks false that an earlier setup recorded, while the capability stays on", async () => {
@@ -425,14 +465,14 @@ describe("holyagent setup, Pi tool settings", () => {
       // The record forgot it, so a value the user sets the same later is theirs.
       await write(piFff(), { mode: "override", followSymlinks: false })
       await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ mode: "override", followSymlinks: false })
+      expect(await read(piFff())).toEqual({ ...PI_FFF, followSymlinks: false })
     })
 
     test("leaves a followSymlinks false that setup did not record", async () => {
       await installed()
       await write(piFff(), { followSymlinks: false })
       await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ followSymlinks: false, mode: "override" })
+      expect(await read(piFff())).toEqual({ followSymlinks: false, ...PI_FFF })
     })
 
     describe("the followSymlinks false that 0.3.1 wrote", () => {
@@ -502,11 +542,11 @@ describe("holyagent setup, Pi tool settings", () => {
 
     test("keeps a mode the user chose, and says so", async () => {
       await installed()
-      await write(piFff(), { mode: "tools-only" })
+      await write(piFff(), { ...PI_FFF, mode: "tools-only" })
       const report = await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ mode: "tools-only" })
+      expect(await read(piFff())).toEqual({ ...PI_FFF, mode: "tools-only" })
       expect(toolLines(report)).toContain(
-        `~ tool settings ${piFff()}: kept mode "tools-only" (HolyAgent sets "override"; yours wins)`,
+        `~ tool settings ${piFff()}: already set: enableHomeDirScanning; kept mode "tools-only" (HolyAgent sets "override"; yours wins)`,
       )
     })
 
@@ -518,34 +558,35 @@ describe("holyagent setup, Pi tool settings", () => {
       await setConfig({})
       await write(piFff(), { enableHomeDirScanning: false })
       await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ enableHomeDirScanning: false, ...PI_FFF })
+      expect(await read(piFff())).toEqual(PI_FFF)
       await setConfig(off)
       const report = await runSetup(withPi())
       expect(await read(piFff())).toEqual({ enableHomeDirScanning: false })
-      expect(toolLines(report)).toContain(REMOVED())
+      expect(toolLines(report)).toContain(`- tool settings ${piFff()}: removed mode "override"`)
     })
 
     test("keeps a followSymlinks the user chose, and takes out only the keys it wrote", async () => {
       await installed()
       await write(piFff(), { followSymlinks: true })
       const report = await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ followSymlinks: true, mode: "override" })
-      expect(toolLines(report)).toContain(ADDED())
+      expect(await read(piFff())).toEqual({ followSymlinks: true, ...PI_FFF })
+      expect(toolLines(report)).toContain(`${ADDED()}, enableHomeDirScanning false`)
       await setConfig(off)
       const reverted = await runSetup(withPi())
       expect(await read(piFff())).toEqual({ followSymlinks: true })
-      expect(toolLines(reverted)).toContain(`- tool settings ${piFff()}: removed mode "override"`)
+      expect(toolLines(reverted)).toContain(REMOVED())
     })
 
     test("leaves a value the user changed after setup", async () => {
       await installed()
       await runSetup(withPi())
-      await write(piFff(), { mode: "tools-only", followSymlinks: true })
+      const preferences = { mode: "tools-only", followSymlinks: true, enableHomeDirScanning: true }
+      await write(piFff(), preferences)
       await setConfig(off)
       const report = await runSetup(withPi())
-      expect(await read(piFff())).toEqual({ mode: "tools-only", followSymlinks: true })
+      expect(await read(piFff())).toEqual(preferences)
       expect(toolLines(report)).toContain(
-        `~ tool settings ${piFff()}: kept mode "tools-only" (setup wrote "override")`,
+        `~ tool settings ${piFff()}: kept mode "tools-only" (setup wrote "override"), enableHomeDirScanning true (setup wrote false)`,
       )
     })
 
@@ -558,16 +599,22 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(piFff())).toEqual(PI_FFF)
     })
 
-    test("has no file at project and local scope, since the package reads Pi's agent folder only", async () => {
+    test("project and local setup never create or edit global pi-fff settings", async () => {
       await installed()
+      const agent = join(home, "agent-dir")
+      const redirected = join(agent, "pi-fff.json")
+      const preferences = { mode: "tools-only", warnOnHomeDirScan: true }
       for (const scope of ["project", "local"] as const) {
         const report = await runSetup(withPi(), { scope })
         expect(toolLines(report)).toContain(
           `- tool settings ~/.pi/agent/pi-fff.json: has no file at ${scope} scope; run \`holyagent setup\` at user scope`,
         )
         expect(await exists(projectPi("pi-fff.json"))).toBe(false)
+        expect(await exists(piFff())).toBe(false)
+        await write(redirected, preferences)
+        await runSetup(withPi(), { scope, env: { PI_CODING_AGENT_DIR: agent } })
+        expect(await read(redirected)).toEqual(preferences)
       }
-      expect(await exists(piFff())).toBe(false)
     })
 
     test("--undo takes the override out by its record", async () => {
@@ -610,7 +657,7 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(billion())).toEqual(BILLION_SUBAGENTS)
       expect(toolLines(report)).toEqual([
         `- tool settings ${billion()}: removed ${GUARDRAILS}`,
-        `- tool settings ${piFff()}: removed mode "override"`,
+        `- tool settings ${piFff()}: removed mode "override", enableHomeDirScanning false`,
       ])
       // Nothing else is written or touched with Pi off, and a second run has nothing to revert.
       expect(toolLines(await runSetup(withPi()))).toEqual([])
@@ -856,8 +903,18 @@ describe("holyagent doctor, Pi tool settings", () => {
         billion(),
         "pi.subagents, guardrails.bashTimeout, guardrails.maxOutputBytes, guardrails.repetition",
       ),
-      lacking(piFff(), "mode"),
+      lacking(piFff(), "mode, enableHomeDirScanning"),
     ])
+  })
+
+  test("identifies missing FFF mode and home-scan preference independently", async () => {
+    await installed()
+    await write(piFff(), { mode: "override", warnOnHomeDirScan: false })
+    expect(toolLines(await runDoctor(withPi()))).toContain(
+      lacking(piFff(), "enableHomeDirScanning"),
+    )
+    await write(piFff(), { enableHomeDirScanning: true, warnOnHomeDirScan: false })
+    expect(toolLines(await runDoctor(withPi()))).toContain(lacking(piFff(), "mode"))
   })
 
   test("names the scope in the fix at project and local scope", async () => {

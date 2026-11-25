@@ -11112,7 +11112,7 @@ var init_guardrails = __esm(() => {
 
 var FFF_OVERRIDE_SETTINGS, FFF_RETIRED_SETTINGS, FFF_NATIVE_HOSTS;
 var init_settings = __esm(() => {
-  FFF_OVERRIDE_SETTINGS = { mode: "override" };
+  FFF_OVERRIDE_SETTINGS = { mode: "override", enableHomeDirScanning: false };
   FFF_RETIRED_SETTINGS = { followSymlinks: false };
   FFF_NATIVE_HOSTS = [
     "darwin-arm64",
@@ -20542,7 +20542,7 @@ var init_pi_settings = __esm(() => {
       }
     ],
     [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-    [PI_FFF_FILE, { mode: "tools-and-ui" }],
+    [PI_FFF_FILE, { mode: "tools-and-ui", enableHomeDirScanning: true }],
     ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [
       [
         profile.toolsFile,
