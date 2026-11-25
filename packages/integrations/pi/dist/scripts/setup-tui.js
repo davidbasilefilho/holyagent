@@ -3960,9 +3960,11 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
     return { state: { ...state, details: !state.details, scroll: 0 } };
   return isQuit(key) || isEnter(key) || key.name === "space" ? { state, command: "close" } : { state };
 };
-var pressControl = (state, rows, control) => {
+var pressControl = (state, rows, control, scroll = FIXED) => {
   const key = (name, from = state) => press(from, rows, { name, ctrl: false });
   if (typeof control === "object") {
+    if ("scrollTo" in control)
+      return (state.screen === "review" || state.screen === "done") && scroll.max > 0 ? { state: { ...state, scroll: Math.min(scroll.max, Math.max(0, control.scrollTo)) } } : { state };
     if ("row" in control) {
       const focus = rows.indexOf(control.row);
       return state.screen === "choose" && focus >= 0 ? key("space", { ...state, focus }) : { state };
@@ -4084,20 +4086,43 @@ var reviewEntry = (line, nameWidth, width) => {
     ...part === "" ? [] : [segment(`  ${part}`, "hint")]
   ] : [segment(`${" ".repeat(side)}${part}`, "hint")]);
 };
-var pageOf = (body, room, from) => {
-  if (body.length <= room)
+var pageOf = (body, room, from, rail) => {
+  if (body.length <= Math.max(1, room))
     return { shown: body, indicator: undefined, scroll: FIXED };
   const size = Math.max(1, room - 1);
   const max = body.length - size;
   const start = Math.min(Math.max(0, from), max);
   const end = start + size;
   const more = start === 0 ? "PgDn for more" : end === body.length ? "PgUp for earlier" : "PgUp/PgDn";
+  const visible = body.slice(start, end);
+  const shown = rail === undefined ? visible : scrollbar(visible, body.length, start, max, rail);
   return {
-    shown: body.slice(start, end),
+    shown,
     indicator: [segment(`Lines ${start + 1}-${end} of ${body.length}, ${more}`, "hint")],
     scroll: { page: Math.max(1, size - 1), max }
   };
 };
+var scrollbar = (shown, total, start, max, { width, look }) => {
+  const visible = shown.length;
+  const thumb = Math.max(1, Math.round(visible * visible / total));
+  const first = Math.round((visible - thumb) * start / max);
+  return shown.map((line, index) => {
+    const within = index >= first && index < first + thumb;
+    const target = visible === 1 ? start === 0 ? max : 0 : Math.round(index * max / (visible - 1));
+    const body = fitLine(line, width - 2, glyphs(look).ellipsis);
+    const used = body.reduce((sum, part) => sum + cells(part.text), 0);
+    return [
+      ...body,
+      segment(" ".repeat(width - 1 - used)),
+      {
+        text: look.unicode ? within ? "\u2588" : "\u2502" : within ? "#" : "|",
+        tone: within ? "focus" : "option",
+        click: { scrollTo: target }
+      }
+    ];
+  });
+};
+var scrollRail = (scrolling, width, look) => scrolling && width >= 8 ? { width, look } : undefined;
 var REVIEW_RECOVERY = "Fix the cause, then choose Back and review again, or choose Cancel and run holyagent setup later.";
 var reviewLayout = (state, context) => {
   const { width, look } = context;
@@ -4117,9 +4142,8 @@ var reviewLayout = (state, context) => {
     "Esc cancel"
   ], width);
   if (state.failure !== undefined) {
-    const cause = wrap(state.failure, width - 2).map((part) => [
-      segment(`  ${part}`, "error")
-    ]);
+    const failure = state.failure;
+    const causeOf = (limit) => wrap(failure, limit - 2).map((part) => [segment(`  ${part}`, "error")]);
     const recovery = hintLines(REVIEW_RECOVERY, width);
     const actions = actionLines();
     const build = (spaced) => {
@@ -4127,7 +4151,9 @@ var reviewLayout = (state, context) => {
       const layout = (scrolling) => {
         const top = [...keys(scrolling), ...gap, ...heading_];
         const bottom = [...gap, ...recovery, ...gap, ...actions];
-        const page = pageOf(cause, context.height - 1 - top.length - bottom.length, state.scroll);
+        const rail = scrollRail(scrolling, width, look);
+        const cause = causeOf(rail === undefined ? width : width - 2);
+        const page = pageOf(cause, context.height - 1 - top.length - bottom.length, state.scroll, rail);
         return {
           lines: [
             ...top,
@@ -4144,7 +4170,7 @@ var reviewLayout = (state, context) => {
       return plain.fits ? plain : layout(true);
     };
     const spaced = build(true);
-    const chosen = spaced.shown >= Math.min(3, cause.length) ? spaced : build(false);
+    const chosen = spaced.shown >= Math.min(3, causeOf(width).length) ? spaced : build(false);
     return { lines: chosen.lines, scroll: chosen.scroll };
   }
   if (state.review === undefined) {
@@ -4161,24 +4187,28 @@ var reviewLayout = (state, context) => {
     };
   }
   const { review } = state;
-  const capabilities = review.capabilities ?? [];
-  const nameWidth = Math.max(...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)));
-  const entries = (lines) => lines.flatMap((line) => reviewEntry(line, nameWidth, width));
-  const section = (title, lines) => lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank];
-  const t3 = [
-    ...review.file === undefined ? [] : [
-      ...wrap(review.file, width - 2).map((part) => [segment(`  ${part}`, "hint")]),
-      blank
-    ],
-    ...section("Your choices", review.choices),
-    ...section("Always applied", review.always)
-  ];
-  const body = [...section("Capabilities", capabilities), ...t3].slice(0, -1);
+  const bodyOf = (width) => {
+    const capabilities = review.capabilities ?? [];
+    const nameWidth = Math.max(...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)));
+    const entries = (lines) => lines.flatMap((line) => reviewEntry(line, nameWidth, width));
+    const section = (title, lines) => lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank];
+    const t3 = [
+      ...review.file === undefined ? [] : [
+        ...wrap(review.file, width - 2).map((part) => [segment(`  ${part}`, "hint")]),
+        blank
+      ],
+      ...section("Your choices", review.choices),
+      ...section("Always applied", review.always)
+    ];
+    return [...section("Capabilities", capabilities), ...t3].slice(0, -1);
+  };
   const actions = actionLines();
   const build = (scrolling) => {
     const top = [...keys(scrolling), blank, ...heading_];
     const room = context.height - 1 - top.length - 1 - actions.length;
-    const page = pageOf(body, room, state.scroll);
+    const rail = scrollRail(scrolling, width, look);
+    const body = bodyOf(rail === undefined ? width : width - 2);
+    const page = pageOf(body, room, state.scroll, rail);
     return {
       lines: [...top, ...page.shown, page.indicator ?? blank, ...actions],
       scroll: page.scroll,
@@ -4190,9 +4220,9 @@ var reviewLayout = (state, context) => {
 };
 var reportTone = (line) => line.startsWith("+ ") ? "success" : line.startsWith("! ") ? "error" : line.startsWith("~ ") ? "warning" : "hint";
 var doneLayout = (state, context) => {
-  const { width, height } = context;
+  const { width, height, look } = context;
   const applied = state.applied ?? { ok: false, lines: [] };
-  const body = state.details ? applied.lines.flatMap((line) => wrap(line, width, 2).map((part) => [segment(part, reportTone(line))])) : summarizeResult(applied, context.dryRun).flatMap(({ title, lines }) => [
+  const bodyOf = (width) => state.details ? applied.lines.flatMap((line) => wrap(line, width, 2).map((part) => [segment(part, reportTone(line))])) : summarizeResult(applied, context.dryRun).flatMap(({ title, lines }) => [
     ...heading(title, width),
     ...lines.flatMap((line) => hintLines(`  ${line}`, width))
   ]);
@@ -4212,7 +4242,9 @@ var doneLayout = (state, context) => {
         segment(part, applied.ok ? "success" : "error")
       ])
     ];
-    const page = pageOf(body, height - 1 - top.length, state.scroll);
+    const rail = scrollRail(scrolling, width, look);
+    const body = bodyOf(rail === undefined ? width : width - 2);
+    const page = pageOf(body, height - 1 - top.length, state.scroll, rail);
     return {
       lines: [...top, ...page.shown, ...page.indicator === undefined ? [] : [page.indicator]],
       scroll: page.scroll,
@@ -4373,7 +4405,7 @@ var SetupApp = (props) => {
           pointer = undefined;
           const before = state();
           if (event.button === 0 && down !== undefined && down.x === event.x && down.y === event.y && down.state === before)
-            advance(before, pressControl(before, rows, down.control));
+            advance(before, pressControl(before, rows, down.control, scrollOf(before, context())));
         });
         _$insert(_el$2, (() => {
           var _c$ = _$memo(() => line.length === 0);
