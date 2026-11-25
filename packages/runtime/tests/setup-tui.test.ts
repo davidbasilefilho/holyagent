@@ -340,7 +340,7 @@ describe("the setup interface, look", () => {
     const screen = await shown({ width, height: 20 })
     const track = () => screen.lines().flatMap((line, y) => (/[█│]$/.test(line) ? [y] : []))
     const position = () => screen.lines().find((line) => line.startsWith("Lines "))
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     const first = position()
     const end = track().at(-1)
     expect(end).toBeDefined()
@@ -366,7 +366,7 @@ describe("the setup interface, look", () => {
           lines: Array.from({ length: 40 }, (_, index) => `~ Result line ${index}`),
         }),
     })
-    await screen.keys("enter", "enter", "d")
+    await screen.keys("end", "enter", "enter", "d")
     const last = screen.lines().findLastIndex((line) => line.endsWith("|"))
     expect(last).toBeGreaterThan(0)
     await screen.click(width - 1, last)
