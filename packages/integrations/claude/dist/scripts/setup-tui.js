@@ -3882,6 +3882,8 @@ var lookFor = (env, background = "dark") => ({
 var glyphs = (look) => look.unicode ? { focus: "\u276F", dot: "\xB7", ellipsis: "\u2026", arrows: "\u2191/\u2193", horizontalArrows: "\u2190/\u2192" } : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down", horizontalArrows: "</>" };
 
 var CAPABILITY_ROW = "capability:";
+var BROWSE_ROW = "capability:browseSetup";
+var BROWSE_PROFILE = "capability:browseProfile";
 var tabs = ["pi", "claude", "codex"];
 var tabLabels = { pi: "Pi", claude: "Claude Code", codex: "Codex" };
 var LABELS = {
@@ -3898,6 +3900,10 @@ var providerName = {
 };
 var providerOf = (row, offer) => offer.providers?.find((provider) => row === `provider:${provider}`);
 var labelOf = (row, offer) => {
+  if (row === BROWSE_ROW)
+    return "OpenCode Browse setup";
+  if (row === BROWSE_PROFILE)
+    return "Browse browser profile";
   const provider = providerOf(row, offer);
   if (provider !== undefined)
     return providerName[provider];
@@ -3920,7 +3926,11 @@ var rowsOf = (offer, state) => {
     ...(offer.providers ?? []).map((provider) => `provider:${provider}`),
     ...offer.t3 && offer.device !== undefined ? ["deviceAccess"] : [],
     ...offer.t3 && offer.worktrees ? ["worktrees"] : [],
-    ...offer.capabilities.map((capability) => `${CAPABILITY_ROW}${capability.feature}`)
+    ...offer.capabilities.flatMap((capability) => [
+      `${CAPABILITY_ROW}${capability.feature}`,
+      ...capability.feature === "browserUse" && state?.choices.capabilities["browserUse"] === true && offer.browse?.action !== undefined ? [BROWSE_ROW] : [],
+      ...capability.feature === "browserUse" && state?.choices.capabilities["browserUse"] === true && state.choices.browseSetup === true && (offer.browse?.profiles?.length ?? 0) > 0 ? [BROWSE_PROFILE] : []
+    ])
   ];
 };
 var initialState = (choices) => ({
@@ -3950,6 +3960,8 @@ var toggleProvider = (choices, id) => {
   return { ...choices, piProviders: { provider, providers } };
 };
 var toggled = (choices, row) => {
+  if (row === BROWSE_ROW)
+    return { ...choices, browseSetup: choices.browseSetup !== true };
   if (row === "provider:kimi-coding-global" || row === "provider:openai-codex")
     return toggleProvider(choices, row === "provider:openai-codex" ? "openai-codex" : "kimi-coding-global");
   if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude" || row === "enableCodex")) {
@@ -3965,7 +3977,8 @@ var toggled = (choices, row) => {
   const feature = row.slice(CAPABILITY_ROW.length);
   return {
     ...choices,
-    capabilities: { ...choices.capabilities, [feature]: choices.capabilities[feature] !== true }
+    capabilities: { ...choices.capabilities, [feature]: choices.capabilities[feature] !== true },
+    ...feature === "browserUse" && choices.capabilities[feature] === true ? { browseSetup: false } : {}
   };
 };
 var pagedBy = (state, key, scroll) => {
@@ -3977,7 +3990,7 @@ var pagedBy = (state, key, scroll) => {
   const from = Math.min(state.scroll, scroll.max);
   return { ...state, scroll: Math.min(scroll.max, Math.max(0, from + direction * scroll.page)) };
 };
-var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
+var press = (state, rows, key, scroll = { page: 1, max: 0 }, browseProfiles = 0) => {
   if (state.screen === "choose") {
     if (isQuit(key))
       return { state, command: "cancel" };
@@ -3997,7 +4010,10 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
           state: {
             ...state,
             focus: row === "enablePi" ? 0 : state.focus,
-            choices: toggled(state.choices, row)
+            choices: row === BROWSE_PROFILE ? {
+              ...state.choices,
+              browseProfile: ((state.choices.browseProfile ?? 0) + 1) % Math.max(1, browseProfiles)
+            } : toggled(state.choices, row)
           }
         };
       return {
@@ -4045,8 +4061,8 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
     return { state: { ...state, details: !state.details, scroll: 0 } };
   return isQuit(key) || isEnter(key) ? { state, command: "close" } : { state };
 };
-var pressControl = (state, rows, control, scroll = FIXED) => {
-  const key = (name, from = state) => press(from, rows, { name, ctrl: false });
+var pressControl = (state, rows, control, scroll = FIXED, browseProfiles = 0) => {
+  const key = (name, from = state) => press(from, rows, { name, ctrl: false }, FIXED, browseProfiles);
   if (typeof control === "object") {
     if ("tab" in control)
       return state.screen === "choose" && state.choices.harnesses !== undefined ? { state: { ...state, tab: control.tab, focus: 0 } } : { state };
@@ -4102,7 +4118,13 @@ var chooseKeys = (focus, width) => wrapItems([focus, "Enter select", "Esc cancel
 var heading = (text, width) => wrap(text.toUpperCase(), width).map((part) => [segment(part, "heading")]);
 var blank = [];
 var hintLines = (text, width) => wrap(text, width).map((part) => [segment(part, "hint")]);
-var hintOf = (row, offer) => {
+var hintOf = (row, offer, choices) => {
+  if (row === BROWSE_ROW)
+    return `${offer.browse?.state ?? ""}. Choose ${offer.browse?.action ?? "Configure"} or Skip.`;
+  if (row === BROWSE_PROFILE) {
+    const profile = offer.browse?.profiles?.[choices.browseProfile ?? 0];
+    return `Selected: ${profile === undefined ? "none" : `${profile.browser}, ${profile.profile}`}. Press Enter or click to cycle through detected profiles.`;
+  }
   if (row === "enablePi")
     return "Include Pi and T3 Code in the combined review.";
   if (row === "enableCodex")
@@ -4122,6 +4144,13 @@ var hintOf = (row, offer) => {
 };
 var isOn = (row, choices) => row === "enablePi" ? choices.harnesses?.pi === true : row === "enableCodex" ? choices.harnesses?.codex === true : row === "enableClaude" ? choices.harnesses?.claude === true : row === "deviceAccess" ? choices.deviceAccess : row === "worktrees" ? choices.worktrees : row.startsWith(CAPABILITY_ROW) && choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true;
 var checkbox = (row, choices, offer) => {
+  if (row === BROWSE_ROW)
+    return choices.browseSetup === true ? { box: "[x]", word: offer.browse?.action ?? "Configure" } : { box: "[ ]", word: "Skip" };
+  if (row === BROWSE_PROFILE) {
+    const profiles = offer.browse?.profiles ?? [];
+    const index = choices.browseProfile ?? 0;
+    return { box: `${index + 1}/${profiles.length}`, word: "selected" };
+  }
   const provider = providerOf(row, offer);
   if (provider !== undefined) {
     if (!choices.piProviders?.providers.includes(provider))
@@ -4197,7 +4226,7 @@ var chooseLines = (state, context) => {
     ...unavailable === undefined ? [] : choiceHint(unavailable),
     ...combined?.claude === true && state.tab === "claude" ? choiceHint(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`) : [],
     ...state.tab === "codex" && offer.harnesses?.codexHome !== undefined ? choiceHint(`Profile: ${offer.harnesses.codexHome}`) : [],
-    ...focused === undefined ? [] : choiceHint(hintOf(focused, offer)),
+    ...focused === undefined ? [] : choiceHint(hintOf(focused, offer, state.choices)),
     ...choiceHint(`Environment: ${offer.form}`)
   ];
 };
@@ -4332,6 +4361,7 @@ var reviewLayout = (state, context) => {
       blank
     ]);
     const capabilities = review.capabilities ?? [];
+    const browse = (review.browse ?? []).flatMap((line) => hintLines(`  ${line}`, width));
     const nameWidth = Math.max(...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)));
     const entries = (lines) => lines.flatMap((line) => reviewEntry(line, nameWidth, width));
     const section = (title, lines) => lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank];
@@ -4343,7 +4373,12 @@ var reviewLayout = (state, context) => {
       ...section("Your choices", review.choices),
       ...section("Always applied", review.always)
     ];
-    return [...harnesses, ...section("Capabilities", capabilities), ...t3].slice(0, -1);
+    return [
+      ...browse.length === 0 ? [] : [...heading("Browser Use setup", width), ...browse, blank],
+      ...harnesses,
+      ...section("Capabilities", capabilities),
+      ...t3
+    ].slice(0, -1);
   };
   const actions = actionLines();
   const build = (scrolling) => {
@@ -4538,7 +4573,7 @@ var SetupApp = (props) => {
   const keypress = (key) => {
     const before = state();
     const current = context();
-    advance(before, press(before, current.rows, key, scrollOf(before, current)));
+    advance(before, press(before, current.rows, key, scrollOf(before, current), current.offer.browse?.profiles?.length));
   };
   useKeyboard((event) => keypress({
     name: event.name,
@@ -4576,7 +4611,7 @@ var SetupApp = (props) => {
           pointer = undefined;
           const before = state();
           if (event.button === 0 && down !== undefined && down.x === event.x && down.y === event.y && down.state === before)
-            advance(before, pressControl(before, context().rows, down.control, scrollOf(before, context())));
+            advance(before, pressControl(before, context().rows, down.control, scrollOf(before, context()), props.input.offer.browse?.profiles?.length));
         });
         _$insert(_el$2, (() => {
           var _c$ = _$memo(() => line.length === 0);

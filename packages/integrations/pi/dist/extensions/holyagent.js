@@ -14642,26 +14642,27 @@ var applyDefaults = (existing, defaults) => {
 
 var BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE];
 var BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
-var browsePairCommand = (runner) => {
+var browseRunnerCommand = (runner, operation) => {
   const spec = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
   switch (runner) {
     case "bunx":
-      return ["bunx", "--package", spec, "browse", "pair"];
+      return ["bunx", "--package", spec, "browse", operation];
     case "npm":
-      return ["npm", "exec", "--yes", `--package=${spec}`, "--", "browse", "pair"];
+      return ["npm", "exec", "--yes", `--package=${spec}`, "--", "browse", operation];
     case "mise":
-      return ["mise", "exec", `npm:${spec}`, "--", "browse", "pair"];
+      return ["mise", "exec", `npm:${spec}`, "--", "browse", operation];
     case "unknown":
       return;
   }
 };
+var browsePairCommand = (runner) => browseRunnerCommand(runner, "pair");
 var browsePairFix = (runner) => {
   const command = browsePairCommand(runner);
   return command === undefined ? `use your package manager to run browse pair from ${BROWSE_PACKAGE}@${BROWSE_VERSION} (setup could not identify the runner)` : `run \`${command.join(" ")}\` and enter the code in the extension's options`;
 };
-var STORE = "https://chromewebstore.google.com/detail/opencode-browse/mfnicocicmmlkpjnaffgihfjhdgjkdjg";
+var BROWSE_EXTENSION_STORE = "https://chromewebstore.google.com/detail/opencode-browse/mfnicocicmmlkpjnaffgihfjhdgjkdjg";
 var BROWSE_PAIR_FIX = browsePairFix("npm");
-var BROWSE_INSTALL_FIX = `add the browse extension from ${STORE}, then ${BROWSE_PAIR_FIX}`;
+var BROWSE_INSTALL_FIX = `add the browse extension from ${BROWSE_EXTENSION_STORE}, then ${BROWSE_PAIR_FIX}`;
 var browseDataDirectory = (env) => {
   const home = firstNonEmpty2(env["OPENCODE_BROWSER_HOME"]);
   if (home !== undefined)
@@ -14758,23 +14759,36 @@ var isDisabled = (setting) => {
   const reasons = setting["disable_reasons"];
   return Array.isArray(reasons) ? reasons.length > 0 : typeof reasons === "number" && reasons !== 0;
 };
-var findBrowseExtension = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
+var findBrowseProfiles = (env, platform = process.platform) => forEach2(browserDirectories(env, platform), ({ name, directory }) => gen2(function* () {
   const state = yield* readOptional(join14(directory, "Local State"));
   const decoded = state === undefined ? undefined : decodeUnknownOption2(LocalState)(state, { onExcessProperty: "error" });
   const cached = decoded?._tag === "Some" ? decoded.value.profile?.info_cache : undefined;
   const profiles = cached === undefined ? ["Default"] : Object.keys(cached);
   const found = yield* forEach2(profiles, (profile) => gen2(function* () {
+    if (profile === "." || profile === ".." || /[/\\]/.test(profile) || profile.includes("\x00"))
+      return [];
     const settings = yield* forEach2(["Secure Preferences", "Preferences"], (file) => readOptional(join14(directory, profile, file)).pipe(map4((text) => {
-      const parsed = text === undefined ? undefined : decodeUnknownOption2(Preferences)(text, {
+      if (text === undefined)
+        return;
+      const parsed = decodeUnknownOption2(Preferences)(text, {
         onExcessProperty: "error"
       });
-      return parsed?._tag === "Some" ? parsed.value.extensions?.settings ?? {} : {};
+      return parsed._tag === "Some" ? parsed.value.extensions?.settings ?? {} : {};
     })));
-    const entry = settings.flatMap((entries) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [entries[id]]))[0];
-    return entry === undefined ? [] : [{ browser: name, profile, enabled: !isDisabled(entry) }];
+    if (state === undefined && settings.every((value) => value === undefined))
+      return [];
+    const entry = settings.flatMap((entries = {}) => BROWSE_EXTENSION_IDS.flatMap((id) => entries[id] === undefined ? [] : [entries[id]]))[0];
+    return [
+      {
+        browser: name,
+        profile,
+        extension: entry === undefined ? "missing" : isDisabled(entry) ? "disabled" : "enabled"
+      }
+    ];
   }));
   return found.flat();
 })).pipe(map4((installs) => installs.flat()));
+var findBrowseExtension = (env, platform = process.platform) => findBrowseProfiles(env, platform).pipe(map4((profiles) => profiles.flatMap(({ browser, profile, extension }) => extension === "missing" ? [] : [{ browser, profile, enabled: extension === "enabled" }])));
 var readBrowseState = (env, platform = process.platform) => gen2(function* () {
   const pairing = yield* readBrowsePairing(env);
   if (pairing.state === "paired")
@@ -14795,7 +14809,7 @@ var describeBrowseState = (state, runner = "npm") => {
     };
   return {
     text: `the browse extension is not installed in any browser this check scans (${state.scanned.join(", ")}) and no browser is paired with browse`,
-    fix: `add the browse extension from ${STORE}, then ${browsePairFix(runner)}`
+    fix: `add the browse extension from ${BROWSE_EXTENSION_STORE}, then ${browsePairFix(runner)}`
   };
 };
 

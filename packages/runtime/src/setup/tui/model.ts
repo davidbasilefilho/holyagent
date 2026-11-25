@@ -5,6 +5,8 @@ import { glyphs, type Look, type Tone } from "./theme.ts"
 import type { Applied, Choices, Offer, Review, ReviewLine, SetupDisplayProgress } from "./types.ts"
 
 const CAPABILITY_ROW = "capability:"
+const BROWSE_ROW = "capability:browseSetup"
+const BROWSE_PROFILE = "capability:browseProfile"
 
 /** One run of text in one tone; the screen draws it as a span. */
 export interface Segment {
@@ -107,6 +109,8 @@ const providerOf = (row: RowId, offer: Offer) =>
   offer.providers?.find((provider) => row === `provider:${provider}`)
 
 const labelOf = (row: RowId, offer: Offer): string => {
+  if (row === BROWSE_ROW) return "OpenCode Browse setup"
+  if (row === BROWSE_PROFILE) return "Browse browser profile"
   const provider = providerOf(row, offer)
   if (provider !== undefined) return providerName[provider]
   return row.startsWith(CAPABILITY_ROW)
@@ -132,7 +136,20 @@ export const rowsOf = (offer: Offer, state?: State): ReadonlyArray<RowId> => {
     ...(offer.providers ?? []).map((provider): RowId => `provider:${provider}`),
     ...(offer.t3 && offer.device !== undefined ? (["deviceAccess"] as const) : []),
     ...(offer.t3 && offer.worktrees ? (["worktrees"] as const) : []),
-    ...offer.capabilities.map((capability): RowId => `${CAPABILITY_ROW}${capability.feature}`),
+    ...offer.capabilities.flatMap((capability): ReadonlyArray<RowId> => [
+      `${CAPABILITY_ROW}${capability.feature}` as const,
+      ...(capability.feature === "browserUse" &&
+      state?.choices.capabilities["browserUse"] === true &&
+      offer.browse?.action !== undefined
+        ? ([BROWSE_ROW] as const)
+        : []),
+      ...(capability.feature === "browserUse" &&
+      state?.choices.capabilities["browserUse"] === true &&
+      state.choices.browseSetup === true &&
+      (offer.browse?.profiles?.length ?? 0) > 0
+        ? ([BROWSE_PROFILE] as const)
+        : []),
+    ]),
   ]
 }
 
@@ -182,6 +199,7 @@ const toggleProvider = (choices: Choices, id: PiProvider): Choices => {
 }
 
 const toggled = (choices: Choices, row: RowId): Choices => {
+  if (row === BROWSE_ROW) return { ...choices, browseSetup: choices.browseSetup !== true }
   if (row === "provider:kimi-coding-global" || row === "provider:openai-codex")
     return toggleProvider(
       choices,
@@ -201,6 +219,9 @@ const toggled = (choices: Choices, row: RowId): Choices => {
   return {
     ...choices,
     capabilities: { ...choices.capabilities, [feature]: choices.capabilities[feature] !== true },
+    ...(feature === "browserUse" && choices.capabilities[feature] === true
+      ? { browseSetup: false }
+      : {}),
   }
 }
 
@@ -221,6 +242,7 @@ export const press = (
   rows: ReadonlyArray<RowId>,
   key: Key,
   scroll: Scroll = { page: 1, max: 0 },
+  browseProfiles = 0,
 ): { readonly state: State; readonly command?: Command } => {
   if (state.screen === "choose") {
     if (isQuit(key)) return { state, command: "cancel" }
@@ -243,7 +265,14 @@ export const press = (
           state: {
             ...state,
             focus: row === "enablePi" ? 0 : state.focus,
-            choices: toggled(state.choices, row),
+            choices:
+              row === BROWSE_PROFILE
+                ? {
+                    ...state.choices,
+                    browseProfile:
+                      ((state.choices.browseProfile ?? 0) + 1) % Math.max(1, browseProfiles),
+                  }
+                : toggled(state.choices, row),
           },
         }
       return {
@@ -294,8 +323,10 @@ export const pressControl = (
   rows: ReadonlyArray<RowId>,
   control: Control,
   scroll: Scroll = FIXED,
+  browseProfiles = 0,
 ) => {
-  const key = (name: string, from = state) => press(from, rows, { name, ctrl: false })
+  const key = (name: string, from = state) =>
+    press(from, rows, { name, ctrl: false }, FIXED, browseProfiles)
   if (typeof control === "object") {
     if ("tab" in control)
       return state.screen === "choose" && state.choices.harnesses !== undefined
@@ -389,7 +420,13 @@ const blank: Line = []
 const hintLines = (text: string, width: number): ReadonlyArray<Line> =>
   wrap(text, width).map((part) => [segment(part, "hint")])
 
-const hintOf = (row: RowId, offer: Offer): string => {
+const hintOf = (row: RowId, offer: Offer, choices: Choices): string => {
+  if (row === BROWSE_ROW)
+    return `${offer.browse?.state ?? ""}. Choose ${offer.browse?.action ?? "Configure"} or Skip.`
+  if (row === BROWSE_PROFILE) {
+    const profile = offer.browse?.profiles?.[choices.browseProfile ?? 0]
+    return `Selected: ${profile === undefined ? "none" : `${profile.browser}, ${profile.profile}`}. Press Enter or click to cycle through detected profiles.`
+  }
   if (row === "enablePi") return "Include Pi and T3 Code in the combined review."
   if (row === "enableCodex")
     return "Prepare the native plugin and startup settings in a dedicated Codex home."
@@ -424,6 +461,15 @@ const isOn = (row: RowId, choices: Choices): boolean =>
               choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
 
 const checkbox = (row: RowId, choices: Choices, offer: Offer): { box: string; word: string } => {
+  if (row === BROWSE_ROW)
+    return choices.browseSetup === true
+      ? { box: "[x]", word: offer.browse?.action ?? "Configure" }
+      : { box: "[ ]", word: "Skip" }
+  if (row === BROWSE_PROFILE) {
+    const profiles = offer.browse?.profiles ?? []
+    const index = choices.browseProfile ?? 0
+    return { box: `${index + 1}/${profiles.length}`, word: "selected" }
+  }
   const provider = providerOf(row, offer)
   if (provider !== undefined) {
     if (!choices.piProviders?.providers.includes(provider)) return { box: "[ ]", word: "disabled" }
@@ -536,7 +582,7 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
     ...(state.tab === "codex" && offer.harnesses?.codexHome !== undefined
       ? choiceHint(`Profile: ${offer.harnesses.codexHome}`)
       : []),
-    ...(focused === undefined ? [] : choiceHint(hintOf(focused, offer))),
+    ...(focused === undefined ? [] : choiceHint(hintOf(focused, offer, state.choices))),
     ...choiceHint(`Environment: ${offer.form}`),
   ]
 }
@@ -737,6 +783,7 @@ const reviewLayout = (state: State, context: Context): Layout => {
       blank,
     ])
     const capabilities = review.capabilities ?? []
+    const browse = (review.browse ?? []).flatMap((line) => hintLines(`  ${line}`, width))
     const nameWidth = Math.max(
       ...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)),
     )
@@ -754,7 +801,12 @@ const reviewLayout = (state: State, context: Context): Layout => {
       ...section("Your choices", review.choices),
       ...section("Always applied", review.always),
     ]
-    return [...harnesses, ...section("Capabilities", capabilities), ...t3].slice(0, -1)
+    return [
+      ...(browse.length === 0 ? [] : [...heading("Browser Use setup", width), ...browse, blank]),
+      ...harnesses,
+      ...section("Capabilities", capabilities),
+      ...t3,
+    ].slice(0, -1)
   }
   const actions = actionLines()
   // The title takes one line, and the line above the actions holds the scroll indicator, if any.
