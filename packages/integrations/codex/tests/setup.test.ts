@@ -6,6 +6,7 @@ import { dirname, join } from "node:path"
 import { $ } from "bun"
 import { Effect, Layer, Option } from "effect"
 
+import { SetupProgress, type SetupProgressUpdate } from "../../../core/src/setup/progress.ts"
 import { Shell } from "../../../core/src/setup/shell.ts"
 import { defaultCodexHome, setupCodex } from "../src/setup.ts"
 import { codexStartupConfig } from "../src/startup.ts"
@@ -139,9 +140,24 @@ test.skipIf(native === undefined)(
       const apply = (version: string) => Effect.runPromise(runSetup(version))
       const first = "0.4.0-dev.2026-11-25.gabcdef0"
       const next = "0.4.0-dev.2026-11-25.gabcdef1"
-      expect((await apply(first)).lines.join("\n")).toContain(
-        `install holyagent@holyagent-local ${first}`,
+      const progress: SetupProgressUpdate[] = []
+      const installed = await Effect.runPromise(
+        runSetup(first).pipe(
+          Effect.provideService(SetupProgress, (update) => progress.push(update)),
+        ),
       )
+      expect(installed.lines.join("\n")).toContain(`install holyagent@holyagent-local ${first}`)
+      expect(
+        progress
+          .filter(({ activity }) => activity === undefined)
+          .map(({ index, total, label }) => [index, total, label]),
+      ).toEqual([
+        [1, 4, "Codex runtime"],
+        [2, 4, "Codex profile files"],
+        [3, 4, "Codex marketplace"],
+        [4, 4, "Codex plugin"],
+      ])
+      expect(progress.at(-1)?.activity).toBe(`Checking enabled version ${first}`)
       expect((await apply(first)).lines.join("\n")).toContain(`${first} already present`)
       expect((await apply(next)).lines.join("\n")).toContain(
         `install holyagent@holyagent-local ${next}`,

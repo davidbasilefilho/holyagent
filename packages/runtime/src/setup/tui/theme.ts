@@ -114,5 +114,5 @@ export const lookFor = (env: Env, background: Background = "dark"): Look => ({
 /** The glyphs of holycodex's screens and their ASCII stand-ins for a locale that is not UTF-8. */
 export const glyphs = (look: Look) =>
   look.unicode
-    ? { focus: "❯", dot: "·", ellipsis: "…", arrows: "↑/↓" }
-    : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down" }
+    ? { focus: "❯", dot: "·", ellipsis: "…", arrows: "↑/↓", horizontalArrows: "←/→" }
+    : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down", horizontalArrows: "</>" }

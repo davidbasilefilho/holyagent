@@ -200,7 +200,9 @@ export const toolArgs = (
     ...(has(capabilities, "Shell") || roleTask === "Reviewer.code" ? SHELL_TOOLS : []),
     ...(has(capabilities, "Search") ? webChoice(profile, features.web).tools : []),
     ...(has(capabilities, "VisualInspection")
-      ? formEnabled.flatMap((capability) => capability.tools.visual)
+      ? formEnabled
+          .flatMap((capability) => capability.tools.visual)
+          .filter((tool) => features.mcp || !tool.startsWith("mcp__"))
       : []),
     ...(options.screen === true
       ? formEnabled
@@ -219,7 +221,7 @@ export const toolArgs = (
 
 /**
  * Whether a tool name matches a `--tools` or `--exclude-tools` entry: an exact name, or a pattern
- * whose `*` stands for any run of characters (`computer_use_*`).
+ * whose `*` stands for any run of characters (`mcp__browse__*`).
  */
 export const toolMatches = (pattern: string, name: string): boolean => {
   const original = canonicalPiToolName(name)
@@ -291,9 +293,8 @@ export {
  * - The `settings` of each enabled capability in the registry (`CAPABILITIES`), in its order: the
  *   subagents package's `subagents.json` ({@link SUBAGENTS_ONLY_SPECIALISTS}), so only the 18
  *   specialists the package ships can launch; Billion Context's own `acp_delegate` subagents off
- *   while context compression stays on; the computer-use confirmations off, the decided "full
- *   access, no prompts"; Billion Context's bash guardrails off while the bash tool runs on
- *   just-bash, and only while Billion Context itself is on (a patch's `whileOn`);
+ *   while context compression stays on; Billion Context's bash guardrails off while the bash tool
+ *   runs on just-bash, and only while Billion Context itself is on (a patch's `whileOn`);
  *   `@ff-labs/pi-fff`'s override mode while fff is on and its native library covers the
  *   `platform`.
  *

@@ -4,13 +4,18 @@ import { Effect } from "effect"
 import {
   BROWSER_USE_MCP_SERVER,
   type CapabilityForm,
+  COMPUTER_USE_TOOLS,
+  CUA_DRIVER_NAME,
+  CUA_DRIVER_NAMESPACE,
+  CUA_DRIVER_TOOLS,
   enabledCapabilities,
   formContent,
+  LEGACY_COMPUTER_USE_TOOLS,
   type McpServer,
   T3_PREVIEW_TOOLS,
 } from "../../../runtime/src/config/capabilities.ts"
 import type { Config } from "../../../runtime/src/config/schema.ts"
-import { isHeadlessScreenAgent } from "../../../runtime/src/domain/route.ts"
+import { agentFor, isHeadlessScreenAgent, ROUTES } from "../../../runtime/src/domain/route.ts"
 import { toolMatches } from "../../../runtime/src/pi/tools.ts"
 import { SCREEN_SPECIALIST_NAMES } from "./specialists.ts"
 
@@ -51,6 +56,38 @@ export const isScreenAgent = (agent: string | undefined): boolean =>
  */
 export const screenFormOf = (agent: string | undefined): CapabilityForm =>
   isHeadlessScreenAgent(agent) ? "headless" : "normal"
+
+const desktopAgents = new Set(
+  ROUTES.filter(({ capabilities }) => capabilities.includes("VisualInspection")).flatMap(
+    (route) => [route.agent, agentFor(route, true, "normal")],
+  ),
+)
+
+/** Which configured servers belong to this specialist's assigned role. */
+export const screenServersFor = (
+  agent: string | undefined,
+  servers: ReadonlyArray<McpServer>,
+): ReadonlyArray<McpServer> =>
+  servers.filter((server) =>
+    server.name === CUA_DRIVER_NAME
+      ? agent !== undefined && desktopAgents.has(agent)
+      : isScreenAgent(agent),
+  )
+
+/** Applies the desktop route to direct, discovered and Code Mode calls alike. */
+export const refuseUnassignedDesktop = (
+  event: { readonly toolName: string },
+  permitted: boolean,
+): ToolCallEventResult | undefined => {
+  const matches = (patterns: ReadonlyArray<string>) =>
+    patterns.some((pattern) => toolMatches(pattern, event.toolName))
+  if (matches(LEGACY_COMPUTER_USE_TOOLS))
+    return { block: true, reason: "HolyAgent no longer uses the legacy Pi desktop extension." }
+  if (!toolMatches(CUA_DRIVER_NAMESPACE, event.toolName)) return undefined
+  return permitted && COMPUTER_USE_TOOLS.includes(event.toolName)
+    ? undefined
+    : { block: true, reason: "Only assigned Cua Driver desktop primitives are available." }
+}
 
 /**
  * The MCP servers the capabilities of a config add in a form, for a specialist that carries the
@@ -116,15 +153,21 @@ export const refuseT3PreviewOutsideT3 = (
 export const registerScreenServers = (
   register: (
     name: string,
-    config: { readonly command: string; readonly args: Array<string>; readonly cwd?: string },
+    config: {
+      readonly command: string
+      readonly args: Array<string>
+      readonly cwd?: string
+      readonly exposure?: "hidden"
+      readonly toolExposure?: Readonly<Record<string, "direct">>
+    },
   ) => void,
   agent: string | undefined,
   servers: ReadonlyArray<McpServer>,
   neutralDirectory: string,
   launch: (server: McpServer) => { readonly command: string; readonly args: ReadonlyArray<string> },
 ): { readonly registered: ReadonlyArray<string>; readonly failures: ReadonlyArray<string> } => {
-  if (!isScreenAgent(agent)) return { registered: [], failures: [] }
-  const outcomes = servers.map((server) =>
+  const assigned = screenServersFor(agent, servers)
+  const outcomes = assigned.map((server) =>
     Effect.runSync(
       Effect.try({
         try: () => {
@@ -132,7 +175,17 @@ export const registerScreenServers = (
           return register(server.name, {
             command,
             args: [...args],
-            ...(server.command === "npx" || server.launchesChromium === true
+            ...(server.name === CUA_DRIVER_NAME
+              ? {
+                  exposure: "hidden" as const,
+                  toolExposure: Object.fromEntries(
+                    CUA_DRIVER_TOOLS.map((tool) => [tool, "direct"] as const),
+                  ),
+                }
+              : {}),
+            ...(server.command === "npx" ||
+            server.launchesChromium === true ||
+            server.name === CUA_DRIVER_NAME
               ? { cwd: neutralDirectory }
               : {}),
           })

@@ -152,7 +152,7 @@ Where to look. Call the tools from codemode scripts. The T3 Code tools below exi
 
 - Web: the record's web target, through T3 Code's integrated browser: `preview_open` and `preview_navigate`, `preview_snapshot` (accessibility tree with console and network entries, and a screenshot), `preview_act` (click, type, hover, select, drag, press, scroll, upload), `preview_resize` for viewports, `preview_set_appearance` for light and dark, and `preview_wait_for` after navigation. Open your own tab when other specialists browse in parallel: `preview_open` with `reuseExistingTab=false`, then pass the `tabId` it returns, when its description lists them.
 - TUI: the terminal frames the record's capture command produces.
-- Desktop GUI: its screenshots; use the `computer_use_*` tools of `@amaster.ai/pi-computer-use` only when your tool list has them.
+- Desktop GUI: its screenshots; use the Cua Driver desktop tools only when your tool list has them.
 - Mobile: `device_list`, `device_open`, `device_screenshot` and `device_close` for simulators and emulators; taps and typing go through the `agent-device` CLI that `device_open` prints. Report them as blocked when device access is not enabled.
 - A self-contained HTML page you build to show something: `html_preview` returns a PNG with console output. Use fixed pixel heights for charts, avoid `vh` units and `height:100%` (rejected), and leave html and body backgrounds unset so the theme variables apply.
 

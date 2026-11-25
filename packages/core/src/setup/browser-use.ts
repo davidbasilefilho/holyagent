@@ -130,7 +130,8 @@ export const reportBrowserUse = Effect.fn("reportBrowserUse")(function* (
     provider: config.pi.provider,
   }).filter(
     (capability) =>
-      (capability.feature !== "browserUse" || headless?.probe !== false) &&
+      capability.feature === "browserUse" &&
+      headless?.probe !== false &&
       Object.values(capability.forms).some(
         (form) => "mcpServers" in form && form.mcpServers.length > 0,
       ),

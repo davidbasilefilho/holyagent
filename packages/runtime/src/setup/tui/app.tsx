@@ -22,7 +22,7 @@ import {
   view,
 } from "./model.ts"
 import { type Background, BOLD_TONES, lookFor, paletteOf } from "./theme.ts"
-import type { TuiInput, TuiOutcome } from "./types.ts"
+import type { SetupDisplayProgress, TuiInput, TuiOutcome } from "./types.ts"
 
 /** The props of {@link SetupApp}. */
 export interface SetupAppProps {
@@ -63,11 +63,21 @@ export const SetupApp = (props: SetupAppProps) => {
   const look = lookFor(props.input.env, props.background)
   const palette = paletteOf(look)
   const [state, setState] = createSignal<State>(initialState(props.input.initial))
+  const [progress, setProgress] = createSignal<SetupDisplayProgress>()
+  const [elapsedSeconds, setElapsedSeconds] = createSignal(0)
   const abort = new AbortController()
-  // The renderer is destroyed (a hangup, a signal, the end of the run) with an apply possibly still
-  // going: stop it, as Ctrl-C does.
-  onCleanup(() => abort.abort())
   let ticket = 0
+  let timer: ReturnType<typeof setInterval> | undefined
+  const stopTimer = () => {
+    if (timer !== undefined) clearInterval(timer)
+    timer = undefined
+  }
+  // Ignore replies once the renderer is destroyed and stop a still-running apply.
+  onCleanup(() => {
+    ticket += 1
+    stopTimer()
+    abort.abort()
+  })
   let pointer: { x: number; y: number; state: State; control: Control } | undefined
 
   const context = (): Context => ({
@@ -77,6 +87,8 @@ export const SetupApp = (props: SetupAppProps) => {
     width: dimensions().width,
     height: dimensions().height,
     look,
+    progress: progress(),
+    elapsedSeconds: elapsedSeconds(),
   })
 
   const lines = createMemo((): ReadonlyArray<Line> => view(state(), context()))
@@ -91,6 +103,8 @@ export const SetupApp = (props: SetupAppProps) => {
       )
     }
     if (command === "interrupt") {
+      ticket += 1
+      stopTimer()
       abort.abort()
       return props.done({ _tag: "Interrupted" })
     }
@@ -108,10 +122,19 @@ export const SetupApp = (props: SetupAppProps) => {
       )
       return
     }
+    const started = performance.now()
+    timer = setInterval(
+      () => setElapsedSeconds(Math.floor((performance.now() - started) / 1000)),
+      200,
+    )
     settle(
-      () => props.input.apply(current.choices, abort.signal),
+      () =>
+        props.input.apply(current.choices, abort.signal, (update) => {
+          if (mine === ticket) setProgress(update)
+        }),
       (result) => {
         if (mine !== ticket) return
+        stopTimer()
         setState((now) =>
           finished(
             now,
@@ -181,9 +204,29 @@ export const SetupApp = (props: SetupAppProps) => {
               <For each={line as Array<Line[number]>}>
                 {(part) => (
                   <Show
-                    when={part.tone !== undefined && BOLD_TONES.has(part.tone)}
-                    fallback={<span style={{ fg: colorOf(part.tone) }}>{part.text}</span>}>
-                    <b style={{ fg: colorOf(part.tone) }}>{part.text}</b>
+                    when={part.activeTab}
+                    fallback={
+                      <Show
+                        when={part.tone !== undefined && BOLD_TONES.has(part.tone)}
+                        fallback={<span style={{ fg: colorOf(part.tone) }}>{part.text}</span>}>
+                        <b style={{ fg: colorOf(part.tone) }}>{part.text}</b>
+                      </Show>
+                    }>
+                    <Show
+                      when={look.color}
+                      fallback={
+                        <b>
+                          <u>{part.text}</u>
+                        </b>
+                      }>
+                      <b
+                        style={{
+                          fg: look.background === "light" ? "#e1e2e7" : "#1a1b26",
+                          bg: palette.focus,
+                        }}>
+                        {part.text}
+                      </b>
+                    </Show>
                   </Show>
                 )}
               </For>

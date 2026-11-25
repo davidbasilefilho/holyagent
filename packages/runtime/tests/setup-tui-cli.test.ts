@@ -11,7 +11,13 @@ import { CAPABILITIES } from "../src/config/capabilities.ts"
 import { piPackages } from "../src/config/packages.ts"
 import { defaultConfig } from "../src/config/schema.ts"
 import { TuiUnavailable } from "../src/setup/tui/load.ts"
-import type { Choices, Review, SetupTuiModule, TuiInput } from "../src/setup/tui/types.ts"
+import type {
+  Choices,
+  Review,
+  SetupDisplayProgress,
+  SetupTuiModule,
+  TuiInput,
+} from "../src/setup/tui/types.ts"
 import { scratch } from "./setup-fixture.ts"
 
 let home: string
@@ -271,6 +277,51 @@ describe("the public setup renderer", () => {
     expect(result.stdout).toContain("setup cancelled; nothing was written")
     expect(await Bun.file(t3File()).exists()).toBe(false)
     expect(await Bun.file(claude).json()).toEqual({ theme: "light" })
+  })
+
+  test("bare public setup reports the actual phases of each selected harness", async () => {
+    await machine()
+    const pi = join(home, "pi")
+    const config = await Effect.runPromise(defaultConfig)
+    await Bun.write(
+      join(pi, "settings.json"),
+      JSON.stringify({ packages: piPackages(config, undefined, "headless") }),
+    )
+    const updates: Array<SetupDisplayProgress> = []
+    const shown = interface_(async (input) => {
+      const choices = { ...input.initial, harnesses: { pi: true, claude: true } }
+      await input.review(choices)
+      expect(updates).toEqual([])
+      const applied = await input.apply(choices, new AbortController().signal, (update) =>
+        updates.push(update),
+      )
+      return { _tag: "Applied", applied }
+    })
+    const result = await cli(["--form", "headless"], {
+      env: { PI_CODING_AGENT_DIR: pi, HOLYAGENT_HOST: "pi" },
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+    })
+    const piHarness = { index: 1, total: 2, label: "Pi / T3 Code" }
+    const claudeHarness = { index: 2, total: 2, label: "Claude Code" }
+    expect(result.code).toBe(0)
+    expect(updates).toEqual([
+      { harness: piHarness },
+      ...[
+        "Capability settings",
+        "Pi packages",
+        "Pi tool settings",
+        "Browser-use checks",
+        "T3 Code settings",
+      ].map((label, index) => ({
+        harness: piHarness,
+        phase: { index: index + 1, total: 5, label },
+      })),
+      { harness: claudeHarness },
+      { harness: claudeHarness, phase: { index: 1, total: 2, label: "Search-tool checks" } },
+      { harness: claudeHarness, phase: { index: 2, total: 2, label: "Claude Code settings" } },
+    ])
   })
 
   test("prints a copyable report path after the screen closes, with no color or raw details", async () => {

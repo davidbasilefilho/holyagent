@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 import { Effect, Option, Schema } from "effect"
 
 import { type Env, homeDirectory } from "../../../core/src/setup/environment.ts"
+import { reportSetupActivity, withSetupPhase } from "../../../core/src/setup/progress.ts"
 import { Shell } from "../../../core/src/setup/shell.ts"
 import {
   type CodexAsset,
@@ -338,41 +339,71 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
     "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session.",
   ]
   if (options.dryRun) return { ok: true, lines, fingerprint }
-  // Do not execute a native command from a dry run. Apply checks the runtime before writing assets.
-  const binary = yield* run(["--version"])
-  if (!/^codex-cli 0\.172\.0(?:-[\w.]+)?$/m.test(binary))
-    return yield* fail("This startup profile requires the verified Codex 0.172.0 runtime line")
-  if (
-    (yield* canonicalProfile(options.home)) !== home ||
-    (yield* read(home, "config.toml")) !== beforeConfig ||
-    (yield* read(home, "AGENTS.override.md")) !== beforeOverride
-  )
-    return yield* fail(`Profile changed during setup: ${join(home, "config.toml")}`)
-  yield* io(home, () => mkdir(home, { recursive: true, mode: 0o700 }))
-  if (beforeConfig === undefined) yield* store(home, "config.toml", undefined, config)
-  for (const asset of assets) yield* store(home, asset.path, asset.before, asset.content)
-  yield* checkPluginTree(home, sourceRoot, pluginAssets, true)
-  yield* store(home, receiptFile, beforeReceipt, nextReceipt)
-  if (addMarket)
-    yield* Schema.decodeUnknownEffect(Schema.fromJsonString(MarketplaceResult))(
-      yield* run(["plugin", "marketplace", "add", market, "--json"]),
-    ).pipe(Effect.mapError(() => fail("Codex did not confirm the expected marketplace")))
-  if (install) {
-    const result = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PluginResult))(
-      yield* run(["plugin", "add", CODEX_PLUGIN, "--json"]),
-    ).pipe(Effect.mapError(() => fail("Codex did not confirm the expected plugin")))
-    if (result.version !== version)
-      return yield* fail(`Codex installed version ${result.version}, expected ${version}`)
-    yield* checkPluginTree(home, cache, expectedCache, true)
-  }
-  const list = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PluginList))(
-    yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"]),
-  ).pipe(Effect.mapError(() => fail("Codex did not report enabled plugins for this profile")))
-  if (
-    !list.installed.some(
-      (item) => item.pluginId === CODEX_PLUGIN && item.enabled && item.version === version,
-    )
-  )
-    return yield* fail(`Codex did not report ${CODEX_PLUGIN} enabled at ${version}`)
+  const steps = [
+    {
+      label: "Codex runtime",
+      run: Effect.gen(function* () {
+        const binary = yield* run(["--version"])
+        if (!/^codex-cli 0\.172\.0(?:-[\w.]+)?$/m.test(binary))
+          return yield* fail(
+            "This startup profile requires the verified Codex 0.172.0 runtime line",
+          )
+      }),
+    },
+    {
+      label: "Codex profile files",
+      run: Effect.gen(function* () {
+        if (
+          (yield* canonicalProfile(options.home)) !== home ||
+          (yield* read(home, "config.toml")) !== beforeConfig ||
+          (yield* read(home, "AGENTS.override.md")) !== beforeOverride
+        )
+          return yield* fail(`Profile changed during setup: ${join(home, "config.toml")}`)
+        yield* io(home, () => mkdir(home, { recursive: true, mode: 0o700 }))
+        if (beforeConfig === undefined) yield* store(home, "config.toml", undefined, config)
+        for (const asset of assets) yield* store(home, asset.path, asset.before, asset.content)
+        yield* checkPluginTree(home, sourceRoot, pluginAssets, true)
+        yield* store(home, receiptFile, beforeReceipt, nextReceipt)
+      }),
+    },
+    ...(addMarket
+      ? [
+          {
+            label: "Codex marketplace",
+            run: Effect.gen(function* () {
+              yield* Schema.decodeUnknownEffect(Schema.fromJsonString(MarketplaceResult))(
+                yield* run(["plugin", "marketplace", "add", market, "--json"]),
+              ).pipe(Effect.mapError(() => fail("Codex did not confirm the expected marketplace")))
+            }),
+          },
+        ]
+      : []),
+    {
+      label: "Codex plugin",
+      run: Effect.gen(function* () {
+        if (install) {
+          yield* reportSetupActivity(`Installing ${CODEX_PLUGIN} ${version}`)
+          const result = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PluginResult))(
+            yield* run(["plugin", "add", CODEX_PLUGIN, "--json"]),
+          ).pipe(Effect.mapError(() => fail("Codex did not confirm the expected plugin")))
+          if (result.version !== version)
+            return yield* fail(`Codex installed version ${result.version}, expected ${version}`)
+          yield* checkPluginTree(home, cache, expectedCache, true)
+        }
+        yield* reportSetupActivity(`Checking enabled version ${version}`)
+        const list = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PluginList))(
+          yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"]),
+        ).pipe(Effect.mapError(() => fail("Codex did not report enabled plugins for this profile")))
+        if (
+          !list.installed.some(
+            (item) => item.pluginId === CODEX_PLUGIN && item.enabled && item.version === version,
+          )
+        )
+          return yield* fail(`Codex did not report ${CODEX_PLUGIN} enabled at ${version}`)
+      }),
+    },
+  ]
+  for (const [index, { label, run }] of steps.entries())
+    yield* withSetupPhase({ index: index + 1, total: steps.length, label }, run)
   return { ok: true, lines, fingerprint }
 })

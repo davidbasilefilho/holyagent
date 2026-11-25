@@ -82,7 +82,7 @@ const CAPABILITY_LINES_OK = [
     ? "~ pi capability processes: not offered in the normal form (its package does not support win32, only darwin, linux); nothing is expected of it"
     : "ok   pi capability processes: normal form, root, 1 package listed at its pin",
   "ok   pi capability mcp: normal form, both, nothing to install",
-  "ok   pi capability computer-use: normal form, specialists, 1 package listed at its pin",
+  "ok   pi capability computer-use: normal form, specialists, nothing to install",
   "ok   pi capability browser-use: normal form, specialists, nothing to install",
   BROWSE_PAIRING_OK,
   "ok   pi capability just-bash: normal form, both, nothing to install",
@@ -99,7 +99,7 @@ const setProjectConfig = (config: unknown) =>
 /** A fake shell where `pi`, `node` and `bun` are installed and print the given versions. */
 const shellWith = (
   versions: { readonly pi?: string; readonly node?: string } = {},
-  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx", "uvx"],
+  commands: ReadonlyArray<string> = ["bun", "ctx7", "pi", "node", "npx", "uvx", "cua-driver"],
 ) =>
   fakeShell({
     commands,
@@ -171,6 +171,10 @@ describe("holyagent doctor, Pi checks", () => {
             if (capability.name === "mcp" || capability.name === "just-bash")
               return [
                 `ok   pi capability ${capability.name}: normal form, both, nothing to install`,
+              ]
+            if (capability.name === "computer-use")
+              return [
+                "FAIL pi capability computer-use: needs cua-driver on PATH; install the official Cua Driver from https://github.com/trycua/cua/releases and reopen Pi",
               ]
             // Browse needs npx and Node.js, which this shell lacks; its pairing is read from the home
             // directory.
@@ -809,18 +813,21 @@ describe("holyagent setup, Pi packages", () => {
     expect(piCommands(stale)).toEqual([`pi install ${first}`])
   })
 
-  test("removes a feature package the config turns off and installs pi-web-kit when it is turned on", async () => {
+  test("preserves an unowned legacy desktop package and installs pi-web-kit when turned on", async () => {
     await setConfig({ pi: { features: { computerUse: false, web: "pi-web-kit" } } })
-    await write(globalSettings(), { packages: [SOURCE, ...DEFAULT_SOURCES] })
+    const legacy = "npm:@amaster.ai/pi-computer-use@0.1.40"
+    await write(globalSettings(), { packages: [SOURCE, ...DEFAULT_SOURCES, legacy] })
     const shell = withPi()
     const report = await runSetup(shell)
     expect(piCommands(shell)).toEqual([
       `pi install npm:pi-web-kit@${PI_PACKAGE_VERSIONS["pi-web-kit"]}`,
-      "pi remove npm:@amaster.ai/pi-computer-use",
     ])
-    expect(piStep(report).at(-1)).toBe(
-      "- pi npm:@amaster.ai/pi-computer-use: removed with pi remove npm:@amaster.ai/pi-computer-use; its feature is off",
-    )
+    expect(
+      piStep(report).some((line) =>
+        line.includes("legacy package registration has no ownership receipt"),
+      ),
+    ).toBe(true)
+    expect(JSON.parse(await Bun.file(globalSettings()).text()).packages).toContain(legacy)
   })
 
   test("leaves a package alone that is not a HolyAgent feature package, and the HolyAgent package itself", async () => {
