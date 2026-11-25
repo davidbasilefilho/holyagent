@@ -42,6 +42,7 @@ export const codexStartupConfig = (rootOnlyCatalogPath?: string) =>
     "[features]",
     ...(rootOnlyCatalogPath === undefined ? ["multi_agent_v2 = false"] : []),
     "default_mode_request_user_input = true",
+    "context_management = true",
     ...(rootOnlyCatalogPath === undefined
       ? []
       : [

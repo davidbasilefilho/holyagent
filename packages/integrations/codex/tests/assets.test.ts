@@ -77,7 +77,11 @@ test("new startup profiles disable delegation at the native common entry point",
       model: "gpt-6.2-sol",
       model_reasoning_effort: "medium",
       agents: { enabled: false, max_depth: 1 },
-      features: { multi_agent_v2: false, default_mode_request_user_input: true },
+      features: {
+        multi_agent_v2: false,
+        default_mode_request_user_input: true,
+        context_management: true,
+      },
     })
     expect(await Bun.file(join(profile, "agents", "holyagent-reviewer-code.toml")).exists()).toBe(
       true,
@@ -105,6 +109,7 @@ test("the optional V1 profile exposes the root namespace and withholds V2 native
     agents: { enabled: true, max_depth: 1 },
     features: {
       default_mode_request_user_input: true,
+      context_management: true,
       multi_agent_v2: { enabled: false, disable_native_tools: true },
       code_mode: { direct_only_tool_namespaces: ["multi_agent_v1"] },
     },
@@ -158,6 +163,7 @@ test.skipIf(codex === undefined)(
       expect(prompt).not.toContain("spawn_agent")
       const features = await run("features", "list")
       expect(features).toMatch(/^default_mode_request_user_input[ \t]+[^\r\n]+[ \t]+true$/m)
+      expect(features).toMatch(/^context_management[ \t]+[^\r\n]+[ \t]+true$/m)
       expect(features).toMatch(/^multi_agent_v2[ \t]+[^\r\n]+[ \t]+false$/m)
       expect(await Bun.file(join(codexHome, "auth.json")).exists()).toBe(false)
     } finally {

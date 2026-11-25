@@ -1,12 +1,18 @@
 import { randomUUID } from "node:crypto"
-import { lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
-import { dirname, isAbsolute, join, resolve } from "node:path"
+import { lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 
 import { Effect, Option, Schema } from "effect"
 
 import { type Env, homeDirectory } from "../../../core/src/setup/environment.ts"
 import { Shell } from "../../../core/src/setup/shell.ts"
-import { CODEX_ASSET_VERSION, CODEX_MARKETPLACE, CODEX_PLUGIN } from "./assets.ts"
+import {
+  type CodexAsset,
+  CODEX_ASSET_VERSION,
+  CODEX_MARKETPLACE,
+  CODEX_PLUGIN,
+  codexMarketplaceFiles,
+} from "./assets.ts"
 import { CODEX_STARTUP_MARKETPLACE, codexStartupFiles, StartupStageError } from "./startup.ts"
 
 const Receipt = Schema.fromJsonString(
@@ -19,6 +25,15 @@ const MarketplaceResult = Schema.Struct({ marketplaceName: Schema.Literal(CODEX_
 const PluginResult = Schema.Struct({
   pluginId: Schema.Literal(CODEX_PLUGIN),
   version: Schema.String,
+})
+const PluginList = Schema.Struct({
+  installed: Schema.Array(
+    Schema.Struct({
+      pluginId: Schema.String,
+      version: Schema.String,
+      enabled: Schema.Boolean,
+    }),
+  ),
 })
 const receiptFile = join("holyagent", "setup-v1.json")
 const digest = (content: string) => Bun.CryptoHasher.hash("sha256", content, "hex")
@@ -34,6 +49,7 @@ export interface CodexSetupOptions {
   readonly dryRun: boolean
   readonly catalog?: string
   readonly version?: string
+  readonly expectedPlan?: string
 }
 
 const io = <A>(path: string, perform: () => Promise<A>) =>
@@ -47,6 +63,20 @@ const statOptional = (path: string) =>
         error.code === "ENOENT" ? undefined : Promise.reject(error),
     ),
   )
+
+const canonicalProfile = Effect.fn("canonicalCodexSetupProfile")(function* (candidate: string) {
+  const target = resolve(candidate)
+  const root = yield* statOptional(target)
+  if (root !== undefined && !root.isDirectory())
+    return yield* fail(`Not a real profile directory: ${target}`)
+  let ancestor = target
+  const suffix: string[] = []
+  while ((yield* statOptional(ancestor)) === undefined) {
+    suffix.unshift(basename(ancestor))
+    ancestor = dirname(ancestor)
+  }
+  return join(yield* io(ancestor, () => realpath(ancestor)), ...suffix)
+})
 
 const inside = Effect.fn("codexSetupPath")(function* (home: string, relativePath: string) {
   let path = home
@@ -74,6 +104,37 @@ const read = Effect.fn("codexSetupRead")(function* (home: string, entry: string)
   if (stat === undefined) return undefined
   if (!stat.isFile()) return yield* fail(`Not a regular profile file: ${file}`)
   return yield* io(file, () => readFile(file, "utf8"))
+})
+
+const checkPluginTree = Effect.fn("checkCodexPluginTree")(function* (
+  home: string,
+  root: string,
+  expected: ReadonlyArray<CodexAsset>,
+  complete: boolean,
+) {
+  const allowed = new Set(expected.map(({ path }) => path))
+  const directories = new Set([root])
+  for (const { path } of expected)
+    for (let parent = dirname(path); parent !== root; parent = dirname(parent))
+      directories.add(parent)
+  for (const directory of directories) {
+    const absolute = yield* inside(home, directory)
+    const stat = yield* statOptional(absolute)
+    if (stat === undefined && !complete) continue
+    if (stat === undefined || !stat.isDirectory())
+      return yield* fail(`Missing or invalid Codex plugin directory: ${absolute}`)
+    const names = yield* io(absolute, () => readdir(absolute))
+    for (const name of names) {
+      const file = join(directory, name)
+      if (!allowed.has(file) && !directories.has(file))
+        return yield* fail(`Kept unowned entry in Codex plugin: ${join(home, file)}`)
+    }
+  }
+  if (complete) {
+    for (const { path, content } of expected)
+      if ((yield* read(home, path)) !== content)
+        return yield* fail(`Kept modified Codex plugin cache: ${join(home, path)}`)
+  }
 })
 
 const record = (value: unknown): Readonly<Record<string, unknown>> =>
@@ -147,7 +208,7 @@ const store = Effect.fn("writeOwnedCodexSetupFile")(function* (
 /** Provision a dedicated Codex home using the native marketplace and plugin commands. */
 export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: CodexSetupOptions) {
   if (!isAbsolute(options.home)) return yield* fail("--codex-home must be an absolute path")
-  const home = resolve(options.home)
+  const home = yield* canonicalProfile(options.home)
   if (home === dirname(home))
     return yield* fail("Choose a dedicated Codex profile, not a filesystem root")
   const version = options.version ?? CODEX_ASSET_VERSION
@@ -175,10 +236,18 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
         ),
       )
   const desired = yield* codexStartupFiles(home, options.catalog, version)
-  const legacy = yield* codexStartupFiles(home, options.catalog)
+  const legacy = codexMarketplaceFiles().map(({ path, content }) => ({
+    path: join(CODEX_STARTUP_MARKETPLACE, path),
+    content,
+  }))
   const config = desired.find(({ path }) => path === "config.toml")?.content
   if (config === undefined) return yield* fail("Missing bundled Codex startup configuration")
   const beforeConfig = yield* read(home, "config.toml")
+  const beforeOverride = yield* read(home, "AGENTS.override.md")
+  if (beforeOverride?.trim())
+    return yield* fail(
+      "This profile has an AGENTS.override.md that would hide HolyAgent startup guidance. Kept it unchanged. Use another --codex-home.",
+    )
   const settings = beforeConfig === undefined ? {} : yield* parseToml(beforeConfig)
   if (beforeConfig !== undefined) yield* checkPolicy(settings, yield* parseToml(config))
   const market = join(home, CODEX_STARTUP_MARKETPLACE)
@@ -219,6 +288,9 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
         return { ...asset, before }
       }),
   )
+  const sourceRoot = join(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent")
+  const pluginAssets = assets.filter(({ path }) => path.startsWith(sourceRoot))
+  yield* checkPluginTree(home, sourceRoot, pluginAssets, false)
   const nextReceipt = `${JSON.stringify(
     {
       version: 1,
@@ -227,18 +299,29 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
     null,
     2,
   )}\n`
-  const cache = join(
-    "plugins",
-    "cache",
-    CODEX_MARKETPLACE,
-    "holyagent",
-    version,
-    ".codex-plugin",
-    "plugin.json",
-  )
-  const installed = yield* read(home, cache)
-  const install = plugin.enabled !== true || installed === undefined
+  const cache = join("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version)
+  const expectedCache = pluginAssets.map(({ path, content }) => ({
+    path: join(cache, path.slice(sourceRoot.length + 1)),
+    content,
+  }))
+  const cached = yield* statOptional(yield* inside(home, cache))
+  if (cached !== undefined) yield* checkPluginTree(home, cache, expectedCache, true)
+  const install = plugin.enabled !== true || cached === undefined
   const addMarket = Object.keys(registered).length === 0
+  const fingerprint = digest(
+    JSON.stringify([
+      home,
+      version,
+      beforeConfig,
+      beforeOverride,
+      beforeReceipt,
+      addMarket,
+      install,
+      assets.map(({ path, before, content }) => [path, before, content]),
+    ]),
+  )
+  if (options.expectedPlan !== undefined && options.expectedPlan !== fingerprint)
+    return yield* fail("The Codex profile changed after review. Open setup and review it again.")
   const lines = [
     `~ Codex home: ${home}`,
     `~ Startup: ${options.catalog === undefined ? "direct-only" : "adaptive, native V1 root-only (depth one)"}`,
@@ -251,19 +334,24 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
     ...(addMarket ? ["+ Codex plugin: register the local marketplace"] : []),
     ...(install
       ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`]
-      : [`= Codex plugin: ${version} already present`]),
+      : [`= Codex plugin: ${version} already present in the local cache`]),
     "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session.",
   ]
-  if (options.dryRun) return { ok: true, lines }
+  if (options.dryRun) return { ok: true, lines, fingerprint }
   // Do not execute a native command from a dry run. Apply checks the runtime before writing assets.
   const binary = yield* run(["--version"])
   if (!/^codex-cli 0\.172\.0(?:-[\w.]+)?$/m.test(binary))
     return yield* fail("This startup profile requires the verified Codex 0.172.0 runtime line")
-  if ((yield* read(home, "config.toml")) !== beforeConfig)
+  if (
+    (yield* canonicalProfile(options.home)) !== home ||
+    (yield* read(home, "config.toml")) !== beforeConfig ||
+    (yield* read(home, "AGENTS.override.md")) !== beforeOverride
+  )
     return yield* fail(`Profile changed during setup: ${join(home, "config.toml")}`)
   yield* io(home, () => mkdir(home, { recursive: true, mode: 0o700 }))
   if (beforeConfig === undefined) yield* store(home, "config.toml", undefined, config)
   for (const asset of assets) yield* store(home, asset.path, asset.before, asset.content)
+  yield* checkPluginTree(home, sourceRoot, pluginAssets, true)
   yield* store(home, receiptFile, beforeReceipt, nextReceipt)
   if (addMarket)
     yield* Schema.decodeUnknownEffect(Schema.fromJsonString(MarketplaceResult))(
@@ -275,6 +363,16 @@ export const setupCodex = Effect.fn("setupCodex")(function* (env: Env, options: 
     ).pipe(Effect.mapError(() => fail("Codex did not confirm the expected plugin")))
     if (result.version !== version)
       return yield* fail(`Codex installed version ${result.version}, expected ${version}`)
+    yield* checkPluginTree(home, cache, expectedCache, true)
   }
-  return { ok: true, lines }
+  const list = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PluginList))(
+    yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"]),
+  ).pipe(Effect.mapError(() => fail("Codex did not report enabled plugins for this profile")))
+  if (
+    !list.installed.some(
+      (item) => item.pluginId === CODEX_PLUGIN && item.enabled && item.version === version,
+    )
+  )
+    return yield* fail(`Codex did not report ${CODEX_PLUGIN} enabled at ${version}`)
+  return { ok: true, lines, fingerprint }
 })

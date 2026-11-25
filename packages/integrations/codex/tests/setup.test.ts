@@ -58,6 +58,47 @@ test("a conflicting native setup or an opt-out is a preflight failure with no wr
     }
   }))
 
+test("an existing instruction override and extra marketplace content are kept out of setup", () =>
+  fixture(async (scratch) => {
+    const home = join(scratch, "profile")
+    const override = join(home, "AGENTS.override.md")
+    await mkdir(home)
+    await Bun.write(override, "Existing startup notes\n")
+    expect(await Effect.runPromise(Effect.flip(plan(home)))).toMatchObject({
+      detail: expect.stringContaining("would hide HolyAgent startup guidance"),
+    })
+    expect(await Bun.file(override).text()).toBe("Existing startup notes\n")
+    await rm(override)
+    const extra = join(home, "holyagent", "marketplace", "plugins", "holyagent", "extra.txt")
+    await Bun.write(extra, "Unowned content\n")
+    expect(await Effect.runPromise(Effect.flip(plan(home)))).toMatchObject({
+      detail: expect.stringContaining("unowned entry in Codex plugin"),
+    })
+    expect(await Bun.file(extra).text()).toBe("Unowned content\n")
+    expect(await Bun.file(join(home, "config.toml")).exists()).toBe(false)
+  }))
+
+test("apply refuses a change since review before starting the native runtime", () =>
+  fixture(async (scratch) => {
+    const home = join(scratch, "profile")
+    const first = await Effect.runPromise(plan(home))
+    const config = join(home, "config.toml")
+    const external = `# existing settings\n${codexStartupConfig()}`
+    await Bun.write(config, external)
+    const mutation = setupCodex(
+      { HOME: scratch },
+      {
+        home,
+        dryRun: false,
+        expectedPlan: first.fingerprint,
+      },
+    ).pipe(Effect.provide(failOnRun))
+    expect(await Effect.runPromise(Effect.flip(mutation))).toMatchObject({
+      detail: "The Codex profile changed after review. Open setup and review it again.",
+    })
+    expect(await Bun.file(config).text()).toBe(external)
+  }))
+
 test.skipIf(process.platform === "win32")("setup rejects symlinked role directories", () =>
   fixture(async (scratch) => {
     const home = join(scratch, "profile")
@@ -121,6 +162,23 @@ test.skipIf(native === undefined)(
         detail: expect.stringContaining("unowned Codex setup file"),
       })
       expect(await Bun.file(role).text()).toBe("# manual override\n")
+      await rm(role)
+      const cached = join(
+        home,
+        "plugins",
+        "cache",
+        "holyagent-local",
+        "holyagent",
+        next,
+        "skills",
+        "holyagent-workflow",
+        "SKILL.md",
+      )
+      await Bun.write(cached, "Changed in the native cache\n")
+      expect(await Effect.runPromise(Effect.flip(runSetup(next)))).toMatchObject({
+        detail: expect.stringContaining("modified Codex plugin cache"),
+      })
+      expect(await Bun.file(cached).text()).toBe("Changed in the native cache\n")
       expect(await Bun.file(join(home, "auth.json")).exists()).toBe(false)
     }),
   30_000,

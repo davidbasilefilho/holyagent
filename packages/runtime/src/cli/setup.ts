@@ -85,6 +85,7 @@ const codexPlan = (
   env: Env,
   installedPackageRoot: string | undefined,
   dryRun: boolean,
+  expectedPlan?: string,
 ) =>
   Effect.gen(function* () {
     const catalog = stringFlag(args, "root-only-catalog")
@@ -107,6 +108,7 @@ const codexPlan = (
       dryRun,
       ...(catalog === undefined ? {} : { catalog }),
       ...(version === undefined ? {} : { version }),
+      ...(expectedPlan === undefined ? {} : { expectedPlan }),
     })
   }).pipe(
     Effect.provide(shellLive(env)),
@@ -321,6 +323,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
             ),
           )
         if (target === "claude") return printed(yield* apply(flagged, capabilities))
+        let reviewedCodex: string | undefined
         const interactive = yield* runInteractive({
           env,
           cwd,
@@ -370,7 +373,23 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
                     replacePiRegistration,
                   ) =>
                     harness === "codex"
-                      ? codexPlan(args, env, installedPackageRoot, dryRun)
+                      ? Effect.gen(function* () {
+                          if (!dryRun && reviewedCodex === undefined)
+                            return {
+                              ok: false,
+                              lines: ["! Review the Codex setup plan before applying."],
+                            }
+                          const plan = yield* codexPlan(
+                            args,
+                            env,
+                            installedPackageRoot,
+                            dryRun,
+                            dryRun ? undefined : reviewedCodex,
+                          )
+                          if (dryRun)
+                            reviewedCodex = "fingerprint" in plan ? plan.fingerprint : undefined
+                          return plan
+                        })
                       : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
                           target: harness,
                           dryRun,

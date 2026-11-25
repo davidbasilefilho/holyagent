@@ -31926,6 +31926,8 @@ Handle a straightforward change or answer directly. Define the expected result a
 
 For substantial work, identify independent parts and who owns each one. Give a specialist the outcome, relevant constraints, writable paths or resources, and the evidence you need. Keep writes disjoint and reviews independent of the work under review.
 
+When a decision belongs to the user, use the host's native question tool if it is available. Use a synchronous question when the answer blocks the next action, or an asynchronous question when independent work can continue. Keep questions separate from approvals. Use the native wait tool when only specialist work remains. For V1 on the supported 0.172.0 runtime, pass \`timeout_ms: 1200000\` when the tool schema allows it. Treat an activity notification as progress, not a finished result.
+
 Use the repository's gates. Verify each material claim at the boundary it concerns, including the real host or user-facing path when it matters. Use independent review for high-impact or trust-boundary changes. Report the result, checks and unresolved limits.
 `;
 var init_SKILL = () => {};
@@ -32022,6 +32024,7 @@ var CODEX_STARTUP_MARKETPLACE = "holyagent/marketplace", catalogName = "root-onl
   "[features]",
   ...rootOnlyCatalogPath === undefined ? ["multi_agent_v2 = false"] : [],
   "default_mode_request_user_input = true",
+  "context_management = true",
   ...rootOnlyCatalogPath === undefined ? [] : [
     "",
     "[features.multi_agent_v2]",
@@ -32093,9 +32096,9 @@ var init_startup = __esm(async () => {
 });
 
 import { randomUUID as randomUUID4 } from "crypto";
-import { lstat as lstat11, mkdir as mkdir12, readFile as readFile6, rename as rename8, rm as rm11, writeFile as writeFile7 } from "fs/promises";
-import { dirname as dirname14, isAbsolute as isAbsolute11, join as join32, resolve as resolve14 } from "path";
-var Receipt, MarketplaceResult, PluginResult, receiptFile, digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex"), fail9 = (detail) => new StartupStageError({ detail }), defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join32(homeDirectory2(env), ".holyagent"), "codex"), io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) }), statOptional = (path) => io2(path, () => lstat11(path).then((stat) => stat, (error) => error.code === "ENOENT" ? undefined : Promise.reject(error))), inside, read2, record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}, parseToml = (content) => try_2({
+import { lstat as lstat11, mkdir as mkdir12, readdir as readdir6, readFile as readFile6, realpath as realpath7, rename as rename8, rm as rm11, writeFile as writeFile7 } from "fs/promises";
+import { basename as basename9, dirname as dirname14, isAbsolute as isAbsolute11, join as join32, resolve as resolve14 } from "path";
+var Receipt, MarketplaceResult, PluginResult, PluginList, receiptFile, digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex"), fail9 = (detail) => new StartupStageError({ detail }), defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join32(homeDirectory2(env), ".holyagent"), "codex"), io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) }), statOptional = (path) => io2(path, () => lstat11(path).then((stat) => stat, (error) => error.code === "ENOENT" ? undefined : Promise.reject(error))), canonicalProfile, inside, read2, checkPluginTree, record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}, parseToml = (content) => try_2({
   try: () => record4(Bun.TOML.parse(content)),
   catch: () => fail9("Invalid Codex config.toml; left it unchanged")
 }), same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b), checkPolicy, store2, setupCodex;
@@ -32114,7 +32117,27 @@ var init_setup2 = __esm(async () => {
     pluginId: Literal2(CODEX_PLUGIN),
     version: String6
   });
+  PluginList = Struct({
+    installed: ArraySchema(Struct({
+      pluginId: String6,
+      version: String6,
+      enabled: Boolean3
+    }))
+  });
   receiptFile = join32("holyagent", "setup-v1.json");
+  canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
+    const target = resolve14(candidate);
+    const root = yield* statOptional(target);
+    if (root !== undefined && !root.isDirectory())
+      return yield* fail9(`Not a real profile directory: ${target}`);
+    let ancestor = target;
+    const suffix = [];
+    while ((yield* statOptional(ancestor)) === undefined) {
+      suffix.unshift(basename9(ancestor));
+      ancestor = dirname14(ancestor);
+    }
+    return join32(yield* io2(ancestor, () => realpath7(ancestor)), ...suffix);
+  });
   inside = fn2("codexSetupPath")(function* (home, relativePath) {
     let path = home;
     const root = yield* statOptional(home);
@@ -32139,6 +32162,32 @@ var init_setup2 = __esm(async () => {
     if (!stat.isFile())
       return yield* fail9(`Not a regular profile file: ${file}`);
     return yield* io2(file, () => readFile6(file, "utf8"));
+  });
+  checkPluginTree = fn2("checkCodexPluginTree")(function* (home, root, expected, complete) {
+    const allowed = new Set(expected.map(({ path }) => path));
+    const directories = new Set([root]);
+    for (const { path } of expected)
+      for (let parent = dirname14(path);parent !== root; parent = dirname14(parent))
+        directories.add(parent);
+    for (const directory of directories) {
+      const absolute = yield* inside(home, directory);
+      const stat = yield* statOptional(absolute);
+      if (stat === undefined && !complete)
+        continue;
+      if (stat === undefined || !stat.isDirectory())
+        return yield* fail9(`Missing or invalid Codex plugin directory: ${absolute}`);
+      const names = yield* io2(absolute, () => readdir6(absolute));
+      for (const name of names) {
+        const file = join32(directory, name);
+        if (!allowed.has(file) && !directories.has(file))
+          return yield* fail9(`Kept unowned entry in Codex plugin: ${join32(home, file)}`);
+      }
+    }
+    if (complete) {
+      for (const { path, content } of expected)
+        if ((yield* read2(home, path)) !== content)
+          return yield* fail9(`Kept modified Codex plugin cache: ${join32(home, path)}`);
+    }
   });
   checkPolicy = fn2("checkCodexSetupPolicy")(function* (current, wanted) {
     const currentAgents = record4(current.agents);
@@ -32173,7 +32222,7 @@ var init_setup2 = __esm(async () => {
   setupCodex = fn2("setupCodex")(function* (env, options) {
     if (!isAbsolute11(options.home))
       return yield* fail9("--codex-home must be an absolute path");
-    const home = resolve14(options.home);
+    const home = yield* canonicalProfile(options.home);
     if (home === dirname14(home))
       return yield* fail9("Choose a dedicated Codex profile, not a filesystem root");
     const version = options.version ?? CODEX_ASSET_VERSION;
@@ -32188,11 +32237,17 @@ var init_setup2 = __esm(async () => {
       env: { CODEX_HOME: home, NO_COLOR: "1" }
     }).pipe(flatMap2((result) => result.exitCode === 0 ? succeed6(result.stdout) : fail5(fail9(`codex ${args.join(" ")} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 600)}`))));
     const desired = yield* codexStartupFiles(home, options.catalog, version);
-    const legacy = yield* codexStartupFiles(home, options.catalog);
+    const legacy = codexMarketplaceFiles().map(({ path, content }) => ({
+      path: join32(CODEX_STARTUP_MARKETPLACE, path),
+      content
+    }));
     const config = desired.find(({ path }) => path === "config.toml")?.content;
     if (config === undefined)
       return yield* fail9("Missing bundled Codex startup configuration");
     const beforeConfig = yield* read2(home, "config.toml");
+    const beforeOverride = yield* read2(home, "AGENTS.override.md");
+    if (beforeOverride?.trim())
+      return yield* fail9("This profile has an AGENTS.override.md that would hide HolyAgent startup guidance. Kept it unchanged. Use another --codex-home.");
     const settings = beforeConfig === undefined ? {} : yield* parseToml(beforeConfig);
     if (beforeConfig !== undefined)
       yield* checkPolicy(settings, yield* parseToml(config));
@@ -32211,36 +32266,58 @@ var init_setup2 = __esm(async () => {
         return yield* fail9(`Kept modified or unowned Codex setup file: ${join32(home, asset.path)}`);
       return { ...asset, before };
     }));
+    const sourceRoot = join32(CODEX_STARTUP_MARKETPLACE, "plugins", "holyagent");
+    const pluginAssets = assets.filter(({ path }) => path.startsWith(sourceRoot));
+    yield* checkPluginTree(home, sourceRoot, pluginAssets, false);
     const nextReceipt = `${JSON.stringify({
       version: 1,
       files: Object.fromEntries(assets.map(({ path, content }) => [path, digest(content)]))
     }, null, 2)}
 `;
-    const cache = join32("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version, ".codex-plugin", "plugin.json");
-    const installed = yield* read2(home, cache);
-    const install = plugin.enabled !== true || installed === undefined;
+    const cache = join32("plugins", "cache", CODEX_MARKETPLACE, "holyagent", version);
+    const expectedCache = pluginAssets.map(({ path, content }) => ({
+      path: join32(cache, path.slice(sourceRoot.length + 1)),
+      content
+    }));
+    const cached = yield* statOptional(yield* inside(home, cache));
+    if (cached !== undefined)
+      yield* checkPluginTree(home, cache, expectedCache, true);
+    const install = plugin.enabled !== true || cached === undefined;
     const addMarket = Object.keys(registered).length === 0;
+    const fingerprint = digest(JSON.stringify([
+      home,
+      version,
+      beforeConfig,
+      beforeOverride,
+      beforeReceipt,
+      addMarket,
+      install,
+      assets.map(({ path, before, content }) => [path, before, content])
+    ]));
+    if (options.expectedPlan !== undefined && options.expectedPlan !== fingerprint)
+      return yield* fail9("The Codex profile changed after review. Open setup and review it again.");
     const lines = [
       `~ Codex home: ${home}`,
       `~ Startup: ${options.catalog === undefined ? "direct-only" : "adaptive, native V1 root-only (depth one)"}`,
       ...beforeConfig === undefined ? ["+ Codex config: create a dedicated startup profile"] : ["= Codex config: keeping existing settings"],
       ...assets.filter(({ before, content }) => before !== content).map(({ path }) => `+ Codex asset: ${path}`),
       ...addMarket ? ["+ Codex plugin: register the local marketplace"] : [],
-      ...install ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`] : [`= Codex plugin: ${version} already present`],
+      ...install ? [`+ Codex plugin: install ${CODEX_PLUGIN} ${version}`] : [`= Codex plugin: ${version} already present in the local cache`],
       "~ Start Codex with this CODEX_HOME set before launch; setup does not change a running session."
     ];
     if (options.dryRun)
-      return { ok: true, lines };
+      return { ok: true, lines, fingerprint };
     const binary = yield* run(["--version"]);
     if (!/^codex-cli 0\.172\.0(?:-[\w.]+)?$/m.test(binary))
       return yield* fail9("This startup profile requires the verified Codex 0.172.0 runtime line");
-    if ((yield* read2(home, "config.toml")) !== beforeConfig)
+    if ((yield* canonicalProfile(options.home)) !== home || (yield* read2(home, "config.toml")) !== beforeConfig || (yield* read2(home, "AGENTS.override.md")) !== beforeOverride)
       return yield* fail9(`Profile changed during setup: ${join32(home, "config.toml")}`);
     yield* io2(home, () => mkdir12(home, { recursive: true, mode: 448 }));
     if (beforeConfig === undefined)
       yield* store2(home, "config.toml", undefined, config);
     for (const asset of assets)
       yield* store2(home, asset.path, asset.before, asset.content);
+    yield* checkPluginTree(home, sourceRoot, pluginAssets, true);
     yield* store2(home, receiptFile, beforeReceipt, nextReceipt);
     if (addMarket)
       yield* decodeUnknownEffect2(fromJsonString2(MarketplaceResult))(yield* run(["plugin", "marketplace", "add", market, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected marketplace")));
@@ -32248,8 +32325,12 @@ var init_setup2 = __esm(async () => {
       const result = yield* decodeUnknownEffect2(fromJsonString2(PluginResult))(yield* run(["plugin", "add", CODEX_PLUGIN, "--json"])).pipe(mapError2(() => fail9("Codex did not confirm the expected plugin")));
       if (result.version !== version)
         return yield* fail9(`Codex installed version ${result.version}, expected ${version}`);
+      yield* checkPluginTree(home, cache, expectedCache, true);
     }
-    return { ok: true, lines };
+    const list = yield* decodeUnknownEffect2(fromJsonString2(PluginList))(yield* run(["plugin", "list", "--marketplace", CODEX_MARKETPLACE, "--json"])).pipe(mapError2(() => fail9("Codex did not report enabled plugins for this profile")));
+    if (!list.installed.some((item) => item.pluginId === CODEX_PLUGIN && item.enabled && item.version === version))
+      return yield* fail9(`Codex did not report ${CODEX_PLUGIN} enabled at ${version}`);
+    return { ok: true, lines, fingerprint };
   });
 });
 
@@ -32595,7 +32676,7 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
   authorize: () => true
 }), CAPABILITY_FLAGS, printed = (report) => new Verbatim(`${report.lines.join(`
 `)}
-`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]", CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]", PI_USAGE, CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--dry-run] [--non-interactive]", PublicManifest, codexPlan = (args, env, installedPackageRoot, dryRun) => gen2(function* () {
+`, "", report.ok ? 0 : 1), resolveScope, SETUP_USAGE = "setup [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--<capability> on|off] [--form headless|normal] [--worktrees on|off] [--device-access on|off] [--no-tui]", CLAUDE_USAGE = "setup claude [--scope user|project|local] [--undo] [--dry-run] [--subagent-cache-ttl 1h|5m] [--skip-ctx7] [--no-tui|--non-interactive]", PI_USAGE, CODEX_USAGE = "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--dry-run] [--non-interactive]", PublicManifest, codexPlan = (args, env, installedPackageRoot, dryRun, expectedPlan) => gen2(function* () {
   const catalog = stringFlag(args, "root-only-catalog");
   const version = installedPackageRoot === undefined ? undefined : yield* tryPromise2(() => Bun.file(join33(installedPackageRoot, "package.json")).json()).pipe(flatMap2(decodeUnknownEffect2(PublicManifest)), map5((manifest) => Bun.semver.satisfies(manifest.version, manifest.version) ? manifest.version : undefined), orElseSucceed2(() => {
     return;
@@ -32604,7 +32685,8 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
     home: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
     dryRun,
     ...catalog === undefined ? {} : { catalog },
-    ...version === undefined ? {} : { version }
+    ...version === undefined ? {} : { version },
+    ...expectedPlan === undefined ? {} : { expectedPlan }
   });
 }).pipe(provide4(shellLive(env)), catch_2((error) => succeed6({ ok: false, lines: [`! Codex setup: ${error.detail}`] }))), codexCommand, CAPABILITY_NAMES, switchFlag, capabilitySwitches, formOf, DOCTOR_USAGE = "doctor [--scope user|project|local] [--form headless|normal] [--fix]", setupCommand = (target, usage = SETUP_USAGE) => {
   return {
@@ -32698,6 +32780,7 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
       }).pipe(provide4(shellLive(env)), catch_2((error) => succeed6({ lines: [`! setup: ${error.message}`], ok: false })));
       if (target === "claude")
         return printed(yield* apply(flagged, capabilities));
+      let reviewedCodex;
       const interactive = yield* runInteractive({
         env,
         cwd,
@@ -32728,7 +32811,17 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
         ...surface === "public" && target === undefined ? {
           combined: {
             codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
-            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration) => harness === "codex" ? codexPlan(args, env, installedPackageRoot, dryRun) : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration) => harness === "codex" ? gen2(function* () {
+              if (!dryRun && reviewedCodex === undefined)
+                return {
+                  ok: false,
+                  lines: ["! Review the Codex setup plan before applying."]
+                };
+              const plan = yield* codexPlan(args, env, installedPackageRoot, dryRun, dryRun ? undefined : reviewedCodex);
+              if (dryRun)
+                reviewedCodex = "fingerprint" in plan ? plan.fingerprint : undefined;
+              return plan;
+            }) : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
               target: harness,
               dryRun,
               skipSharedPrerequisites,
