@@ -325,7 +325,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
         if (
           surface === "public" &&
           !booleanFlag(args, "undo") &&
-          (target === "pi" || t3Workflow) &&
+          (target === "pi" || (target === undefined && t3Workflow)) &&
           (yield* piInUse(env))
         ) {
           const config = yield* loadPiConfigSource(env, cwd, resolved.scope).pipe(

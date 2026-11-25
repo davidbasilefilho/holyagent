@@ -32506,7 +32506,7 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
         return printed(interactive.report);
       if (interactive.kind === "applied")
         return surface === "public" ? yield* saveSetupResult(interactive.report, booleanFlag(args, "dry-run"), env) : printed(interactive.report);
-      if (surface === "public" && !booleanFlag(args, "undo") && (target === "pi" || t3Workflow) && (yield* piInUse(env))) {
+      if (surface === "public" && !booleanFlag(args, "undo") && (target === "pi" || target === undefined && t3Workflow) && (yield* piInUse(env))) {
         const config = yield* loadPiConfigSource(env, cwd, resolved.scope).pipe(orElseSucceed2(() => {
           return;
         }));
