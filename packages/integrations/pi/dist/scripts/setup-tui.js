@@ -3301,6 +3301,7 @@ var acquireUseRelease2 = acquireUseRelease;
 var runFork2 = runFork;
 var runPromise2 = runPromise;
 // packages/runtime/src/setup/tui/app.tsx
+import { insertNode as _$insertNode } from "@opentui/solid";
 import { effect as _$effect } from "@opentui/solid";
 import { memo as _$memo } from "@opentui/solid";
 import { insert as _$insert } from "@opentui/solid";
@@ -3849,7 +3850,7 @@ var lookFor = (env, background = "dark") => ({
   unicode: unicodeEnabled(env),
   background
 });
-var glyphs = (look) => look.unicode ? { focus: "\u276F", dot: "\xB7", ellipsis: "\u2026", arrows: "\u2191/\u2193" } : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down" };
+var glyphs = (look) => look.unicode ? { focus: "\u276F", dot: "\xB7", ellipsis: "\u2026", arrows: "\u2191/\u2193", horizontalArrows: "\u2190/\u2192" } : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down", horizontalArrows: "</>" };
 
 var CAPABILITY_ROW = "capability:";
 var tabs = ["pi", "claude", "codex"];
@@ -4106,7 +4107,7 @@ var chooseLines = (state, context) => {
     return `${box} ${word}`;
   });
   const labels = rows.map((row) => labelOf(row, offer));
-  const valueWidth = Math.max(0, ...values.map(cells));
+  const valueWidth = cells("[ ] disabled");
   const labelWidth = Math.min(Math.max(0, ...labels.map(cells)), Math.max(4, width - 2 - 2 - valueWidth));
   const rowLine = (row, index) => {
     const focused = index === state.focus;
@@ -4138,14 +4139,16 @@ var chooseLines = (state, context) => {
   const tabsLine = combined === undefined ? [] : [
     tabs.flatMap((tab) => [
       {
-        text: `[${tabLabels[tab]}]`,
-        tone: state.tab === tab ? "focus" : "option",
+        text: ` ${tabLabels[tab]} `,
+        tone: "option",
+        activeTab: state.tab === tab,
         click: { tab }
       },
       segment(" ")
     ]),
-    ...hintLines("Left/Right change harness", width)
+    ...hintLines(`${g.horizontalArrows} change harness`, width)
   ];
+  const choiceHint = (text) => combined === undefined ? hintLines(text, width) : wrap(text, width - 2).map((line) => [segment(`  ${line}`, "hint")]);
   const unavailable = combined !== undefined && state.tab === "codex" ? "Public Codex setup is not available on this build." : combined !== undefined && state.tab === "pi" && offer.harnesses?.piAvailable === false ? "Pi or T3 Code is unavailable on this host." : undefined;
   return [
     ...tabsLine,
@@ -4159,10 +4162,10 @@ var chooseLines = (state, context) => {
     ],
     ...group("Capabilities", configCount, rows.length),
     ...context.height >= 20 ? [button] : [],
-    ...unavailable === undefined ? [] : hintLines(unavailable, width),
-    ...combined?.claude === true && state.tab === "claude" ? hintLines(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`, width) : [],
-    ...focused === undefined ? [] : hintLines(hintOf(focused, offer), width),
-    ...hintLines(`Environment: ${offer.form}`, width)
+    ...unavailable === undefined ? [] : choiceHint(unavailable),
+    ...combined?.claude === true && state.tab === "claude" ? choiceHint(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`) : [],
+    ...focused === undefined ? [] : choiceHint(hintOf(focused, offer)),
+    ...choiceHint(`Environment: ${offer.form}`)
   ];
 };
 var MARK_TONES = {
@@ -4520,25 +4523,56 @@ var SetupApp = (props) => {
             each: line,
             children: (part) => _$createComponent(Show, {
               get when() {
-                return _$memo(() => part.tone !== undefined)() && BOLD_TONES.has(part.tone);
+                return part.activeTab;
               },
               get fallback() {
-                return (() => {
-                  var _el$4 = _$createElement("span");
-                  _$insert(_el$4, () => part.text);
-                  _$effect((_$p) => _$setProp(_el$4, "style", {
-                    fg: colorOf(part.tone)
-                  }, _$p));
-                  return _el$4;
-                })();
+                return _$createComponent(Show, {
+                  get when() {
+                    return _$memo(() => part.tone !== undefined)() && BOLD_TONES.has(part.tone);
+                  },
+                  get fallback() {
+                    return (() => {
+                      var _el$5 = _$createElement("span");
+                      _$insert(_el$5, () => part.text);
+                      _$effect((_$p) => _$setProp(_el$5, "style", {
+                        fg: colorOf(part.tone)
+                      }, _$p));
+                      return _el$5;
+                    })();
+                  },
+                  get children() {
+                    var _el$4 = _$createElement("b");
+                    _$insert(_el$4, () => part.text);
+                    _$effect((_$p) => _$setProp(_el$4, "style", {
+                      fg: colorOf(part.tone)
+                    }, _$p));
+                    return _el$4;
+                  }
+                });
               },
               get children() {
-                var _el$3 = _$createElement("b");
-                _$insert(_el$3, () => part.text);
-                _$effect((_$p) => _$setProp(_el$3, "style", {
-                  fg: colorOf(part.tone)
-                }, _$p));
-                return _el$3;
+                return _$createComponent(Show, {
+                  get when() {
+                    return look.color;
+                  },
+                  get fallback() {
+                    return (() => {
+                      var _el$6 = _$createElement("b"), _el$7 = _$createElement("u");
+                      _$insertNode(_el$6, _el$7);
+                      _$insert(_el$7, () => part.text);
+                      return _el$6;
+                    })();
+                  },
+                  get children() {
+                    var _el$3 = _$createElement("b");
+                    _$insert(_el$3, () => part.text);
+                    _$effect((_$p) => _$setProp(_el$3, "style", {
+                      fg: look.background === "light" ? "#e1e2e7" : "#1a1b26",
+                      bg: palette.focus
+                    }, _$p));
+                    return _el$3;
+                  }
+                });
               }
             })
           });
