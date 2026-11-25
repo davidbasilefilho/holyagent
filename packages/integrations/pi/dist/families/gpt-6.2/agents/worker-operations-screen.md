@@ -3,7 +3,7 @@
 name: worker-operations-screen
 description: "Use for worker-operations: Perform a specified local build or operational task and report its observable result. Writes inside its ownership paths; independence DisjointWrites. Launched for an Assignment that carries the screen capability on a machine with a graphical session: it also has the computer-use, browser-use and T3 preview tools."
 prompt_mode: replace
-tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, bash, powershell, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, ext:pi-computer-use, mcp__browse__*, ext:builtin:codemode"
+tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, bash, powershell, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__browse__*, ext:builtin:codemode"
 ---
 
 You are the holyagent worker-operations specialist. Independence: DisjointWrites.

@@ -2,12 +2,12 @@
 
 **Status: ships in 0.3.1.** An Assignment can carry the screen capability. Its specialist then has the tools that see and drive a screen, whatever its role, and under the Codex provider it runs on GPT-6.1 Terra. The tools belong to three capabilities of the registry ([configuration.md](configuration.md#capabilities)), split by what they drive, and the browser tools differ by the form of the machine ([Forms](#forms)):
 
-| Tools                                                                                    | Capability     | They drive                                                                                       | Form          |
-| ---------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------ | ------------- |
-| `computer_use_*` (`@amaster.ai/pi-computer-use`)                                         | `computer-use` | Desktop applications and the browser's native chrome (tabs, address bar, dialogs)                | `normal` only |
-| `mcp__browse__*` (opencode browse, `@opencode/browse`)                                   | `browser-use`  | The content of a web page in the user's real browser, with its logins and extensions             | `normal`      |
-| `mcp__browser_use__browser_exec`, `mcp__browser_use__browser_screenshot` (`browser-use`) | `browser-use`  | A headless Chromium that HolyAgent starts, with a temporary profile; no desktop, no real browser | `headless`    |
-| T3's `preview_*`, `t3_preview_*`, `html_render`, `html_preview`                          | `mcp`          | The page shown in T3 Code, and HTML rendered there; only where T3 hosts the session              | both          |
+| Tools                                                                                    | Capability     | They drive                                                                                       | Form       |
+| ---------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------ | ---------- |
+| Cua Driver desktop tools                                                                 | `computer-use` | Desktop applications on the Pi host, for graphical visual specialists only.                      |
+| `mcp__browse__*` (opencode browse, `@opencode/browse`)                                   | `browser-use`  | The content of a web page in the user's real browser, with its logins and extensions             | `normal`   |
+| `mcp__browser_use__browser_exec`, `mcp__browser_use__browser_screenshot` (`browser-use`) | `browser-use`  | A headless Chromium that HolyAgent starts, with a temporary profile; no desktop, no real browser | `headless` |
+| T3's `preview_*`, `t3_preview_*`, `html_render`, `html_preview`                          | `mcp`          | The page shown in T3 Code, and HTML rendered there; only where T3 hosts the session              | both       |
 
 T3's device tools stay with the visual roles and are not part of the screen capability. Every one of the three was already switchable on its own (`pi.features.computerUse`, `pi.features.browserUse`, `pi.features.mcp`); a capability that is off adds nothing to the grant. The MCP servers run in Pi's built-in MCP extension, so with `pi.features.mcp` off no server is registered and no `mcp__` tool is granted, in either form; setup and doctor say so ([Reported states](#reported-states)).
 
@@ -80,7 +80,7 @@ Setup and doctor detect the form from the machine ([configuration.md](configurat
 
 | Capability     | `normal`                                                                                                  | `headless`                                                                                   |
 | -------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `computer-use` | `@amaster.ai/pi-computer-use`, which needs a graphical session                                            | Not offered: it drives a graphical session and the machine has none                          |
+| `computer-use` | Official `cua-driver mcp`; needs a graphical session and Pi MCP.                                          | Not offered on a headless host.                                                              |
 | `browser-use`  | The `browse` MCP server; needs a graphical session, `npx` and Node.js 22.19 or newer; reports the pairing | The `browser_use` MCP server; needs `uvx` and a Chromium; no display, no Node.js, no pairing |
 | `mcp`          | T3's preview tools, where T3 hosts the session                                                            | The same                                                                                     |
 

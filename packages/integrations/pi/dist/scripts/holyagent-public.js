@@ -9011,7 +9011,6 @@ var pi_packages_default = {
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.8",
-  "@amaster.ai/pi-computer-use": "0.1.40",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
   "@opencode/browse": "0.1.5"
@@ -9043,7 +9042,36 @@ var T3_PREVIEW_TOOLS = [
   `${T3_PREFIX}html_preview`
 ];
 var T3_VISUAL_TOOLS = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`];
-var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var CUA_DRIVER_NAME = "holyagent_cua_driver";
+var CUA_DRIVER_NAMESPACE = `mcp__${CUA_DRIVER_NAME}__*`;
+var CUA_DRIVER_TOOLS = [
+  "list_apps",
+  "list_windows",
+  "get_window_state",
+  "get_accessibility_tree",
+  "verify_state",
+  "launch_app",
+  "set_window_frame",
+  "click",
+  "double_click",
+  "right_click",
+  "drag",
+  "type_text",
+  "press_key",
+  "hotkey",
+  "set_value",
+  "scroll"
+];
+var COMPUTER_USE_TOOLS = CUA_DRIVER_TOOLS.map((name) => `mcp__${CUA_DRIVER_NAME}__${name}`);
+var LEGACY_COMPUTER_USE_TOOLS = ["computer_use_*"];
+var RETIRED_COMPUTER_USE_SETTINGS = {
+  "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false }
+};
+var CUA_DRIVER_SERVER = {
+  name: CUA_DRIVER_NAME,
+  command: "cua-driver",
+  args: ["mcp"]
+};
 var BROWSE_PACKAGE = "@opencode/browse";
 var BROWSE_SERVER = "browse";
 var BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
@@ -9177,27 +9205,32 @@ var CAPABILITIES = [
   {
     name: "computer-use",
     feature: "computerUse",
-    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    description: "Lets the visual specialists drive the desktop through the official Cua Driver",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
     needs: [{ kind: "display" }],
     forms: {
       headless: { unavailable: "it drives a graphical session and this machine has none" },
-      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
-    },
-    settings: [
-      {
-        file: PI_SETTINGS_FILE,
-        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+      normal: {
+        packages: [],
+        mcpServers: [CUA_DRIVER_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: CUA_DRIVER_SERVER.command,
+            fix: "install the official Cua Driver from https://github.com/trycua/cua/releases and reopen Pi"
+          }
+        ]
       }
-    ],
-    tools: {
-      rootExclude: COMPUTER_USE_TOOLS,
-      visual: COMPUTER_USE_TOOLS,
-      screen: COMPUTER_USE_TOOLS
     },
-    health: ["needs", "packages"]
+    settings: [],
+    tools: {
+      rootExclude: [CUA_DRIVER_NAMESPACE, ...LEGACY_COMPUTER_USE_TOOLS],
+      visual: COMPUTER_USE_TOOLS,
+      screen: []
+    },
+    health: ["needs"]
   },
   {
     name: "browser-use",
@@ -11125,14 +11158,14 @@ var resultHeadline = (ok, dryRun) => {
   return ok ? "Setup finished." : "Setup finished with failures.";
 };
 var summarizeResult = (result, dryRun) => {
-  const scope = /^~ (?:scope|form): /;
+  const informational = /^~ (?:scope|form|setup harness): /;
   const changes = [
     ...subjects(result.lines, "+ "),
     ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
   ];
   const warnings = [
     ...subjects(result.lines, "! "),
-    ...subjects(result.lines.filter((line) => !scope.test(line)), "~ ")
+    ...subjects(result.lines.filter((line) => !informational.test(line)), "~ ")
   ];
   return [
     {
@@ -18259,8 +18292,7 @@ var PACKAGE_DEFAULTS = new Map([
     PI_SETTINGS_FILE,
     {
       codemode: { mode: "on" },
-      defaultThinkingLevel: "medium",
-      "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true }
+      defaultThinkingLevel: "medium"
     }
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
@@ -18394,7 +18426,8 @@ var mergeTarget = fn2("mergeToolSettingsFile")(function* (env, options, planned)
 });
 var REVERTABLE = [
   ...CAPABILITIES.flatMap((capability) => capability.settings).filter((patch) => patch.revertWhenOff === true).flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf }))),
-  ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf }))
+  ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf })),
+  ...leaves(RETIRED_COMPUTER_USE_SETTINGS).map((leaf) => ({ file: PI_SETTINGS_FILE, leaf }))
 ];
 var revertFile = fn2("revertToolSettingsFile")(function* (env, options, file, wanted) {
   const recorded = yield* readRecorded(env, file);
@@ -18643,7 +18676,7 @@ var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform
   const headless = options.form === "headless" ? headlessBrowserRoute(config, piExecutionSurface(env, options.surface)) : undefined;
   const reporting = enabledCapabilities(config.pi.features, {
     provider: config.pi.provider
-  }).filter((capability) => (capability.feature !== "browserUse" || headless?.probe !== false) && Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
+  }).filter((capability) => capability.feature === "browserUse" && headless?.probe !== false && Object.values(capability.forms).some((form) => ("mcpServers" in form) && form.mcpServers.length > 0));
   const lines = yield* forEach2(reporting, (capability) => reportOne(env, capability, config.pi.features, options, platform));
   return [...headless?.lines ?? [], ...lines.flat()];
 });
@@ -18741,6 +18774,16 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
 });
 
 import { basename as basename8, dirname as dirname12, isAbsolute as isAbsolute9, join as join24, relative as relative5, resolve as resolve13 } from "path";
+
+var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
+  return;
+} });
+var SetupActivity = Reference("holyagent/setup/SetupActivity", { defaultValue: () => {
+  return;
+} });
+var withSetupPhase = (phase, run) => flatMap2(SetupProgress, (report) => report === undefined ? run : sync2(() => report(phase)).pipe(andThen2(provideService2(run, SetupActivity, (activity) => report({ ...phase, activity })))));
+var reportSetupActivity = (activity) => flatMap2(SetupActivity, (report) => sync2(() => report?.(activity)));
+
 var MANAGED_NAMES = new Set([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
@@ -18859,6 +18902,8 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
     const where = listedIn(source);
     return where === undefined ? [] : [present(`pi ${source}: already listed in ${where}`)];
   });
+  if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
+    lines.push(skipped("pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead"));
   let replacement;
   if (options.installedPackageRoot !== undefined) {
     const match = yield* registration(env, options.installedPackageRoot, [{ file, sources: listed }, ...elsewhere], options.replacePiRegistration === true);
@@ -18898,6 +18943,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
         ...lines,
         `! pi package: ${file} changed before install; the previous registration was not replaced`
       ];
+    yield* reportSetupActivity(`Installing ${source}`);
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
@@ -18916,6 +18962,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`));
       continue;
     }
+    yield* reportSetupActivity(`Removing npm:${name}`);
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
@@ -19275,6 +19322,7 @@ var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dry
       lines: [added(`${command}: would install with bun add -g ${packageName}`)]
     };
   }
+  yield* reportSetupActivity(`Installing ${packageName}`);
   const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
   if (result.exitCode !== 0)
     return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
@@ -19333,38 +19381,64 @@ var setup = fn2("setup")(function* (env, options) {
     if (blockers.length > 0)
       return { lines: blockers.map((line) => `! ${line}`), ok: false };
   }
-  const ctx7Lines = options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun));
-  const capabilityLines = piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
-    scope,
-    cwd: piOptions.cwd,
-    dryRun: options.dryRun,
-    choices,
-    ...options.piProviders === undefined ? {} : { providers: options.piProviders }
-  })) : Object.keys(choices).length > 0 ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")] : [];
-  const piSteps = piUsed && !capabilityLines.some((line) => line.startsWith("! "));
-  const lines = [
-    ...ctx7Lines,
-    ...piUsed ? [hint(`form: ${describeForm(form)}`)] : [],
-    ...capabilityLines,
-    ...piUsed && !piSteps ? [
-      skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
-    ] : [],
-    ...piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
-    ...piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
-    ...piSteps ? yield* asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })) : [],
-    ...piSteps && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
-      dryRun: options.dryRun,
-      ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
-      ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
-    })) : [],
-    ...usesStandaloneSearch(env, piUsed, surface) ? yield* searchToolLines(piOptions.cwd, setupToolLine) : [],
-    ...piOnly ? [] : yield* onSettings((file) => mergeUserSettings({
-      env,
-      file,
-      subagentCacheTtl: options.subagentCacheTtl,
-      dryRun: options.dryRun
-    }))
+  let piSteps = true;
+  const whenPiSaved = () => piSteps;
+  const phase = (label, run, runIf = () => true) => ({ label, run, runIf });
+  const report = (lines) => ({ lines });
+  const plan = [
+    ...options.skipCtx7 ? [report(() => [skipped("ctx7: skipped by flag")])] : cloud ? [report(() => [skipped(`ctx7: ${CLOUD_SKIP}`)])] : [phase("Context7", asStep("ctx7", installCtx7(env, options.dryRun)))],
+    ...piUsed ? [
+      report(() => [hint(`form: ${describeForm(form)}`)]),
+      phase("Capability settings", asStep("capabilities", applyCapabilityChoices(env, {
+        scope,
+        cwd: piOptions.cwd,
+        dryRun: options.dryRun,
+        choices,
+        ...options.piProviders === undefined ? {} : { providers: options.piProviders }
+      })).pipe(tap2((lines) => sync2(() => {
+        piSteps = !lines.some((line) => line.startsWith("! "));
+      })))),
+      report(() => piSteps ? [] : [
+        skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
+      ]),
+      phase("Pi packages", asStep("pi packages", installPiPackages(env, piOptions)), whenPiSaved),
+      phase("Pi tool settings", asStep("tool settings", installPiToolSettings(env, piOptions)), whenPiSaved),
+      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })), whenPiSaved),
+      ...scope === "user" ? [
+        phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+          dryRun: options.dryRun,
+          ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
+          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
+        })), whenPiSaved)
+      ] : []
+    ] : Object.keys(choices).length === 0 ? [] : [
+      report(() => [
+        skipped("capabilities: Pi is not in use, so the capability choices were not applied")
+      ])
+    ],
+    ...usesStandaloneSearch(env, piUsed, surface) ? [phase("Search-tool checks", searchToolLines(piOptions.cwd, setupToolLine))] : [],
+    ...piOnly ? [] : [
+      phase("Claude Code settings", onSettings((file) => mergeUserSettings({
+        env,
+        file,
+        subagentCacheTtl: options.subagentCacheTtl,
+        dryRun: options.dryRun
+      })))
+    ]
   ];
+  const total = plan.filter((step) => ("run" in step)).length;
+  const lines = [];
+  let index = 0;
+  for (const step of plan) {
+    if ("lines" in step) {
+      lines.push(...step.lines());
+      continue;
+    }
+    index += 1;
+    if (step.runIf()) {
+      lines.push(...yield* withSetupPhase({ index, total, label: step.label }, step.run));
+    }
+  }
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
 });
 
@@ -29778,7 +29852,7 @@ var runInteractive = fn2("runInteractive")(function* (options) {
         return yield* fail5(new Error("the T3 settings step has nothing to do any more"));
       return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));
     })),
-    apply: (choices, signal) => {
+    apply: (choices, signal, reportProgress) => {
       const chosen = withProviderChanges(choices);
       if ((combined !== undefined || chosen.piProviders !== undefined) && reviewedChoices !== choices)
         return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
@@ -29788,11 +29862,18 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       applyStarted = true;
       const changed = changedSwitches(initialSwitches, choices.capabilities);
       const confirmReplacement = (report) => report.ok && replacementOf(report) === replacement ? void_3 : fail5(new Error("The Pi package plan changed. Review it again before replacing the previous registration."));
-      const applySingle = options.apply(chosen, changed, replacement !== undefined);
-      return runPromise2(combined === undefined ? replacement === undefined || options.previewPi === undefined ? applySingle : options.previewPi(chosen, changed).pipe(flatMap2(confirmReplacement), andThen2(applySingle)) : forEach2(selectionOf(choices), (target, index) => {
+      const observed = (run, harness) => reportProgress === undefined ? run : run.pipe(provideService2(SetupProgress, (phase) => reportProgress({
+        ...harness === undefined ? {} : { harness },
+        phase: phase.activity === undefined ? phase : { ...phase, activity: plain(phase.activity) }
+      })));
+      const applySingle = observed(options.apply(chosen, changed, replacement !== undefined));
+      const targets = selectionOf(choices);
+      return runPromise2(combined === undefined ? replacement === undefined || options.previewPi === undefined ? applySingle : options.previewPi(chosen, changed).pipe(flatMap2(confirmReplacement), andThen2(applySingle)) : forEach2(targets, (target, index) => {
+        const harness = { index: index + 1, total: targets.length, label: label(target) };
         const replace = target === "pi" && replacement !== undefined;
-        const perform = combined.run(target, chosen, changed, options.dryRun, index > 0, replace);
-        return replace ? combined.run(target, chosen, changed, true, index > 0, true).pipe(flatMap2(confirmReplacement), andThen2(perform)) : perform;
+        const perform = observed(combined.run(target, chosen, changed, options.dryRun, index > 0, replace), harness);
+        const run = replace ? combined.run(target, chosen, changed, true, index > 0, true).pipe(flatMap2(confirmReplacement), andThen2(perform)) : perform;
+        return sync2(() => reportProgress?.({ harness })).pipe(andThen2(run));
       }).pipe(map4((reports) => ({
         ok: reports.length > 0 && reports.every(({ ok }) => ok),
         lines: reports.flatMap(({ lines }) => lines)
@@ -29887,7 +29968,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       "--undo removes from the --scope file only what that record says setup added, and only while the value still equals what setup wrote: a changed value, and a key with no record (set before setup or by an earlier version), is kept and reported with `~`, so remove it by hand; permissions.deny loses only the entries setup added, and parent objects left empty are dropped; removed keys print `-` lines (`= nothing to remove` when absent); the file's record is cleared; ctx7 and the Pi packages stay installed; honors --dry-run",
       "a failed step is reported and the rest still run; in the internal Claude entry in a claude.ai cloud session (CLAUDE_CODE_REMOTE=true) ctx7 is skipped and the settings are still merged",
       `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
-      "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
+      "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults"

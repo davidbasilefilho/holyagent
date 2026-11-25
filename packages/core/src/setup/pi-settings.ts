@@ -6,6 +6,7 @@ import {
   CAPABILITIES,
   type CapabilityDefinition,
   type CapabilityForm,
+  RETIRED_COMPUTER_USE_SETTINGS,
 } from "../config/capabilities.ts"
 import type { Config, PiProviderSelection } from "../config/schema.ts"
 import { FFF_RETIRED_SETTINGS } from "../pi/fff/settings.ts"
@@ -48,7 +49,6 @@ import { take } from "./settings.ts"
  *   `core/defaults.js` of `@earendil-works/pi-coding-agent@1.5.0`). `defaultProvider` and
  *   `defaultModel` have no default to equal: unset, Pi picks the first available model of its own
  *   preference list.
- * - `@amaster.ai/pi-computer-use@0.1.36`, `dist/config.js`: both confirmations default to `true`.
  * - `@tintinweb/pi-subagents@0.23.1`, README "Disable defaults": `disableDefaultAgents` is `false`.
  * - `pi-provider-kimi-code@0.6.13`, `src/config.ts` `makeDefaultTools`: each Moonshot tool is
  *   `enabled: false`.
@@ -61,7 +61,6 @@ const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonOb
     {
       codemode: { mode: "on" },
       defaultThinkingLevel: "medium",
-      "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: true },
     },
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
@@ -347,6 +346,7 @@ const REVERTABLE: ReadonlyArray<{ readonly file: string; readonly leaf: Default 
     .filter((patch) => patch.revertWhenOff === true)
     .flatMap((patch) => leaves(patch.content).map((leaf) => ({ file: patch.file, leaf }))),
   ...leaves(FFF_RETIRED_SETTINGS).map((leaf) => ({ file: PI_FFF_FILE, leaf })),
+  ...leaves(RETIRED_COMPUTER_USE_SETTINGS).map((leaf) => ({ file: PI_SETTINGS_FILE, leaf })),
 ]
 
 /**

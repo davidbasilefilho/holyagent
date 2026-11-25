@@ -154,17 +154,7 @@ describe("the capability registry", () => {
   test("the default packages preserve registry order and omit unavailable platform packages", () => {
     expect(piPackages(DEFAULT_CONFIG)).toEqual([
       piPackageSource("pi-provider-kimi-code"),
-      ...(
-        [
-          "subagents",
-          "contextCompression",
-          "todo",
-          "ask",
-          "processes",
-          "computerUse",
-          "fff",
-        ] as const
-      )
+      ...(["subagents", "contextCompression", "todo", "ask", "processes", "fff"] as const)
         .filter((feature) => feature !== "processes" || process.platform !== "win32")
         .map((feature) => piPackageSource(FEATURE_PACKAGES[feature])),
     ])
@@ -200,9 +190,7 @@ describe("registry-driven selection", () => {
     expect(capabilityPackages({ screenShot: false }, "normal", definitions)).toEqual([])
     expect(unavailableIn(SYNTHETIC, "headless")).toBeUndefined()
     expect(capabilityPackages({ computerUse: true }, "headless")).toEqual([])
-    expect(capabilityPackages({ computerUse: true }, "normal")).toEqual([
-      "@amaster.ai/pi-computer-use",
-    ])
+    expect(capabilityPackages({ computerUse: true }, "normal")).toEqual([])
   })
 
   test("piPackages applies the form: the headless form leaves out computer use, and an added entry is one more package", () => {
@@ -225,11 +213,10 @@ describe("registry-driven selection", () => {
       "@juicesharp/rpiv-todo",
       "@juicesharp/rpiv-ask-user-question",
       "@aliou/pi-processes",
-      "@amaster.ai/pi-computer-use",
       "@ff-labs/pi-fff",
       "pi-web-kit",
     ])
-    expect(managedCapabilityPackages()).toContain("@amaster.ai/pi-computer-use")
+    expect(managedCapabilityPackages().some((name) => name.includes("pi-computer-use"))).toBe(false)
   })
 })
 
@@ -317,12 +304,9 @@ describe("registry-driven tool settings", () => {
   })
 
   test("a capability that is off or not offered in the form writes no settings", () => {
-    const computerUse = CAPABILITIES.find((capability) => capability.feature === "computerUse")
-    const patch = computerUse?.settings[0]
-    if (patch === undefined) throw new Error("computer use carries no settings")
-    expect(toolSettings(DEFAULT_CONFIG)).toContainEqual(patch)
-    expect(toolSettings(DEFAULT_CONFIG, undefined, "headless")).not.toContainEqual(patch)
-    expect(toolSettings(withFeatures({ computerUse: false }))).not.toContainEqual(patch)
+    expect(
+      CAPABILITIES.find((capability) => capability.feature === "computerUse")?.settings,
+    ).toEqual([])
     expect(files(withFeatures({ subagents: false }))).not.toContain("~/.pi/agent/subagents.json")
     expect(files(DEFAULT_CONFIG, "headless")).toContain("~/.pi/agent/subagents.json")
   })
@@ -400,7 +384,11 @@ describe("the browser-use capability entry", () => {
         (form) => formContent(capability, form)?.mcpServers ?? [],
       ),
     )
-    expect(servers.map(({ name }) => name).toSorted()).toEqual(["browse", "browser_use"])
+    expect(servers.map(({ name }) => name).toSorted()).toEqual([
+      "browse",
+      "browser_use",
+      "holyagent_cua_driver",
+    ])
     for (const server of servers.filter(({ command }) => command === "npx")) {
       // Before the package, so npx reads them as its own options and not the package's.
       const package_ = server.args.findIndex((argument) => /^@[^/]+\/[^@]+@/.test(argument))
@@ -446,7 +434,8 @@ describe("the browser-use capability entry", () => {
     // The capabilities that have no server keep their screen tools whatever the form.
     const computerUse = CAPABILITIES.find(({ name }) => name === "computer-use")
     const mcp = CAPABILITIES.find(({ name }) => name === "mcp")
-    expect(computerUse && screenTools(computerUse, "normal")).toEqual(COMPUTER_USE_TOOLS)
+    expect(computerUse?.tools.visual).toEqual(COMPUTER_USE_TOOLS)
+    expect(computerUse && screenTools(computerUse, "normal")).toEqual([])
     expect(computerUse && screenTools(computerUse, "headless")).toEqual([])
     for (const form of ["headless", "normal"] as const)
       expect(mcp && screenTools(mcp, form)).toEqual(T3_PREVIEW_TOOLS)
@@ -469,19 +458,14 @@ describe("the browser-use capability entry", () => {
     expect(managedCapabilityPackages()).not.toContain("browser-use")
   })
 
-  test("only computer use, browser use and T3's preview tools are granted by the screen capability", () => {
+  test("only browser use and T3's preview tools are granted by the screen capability", () => {
     expect(
       CAPABILITIES.filter((capability) => capability.tools.screen.length > 0).map(
         (capability) => capability.name,
       ),
-    ).toEqual(["mcp", "computer-use", "browser-use"])
+    ).toEqual(["mcp", "browser-use"])
     expect(CAPABILITIES.flatMap((capability) => capability.tools.screen).toSorted()).toEqual(
-      [
-        ...T3_PREVIEW_TOOLS,
-        ...COMPUTER_USE_TOOLS,
-        ...BROWSE_TOOLS,
-        ...BROWSER_USE_TOOLS,
-      ].toSorted(),
+      [...T3_PREVIEW_TOOLS, ...BROWSE_TOOLS, ...BROWSER_USE_TOOLS].toSorted(),
     )
     for (const tool of T3_PREVIEW_TOOLS) expect(T3_VISUAL_TOOLS).toContain(tool)
   })

@@ -3,7 +3,7 @@
 name: reviewer-visual
 description: "Use for reviewer-visual: Independently assess rendered output against the request's visual and interaction criteria, and report observed evidence or blockers. Read-only; independence IndependentReview."
 prompt_mode: replace
-tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__t3*code__device_*, ext:pi-computer-use, ext:builtin:codemode"
+tools: "read, grep, find, ls, ext:pi-fff/multi_grep, ext:pi-fff/ffgrep, ext:pi-fff/fffind, ext:pi-fff/fff-multi-grep, mcp__t3*code__preview_*, mcp__t3*code__t3_preview_*, mcp__t3*code__html_render, mcp__t3*code__html_preview, mcp__t3*code__device_*, mcp__holyagent_cua_driver__list_apps, mcp__holyagent_cua_driver__list_windows, mcp__holyagent_cua_driver__get_window_state, mcp__holyagent_cua_driver__get_accessibility_tree, mcp__holyagent_cua_driver__verify_state, mcp__holyagent_cua_driver__launch_app, mcp__holyagent_cua_driver__set_window_frame, mcp__holyagent_cua_driver__click, mcp__holyagent_cua_driver__double_click, mcp__holyagent_cua_driver__right_click, mcp__holyagent_cua_driver__drag, mcp__holyagent_cua_driver__type_text, mcp__holyagent_cua_driver__press_key, mcp__holyagent_cua_driver__hotkey, mcp__holyagent_cua_driver__set_value, mcp__holyagent_cua_driver__scroll, ext:builtin:codemode"
 ---
 
 You are the holyagent reviewer-visual specialist. Independence: IndependentReview.

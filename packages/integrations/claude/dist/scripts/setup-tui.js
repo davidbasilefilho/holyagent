@@ -3301,6 +3301,7 @@ var acquireUseRelease2 = acquireUseRelease;
 var runFork2 = runFork;
 var runPromise2 = runPromise;
 // packages/runtime/src/setup/tui/app.tsx
+import { insertNode as _$insertNode } from "@opentui/solid";
 import { effect as _$effect } from "@opentui/solid";
 import { memo as _$memo } from "@opentui/solid";
 import { insert as _$insert } from "@opentui/solid";
@@ -3330,14 +3331,14 @@ var resultHeadline = (ok, dryRun) => {
   return ok ? "Setup finished." : "Setup finished with failures.";
 };
 var summarizeResult = (result, dryRun) => {
-  const scope = /^~ (?:scope|form): /;
+  const informational = /^~ (?:scope|form|setup harness): /;
   const changes = [
     ...subjects(result.lines, "+ "),
     ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
   ];
   const warnings = [
     ...subjects(result.lines, "! "),
-    ...subjects(result.lines.filter((line) => !scope.test(line)), "~ ")
+    ...subjects(result.lines.filter((line) => !informational.test(line)), "~ ")
   ];
   return [
     {
@@ -3468,7 +3469,6 @@ var pi_packages_default = {
   "@juicesharp/rpiv-todo": "2.15.0",
   "@juicesharp/rpiv-ask-user-question": "2.15.0",
   "@aliou/pi-processes": "0.13.8",
-  "@amaster.ai/pi-computer-use": "0.1.40",
   "pi-web-kit": "0.5.0",
   "@ff-labs/pi-fff": "0.11.0",
   "@opencode/browse": "0.1.5"
@@ -3483,7 +3483,6 @@ var pypi_packages_default = {
 var PYPI_PACKAGE_VERSIONS = pypi_packages_default;
 
 var BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json";
-var PI_SETTINGS_FILE = "~/.pi/agent/settings.json";
 var SUBAGENTS_SETTINGS_FILE = "~/.pi/agent/subagents.json";
 var SUBAGENTS_ONLY_SPECIALISTS = {
   disableDefaultAgents: true,
@@ -3498,7 +3497,33 @@ var T3_PREVIEW_TOOLS = [
   `${T3_PREFIX}html_preview`
 ];
 var T3_VISUAL_TOOLS = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`];
-var COMPUTER_USE_TOOLS = ["computer_use_*"];
+var CUA_DRIVER_NAME = "holyagent_cua_driver";
+var CUA_DRIVER_NAMESPACE = `mcp__${CUA_DRIVER_NAME}__*`;
+var CUA_DRIVER_TOOLS = [
+  "list_apps",
+  "list_windows",
+  "get_window_state",
+  "get_accessibility_tree",
+  "verify_state",
+  "launch_app",
+  "set_window_frame",
+  "click",
+  "double_click",
+  "right_click",
+  "drag",
+  "type_text",
+  "press_key",
+  "hotkey",
+  "set_value",
+  "scroll"
+];
+var COMPUTER_USE_TOOLS = CUA_DRIVER_TOOLS.map((name) => `mcp__${CUA_DRIVER_NAME}__${name}`);
+var LEGACY_COMPUTER_USE_TOOLS = ["computer_use_*"];
+var CUA_DRIVER_SERVER = {
+  name: CUA_DRIVER_NAME,
+  command: "cua-driver",
+  args: ["mcp"]
+};
 var BROWSE_PACKAGE = "@opencode/browse";
 var BROWSE_SERVER = "browse";
 var BROWSE_TOOLS = [`mcp__${BROWSE_SERVER}__*`];
@@ -3631,27 +3656,32 @@ var CAPABILITIES = [
   {
     name: "computer-use",
     feature: "computerUse",
-    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    description: "Lets the visual specialists drive the desktop through the official Cua Driver",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
     needs: [{ kind: "display" }],
     forms: {
       headless: { unavailable: "it drives a graphical session and this machine has none" },
-      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] }
-    },
-    settings: [
-      {
-        file: PI_SETTINGS_FILE,
-        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } }
+      normal: {
+        packages: [],
+        mcpServers: [CUA_DRIVER_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: CUA_DRIVER_SERVER.command,
+            fix: "install the official Cua Driver from https://github.com/trycua/cua/releases and reopen Pi"
+          }
+        ]
       }
-    ],
-    tools: {
-      rootExclude: COMPUTER_USE_TOOLS,
-      visual: COMPUTER_USE_TOOLS,
-      screen: COMPUTER_USE_TOOLS
     },
-    health: ["needs", "packages"]
+    settings: [],
+    tools: {
+      rootExclude: [CUA_DRIVER_NAMESPACE, ...LEGACY_COMPUTER_USE_TOOLS],
+      visual: COMPUTER_USE_TOOLS,
+      screen: []
+    },
+    health: ["needs"]
   },
   {
     name: "browser-use",
@@ -3849,7 +3879,7 @@ var lookFor = (env, background = "dark") => ({
   unicode: unicodeEnabled(env),
   background
 });
-var glyphs = (look) => look.unicode ? { focus: "\u276F", dot: "\xB7", ellipsis: "\u2026", arrows: "\u2191/\u2193" } : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down" };
+var glyphs = (look) => look.unicode ? { focus: "\u276F", dot: "\xB7", ellipsis: "\u2026", arrows: "\u2191/\u2193", horizontalArrows: "\u2190/\u2192" } : { focus: ">", dot: "-", ellipsis: "...", arrows: "up/down", horizontalArrows: "</>" };
 
 var CAPABILITY_ROW = "capability:";
 var tabs = ["pi", "claude", "codex"];
@@ -4106,7 +4136,7 @@ var chooseLines = (state, context) => {
     return `${box} ${word}`;
   });
   const labels = rows.map((row) => labelOf(row, offer));
-  const valueWidth = Math.max(0, ...values.map(cells));
+  const valueWidth = cells("[ ] disabled");
   const labelWidth = Math.min(Math.max(0, ...labels.map(cells)), Math.max(4, width - 2 - 2 - valueWidth));
   const rowLine = (row, index) => {
     const focused = index === state.focus;
@@ -4138,14 +4168,16 @@ var chooseLines = (state, context) => {
   const tabsLine = combined === undefined ? [] : [
     tabs.flatMap((tab) => [
       {
-        text: `[${tabLabels[tab]}]`,
-        tone: state.tab === tab ? "focus" : "option",
+        text: ` ${tabLabels[tab]} `,
+        tone: "option",
+        activeTab: state.tab === tab,
         click: { tab }
       },
       segment(" ")
     ]),
-    ...hintLines("Left/Right change harness", width)
+    ...hintLines(`${g.horizontalArrows} change harness`, width)
   ];
+  const choiceHint = (text) => combined === undefined ? hintLines(text, width) : wrap(text, width - 2).map((line) => [segment(`  ${line}`, "hint")]);
   const unavailable = combined !== undefined && state.tab === "codex" ? "Public Codex setup is not available on this build." : combined !== undefined && state.tab === "pi" && offer.harnesses?.piAvailable === false ? "Pi or T3 Code is unavailable on this host." : undefined;
   return [
     ...tabsLine,
@@ -4159,10 +4191,10 @@ var chooseLines = (state, context) => {
     ],
     ...group("Capabilities", configCount, rows.length),
     ...context.height >= 20 ? [button] : [],
-    ...unavailable === undefined ? [] : hintLines(unavailable, width),
-    ...combined?.claude === true && state.tab === "claude" ? hintLines(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`, width) : [],
-    ...focused === undefined ? [] : hintLines(hintOf(focused, offer), width),
-    ...hintLines(`Environment: ${offer.form}`, width)
+    ...unavailable === undefined ? [] : choiceHint(unavailable),
+    ...combined?.claude === true && state.tab === "claude" ? choiceHint(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`) : [],
+    ...focused === undefined ? [] : choiceHint(hintOf(focused, offer)),
+    ...choiceHint(`Environment: ${offer.form}`)
   ];
 };
 var MARK_TONES = {
@@ -4382,15 +4414,21 @@ var fitLine = (line, width, ellipsis) => {
   }
   return kept;
 };
-var layoutOf = (state, context) => state.screen === "choose" ? { lines: chooseLines(state, context), scroll: FIXED } : state.screen === "review" ? reviewLayout(state, context) : state.screen === "applying" ? {
-  lines: [
-    [segment("Press Ctrl-C to stop", "option")],
+var applyingLines = (context) => {
+  const phase = context.progress?.phase;
+  const harness = context.progress?.harness;
+  const elapsed = context.elapsedSeconds ?? 0;
+  return [
+    [segment("Press Ctrl+C to stop", "option")],
     blank,
     ...heading("Applying", context.width),
-    [segment("Applying setup; this can take a moment.", "argument")]
-  ],
-  scroll: FIXED
-} : doneLayout(state, context);
+    [segment(`Elapsed ${elapsed}s`, "hint")],
+    ...harness === undefined ? [] : wrap(`Harness ${harness.index} of ${harness.total}: ${harness.label}`, context.width).map((part) => [segment(part, "hint")]),
+    ...wrap(phase === undefined ? "Preparing setup\u2026" : `Step ${phase.index} of ${phase.total}: ${phase.label}`, context.width).map((part) => [segment(part, "argument")]),
+    ...phase?.activity === undefined ? [] : wrap(phase.activity, context.width).map((part) => [segment(part, "hint")])
+  ];
+};
+var layoutOf = (state, context) => state.screen === "choose" ? { lines: chooseLines(state, context), scroll: FIXED } : state.screen === "review" ? reviewLayout(state, context) : state.screen === "applying" ? { lines: applyingLines(context), scroll: FIXED } : doneLayout(state, context);
 var scrollOf = (state, context) => layoutOf(state, context).scroll;
 var view = (state, context) => [title(context.look), ...layoutOf(state, context).lines].map((line) => fitLine(line, context.width, glyphs(context.look).ellipsis));
 
@@ -4411,9 +4449,21 @@ var SetupApp = (props) => {
   const look = lookFor(props.input.env, props.background);
   const palette = paletteOf(look);
   const [state, setState] = createSignal(initialState(props.input.initial));
+  const [progress, setProgress] = createSignal();
+  const [elapsedSeconds, setElapsedSeconds] = createSignal(0);
   const abort = new AbortController;
-  onCleanup(() => abort.abort());
   let ticket = 0;
+  let timer;
+  const stopTimer = () => {
+    if (timer !== undefined)
+      clearInterval(timer);
+    timer = undefined;
+  };
+  onCleanup(() => {
+    ticket += 1;
+    stopTimer();
+    abort.abort();
+  });
   let pointer;
   const context = () => ({
     rows: rowsOf(props.input.offer, state()),
@@ -4421,7 +4471,9 @@ var SetupApp = (props) => {
     dryRun: props.input.dryRun,
     width: dimensions().width,
     height: dimensions().height,
-    look
+    look,
+    progress: progress(),
+    elapsedSeconds: elapsedSeconds()
   });
   const lines = createMemo(() => view(state(), context()));
   const run = (command) => {
@@ -4440,6 +4492,8 @@ var SetupApp = (props) => {
       });
     }
     if (command === "interrupt") {
+      ticket += 1;
+      stopTimer();
       abort.abort();
       return props.done({
         _tag: "Interrupted"
@@ -4455,9 +4509,15 @@ var SetupApp = (props) => {
       });
       return;
     }
-    settle(() => props.input.apply(current.choices, abort.signal), (result) => {
+    const started = performance.now();
+    timer = setInterval(() => setElapsedSeconds(Math.floor((performance.now() - started) / 1000)), 200);
+    settle(() => props.input.apply(current.choices, abort.signal, (update) => {
+      if (mine === ticket)
+        setProgress(update);
+    }), (result) => {
       if (mine !== ticket)
         return;
+      stopTimer();
       setState((now) => finished(now, "value" in result ? result.value : {
         ok: false,
         lines: [`! setup: ${result.message}`]
@@ -4520,25 +4580,56 @@ var SetupApp = (props) => {
             each: line,
             children: (part) => _$createComponent(Show, {
               get when() {
-                return _$memo(() => part.tone !== undefined)() && BOLD_TONES.has(part.tone);
+                return part.activeTab;
               },
               get fallback() {
-                return (() => {
-                  var _el$4 = _$createElement("span");
-                  _$insert(_el$4, () => part.text);
-                  _$effect((_$p) => _$setProp(_el$4, "style", {
-                    fg: colorOf(part.tone)
-                  }, _$p));
-                  return _el$4;
-                })();
+                return _$createComponent(Show, {
+                  get when() {
+                    return _$memo(() => part.tone !== undefined)() && BOLD_TONES.has(part.tone);
+                  },
+                  get fallback() {
+                    return (() => {
+                      var _el$5 = _$createElement("span");
+                      _$insert(_el$5, () => part.text);
+                      _$effect((_$p) => _$setProp(_el$5, "style", {
+                        fg: colorOf(part.tone)
+                      }, _$p));
+                      return _el$5;
+                    })();
+                  },
+                  get children() {
+                    var _el$4 = _$createElement("b");
+                    _$insert(_el$4, () => part.text);
+                    _$effect((_$p) => _$setProp(_el$4, "style", {
+                      fg: colorOf(part.tone)
+                    }, _$p));
+                    return _el$4;
+                  }
+                });
               },
               get children() {
-                var _el$3 = _$createElement("b");
-                _$insert(_el$3, () => part.text);
-                _$effect((_$p) => _$setProp(_el$3, "style", {
-                  fg: colorOf(part.tone)
-                }, _$p));
-                return _el$3;
+                return _$createComponent(Show, {
+                  get when() {
+                    return look.color;
+                  },
+                  get fallback() {
+                    return (() => {
+                      var _el$6 = _$createElement("b"), _el$7 = _$createElement("u");
+                      _$insertNode(_el$6, _el$7);
+                      _$insert(_el$7, () => part.text);
+                      return _el$6;
+                    })();
+                  },
+                  get children() {
+                    var _el$3 = _$createElement("b");
+                    _$insert(_el$3, () => part.text);
+                    _$effect((_$p) => _$setProp(_el$3, "style", {
+                      fg: look.background === "light" ? "#e1e2e7" : "#1a1b26",
+                      bg: palette.focus
+                    }, _$p));
+                    return _el$3;
+                  }
+                });
               }
             })
           });

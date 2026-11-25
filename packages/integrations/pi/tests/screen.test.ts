@@ -3,7 +3,11 @@ import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 
 import piPins from "../../../core/src/config/pi-packages.json" with { type: "json" }
-import { BROWSER_USE_MCP_SERVER } from "../../../runtime/src/config/capabilities.ts"
+import {
+  BROWSER_USE_MCP_SERVER,
+  CUA_DRIVER_NAME,
+  CUA_DRIVER_SERVER,
+} from "../../../runtime/src/config/capabilities.ts"
 import { PYPI_PACKAGE_VERSIONS } from "../../../runtime/src/config/pypi-packages.ts"
 import { defaultConfig } from "../../../runtime/src/config/schema.ts"
 import {
@@ -14,6 +18,7 @@ import {
   HEADLESS_SCREEN_NOTE,
   isScreenAgent,
   refuseT3PreviewOutsideT3,
+  refuseUnassignedDesktop,
   registerScreenServers,
   screenFormOf,
   screenServers,
@@ -69,7 +74,7 @@ describe("the screen specialists' names", () => {
 
 describe("the servers a screen specialist registers", () => {
   test("the normal form offers browse at the pinned release", () => {
-    expect(screenServers(DEFAULTS, "normal")).toEqual([BROWSE])
+    expect(screenServers(DEFAULTS, "normal")).toEqual([CUA_DRIVER_SERVER, BROWSE])
   })
 
   test("the headless form offers the browser-use server at its pin, through uvx with no uv config and the public index", () => {
@@ -86,17 +91,19 @@ describe("the servers a screen specialist registers", () => {
   })
 
   test("a switched-off capability adds none, and neither does the MCP extension being off", () => {
-    expect(screenServers(withFeatures({ browserUse: false }), "normal")).toEqual([])
+    expect(screenServers(withFeatures({ browserUse: false }), "normal")).toEqual([
+      CUA_DRIVER_SERVER,
+    ])
     expect(screenServers(withFeatures({ browserUse: false }), "headless")).toEqual([])
     // Pi's MCP extension runs the servers: with `--no-mcp` there is nothing to register them with.
     expect(screenServers(withFeatures({ mcp: false }), "normal")).toEqual([])
     expect(screenServers(withFeatures({ mcp: false }), "headless")).toEqual([])
   })
 
-  test("the other capabilities add none: only browse has a server", () => {
+  test("a normal desktop route remains without browse", () => {
     expect(
       screenServers(withFeatures({ browserUse: false, computerUse: true, mcp: true }), "normal"),
-    ).toEqual([])
+    ).toEqual([CUA_DRIVER_SERVER])
   })
 })
 
@@ -107,7 +114,10 @@ describe("the servers in a session T3 hosts", () => {
   })
 
   test("the normal form's browse stays", () => {
-    expect(withoutBrowserUseInT3(screenServers(DEFAULTS, "normal"), true)).toEqual([BROWSE])
+    expect(withoutBrowserUseInT3(screenServers(DEFAULTS, "normal"), true)).toEqual([
+      CUA_DRIVER_SERVER,
+      BROWSE,
+    ])
   })
 
   test("outside T3 the servers of either form are unchanged", () => {
@@ -174,6 +184,37 @@ describe("registering them", () => {
       },
     }
   }
+
+  test("only graphical visual specialists register the official desktop transport", () => {
+    for (const [agent, authorized] of [
+      ["worker-visual", true],
+      ["reviewer-visual-screen", true],
+      ["worker-implementation-screen", false],
+      ["worker-visual-headless-screen", false],
+      [undefined, false],
+    ] as const) {
+      const { calls, register } = recorder()
+      registerScreenServers(register, agent, [CUA_DRIVER_SERVER], NEUTRAL, LAUNCH)
+      expect(calls).toHaveLength(authorized ? 1 : 0)
+      if (authorized)
+        expect(calls[0]).toMatchObject({
+          name: CUA_DRIVER_NAME,
+          config: {
+            command: "cua-driver",
+            args: ["mcp"],
+            cwd: NEUTRAL,
+            exposure: "hidden",
+            toolExposure: { get_window_state: "direct" },
+          },
+        })
+    }
+    const event = (tool: string) => ({ toolName: `mcp__${CUA_DRIVER_NAME}__${tool}` })
+    expect(refuseUnassignedDesktop(event("get_window_state"), true)).toBeUndefined()
+    expect(refuseUnassignedDesktop(event("get_window_state"), false)?.block).toBe(true)
+    expect(refuseUnassignedDesktop(event("install_extension"), true)?.block).toBe(true)
+    expect(refuseUnassignedDesktop(event("run_script"), true)?.block).toBe(true)
+    expect(refuseUnassignedDesktop({ toolName: "computer_use_click" }, true)?.block).toBe(true)
+  })
 
   test("a screen specialist registers each server as a stdio command", () => {
     const { calls, register } = recorder()
