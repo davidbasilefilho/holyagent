@@ -9,7 +9,13 @@ const portable = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, 
 
 /** Bunx places its resolved package in a temporary directory named after the package request. */
 export const isBunxPackageRoot = (root: string): boolean =>
-  /(?:^|\/)bunx-\d+-holyagent(?:@[^/]+)?\/node_modules\/holyagent$/i.test(portable(root))
+  /(?:^|\/)(?:bunx-\d+-holyagent|\.bunx-\d+\/holyagent)(?:@[^/]+)?\/node_modules\/holyagent$/i.test(
+    portable(root),
+  )
+
+/** Npm exec runs a package from its transient npx cache. */
+export const isNpmExecPackageRoot = (root: string): boolean =>
+  /\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(portable(root))
 
 /** Identify a runner only from its recorded package layout, not from programs on PATH. */
 export const packageRunner = (root: string, env: Env): PackageRunner => {
@@ -19,7 +25,7 @@ export const packageRunner = (root: string, env: Env): PackageRunner => {
     return "mise"
   const bun = portable(env.BUN_INSTALL ?? join(homeDirectory(env), ".bun"))
   if (path === `${bun}/install/global/node_modules/holyagent`) return "bunx"
-  if (/\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(path)) return "npm"
+  if (isNpmExecPackageRoot(path)) return "npm"
   const prefix = env.npm_config_prefix ?? env.NPM_CONFIG_PREFIX
   if (
     prefix !== undefined &&

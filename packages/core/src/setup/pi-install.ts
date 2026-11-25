@@ -17,7 +17,7 @@ import {
   readJsonObjectSnapshot,
   writeJsonObjectIfUnchanged,
 } from "./json-file.ts"
-import { isBunxPackageRoot } from "./package-runner.ts"
+import { isBunxPackageRoot, isNpmExecPackageRoot } from "./package-runner.ts"
 import {
   type CapabilityChoices,
   isHolyagentSource,
@@ -133,8 +133,11 @@ const registration = Effect.fn("planPiPackageRegistration")(function* (
   replace: boolean,
 ) {
   const { root, physical, version } = yield* installedPackage(path)
-  const source =
-    isBunxPackageRoot(root) || isBunxPackageRoot(physical) ? `npm:holyagent@${version}` : root
+  const source = [root, physical].some(
+    (path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path),
+  )
+    ? `npm:holyagent@${version}`
+    : root
   let listedIn: string | undefined
   const conflicts: Array<{ readonly file: string; readonly prior: string }> = []
   for (const { file, sources } of settings) {

@@ -20781,7 +20781,7 @@ var init_search_tools = __esm(() => {
 });
 
 import { join as join22 } from "path";
-var portable = (value) => value.replaceAll("\\", "/").replace(/\/+$/, ""), isBunxPackageRoot = (root) => /(?:^|\/)bunx-\d+-holyagent(?:@[^/]+)?\/node_modules\/holyagent$/i.test(portable(root)), packageRunner = (root, env) => {
+var portable = (value) => value.replaceAll("\\", "/").replace(/\/+$/, ""), isBunxPackageRoot = (root) => /(?:^|\/)(?:bunx-\d+-holyagent|\.bunx-\d+\/holyagent)(?:@[^/]+)?\/node_modules\/holyagent$/i.test(portable(root)), isNpmExecPackageRoot = (root) => /\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(portable(root)), packageRunner = (root, env) => {
   const path = portable(root);
   if (isBunxPackageRoot(root))
     return "bunx";
@@ -20790,7 +20790,7 @@ var portable = (value) => value.replaceAll("\\", "/").replace(/\/+$/, ""), isBun
   const bun = portable(env.BUN_INSTALL ?? join22(homeDirectory2(env), ".bun"));
   if (path === `${bun}/install/global/node_modules/holyagent`)
     return "bunx";
-  if (/\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(path))
+  if (isNpmExecPackageRoot(path))
     return "npm";
   const prefix = env.npm_config_prefix ?? env.NPM_CONFIG_PREFIX;
   if (prefix !== undefined && ["/lib/node_modules/holyagent", "/node_modules/holyagent"].some((suffix) => path === portable(prefix) + suffix))
@@ -21010,7 +21010,7 @@ var init_pi_install = __esm(() => {
   });
   registration = fn2("planPiPackageRegistration")(function* (env, path, settings, replace) {
     const { root, physical, version } = yield* installedPackage(path);
-    const source = isBunxPackageRoot(root) || isBunxPackageRoot(physical) ? `npm:holyagent@${version}` : root;
+    const source = [root, physical].some((path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path)) ? `npm:holyagent@${version}` : root;
     let listedIn;
     const conflicts = [];
     for (const { file, sources } of settings) {

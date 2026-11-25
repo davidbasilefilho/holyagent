@@ -18587,7 +18587,8 @@ var searchToolLines = (cwd, format) => gen2(function* () {
 
 import { join as join22 } from "path";
 var portable = (value) => value.replaceAll("\\", "/").replace(/\/+$/, "");
-var isBunxPackageRoot = (root) => /(?:^|\/)bunx-\d+-holyagent(?:@[^/]+)?\/node_modules\/holyagent$/i.test(portable(root));
+var isBunxPackageRoot = (root) => /(?:^|\/)(?:bunx-\d+-holyagent|\.bunx-\d+\/holyagent)(?:@[^/]+)?\/node_modules\/holyagent$/i.test(portable(root));
+var isNpmExecPackageRoot = (root) => /\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(portable(root));
 var packageRunner = (root, env) => {
   const path = portable(root);
   if (isBunxPackageRoot(root))
@@ -18597,7 +18598,7 @@ var packageRunner = (root, env) => {
   const bun = portable(env.BUN_INSTALL ?? join22(homeDirectory2(env), ".bun"));
   if (path === `${bun}/install/global/node_modules/holyagent`)
     return "bunx";
-  if (/\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(path))
+  if (isNpmExecPackageRoot(path))
     return "npm";
   const prefix = env.npm_config_prefix ?? env.NPM_CONFIG_PREFIX;
   if (prefix !== undefined && ["/lib/node_modules/holyagent", "/node_modules/holyagent"].some((suffix) => path === portable(prefix) + suffix))
@@ -18786,7 +18787,7 @@ var sourcePackageRoot = (path) => basename8(path) === "holyagent.js" && basename
 var localHolyagentPackageAt = (path) => readJsonObject(join24(sourcePackageRoot(path), "package.json")).pipe(map4((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false));
 var registration = fn2("planPiPackageRegistration")(function* (env, path, settings, replace) {
   const { root, physical, version } = yield* installedPackage(path);
-  const source = isBunxPackageRoot(root) || isBunxPackageRoot(physical) ? `npm:holyagent@${version}` : root;
+  const source = [root, physical].some((path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path)) ? `npm:holyagent@${version}` : root;
   let listedIn;
   const conflicts = [];
   for (const { file, sources } of settings) {

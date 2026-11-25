@@ -655,6 +655,11 @@ test.each([
     ["bunx", "--package", `@opencode/browse@${BROWSE_VERSION}`, "browse", "pair"],
   ],
   [
+    "/home/person/.bun/install/cache/.bunx-1000/holyagent@dev/node_modules/holyagent",
+    "bunx",
+    ["bunx", "--package", `@opencode/browse@${BROWSE_VERSION}`, "browse", "pair"],
+  ],
+  [
     "/home/person/.bun/install/global/node_modules/holyagent",
     "bunx",
     ["bunx", "--package", `@opencode/browse@${BROWSE_VERSION}`, "browse", "pair"],
