@@ -4107,7 +4107,7 @@ var chooseLines = (state, context) => {
     return `${box} ${word}`;
   });
   const labels = rows.map((row) => labelOf(row, offer));
-  const valueWidth = Math.max(0, ...values.map(cells));
+  const valueWidth = cells("[ ] disabled");
   const labelWidth = Math.min(Math.max(0, ...labels.map(cells)), Math.max(4, width - 2 - 2 - valueWidth));
   const rowLine = (row, index) => {
     const focused = index === state.focus;
@@ -4148,6 +4148,7 @@ var chooseLines = (state, context) => {
     ]),
     ...hintLines(`${g.horizontalArrows} change harness`, width)
   ];
+  const choiceHint = (text) => combined === undefined ? hintLines(text, width) : wrap(text, width - 2).map((line) => [segment(`  ${line}`, "hint")]);
   const unavailable = combined !== undefined && state.tab === "codex" ? "Public Codex setup is not available on this build." : combined !== undefined && state.tab === "pi" && offer.harnesses?.piAvailable === false ? "Pi or T3 Code is unavailable on this host." : undefined;
   return [
     ...tabsLine,
@@ -4161,10 +4162,10 @@ var chooseLines = (state, context) => {
     ],
     ...group("Capabilities", configCount, rows.length),
     ...context.height >= 20 ? [button] : [],
-    ...unavailable === undefined ? [] : hintLines(unavailable, width),
-    ...combined?.claude === true && state.tab === "claude" ? hintLines(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`, width) : [],
-    ...focused === undefined ? [] : hintLines(hintOf(focused, offer), width),
-    ...hintLines(`Environment: ${offer.form}`, width)
+    ...unavailable === undefined ? [] : choiceHint(unavailable),
+    ...combined?.claude === true && state.tab === "claude" ? choiceHint(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`) : [],
+    ...focused === undefined ? [] : choiceHint(hintOf(focused, offer)),
+    ...choiceHint(`Environment: ${offer.form}`)
   ];
 };
 var MARK_TONES = {
