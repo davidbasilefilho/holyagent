@@ -146,12 +146,21 @@ export const subagentModel = ({ provider, model }: ModelRoute): string => `${pro
 export const routedModels = (config: Config): ReadonlyArray<ModelRoute> =>
   (Object.keys(config.pi.routes) as Array<RouteKey>).map((key) => routeModel(config, key))
 
-/** The variables the launcher sets on a Pi process for the provider the config selects. */
+/** The Pi model providers available from setup selections, the default and explicit role routes. */
+export const enabledPiProviders = (config: Config): ReadonlyArray<PiProvider> => [
+  ...new Set([
+    config.pi.provider,
+    ...(config.pi.providers ?? []),
+    ...Object.values(config.pi.routes).flatMap(({ provider }) =>
+      provider === undefined ? [] : [provider],
+    ),
+  ]),
+]
+
+/** The variables the launcher sets on a Pi process for the configured providers. */
 export const providerEnv = (config: Config): Readonly<Record<string, string>> =>
   Object.fromEntries(
-    Object.values(config.pi.routes).flatMap((row) =>
-      Object.entries(PROVIDERS[row.provider ?? config.pi.provider].env),
-    ),
+    enabledPiProviders(config).flatMap((provider) => Object.entries(PROVIDERS[provider].env)),
   )
 
 /**

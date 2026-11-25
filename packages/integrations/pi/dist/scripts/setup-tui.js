@@ -3855,14 +3855,23 @@ var CAPABILITY_ROW = "capability:";
 var tabs = ["pi", "claude", "codex"];
 var tabLabels = { pi: "Pi", claude: "Claude Code", codex: "Codex" };
 var LABELS = {
-  pi: "Pi provider",
   deviceAccess: "Agent device access",
   worktrees: "New threads in worktrees",
   enablePi: "Configure Pi",
   enableClaude: "Configure Claude Code"
 };
 var capabilityOf = (row, offer) => row.startsWith(CAPABILITY_ROW) ? offer.capabilities.find((capability) => capability.feature === row.slice(CAPABILITY_ROW.length)) : undefined;
-var labelOf = (row, offer) => row.startsWith(CAPABILITY_ROW) ? capabilityOf(row, offer)?.name ?? row : LABELS[row];
+var providerName = {
+  "kimi-coding-global": "Kimi for Coding (global)",
+  "openai-codex": "OpenAI Codex (ChatGPT)"
+};
+var providerOf = (row, offer) => offer.providers?.find((provider) => row === `provider:${provider}`);
+var labelOf = (row, offer) => {
+  const provider = providerOf(row, offer);
+  if (provider !== undefined)
+    return providerName[provider];
+  return row.startsWith(CAPABILITY_ROW) ? capabilityOf(row, offer)?.name ?? row : LABELS[row];
+};
 var rowsOf = (offer, state) => {
   const selected = state?.choices.harnesses;
   if (selected !== undefined && offer.harnesses !== undefined) {
@@ -3877,7 +3886,7 @@ var rowsOf = (offer, state) => {
   }
   return [
     ...selected === undefined ? [] : ["enablePi"],
-    ...offer.t3 ? ["pi"] : [],
+    ...(offer.providers ?? []).map((provider) => `provider:${provider}`),
     ...offer.t3 && offer.device !== undefined ? ["deviceAccess"] : [],
     ...offer.t3 && offer.worktrees ? ["worktrees"] : [],
     ...offer.capabilities.map((capability) => `${CAPABILITY_ROW}${capability.feature}`)
@@ -3901,7 +3910,17 @@ var isQuit = (key) => isCancel(key) || !key.ctrl && key.name === "q";
 var isEnter = (key) => key.name === "return" || key.name === "enter";
 var stepOf = (key) => key.ctrl ? 0 : key.name === "up" || key.name === "k" ? -1 : key.name === "down" || key.name === "j" ? 1 : 0;
 var wrapped = (index, step, length) => ((index + step) % length + length) % length;
+var toggleProvider = (choices, id) => {
+  const selection = choices.piProviders;
+  if (selection === undefined)
+    return choices;
+  const providers = selection.providers.includes(id) ? selection.providers.filter((p) => p !== id) : [...selection.providers, id];
+  const provider = providers.includes(selection.provider) ? selection.provider : providers[0] ?? selection.provider;
+  return { ...choices, piProviders: { provider, providers } };
+};
 var toggled = (choices, row) => {
+  if (row === "provider:kimi-coding-global" || row === "provider:openai-codex")
+    return toggleProvider(choices, row === "provider:openai-codex" ? "openai-codex" : "kimi-coding-global");
   if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude")) {
     const key = row === "enablePi" ? "pi" : "claude";
     return { ...choices, harnesses: { ...choices.harnesses, [key]: !choices.harnesses[key] } };
@@ -3935,14 +3954,21 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
       const tab = tabs[wrapped(tabs.indexOf(state.tab), key.name === "left" ? -1 : 1, tabs.length)];
       return { state: { ...state, tab: tab ?? state.tab, focus: 0 } };
     }
+    if (!key.ctrl && key.name === "end")
+      return { state: { ...state, focus: rows.length } };
     const step = stepOf(key);
-    if (step !== 0 && rows.length > 0)
-      return { state: { ...state, focus: wrapped(state.focus, step, rows.length) } };
-    if (!key.ctrl && key.name === "space") {
+    if (step !== 0)
+      return { state: { ...state, focus: wrapped(state.focus, step, rows.length + 1) } };
+    if (isEnter(key) && !key.ctrl) {
       const row = rows[state.focus];
-      return row === undefined ? { state } : { state: { ...state, choices: toggled(state.choices, row) } };
-    }
-    if (isEnter(key))
+      if (row !== undefined)
+        return {
+          state: {
+            ...state,
+            focus: row === "enablePi" ? 0 : state.focus,
+            choices: toggled(state.choices, row)
+          }
+        };
       return {
         state: {
           ...state,
@@ -3954,6 +3980,7 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
         },
         command: "review"
       };
+    }
     return { state };
   }
   if (state.screen === "review") {
@@ -3985,7 +4012,7 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
     return { state: paged };
   if (!key.ctrl && key.name === "d")
     return { state: { ...state, details: !state.details, scroll: 0 } };
-  return isQuit(key) || isEnter(key) || key.name === "space" ? { state, command: "close" } : { state };
+  return isQuit(key) || isEnter(key) ? { state, command: "close" } : { state };
 };
 var pressControl = (state, rows, control) => {
   const key = (name, from = state) => press(from, rows, { name, ctrl: false });
@@ -3994,13 +4021,13 @@ var pressControl = (state, rows, control) => {
       return state.screen === "choose" && state.choices.harnesses !== undefined ? { state: { ...state, tab: control.tab, focus: 0 } } : { state };
     if ("row" in control) {
       const focus = rows.indexOf(control.row);
-      return state.screen === "choose" && focus >= 0 ? key("space", { ...state, focus }) : { state };
+      return state.screen === "choose" && focus >= 0 ? key("enter", { ...state, focus }) : { state };
     }
     const action = reviewActions(state).indexOf(control.action);
     return state.screen === "review" && action >= 0 ? key("enter", { ...state, action }) : { state };
   }
   if (state.screen === "choose" && control === "choose-review")
-    return key("enter");
+    return key("enter", { ...state, focus: rows.length });
   if (state.screen === "choose" && control === "choose-cancel")
     return key("escape");
   if (state.screen === "done" && control === "details")
@@ -4031,9 +4058,12 @@ var KEY_GAP = "   ";
 var segment = (text, tone) => tone === undefined ? { text } : { text, tone };
 var title = (look) => [segment(`HolyAgent  ${glyphs(look).dot}  setup`, "heading")];
 var keyLines = (items, width) => wrapItems(items, width, KEY_GAP).map((text) => [segment(text, "option")]);
-var chooseKeys = (focus, width) => wrapItems([focus, "Space toggle", "Enter review", "Esc cancel"], width, KEY_GAP).map((line) => line.split(KEY_GAP).flatMap((text, index) => {
-  const click = text === "Enter review" ? "choose-review" : text === "Esc cancel" ? "choose-cancel" : undefined;
-  const item = { text, tone: "option", ...click === undefined ? {} : { click } };
+var chooseKeys = (focus, width) => wrapItems([focus, "Enter select", "Esc cancel"], width, KEY_GAP).map((line) => line.split(KEY_GAP).flatMap((text, index) => {
+  const item = {
+    text,
+    tone: "option",
+    ...text === "Esc cancel" ? { click: "choose-cancel" } : {}
+  };
   return index === 0 ? [item] : [segment(KEY_GAP), item];
 }));
 var heading = (text, width) => wrap(text.toUpperCase(), width).map((part) => [segment(part, "heading")]);
@@ -4044,8 +4074,8 @@ var hintOf = (row, offer) => {
     return "Include Pi and T3 Code in the combined review.";
   if (row === "enableClaude")
     return "Include the existing Claude Code plugin in the combined review.";
-  if (row === "pi")
-    return "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose.";
+  if (providerOf(row, offer) !== undefined)
+    return "Enable more than one provider if you use both. The default is used for routes without their own provider.";
   if (row === "deviceAccess")
     return `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.`;
   if (row === "worktrees")
@@ -4056,25 +4086,33 @@ var hintOf = (row, offer) => {
   return capability.unavailable === undefined ? `${capability.description}.` : `${capability.description}. Not offered in this form: ${capability.unavailable}; the choice is kept in the config.`;
 };
 var isOn = (row, choices) => row === "enablePi" ? choices.harnesses?.pi === true : row === "enableClaude" ? choices.harnesses?.claude === true : row === "deviceAccess" ? choices.deviceAccess : row === "worktrees" ? choices.worktrees : row.startsWith(CAPABILITY_ROW) && choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true;
-var checkbox = (row, choices) => row === "pi" ? { box: "[x]", word: "fixed" } : isOn(row, choices) ? { box: "[x]", word: "enabled" } : { box: "[ ]", word: "disabled" };
+var checkbox = (row, choices, offer) => {
+  const provider = providerOf(row, offer);
+  if (provider !== undefined) {
+    if (!choices.piProviders?.providers.includes(provider))
+      return { box: "[ ]", word: "disabled" };
+    return { box: "[x]", word: choices.piProviders.provider === provider ? "default" : "enabled" };
+  }
+  return isOn(row, choices) ? { box: "[x]", word: "enabled" } : { box: "[ ]", word: "disabled" };
+};
 var FIXED = { page: 1, max: 0 };
 var chooseLines = (state, context) => {
   const { rows, offer, width, look } = context;
   const g = glyphs(look);
   const values = rows.map((row) => {
-    const { box, word } = checkbox(row, state.choices);
+    const { box, word } = checkbox(row, state.choices, offer);
     return `${box} ${word}`;
   });
   const labels = rows.map((row) => labelOf(row, offer));
-  const valueWidth = Math.max(...values.map(cells));
-  const labelWidth = Math.min(Math.max(...labels.map(cells)), Math.max(4, width - 2 - 2 - valueWidth));
+  const valueWidth = Math.max(0, ...values.map(cells));
+  const labelWidth = Math.min(Math.max(0, ...labels.map(cells)), Math.max(4, width - 2 - 2 - valueWidth));
   const rowLine = (row, index) => {
     const focused = index === state.focus;
     const label = pad(clip(labels[index] ?? "", labelWidth, g.ellipsis), labelWidth);
     const value = values[index] ?? "";
     const line = focused ? [segment(`${g.focus} ${label}  ${value}`, "focus")] : [
       segment(`  ${label}  `, "argument"),
-      segment(value, row === "pi" || !isOn(row, state.choices) ? "disabled" : "enabled")
+      segment(value, value.startsWith("[ ]") ? "disabled" : "enabled")
     ];
     return line.map((part) => ({ ...part, click: { row } }));
   };
@@ -4083,7 +4121,16 @@ var chooseLines = (state, context) => {
     ...rows.slice(from, to).map((row, index) => rowLine(row, from + index)),
     blank
   ];
-  const t3Count = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length;
+  const configCount = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length;
+  const providerStart = rows[0] === "enablePi" ? 1 : 0;
+  const providerEnd = providerStart + rows.filter((row) => providerOf(row, offer) !== undefined).length;
+  const button = [
+    {
+      text: `${state.focus === rows.length ? g.focus : " "} [Review choices]`,
+      tone: state.focus === rows.length ? "focus" : "option",
+      click: "choose-review"
+    }
+  ];
   const focused = rows[state.focus];
   const combined = state.choices.harnesses;
   const tabsLine = combined === undefined ? [] : [
@@ -4102,8 +4149,14 @@ var chooseLines = (state, context) => {
     ...tabsLine,
     ...chooseKeys(`${g.arrows} or j/k focus`, width),
     blank,
-    ...group(combined === undefined ? "T3 Code" : tabLabels[state.tab], 0, t3Count),
-    ...group("Capabilities", t3Count, rows.length),
+    ...context.height < 20 ? [button, blank] : [],
+    ...providerEnd === providerStart ? group(combined === undefined ? "T3 Code" : tabLabels[state.tab], 0, configCount) : [
+      ...group("Pi", 0, providerStart),
+      ...group("Pi model providers", providerStart, providerEnd),
+      ...group("T3 Code", providerEnd, configCount)
+    ],
+    ...group("Capabilities", configCount, rows.length),
+    ...context.height >= 20 ? [button] : [],
     ...unavailable === undefined ? [] : hintLines(unavailable, width),
     ...combined?.claude === true && state.tab === "claude" ? hintLines(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`, width) : [],
     ...focused === undefined ? [] : hintLines(hintOf(focused, offer), width),
@@ -4153,7 +4206,7 @@ var reviewLayout = (state, context) => {
   const g = glyphs(look);
   const heading_ = heading(context.dryRun ? "Review (dry run: would change, nothing is written)" : "Review", width);
   const actionLines = () => reviewActions(state).map((action, index) => {
-    const text = action === "apply" ? context.dryRun ? "Apply (dry run)" : "Apply" : action === "back" ? "Back" : "Cancel";
+    const text = action === "apply" ? context.dryRun ? "Apply (dry run)" : state.review?.replacePiRegistration === true ? "Apply and replace Pi package" : "Apply" : action === "back" ? "Back" : "Cancel";
     if (index === state.action)
       return [{ text: `${g.focus} ${text}`, tone: "focus", click: { action } }];
     const tone = action === "apply" ? "enabled" : action === "cancel" ? "error" : "argument";

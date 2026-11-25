@@ -21,88 +21,70 @@ const clickText = async (screen: Mounted, text: string, exact = false) => {
 }
 
 describe("the setup interface, choose screen", () => {
-  test("shows the title, key hint, heading and the three rows with their defaults", async () => {
+  test("shows the title, Enter hint, settings and a separate review button", async () => {
     const screen = await shown({ width: 80, height: 24 })
-    const lines = screen.lines()
-    expect(lines[0]).toBe("HolyAgent  ·  setup")
-    expect(lines[1]).toBe("↑/↓ or j/k focus   Space toggle   Enter review   Esc cancel")
-    expect(lines[3]).toBe("T3 CODE")
-    expect(lines[4]).toBe("❯ Pi provider               [x] fixed")
-    expect(lines[5]).toBe("  Agent device access       [x] enabled")
-    expect(lines[6]).toBe("  New threads in worktrees  [x] enabled")
-  })
-
-  test("offers no device row where no Xcode or Android SDK was found", async () => {
-    const screen = await shown({ width: 80, height: 24, device: undefined })
     const text = screen.lines().join("\n")
-    expect(text).toContain("Pi provider")
+    expect(text).toContain("HolyAgent  ·  setup")
+    expect(text).toContain("Enter select")
+    expect(text).not.toContain("Space")
+    expect(text).not.toContain("fixed")
+    expect(text).toContain("❯ Agent device access")
     expect(text).toContain("New threads in worktrees")
-    expect(text).not.toContain("device")
-    await screen.keys("down", "down")
-    expect(screen.lines().find(ROW("❯"))).toContain("Pi provider")
+    expect(text).toContain("[Review choices]")
   })
 
-  test("leaves the worktree row out when the config does not allow the choice", async () => {
-    const screen = await shown({ width: 80, height: 24, worktrees: false })
-    expect(screen.lines().join("\n")).not.toContain("worktrees")
-  })
-
-  test("moves focus with up, down, j and k, wrapping at the ends, and hints at the focused row", async () => {
+  test("space does nothing and Enter toggles without reviewing", async () => {
     const screen = await shown({ width: 80, height: 24 })
-    await screen.keys("down")
-    expect(screen.lines()[5]).toStartWith("❯ Agent device access")
-    expect(screen.lines().join("\n")).toContain("Found: Xcode")
-    await screen.keys("j", "j")
-    expect(screen.lines()[4]).toStartWith("❯ Pi provider")
-    await screen.keys("k")
-    expect(screen.lines()[6]).toStartWith("❯ New threads in worktrees")
-    await screen.keys("up")
-    expect(screen.lines()[5]).toStartWith("❯ Agent device access")
+    const before = screen.lines()
+    await screen.keys(" ")
+    expect(screen.lines()).toEqual(before)
+    await screen.keys("enter")
+    expect(screen.lines().find(ROW("❯"))).toContain("[ ] disabled")
+    expect(screen.reviews).toEqual([])
+    await screen.keys("down", "down", "enter")
+    expect(screen.reviews).toHaveLength(1)
+    expect(screen.applies).toEqual([])
   })
 
-  test("toggles a row with space and leaves the Pi provider row fixed", async () => {
-    const screen = await shown({ width: 80, height: 24 })
-    await screen.keys(" ")
-    expect(screen.lines()[4]).toBe("❯ Pi provider               [x] fixed")
-    await screen.keys("down", " ")
-    expect(screen.lines()[5]).toBe("❯ Agent device access       [ ] disabled")
-    await screen.keys(" ")
-    expect(screen.lines()[5]).toBe("❯ Agent device access       [x] enabled")
-    await screen.keys("down", " ")
-    expect(screen.lines()[6]).toBe("❯ New threads in worktrees  [ ] disabled")
+  test("omits unavailable T3 choices and keeps the review button", async () => {
+    const screen = await shown({ width: 80, height: 24, device: undefined, worktrees: false })
+    const text = screen.lines().join("\n")
+    expect(text).not.toContain("Agent device access")
+    expect(text).not.toContain("worktrees")
+    expect(text).toContain("❯ [Review choices]")
   })
 })
 
 describe("the setup interface, review and apply", () => {
-  test("keeps harness choices while switching tabs by mouse and keyboard", async () => {
+  test("retains multiple harnesses and Pi providers by keyboard without applying", async () => {
     const screen = await shown({ width: 80, height: 30, combined: true })
-    await clickText(screen, "New threads in worktrees")
-    await clickText(screen, "[Claude Code]")
-    await screen.keys(" ")
-    expect(screen.lines().join("\n")).toContain("Existing plugin, user scope")
-    await screen.keys("right")
+    await screen.keys("down", "down", "enter", "right", "enter", "right")
     expect(screen.lines().join("\n")).toContain("Public Codex setup is not available")
-    await screen.keys("right", "enter")
+    await screen.keys("right", "end", "enter")
     expect(screen.reviews).toEqual([
       {
-        worktrees: false,
+        worktrees: true,
         deviceAccess: true,
         capabilities: {},
         harnesses: { pi: true, claude: true },
+        piProviders: {
+          provider: "kimi-coding-global",
+          providers: ["kimi-coding-global", "openai-codex"],
+        },
       },
     ])
-    expect(screen.applies).toHaveLength(0)
+    expect(screen.applies).toEqual([])
   })
 
   test("goes through choices, back, apply and close using only the mouse", async () => {
     const screen = await shown({ width: 80, height: 36 })
     await clickText(screen, "New threads in worktrees")
-    await clickText(screen, "Enter review")
+    await clickText(screen, "Review choices")
     expect(screen.reviews).toEqual([{ worktrees: false, deviceAccess: true, capabilities: {} }])
     expect(screen.applies).toEqual([])
     await clickText(screen, "Back", true)
     await clickText(screen, "Agent device access")
-    await clickText(screen, "Enter review")
+    await clickText(screen, "Review choices")
     await clickText(screen, "Apply", true)
     expect(screen.applies).toEqual([{ worktrees: false, deviceAccess: false, capabilities: {} }])
     await clickText(screen, "Close (Enter or q)")
@@ -111,7 +93,7 @@ describe("the setup interface, review and apply", () => {
 
   test("cancels a reviewed setup by mouse without applying changes", async () => {
     const screen = await shown({ width: 48, height: 20 })
-    await clickText(screen, "Enter review")
+    await clickText(screen, "Review choices")
     await clickText(screen, "Cancel", true)
     expect(screen.applies).toEqual([])
     expect(screen.outcomes).toEqual([{ _tag: "Cancelled" }])
@@ -119,7 +101,7 @@ describe("the setup interface, review and apply", () => {
 
   test("Enter reviews the current choices: what each switch changes and what is always applied", async () => {
     const screen = await shown({ width: 80, height: 40 })
-    await screen.keys("down", " ", "enter")
+    await screen.keys("enter", "end", "enter")
     expect(screen.reviews).toEqual([{ worktrees: true, deviceAccess: false, capabilities: {} }])
     const text = screen.lines().join("\n")
     expect(text).toContain("REVIEW")
@@ -136,7 +118,7 @@ describe("the setup interface, review and apply", () => {
 
   test("confirming applies the choices once and shows the result; closing reports it", async () => {
     const screen = await shown({ width: 80, height: 24 })
-    await screen.keys("down", "down", " ", "enter", "enter")
+    await screen.keys("down", "enter", "end", "enter", "enter")
     expect(screen.applies).toEqual([{ worktrees: false, deviceAccess: true, capabilities: {} }])
     const text = screen.lines().join("\n")
     expect(text).toContain("RESULT")
@@ -165,7 +147,7 @@ describe("the setup interface, review and apply", () => {
           lines: ["! t3 settings: /t3/settings.json changed while setup worked"],
         }),
     })
-    await screen.keys("enter", "enter")
+    await screen.keys("end", "enter", "enter")
     const text = screen.lines().join("\n")
     expect(text).toContain("Setup finished with failures.")
     expect(text).toContain("WARNINGS\nt3 settings")
@@ -190,7 +172,7 @@ describe("the setup interface, review and apply", () => {
       height: 24,
       apply: () => Promise.reject(new Error("the process was killed")),
     })
-    await screen.keys("enter", "enter", "d")
+    await screen.keys("end", "enter", "enter", "d")
     expect(screen.lines().join("\n")).toContain("! setup: the process was killed")
   })
 
@@ -200,7 +182,7 @@ describe("the setup interface, review and apply", () => {
       height: 24,
       review: () => Promise.reject(new Error("settings.json is not a JSON object")),
     })
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     const text = screen.lines().join("\n")
     expect(text).toContain("settings.json is not a JSON object")
     expect(text).not.toContain("Apply")
@@ -219,11 +201,11 @@ describe("the setup interface, review and apply", () => {
           release = () => resolve(undefined as never)
         }),
     })
-    await screen.keys("down", " ", "enter")
+    await screen.keys("enter", "end", "enter")
     expect(screen.lines().join("\n")).toContain("Reading what will change")
     await screen.keys("enter")
     expect(screen.lines()[3]).toBe("T3 CODE")
-    expect(screen.lines()[5]).toBe("❯ Agent device access       [ ] disabled")
+    expect(screen.lines().join("\n")).toMatch(/Agent device access +\[ \] disabled/)
     release()
     await screen.settle()
     expect(screen.lines()[3]).toBe("T3 CODE")
@@ -231,7 +213,7 @@ describe("the setup interface, review and apply", () => {
 
   test("a dry run says so on the review and the apply action", async () => {
     const screen = await shown({ width: 80, height: 24, dryRun: true })
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     expect(screen.lines().join("\n")).toContain(
       "REVIEW (DRY RUN: WOULD CHANGE, NOTHING IS WRITTEN)",
     )
@@ -240,7 +222,7 @@ describe("the setup interface, review and apply", () => {
 
   test("the review moves between Apply, Back and Cancel and Cancel cancels", async () => {
     const screen = await shown({ width: 80, height: 24 })
-    await screen.keys("enter", "down", "down")
+    await screen.keys("end", "enter", "down", "down")
     expect(screen.lines().find(ROW("❯"))).toBe("❯ Cancel")
     await screen.keys("enter")
     expect(screen.outcomes).toEqual([{ _tag: "Cancelled" }])
@@ -253,7 +235,7 @@ describe("the setup interface, cancel", () => {
     "%s on the choices cancels and runs nothing",
     async (key) => {
       const screen = await shown({ width: 80, height: 24 })
-      await screen.keys("down", " ", key)
+      await screen.keys("enter", key)
       expect(screen.outcomes).toEqual([{ _tag: "Cancelled" }])
       expect(screen.reviews).toEqual([])
       expect(screen.applies).toEqual([])
@@ -262,14 +244,14 @@ describe("the setup interface, cancel", () => {
 
   test.each([["escape"], ["ctrl-c"]])("%s on the review cancels and runs no apply", async (key) => {
     const screen = await shown({ width: 80, height: 24 })
-    await screen.keys("enter", key)
+    await screen.keys("end", "enter", key)
     expect(screen.outcomes).toEqual([{ _tag: "Cancelled" }])
     expect(screen.applies).toEqual([])
   })
 
   test("Ctrl-C while applying stops the screen and aborts the apply", async () => {
     const screen = await shown({ width: 80, height: 24, apply: () => new Promise(() => {}) })
-    await screen.keys("enter", "enter")
+    await screen.keys("end", "enter", "enter")
     expect(screen.lines().join("\n")).toContain("APPLYING")
     await screen.keys("escape", "down")
     expect(screen.outcomes).toEqual([])
@@ -287,10 +269,10 @@ describe("the setup interface, look", () => {
     expect(listing).toContain(`${TERMINAL_THEME.heading} bold "HolyAgent  ·  setup"`)
     expect(listing).toContain(`${TERMINAL_THEME.option} "↑/↓ or j/k focus`)
     expect(listing).toContain(`${TERMINAL_THEME.heading} bold "T3 CODE"`)
-    expect(listing).toContain(`${TERMINAL_THEME.focus} bold "❯ Pi provider`)
+    expect(listing).toContain(`${TERMINAL_THEME.focus} bold "❯ Agent device access`)
     expect(listing).toContain(`${TERMINAL_THEME.enabled} "[x] enabled"`)
-    expect(listing).toContain(`${TERMINAL_THEME.hint} "Pi runs in T3 Code`)
-    await screen.keys("down", " ")
+    expect(listing).toContain(`${TERMINAL_THEME.hint} "Lets agents use the iOS simulator`)
+    await screen.keys("enter")
     expect(spanListing(screen)).toContain(
       `${TERMINAL_THEME.focus} bold "❯ Agent device access       [ ] disabled"`,
     )
@@ -306,13 +288,13 @@ describe("the setup interface, look", () => {
       height: 28,
       env: { TERM: "xterm-256color", NO_COLOR: "1" },
     })
-    await screen.keys("down", " ")
+    await screen.keys("enter")
     const listing = spanListing(screen)
     expect(listing).not.toMatch(/#[0-9a-f]{6}/)
     expect(listing).toContain('default bold "HolyAgent  ·  setup"')
     expect(listing).toContain('default bold "❯ Agent device access       [ ] disabled"')
-    expect(screen.lines()[5]).toBe("❯ Agent device access       [ ] disabled")
-    await screen.keys("enter", "pagedown")
+    expect(screen.lines().join("\n")).toMatch(/Agent device access +\[ \] disabled/)
+    await screen.keys("end", "enter", "pagedown")
     expect(spanListing(screen)).not.toMatch(/#[0-9a-f]{6}/)
     expect(screen.lines().join("\n")).toContain("+ Pi provider")
   })
@@ -323,7 +305,7 @@ describe("the setup interface, look", () => {
       height: 24,
       env: { TERM: "xterm-256color", LANG: "C" },
     })
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     for (const line of screen.lines()) expect(line).toMatch(/^[\x20-\x7e]*$/)
     expect(screen.lines()[0]).toBe("HolyAgent  -  setup")
     expect(screen.lines().join("\n")).toContain("> Apply")
@@ -332,12 +314,12 @@ describe("the setup interface, look", () => {
   test("at 40 columns no line is cut off, the key hint wraps whole and the focus row fits", async () => {
     const screen = await shown({ width: 40, height: 20 })
     const lines = screen.lines()
-    expect(lines[1]).toBe("↑/↓ or j/k focus   Space toggle")
-    expect(lines[2]).toBe("Enter review   Esc cancel")
-    expect(lines[5]).toBe("❯ Pi provider               [x] fixed")
-    expect(lines[7]).toBe("  New threads in worktrees  [x] enabled")
+    expect(lines[1]).toBe("↑/↓ or j/k focus   Enter select")
+    expect(lines[2]).toBe("Esc cancel")
+    expect(lines.some((line) => line.includes("❯ Agent device access"))).toBe(true)
+    expect(lines.some((line) => line.includes("New threads in worktrees"))).toBe(true)
     for (const line of lines) expect(cells(line)).toBeLessThanOrEqual(40)
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     const review = screen.lines()
     expect(review.length).toBeLessThanOrEqual(20)
     expect(review.join("\n")).toContain("❯ Apply")
@@ -347,9 +329,9 @@ describe("the setup interface, look", () => {
 
   test("a resize reflows the screen", async () => {
     const screen = await shown({ width: 80, height: 24 })
-    expect(screen.lines()[1]).toBe("↑/↓ or j/k focus   Space toggle   Enter review   Esc cancel")
+    expect(screen.lines()[1]).toBe("↑/↓ or j/k focus   Enter select   Esc cancel")
     await screen.resize(40, 20)
-    expect(screen.lines()[2]).toBe("Enter review   Esc cancel")
+    expect(screen.lines()[2]).toBe("Esc cancel")
   })
 
   test("a long result scrolls with Page Down and every line can be read", async () => {
@@ -359,7 +341,7 @@ describe("the setup interface, look", () => {
       height: 12,
       apply: () => Promise.resolve({ ok: true, lines }),
     })
-    await screen.keys("enter", "enter", "d")
+    await screen.keys("end", "enter", "enter", "d")
     expect(screen.lines()).toHaveLength(12)
     expect(screen.lines().at(-1)).toBe("Lines 1-5 of 30, PgDn for more")
     const seen = new Set<string>()
@@ -395,7 +377,7 @@ describe("the setup interface, wrapping", () => {
         height,
         apply: () => Promise.resolve(LONG_APPLIED(false)),
       })
-      await screen.keys("enter", "enter", "d")
+      await screen.keys("end", "enter", "enter", "d")
       const lines = screen.lines()
       expect(lines.join("").includes("…")).toBe(false)
       expect(lines.some((line) => line.startsWith("Lines "))).toBe(false)
@@ -410,7 +392,6 @@ describe("the setup interface, wrapping", () => {
 
   test("a path wraps after a separator, never inside a folder name", async () => {
     const screen = await shown({ width: 40, height: 20 })
-    await screen.keys("down")
     const text = screen.lines().join("\n")
     expect(text).toContain("(/Applications/Xcode.app/Contents/")
     expect(text).toContain("Developer).")
@@ -422,7 +403,7 @@ describe("the setup interface, wrapping", () => {
       height: 24,
       apply: () => Promise.reject(new Error("the process was killed")),
     })
-    await failed.keys("enter", "enter")
+    await failed.keys("end", "enter", "enter")
     expect(failed.lines().join(" ").replace(/\s+/g, " ")).toContain("before running setup again")
     failed.destroy()
     const unreadable = await shown({
@@ -430,7 +411,7 @@ describe("the setup interface, wrapping", () => {
       height: 24,
       review: () => Promise.reject(new Error("settings.json is not a JSON object")),
     })
-    await unreadable.keys("enter")
+    await unreadable.keys("end", "enter")
     expect(unreadable.lines().join("\n")).toContain("choose Back and review again")
   })
 
@@ -442,7 +423,7 @@ describe("the setup interface, wrapping", () => {
       apply: () =>
         Promise.resolve({ ok: true, lines: ["+ t3 settings: would add defaultThreadEnvMode"] }),
     })
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     expect(screen.lines().join("\n")).toContain("WOULD CHANGE, NOTHING IS WRITTEN")
     await screen.keys("enter")
     const text = screen.lines().join("\n")
@@ -460,7 +441,7 @@ describe("the setup interface, a review that cannot be read on a small screen", 
       dryRun,
       review: () => Promise.reject(new Error(CAUSE)),
     })
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     return screen
   }
 
@@ -496,7 +477,7 @@ describe("the setup interface, a review that cannot be read on a small screen", 
     expect(lines.join("\n")).toMatch(/PgUp for earlier$/m)
     expect(lines.find(ROW("❯"))).toBe("❯ Back")
     expect(lines.filter((line) => line !== "").at(-1)).toBe("  Cancel")
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     expect(screen.lines()).toContain("T3 CODE")
   })
 
@@ -506,7 +487,7 @@ describe("the setup interface, a review that cannot be read on a small screen", 
       height: 20,
       review: () => Promise.reject(new Error("settings.json is not a JSON object")),
     })
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     const text = screen.lines().join("\n")
     expect(text).toContain("settings.json is not a JSON")
     expect(text).not.toContain("Lines 1-")
@@ -517,7 +498,7 @@ describe("the setup interface, a review that cannot be read on a small screen", 
 describe("the setup interface, a review longer than the screen", () => {
   const reading = async (width: number, height: number) => {
     const screen = await shown({ width, height })
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     const seen = new Set<string>()
     const pages: Array<string> = []
     for (let page = 0; page < 10; page += 1) {
@@ -559,18 +540,18 @@ describe("the setup interface, a review longer than the screen", () => {
 
   test("the hint line names the scroll keys only when the review scrolls", async () => {
     const tall = await shown({ width: 120, height: 40 })
-    await tall.keys("enter")
+    await tall.keys("end", "enter")
     expect(tall.lines().join("\n")).not.toContain("PgUp/PgDn")
     tall.destroy()
     const short = await shown({ width: 80, height: 24 })
-    await short.keys("enter")
+    await short.keys("end", "enter")
     expect(short.lines()[1]).toContain("PgUp/PgDn scroll")
     expect(short.lines().join("\n")).toMatch(/^Lines 1-\d+ of \d+, PgDn for more$/m)
   })
 
   test("Page Up stops at the top, Page Down at the end, and focus keys still move the action", async () => {
     const screen = await shown({ width: 40, height: 20 })
-    await screen.keys("enter", "pageup")
+    await screen.keys("end", "enter", "pageup")
     expect(screen.lines().join("\n")).toMatch(/^Lines 1-/m)
     await screen.keys("pagedown", "pagedown", "pagedown", "pagedown", "pagedown", "pagedown")
     const end = screen.lines().join("\n")

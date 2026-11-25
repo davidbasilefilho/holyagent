@@ -6,11 +6,13 @@ import { Effect } from "effect"
 
 import piPins from "../../core/src/config/pi-packages.json" with { type: "json" }
 import pypiPins from "../../core/src/config/pypi-packages.json" with { type: "json" }
+import { packageRunner } from "../../core/src/setup/package-runner.ts"
 import { CAPABILITIES } from "../src/config/capabilities.ts"
 import {
   BROWSE_COMMAND,
   BROWSE_EXTENSION_IDS,
   BROWSE_INSTALL_FIX,
+  browsePairCommand,
   BROWSE_PAIR_FIX,
   BROWSE_VERSION,
   browseDataDirectory,
@@ -141,8 +143,8 @@ describe("where browse keeps its pairings", () => {
   test("the pinned release is the one the commands name", () => {
     expect(BROWSE_VERSION).toBe(piPins["@opencode/browse"])
     expect(BROWSE_COMMAND).toBe(`npx -y @opencode/browse@${piPins["@opencode/browse"]}`)
-    expect(BROWSE_PAIR_FIX).toContain(`${BROWSE_COMMAND} install`)
-    expect(BROWSE_PAIR_FIX).toContain(`${BROWSE_COMMAND} pair`)
+    expect(BROWSE_PAIR_FIX).not.toContain("browse install")
+    expect(BROWSE_PAIR_FIX).toContain(`--package=@opencode/browse@${BROWSE_VERSION} -- browse pair`)
   })
 })
 
@@ -645,3 +647,48 @@ describe("holyagent setup on browse", () => {
     expect(await Bun.file(join(home, ".pi", "agent", "mcp.json")).exists()).toBe(false)
   })
 })
+
+test.each([
+  [
+    "C:/Users/person/AppData/Local/Temp/bunx-1275120565-holyagent@dev/node_modules/holyagent",
+    "bunx",
+    ["bunx", "--package", `@opencode/browse@${BROWSE_VERSION}`, "browse", "pair"],
+  ],
+  [
+    "/home/person/.bun/install/global/node_modules/holyagent",
+    "bunx",
+    ["bunx", "--package", `@opencode/browse@${BROWSE_VERSION}`, "browse", "pair"],
+  ],
+  [
+    "/home/person/.npm/_npx/abc/node_modules/holyagent",
+    "npm",
+    [
+      "npm",
+      "exec",
+      "--yes",
+      `--package=@opencode/browse@${BROWSE_VERSION}`,
+      "--",
+      "browse",
+      "pair",
+    ],
+  ],
+  [
+    "/home/person/.local/share/mise/installs/npm-holyagent/0.4.0/lib/node_modules/holyagent",
+    "mise",
+    ["mise", "exec", `npm:@opencode/browse@${BROWSE_VERSION}`, "--", "browse", "pair"],
+  ],
+  ["/custom/location/node_modules/holyagent", "unknown", undefined],
+] as const)(
+  "Browse uses the observed runner for %s with no global install",
+  (root, expected, command) => {
+    const runner = packageRunner(root, { HOME: "/home/person" })
+    expect(runner).toBe(expected)
+    expect(browsePairCommand(runner)).toEqual(command)
+    const detected = describeBrowseState({ state: "missing", scanned: ["Chrome"] }, runner)
+    if (command === undefined) {
+      expect(detected.fix).toContain("could not identify the runner")
+      expect(detected.fix).not.toContain("npx")
+    } else expect(detected.fix).toContain(command.join(" "))
+    expect(detected.fix).not.toContain("browse install")
+  },
+)

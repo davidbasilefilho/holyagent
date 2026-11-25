@@ -39,7 +39,7 @@ T3 Code is the only supported user-facing interface. The supported workflow uses
 
 `holyagent install` is an alias for `holyagent setup`. Run `holyagent doctor` to check the installation and `holyagent update --dry-run` to preview an update. For a package registered by setup from npm's global prefix, `holyagent update` keeps that registration and updates the installed package. The existing `npm:` Pi registration updates both package stores. Use `--version <version>` to select an exact stable version. Restart T3 Code after an update.
 
-Use `holyagent setup pi` to configure the T3 Code/Pi integration directly. It registers your installed HolyAgent package with Pi when a registration is missing. If another HolyAgent package is already registered, setup reports the conflict and keeps that entry. The `install` alias accepts the same arguments.
+Use `holyagent setup pi` to configure the T3 Code/Pi integration directly. It registers your installed HolyAgent package with Pi when a registration is missing. If another HolyAgent package is already registered, unattended setup keeps it. Interactive setup can review and explicitly replace one registration at the selected scope, without removing the old entry before the new package is installed. The `install` alias accepts the same arguments.
 
 `holyagent setup claude` applies the existing Claude plugin settings at the selected scope. Install the plugin separately before running this command. It preserves existing values and applies the same scoped behavior with `--undo`.
 
@@ -166,7 +166,11 @@ On Pi the specialists' `find` and `grep` tools are [fff](https://github.com/dmtr
 
 ### The T3 Code setup screen
 
-When Pi is installed and enabled in your config and the run is not `--undo`, `holyagent setup` shows an interactive screen in your terminal with one row for each Pi capability, headed by the form in force (headless or normal, [Capabilities](pi/configuration.md#capabilities)), each starting at what your config decides; Space switches one, and the review lists what each switch does (turned on, turned off, unchanged, or not offered in the form) before the run writes the changed ones to the config and installs or removes their packages. A capability flag (`--todo off`) applies directly and keeps the screen out. When also the scope is `user` and T3 Code is installed (its home folder, `T3CODE_HOME` or `~/.t3`, exists), the screen also covers the choices setup makes in T3's settings, then a review of every key it will change, and applies on confirm. It has two rows to switch beside the fixed Pi provider row: agent device access (offered only where Xcode's iOS simulator or an Android SDK is found and `pi.t3.deviceAccess` is true) and new threads in worktrees (while `pi.t3.worktrees` is true); both start enabled. Up and down (or `j` and `k`) move, Space toggles, Enter opens the review and applies it from there, and Esc, `q` or Ctrl-C cancels and writes nothing. The public package installs OpenTUI, Solid and the native renderer during the ordinary package install. Opening setup uses those installed files and works without network access. In headless T3 Code, Preview supplies the browser backend. The rows, keys and packaging are in [pi/t3-code.md](pi/t3-code.md#the-setup-screen-and-its-flags).
+In a terminal, use `bunx holyagent@dev setup` to try the development setup. Without `setup` the public command shows help. Use Left and Right or click a harness tab. Enable Pi and Claude together if needed. Codex public setup is not available on this build.
+
+When Pi is enabled, its tab lists the two model providers HolyAgent supports: Kimi for Coding (global) and OpenAI Codex (ChatGPT). Enable either or both. Setup keeps the current default while it remains selected and respects explicit per-role routes. T3 settings such as new threads in worktrees and agent device access appear only when offered by the scope and host.
+
+Use Up and Down to move and Enter to change the focused option. Focus or click **Review choices** to open the plan. Nothing is written until you choose **Apply** or explicitly confirm a package replacement. Escape, `q` or Ctrl-C cancels. A capability flag or `--non-interactive` skips the screen. See [the detailed setup controls](pi/t3-code.md#the-setup-screen-and-its-flags).
 
 Three flags make the choices without the screen:
 

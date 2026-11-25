@@ -1,3 +1,4 @@
+import type { PiProvider } from "../../config/schema.ts"
 import { resultHeadline, summarizeResult } from "./result.ts"
 import { cells, clip, pad, wrap, wrapItems } from "./text.ts"
 import { glyphs, type Look, type Tone } from "./theme.ts"
@@ -17,7 +18,7 @@ export type Line = ReadonlyArray<Segment>
 
 /** A row of the choose screen: a T3 row, or `capability:<pi.features key>`. */
 export type RowId =
-  | "pi"
+  | `provider:${PiProvider}`
   | "deviceAccess"
   | "worktrees"
   | "enablePi"
@@ -79,7 +80,6 @@ export type Control =
   | { readonly tab: Tab }
 
 const LABELS = {
-  pi: "Pi provider",
   deviceAccess: "Agent device access",
   worktrees: "New threads in worktrees",
   enablePi: "Configure Pi",
@@ -94,10 +94,21 @@ const capabilityOf = (row: RowId, offer: Offer) =>
       )
     : undefined
 
-const labelOf = (row: RowId, offer: Offer): string =>
-  row.startsWith(CAPABILITY_ROW)
+const providerName: Record<PiProvider, string> = {
+  "kimi-coding-global": "Kimi for Coding (global)",
+  "openai-codex": "OpenAI Codex (ChatGPT)",
+}
+
+const providerOf = (row: RowId, offer: Offer) =>
+  offer.providers?.find((provider) => row === `provider:${provider}`)
+
+const labelOf = (row: RowId, offer: Offer): string => {
+  const provider = providerOf(row, offer)
+  if (provider !== undefined) return providerName[provider]
+  return row.startsWith(CAPABILITY_ROW)
     ? (capabilityOf(row, offer)?.name ?? row)
     : LABELS[row as keyof typeof LABELS]
+}
 
 /**
  * The rows the machine allows: with T3 work, the Pi provider, the device row only with a host and
@@ -113,7 +124,7 @@ export const rowsOf = (offer: Offer, state?: State): ReadonlyArray<RowId> => {
   }
   return [
     ...(selected === undefined ? [] : (["enablePi"] as const)),
-    ...(offer.t3 ? (["pi"] as const) : []),
+    ...(offer.providers ?? []).map((provider): RowId => `provider:${provider}`),
     ...(offer.t3 && offer.device !== undefined ? (["deviceAccess"] as const) : []),
     ...(offer.t3 && offer.worktrees ? (["worktrees"] as const) : []),
     ...offer.capabilities.map((capability): RowId => `${CAPABILITY_ROW}${capability.feature}`),
@@ -153,7 +164,24 @@ const stepOf = (key: Key): -1 | 1 | 0 =>
 const wrapped = (index: number, step: number, length: number) =>
   (((index + step) % length) + length) % length
 
+const toggleProvider = (choices: Choices, id: PiProvider): Choices => {
+  const selection = choices.piProviders
+  if (selection === undefined) return choices
+  const providers = selection.providers.includes(id)
+    ? selection.providers.filter((p) => p !== id)
+    : [...selection.providers, id]
+  const provider = providers.includes(selection.provider)
+    ? selection.provider
+    : (providers[0] ?? selection.provider)
+  return { ...choices, piProviders: { provider, providers } }
+}
+
 const toggled = (choices: Choices, row: RowId): Choices => {
+  if (row === "provider:kimi-coding-global" || row === "provider:openai-codex")
+    return toggleProvider(
+      choices,
+      row === "provider:openai-codex" ? "openai-codex" : "kimi-coding-global",
+    )
   if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude")) {
     const key = row === "enablePi" ? "pi" : "claude"
     return { ...choices, harnesses: { ...choices.harnesses, [key]: !choices.harnesses[key] } }
@@ -196,16 +224,20 @@ export const press = (
       const tab = tabs[wrapped(tabs.indexOf(state.tab), key.name === "left" ? -1 : 1, tabs.length)]
       return { state: { ...state, tab: tab ?? state.tab, focus: 0 } }
     }
+    if (!key.ctrl && key.name === "end") return { state: { ...state, focus: rows.length } }
     const step = stepOf(key)
-    if (step !== 0 && rows.length > 0)
-      return { state: { ...state, focus: wrapped(state.focus, step, rows.length) } }
-    if (!key.ctrl && key.name === "space") {
+    if (step !== 0)
+      return { state: { ...state, focus: wrapped(state.focus, step, rows.length + 1) } }
+    if (isEnter(key) && !key.ctrl) {
       const row = rows[state.focus]
-      return row === undefined
-        ? { state }
-        : { state: { ...state, choices: toggled(state.choices, row) } }
-    }
-    if (isEnter(key))
+      if (row !== undefined)
+        return {
+          state: {
+            ...state,
+            focus: row === "enablePi" ? 0 : state.focus,
+            choices: toggled(state.choices, row),
+          },
+        }
       return {
         state: {
           ...state,
@@ -217,6 +249,7 @@ export const press = (
         },
         command: "review",
       }
+    }
     return { state }
   }
   if (state.screen === "review") {
@@ -244,9 +277,7 @@ export const press = (
   if (paged !== undefined) return { state: paged }
   if (!key.ctrl && key.name === "d")
     return { state: { ...state, details: !state.details, scroll: 0 } }
-  return isQuit(key) || isEnter(key) || key.name === "space"
-    ? { state, command: "close" }
-    : { state }
+  return isQuit(key) || isEnter(key) ? { state, command: "close" } : { state }
 }
 
 /** Pointer controls use the same transitions and preconditions as the keyboard. */
@@ -259,12 +290,13 @@ export const pressControl = (state: State, rows: ReadonlyArray<RowId>, control: 
         : { state }
     if ("row" in control) {
       const focus = rows.indexOf(control.row)
-      return state.screen === "choose" && focus >= 0 ? key("space", { ...state, focus }) : { state }
+      return state.screen === "choose" && focus >= 0 ? key("enter", { ...state, focus }) : { state }
     }
     const action = reviewActions(state).indexOf(control.action)
     return state.screen === "review" && action >= 0 ? key("enter", { ...state, action }) : { state }
   }
-  if (state.screen === "choose" && control === "choose-review") return key("enter")
+  if (state.screen === "choose" && control === "choose-review")
+    return key("enter", { ...state, focus: rows.length })
   if (state.screen === "choose" && control === "choose-cancel") return key("escape")
   if (state.screen === "done" && control === "details") return key("d")
   if (state.screen === "done" && control === "close") return key("q")
@@ -319,15 +351,13 @@ const keyLines = (items: ReadonlyArray<string>, width: number): ReadonlyArray<Li
   wrapItems(items, width, KEY_GAP).map((text) => [segment(text, "option")])
 
 const chooseKeys = (focus: string, width: number): ReadonlyArray<Line> =>
-  wrapItems([focus, "Space toggle", "Enter review", "Esc cancel"], width, KEY_GAP).map((line) =>
+  wrapItems([focus, "Enter select", "Esc cancel"], width, KEY_GAP).map((line) =>
     line.split(KEY_GAP).flatMap((text, index): Line => {
-      const click =
-        text === "Enter review"
-          ? "choose-review"
-          : text === "Esc cancel"
-            ? "choose-cancel"
-            : undefined
-      const item: Segment = { text, tone: "option", ...(click === undefined ? {} : { click }) }
+      const item: Segment = {
+        text,
+        tone: "option",
+        ...(text === "Esc cancel" ? { click: "choose-cancel" } : {}),
+      }
       return index === 0 ? [item] : [segment(KEY_GAP), item]
     }),
   )
@@ -344,8 +374,8 @@ const hintOf = (row: RowId, offer: Offer): string => {
   if (row === "enablePi") return "Include Pi and T3 Code in the combined review."
   if (row === "enableClaude")
     return "Include the existing Claude Code plugin in the combined review."
-  if (row === "pi")
-    return "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose."
+  if (providerOf(row, offer) !== undefined)
+    return "Enable more than one provider if you use both. The default is used for routes without their own provider."
   if (row === "deviceAccess")
     return `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.`
   if (row === "worktrees")
@@ -357,7 +387,7 @@ const hintOf = (row: RowId, offer: Offer): string => {
     : `${capability.description}. Not offered in this form: ${capability.unavailable}; the choice is kept in the config.`
 }
 
-/** Whether a row is switched on in the choices; the Pi provider row is fixed, so it never is. */
+/** Whether a row is enabled in the current choices. */
 const isOn = (row: RowId, choices: Choices): boolean =>
   row === "enablePi"
     ? choices.harnesses?.pi === true
@@ -370,12 +400,14 @@ const isOn = (row: RowId, choices: Choices): boolean =>
           : row.startsWith(CAPABILITY_ROW) &&
             choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
 
-const checkbox = (row: RowId, choices: Choices): { box: string; word: string } =>
-  row === "pi"
-    ? { box: "[x]", word: "fixed" }
-    : isOn(row, choices)
-      ? { box: "[x]", word: "enabled" }
-      : { box: "[ ]", word: "disabled" }
+const checkbox = (row: RowId, choices: Choices, offer: Offer): { box: string; word: string } => {
+  const provider = providerOf(row, offer)
+  if (provider !== undefined) {
+    if (!choices.piProviders?.providers.includes(provider)) return { box: "[ ]", word: "disabled" }
+    return { box: "[x]", word: choices.piProviders.provider === provider ? "default" : "enabled" }
+  }
+  return isOn(row, choices) ? { box: "[x]", word: "enabled" } : { box: "[ ]", word: "disabled" }
+}
 
 /** The lines of a screen, and how far it scrolls. */
 interface Layout {
@@ -389,13 +421,13 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
   const { rows, offer, width, look } = context
   const g = glyphs(look)
   const values = rows.map((row) => {
-    const { box, word } = checkbox(row, state.choices)
+    const { box, word } = checkbox(row, state.choices, offer)
     return `${box} ${word}`
   })
   const labels = rows.map((row) => labelOf(row, offer))
-  const valueWidth = Math.max(...values.map(cells))
+  const valueWidth = Math.max(0, ...values.map(cells))
   const labelWidth = Math.min(
-    Math.max(...labels.map(cells)),
+    Math.max(0, ...labels.map(cells)),
     Math.max(4, width - 2 - 2 - valueWidth),
   )
   const rowLine = (row: RowId, index: number): Line => {
@@ -406,7 +438,7 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
       ? [segment(`${g.focus} ${label}  ${value}`, "focus")]
       : [
           segment(`  ${label}  `, "argument"),
-          segment(value, row === "pi" || !isOn(row, state.choices) ? "disabled" : "enabled"),
+          segment(value, value.startsWith("[ ]") ? "disabled" : "enabled"),
         ]
     return line.map((part) => ({ ...part, click: { row } }))
   }
@@ -418,7 +450,17 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
           ...rows.slice(from, to).map((row, index) => rowLine(row, from + index)),
           blank,
         ]
-  const t3Count = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length
+  const configCount = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length
+  const providerStart = rows[0] === "enablePi" ? 1 : 0
+  const providerEnd =
+    providerStart + rows.filter((row) => providerOf(row, offer) !== undefined).length
+  const button = [
+    {
+      text: `${state.focus === rows.length ? g.focus : " "} [Review choices]`,
+      tone: state.focus === rows.length ? "focus" : "option",
+      click: "choose-review",
+    },
+  ] satisfies Line
   const focused = rows[state.focus]
   const combined = state.choices.harnesses
   const tabsLine: ReadonlyArray<Line> =
@@ -445,8 +487,16 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
     ...tabsLine,
     ...chooseKeys(`${g.arrows} or j/k focus`, width),
     blank,
-    ...group(combined === undefined ? "T3 Code" : tabLabels[state.tab], 0, t3Count),
-    ...group("Capabilities", t3Count, rows.length),
+    ...(context.height < 20 ? [button, blank] : []),
+    ...(providerEnd === providerStart
+      ? group(combined === undefined ? "T3 Code" : tabLabels[state.tab], 0, configCount)
+      : [
+          ...group("Pi", 0, providerStart),
+          ...group("Pi model providers", providerStart, providerEnd),
+          ...group("T3 Code", providerEnd, configCount),
+        ]),
+    ...group("Capabilities", configCount, rows.length),
+    ...(context.height >= 20 ? [button] : []),
     ...(unavailable === undefined ? [] : hintLines(unavailable, width)),
     ...(combined?.claude === true && state.tab === "claude"
       ? hintLines(
@@ -533,7 +583,9 @@ const reviewLayout = (state: State, context: Context): Layout => {
         action === "apply"
           ? context.dryRun
             ? "Apply (dry run)"
-            : "Apply"
+            : state.review?.replacePiRegistration === true
+              ? "Apply and replace Pi package"
+              : "Apply"
           : action === "back"
             ? "Back"
             : "Cancel"

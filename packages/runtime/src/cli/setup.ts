@@ -2,6 +2,7 @@ import { type Context, setup as coreSetup } from "@holyagent/core"
 import { Effect, Schema } from "effect"
 
 import { CAPABILITIES } from "../config/capabilities.ts"
+import type { PiProviderSelection } from "../config/schema.ts"
 import { DEFAULT_CONFIG } from "../domain/directive.ts"
 import { SetupFailure } from "../setup/errors.ts"
 import { chooseForm, FORM_CHOICES } from "../setup/form.ts"
@@ -139,7 +140,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
       `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
-      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the installed public CLI loads the renderer from its own package",
+      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults",
     ],
     flags: {
@@ -201,6 +202,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           choices: {
             readonly worktrees?: boolean | undefined
             readonly deviceAccess?: boolean | undefined
+            readonly piProviders?: PiProviderSelection
           },
           chosen: CapabilityChoices,
           notes: ReadonlyArray<string> = [],
@@ -208,6 +210,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
             readonly target: SetupTarget
             readonly dryRun: boolean
             readonly skipSharedPrerequisites: boolean
+            readonly replacePiRegistration?: boolean
           },
         ) =>
           Effect.gen(function* () {
@@ -218,6 +221,9 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
               ...(selectedTarget === "claude" || installedPackageRoot === undefined
                 ? {}
                 : { installedPackageRoot }),
+              ...(selectedTarget !== "claude" && selected?.replacePiRegistration === true
+                ? { replacePiRegistration: true }
+                : {}),
               undo: booleanFlag(args, "undo"),
               subagentCacheTtl,
               dryRun: selected?.dryRun ?? booleanFlag(args, "dry-run"),
@@ -226,6 +232,9 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
               ...(choices.worktrees === undefined ? {} : { worktrees: choices.worktrees }),
               ...(choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }),
               capabilities: selectedTarget === "claude" ? {} : chosen,
+              ...(selectedTarget === "claude" || choices.piProviders === undefined
+                ? {}
+                : { piProviders: choices.piProviders }),
               form,
             })
             return {
@@ -260,15 +269,42 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           form,
           ...(setupTui === undefined ? {} : { load: setupTui }),
           notify: emit,
-          apply: (choices, chosen) => apply(choices, chosen),
+          apply: (choices, chosen, replacePiRegistration) =>
+            target === "pi"
+              ? apply(choices, chosen, [], {
+                  target: "pi",
+                  dryRun: booleanFlag(args, "dry-run"),
+                  skipSharedPrerequisites: false,
+                  replacePiRegistration,
+                })
+              : apply(choices, chosen),
+          ...(surface === "public" && target === "pi"
+            ? {
+                previewPi: (choices, chosen) =>
+                  apply(choices, chosen, [], {
+                    target: "pi",
+                    dryRun: true,
+                    skipSharedPrerequisites: false,
+                    replacePiRegistration: true,
+                  }),
+              }
+            : {}),
           ...(surface === "public" && target === undefined
             ? {
                 combined: {
-                  run: (harness, choices, chosen, dryRun, skipSharedPrerequisites) =>
+                  run: (
+                    harness,
+                    choices,
+                    chosen,
+                    dryRun,
+                    skipSharedPrerequisites,
+                    replacePiRegistration,
+                  ) =>
                     apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
                       target: harness,
                       dryRun,
                       skipSharedPrerequisites,
+                      replacePiRegistration,
                     }),
                 },
               }

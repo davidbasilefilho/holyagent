@@ -37,13 +37,13 @@ describe("the setup interface, capability rows", () => {
     expect(rows.every((row) => row.endsWith("[x] enabled"))).toBe(true)
   })
 
-  test("Space toggles the focused capability, and the review and apply get the switches", async () => {
+  test("Enter toggles the focused capability, and the review and apply get the switches", async () => {
     const screen = await shown({ width: 100, height: 50, capabilities: OFFERS })
-    // The three T3 rows come first.
-    await screen.keys("down", "down", "down", " ")
+    // The two T3 rows come first.
+    await screen.keys("down", "down", "enter")
     expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("subagents")
     expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("[ ] disabled")
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     const [choices] = screen.reviews
     expect(choices?.capabilities["subagents"]).toBe(false)
     expect(choices?.capabilities["todo"]).toBe(true)
@@ -60,7 +60,7 @@ describe("the setup interface, capability rows", () => {
     expect(text).not.toContain("T3 CODE")
     expect(text).not.toContain("Pi provider")
     expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("subagents")
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     const review = screen.lines().join("\n")
     expect(review).toContain("CAPABILITIES")
     expect(review).not.toContain("YOUR CHOICES")
@@ -75,9 +75,10 @@ describe("the setup interface, capability rows", () => {
       t3: false,
       capabilities: capabilityOffers(HEADLESS),
     })
-    // The focus wraps up from the first row to the last (fff), then back through just-bash,
+    // Up first reaches the Review choices button, then the last option (fff), then back through just-bash,
     // auto-review, context-management, luna-reserve and browser-use to computer-use. Browser use
     // is offered headless (the browser-use server), so only computer use says it is not.
+    await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
     await screen.keys("k")
@@ -89,7 +90,7 @@ describe("the setup interface, capability rows", () => {
     await screen.keys("k")
     expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("computer-use")
     expect(screen.lines().join(" ").replace(/\s+/g, " ")).toContain("Not offered in this form")
-    await screen.keys(" ")
+    await screen.keys("enter")
     expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("[ ] disabled")
   })
 })

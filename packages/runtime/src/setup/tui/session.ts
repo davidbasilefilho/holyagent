@@ -1,12 +1,13 @@
 import { Effect, Schema } from "effect"
 
+import { enabledPiProviders } from "../../../../core/src/pi/provider.ts"
 import {
   CAPABILITIES,
   type CapabilityDefinition,
   formContent,
   unavailableIn,
 } from "../../config/capabilities.ts"
-import type { Config } from "../../config/schema.ts"
+import { type Config, PiProvider } from "../../config/schema.ts"
 import { inCloudSession } from "../../vcs/identity.ts"
 import type { Env } from "../environment.ts"
 import { describeForm, type FormChoice, inCi } from "../form.ts"
@@ -263,7 +264,13 @@ export interface InteractiveOptions {
    * Runs the whole setup with the choices and the capability switches that differ from the
    * config's, and returns its report.
    */
-  readonly apply: (choices: Choices, capabilities: CapabilityChoices) => Effect.Effect<Report>
+  readonly apply: (
+    choices: Choices,
+    capabilities: CapabilityChoices,
+    replacePiRegistration: boolean,
+  ) => Effect.Effect<Report>
+  /** The explicit public Pi command uses this for preflight of changed providers. */
+  readonly previewPi?: (choices: Choices, capabilities: CapabilityChoices) => Effect.Effect<Report>
   /** Read-only preview and confirmed application of the public harness selections. */
   readonly combined?: {
     readonly run: (
@@ -272,6 +279,7 @@ export interface InteractiveOptions {
       capabilities: CapabilityChoices,
       dryRun: boolean,
       skipSharedPrerequisites: boolean,
+      replacePiRegistration: boolean,
     ) => Effect.Effect<Report>
   }
 }
@@ -355,21 +363,49 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   if (loaded instanceof TuiUnavailable) return fail(`unavailable (${loaded.reason})`)
   const initialSwitches = features === undefined ? {} : features
   const piAvailable = piUsed && config?.pi.enable === true
+  const providerChoices =
+    piAvailable &&
+    config !== undefined &&
+    (combined !== undefined || options.previewPi !== undefined)
+      ? { provider: config.pi.provider, providers: enabledPiProviders(config) }
+      : undefined
+  const withProviderChanges = (choices: Choices): Choices => {
+    const selection = choices.piProviders
+    return selection !== undefined &&
+      providerChoices !== undefined &&
+      selection.provider === providerChoices.provider &&
+      selection.providers.length === providerChoices.providers.length &&
+      selection.providers.every((provider) => providerChoices.providers.includes(provider))
+      ? {
+          worktrees: choices.worktrees,
+          deviceAccess: choices.deviceAccess,
+          capabilities: choices.capabilities,
+          ...(choices.harnesses === undefined ? {} : { harnesses: choices.harnesses }),
+        }
+      : choices
+  }
+  const failedReport = (report: Report) =>
+    new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed")
   const selectionOf = (choices: Choices) =>
     (["pi", "claude"] as const).filter((target) => choices.harnesses?.[target] === true)
   const label = (target: "pi" | "claude") => (target === "pi" ? "Pi / T3 Code" : "Claude Code")
   let applyStarted = false
   let reviewedChoices: Choices | undefined
   let reviewSequence = 0
+  let reviewedReplacement: string | undefined
+  const replacementOf = (report: Report) =>
+    report.lines.find((line) => line.startsWith("+ pi package: replace "))
   const input: TuiInput = {
     env: options.env,
     offer: {
       ...offerOf(preview, offers, options.form),
+      ...(providerChoices === undefined ? {} : { providers: PiProvider.literals }),
       ...(combined === undefined ? {} : { harnesses: { piAvailable, scope: options.scope } }),
     },
     initial: {
       ...DEFAULT_CHOICES,
       capabilities: initialSwitches,
+      ...(providerChoices === undefined ? {} : { piProviders: providerChoices }),
       ...(combined === undefined ? {} : { harnesses: { pi: piAvailable, claude: false } }),
     },
     dryRun: options.dryRun,
@@ -387,7 +423,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             const changed = changedSwitches(initialSwitches, choices.capabilities)
             const plans = yield* Effect.forEach(targets, (target, index) =>
               combined
-                .run(target, choices, changed, true, index > 0)
+                .run(target, withProviderChanges(choices), changed, true, index > 0, true)
                 .pipe(Effect.map((report) => ({ name: label(target), ...report }))),
             )
             const error = plans.find((plan) => !plan.ok)
@@ -397,13 +433,41 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                   `${error.name}: ${error.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed"}`,
                 ),
               )
-            if (sequence === reviewSequence) reviewedChoices = choices
+            const replacement = plans.flatMap((plan) => replacementOf(plan) ?? [])[0]
+            if (sequence === reviewSequence) {
+              reviewedChoices = choices
+              reviewedReplacement = replacement
+            }
             return {
+              replacePiRegistration: replacement !== undefined,
               file: undefined,
               choices: [],
               always: [],
               harnesses: plans.map(({ name, lines }) => ({ name, lines })),
             } satisfies Review
+          }
+          const chosen = withProviderChanges(choices)
+          if (options.previewPi !== undefined) {
+            const sequence = ++reviewSequence
+            reviewedChoices = undefined
+            const report = yield* options.previewPi(
+              chosen,
+              changedSwitches(initialSwitches, choices.capabilities),
+            )
+            if (!report.ok) return yield* Effect.fail(failedReport(report))
+            const replacement = replacementOf(report)
+            if (sequence === reviewSequence) {
+              reviewedChoices = choices
+              reviewedReplacement = replacement
+            }
+            if (replacement !== undefined || chosen.piProviders !== undefined)
+              return {
+                replacePiRegistration: replacement !== undefined,
+                file: undefined,
+                choices: [],
+                always: [],
+                harnesses: [{ name: label("pi"), lines: report.lines }],
+              } satisfies Review
           }
           const next =
             preview === undefined
@@ -422,19 +486,51 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
         }),
       ),
     apply: (choices, signal) => {
-      if (combined !== undefined && reviewedChoices !== choices)
+      const chosen = withProviderChanges(choices)
+      if (
+        (combined !== undefined || chosen.piProviders !== undefined) &&
+        reviewedChoices !== choices
+      )
         return Effect.runPromise(
           Effect.fail(new Error("Review the current harness selection before applying.")),
         )
+      const replacement = reviewedChoices === choices ? reviewedReplacement : undefined
       reviewedChoices = undefined
+      reviewedReplacement = undefined
       applyStarted = true
       const changed = changedSwitches(initialSwitches, choices.capabilities)
+      const confirmReplacement = (report: Report) =>
+        report.ok && replacementOf(report) === replacement
+          ? Effect.void
+          : Effect.fail(
+              new Error(
+                "The Pi package plan changed. Review it again before replacing the previous registration.",
+              ),
+            )
+      const applySingle = options.apply(chosen, changed, replacement !== undefined)
       return Effect.runPromise(
         combined === undefined
-          ? options.apply(choices, changed)
-          : Effect.forEach(selectionOf(choices), (target, index) =>
-              combined.run(target, choices, changed, options.dryRun, index > 0),
-            ).pipe(
+          ? replacement === undefined || options.previewPi === undefined
+            ? applySingle
+            : options
+                .previewPi(chosen, changed)
+                .pipe(Effect.flatMap(confirmReplacement), Effect.andThen(applySingle))
+          : Effect.forEach(selectionOf(choices), (target, index) => {
+              const replace = target === "pi" && replacement !== undefined
+              const perform = combined.run(
+                target,
+                chosen,
+                changed,
+                options.dryRun,
+                index > 0,
+                replace,
+              )
+              return replace
+                ? combined
+                    .run(target, chosen, changed, true, index > 0, true)
+                    .pipe(Effect.flatMap(confirmReplacement), Effect.andThen(perform))
+                : perform
+            }).pipe(
               Effect.map((reports) => ({
                 ok: reports.length > 0 && reports.every(({ ok }) => ok),
                 lines: reports.flatMap(({ lines }) => lines),

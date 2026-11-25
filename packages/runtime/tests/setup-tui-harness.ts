@@ -117,12 +117,22 @@ export const mount = async (options: Mount) => {
       worktrees: options.worktrees ?? true,
       capabilities: options.capabilities ?? [],
       form: "normal (detected: a graphical session is available)",
-      ...(options.combined === true ? { harnesses: { piAvailable: true, scope: "user" } } : {}),
+      ...(options.combined === true
+        ? {
+            harnesses: { piAvailable: true, scope: "user" },
+            providers: ["kimi-coding-global", "openai-codex"],
+          }
+        : {}),
     },
     initial: {
       worktrees: true,
       deviceAccess: true,
-      ...(options.combined === true ? { harnesses: { pi: true, claude: false } } : {}),
+      ...(options.combined === true
+        ? {
+            harnesses: { pi: true, claude: false },
+            piProviders: { provider: "kimi-coding-global", providers: ["kimi-coding-global"] },
+          }
+        : {}),
       capabilities: Object.fromEntries(
         (options.capabilities ?? []).map((capability) => [capability.feature, true]),
       ),
@@ -174,6 +184,7 @@ export const mount = async (options: Mount) => {
       } else if (name === "ctrl-c") setup.mockInput.pressCtrlC()
       else if (name === "pagedown") setup.mockInput.pressKey("\u001B[6~")
       else if (name === "pageup") setup.mockInput.pressKey("\u001B[5~")
+      else if (name === "end") setup.mockInput.pressKey("\u001B[F")
       else if (name === "up" || name === "down" || name === "left" || name === "right")
         setup.mockInput.pressArrow(name)
       else setup.mockInput.pressKey(name)

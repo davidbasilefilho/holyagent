@@ -14,10 +14,10 @@ import {
   type SystemNeed,
   unavailableIn,
 } from "../config/capabilities.ts"
-import { loadConfig } from "../config/load.ts"
+import { loadConfig, loadConfigWithSource } from "../config/load.ts"
 import { piPackages } from "../config/packages.ts"
 import { piPackageSource } from "../config/pi-packages.ts"
-import type { Config } from "../config/schema.ts"
+import { Config, type PiProviderSelection } from "../config/schema.ts"
 import { fileSystem } from "../ports/filesystem.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { describeBrowseState, readBrowseState } from "./browse.ts"
@@ -340,14 +340,28 @@ export const loadPiConfig = (
   cwd: string,
   scope: Scope,
   choices: CapabilityChoices = {},
-): Effect.Effect<Config, SetupFailure> =>
-  loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(
+  providers?: PiProviderSelection,
+): Effect.Effect<Config, SetupFailure> => {
+  const sources = { projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }
+  const config =
+    providers === undefined
+      ? loadConfig(sources)
+      : loadConfigWithSource(sources).pipe(
+          Effect.flatMap(({ written }) =>
+            Schema.decodeUnknownEffect(Config)({
+              ...written,
+              pi: { ...written.pi, ...providers },
+            }),
+          ),
+        )
+  return config.pipe(
     Effect.map((config): Config => ({
       ...config,
       pi: { ...config.pi, features: { ...config.pi.features, ...choices } },
     })),
     Effect.mapError((error) => new SetupFailure({ message: error.message })),
   )
+}
 
 /**
  * Whether Pi has the HolyAgent package in the files that count at the scope ({@link

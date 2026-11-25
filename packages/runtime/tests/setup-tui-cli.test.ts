@@ -65,7 +65,9 @@ const cli = (
 ) =>
   Effect.runPromise(
     run(
-      ["setup", "--skip-ctx7", ...argv],
+      argv[0] === "pi"
+        ? ["setup", "pi", "--skip-ctx7", ...argv.slice(1)]
+        : ["setup", "--skip-ctx7", ...argv],
       {
         cwd: home,
         env: environment(options.env),
@@ -182,11 +184,58 @@ describe("setup flags for the T3 choices", () => {
     expect(text).toContain("--worktrees on|off and --device-access on|off make a choice")
     expect(text).toContain("--no-tui keeps the screen out")
     expect(text).toContain("the installed public CLI loads the renderer from its own package")
-    expect(text).toContain("Esc or Ctrl-C cancels and writes nothing")
+    expect(text).toContain("Esc or Ctrl-C cancels without writing")
   })
 })
 
 describe("the public setup renderer", () => {
+  test("public Pi setup reviews and applies two providers without flattening routes", async () => {
+    await machine()
+    const pi = join(home, "pi")
+    const config = join(home, ".holyagent", "config.json")
+    await Bun.write(
+      config,
+      JSON.stringify({
+        pi: {
+          provider: "kimi-coding-global",
+          routes: { root: { thinking: "high" } },
+        },
+      }),
+    )
+    const initial = await Effect.runPromise(defaultConfig)
+    await Bun.write(
+      join(pi, "settings.json"),
+      JSON.stringify({ packages: piPackages(initial, undefined, "headless") }),
+    )
+    const shown = interface_(async (input) => {
+      const choices: Choices = {
+        ...input.initial,
+        piProviders: {
+          provider: "kimi-coding-global",
+          providers: ["kimi-coding-global", "openai-codex"],
+        },
+      }
+      await expect(input.apply(choices, new AbortController().signal)).rejects.toThrow("Review")
+      const review = await input.review(choices)
+      expect(review.harnesses?.[0]?.lines.join("\n")).toContain("kimi-coding-global, openai-codex")
+      expect((await Bun.file(config).json()).pi.providers).toBeUndefined()
+      const result = await input.apply(choices, new AbortController().signal)
+      return { _tag: "Applied", applied: result }
+    })
+    const result = await cli(["pi", "--form", "headless"], {
+      env: { PI_CODING_AGENT_DIR: pi },
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+    })
+    expect(result.code).toBe(0)
+    expect((await Bun.file(config).json()).pi).toEqual({
+      provider: "kimi-coding-global",
+      providers: ["kimi-coding-global", "openai-codex"],
+      routes: { root: { thinking: "high" } },
+    })
+  })
+
   test("bare setup plans both selected harnesses once and cancel writes neither", async () => {
     await machine()
     const claude = join(home, "claude", "settings.json")
