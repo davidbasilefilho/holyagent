@@ -181,9 +181,29 @@ export const SetupApp = (props: SetupAppProps) => {
               <For each={line as Array<Line[number]>}>
                 {(part) => (
                   <Show
-                    when={part.tone !== undefined && BOLD_TONES.has(part.tone)}
-                    fallback={<span style={{ fg: colorOf(part.tone) }}>{part.text}</span>}>
-                    <b style={{ fg: colorOf(part.tone) }}>{part.text}</b>
+                    when={part.activeTab}
+                    fallback={
+                      <Show
+                        when={part.tone !== undefined && BOLD_TONES.has(part.tone)}
+                        fallback={<span style={{ fg: colorOf(part.tone) }}>{part.text}</span>}>
+                        <b style={{ fg: colorOf(part.tone) }}>{part.text}</b>
+                      </Show>
+                    }>
+                    <Show
+                      when={look.color}
+                      fallback={
+                        <b>
+                          <u>{part.text}</u>
+                        </b>
+                      }>
+                      <b
+                        style={{
+                          fg: look.background === "light" ? "#e1e2e7" : "#1a1b26",
+                          bg: palette.focus,
+                        }}>
+                        {part.text}
+                      </b>
+                    </Show>
                   </Show>
                 )}
               </For>

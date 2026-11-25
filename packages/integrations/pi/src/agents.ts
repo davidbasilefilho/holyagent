@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 
-import { type CapabilityForm, FEATURE_PACKAGES } from "../../../runtime/src/config/capabilities.ts"
+import type { CapabilityForm } from "../../../runtime/src/config/capabilities.ts"
 import { WEB_KIT_PACKAGE } from "../../../runtime/src/config/packages.ts"
 import { type Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
 import { agentFor, type Route } from "../../../runtime/src/domain/route.ts"
@@ -10,7 +10,6 @@ import { FFF_TOOLS } from "../../../runtime/src/pi/fff/settings.ts"
 import { providerProfile, PROVIDERS, webChoice } from "../../../runtime/src/pi/provider.ts"
 import {
   CODEMODE_TOOL,
-  COMPUTER_USE_TOOLS,
   READ_TOOLS,
   SHELL_TOOLS,
   toolArgs,
@@ -81,8 +80,6 @@ export const agentTools = (
       if (profile.writeTools.includes(tool)) return []
       if (FFF_TOOLS.includes(tool)) return [`ext:pi-fff/${tool}`]
       if (tool === CODEMODE_TOOL) return ["ext:builtin:codemode"]
-      if (COMPUTER_USE_TOOLS.includes(tool))
-        return [`ext:${extensionName(FEATURE_PACKAGES.computerUse)}`]
       if ((web.tools as ReadonlyArray<string>).includes(tool))
         return webEntries(config.pi.features.web)
       throw new Error(`${route.agent}: no package tools entry for ${tool}`)

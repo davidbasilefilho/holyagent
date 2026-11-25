@@ -29,6 +29,7 @@ import { literalWorkflowName, workflowRefusal } from "../../../runtime/src/cli/w
 import {
   BROWSER_SERVER_COMMAND,
   type CapabilityForm,
+  CUA_DRIVER_NAME,
   type McpServer,
 } from "../../../runtime/src/config/capabilities.ts"
 import { type Config, defaultConfig } from "../../../runtime/src/config/schema.ts"
@@ -92,9 +93,11 @@ export { refuseProfileLaunch } from "./profile-gate.ts"
 import {
   isScreenAgent,
   refuseT3PreviewOutsideT3,
+  refuseUnassignedDesktop,
   registerScreenServers,
   screenFormOf,
   screenServers,
+  screenServersFor,
   withoutBrowserUseInT3,
 } from "./screen.ts"
 import { AGENT_TYPES, SPECIALIST_NAMES } from "./specialists.ts"
@@ -559,6 +562,8 @@ interface Held {
   probe: AbortController | undefined
   /** True when the session runs under T3 Code (see {@link hostedByT3}), a specialist's included. */
   t3: boolean
+  /** Whether this visual specialist has a configured desktop MCP route. */
+  desktopAllowed: boolean
   /**
    * True once the start ran for a root under T3 Code, applied or not: T3's tools the root keeps off
    * are refused when called. Refusing is the safe side when the tools were not applied.
@@ -1512,24 +1517,25 @@ export const createExtension =
     // servers, not those kept.
     const registerScreen = (
       servers: ReadonlyArray<McpServer>,
-      t3: boolean,
+      session: Held,
     ): Delivery | undefined => {
       const agent = childAgent(pi.getSessionName())
       // No server for a screen specialist: `pi.features.mcp` or the capability is off, so tell it.
-      if (isScreenAgent(agent) && servers.length === 0) {
+      if (isScreenAgent(agent) && screenServersFor(agent, servers).length === 0) {
         if (noServerTold) return undefined
         noServerTold = true
         return notice(
           "no MCP server of the screen capability is registered (pi.features.mcp or browser-use is off); work without browser tools and report that they are missing",
         )
       }
-      const { failures } = registerScreenServers(
+      const { failures, registered } = registerScreenServers(
         (name, server) => pi.registerMcpServer(name, server),
         agent,
-        withoutBrowserUseInT3(servers, t3),
+        withoutBrowserUseInT3(servers, session.t3),
         homeDirectory(env),
         browserLauncher,
       )
+      session.desktopAllowed = isChild() && registered.includes(CUA_DRIVER_NAME)
       return failures.length === 0
         ? undefined
         : notice(
@@ -1593,6 +1599,8 @@ export const createExtension =
         }
         native.setEnabled(coreServices === undefined && result?.nativeEnabled === true)
         taken.gatesOff = result?.gatesOff === true
+        if (!(result?.screenServers ?? []).some(({ name }) => name === CUA_DRIVER_NAME))
+          taken.desktopAllowed = false
         if (result?.enabled === false) taken.profileRouting = false
         else if (result?.profileRouting !== undefined)
           taken.profileRouting =
@@ -1649,7 +1657,7 @@ export const createExtension =
           if (result?.screenServers !== undefined)
             taken.specialistNotice = joinOptional(
               taken.specialistNotice,
-              registerScreen(result.screenServers, taken.t3),
+              registerScreen(result.screenServers, taken),
             )
           if (result?.config !== undefined) startProviderCheck(taken, result.config)
           if (result?.tools !== undefined) {
@@ -1684,6 +1692,7 @@ export const createExtension =
         excluded: Effect.runSync(startingExclusions),
         started: false,
         t3: hostedByT3(ctx, env, isChild()),
+        desktopAllowed: false,
         t3Gate: false,
         t3Root: false,
         codex: undefined,
@@ -1818,6 +1827,7 @@ export const createExtension =
     pi.on("tool_call", (event, ctx) => {
       const gate = () =>
         refuseExcludedTool(event, held?.excluded ?? []) ??
+        refuseUnassignedDesktop(event, held?.desktopAllowed === true && isChild()) ??
         (isChild()
           ? (refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ??
             refusePrematureWebFallback(

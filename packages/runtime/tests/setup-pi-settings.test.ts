@@ -57,7 +57,7 @@ const setProjectConfig = (config: unknown) =>
 
 const withPi = () =>
   fakeShell({
-    commands: ["bun", "ctx7", "pi", "node", "npx"],
+    commands: ["bun", "ctx7", "pi", "node", "npx", "cua-driver"],
     respond: (line) =>
       line === "pi --version"
         ? { stdout: `${PI_HOST_VERSION}\n` }
@@ -110,9 +110,6 @@ const MODEL = {
   defaultModel: "k3.1-pro",
   defaultThinkingLevel: "high",
 }
-const COMPUTER_USE = {
-  "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false },
-}
 const SUBAGENTS = { disableDefaultAgents: true, fallbackSubagent: "none" }
 /**
  * `@ff-labs/pi-fff`'s file with the override mode that puts its tools in place of Pi's. Setup
@@ -124,6 +121,24 @@ const BILLION_SUBAGENTS = { pi: { subagents: false } }
 const BILLION = { ...BILLION_SUBAGENTS, ...BILLION_CONTEXT_GUARDRAILS_FILE }
 
 describe("holyagent setup, Pi tool settings", () => {
+  test("removes only recorded desktop confirmation settings that still match", async () => {
+    await write(globalSettings(), {
+      "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: true, custom: "keep" },
+    })
+    await Effect.runPromise(
+      addRecorded({ HOME: home }, globalSettings(), [
+        { path: ["pi-computer-use", "confirmAppLaunch"], value: false },
+        { path: ["pi-computer-use", "confirmDangerousActions"], value: false },
+      ]),
+    )
+    await runSetup(withPi())
+    expect(await read(globalSettings())).toMatchObject({
+      "pi-computer-use": { confirmDangerousActions: true, custom: "keep" },
+    })
+    const settings = (await read(globalSettings())) as Record<string, unknown>
+    expect(settings["pi-computer-use"]).not.toHaveProperty("confirmAppLaunch")
+  })
+
   test("writes every key toolSettings returns into Pi's global files, beside what the files hold", async () => {
     await installed()
     const shell = withPi()
@@ -132,7 +147,6 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(globalSettings())).toEqual({
       ...FULL(),
       ...CODEMODE,
-      ...COMPUTER_USE,
     })
     expect(await read(globalSubagents())).toEqual(SUBAGENTS)
     expect(await exists(globalKimi())).toBe(false)
@@ -181,7 +195,7 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(globalSettings())).toEqual({
       ...FULL(),
       codemode: { mode: "on", inlineBudget: 100 },
-      "pi-computer-use": { confirmAppLaunch: true, confirmDangerousActions: false },
+      "pi-computer-use": { confirmAppLaunch: true },
     })
     expect(await read(globalSubagents())).toEqual({
       disableDefaultAgents: false,
@@ -208,7 +222,7 @@ describe("holyagent setup, Pi tool settings", () => {
     await setConfig({ pi: { codemode: { mode: "on" } } })
     await installed()
     const report = await runSetup(withPi())
-    expect(await read(globalSettings())).toEqual({ ...FULL(), ...COMPUTER_USE })
+    expect(await read(globalSettings())).toEqual({ ...FULL() })
     expect(toolLines(report).join("\n")).toContain("left out, the package default: codemode.mode")
   })
 
@@ -220,7 +234,6 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(await read(globalSettings())).toEqual({
         ...FULL(),
         ...CODEMODE,
-        ...COMPUTER_USE,
         theme: "dark",
         ...prior,
       })
@@ -244,7 +257,6 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(globalSettings())).toEqual({
       ...FULL(),
       ...CODEMODE,
-      ...COMPUTER_USE,
     })
   })
 
@@ -597,7 +609,6 @@ describe("holyagent setup, Pi tool settings", () => {
     expect(await read(join(agent, "settings.json"))).toEqual({
       ...FULL(),
       ...CODEMODE,
-      ...COMPUTER_USE,
     })
     expect(await read(join(agent, "subagents.json"))).toEqual(SUBAGENTS)
     expect(await read(bili)).toEqual(BILLION)
@@ -617,7 +628,6 @@ describe("holyagent setup, Pi tool settings", () => {
       const report = await runSetup(withPi(), { scope })
       expect(await read(projectPi("settings.json"))).toEqual({
         ...CODEMODE,
-        ...COMPUTER_USE,
       })
       expect(await exists(projectPi("providers", "kimi-coding", "config.json"))).toBe(false)
       expect(await exists(projectPi("subagents.json"))).toBe(false)
@@ -642,11 +652,10 @@ describe("holyagent setup, Pi tool settings", () => {
       expect(report.ok).toBe(true)
       expect(await read(projectPi("settings.json"))).toEqual({
         ...CODEMODE,
-        "pi-computer-use": { confirmDangerousActions: false },
       })
       expect(await exists(projectPi("providers", "kimi-coding", "config.json"))).toBe(false)
       const lines = toolLines(report).join("\n")
-      expect(lines).toContain("left out, set in your global file: pi-computer-use.confirmAppLaunch")
+      expect(lines).not.toContain("pi-computer-use.confirmAppLaunch")
     }
     // The global files are as the user left them.
     expect(await read(globalKimi())).toEqual({ tools: { moonshot_search: { enabled: false } } })
@@ -763,10 +772,7 @@ describe("holyagent doctor, Pi tool settings", () => {
     const report = await runDoctor(withPi())
     expect(report.ok).toBe(true)
     expect(toolLines(report)).toEqual([
-      lacking(
-        globalSettings(),
-        "codemode.mode, pi-computer-use.confirmAppLaunch, pi-computer-use.confirmDangerousActions",
-      ),
+      lacking(globalSettings(), "codemode.mode"),
       lacking(globalSubagents(), "disableDefaultAgents, fallbackSubagent"),
       lacking(
         billion(),
@@ -1032,7 +1038,7 @@ describe("holyagent setup --undo, Pi tool settings", () => {
     for (const scope of ["project", "local"] as const) {
       await runSetup(withPi(), { scope })
       // The repository swaps the settings file for a link to the user's own, holding the same values.
-      await write(globalSettings(), { ...FULL(), ...CODEMODE, ...COMPUTER_USE })
+      await write(globalSettings(), { ...FULL(), ...CODEMODE })
       const globalBefore = await Bun.file(globalSettings()).text()
       await rm(projectPi("settings.json"))
       await symlink(globalSettings(), projectPi("settings.json"))

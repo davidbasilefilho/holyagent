@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { RGBA, TextAttributes } from "@opentui/core"
 import { createTestRenderer } from "@opentui/core/testing"
 import { Effect } from "effect"
 
@@ -175,6 +176,58 @@ describe("the setup interface on a light terminal", () => {
     return open
   }
   afterEach(() => open?.destroy())
+
+  test.each(["dark", "light"] as const)(
+    "the %s tab highlight follows navigation independently of row focus",
+    async (background) => {
+      const screen = await shown({
+        width: 64,
+        height: 25,
+        background,
+        combined: true,
+        env: { LANG: "C.UTF-8" },
+      })
+      const tabs = () => screen.spans().lines[1]?.spans ?? []
+      const highlight = RGBA.fromHex(
+        background === "light" ? LIGHT_THEME.focus : TERMINAL_THEME.focus,
+      )
+      const fg = RGBA.fromHex(background === "light" ? LIGHT_BACKGROUND : DARK_BACKGROUND)
+      const active = () =>
+        tabs().filter(
+          (span) =>
+            span.bg.r === highlight.r && span.bg.g === highlight.g && span.bg.b === highlight.b,
+        )
+      expect(screen.lines()[1]).toBe(" Pi   Claude Code   Codex")
+      expect(screen.lines()[2]).toBe("←/→ change harness")
+      expect(active().map(({ text }) => text.trim())).toEqual(["Pi"])
+      expect(active()[0]?.fg.r).toBe(fg.r)
+      expect(active()[0]?.fg.g).toBe(fg.g)
+      expect(active()[0]?.fg.b).toBe(fg.b)
+      await screen.keys("down", "right")
+      expect(active().map(({ text }) => text.trim())).toEqual(["Claude Code"])
+      expect(screen.lines().join("\n")).toMatch(/❯ Configure Claude Code +\[ \] disabled/)
+      await screen.click(22, 1)
+      expect(active().map(({ text }) => text.trim())).toEqual(["Codex"])
+      expect(screen.lines().join("\n")).toContain("Public Codex setup is not available")
+    },
+  )
+  test("no-color ASCII terminals show an underlined active tab and preserve checkbox labels", async () => {
+    const screen = await shown({
+      width: 64,
+      height: 25,
+      combined: true,
+      env: { LANG: "C", NO_COLOR: "1" },
+    })
+    expect(screen.lines()[2]).toBe("</> change harness")
+    const active = () =>
+      screen
+        .spans()
+        .lines[1]?.spans.find(({ attributes }) => (attributes & TextAttributes.UNDERLINE) !== 0)
+    expect(active()?.text.trim()).toBe("Pi")
+    expect(screen.lines().join("\n")).toContain("[x] enabled")
+    await screen.keys("left")
+    expect(active()?.text.trim()).toBe("Codex")
+  })
 
   test("draws in the light palette", async () => {
     const screen = await shown({ width: 80, height: 24, background: "light" })

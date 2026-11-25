@@ -167,10 +167,7 @@ export interface CapabilityDefinition {
 /** Billion Context's settings file; `BILI_CONFIG_FILE` can relocate it, and setup then writes there. */
 export const BILLION_CONTEXT_FILE = "~/.config/billion-context/billion-context.json"
 
-/**
- * Pi's agent-directory settings file: the codemode mode and the options of
- * `@amaster.ai/pi-computer-use`.
- */
+/** Pi's agent-directory settings file. */
 export const PI_SETTINGS_FILE = "~/.pi/agent/settings.json"
 
 /**
@@ -224,8 +221,51 @@ export const T3_PREVIEW_TOOLS: ReadonlyArray<string> = [
  */
 export const T3_VISUAL_TOOLS: ReadonlyArray<string> = [...T3_PREVIEW_TOOLS, `${T3_PREFIX}device_*`]
 
-/** The computer-use tools of `@amaster.ai/pi-computer-use`, which all carry this prefix. */
-export const COMPUTER_USE_TOOLS: ReadonlyArray<string> = ["computer_use_*"]
+/** The namespace reserved for the official desktop MCP server in HolyAgent sessions. */
+export const CUA_DRIVER_NAME = "holyagent_cua_driver"
+
+/** The reserved namespace, including unpublished tools from the same server. */
+export const CUA_DRIVER_NAMESPACE = `mcp__${CUA_DRIVER_NAME}__*`
+
+/** The official desktop primitives exposed to visual specialists. */
+export const CUA_DRIVER_TOOLS = [
+  "list_apps",
+  "list_windows",
+  "get_window_state",
+  "get_accessibility_tree",
+  "verify_state",
+  "launch_app",
+  "set_window_frame",
+  "click",
+  "double_click",
+  "right_click",
+  "drag",
+  "type_text",
+  "press_key",
+  "hotkey",
+  "set_value",
+  "scroll",
+] as const
+
+/** The desktop primitives as Pi tool names. */
+export const COMPUTER_USE_TOOLS: ReadonlyArray<string> = CUA_DRIVER_TOOLS.map(
+  (name) => `mcp__${CUA_DRIVER_NAME}__${name}`,
+)
+
+/** The tool namespace of the retired Pi extension, retained for defensive exclusion. */
+export const LEGACY_COMPUTER_USE_TOOLS: ReadonlyArray<string> = ["computer_use_*"]
+
+/** The legacy settings removed only where the setup record establishes ownership. */
+export const RETIRED_COMPUTER_USE_SETTINGS = {
+  "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false },
+}
+
+/** The official Cua Driver's local MCP transport. No host permissions are granted by setup. */
+export const CUA_DRIVER_SERVER: McpServer = {
+  name: CUA_DRIVER_NAME,
+  command: "cua-driver",
+  args: ["mcp"],
+}
 
 /**
  * The npm package of opencode browse, the MCP server of the `browser-use` capability. It is pinned
@@ -462,28 +502,32 @@ export const CAPABILITIES = [
   {
     name: "computer-use",
     feature: "computerUse",
-    description: "Lets the visual specialists drive the desktop (@amaster.ai/pi-computer-use)",
+    description: "Lets the visual specialists drive the desktop through the official Cua Driver",
     skills: [],
     applicability: "specialists",
     defaultOn: true,
     needs: [{ kind: "display" }],
     forms: {
       headless: { unavailable: "it drives a graphical session and this machine has none" },
-      normal: { packages: ["@amaster.ai/pi-computer-use"], mcpServers: [] },
-    },
-    // The decided "full access, no prompts".
-    settings: [
-      {
-        file: PI_SETTINGS_FILE,
-        content: { "pi-computer-use": { confirmAppLaunch: false, confirmDangerousActions: false } },
+      normal: {
+        packages: [],
+        mcpServers: [CUA_DRIVER_SERVER],
+        needs: [
+          {
+            kind: "command",
+            command: CUA_DRIVER_SERVER.command,
+            fix: "install the official Cua Driver from https://github.com/trycua/cua/releases and reopen Pi",
+          },
+        ],
       },
-    ],
-    tools: {
-      rootExclude: COMPUTER_USE_TOOLS,
-      visual: COMPUTER_USE_TOOLS,
-      screen: COMPUTER_USE_TOOLS,
     },
-    health: ["needs", "packages"],
+    settings: [],
+    tools: {
+      rootExclude: [CUA_DRIVER_NAMESPACE, ...LEGACY_COMPUTER_USE_TOOLS],
+      visual: COMPUTER_USE_TOOLS,
+      screen: [],
+    },
+    health: ["needs"],
   },
   {
     // Browser use for screen specialists, in two forms. Normal: opencode browse (`@opencode/browse`),

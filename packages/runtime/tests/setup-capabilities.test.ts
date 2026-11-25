@@ -30,7 +30,7 @@ afterEach(() => remove())
 const DEFAULT = await Effect.runPromise(defaultConfig)
 const ALL = piPackages(DEFAULT)
 const TODO = ALL.find((source) => source.includes("rpiv-todo")) as string
-const COMPUTER_USE = ALL.find((source) => source.includes("pi-computer-use")) as string
+const COMPUTER_USE = "npm:@amaster.ai/pi-computer-use@0.1.40"
 
 const write = async (file: string, content: unknown) => {
   await mkdir(dirname(file), { recursive: true })
@@ -306,7 +306,7 @@ describe("a capability flag in setup", () => {
 })
 
 describe("the form in setup", () => {
-  test("the headless form installs no computer-use package, removes a listed one and says which form it used", async () => {
+  test("the headless form installs no computer-use package, preserves a listed one and says which form it used", async () => {
     await write(globalSettings(), {
       packages: ALL.filter((source) => source !== COMPUTER_USE),
     })
@@ -316,31 +316,31 @@ describe("the form in setup", () => {
     expect(report.lines).toContain("~ form: headless (set by --form headless)")
     expect(report.lines.some((line) => line.includes("pi-computer-use"))).toBe(false)
 
-    await write(globalSettings(), { packages: ALL })
+    await write(globalSettings(), { packages: [...ALL, COMPUTER_USE] })
     const stale = withPi()
     await runSetup(stale, { form: "headless" })
-    expect(piCommands(stale)).toEqual(["pi remove npm:@amaster.ai/pi-computer-use"])
+    expect(piCommands(stale)).toEqual([])
+    expect(await read(globalSettings())).toMatchObject({ packages: [...ALL, COMPUTER_USE] })
   })
 
-  test("the normal form installs it, as before", async () => {
+  test("the normal form uses the official driver without installing a Pi package", async () => {
     await write(globalSettings(), { packages: ALL.filter((source) => source !== COMPUTER_USE) })
     const shell = withPi()
     const report = await runSetup(shell, { form: "normal" })
-    expect(piCommands(shell)).toEqual([`pi install ${COMPUTER_USE}`])
+    expect(piCommands(shell)).toEqual([])
     expect(report.lines).toContain("~ form: normal (set by --form normal)")
   })
 
-  test("the headless form writes no computer-use settings, and the normal form does", async () => {
+  test("neither form writes the legacy confirmation flags", async () => {
     await write(globalSettings(), { packages: ALL })
     await runSetup(withPi(), { form: "headless" })
     const headless = (await read(globalSettings())) as Record<string, unknown>
     expect(headless["pi-computer-use"]).toBeUndefined()
     expect(headless["codemode"]).toEqual({ mode: "only" })
     await runSetup(withPi(), { form: "normal" })
-    expect(((await read(globalSettings())) as Record<string, unknown>)["pi-computer-use"]).toEqual({
-      confirmAppLaunch: false,
-      confirmDangerousActions: false,
-    })
+    expect(
+      ((await read(globalSettings())) as Record<string, unknown>)["pi-computer-use"],
+    ).toBeUndefined()
   })
 })
 

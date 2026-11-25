@@ -41,7 +41,6 @@ describe("piPackages", () => {
       `npm:@juicesharp/rpiv-todo@${piPins["@juicesharp/rpiv-todo"]}`,
       `npm:@juicesharp/rpiv-ask-user-question@${piPins["@juicesharp/rpiv-ask-user-question"]}`,
       `npm:@aliou/pi-processes@${piPins["@aliou/pi-processes"]}`,
-      `npm:@amaster.ai/pi-computer-use@${piPins["@amaster.ai/pi-computer-use"]}`,
       `npm:@ff-labs/pi-fff@${piPins["@ff-labs/pi-fff"]}`,
     ])
   })
@@ -50,7 +49,6 @@ describe("piPackages", () => {
     ["processes", "@aliou/pi-processes"],
     ["todo", "@juicesharp/rpiv-todo"],
     ["ask", "@juicesharp/rpiv-ask-user-question"],
-    ["computerUse", "@amaster.ai/pi-computer-use"],
     ["fff", "@ff-labs/pi-fff"],
     ["contextCompression", "billion-context"],
     ["subagents", "@tintinweb/pi-subagents"],

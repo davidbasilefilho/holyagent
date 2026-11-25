@@ -10,6 +10,7 @@ const CAPABILITY_ROW = "capability:"
 export interface Segment {
   readonly text: string
   readonly tone?: Tone
+  readonly activeTab?: boolean
   readonly click?: Control
 }
 
@@ -432,7 +433,9 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
     return `${box} ${word}`
   })
   const labels = rows.map((row) => labelOf(row, offer))
-  const valueWidth = Math.max(0, ...values.map(cells))
+  // Reserve the longest state even when all visible choices are enabled. On narrow terminals
+  // changing one choice must not move every state column.
+  const valueWidth = cells("[ ] disabled")
   const labelWidth = Math.min(
     Math.max(0, ...labels.map(cells)),
     Math.max(4, width - 2 - 2 - valueWidth),
@@ -476,14 +479,19 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
       : [
           tabs.flatMap((tab): Line => [
             {
-              text: `[${tabLabels[tab]}]`,
-              tone: state.tab === tab ? "focus" : "option",
+              text: ` ${tabLabels[tab]} `,
+              tone: "option",
+              activeTab: state.tab === tab,
               click: { tab },
             },
             segment(" "),
           ]),
-          ...hintLines("Left/Right change harness", width),
+          ...hintLines(`${g.horizontalArrows} change harness`, width),
         ]
+  const choiceHint = (text: string) =>
+    combined === undefined
+      ? hintLines(text, width)
+      : wrap(text, width - 2).map((line): Line => [segment(`  ${line}`, "hint")])
   const unavailable =
     combined !== undefined && state.tab === "codex"
       ? "Public Codex setup is not available on this build."
@@ -504,15 +512,14 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
         ]),
     ...group("Capabilities", configCount, rows.length),
     ...(context.height >= 20 ? [button] : []),
-    ...(unavailable === undefined ? [] : hintLines(unavailable, width)),
+    ...(unavailable === undefined ? [] : choiceHint(unavailable)),
     ...(combined?.claude === true && state.tab === "claude"
-      ? hintLines(
+      ? choiceHint(
           `Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`,
-          width,
         )
       : []),
-    ...(focused === undefined ? [] : hintLines(hintOf(focused, offer), width)),
-    ...hintLines(`Environment: ${offer.form}`, width),
+    ...(focused === undefined ? [] : choiceHint(hintOf(focused, offer))),
+    ...choiceHint(`Environment: ${offer.form}`),
   ]
 }
 

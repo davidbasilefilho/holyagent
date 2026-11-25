@@ -34,6 +34,42 @@ describe("the setup interface, choose screen", () => {
     expect(text).toContain("[Review choices]")
   })
 
+  test.each([101, 38])(
+    "the Pi worktree row and state columns stay aligned at %s columns",
+    async (width) => {
+      const screen = await shown({
+        width,
+        height: 30,
+        combined: true,
+        capabilities: [
+          {
+            feature: "browserUse",
+            name: "browser-use",
+            description: "Use a browser.",
+            unavailable: undefined,
+          },
+        ],
+      })
+      const columns = () =>
+        screen.lines().flatMap((line) => {
+          const column = line.search(/\[[x ]\]/)
+          return column < 0 ? [] : [cells(line.slice(0, column))]
+        })
+      const initial = columns()
+      expect(initial).toHaveLength(6)
+      expect(new Set(initial).size).toBe(1)
+      await screen.keys("down", "down", "down", "down")
+      const focus = screen.lines().find((line) => line.startsWith("❯"))
+      expect(focus).toStartWith("❯ New threads in")
+      expect(screen.lines().join("\n")).toMatch(/^  New T3 Code threads/m)
+      expect(columns()).toEqual(initial)
+      await clickText(screen, "New threads in")
+      expect(screen.lines().find((line) => line.startsWith("❯"))).toContain("[ ] disabled")
+      expect(columns()).toEqual(initial)
+      expect(screen.lines().join("\n")).toContain("[Review choices]")
+    },
+  )
+
   test("space does nothing and Enter toggles without reviewing", async () => {
     const screen = await shown({ width: 80, height: 24 })
     const before = screen.lines()
