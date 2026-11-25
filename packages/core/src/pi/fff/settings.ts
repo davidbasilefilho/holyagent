@@ -10,6 +10,11 @@
  * adds `multi_grep`), so they replace Pi's. The package's default, `tools-and-ui`, adds `fffind`,
  * `ffgrep` and `fff-multi-grep` beside Pi's tools.
  *
+ * `enableHomeDirScanning: false` opts out of indexing a session opened at the home directory
+ * itself. Projects and worktrees below it still index normally. Pi's built-in search tools stay
+ * available there; HolyAgent does not reroute search. Native flags and environment variables still
+ * outrank the file, and setup leaves `warnOnHomeDirScan` untouched.
+ *
  * Setup leaves `followSymlinks` unset, so the package follows directory links by its own default
  * (for worktree and stow layouts): a link in a repository to a folder outside it becomes
  * searchable, which Pi's own `rg` and `fd` do not allow. A user's own value stays, and the
@@ -18,7 +23,7 @@
  * The file is read from Pi's agent directory only (`PI_CODING_AGENT_DIR` honored); a project file
  * is not read, and `--fff-mode` or `PI_FFF_MODE` outrank `mode`.
  */
-export const FFF_OVERRIDE_SETTINGS = { mode: "override" } as const
+export const FFF_OVERRIDE_SETTINGS = { mode: "override", enableHomeDirScanning: false } as const
 
 /**
  * What an earlier setup wrote to `pi-fff.json` and no longer does (0.3.1 wrote `followSymlinks:

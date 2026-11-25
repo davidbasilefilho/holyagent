@@ -9404,7 +9404,7 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
-var FFF_OVERRIDE_SETTINGS = { mode: "override" };
+var FFF_OVERRIDE_SETTINGS = { mode: "override", enableHomeDirScanning: false };
 var FFF_RETIRED_SETTINGS = { followSymlinks: false };
 var FFF_TOOLS = [
   "grep",
@@ -15719,7 +15719,7 @@ var PACKAGE_DEFAULTS = new Map([
     }
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-  [PI_FFF_FILE, { mode: "tools-and-ui" }],
+  [PI_FFF_FILE, { mode: "tools-and-ui", enableHomeDirScanning: true }],
   ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [
     [
       profile.toolsFile,
