@@ -3393,10 +3393,12 @@ describe("the root's excluded tools", () => {
     })(api.pi)
     const started = api.emit("session_start", { reason: "startup" })
     await hold.entered
-    for (const name of EXCLUDED)
-      expect(await api.emit("tool_call", call(name))).toEqual(
-        name.startsWith("moonshot_") ? blocked : [undefined],
-      )
+    for (const name of EXCLUDED) {
+      const replies = await api.emit("tool_call", call(name))
+      if (name.startsWith("computer_use_"))
+        expect(replies).toContainEqual(expect.objectContaining({ block: true }))
+      else expect(replies).toEqual(name.startsWith("moonshot_") ? blocked : [undefined])
+    }
     hold.open()
     await started
   })
@@ -3429,10 +3431,12 @@ describe("the root's excluded tools", () => {
         expect(await api.emit("tool_call", call(name))).toEqual([undefined])
     }
     const worker = await run(healthy("/missing"), { sessionName: "worker-implementation#a1b2c3d4" })
-    for (const name of EXCLUDED)
-      expect(await worker.api.emit("tool_call", call(name))).toEqual(
-        name.startsWith("moonshot_") ? blocked : [undefined],
-      )
+    for (const name of EXCLUDED) {
+      const replies = await worker.api.emit("tool_call", call(name))
+      if (name.startsWith("computer_use_"))
+        expect(replies).toContainEqual(expect.objectContaining({ block: true }))
+      else expect(replies).toEqual(name.startsWith("moonshot_") ? blocked : [undefined])
+    }
     const librarian = await run(healthy("/missing"), {
       sessionName: "librarian-lookup#a1b2c3d4",
       activeTools: ["moonshot_search", "moonshot_fetch"],
@@ -4223,13 +4227,22 @@ describe("the MCP servers of the screen capability", () => {
       expect(
         (await registered(`${name}#a1b2c3d4`)).map((server) => server.name),
         name,
-      ).toEqual([name.endsWith("-headless-screen") ? "browser_use" : "browse"])
+      ).toEqual(
+        name.endsWith("-headless-screen")
+          ? ["browser_use"]
+          : name.endsWith("-visual-screen")
+            ? ["holyagent_cua_driver", "browse"]
+            : ["browse"],
+      )
   })
 
-  test("the root and the specialists without the capability register none, so no other process starts the server", async () => {
+  test("the root registers no servers and a visual specialist does not need browser access to get Cua", async () => {
     expect(await registered(undefined)).toEqual([])
     for (const name of SPECIALIST_NAMES)
-      expect(await registered(`${name}#a1b2c3d4`), name).toEqual([])
+      expect(
+        (await registered(`${name}#a1b2c3d4`)).map((server) => server.name),
+        name,
+      ).toEqual(name.endsWith("-visual") ? ["holyagent_cua_driver"] : [])
     expect(await registered("my chat#1")).toEqual([])
   })
 
@@ -4311,13 +4324,16 @@ describe("the MCP servers of the screen capability", () => {
 
     test("a normal screen specialist still registers browse", async () => {
       const { api } = await started("worker-visual-screen", T3_HOSTED, "rpc")
-      expect(api.mcpServers.map((server) => server.name)).toEqual(["browse"])
+      expect(api.mcpServers.map((server) => server.name)).toEqual([
+        "holyagent_cua_driver",
+        "browse",
+      ])
     })
   })
 
-  test("browser use switched off registers none, and the specialist is told", async () => {
+  test("a non-visual specialist without browser use is told that no screen server is registered", async () => {
     const { api, delivered } = await run(configWith({ browserUse: false }), {
-      sessionName: "worker-visual-screen#a1b2c3d4",
+      sessionName: "worker-implementation-screen#a1b2c3d4",
       env: DISPLAY,
     })
     expect(api.mcpServers).toEqual([])
