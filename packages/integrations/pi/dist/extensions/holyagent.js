@@ -3091,6 +3091,9 @@ ContImpl.prototype = OnSuccessProto;
 var returnPayload = function() {
   return this.payload;
 };
+var succeedPayload = function(_value, fiber) {
+  return fiber.succeedWith(this.payload);
+};
 var continuationMarksStack = /* @__PURE__ */ (() => {
   const limit = /* @__PURE__ */ getStackTraceLimit();
   if (limit === 0)
@@ -3114,8 +3117,16 @@ var andThenCont = function(value) {
   const f = this.payload;
   return f(value);
 };
+var tapCont = function(value) {
+  const f = this.payload;
+  return new ContImpl(f(value), succeedPayload, value);
+};
+var tapEffectCont = function(value) {
+  return new ContImpl(this.payload, succeedPayload, value);
+};
 var asSome = (self) => map2(self, some2);
 var andThen = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, isEffect(f) ? returnPayload : andThenCont, f));
+var tap = /* @__PURE__ */ dual(2, (self, f) => new ContImpl(self, isEffect(f) ? tapEffectCont : tapCont, f));
 var asVoid = (self) => new ContImpl(self, returnPayload, exitVoid);
 var raceAllFirst = (all, options) => withFiber((parent) => {
   const fibers = new Set;
@@ -4310,6 +4321,7 @@ var withFiber2 = withFiber;
 var fromResult2 = fromResult;
 var flatMap2 = flatMap;
 var andThen2 = andThen;
+var tap2 = tap;
 var result2 = result;
 var option2 = option;
 var exit2 = exit;
@@ -16185,6 +16197,16 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
 });
 
 import { basename as basename7, dirname as dirname10, isAbsolute as isAbsolute9, join as join22, relative as relative4, resolve as resolve12 } from "node:path";
+
+var SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
+  return;
+} });
+var SetupActivity = Reference("holyagent/setup/SetupActivity", { defaultValue: () => {
+  return;
+} });
+var withSetupPhase = (phase, run) => flatMap2(SetupProgress, (report) => report === undefined ? run : sync2(() => report(phase)).pipe(andThen2(provideService2(run, SetupActivity, (activity) => report({ ...phase, activity })))));
+var reportSetupActivity = (activity) => flatMap2(SetupActivity, (report) => sync2(() => report?.(activity)));
+
 var MANAGED_NAMES = new Set([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
@@ -16344,6 +16366,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
         ...lines,
         `! pi package: ${file} changed before install; the previous registration was not replaced`
       ];
+    yield* reportSetupActivity(`Installing ${source}`);
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
@@ -16362,6 +16385,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`));
       continue;
     }
+    yield* reportSetupActivity(`Removing npm:${name}`);
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
@@ -16721,6 +16745,7 @@ var ensureGlobal = fn2("ensureGlobal")(function* (env, command, packageName, dry
       lines: [added(`${command}: would install with bun add -g ${packageName}`)]
     };
   }
+  yield* reportSetupActivity(`Installing ${packageName}`);
   const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
   if (result.exitCode !== 0)
     return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
@@ -16779,38 +16804,64 @@ var setup = fn2("setup")(function* (env, options) {
     if (blockers.length > 0)
       return { lines: blockers.map((line) => `! ${line}`), ok: false };
   }
-  const ctx7Lines = options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun));
-  const capabilityLines = piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
-    scope,
-    cwd: piOptions.cwd,
-    dryRun: options.dryRun,
-    choices,
-    ...options.piProviders === undefined ? {} : { providers: options.piProviders }
-  })) : Object.keys(choices).length > 0 ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")] : [];
-  const piSteps = piUsed && !capabilityLines.some((line) => line.startsWith("! "));
-  const lines = [
-    ...ctx7Lines,
-    ...piUsed ? [hint(`form: ${describeForm(form)}`)] : [],
-    ...capabilityLines,
-    ...piUsed && !piSteps ? [
-      skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
-    ] : [],
-    ...piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
-    ...piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
-    ...piSteps ? yield* asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })) : [],
-    ...piSteps && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
-      dryRun: options.dryRun,
-      ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
-      ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
-    })) : [],
-    ...usesStandaloneSearch(env, piUsed, surface) ? yield* searchToolLines(piOptions.cwd, setupToolLine) : [],
-    ...piOnly ? [] : yield* onSettings((file) => mergeUserSettings({
-      env,
-      file,
-      subagentCacheTtl: options.subagentCacheTtl,
-      dryRun: options.dryRun
-    }))
+  let piSteps = true;
+  const whenPiSaved = () => piSteps;
+  const phase = (label, run, runIf = () => true) => ({ label, run, runIf });
+  const report = (lines) => ({ lines });
+  const plan = [
+    ...options.skipCtx7 ? [report(() => [skipped("ctx7: skipped by flag")])] : cloud ? [report(() => [skipped(`ctx7: ${CLOUD_SKIP}`)])] : [phase("Context7", asStep("ctx7", installCtx7(env, options.dryRun)))],
+    ...piUsed ? [
+      report(() => [hint(`form: ${describeForm(form)}`)]),
+      phase("Capability settings", asStep("capabilities", applyCapabilityChoices(env, {
+        scope,
+        cwd: piOptions.cwd,
+        dryRun: options.dryRun,
+        choices,
+        ...options.piProviders === undefined ? {} : { providers: options.piProviders }
+      })).pipe(tap2((lines) => sync2(() => {
+        piSteps = !lines.some((line) => line.startsWith("! "));
+      })))),
+      report(() => piSteps ? [] : [
+        skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
+      ]),
+      phase("Pi packages", asStep("pi packages", installPiPackages(env, piOptions)), whenPiSaved),
+      phase("Pi tool settings", asStep("tool settings", installPiToolSettings(env, piOptions)), whenPiSaved),
+      phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })), whenPiSaved),
+      ...scope === "user" ? [
+        phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+          dryRun: options.dryRun,
+          ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
+          ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
+        })), whenPiSaved)
+      ] : []
+    ] : Object.keys(choices).length === 0 ? [] : [
+      report(() => [
+        skipped("capabilities: Pi is not in use, so the capability choices were not applied")
+      ])
+    ],
+    ...usesStandaloneSearch(env, piUsed, surface) ? [phase("Search-tool checks", searchToolLines(piOptions.cwd, setupToolLine))] : [],
+    ...piOnly ? [] : [
+      phase("Claude Code settings", onSettings((file) => mergeUserSettings({
+        env,
+        file,
+        subagentCacheTtl: options.subagentCacheTtl,
+        dryRun: options.dryRun
+      })))
+    ]
   ];
+  const total = plan.filter((step) => ("run" in step)).length;
+  const lines = [];
+  let index = 0;
+  for (const step of plan) {
+    if ("lines" in step) {
+      lines.push(...step.lines());
+      continue;
+    }
+    index += 1;
+    if (step.runIf()) {
+      lines.push(...yield* withSetupPhase({ index, total, label: step.label }, step.run));
+    }
+  }
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
 });
 

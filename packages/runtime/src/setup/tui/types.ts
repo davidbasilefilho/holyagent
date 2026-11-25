@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 
+import type { SetupProgressUpdate } from "../../../../core/src/setup/progress.ts"
 import type { PiProvider, PiProviderSelection } from "../../config/schema.ts"
 
 /** The setup choices: harnesses, Pi model providers, T3 settings and capability switches. */
@@ -82,6 +83,12 @@ export interface Applied {
   readonly lines: ReadonlyArray<string>
 }
 
+/** The active harness and its current phase, if that harness has finished planning. */
+export interface SetupDisplayProgress {
+  readonly harness?: { readonly index: number; readonly total: number; readonly label: string }
+  readonly phase?: SetupProgressUpdate
+}
+
 /** What the setup interface needs from the command; the host builds it, the interface only calls. */
 export interface TuiInput {
   /** The environment of the process, for the colour policy and the glyph set. */
@@ -94,7 +101,11 @@ export interface TuiInput {
   /** Lists what the choices change; rejects with an `Error` when the files cannot be read. */
   readonly review: (choices: Choices) => Promise<Review>
   /** Runs setup with the choices; `signal` aborts it when the person interrupts. */
-  readonly apply: (choices: Choices, signal: AbortSignal) => Promise<Applied>
+  readonly apply: (
+    choices: Choices,
+    signal: AbortSignal,
+    report?: (progress: SetupDisplayProgress) => void,
+  ) => Promise<Applied>
 }
 
 /** How the interface ended: the person applied, cancelled, or interrupted a running apply. */

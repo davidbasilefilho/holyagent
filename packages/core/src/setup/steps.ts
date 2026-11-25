@@ -16,6 +16,7 @@ import {
 } from "./pi-check.ts"
 import { installPiPackages } from "./pi-install.ts"
 import { installPiToolSettings, undoPiToolSettings } from "./pi-settings.ts"
+import { reportSetupActivity, withSetupPhase } from "./progress.ts"
 import { added, failed, hint, present, type Report, skipped } from "./report.ts"
 import { type Scope, settingsFile } from "./scope.ts"
 import { searchToolLines, setupToolLine } from "./search-tools.ts"
@@ -54,6 +55,7 @@ const ensureGlobal = Effect.fn("ensureGlobal")(function* (
     }
   }
   // Bun reads no .env and the empty config, so a project's own files cannot redirect the install.
+  yield* reportSetupActivity(`Installing ${packageName}`)
   const result = yield* shell.run(
     "bun",
     ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName],
@@ -201,72 +203,130 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
     if (blockers.length > 0)
       return { lines: blockers.map((line) => `! ${line}`), ok: false } satisfies Report
   }
-  const ctx7Lines = options.skipCtx7
-    ? [skipped("ctx7: skipped by flag")]
-    : cloud
-      ? [skipped(`ctx7: ${CLOUD_SKIP}`)]
-      : yield* asStep("ctx7", installCtx7(env, options.dryRun))
-  const capabilityLines = piUsed
-    ? yield* asStep(
-        "capabilities",
-        applyCapabilityChoices(env, {
-          scope,
-          cwd: piOptions.cwd,
-          dryRun: options.dryRun,
-          choices,
-          ...(options.piProviders === undefined ? {} : { providers: options.piProviders }),
-        }),
-      )
-    : Object.keys(choices).length > 0
-      ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")]
-      : []
-  // The Pi steps plan from the choices laid over the config, so when they could not be saved those
-  // steps stop: a package must not change without the config that explains it.
-  const piSteps = piUsed && !capabilityLines.some((line) => line.startsWith("! "))
-  const lines = [
-    ...ctx7Lines,
-    ...(piUsed ? [hint(`form: ${describeForm(form)}`)] : []),
-    ...capabilityLines,
-    ...(piUsed && !piSteps
+  // A failed capability write blocks the dependent phases. They remain in the plan but never
+  // report progress as though they ran.
+  let piSteps = true
+  const whenPiSaved = () => piSteps
+  const phase = (
+    label: string,
+    run: Effect.Effect<ReadonlyArray<string>, never, Shell>,
+    runIf = () => true,
+  ) => ({ label, run, runIf })
+  const report = (lines: () => ReadonlyArray<string>) => ({ lines })
+  const plan = [
+    ...(options.skipCtx7
+      ? [report(() => [skipped("ctx7: skipped by flag")])]
+      : cloud
+        ? [report(() => [skipped(`ctx7: ${CLOUD_SKIP}`)])]
+        : [phase("Context7", asStep("ctx7", installCtx7(env, options.dryRun)))]),
+    ...(piUsed
       ? [
-          skipped(
-            `pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter(
-              (capability) => choices[capability.feature] !== undefined,
-            )
-              .map((capability) => capability.name)
-              .join(", ")} was not saved`,
+          report(() => [hint(`form: ${describeForm(form)}`)]),
+          phase(
+            "Capability settings",
+            asStep(
+              "capabilities",
+              applyCapabilityChoices(env, {
+                scope,
+                cwd: piOptions.cwd,
+                dryRun: options.dryRun,
+                choices,
+                ...(options.piProviders === undefined ? {} : { providers: options.piProviders }),
+              }),
+            ).pipe(
+              Effect.tap((lines) =>
+                Effect.sync(() => {
+                  piSteps = !lines.some((line) => line.startsWith("! "))
+                }),
+              ),
+            ),
           ),
+          report(() =>
+            piSteps
+              ? []
+              : [
+                  skipped(
+                    `pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter(
+                      (capability) => choices[capability.feature] !== undefined,
+                    )
+                      .map((capability) => capability.name)
+                      .join(", ")} was not saved`,
+                  ),
+                ],
+          ),
+          phase(
+            "Pi packages",
+            asStep("pi packages", installPiPackages(env, piOptions)),
+            whenPiSaved,
+          ),
+          phase(
+            "Pi tool settings",
+            asStep("tool settings", installPiToolSettings(env, piOptions)),
+            whenPiSaved,
+          ),
+          phase(
+            "Browser-use checks",
+            asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })),
+            whenPiSaved,
+          ),
+          // T3 Code's server settings are the user's own, so the step runs at scope user only.
+          ...(scope === "user"
+            ? [
+                phase(
+                  "T3 Code settings",
+                  asStep(
+                    "t3 settings",
+                    installT3Settings(env, piOptions.cwd, {
+                      dryRun: options.dryRun,
+                      ...(options.worktrees === undefined ? {} : { worktrees: options.worktrees }),
+                      ...(options.deviceAccess === undefined
+                        ? {}
+                        : { deviceAccess: options.deviceAccess }),
+                    }),
+                  ),
+                  whenPiSaved,
+                ),
+              ]
+            : []),
         ]
-      : []),
-    ...(piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : []),
-    ...(piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : []),
-    ...(piSteps
-      ? yield* asStep("browser use", reportBrowserUse(env, { ...piOptions, surface }))
-      : []),
-    // T3 Code's server settings are the user's own, so the step runs at scope user only.
-    ...(piSteps && scope === "user"
-      ? yield* asStep(
-          "t3 settings",
-          installT3Settings(env, piOptions.cwd, {
-            dryRun: options.dryRun,
-            ...(options.worktrees === undefined ? {} : { worktrees: options.worktrees }),
-            ...(options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }),
-          }),
-        )
-      : []),
+      : Object.keys(choices).length === 0
+        ? []
+        : [
+            report(() => [
+              skipped("capabilities: Pi is not in use, so the capability choices were not applied"),
+            ]),
+          ]),
     ...(usesStandaloneSearch(env, piUsed, surface)
-      ? yield* searchToolLines(piOptions.cwd, setupToolLine)
+      ? [phase("Search-tool checks", searchToolLines(piOptions.cwd, setupToolLine))]
       : []),
     ...(piOnly
       ? []
-      : yield* onSettings((file) =>
-          mergeUserSettings({
-            env,
-            file,
-            subagentCacheTtl: options.subagentCacheTtl,
-            dryRun: options.dryRun,
-          }),
-        )),
+      : [
+          phase(
+            "Claude Code settings",
+            onSettings((file) =>
+              mergeUserSettings({
+                env,
+                file,
+                subagentCacheTtl: options.subagentCacheTtl,
+                dryRun: options.dryRun,
+              }),
+            ),
+          ),
+        ]),
   ]
+  const total = plan.filter((step) => "run" in step).length
+  const lines: Array<string> = []
+  let index = 0
+  for (const step of plan) {
+    if ("lines" in step) {
+      lines.push(...step.lines())
+      continue
+    }
+    index += 1
+    if (step.runIf()) {
+      lines.push(...(yield* withSetupPhase({ index, total, label: step.label }, step.run)))
+    }
+  }
   return { lines, ok: !lines.some((line) => line.startsWith("! ")) } satisfies Report
 })
