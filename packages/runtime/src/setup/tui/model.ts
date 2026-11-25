@@ -9,7 +9,7 @@ const CAPABILITY_ROW = "capability:"
 export interface Segment {
   readonly text: string
   readonly tone?: Tone
-  readonly click?: "close" | "details"
+  readonly click?: Control
 }
 
 /** One screen line. */
@@ -56,6 +56,15 @@ export interface Key {
 
 /** An action of the review screen. */
 export type ReviewAction = "apply" | "back" | "cancel"
+
+/** A visible control on the choose, review or result screen. */
+export type Control =
+  | "close"
+  | "details"
+  | "choose-review"
+  | "choose-cancel"
+  | { readonly row: RowId }
+  | { readonly action: ReviewAction }
 
 const LABELS = {
   pi: "Pi provider",
@@ -202,6 +211,35 @@ export const press = (
     : { state }
 }
 
+/** Pointer controls use the same transitions and preconditions as the keyboard. */
+export const pressControl = (state: State, rows: ReadonlyArray<RowId>, control: Control) => {
+  const key = (name: string, from = state) => press(from, rows, { name, ctrl: false })
+  if (typeof control === "object") {
+    if ("row" in control) {
+      const focus = rows.indexOf(control.row)
+      return state.screen === "choose" && focus >= 0 ? key("space", { ...state, focus }) : { state }
+    }
+    const action = reviewActions(state).indexOf(control.action)
+    return state.screen === "review" && action >= 0 ? key("enter", { ...state, action }) : { state }
+  }
+  if (state.screen === "choose" && control === "choose-review") return key("enter")
+  if (state.screen === "choose" && control === "choose-cancel") return key("escape")
+  if (state.screen === "done" && control === "details") return key("d")
+  if (state.screen === "done" && control === "close") return key("q")
+  return { state }
+}
+
+/** Hit-test only the visible cell range of a control, not the rest of its text line. */
+export const controlAt = (line: Line, column: number): Control | undefined => {
+  let offset = 0
+  for (const part of line) {
+    const end = offset + cells(part.text)
+    if (column >= offset && column < end) return part.click
+    offset = end
+  }
+  return undefined
+}
+
 /** The state once the review of the current choices was read. */
 export const reviewed = (state: State, review: Review): State =>
   state.screen === "review" ? { ...state, review, failure: undefined, action: 0, scroll: 0 } : state
@@ -237,6 +275,20 @@ const title = (look: Look): Line => [segment(`HolyAgent  ${glyphs(look).dot}  se
 
 const keyLines = (items: ReadonlyArray<string>, width: number): ReadonlyArray<Line> =>
   wrapItems(items, width, KEY_GAP).map((text) => [segment(text, "option")])
+
+const chooseKeys = (focus: string, width: number): ReadonlyArray<Line> =>
+  wrapItems([focus, "Space toggle", "Enter review", "Esc cancel"], width, KEY_GAP).map((line) =>
+    line.split(KEY_GAP).flatMap((text, index): Line => {
+      const click =
+        text === "Enter review"
+          ? "choose-review"
+          : text === "Esc cancel"
+            ? "choose-cancel"
+            : undefined
+      const item: Segment = { text, tone: "option", ...(click === undefined ? {} : { click }) }
+      return index === 0 ? [item] : [segment(KEY_GAP), item]
+    }),
+  )
 
 const heading = (text: string, width: number): ReadonlyArray<Line> =>
   wrap(text.toUpperCase(), width).map((part) => [segment(part, "heading")])
@@ -301,11 +353,13 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
     const focused = index === state.focus
     const label = pad(clip(labels[index] ?? "", labelWidth, g.ellipsis), labelWidth)
     const value = values[index] ?? ""
-    if (focused) return [segment(`${g.focus} ${label}  ${value}`, "focus")]
-    return [
-      segment(`  ${label}  `, "argument"),
-      segment(value, row === "pi" || !isOn(row, state.choices) ? "disabled" : "enabled"),
-    ]
+    const line = focused
+      ? [segment(`${g.focus} ${label}  ${value}`, "focus")]
+      : [
+          segment(`  ${label}  `, "argument"),
+          segment(value, row === "pi" || !isOn(row, state.choices) ? "disabled" : "enabled"),
+        ]
+    return line.map((part) => ({ ...part, click: { row } }))
   }
   const group = (title: string, from: number, to: number): ReadonlyArray<Line> =>
     to <= from
@@ -318,7 +372,7 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
   const t3Count = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length
   const focused = rows[state.focus]
   return [
-    ...keyLines([`${g.arrows} or j/k focus`, "Space toggle", "Enter review", "Esc cancel"], width),
+    ...chooseKeys(`${g.arrows} or j/k focus`, width),
     blank,
     ...group("T3 Code", 0, t3Count),
     ...group("Capabilities", t3Count, rows.length),
@@ -405,9 +459,10 @@ const reviewLayout = (state: State, context: Context): Layout => {
           : action === "back"
             ? "Back"
             : "Cancel"
-      if (index === state.action) return [segment(`${g.focus} ${text}`, "focus")]
+      if (index === state.action)
+        return [{ text: `${g.focus} ${text}`, tone: "focus", click: { action } }]
       const tone: Tone = action === "apply" ? "enabled" : action === "cancel" ? "error" : "argument"
-      return [segment(`  ${text}`, tone)]
+      return [{ text: `  ${text}`, tone, click: { action } }]
     })
   const keys = (scrolling: boolean) =>
     keyLines(
