@@ -170,7 +170,10 @@ export const SetupApp = (props: SetupAppProps) => {
                 down.y === event.y &&
                 down.state === before
               )
-                advance(before, pressControl(before, rows, down.control))
+                advance(
+                  before,
+                  pressControl(before, rows, down.control, scrollOf(before, context())),
+                )
             }}>
             {line.length === 0 ? (
               " "

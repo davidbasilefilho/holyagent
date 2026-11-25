@@ -185,7 +185,7 @@ The T3 part of `holyagent setup` is an interactive screen with a flag for each c
 | Agent device access      | `[x] enabled` | `enableDeviceSupport`, `enableAgentDeviceAccess` | Only where Xcode's iOS simulator or an Android SDK is found and `pi.t3.deviceAccess` is true |
 | New threads in worktrees | `[x] enabled` | `defaultThreadEnvMode`                           | While `pi.t3.worktrees` is true                                                              |
 
-Space switches a choice between `[x] enabled` and `[ ] disabled`; the screen never says "selected". The review names a switched-off choice as `off; nothing written`.
+Space switches a choice between `[x] enabled` and `[ ] disabled`; the screen never says "selected". The review names a switched-off choice as `off; nothing written`. In a long review or result, use Page Up and Page Down, the mouse wheel, or click the scrollbar.
 
 **Capability rows.** When Pi is in use and the config loads with `pi.enable` on, the screen also shows a row for each capability of the registry ([configuration](configuration.md)), and opens for them alone where the T3 step has no work. Each row starts from what the merged config decides and writes `pi.features.<key>` only when you change it, so an untouched row never freezes a default into the file; a capability the detected form does not offer is listed as not offered. At scope `project` or `local` the choice is written to the project's `.holyagent/config.json`, which setup refuses to write through a symlink, and turning on a capability that the user config switches off for good (`computerUse`) is refused with a message naming the user setting. When the choices cannot be saved, setup does not run the package and settings steps.
 
