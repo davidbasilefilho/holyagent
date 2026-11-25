@@ -154,7 +154,16 @@ export const SetupApp = (props: SetupAppProps) => {
   const keypress = (key: Key) => {
     const before = state()
     const current = context()
-    advance(before, press(before, current.rows, key, scrollOf(before, current)))
+    advance(
+      before,
+      press(
+        before,
+        current.rows,
+        key,
+        scrollOf(before, current),
+        current.offer.browse?.profiles?.length,
+      ),
+    )
   }
   useKeyboard((event) => keypress({ name: event.name, ctrl: event.ctrl }))
 
@@ -195,7 +204,13 @@ export const SetupApp = (props: SetupAppProps) => {
               )
                 advance(
                   before,
-                  pressControl(before, context().rows, down.control, scrollOf(before, context())),
+                  pressControl(
+                    before,
+                    context().rows,
+                    down.control,
+                    scrollOf(before, context()),
+                    props.input.offer.browse?.profiles?.length,
+                  ),
                 )
             }}>
             {line.length === 0 ? (

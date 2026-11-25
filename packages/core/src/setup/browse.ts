@@ -15,20 +15,27 @@ export const BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]
 /** The package request used by the existing Browse MCP route. */
 export const BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`
 
-/** The supported runner and arguments for the pinned Browse CLI, or no command if not recognized. */
-export const browsePairCommand = (runner: PackageRunner): ReadonlyArray<string> | undefined => {
+/** The recognized runner and arguments for one operation against the pinned Browse CLI. */
+export const browseRunnerCommand = (
+  runner: PackageRunner,
+  operation: "pair" | "--version",
+): ReadonlyArray<string> | undefined => {
   const spec = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`
   switch (runner) {
     case "bunx":
-      return ["bunx", "--package", spec, "browse", "pair"]
+      return ["bunx", "--package", spec, "browse", operation]
     case "npm":
-      return ["npm", "exec", "--yes", `--package=${spec}`, "--", "browse", "pair"]
+      return ["npm", "exec", "--yes", `--package=${spec}`, "--", "browse", operation]
     case "mise":
-      return ["mise", "exec", `npm:${spec}`, "--", "browse", "pair"]
+      return ["mise", "exec", `npm:${spec}`, "--", "browse", operation]
     case "unknown":
       return undefined
   }
 }
+
+/** The supported runner for the official narrow pairing command, or no command if unknown. */
+export const browsePairCommand = (runner: PackageRunner): ReadonlyArray<string> | undefined =>
+  browseRunnerCommand(runner, "pair")
 
 const browsePairFix = (runner: PackageRunner) => {
   const command = browsePairCommand(runner)
@@ -37,14 +44,15 @@ const browsePairFix = (runner: PackageRunner) => {
     : `run \`${command.join(" ")}\` and enter the code in the extension's options`
 }
 
-const STORE =
+/** The official Chrome-family store page for Browse's separate browser extension. */
+export const BROWSE_EXTENSION_STORE =
   "https://chromewebstore.google.com/detail/opencode-browse/mfnicocicmmlkpjnaffgihfjhdgjkdjg"
 
 /** Setup leaves global launchers and MCP registration alone when pairing a browser. */
 export const BROWSE_PAIR_FIX = browsePairFix("npm")
 
 /** Install only the extension from its official store and pair separately. */
-export const BROWSE_INSTALL_FIX = `add the browse extension from ${STORE}, then ${BROWSE_PAIR_FIX}`
+export const BROWSE_INSTALL_FIX = `add the browse extension from ${BROWSE_EXTENSION_STORE}, then ${BROWSE_PAIR_FIX}`
 
 /**
  * The folder where browse keeps what it stores per user, as its own `dataRoot` resolves it:
@@ -266,16 +274,23 @@ export interface ExtensionInstall {
   readonly enabled: boolean
 }
 
+/** One detected Chromium-family user profile and its local Browse extension state. */
+export interface BrowseProfile {
+  readonly browser: string
+  readonly profile: string
+  readonly extension: "enabled" | "disabled" | "missing"
+}
+
 /**
  * Finds the browse extension in the browsers {@link browserDirectories} lists, the way browse's own
  * setup does: it reads each profile's `Secure Preferences` and `Preferences` for an
  * {@link BROWSE_EXTENSION_IDS} entry under `extensions.settings`. Read only, no browser is started
  * and nothing is written; a folder or file that is missing or unreadable counts as nothing found.
  */
-export const findBrowseExtension = (
+export const findBrowseProfiles = (
   env: Env,
   platform: string = process.platform,
-): Effect.Effect<ReadonlyArray<ExtensionInstall>> =>
+): Effect.Effect<ReadonlyArray<BrowseProfile>> =>
   Effect.forEach(browserDirectories(env, platform), ({ name, directory }) =>
     Effect.gen(function* () {
       const state = yield* readOptional(join(directory, "Local State"))
@@ -287,30 +302,54 @@ export const findBrowseExtension = (
       const profiles = cached === undefined ? ["Default"] : Object.keys(cached)
       const found = yield* Effect.forEach(profiles, (profile) =>
         Effect.gen(function* () {
+          if (
+            profile === "." ||
+            profile === ".." ||
+            /[/\\]/.test(profile) ||
+            profile.includes("\0")
+          )
+            return []
           const settings = yield* Effect.forEach(["Secure Preferences", "Preferences"], (file) =>
             readOptional(join(directory, profile, file)).pipe(
               Effect.map((text) => {
-                const parsed =
-                  text === undefined
-                    ? undefined
-                    : Schema.decodeUnknownOption(Preferences)(text, {
-                        onExcessProperty: "error",
-                      })
-                return parsed?._tag === "Some" ? (parsed.value.extensions?.settings ?? {}) : {}
+                if (text === undefined) return undefined
+                const parsed = Schema.decodeUnknownOption(Preferences)(text, {
+                  onExcessProperty: "error",
+                })
+                return parsed._tag === "Some" ? (parsed.value.extensions?.settings ?? {}) : {}
               }),
             ),
           )
-          const entry = settings.flatMap((entries) =>
+          if (state === undefined && settings.every((value) => value === undefined)) return []
+          const entry = settings.flatMap((entries = {}) =>
             BROWSE_EXTENSION_IDS.flatMap((id) => (entries[id] === undefined ? [] : [entries[id]])),
           )[0]
-          return entry === undefined
-            ? []
-            : [{ browser: name, profile, enabled: !isDisabled(entry) } satisfies ExtensionInstall]
+          return [
+            {
+              browser: name,
+              profile,
+              extension:
+                entry === undefined ? "missing" : isDisabled(entry) ? "disabled" : "enabled",
+            } satisfies BrowseProfile,
+          ]
         }),
       )
       return found.flat()
     }),
   ).pipe(Effect.map((installs) => installs.flat()))
+
+/** Profiles with the extension present, including when the profile has it disabled. */
+export const findBrowseExtension = (
+  env: Env,
+  platform: string = process.platform,
+): Effect.Effect<ReadonlyArray<ExtensionInstall>> =>
+  findBrowseProfiles(env, platform).pipe(
+    Effect.map((profiles) =>
+      profiles.flatMap(({ browser, profile, extension }) =>
+        extension === "missing" ? [] : [{ browser, profile, enabled: extension === "enabled" }],
+      ),
+    ),
+  )
 
 /**
  * Where setup and doctor find browse: a browser is paired with it (its extension is installed and
@@ -366,6 +405,6 @@ export const describeBrowseState = (
     }
   return {
     text: `the browse extension is not installed in any browser this check scans (${state.scanned.join(", ")}) and no browser is paired with browse`,
-    fix: `add the browse extension from ${STORE}, then ${browsePairFix(runner)}`,
+    fix: `add the browse extension from ${BROWSE_EXTENSION_STORE}, then ${browsePairFix(runner)}`,
   }
 }

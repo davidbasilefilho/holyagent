@@ -141,6 +141,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
       "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
+      "graphical public Pi setup with Browser Use enabled can configure or update OpenCode Browse after review; Skip is the default. Setup runs only the pinned Browse CLI with the HolyAgent package runner after closing the screen. Pairing requires entering the one-time code in the selected browser profile. Dry-run and non-interactive setup do not run Browse",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults",
     ],
     flags: {
@@ -267,6 +268,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
             flagged.deviceAccess !== undefined ||
             Object.keys(capabilities).length > 0,
           form,
+          ...(surface === "public" ? { browse: { packageRoot: installedPackageRoot } } : {}),
           ...(setupTui === undefined ? {} : { load: setupTui }),
           notify: emit,
           apply: (choices, chosen, replacePiRegistration) =>
