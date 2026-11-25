@@ -74,6 +74,26 @@ describe("the setup interface, choose screen", () => {
 })
 
 describe("the setup interface, review and apply", () => {
+  test("keeps harness choices while switching tabs by mouse and keyboard", async () => {
+    const screen = await shown({ width: 80, height: 30, combined: true })
+    await clickText(screen, "New threads in worktrees")
+    await clickText(screen, "[Claude Code]")
+    await screen.keys(" ")
+    expect(screen.lines().join("\n")).toContain("Existing plugin, user scope")
+    await screen.keys("right")
+    expect(screen.lines().join("\n")).toContain("Public Codex setup is not available")
+    await screen.keys("right", "enter")
+    expect(screen.reviews).toEqual([
+      {
+        worktrees: false,
+        deviceAccess: true,
+        capabilities: {},
+        harnesses: { pi: true, claude: true },
+      },
+    ])
+    expect(screen.applies).toHaveLength(0)
+  })
+
   test("goes through choices, back, apply and close using only the mouse", async () => {
     const screen = await shown({ width: 80, height: 36 })
     await clickText(screen, "New threads in worktrees")

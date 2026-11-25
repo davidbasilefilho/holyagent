@@ -43,6 +43,8 @@ Use `holyagent setup pi` to configure the T3 Code/Pi integration directly. It re
 
 `holyagent setup claude` applies the existing Claude plugin settings at the selected scope. Install the plugin separately before running this command. It preserves existing values and applies the same scoped behavior with `--undo`.
 
+In an interactive terminal, run bare `holyagent setup` to review Pi and Claude together. Use Left and Right or click a tab, enable the harnesses you want, and review all selected steps before applying. Pi starts selected when available. Claude is opt-in, uses the same settings as explicit Claude setup, and preserves existing values. Cancel to leave both unchanged. The Codex tab is informational on this build. Bare unattended setup still targets Pi.
+
 Use `--non-interactive` for scripts. It skips the setup screen and uses the defaults shown by `holyagent setup --help` or the flags you supplied. Use `--dry-run` to see changes before applying them.
 
 Interactive Pi setup shows controls for the detected environment. General Pi capabilities use their configured values or the documented defaults. Change those in [Pi configuration](pi/configuration.md#capabilities) or pass the corresponding flag.

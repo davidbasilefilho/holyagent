@@ -9,6 +9,8 @@ export interface Choices {
   readonly deviceAccess: boolean
   /** Each offered capability's switch, by `pi.features` key. */
   readonly capabilities: Readonly<Record<string, boolean>>
+  /** Selected public harnesses in the combined setup. */
+  readonly harnesses?: { readonly pi: boolean; readonly claude: boolean }
 }
 
 /** One capability row of the choose screen. */
@@ -38,6 +40,8 @@ export interface Offer {
   readonly capabilities: ReadonlyArray<CapabilityOffer>
   /** The form in force, as a phrase for the capability heading (`headless (detected: CI is set)`). */
   readonly form: string
+  /** Present only in bare public setup when the harness chooser is available. */
+  readonly harnesses?: { readonly piAvailable: boolean; readonly scope: string }
 }
 
 /** One line of the review: what setup does with a group of T3 settings keys. */
@@ -61,6 +65,11 @@ export interface Review {
   readonly choices: ReadonlyArray<ReviewLine>
   /** The groups setup always applies. */
   readonly always: ReadonlyArray<ReviewLine>
+  /** Planned setup operations for the selected harnesses, with no settings written yet. */
+  readonly harnesses?: ReadonlyArray<{
+    readonly name: string
+    readonly lines: ReadonlyArray<string>
+  }>
 }
 
 /** The result of the setup run the interface applied: its report lines and whether all passed. */

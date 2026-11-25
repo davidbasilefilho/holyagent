@@ -16,7 +16,17 @@ export interface Segment {
 export type Line = ReadonlyArray<Segment>
 
 /** A row of the choose screen: a T3 row, or `capability:<pi.features key>`. */
-export type RowId = "pi" | "deviceAccess" | "worktrees" | `capability:${string}`
+export type RowId =
+  | "pi"
+  | "deviceAccess"
+  | "worktrees"
+  | "enablePi"
+  | "enableClaude"
+  | `capability:${string}`
+
+const tabs = ["pi", "claude", "codex"] as const
+type Tab = (typeof tabs)[number]
+const tabLabels: Record<Tab, string> = { pi: "Pi", claude: "Claude Code", codex: "Codex" }
 
 /** The screens, in the order a run goes through them. */
 export type Screen = "choose" | "review" | "applying" | "done"
@@ -24,6 +34,7 @@ export type Screen = "choose" | "review" | "applying" | "done"
 /** What the screens show and the keys change; every transition below is a pure function of it. */
 export interface State {
   readonly screen: Screen
+  readonly tab: Tab
   /** The focused row of the choose screen, an index into the rows. */
   readonly focus: number
   /** The focused action of the review screen, an index into {@link reviewActions}. */
@@ -65,11 +76,14 @@ export type Control =
   | "choose-cancel"
   | { readonly row: RowId }
   | { readonly action: ReviewAction }
+  | { readonly tab: Tab }
 
 const LABELS = {
   pi: "Pi provider",
   deviceAccess: "Agent device access",
   worktrees: "New threads in worktrees",
+  enablePi: "Configure Pi",
+  enableClaude: "Configure Claude Code",
 } as const
 
 /** The capability a row switches, or `undefined` for a T3 row. */
@@ -81,24 +95,35 @@ const capabilityOf = (row: RowId, offer: Offer) =>
     : undefined
 
 const labelOf = (row: RowId, offer: Offer): string =>
-  row === "pi" || row === "deviceAccess" || row === "worktrees"
-    ? LABELS[row]
-    : (capabilityOf(row, offer)?.name ?? row)
+  row.startsWith(CAPABILITY_ROW)
+    ? (capabilityOf(row, offer)?.name ?? row)
+    : LABELS[row as keyof typeof LABELS]
 
 /**
  * The rows the machine allows: with T3 work, the Pi provider, the device row only with a host and
  * worktrees; then one row for each capability.
  */
-export const rowsOf = (offer: Offer): ReadonlyArray<RowId> => [
-  ...(offer.t3 ? (["pi"] as const) : []),
-  ...(offer.t3 && offer.device !== undefined ? (["deviceAccess"] as const) : []),
-  ...(offer.t3 && offer.worktrees ? (["worktrees"] as const) : []),
-  ...offer.capabilities.map((capability): RowId => `${CAPABILITY_ROW}${capability.feature}`),
-]
+export const rowsOf = (offer: Offer, state?: State): ReadonlyArray<RowId> => {
+  const selected = state?.choices.harnesses
+  if (selected !== undefined && offer.harnesses !== undefined) {
+    if (state?.tab === "codex") return []
+    if (state?.tab === "claude") return ["enableClaude"]
+    if (!offer.harnesses.piAvailable) return []
+    if (!selected.pi) return ["enablePi"]
+  }
+  return [
+    ...(selected === undefined ? [] : (["enablePi"] as const)),
+    ...(offer.t3 ? (["pi"] as const) : []),
+    ...(offer.t3 && offer.device !== undefined ? (["deviceAccess"] as const) : []),
+    ...(offer.t3 && offer.worktrees ? (["worktrees"] as const) : []),
+    ...offer.capabilities.map((capability): RowId => `${CAPABILITY_ROW}${capability.feature}`),
+  ]
+}
 
 /** The state a run starts in. */
 export const initialState = (choices: Choices): State => ({
   screen: "choose",
+  tab: "pi",
   focus: 0,
   action: 0,
   scroll: 0,
@@ -129,6 +154,10 @@ const wrapped = (index: number, step: number, length: number) =>
   (((index + step) % length) + length) % length
 
 const toggled = (choices: Choices, row: RowId): Choices => {
+  if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude")) {
+    const key = row === "enablePi" ? "pi" : "claude"
+    return { ...choices, harnesses: { ...choices.harnesses, [key]: !choices.harnesses[key] } }
+  }
   if (row === "deviceAccess") return { ...choices, deviceAccess: !choices.deviceAccess }
   if (row === "worktrees") return { ...choices, worktrees: !choices.worktrees }
   if (!row.startsWith(CAPABILITY_ROW)) return choices
@@ -159,8 +188,17 @@ export const press = (
 ): { readonly state: State; readonly command?: Command } => {
   if (state.screen === "choose") {
     if (isQuit(key)) return { state, command: "cancel" }
+    if (
+      state.choices.harnesses !== undefined &&
+      !key.ctrl &&
+      (key.name === "left" || key.name === "right")
+    ) {
+      const tab = tabs[wrapped(tabs.indexOf(state.tab), key.name === "left" ? -1 : 1, tabs.length)]
+      return { state: { ...state, tab: tab ?? state.tab, focus: 0 } }
+    }
     const step = stepOf(key)
-    if (step !== 0) return { state: { ...state, focus: wrapped(state.focus, step, rows.length) } }
+    if (step !== 0 && rows.length > 0)
+      return { state: { ...state, focus: wrapped(state.focus, step, rows.length) } }
     if (!key.ctrl && key.name === "space") {
       const row = rows[state.focus]
       return row === undefined
@@ -215,6 +253,10 @@ export const press = (
 export const pressControl = (state: State, rows: ReadonlyArray<RowId>, control: Control) => {
   const key = (name: string, from = state) => press(from, rows, { name, ctrl: false })
   if (typeof control === "object") {
+    if ("tab" in control)
+      return state.screen === "choose" && state.choices.harnesses !== undefined
+        ? { state: { ...state, tab: control.tab, focus: 0 } }
+        : { state }
     if ("row" in control) {
       const focus = rows.indexOf(control.row)
       return state.screen === "choose" && focus >= 0 ? key("space", { ...state, focus }) : { state }
@@ -299,6 +341,9 @@ const hintLines = (text: string, width: number): ReadonlyArray<Line> =>
   wrap(text, width).map((part) => [segment(part, "hint")])
 
 const hintOf = (row: RowId, offer: Offer): string => {
+  if (row === "enablePi") return "Include Pi and T3 Code in the combined review."
+  if (row === "enableClaude")
+    return "Include the existing Claude Code plugin in the combined review."
   if (row === "pi")
     return "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose."
   if (row === "deviceAccess")
@@ -314,12 +359,16 @@ const hintOf = (row: RowId, offer: Offer): string => {
 
 /** Whether a row is switched on in the choices; the Pi provider row is fixed, so it never is. */
 const isOn = (row: RowId, choices: Choices): boolean =>
-  row === "deviceAccess"
-    ? choices.deviceAccess
-    : row === "worktrees"
-      ? choices.worktrees
-      : row.startsWith(CAPABILITY_ROW) &&
-        choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
+  row === "enablePi"
+    ? choices.harnesses?.pi === true
+    : row === "enableClaude"
+      ? choices.harnesses?.claude === true
+      : row === "deviceAccess"
+        ? choices.deviceAccess
+        : row === "worktrees"
+          ? choices.worktrees
+          : row.startsWith(CAPABILITY_ROW) &&
+            choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
 
 const checkbox = (row: RowId, choices: Choices): { box: string; word: string } =>
   row === "pi"
@@ -371,11 +420,40 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
         ]
   const t3Count = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length
   const focused = rows[state.focus]
+  const combined = state.choices.harnesses
+  const tabsLine: ReadonlyArray<Line> =
+    combined === undefined
+      ? []
+      : [
+          tabs.flatMap((tab): Line => [
+            {
+              text: `[${tabLabels[tab]}]`,
+              tone: state.tab === tab ? "focus" : "option",
+              click: { tab },
+            },
+            segment(" "),
+          ]),
+          ...hintLines("Left/Right change harness", width),
+        ]
+  const unavailable =
+    combined !== undefined && state.tab === "codex"
+      ? "Public Codex setup is not available on this build."
+      : combined !== undefined && state.tab === "pi" && offer.harnesses?.piAvailable === false
+        ? "Pi or T3 Code is unavailable on this host."
+        : undefined
   return [
+    ...tabsLine,
     ...chooseKeys(`${g.arrows} or j/k focus`, width),
     blank,
-    ...group("T3 Code", 0, t3Count),
+    ...group(combined === undefined ? "T3 Code" : tabLabels[state.tab], 0, t3Count),
     ...group("Capabilities", t3Count, rows.length),
+    ...(unavailable === undefined ? [] : hintLines(unavailable, width)),
+    ...(combined?.claude === true && state.tab === "claude"
+      ? hintLines(
+          `Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`,
+          width,
+        )
+      : []),
     ...(focused === undefined ? [] : hintLines(hintOf(focused, offer), width)),
     ...hintLines(`Environment: ${offer.form}`, width),
   ]
@@ -522,6 +600,11 @@ const reviewLayout = (state: State, context: Context): Layout => {
     }
   }
   const { review } = state
+  const harnesses = (review.harnesses ?? []).flatMap(({ name, lines }) => [
+    ...heading(name, width),
+    ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
+    blank,
+  ])
   const capabilities = review.capabilities ?? []
   const nameWidth = Math.max(
     ...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)),
@@ -540,7 +623,11 @@ const reviewLayout = (state: State, context: Context): Layout => {
     ...section("Your choices", review.choices),
     ...section("Always applied", review.always),
   ]
-  const body: ReadonlyArray<Line> = [...section("Capabilities", capabilities), ...t3].slice(0, -1)
+  const body: ReadonlyArray<Line> = [
+    ...harnesses,
+    ...section("Capabilities", capabilities),
+    ...t3,
+  ].slice(0, -1)
   const actions = actionLines()
   // The title takes one line, and the line above the actions holds the scroll indicator, if any.
   const build = (scrolling: boolean): Layout & { readonly fits: boolean } => {

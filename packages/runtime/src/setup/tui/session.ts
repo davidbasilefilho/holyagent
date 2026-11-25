@@ -264,6 +264,16 @@ export interface InteractiveOptions {
    * config's, and returns its report.
    */
   readonly apply: (choices: Choices, capabilities: CapabilityChoices) => Effect.Effect<Report>
+  /** Read-only preview and confirmed application of the public harness selections. */
+  readonly combined?: {
+    readonly run: (
+      target: "pi" | "claude",
+      choices: Choices,
+      capabilities: CapabilityChoices,
+      dryRun: boolean,
+      skipSharedPrerequisites: boolean,
+    ) => Effect.Effect<Report>
+  }
 }
 
 /** How {@link runInteractive} ended: the line-based setup runs, or the person decided. */
@@ -307,8 +317,10 @@ const decodeOutcome = Schema.decodeUnknownEffect(TuiOutcomeSchema, { onExcessPro
 export const runInteractive = Effect.fn("runInteractive")(function* (options: InteractiveOptions) {
   const line = { kind: "line", notes: [] } satisfies Interactive
   if (options.undo || inCloudSession(options.env)) return line
+  const fallbackReason = tuiFallbackReason(options)
+  const combined = fallbackReason === undefined ? options.combined : undefined
   const piUsed = yield* piInUse(options.env)
-  if (!piUsed) return line
+  if (!piUsed && combined === undefined) return line
   // Loaded once for the run: a config that cannot be read is reported by the line-based Pi steps,
   // which then run.
   const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(
@@ -327,11 +339,10 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
               offer.unavailable === undefined &&
               (offer.feature === "browserUse" || offer.feature === "computerUse")),
         )
-  if (preview === undefined && offers.length === 0) return line
-  const reason = tuiFallbackReason(options)
+  if (preview === undefined && offers.length === 0 && combined === undefined) return line
   // With no T3 work the capability rows are all the screen would hold; a scripted run has nothing
   // to explain then, as before the rows existed.
-  if (reason !== undefined) return preview === undefined ? line : fallback(reason)
+  if (fallbackReason !== undefined) return preview === undefined ? line : fallback(fallbackReason)
   const load =
     options.load ??
     (options.t3Workflow
@@ -343,15 +354,57 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   const fail = options.t3Workflow ? stopped : fallback
   if (loaded instanceof TuiUnavailable) return fail(`unavailable (${loaded.reason})`)
   const initialSwitches = features === undefined ? {} : features
+  const piAvailable = piUsed && config?.pi.enable === true
+  const selectionOf = (choices: Choices) =>
+    (["pi", "claude"] as const).filter((target) => choices.harnesses?.[target] === true)
+  const label = (target: "pi" | "claude") => (target === "pi" ? "Pi / T3 Code" : "Claude Code")
   let applyStarted = false
+  let reviewedChoices: Choices | undefined
+  let reviewSequence = 0
   const input: TuiInput = {
     env: options.env,
-    offer: offerOf(preview, offers, options.form),
-    initial: { ...DEFAULT_CHOICES, capabilities: initialSwitches },
+    offer: {
+      ...offerOf(preview, offers, options.form),
+      ...(combined === undefined ? {} : { harnesses: { piAvailable, scope: options.scope } }),
+    },
+    initial: {
+      ...DEFAULT_CHOICES,
+      capabilities: initialSwitches,
+      ...(combined === undefined ? {} : { harnesses: { pi: piAvailable, claude: false } }),
+    },
     dryRun: options.dryRun,
     review: (choices) =>
       Effect.runPromise(
         Effect.gen(function* () {
+          if (combined !== undefined) {
+            const sequence = ++reviewSequence
+            reviewedChoices = undefined
+            const targets = selectionOf(choices)
+            if (targets.length === 0)
+              return yield* Effect.fail(new Error("Enable at least one available harness."))
+            if (targets.includes("pi") && !piAvailable)
+              return yield* Effect.fail(new Error("Pi is not available for setup here."))
+            const changed = changedSwitches(initialSwitches, choices.capabilities)
+            const plans = yield* Effect.forEach(targets, (target, index) =>
+              combined
+                .run(target, choices, changed, true, index > 0)
+                .pipe(Effect.map((report) => ({ name: label(target), ...report }))),
+            )
+            const error = plans.find((plan) => !plan.ok)
+            if (error !== undefined)
+              return yield* Effect.fail(
+                new Error(
+                  `${error.name}: ${error.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed"}`,
+                ),
+              )
+            if (sequence === reviewSequence) reviewedChoices = choices
+            return {
+              file: undefined,
+              choices: [],
+              always: [],
+              harnesses: plans.map(({ name, lines }) => ({ name, lines })),
+            } satisfies Review
+          }
           const next =
             preview === undefined
               ? undefined
@@ -369,9 +422,24 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
         }),
       ),
     apply: (choices, signal) => {
+      if (combined !== undefined && reviewedChoices !== choices)
+        return Effect.runPromise(
+          Effect.fail(new Error("Review the current harness selection before applying.")),
+        )
+      reviewedChoices = undefined
       applyStarted = true
+      const changed = changedSwitches(initialSwitches, choices.capabilities)
       return Effect.runPromise(
-        options.apply(choices, changedSwitches(initialSwitches, choices.capabilities)),
+        combined === undefined
+          ? options.apply(choices, changed)
+          : Effect.forEach(selectionOf(choices), (target, index) =>
+              combined.run(target, choices, changed, options.dryRun, index > 0),
+            ).pipe(
+              Effect.map((reports) => ({
+                ok: reports.length > 0 && reports.every(({ ok }) => ok),
+                lines: reports.flatMap(({ lines }) => lines),
+              })),
+            ),
         { signal },
       )
     },

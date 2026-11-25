@@ -127,7 +127,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
     output:
       "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
-      "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
+      "Pi setup uses user scope by default and checks that T3 Code was opened at least once. It does not change Claude Code settings unless you also select Claude Code in bare interactive setup",
       "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
       "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
       "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
@@ -204,21 +204,28 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           },
           chosen: CapabilityChoices,
           notes: ReadonlyArray<string> = [],
+          selected?: {
+            readonly target: SetupTarget
+            readonly dryRun: boolean
+            readonly skipSharedPrerequisites: boolean
+          },
         ) =>
           Effect.gen(function* () {
+            const selectedTarget = selected?.target ?? target
             const report = yield* coreSetup.setup(coreContext(cwd, env), {
               scope: resolved.scope,
-              ...(target === undefined ? { t3Workflow } : { target }),
-              ...(target === "claude" || installedPackageRoot === undefined
+              ...(selectedTarget === undefined ? { t3Workflow } : { target: selectedTarget }),
+              ...(selectedTarget === "claude" || installedPackageRoot === undefined
                 ? {}
                 : { installedPackageRoot }),
               undo: booleanFlag(args, "undo"),
               subagentCacheTtl,
-              dryRun: booleanFlag(args, "dry-run"),
-              skipCtx7: booleanFlag(args, "skip-ctx7"),
+              dryRun: selected?.dryRun ?? booleanFlag(args, "dry-run"),
+              skipCtx7:
+                selected?.skipSharedPrerequisites === true || booleanFlag(args, "skip-ctx7"),
               ...(choices.worktrees === undefined ? {} : { worktrees: choices.worktrees }),
               ...(choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }),
-              capabilities: chosen,
+              capabilities: selectedTarget === "claude" ? {} : chosen,
               form,
             })
             return {
@@ -254,6 +261,18 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           ...(setupTui === undefined ? {} : { load: setupTui }),
           notify: emit,
           apply: (choices, chosen) => apply(choices, chosen),
+          ...(surface === "public" && target === undefined
+            ? {
+                combined: {
+                  run: (harness, choices, chosen, dryRun, skipSharedPrerequisites) =>
+                    apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+                      target: harness,
+                      dryRun,
+                      skipSharedPrerequisites,
+                    }),
+                },
+              }
+            : {}),
         })
         if (interactive.kind === "done") return printed(interactive.report)
         if (interactive.kind === "applied")
@@ -328,7 +347,7 @@ const publicPiSetup = (target?: "pi"): Command => {
     notes: [
       ...(target === undefined
         ? [
-            "Without a harness, setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options.",
+            "In a terminal, bare setup opens a combined Pi and Claude Code review. Codex is not an available public setup target on this build. Unattended bare setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options.",
           ]
         : []),
       ...(command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []),

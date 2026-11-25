@@ -187,6 +187,43 @@ describe("setup flags for the T3 choices", () => {
 })
 
 describe("the public setup renderer", () => {
+  test("bare setup plans both selected harnesses once and cancel writes neither", async () => {
+    await machine()
+    const claude = join(home, "claude", "settings.json")
+    await Bun.write(claude, '{"theme":"light"}')
+    const pi = join(home, "pi")
+    const config = await Effect.runPromise(defaultConfig)
+    await Bun.write(
+      join(pi, "settings.json"),
+      JSON.stringify({ packages: piPackages(config, undefined, "headless") }),
+    )
+    const shown = interface_(async (input) => {
+      const choices = { ...input.initial, harnesses: { pi: true, claude: true } }
+      await expect(input.apply(choices, new AbortController().signal)).rejects.toThrow("Review")
+      const review = await input.review(choices)
+      expect(review.harnesses?.map(({ name }) => name)).toEqual(["Pi / T3 Code", "Claude Code"])
+      expect(review.harnesses?.[1]?.lines.join("\n").toLowerCase()).toContain("would")
+      await expect(
+        input.apply(
+          { ...choices, harnesses: { pi: false, claude: true } },
+          new AbortController().signal,
+        ),
+      ).rejects.toThrow("Review")
+      expect(await Bun.file(t3File()).exists()).toBe(false)
+      expect(await Bun.file(claude).json()).toEqual({ theme: "light" })
+      return { _tag: "Cancelled" }
+    })
+    const result = await cli(["--form", "headless"], {
+      env: { PI_CODING_AGENT_DIR: pi },
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+    })
+    expect(result.stdout).toContain("setup cancelled; nothing was written")
+    expect(await Bun.file(t3File()).exists()).toBe(false)
+    expect(await Bun.file(claude).json()).toEqual({ theme: "light" })
+  })
+
   test("prints a copyable report path after the screen closes, with no color or raw details", async () => {
     await machine()
     const lines = [

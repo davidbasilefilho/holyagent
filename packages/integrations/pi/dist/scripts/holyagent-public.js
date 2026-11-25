@@ -29537,31 +29537,66 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   const line = { kind: "line", notes: [] };
   if (options.undo || inCloudSession(options.env))
     return line;
+  const fallbackReason = tuiFallbackReason(options);
+  const combined = fallbackReason === undefined ? options.combined : undefined;
   const piUsed = yield* piInUse(options.env);
-  if (!piUsed)
+  if (!piUsed && combined === undefined)
     return line;
   const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
   const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config });
   const features = config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features);
   const offers = features === undefined ? [] : capabilityOffers(options.form).filter((offer) => options.t3Workflow !== true || options.form.form === "normal" && offer.unavailable === undefined && (offer.feature === "browserUse" || offer.feature === "computerUse"));
-  if (preview === undefined && offers.length === 0)
+  if (preview === undefined && offers.length === 0 && combined === undefined)
     return line;
-  const reason = tuiFallbackReason(options);
-  if (reason !== undefined)
-    return preview === undefined ? line : fallback(reason);
+  if (fallbackReason !== undefined)
+    return preview === undefined ? line : fallback(fallbackReason);
   const load = options.load ?? (options.t3Workflow ? () => loadPackagedSetupTui() : (env, notify) => loadSetupTui(env, { notify }));
   const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
   const fail = options.t3Workflow ? stopped : fallback;
   if (loaded instanceof TuiUnavailable)
     return fail(`unavailable (${loaded.reason})`);
   const initialSwitches = features === undefined ? {} : features;
+  const piAvailable = piUsed && config?.pi.enable === true;
+  const selectionOf = (choices) => ["pi", "claude"].filter((target) => choices.harnesses?.[target] === true);
+  const label = (target) => target === "pi" ? "Pi / T3 Code" : "Claude Code";
   let applyStarted = false;
+  let reviewedChoices;
+  let reviewSequence = 0;
   const input = {
     env: options.env,
-    offer: offerOf(preview, offers, options.form),
-    initial: { ...DEFAULT_CHOICES, capabilities: initialSwitches },
+    offer: {
+      ...offerOf(preview, offers, options.form),
+      ...combined === undefined ? {} : { harnesses: { piAvailable, scope: options.scope } }
+    },
+    initial: {
+      ...DEFAULT_CHOICES,
+      capabilities: initialSwitches,
+      ...combined === undefined ? {} : { harnesses: { pi: piAvailable, claude: false } }
+    },
     dryRun: options.dryRun,
     review: (choices) => runPromise2(gen2(function* () {
+      if (combined !== undefined) {
+        const sequence = ++reviewSequence;
+        reviewedChoices = undefined;
+        const targets = selectionOf(choices);
+        if (targets.length === 0)
+          return yield* fail5(new Error("Enable at least one available harness."));
+        if (targets.includes("pi") && !piAvailable)
+          return yield* fail5(new Error("Pi is not available for setup here."));
+        const changed = changedSwitches(initialSwitches, choices.capabilities);
+        const plans = yield* forEach2(targets, (target, index) => combined.run(target, choices, changed, true, index > 0).pipe(map4((report) => ({ name: label(target), ...report }))));
+        const error = plans.find((plan) => !plan.ok);
+        if (error !== undefined)
+          return yield* fail5(new Error(`${error.name}: ${error.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed"}`));
+        if (sequence === reviewSequence)
+          reviewedChoices = choices;
+        return {
+          file: undefined,
+          choices: [],
+          always: [],
+          harnesses: plans.map(({ name, lines }) => ({ name, lines }))
+        };
+      }
       const next = preview === undefined ? undefined : yield* previewT3Settings(options.env, options.cwd, {
         ...choices,
         ...config === undefined ? {} : { config }
@@ -29571,8 +29606,15 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));
     })),
     apply: (choices, signal) => {
+      if (combined !== undefined && reviewedChoices !== choices)
+        return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
+      reviewedChoices = undefined;
       applyStarted = true;
-      return runPromise2(options.apply(choices, changedSwitches(initialSwitches, choices.capabilities)), { signal });
+      const changed = changedSwitches(initialSwitches, choices.capabilities);
+      return runPromise2(combined === undefined ? options.apply(choices, changed) : forEach2(selectionOf(choices), (target, index) => combined.run(target, choices, changed, options.dryRun, index > 0)).pipe(map4((reports) => ({
+        ok: reports.length > 0 && reports.every(({ ok }) => ok),
+        lines: reports.flatMap(({ lines }) => lines)
+      }))), { signal });
     }
   };
   return yield* tryPromise2({
@@ -29653,7 +29695,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
     summary: target === "claude" ? "Configure the existing Claude plugin, preserving your settings" : "Configure HolyAgent for T3 Code, skipping every step already done",
     output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
-      "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
+      "Pi setup uses user scope by default and checks that T3 Code was opened at least once. It does not change Claude Code settings unless you also select Claude Code in bare interactive setup",
       "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
       "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
       "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
@@ -29709,18 +29751,19 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
           message: "--undo takes no capability flag and no --form",
           hint: `Usage: holyagent ${usage}`
         });
-      const apply = (choices, chosen, notes = []) => gen2(function* () {
+      const apply = (choices, chosen, notes = [], selected) => gen2(function* () {
+        const selectedTarget = selected?.target ?? target;
         const report = yield* setup2(coreContext2(cwd, env), {
           scope: resolved.scope,
-          ...target === undefined ? { t3Workflow } : { target },
-          ...target === "claude" || installedPackageRoot === undefined ? {} : { installedPackageRoot },
+          ...selectedTarget === undefined ? { t3Workflow } : { target: selectedTarget },
+          ...selectedTarget === "claude" || installedPackageRoot === undefined ? {} : { installedPackageRoot },
           undo: booleanFlag(args, "undo"),
           subagentCacheTtl,
-          dryRun: booleanFlag(args, "dry-run"),
-          skipCtx7: booleanFlag(args, "skip-ctx7"),
+          dryRun: selected?.dryRun ?? booleanFlag(args, "dry-run"),
+          skipCtx7: selected?.skipSharedPrerequisites === true || booleanFlag(args, "skip-ctx7"),
           ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
           ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess },
-          capabilities: chosen,
+          capabilities: selectedTarget === "claude" ? {} : chosen,
           form
         });
         return {
@@ -29748,7 +29791,16 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         form,
         ...setupTui === undefined ? {} : { load: setupTui },
         notify: emit,
-        apply: (choices, chosen) => apply(choices, chosen)
+        apply: (choices, chosen) => apply(choices, chosen),
+        ...surface === "public" && target === undefined ? {
+          combined: {
+            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites) => apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+              target: harness,
+              dryRun,
+              skipSharedPrerequisites
+            })
+          }
+        } : {}
       });
       if (interactive.kind === "done")
         return printed(interactive.report);
@@ -29807,7 +29859,7 @@ var publicPiSetup = (target) => {
     flags: { ...flags, "non-interactive": "boolean" },
     notes: [
       ...target === undefined ? [
-        "Without a harness, setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options."
+        "In a terminal, bare setup opens a combined Pi and Claude Code review. Codex is not an available public setup target on this build. Unattended bare setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options."
       ] : [],
       ...command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? [],
       "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal."
