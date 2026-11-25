@@ -26,6 +26,7 @@ export type RowId =
   | "worktrees"
   | "enablePi"
   | "enableClaude"
+  | "enableCodex"
   | `capability:${string}`
 
 const tabs = ["pi", "claude", "codex"] as const
@@ -88,6 +89,7 @@ const LABELS = {
   worktrees: "New threads in worktrees",
   enablePi: "Configure Pi",
   enableClaude: "Configure Claude Code",
+  enableCodex: "Configure Codex",
 } as const
 
 /** The capability a row switches, or `undefined` for a T3 row. */
@@ -123,7 +125,8 @@ const labelOf = (row: RowId, offer: Offer): string => {
 export const rowsOf = (offer: Offer, state?: State): ReadonlyArray<RowId> => {
   const selected = state?.choices.harnesses
   if (selected !== undefined && offer.harnesses !== undefined) {
-    if (state?.tab === "codex") return []
+    if (state?.tab === "codex")
+      return offer.harnesses.codexHome === undefined ? [] : ["enableCodex"]
     if (state?.tab === "claude") return ["enableClaude"]
     if (!offer.harnesses.piAvailable) return []
     if (!selected.pi) return ["enablePi"]
@@ -199,8 +202,11 @@ const toggled = (choices: Choices, row: RowId): Choices => {
       choices,
       row === "provider:openai-codex" ? "openai-codex" : "kimi-coding-global",
     )
-  if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude")) {
-    const key = row === "enablePi" ? "pi" : "claude"
+  if (
+    choices.harnesses !== undefined &&
+    (row === "enablePi" || row === "enableClaude" || row === "enableCodex")
+  ) {
+    const key = row === "enablePi" ? "pi" : row === "enableClaude" ? "claude" : "codex"
     return { ...choices, harnesses: { ...choices.harnesses, [key]: !choices.harnesses[key] } }
   }
   if (row === "deviceAccess") return { ...choices, deviceAccess: !choices.deviceAccess }
@@ -419,6 +425,8 @@ const hintOf = (row: RowId, offer: Offer, choices: Choices): string => {
     return `Selected: ${profile === undefined ? "none" : `${profile.browser}, ${profile.profile}`}. Press Enter or click to cycle through detected profiles.`
   }
   if (row === "enablePi") return "Include Pi and T3 Code in the combined review."
+  if (row === "enableCodex")
+    return "Prepare the native plugin and startup settings in a dedicated Codex home."
   if (row === "enableClaude")
     return "Include the existing Claude Code plugin in the combined review."
   if (providerOf(row, offer) !== undefined)
@@ -438,14 +446,16 @@ const hintOf = (row: RowId, offer: Offer, choices: Choices): string => {
 const isOn = (row: RowId, choices: Choices): boolean =>
   row === "enablePi"
     ? choices.harnesses?.pi === true
-    : row === "enableClaude"
-      ? choices.harnesses?.claude === true
-      : row === "deviceAccess"
-        ? choices.deviceAccess
-        : row === "worktrees"
-          ? choices.worktrees
-          : row.startsWith(CAPABILITY_ROW) &&
-            choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
+    : row === "enableCodex"
+      ? choices.harnesses?.codex === true
+      : row === "enableClaude"
+        ? choices.harnesses?.claude === true
+        : row === "deviceAccess"
+          ? choices.deviceAccess
+          : row === "worktrees"
+            ? choices.worktrees
+            : row.startsWith(CAPABILITY_ROW) &&
+              choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
 
 const checkbox = (row: RowId, choices: Choices, offer: Offer): { box: string; word: string } => {
   if (row === BROWSE_ROW)
@@ -541,8 +551,8 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
       ? hintLines(text, width)
       : wrap(text, width - 2).map((line): Line => [segment(`  ${line}`, "hint")])
   const unavailable =
-    combined !== undefined && state.tab === "codex"
-      ? "Public Codex setup is not available on this build."
+    combined !== undefined && state.tab === "codex" && offer.harnesses?.codexHome === undefined
+      ? "Codex setup is not available in this environment."
       : combined !== undefined && state.tab === "pi" && offer.harnesses?.piAvailable === false
         ? "Pi or T3 Code is unavailable on this host."
         : undefined
@@ -565,6 +575,9 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
       ? choiceHint(
           `Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`,
         )
+      : []),
+    ...(state.tab === "codex" && offer.harnesses?.codexHome !== undefined
+      ? choiceHint(`Profile: ${offer.harnesses.codexHome}`)
       : []),
     ...(focused === undefined ? [] : choiceHint(hintOf(focused, offer, state.choices))),
     ...choiceHint(`Environment: ${offer.form}`),

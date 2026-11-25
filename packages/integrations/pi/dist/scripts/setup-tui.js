@@ -3890,7 +3890,8 @@ var LABELS = {
   deviceAccess: "Agent device access",
   worktrees: "New threads in worktrees",
   enablePi: "Configure Pi",
-  enableClaude: "Configure Claude Code"
+  enableClaude: "Configure Claude Code",
+  enableCodex: "Configure Codex"
 };
 var capabilityOf = (row, offer) => row.startsWith(CAPABILITY_ROW) ? offer.capabilities.find((capability) => capability.feature === row.slice(CAPABILITY_ROW.length)) : undefined;
 var providerName = {
@@ -3912,7 +3913,7 @@ var rowsOf = (offer, state) => {
   const selected = state?.choices.harnesses;
   if (selected !== undefined && offer.harnesses !== undefined) {
     if (state?.tab === "codex")
-      return [];
+      return offer.harnesses.codexHome === undefined ? [] : ["enableCodex"];
     if (state?.tab === "claude")
       return ["enableClaude"];
     if (!offer.harnesses.piAvailable)
@@ -3962,8 +3963,8 @@ var toggled = (choices, row) => {
     return { ...choices, browseSetup: choices.browseSetup !== true };
   if (row === "provider:kimi-coding-global" || row === "provider:openai-codex")
     return toggleProvider(choices, row === "provider:openai-codex" ? "openai-codex" : "kimi-coding-global");
-  if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude")) {
-    const key = row === "enablePi" ? "pi" : "claude";
+  if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude" || row === "enableCodex")) {
+    const key = row === "enablePi" ? "pi" : row === "enableClaude" ? "claude" : "codex";
     return { ...choices, harnesses: { ...choices.harnesses, [key]: !choices.harnesses[key] } };
   }
   if (row === "deviceAccess")
@@ -4125,6 +4126,8 @@ var hintOf = (row, offer, choices) => {
   }
   if (row === "enablePi")
     return "Include Pi and T3 Code in the combined review.";
+  if (row === "enableCodex")
+    return "Prepare the native plugin and startup settings in a dedicated Codex home.";
   if (row === "enableClaude")
     return "Include the existing Claude Code plugin in the combined review.";
   if (providerOf(row, offer) !== undefined)
@@ -4138,7 +4141,7 @@ var hintOf = (row, offer, choices) => {
     return "";
   return capability.unavailable === undefined ? `${capability.description}.` : `${capability.description}. Not offered in this form: ${capability.unavailable}; the choice is kept in the config.`;
 };
-var isOn = (row, choices) => row === "enablePi" ? choices.harnesses?.pi === true : row === "enableClaude" ? choices.harnesses?.claude === true : row === "deviceAccess" ? choices.deviceAccess : row === "worktrees" ? choices.worktrees : row.startsWith(CAPABILITY_ROW) && choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true;
+var isOn = (row, choices) => row === "enablePi" ? choices.harnesses?.pi === true : row === "enableCodex" ? choices.harnesses?.codex === true : row === "enableClaude" ? choices.harnesses?.claude === true : row === "deviceAccess" ? choices.deviceAccess : row === "worktrees" ? choices.worktrees : row.startsWith(CAPABILITY_ROW) && choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true;
 var checkbox = (row, choices, offer) => {
   if (row === BROWSE_ROW)
     return choices.browseSetup === true ? { box: "[x]", word: offer.browse?.action ?? "Configure" } : { box: "[ ]", word: "Skip" };
@@ -4206,7 +4209,7 @@ var chooseLines = (state, context) => {
     ...hintLines(`${g.horizontalArrows} change harness`, width)
   ];
   const choiceHint = (text) => combined === undefined ? hintLines(text, width) : wrap(text, width - 2).map((line) => [segment(`  ${line}`, "hint")]);
-  const unavailable = combined !== undefined && state.tab === "codex" ? "Public Codex setup is not available on this build." : combined !== undefined && state.tab === "pi" && offer.harnesses?.piAvailable === false ? "Pi or T3 Code is unavailable on this host." : undefined;
+  const unavailable = combined !== undefined && state.tab === "codex" && offer.harnesses?.codexHome === undefined ? "Codex setup is not available in this environment." : combined !== undefined && state.tab === "pi" && offer.harnesses?.piAvailable === false ? "Pi or T3 Code is unavailable on this host." : undefined;
   return [
     ...tabsLine,
     ...chooseKeys(`${g.arrows} or j/k focus`, width),
@@ -4221,6 +4224,7 @@ var chooseLines = (state, context) => {
     ...context.height >= 20 ? [button] : [],
     ...unavailable === undefined ? [] : choiceHint(unavailable),
     ...combined?.claude === true && state.tab === "claude" ? choiceHint(`Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`) : [],
+    ...state.tab === "codex" && offer.harnesses?.codexHome !== undefined ? choiceHint(`Profile: ${offer.harnesses.codexHome}`) : [],
     ...focused === undefined ? [] : choiceHint(hintOf(focused, offer, state.choices)),
     ...choiceHint(`Environment: ${offer.form}`)
   ];

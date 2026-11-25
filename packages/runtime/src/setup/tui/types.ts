@@ -16,7 +16,7 @@ export interface Choices {
   /** The detected browser profile picked for a new Browse pairing. */
   readonly browseProfile?: number
   /** Selected public harnesses in the combined setup. */
-  readonly harnesses?: { readonly pi: boolean; readonly claude: boolean }
+  readonly harnesses?: { readonly pi: boolean; readonly claude: boolean; readonly codex?: boolean }
 }
 
 /** One capability row of the choose screen. */
@@ -51,7 +51,11 @@ export interface Offer {
   /** The form in force, as a phrase for the capability heading (`headless (detected: CI is set)`). */
   readonly form: string
   /** Present only in bare public setup when the harness chooser is available. */
-  readonly harnesses?: { readonly piAvailable: boolean; readonly scope: string }
+  readonly harnesses?: {
+    readonly piAvailable: boolean
+    readonly scope: string
+    readonly codexHome?: string
+  }
 }
 
 /** One line of the review: what setup does with a group of T3 settings keys. */

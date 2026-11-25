@@ -208,7 +208,9 @@ describe("the setup interface on a light terminal", () => {
       expect(screen.lines().join("\n")).toMatch(/❯ Configure Claude Code +\[ \] disabled/)
       await screen.click(22, 1)
       expect(active().map(({ text }) => text.trim())).toEqual(["Codex"])
-      expect(screen.lines().join("\n")).toContain("Public Codex setup is not available")
+      expect(screen.lines().join("\n")).toContain(
+        "Codex setup is not available in this environment",
+      )
     },
   )
   test("no-color ASCII terminals show an underlined active tab and preserve checkbox labels", async () => {

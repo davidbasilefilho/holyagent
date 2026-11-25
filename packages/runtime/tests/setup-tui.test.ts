@@ -104,7 +104,7 @@ describe("the setup interface, review and apply", () => {
     expect(selected).toMatch(/Kimi for Coding[^\n]*\[x\][^\n]*enabled/)
     expect(selected).toMatch(/OpenAI Codex[^\n]*\[x\][^\n]*enabled/)
     await screen.keys("right", "enter", "right")
-    expect(screen.lines().join("\n")).toContain("Public Codex setup is not available")
+    expect(screen.lines().join("\n")).toContain("Codex setup is not available")
     await screen.keys("right", "end", "enter")
     expect(screen.reviews).toEqual([
       {

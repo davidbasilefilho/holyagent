@@ -1,9 +1,13 @@
+import { join } from "node:path"
+
 import { type Context, setup as coreSetup } from "@holyagent/core"
 import { Effect, Schema } from "effect"
 
 import { CAPABILITIES } from "../config/capabilities.ts"
 import type { PiProviderSelection } from "../config/schema.ts"
 import { DEFAULT_CONFIG } from "../domain/directive.ts"
+import { defaultCodexHome, setupCodex } from "../setup/codex/setup.ts"
+import type { Env } from "../setup/environment.ts"
 import { SetupFailure } from "../setup/errors.ts"
 import { chooseForm, FORM_CHOICES } from "../setup/form.ts"
 import {
@@ -79,6 +83,72 @@ const PI_USAGE = SETUP_USAGE.replace(" [--subagent-cache-ttl 1h|5m]", "").replac
   "[--no-tui]",
   "[--no-tui|--non-interactive]",
 )
+
+const CODEX_USAGE =
+  "setup codex [--codex-home <absolute-directory>] [--root-only-catalog <absolute-file>] [--dry-run] [--non-interactive]"
+const PublicManifest = Schema.Struct({ name: Schema.Literal("holyagent"), version: Schema.String })
+const codexPlan = (
+  args: Parameters<typeof stringFlag>[0],
+  env: Env,
+  installedPackageRoot: string | undefined,
+  dryRun: boolean,
+  expectedPlan?: string,
+) =>
+  Effect.gen(function* () {
+    const catalog = stringFlag(args, "root-only-catalog")
+    const version =
+      installedPackageRoot === undefined
+        ? undefined
+        : yield* Effect.tryPromise((): Promise<unknown> =>
+            Bun.file(join(installedPackageRoot, "package.json")).json(),
+          ).pipe(
+            Effect.flatMap(Schema.decodeUnknownEffect(PublicManifest)),
+            Effect.map((manifest) =>
+              Bun.semver.satisfies(manifest.version, manifest.version)
+                ? manifest.version
+                : undefined,
+            ),
+            Effect.orElseSucceed(() => undefined),
+          )
+    return yield* setupCodex(env, {
+      home: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
+      dryRun,
+      ...(catalog === undefined ? {} : { catalog }),
+      ...(version === undefined ? {} : { version }),
+      ...(expectedPlan === undefined ? {} : { expectedPlan }),
+    })
+  }).pipe(
+    Effect.provide(shellLive(env)),
+    Effect.catch((error) =>
+      Effect.succeed({ ok: false, lines: [`! Codex setup: ${error.detail}`] }),
+    ),
+  )
+
+const codexCommand: Command = {
+  path: ["setup", "codex"],
+  usage: CODEX_USAGE,
+  summary: "Prepare a dedicated native Codex profile and install the HolyAgent plugin",
+  output: "The planned or applied setup steps and the CODEX_HOME to provide before startup",
+  notes: [
+    "--codex-home defaults to the codex directory under HOLYAGENT_HOME or ~/.holyagent. An explicit directory must be absolute.",
+    "The verified Codex 0.172.0 runtime must already be on PATH. Setup never changes a running session.",
+    "Direct work is the default. Pass the original Codex 0.172.0 catalog with --root-only-catalog to opt into adaptive native V1 delegation at depth one.",
+    "--dry-run never installs or writes. Explicit Codex setup is always non-interactive.",
+  ],
+  flags: {
+    "codex-home": "string",
+    "root-only-catalog": "string",
+    "dry-run": "boolean",
+    "non-interactive": "boolean",
+    "no-tui": "boolean",
+  },
+  stateless: true,
+  positionals: 0,
+  run: ({ args, env, installedPackageRoot }) =>
+    codexPlan(args, env, installedPackageRoot, booleanFlag(args, "dry-run")).pipe(
+      Effect.map(printed),
+    ),
+}
 
 const CAPABILITY_NAMES = CAPABILITIES.map((capability) => capability.name).join(", ")
 
@@ -261,6 +331,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
             ),
           )
         if (target === "claude") return printed(yield* apply(flagged, capabilities))
+        let reviewedCodex: string | undefined
         const interactive = yield* runInteractive({
           env,
           cwd,
@@ -301,6 +372,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           ...(surface === "public" && target === undefined
             ? {
                 combined: {
+                  codexHome: stringFlag(args, "codex-home") ?? defaultCodexHome(env),
                   run: (
                     harness,
                     choices,
@@ -309,12 +381,30 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
                     skipSharedPrerequisites,
                     replacePiRegistration,
                   ) =>
-                    apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
-                      target: harness,
-                      dryRun,
-                      skipSharedPrerequisites,
-                      replacePiRegistration,
-                    }),
+                    harness === "codex"
+                      ? Effect.gen(function* () {
+                          if (!dryRun && reviewedCodex === undefined)
+                            return {
+                              ok: false,
+                              lines: ["! Review the Codex setup plan before applying."],
+                            }
+                          const plan = yield* codexPlan(
+                            args,
+                            env,
+                            installedPackageRoot,
+                            dryRun,
+                            dryRun ? undefined : reviewedCodex,
+                          )
+                          if (dryRun)
+                            reviewedCodex = "fingerprint" in plan ? plan.fingerprint : undefined
+                          return plan
+                        })
+                      : apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+                          target: harness,
+                          dryRun,
+                          skipSharedPrerequisites,
+                          replacePiRegistration,
+                        }),
                 },
               }
             : {}),
@@ -324,6 +414,18 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           return surface === "public"
             ? yield* saveSetupResult(interactive.report, booleanFlag(args, "dry-run"), env)
             : printed(interactive.report)
+        if (
+          surface === "public" &&
+          target === undefined &&
+          (stringFlag(args, "codex-home") !== undefined ||
+            stringFlag(args, "root-only-catalog") !== undefined)
+        )
+          return printed({
+            ok: false,
+            lines: [
+              "! Choose Codex in a terminal, or use holyagent setup codex for unattended provisioning.",
+            ],
+          })
         if (
           surface === "public" &&
           !booleanFlag(args, "undo") &&
@@ -417,17 +519,23 @@ export const SETUP_COMMANDS = [
 const publicPiSetup = (target?: "pi"): Command => {
   const command = setupCommand(
     target,
-    target === undefined ? "setup [pi|claude] [options]" : PI_USAGE.replace(/^setup\b/, "setup pi"),
+    target === undefined
+      ? "setup [pi|claude|codex] [options]"
+      : PI_USAGE.replace(/^setup\b/, "setup pi"),
   )
   const { "subagent-cache-ttl": _claudeOnly, ...flags } = command.flags
   return {
     ...command,
     summary: target === undefined ? "Configure HolyAgent (alias: install)" : command.summary,
-    flags: { ...flags, "non-interactive": "boolean" },
+    flags: {
+      ...flags,
+      "non-interactive": "boolean",
+      ...(target === undefined ? { "codex-home": "string", "root-only-catalog": "string" } : {}),
+    },
     notes: [
       ...(target === undefined
         ? [
-            "In a terminal, bare setup opens a combined Pi and Claude Code review. Codex is not an available public setup target on this build. Unattended bare setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options.",
+            "In a terminal, bare setup opens one review for selected Pi, Claude Code, and native Codex harnesses. Unattended bare setup still targets Pi. See holyagent setup codex --help for the dedicated native startup profile.",
           ]
         : []),
       ...(command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []),
@@ -438,6 +546,7 @@ const publicPiSetup = (target?: "pi"): Command => {
 
 /** Explicit harness selectors share the public setup handler and precede the bare command. */
 export const PUBLIC_SETUP_COMMANDS: ReadonlyArray<Command> = [
+  codexCommand,
   publicPiSetup("pi"),
   {
     ...setupCommand("claude", CLAUDE_USAGE),
