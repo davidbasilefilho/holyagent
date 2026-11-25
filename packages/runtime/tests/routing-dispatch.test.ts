@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 
@@ -94,7 +94,7 @@ const fixture = async (
   profile?: "fast" | "normal",
   models?: ReadonlyArray<string>,
 ) => {
-  const base = await mkdtemp(join(tmpdir(), "holyagent-routing-"))
+  const base = await realpath(await mkdtemp(join(tmpdir(), "holyagent-routing-")))
   const root = join(base, "project")
   const home = join(base, "home")
   await mkdir(join(root, ".holyagent"), { recursive: true })
