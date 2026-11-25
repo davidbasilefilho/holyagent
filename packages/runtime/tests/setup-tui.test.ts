@@ -12,6 +12,13 @@ const shown = async (options: Parameters<typeof mount>[0]) => {
 afterEach(() => open?.destroy())
 
 const ROW = (text: string) => (line: string) => line.includes(text)
+const clickText = async (screen: Mounted, text: string, exact = false) => {
+  const lines = screen.lines()
+  const row = lines.findIndex(exact ? (line) => line.replace(/^❯ /, "").trim() === text : ROW(text))
+  expect(row).toBeGreaterThanOrEqual(0)
+  const line = lines[row] ?? ""
+  await screen.click(cells(line.slice(0, line.indexOf(text))), row)
+}
 
 describe("the setup interface, choose screen", () => {
   test("shows the title, key hint, heading and the three rows with their defaults", async () => {
@@ -67,6 +74,29 @@ describe("the setup interface, choose screen", () => {
 })
 
 describe("the setup interface, review and apply", () => {
+  test("goes through choices, back, apply and close using only the mouse", async () => {
+    const screen = await shown({ width: 80, height: 36 })
+    await clickText(screen, "New threads in worktrees")
+    await clickText(screen, "Enter review")
+    expect(screen.reviews).toEqual([{ worktrees: false, deviceAccess: true, capabilities: {} }])
+    expect(screen.applies).toEqual([])
+    await clickText(screen, "Back", true)
+    await clickText(screen, "Agent device access")
+    await clickText(screen, "Enter review")
+    await clickText(screen, "Apply", true)
+    expect(screen.applies).toEqual([{ worktrees: false, deviceAccess: false, capabilities: {} }])
+    await clickText(screen, "Close (Enter or q)")
+    expect(screen.outcomes.map(({ _tag }) => _tag)).toEqual(["Applied"])
+  })
+
+  test("cancels a reviewed setup by mouse without applying changes", async () => {
+    const screen = await shown({ width: 48, height: 20 })
+    await clickText(screen, "Enter review")
+    await clickText(screen, "Cancel", true)
+    expect(screen.applies).toEqual([])
+    expect(screen.outcomes).toEqual([{ _tag: "Cancelled" }])
+  })
+
   test("Enter reviews the current choices: what each switch changes and what is always applied", async () => {
     const screen = await shown({ width: 80, height: 40 })
     await screen.keys("down", " ", "enter")

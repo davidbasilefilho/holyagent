@@ -6,11 +6,14 @@ import { createMemo, createSignal, For, onCleanup, Show } from "solid-js"
 import {
   type Command,
   type Context,
+  type Control,
+  controlAt,
   finished,
   initialState,
   type Key,
   type Line,
   press,
+  pressControl,
   reviewed,
   reviewFailed,
   rowsOf,
@@ -66,6 +69,7 @@ export const SetupApp = (props: SetupAppProps) => {
   // going: stop it, as Ctrl-C does.
   onCleanup(() => abort.abort())
   let ticket = 0
+  let pointer: { x: number; y: number; state: State; control: Control } | undefined
 
   const context = (): Context => ({
     rows,
@@ -119,13 +123,15 @@ export const SetupApp = (props: SetupAppProps) => {
     )
   }
 
-  const keypress = (key: Key) => {
-    // A key that goes back to the choices makes any review reply still on its way stale.
-    const before = state()
-    const next = press(before, rows, key, scrollOf(before, context()))
+  const advance = (before: State, next: ReturnType<typeof press>) => {
+    // Going back to the choices makes any review reply still on its way stale.
     if (next.state.screen !== before.screen && next.state.screen === "choose") ticket += 1
     setState(next.state)
     if (next.command !== undefined) run(next.command)
+  }
+  const keypress = (key: Key) => {
+    const before = state()
+    advance(before, press(before, rows, key, scrollOf(before, context())))
   }
   useKeyboard((event) => keypress({ name: event.name, ctrl: event.ctrl }))
 
@@ -146,10 +152,25 @@ export const SetupApp = (props: SetupAppProps) => {
         {(line) => (
           <text
             fg={RGBA.defaultForeground()}
+            onMouseDown={(event) => {
+              const control = controlAt(line, event.x - (event.currentTarget?.x ?? 0))
+              pointer =
+                event.button === 0 && control !== undefined
+                  ? { x: event.x, y: event.y, state: state(), control }
+                  : undefined
+            }}
             onMouseUp={(event) => {
-              const click = line.find((part) => part.click !== undefined)?.click
-              if (event.button === 0 && click !== undefined)
-                keypress({ name: click === "close" ? "q" : "d", ctrl: false })
+              const down = pointer
+              pointer = undefined
+              const before = state()
+              if (
+                event.button === 0 &&
+                down !== undefined &&
+                down.x === event.x &&
+                down.y === event.y &&
+                down.state === before
+              )
+                advance(before, pressControl(before, rows, down.control))
             }}>
             {line.length === 0 ? (
               " "

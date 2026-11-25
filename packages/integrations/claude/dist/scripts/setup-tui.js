@@ -3960,6 +3960,36 @@ var press = (state, rows, key, scroll = { page: 1, max: 0 }) => {
     return { state: { ...state, details: !state.details, scroll: 0 } };
   return isQuit(key) || isEnter(key) || key.name === "space" ? { state, command: "close" } : { state };
 };
+var pressControl = (state, rows, control) => {
+  const key = (name, from = state) => press(from, rows, { name, ctrl: false });
+  if (typeof control === "object") {
+    if ("row" in control) {
+      const focus = rows.indexOf(control.row);
+      return state.screen === "choose" && focus >= 0 ? key("space", { ...state, focus }) : { state };
+    }
+    const action = reviewActions(state).indexOf(control.action);
+    return state.screen === "review" && action >= 0 ? key("enter", { ...state, action }) : { state };
+  }
+  if (state.screen === "choose" && control === "choose-review")
+    return key("enter");
+  if (state.screen === "choose" && control === "choose-cancel")
+    return key("escape");
+  if (state.screen === "done" && control === "details")
+    return key("d");
+  if (state.screen === "done" && control === "close")
+    return key("q");
+  return { state };
+};
+var controlAt = (line, column) => {
+  let offset = 0;
+  for (const part of line) {
+    const end = offset + cells(part.text);
+    if (column >= offset && column < end)
+      return part.click;
+    offset = end;
+  }
+  return;
+};
 var reviewed = (state, review) => state.screen === "review" ? { ...state, review, failure: undefined, action: 0, scroll: 0 } : state;
 var reviewFailed = (state, failure) => state.screen === "review" ? { ...state, review: undefined, failure, action: 0, scroll: 0 } : state;
 var finished = (state, applied) => ({
@@ -3972,6 +4002,11 @@ var KEY_GAP = "   ";
 var segment = (text, tone) => tone === undefined ? { text } : { text, tone };
 var title = (look) => [segment(`HolyAgent  ${glyphs(look).dot}  setup`, "heading")];
 var keyLines = (items, width) => wrapItems(items, width, KEY_GAP).map((text) => [segment(text, "option")]);
+var chooseKeys = (focus, width) => wrapItems([focus, "Space toggle", "Enter review", "Esc cancel"], width, KEY_GAP).map((line) => line.split(KEY_GAP).flatMap((text, index) => {
+  const click = text === "Enter review" ? "choose-review" : text === "Esc cancel" ? "choose-cancel" : undefined;
+  const item = { text, tone: "option", ...click === undefined ? {} : { click } };
+  return index === 0 ? [item] : [segment(KEY_GAP), item];
+}));
 var heading = (text, width) => wrap(text.toUpperCase(), width).map((part) => [segment(part, "heading")]);
 var blank = [];
 var hintLines = (text, width) => wrap(text, width).map((part) => [segment(part, "hint")]);
@@ -4004,12 +4039,11 @@ var chooseLines = (state, context) => {
     const focused = index === state.focus;
     const label = pad(clip(labels[index] ?? "", labelWidth, g.ellipsis), labelWidth);
     const value = values[index] ?? "";
-    if (focused)
-      return [segment(`${g.focus} ${label}  ${value}`, "focus")];
-    return [
+    const line = focused ? [segment(`${g.focus} ${label}  ${value}`, "focus")] : [
       segment(`  ${label}  `, "argument"),
       segment(value, row === "pi" || !isOn(row, state.choices) ? "disabled" : "enabled")
     ];
+    return line.map((part) => ({ ...part, click: { row } }));
   };
   const group = (title, from, to) => to <= from ? [] : [
     ...heading(title, width),
@@ -4019,7 +4053,7 @@ var chooseLines = (state, context) => {
   const t3Count = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length;
   const focused = rows[state.focus];
   return [
-    ...keyLines([`${g.arrows} or j/k focus`, "Space toggle", "Enter review", "Esc cancel"], width),
+    ...chooseKeys(`${g.arrows} or j/k focus`, width),
     blank,
     ...group("T3 Code", 0, t3Count),
     ...group("Capabilities", t3Count, rows.length),
@@ -4072,9 +4106,9 @@ var reviewLayout = (state, context) => {
   const actionLines = () => reviewActions(state).map((action, index) => {
     const text = action === "apply" ? context.dryRun ? "Apply (dry run)" : "Apply" : action === "back" ? "Back" : "Cancel";
     if (index === state.action)
-      return [segment(`${g.focus} ${text}`, "focus")];
+      return [{ text: `${g.focus} ${text}`, tone: "focus", click: { action } }];
     const tone = action === "apply" ? "enabled" : action === "cancel" ? "error" : "argument";
-    return [segment(`  ${text}`, tone)];
+    return [{ text: `  ${text}`, tone, click: { action } }];
   });
   const keys = (scrolling) => keyLines([
     `${g.arrows} or j/k focus`,
@@ -4242,6 +4276,7 @@ var SetupApp = (props) => {
   const abort = new AbortController;
   onCleanup(() => abort.abort());
   let ticket = 0;
+  let pointer;
   const context = () => ({
     rows,
     offer: props.input.offer,
@@ -4291,14 +4326,16 @@ var SetupApp = (props) => {
       }));
     });
   };
-  const keypress = (key) => {
-    const before = state();
-    const next = press(before, rows, key, scrollOf(before, context()));
+  const advance = (before, next) => {
     if (next.state.screen !== before.screen && next.state.screen === "choose")
       ticket += 1;
     setState(next.state);
     if (next.command !== undefined)
       run(next.command);
+  };
+  const keypress = (key) => {
+    const before = state();
+    advance(before, press(before, rows, key, scrollOf(before, context())));
   };
   useKeyboard((event) => keypress({
     name: event.name,
@@ -4322,13 +4359,21 @@ var SetupApp = (props) => {
       },
       children: (line) => (() => {
         var _el$2 = _$createElement("text");
+        _$setProp(_el$2, "onMouseDown", (event) => {
+          const control = controlAt(line, event.x - (event.currentTarget?.x ?? 0));
+          pointer = event.button === 0 && control !== undefined ? {
+            x: event.x,
+            y: event.y,
+            state: state(),
+            control
+          } : undefined;
+        });
         _$setProp(_el$2, "onMouseUp", (event) => {
-          const click = line.find((part) => part.click !== undefined)?.click;
-          if (event.button === 0 && click !== undefined)
-            keypress({
-              name: click === "close" ? "q" : "d",
-              ctrl: false
-            });
+          const down = pointer;
+          pointer = undefined;
+          const before = state();
+          if (event.button === 0 && down !== undefined && down.x === event.x && down.y === event.y && down.state === before)
+            advance(before, pressControl(before, rows, down.control));
         });
         _$insert(_el$2, (() => {
           var _c$ = _$memo(() => line.length === 0);
