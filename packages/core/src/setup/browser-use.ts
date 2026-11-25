@@ -13,6 +13,7 @@ import { fileSystem } from "../ports/filesystem.ts"
 import { describeBrowseState, readBrowseState } from "./browse.ts"
 import { findChromiumWith } from "./chromium.ts"
 import type { Env } from "./environment.ts"
+import { packageRunner } from "./package-runner.ts"
 import {
   headlessBrowserRoute,
   loadPiConfig,
@@ -65,7 +66,11 @@ const reportOne = (
       content?.pairing === true && withheld === undefined
         ? yield* readBrowseState(env, platform).pipe(
             Effect.map((state) => {
-              const { text, fix } = describeBrowseState(state)
+              const runner =
+                options.installedPackageRoot === undefined
+                  ? "npm"
+                  : packageRunner(options.installedPackageRoot, env)
+              const { text, fix } = describeBrowseState(state, runner)
               return state.state === "paired"
                 ? present(`${label}: ${text}`)
                 : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`)
@@ -109,7 +114,13 @@ export const reportBrowserUse = Effect.fn("reportBrowserUse")(function* (
   options: PiInstallOptions & { readonly surface?: PiExecutionSurface | undefined },
   platform: string = process.platform,
 ) {
-  const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices)
+  const config = yield* loadPiConfig(
+    env,
+    options.cwd,
+    options.scope,
+    options.choices,
+    options.providers,
+  )
   if (!config.pi.enable) return []
   const headless =
     options.form === "headless"

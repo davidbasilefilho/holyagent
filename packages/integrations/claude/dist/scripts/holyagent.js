@@ -9442,6 +9442,7 @@ var CAPABILITY_FIELDS = Object.fromEntries(CAPABILITIES.map((capability) => [cap
 var PI_FIELDS = {
   enable: defaulted(Enabled, true),
   provider: defaulted(PiProvider, "kimi-coding-global"),
+  providers: optionalKey2(NonEmptyArray(PiProvider)),
   profile: optionalKey2(Literals(["normal", "fast"])),
   routes: defaulted(Struct(ROUTE_FIELDS), {}),
   features: defaulted(Struct({
@@ -15912,6 +15913,13 @@ var rootModelSettings = (config) => {
   return { defaultProvider: provider, defaultModel: model, defaultThinkingLevel: thinking };
 };
 var subagentModel = ({ provider, model }) => `${provider}/${model}`;
+var enabledPiProviders = (config) => [
+  ...new Set([
+    config.pi.provider,
+    ...config.pi.providers ?? [],
+    ...Object.values(config.pi.routes).flatMap(({ provider }) => provider === undefined ? [] : [provider])
+  ])
+];
 var WEB_KIT_TOOLS = ["web_search", "web_fetch"];
 var webChoice = (_profile, mode) => mode === "off" ? { source: "off", tools: [] } : mode === "provider" ? { source: "provider", tools: PROVIDERS["kimi-coding-global"].webTools } : {
   source: "pi-web-kit",
@@ -17282,7 +17290,7 @@ var piPackages = (config, profile = providerProfile(config), form = "normal", de
   const names = [
     ...new Set([
       profile.package,
-      ...Object.values(config.pi.routes).map((row) => PROVIDERS[row.provider ?? config.pi.provider].package)
+      ...enabledPiProviders(config).map((provider) => PROVIDERS[provider].package)
     ].filter((name) => name !== undefined)),
     ...capabilityPackages(features, form, definitions, platform),
     ...webChoice(profile, features.web).source === "pi-web-kit" ? [WEB_KIT_PACKAGE] : []
@@ -17392,8 +17400,26 @@ var applyDefaults = (existing, defaults) => {
 
 var BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE];
 var BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
-var BROWSE_PAIR_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page when no browser has it and pairs the browser (\`${BROWSE_COMMAND} pair\` prints a code to enter in the extension's options instead)`;
-var BROWSE_INSTALL_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page, and add it to your browser`;
+var browsePairCommand = (runner) => {
+  const spec = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`;
+  switch (runner) {
+    case "bunx":
+      return ["bunx", "--package", spec, "browse", "pair"];
+    case "npm":
+      return ["npm", "exec", "--yes", `--package=${spec}`, "--", "browse", "pair"];
+    case "mise":
+      return ["mise", "exec", `npm:${spec}`, "--", "browse", "pair"];
+    case "unknown":
+      return;
+  }
+};
+var browsePairFix = (runner) => {
+  const command = browsePairCommand(runner);
+  return command === undefined ? `use your package manager to run browse pair from ${BROWSE_PACKAGE}@${BROWSE_VERSION} (setup could not identify the runner)` : `run \`${command.join(" ")}\` and enter the code in the extension's options`;
+};
+var STORE = "https://chromewebstore.google.com/detail/opencode-browse/mfnicocicmmlkpjnaffgihfjhdgjkdjg";
+var BROWSE_PAIR_FIX = browsePairFix("npm");
+var BROWSE_INSTALL_FIX = `add the browse extension from ${STORE}, then ${BROWSE_PAIR_FIX}`;
 var browseDataDirectory = (env) => {
   const home = firstNonEmpty2(env["OPENCODE_BROWSER_HOME"]);
   if (home !== undefined)
@@ -17517,17 +17543,17 @@ var readBrowseState = (env, platform = process.platform) => gen2(function* () {
     scanned: browserDirectories(env, platform).map(({ name }) => name)
   };
 });
-var describeBrowseState = (state) => {
+var describeBrowseState = (state, runner = "npm") => {
   if (state.state === "paired")
     return { text: describePairing(state) };
   if (state.state === "installed")
     return {
       text: `the browse extension is installed (${state.installs.map(({ browser, profile, enabled }) => `${browser}, profile ${profile}${enabled ? "" : ", disabled"}`).join("; ")}) but no browser is paired with browse`,
-      fix: BROWSE_PAIR_FIX
+      fix: browsePairFix(runner)
     };
   return {
     text: `the browse extension is not installed in any browser this check scans (${state.scanned.join(", ")}) and no browser is paired with browse`,
-    fix: BROWSE_INSTALL_FIX
+    fix: `add the browse extension from ${STORE}, then ${browsePairFix(runner)}`
   };
 };
 
@@ -17739,10 +17765,17 @@ var headlessBrowserRoute = (config, surface) => {
     };
   return { probe: true, lines: [] };
 };
-var loadPiConfig = (env, cwd, scope, choices = {}) => loadConfig({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }).pipe(map4((config) => ({
-  ...config,
-  pi: { ...config.pi, features: { ...config.pi.features, ...choices } }
-})), mapError2((error) => new SetupFailure({ message: error.message })));
+var loadPiConfig = (env, cwd, scope, choices = {}, providers) => {
+  const sources = { projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env };
+  const config = providers === undefined ? loadConfig(sources) : loadConfigWithSource(sources).pipe(flatMap2(({ written }) => decodeUnknownEffect2(Config)({
+    ...written,
+    pi: { ...written.pi, ...providers }
+  })));
+  return config.pipe(map4((config) => ({
+    ...config,
+    pi: { ...config.pi, features: { ...config.pi.features, ...choices } }
+  })), mapError2((error) => new SetupFailure({ message: error.message })));
+};
 var checkPackage = (env, cwd, scope) => gen2(function* () {
   const files = piPresenceFiles(env, cwd, scope);
   const outcomes = yield* forEach2(files, (file) => piSettingsSources(file).pipe(map4((sources) => ({
@@ -18351,7 +18384,7 @@ var resolveTarget = fn2("resolveToolSettingsTarget")(function* (target) {
     atPair: target.all.filter(leftWithPair).map(keyName)
   };
 });
-var planAt = (env, cwd, scope, form, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
+var planAt = (env, cwd, scope, form, choices, providers) => loadPiConfig(env, cwd, scope, choices, providers).pipe(map4((config) => config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined), orElseSucceed2(() => {
   return;
 }));
 var piDisabledAt = (env, cwd, scope, choices) => loadPiConfig(env, cwd, scope, choices).pipe(map4((config) => !config.pi.enable), orElseSucceed2(() => false));
@@ -18440,7 +18473,7 @@ var revertUnplanned = fn2("revertUnplannedToolSettings")(function* (env, options
   return lines;
 });
 var installPiToolSettings = fn2("installPiToolSettings")(function* (env, options) {
-  const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices);
+  const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices, options.providers);
   if (plan === undefined)
     return (yield* piDisabledAt(env, options.cwd, options.scope, options.choices)) ? yield* revertUnplanned(env, options, undefined) : [];
   const lines = [];
@@ -18582,6 +18615,29 @@ var searchToolLines = (cwd, format) => gen2(function* () {
   return yield* forEach2(TOOLS, (tool) => locateTool(tool, cwd, shell.which).pipe(map4((found) => format(tool, found))));
 });
 
+import { join as join22 } from "path";
+var portable = (value) => value.replaceAll("\\", "/").replace(/\/+$/, "");
+var isBunxPackageRoot = (root) => /(?:^|\/)(?:bunx-\d+-holyagent|\.bunx-\d+\/holyagent)(?:@[^/]+)?\/node_modules\/holyagent$/i.test(portable(root));
+var isNpmExecPackageRoot = (root) => /\/_npx\/[^/]+\/node_modules\/holyagent$/i.test(portable(root));
+var packageRunner = (root, env) => {
+  const path = portable(root);
+  if (isBunxPackageRoot(root))
+    return "bunx";
+  if (/\/installs\/npm-holyagent\/[^/]+\/(?:lib\/)?node_modules\/holyagent$/i.test(path))
+    return "mise";
+  const bun = portable(env.BUN_INSTALL ?? join22(homeDirectory2(env), ".bun"));
+  if (path === `${bun}/install/global/node_modules/holyagent`)
+    return "bunx";
+  if (isNpmExecPackageRoot(path))
+    return "npm";
+  const prefix = env.npm_config_prefix ?? env.NPM_CONFIG_PREFIX;
+  if (prefix !== undefined && ["/lib/node_modules/holyagent", "/node_modules/holyagent"].some((suffix) => path === portable(prefix) + suffix))
+    return "npm";
+  if (/^(?:\/usr(?:\/local)?\/lib|.*\/AppData\/Roaming\/npm)\/node_modules\/holyagent$/i.test(path))
+    return "npm";
+  return "unknown";
+};
+
 var reportOne = (env, capability, features, options, platform) => gen2(function* () {
   const form = options.form ?? "normal";
   const label = capability.name;
@@ -18599,7 +18655,8 @@ var reportOne = (env, capability, features, options, platform) => gen2(function*
   const chromium = launched ? findChromiumWith(yield* fileSystem, env, platform) : undefined;
   const browser = chromium === undefined ? [] : [present(`${label}: the headless browser is the Chromium at ${chromium}`)];
   const pairing = content?.pairing === true && withheld === undefined ? yield* readBrowseState(env, platform).pipe(map4((state) => {
-    const { text, fix } = describeBrowseState(state);
+    const runner = options.installedPackageRoot === undefined ? "npm" : packageRunner(options.installedPackageRoot, env);
+    const { text, fix } = describeBrowseState(state, runner);
     return state.state === "paired" ? present(`${label}: ${text}`) : hint(`${label}: ${text}${fix === undefined ? "" : `; ${fix}`}`);
   }), catchTag2("SetupFailure", (error) => succeed6(hint(`${label}: cannot tell whether a browser is paired: ${error.message}`))), map4((line) => [line])) : [];
   return [
@@ -18610,7 +18667,7 @@ var reportOne = (env, capability, features, options, platform) => gen2(function*
   ];
 });
 var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform = process.platform) {
-  const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices);
+  const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices, options.providers);
   if (!config.pi.enable)
     return [];
   const headless = options.form === "headless" ? headlessBrowserRoute(config, piExecutionSurface(env, options.surface)) : undefined;
@@ -18621,8 +18678,8 @@ var reportBrowserUse = fn2("reportBrowserUse")(function* (env, options, platform
   return [...headless?.lines ?? [], ...lines.flat()];
 });
 
-import { join as join22 } from "path";
-var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join22(stateDirectory(cwd), CONFIG_FILE);
+import { join as join23 } from "path";
+var capabilityConfigFile = (env, cwd, scope) => scope === "user" ? userConfigFile(env) : join23(stateDirectory(cwd), CONFIG_FILE);
 var objectAt = (parent, key, file, path) => {
   const value = parent[key];
   if (value === undefined)
@@ -18653,13 +18710,29 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
     const value = options.choices[capability.feature];
     return value === undefined ? [] : [{ capability, value }];
   });
-  if (chosen.length === 0)
+  if (chosen.length === 0 && options.providers === undefined)
     return [];
-  const current = (yield* loadPiConfig(env, options.cwd, options.scope)).pi.features;
+  const config = yield* loadPiConfig(env, options.cwd, options.scope);
+  const currentPi = config.pi;
+  const current = currentPi.features;
+  const wanted = options.providers;
+  if (wanted !== undefined) {
+    if (!wanted.providers.includes(wanted.provider))
+      return yield* new SetupFailure({
+        message: "Select at least one Pi model provider, including the default"
+      });
+    const required = Object.entries(currentPi.routes).find(([, route]) => route.provider !== undefined && !wanted.providers.includes(route.provider));
+    if (required !== undefined)
+      return yield* new SetupFailure({
+        message: `Pi route ${required[0]} explicitly uses ${required[1].provider}; keep it selected or change the route first`
+      });
+  }
+  const existingProviders = enabledPiProviders(config);
+  const providers = wanted === undefined || wanted.provider === currentPi.provider && wanted.providers.length === existingProviders.length && wanted.providers.every((provider) => existingProviders.includes(provider)) ? undefined : wanted;
   const changed = chosen.filter(({ capability, value }) => current[capability.feature] !== value);
   const word = (value) => value ? "on" : "off";
   const lines = chosen.filter(({ capability, value }) => current[capability.feature] === value).map(({ capability, value }) => present(`capability ${capability.name}: already ${word(value)}`));
-  if (changed.length === 0)
+  if (changed.length === 0 && providers === undefined)
     return lines;
   const file = capabilityConfigFile(env, options.cwd, options.scope);
   if (options.scope !== "user") {
@@ -18670,20 +18743,26 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   if (!options.dryRun) {
     const existing = yield* readJsonObject(file);
     const pi = yield* objectAt(existing, "pi", file, "pi");
-    const features = yield* objectAt(pi, "features", file, "pi.features");
+    const features = changed.length === 0 ? undefined : yield* objectAt(pi, "features", file, "pi.features");
     yield* writeJsonObject(file, {
       ...existing,
       pi: {
         ...pi,
-        features: {
-          ...features,
-          ...Object.fromEntries(changed.map(({ capability, value }) => [capability.feature, value]))
+        ...providers,
+        ...features === undefined ? {} : {
+          features: {
+            ...features,
+            ...Object.fromEntries(changed.map(({ capability, value }) => [capability.feature, value]))
+          }
         }
       }
     });
   }
   return [
     ...lines,
+    ...providers === undefined ? [] : [
+      added(`Pi model providers: ${options.dryRun ? "would enable" : "enabled"} ${providers.providers.join(", ")}; default ${providers.provider} (${file})`)
+    ],
     ...changed.map(({ capability, value }) => {
       const text = `capability ${capability.name}: ${options.dryRun ? "would turn" : "turned"} ${word(value)} (pi.features.${capability.feature} in ${file})`;
       return value ? added(text) : skipped(text);
@@ -18691,7 +18770,7 @@ var applyCapabilityChoices = fn2("applyCapabilityChoices")(function* (env, optio
   ];
 });
 
-import { basename as basename8, dirname as dirname12, isAbsolute as isAbsolute9, join as join23, relative as relative5, resolve as resolve13 } from "path";
+import { basename as basename8, dirname as dirname12, isAbsolute as isAbsolute9, join as join24, relative as relative5, resolve as resolve13 } from "path";
 var MANAGED_NAMES = new Set([
   ...managedCapabilityPackages(),
   WEB_KIT_PACKAGE,
@@ -18720,10 +18799,10 @@ var installedPackage = fn2("installedPiPackage")(function* (path) {
   const physical = yield* realPath(root);
   if (physical === undefined || !installedLayout(physical))
     return yield* invalid;
-  const manifest = yield* readJsonObject(join23(root, "package.json"));
-  if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join23(root, "extensions", "holyagent.js"))))
+  const manifest = yield* readJsonObject(join24(root, "package.json"));
+  if (manifest.name !== "holyagent" || manifest.version !== package_default.version && !(typeof manifest.version === "string" && manifest.version.startsWith(`${package_default.version}-dev.`)) || manifest.private === true || !isJsonObject2(manifest.pi) || !Array.isArray(manifest.pi.extensions) || !manifest.pi.extensions.includes("./extensions") || !(yield* fileExists2(join24(root, "extensions", "holyagent.js"))))
     return yield* invalid;
-  return { root, physical };
+  return { root, physical, version: String(manifest.version) };
 });
 var piLocalSourcePath = (env, file, source) => {
   if (isAbsolute9(source))
@@ -18735,30 +18814,60 @@ var piLocalSourcePath = (env, file, source) => {
   return resolve13(dirname12(file), source);
 };
 var sourcePackageRoot = (path) => basename8(path) === "holyagent.js" && basename8(dirname12(path)) === "extensions" ? dirname12(dirname12(path)) : path;
-var localHolyagentPackageAt = (path) => readJsonObject(join23(sourcePackageRoot(path), "package.json")).pipe(map4((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false));
-var registration = fn2("planPiPackageRegistration")(function* (env, path, settings) {
-  const { root, physical } = yield* installedPackage(path);
+var localHolyagentPackageAt = (path) => readJsonObject(join24(sourcePackageRoot(path), "package.json")).pipe(map4((manifest) => manifest.name === "holyagent"), orElseSucceed2(() => false));
+var registration = fn2("planPiPackageRegistration")(function* (env, path, settings, replace) {
+  const { root, physical, version } = yield* installedPackage(path);
+  const source = [root, physical].some((path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path)) ? `npm:holyagent@${version}` : root;
   let listedIn;
+  const conflicts = [];
   for (const { file, sources } of settings) {
     for (const entry of sources) {
-      const source = entry.trim();
-      const local = piLocalSourcePath(env, file, source);
+      const local = piLocalSourcePath(env, file, entry.trim());
       const actual = local === undefined ? undefined : yield* realPath(local);
-      if (actual !== undefined && relative5(physical, actual) === "") {
+      if (entry.trim() === source || source === root && actual !== undefined && relative5(physical, actual) === "") {
         listedIn ??= file;
-        continue;
+      } else if (isHolyagentSource(entry.trim()) || actual !== undefined && (yield* localHolyagentPackageAt(actual))) {
+        conflicts.push({ file, prior: entry });
       }
-      if (isHolyagentSource(source) || actual !== undefined && (yield* localHolyagentPackageAt(actual)))
-        return yield* new SetupFailure({
-          message: `HolyAgent is already configured as ${JSON.stringify(entry)} in ${file}. To switch to the installed package at ${root}, review and remove the existing Pi package entry, then run setup again`
-        });
     }
   }
-  return listedIn === undefined ? { source: root } : { listedIn };
+  const [conflict] = conflicts;
+  if (conflict !== undefined) {
+    if (!replace || conflicts.length !== 1 || conflict.file !== settings[0]?.file || listedIn !== undefined)
+      return yield* new SetupFailure({
+        message: `HolyAgent is already configured as ${JSON.stringify(conflict.prior)} in ${conflict.file}; review the existing registration in interactive setup at its scope before replacing it`
+      });
+    return { source, prior: conflict.prior };
+  }
+  return listedIn === undefined ? { source } : { listedIn };
+});
+var entrySource = (entry) => isJsonObject2(entry) ? entry.source : entry;
+var retireRegistration = fn2("retirePiRegistration")(function* (file, prior, source, previousEntry) {
+  const current = yield* readJsonObjectSnapshot(file);
+  const packages = Array.isArray(current.value.packages) ? current.value.packages : [];
+  const old = packages.filter((entry) => entrySource(entry) === prior);
+  if (current.text === undefined || packages.filter((entry) => entrySource(entry) === source).length !== 1 || old.length > 1 || old.length === 1 && JSON.stringify(old[0]) !== JSON.stringify(previousEntry))
+    return yield* new SetupFailure({
+      message: `${file}: the Pi registration changed during install; kept the previous source where it was still present`
+    });
+  const replacement = isJsonObject2(previousEntry) ? { ...previousEntry, source } : source;
+  const next = packages.flatMap((entry) => {
+    const key = entrySource(entry);
+    if (key === prior)
+      return [replacement];
+    if (key === source)
+      return old.length === 0 ? [replacement] : [];
+    return [entry];
+  });
+  if (!(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text))) {
+    return yield* new SetupFailure({
+      message: `${file}: settings changed while replacing the package; did not remove the previous source`
+    });
+  }
 });
 var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   const shell = yield* Shell;
-  const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices);
+  const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices, options.providers);
   if (!config.pi.enable)
     return [skipped("pi packages: pi.enable is off in the HolyAgent config")];
   const projectLevel = options.scope !== "user";
@@ -18782,15 +18891,18 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   });
   if (listed.some((source) => parseNpmSource(source)?.name === "@amaster.ai/pi-computer-use"))
     lines.push(skipped("pi computer-use: legacy package registration has no ownership receipt and was kept; HolyAgent uses the official Cua Driver instead"));
+  let replacement;
   if (options.installedPackageRoot !== undefined) {
-    const match = yield* registration(env, options.installedPackageRoot, [
-      { file, sources: listed },
-      ...elsewhere
-    ]);
+    const match = yield* registration(env, options.installedPackageRoot, [{ file, sources: listed }, ...elsewhere], options.replacePiRegistration === true);
     if (match.source === undefined)
       lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`));
-    else
+    else {
+      if (match.prior !== undefined) {
+        replacement = { source: match.source, prior: match.prior };
+        lines.unshift(added(`pi package: replace ${JSON.stringify(match.prior)} with ${JSON.stringify(match.source)} in ${file}`));
+      }
       installs.unshift(match.source);
+    }
   }
   if (installs.length === 0 && removals.length === 0)
     return lines;
@@ -18809,10 +18921,24 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
       lines.push(added(`pi ${source}: would install with ${command}`));
       continue;
     }
+    const commit = replacement?.source === source ? replacement : undefined;
+    const before = commit === undefined ? undefined : yield* readJsonObject(file);
+    const entries = Array.isArray(before?.packages) ? before.packages : [];
+    const previousEntry = entries.find((entry) => commit !== undefined && entrySource(entry) === commit.prior);
+    if (commit !== undefined && previousEntry === undefined)
+      return [
+        ...lines,
+        `! pi package: ${file} changed before install; the previous registration was not replaced`
+      ];
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
     });
+    if (commit !== undefined) {
+      if (result.exitCode !== 0)
+        return [...lines, failed2(command, result)];
+      yield* retireRegistration(file, commit.prior, source, previousEntry);
+    }
     lines.push(result.exitCode === 0 ? added(`pi ${source}: installed with ${command}`) : failed2(command, result));
   }
   for (const name of removals) {
@@ -18831,7 +18957,7 @@ var installPiPackages = fn2("installPiPackages")(function* (env, options) {
   return lines;
 });
 
-import { join as join24 } from "path";
+import { join as join25 } from "path";
 var T3_STORAGE_CLEANUP = {
   logsAfterDays: 30,
   browserArtifactsAfterDays: 14,
@@ -18852,21 +18978,21 @@ var checkT3Prerequisites = (env, piUsed) => gen2(function* () {
     ...piUsed ? [] : ["pi: install the Pi backend and make sure pi is on PATH"]
   ];
 });
-var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join24(homeDirectory2(env), ".t3");
-var t3SettingsFile = (env) => join24(t3Home(env), "userdata", "settings.json");
+var t3Home = (env) => firstNonEmpty2(env["T3CODE_HOME"]) ?? join25(homeDirectory2(env), ".t3");
+var t3SettingsFile = (env) => join25(t3Home(env), "userdata", "settings.json");
 var isDirectory2 = (path) => fileSystem.pipe(flatMap2((fs) => tryPromise2(() => fs.stat(path))), map4((info) => info.isDirectory()), orElseSucceed2(() => false));
 var deviceHost = fn2("t3DeviceHost")(function* (env, platform) {
   const home = homeDirectory2(env);
   if (platform === "darwin") {
     const developer = firstNonEmpty2(env["DEVELOPER_DIR"]) ?? "/Applications/Xcode.app/Contents/Developer";
-    const simulator = join24(developer, "Platforms", "iPhoneSimulator.platform");
+    const simulator = join25(developer, "Platforms", "iPhoneSimulator.platform");
     if (yield* isDirectory2(simulator))
       return `Xcode (${developer})`;
   }
   const sdkFolders = [
     firstNonEmpty2(env["ANDROID_HOME"]),
     firstNonEmpty2(env["ANDROID_SDK_ROOT"]),
-    platform === "darwin" ? join24(home, "Library", "Android", "sdk") : platform === "win32" ? join24(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join24(home, "AppData", "Local"), "Android", "Sdk") : join24(home, "Android", "Sdk")
+    platform === "darwin" ? join25(home, "Library", "Android", "sdk") : platform === "win32" ? join25(firstNonEmpty2(env["LOCALAPPDATA"]) ?? join25(home, "AppData", "Local"), "Android", "Sdk") : join25(home, "Android", "Sdk")
   ];
   for (const folder of sdkFolders) {
     if (folder !== undefined && (yield* isDirectory2(folder)))
@@ -19214,9 +19340,13 @@ var setup = fn2("setup")(function* (env, options) {
     scope,
     cwd: options.cwd ?? process.cwd(),
     dryRun: options.dryRun,
-    ...piOnly && options.installedPackageRoot !== undefined ? { installedPackageRoot: options.installedPackageRoot } : {},
+    ...piOnly && options.installedPackageRoot !== undefined ? {
+      installedPackageRoot: options.installedPackageRoot,
+      ...options.replacePiRegistration === true ? { replacePiRegistration: true } : {}
+    } : {},
     form: form.form,
-    choices
+    choices,
+    ...options.piProviders === undefined ? {} : { providers: options.piProviders }
   };
   if (options.undo === true) {
     const lines = [
@@ -19240,7 +19370,8 @@ var setup = fn2("setup")(function* (env, options) {
     scope,
     cwd: piOptions.cwd,
     dryRun: options.dryRun,
-    choices
+    choices,
+    ...options.piProviders === undefined ? {} : { providers: options.piProviders }
   })) : Object.keys(choices).length > 0 ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")] : [];
   const piSteps = piUsed && !capabilityLines.some((line) => line.startsWith("! "));
   const lines = [
@@ -19368,6 +19499,8 @@ var schemas4 = {
     t3Workflow: optionalKey2(Boolean3),
     target: optionalKey2(Literals(SETUP_TARGETS)),
     installedPackageRoot: optionalKey2(String5),
+    replacePiRegistration: optionalKey2(Boolean3),
+    piProviders: optionalKey2(Struct({ provider: PiProvider, providers: ArraySchema(PiProvider) })),
     dryRun: Boolean3,
     skipCtx7: Boolean3,
     scope: optionalKey2(Literals(SCOPES)),
@@ -19565,9 +19698,9 @@ var stateMode2 = (context, input) => gen2(function* () {
   }));
 });
 import { copyFile as copyFile2, lstat as lstat9, mkdir as mkdir9, readdir as readdir5 } from "fs/promises";
-import { dirname as dirname13, join as join26, relative as relative6 } from "path";
+import { dirname as dirname13, join as join27, relative as relative6 } from "path";
 
-import { join as join25 } from "path";
+import { join as join26 } from "path";
 var LEGACY_FOLDERS = {
   holyclaude: ".holyclaude",
   holycodex: ".holycodex"
@@ -19723,7 +19856,7 @@ var byFolder = (paths) => {
   return folders;
 };
 var convertibleFolders = (source, files) => byFolder(source === "holyclaude" ? files.filter((path) => path.startsWith("intents/")).map((path) => path.slice(8)) : files.filter((path) => !path.startsWith(".")));
-var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join25(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
+var legacyFoldersWithState = (root) => filter3(["holyclaude", "holycodex"], (source) => listFiles(join26(root, LEGACY_FOLDERS[source])).pipe(map4((files) => convertibleFolders(source, files).size > 0))).pipe(map4((sources) => sources.map((source) => LEGACY_FOLDERS[source])));
 var isoOf = (millis) => {
   const date = new Date(millis);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
@@ -19844,13 +19977,13 @@ var holyclaudeAssignment = (legacy, roleTask, siblings) => {
 };
 var gatherHolyclaude = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holyclaude;
-  const legacy = join25(root, folderName);
+  const legacy = join26(root, folderName);
   const intents = convertibleFolders("holyclaude", yield* listFiles(legacy));
   if (intents.size === 0)
     return;
   const state = collector("holyclaude");
   for (const [folder, inside] of intents) {
-    const base = join25(legacy, "intents", folder);
+    const base = join26(legacy, "intents", folder);
     const shown = (relative) => `${folderName}/intents/${folder}/${relative}`;
     if (!inside.includes("intent.json")) {
       unconvertible(state, shown("").slice(0, -1), "the folder has no intent.json");
@@ -19858,7 +19991,7 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     }
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.json$/.test(path));
     const notes = inside.filter((path) => path !== "intent.json" && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join25(base, "intent.json"));
+    const read = yield* readLegacy(() => HolyclaudeIntent, "json", join26(base, "intent.json"));
     const intent = yield* intentRecord(directory, shown("intent.json"), "problem" in read ? read : holyclaudeIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.json"), intent.problem);
@@ -19869,10 +20002,10 @@ var gatherHolyclaude = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join25(base, path), to: join25(target, path) });
+      state.notes.push({ from: join26(base, path), to: join26(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join25(base, path));
+      const assignment = yield* readLegacy(() => HolyclaudeAssignment, "json", join26(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (assignment.value.intent_id !== intent.value.intent.id)
@@ -19974,13 +20107,13 @@ var holycodexAssignment = (legacy, roleTask, intent, siblings) => {
 var TRANSACTION_FILE = ".holycodex-transaction.toon";
 var gatherHolycodex = (root, directory) => gen2(function* () {
   const folderName = LEGACY_FOLDERS.holycodex;
-  const legacy = join25(root, folderName);
+  const legacy = join26(root, folderName);
   const folders = convertibleFolders("holycodex", yield* listFiles(legacy));
   if (folders.size === 0)
     return;
   const state = collector("holycodex");
   for (const [folder, inside] of folders) {
-    const base = join25(legacy, folder);
+    const base = join26(legacy, folder);
     const shown = (relative) => `${folderName}/${folder}/${relative}`;
     if (!inside.includes("intent.toon")) {
       unconvertible(state, `${folderName}/${folder}`, "the folder has no intent.toon");
@@ -19994,7 +20127,7 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
       });
     const assignmentFiles = inside.filter((path) => /^assignments\/[^/]+\.toon$/.test(path));
     const notes = inside.filter((path) => path !== "intent.toon" && path !== TRANSACTION_FILE && !assignmentFiles.includes(path) && !path.endsWith(".tmp"));
-    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join25(base, "intent.toon"));
+    const read = yield* readLegacy((raw) => typeof raw === "object" && raw !== null && ("schema_version" in raw) && raw.schema_version === "holycodex-intent-0" ? HolycodexIntentV0 : HolycodexIntent, "toon", join26(base, "intent.toon"));
     const intent = yield* intentRecord(directory, shown("intent.toon"), "problem" in read ? read : holycodexIntent(read.value));
     if ("problem" in intent) {
       unconvertible(state, shown("intent.toon"), intent.problem);
@@ -20005,10 +20138,10 @@ var gatherHolycodex = (root, directory) => gen2(function* () {
     state.records.push(intent.value.record);
     const target = intentFolder(directory, intent.value.intent);
     for (const path of notes)
-      state.notes.push({ from: join25(base, path), to: join25(target, path) });
+      state.notes.push({ from: join26(base, path), to: join26(target, path) });
     const decoded = [];
     for (const path of assignmentFiles) {
-      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join25(base, path));
+      const assignment = yield* readLegacy(() => HolycodexAssignment, "toon", join26(base, path));
       if ("problem" in assignment)
         unconvertible(state, shown(path), assignment.problem);
       else if (mapId("intent", assignment.value.intent_id) !== intent.value.intent.id)
@@ -20137,7 +20270,7 @@ var mentionsOf = (root, folders) => gen2(function* () {
   const names = yield* io(root, () => readdir5(root, { withFileTypes: true }).then((entries) => entries.filter((entry) => entry.isFile()).map((entry) => entry.name)));
   const hits = [];
   for (const name of names.toSorted()) {
-    const text = yield* readText(join26(root, name));
+    const text = yield* readText(join27(root, name));
     if (text !== undefined && folders.some((folder) => text.includes(folder)))
       hits.push(name);
   }
@@ -20179,7 +20312,7 @@ var migrate = (context, input) => gen2(function* () {
     }));
   }));
 });
-import { join as join27 } from "path";
+import { join as join28 } from "path";
 var setting = (raw) => raw?.trim() || undefined;
 var WorkflowSettings = Struct({
   disableWorkflows: optionalKey2(Boolean3),
@@ -20205,11 +20338,11 @@ var workflowAvailability = (options, root) => gen2(function* () {
     return options.workflowsAvailable;
   if (host === "pi" || env.CLAUDE_CODE_DISABLE_WORKFLOWS === "1")
     return false;
-  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join27(homeDirectory(env), ".claude");
+  const claudeDir = firstNonEmpty(env.CLAUDE_CONFIG_DIR) ?? join28(homeDirectory(env), ".claude");
   return !(yield* forEach2([
-    join27(claudeDir, "settings.json"),
-    join27(root, ".claude", "settings.json"),
-    join27(root, ".claude", "settings.local.json")
+    join28(claudeDir, "settings.json"),
+    join28(root, ".claude", "settings.json"),
+    join28(root, ".claude", "settings.local.json")
   ], disables)).includes(true);
 });
 var executionConfig = (options, root) => gen2(function* () {
@@ -21305,7 +21438,7 @@ var ASSIGNMENT_COMMANDS = [
 ];
 import { mkdir as mkdir10, mkdtemp as mkdtemp4, rm as rm10 } from "fs/promises";
 import { tmpdir as tmpdir2 } from "os";
-import { join as join28 } from "path";
+import { join as join29 } from "path";
 class BrowserLaunchFailed extends TaggedError2("BrowserLaunchFailed") {
   get message() {
     return this.reason;
@@ -21397,9 +21530,9 @@ var launch = (host, options) => scoped2(gen2(function* () {
     return yield* failed3(`no Chromium was found; ${options.chromiumFix}`);
   const base = yield* acquireRelease2(host.temporaryDirectory("holyagent-browser-"), (path) => host.removeDirectory(path));
   const folders = {
-    profile: join28(base, FOLDERS.profile),
-    config: join28(base, FOLDERS.config),
-    harness: join28(base, FOLDERS.harness)
+    profile: join29(base, FOLDERS.profile),
+    config: join29(base, FOLDERS.config),
+    harness: join29(base, FOLDERS.harness)
   };
   for (const folder of Object.values(folders))
     yield* host.makeDirectory(folder);
@@ -21464,12 +21597,12 @@ var liveHost = {
     },
     catch: (cause) => failed3(`cannot start ${spec.command}: ${reason(cause)}`)
   }),
-  devToolsPort: (profile) => tryPromise2(() => Bun.file(join28(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
+  devToolsPort: (profile) => tryPromise2(() => Bun.file(join29(profile, "DevToolsActivePort")).text()).pipe(map4(parseDevToolsActivePort), orElseSucceed2(() => {
     return;
   })),
   answers: (url) => tryPromise2(() => fetch(url, { signal: AbortSignal.timeout(1000) })).pipe(map4((response) => response.ok), orElseSucceed2(() => false)),
   temporaryDirectory: (prefix) => tryPromise2({
-    try: () => mkdtemp4(join28(tmpdir2(), prefix)),
+    try: () => mkdtemp4(join29(tmpdir2(), prefix)),
     catch: (cause) => failed3(`cannot create a temporary directory: ${reason(cause)}`)
   }),
   makeDirectory: (path) => tryPromise2({
@@ -21585,11 +21718,11 @@ var setupNotice = (env, cwd) => {
 };
 import { lstat as lstat10, mkdir as mkdir11, open as open7 } from "fs/promises";
 import { tmpdir as tmpdir3, userInfo as userInfo2 } from "os";
-import { join as join29 } from "path";
+import { join as join30 } from "path";
 var SAFE_SESSION = /^[\w.-]{1,80}$/;
 var isSessionId = (id) => id !== undefined && SAFE_SESSION.test(id) && !/^\.+$/.test(id);
-var markers = () => join29(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo2().username).toString().replace(/[^\w.-]/g, "_")}`);
-var markerOf = (sessionId) => join29(markers(), sessionId);
+var markers = () => join30(tmpdir3(), `holyagent-sessions-${(process.getuid?.() ?? userInfo2().username).toString().replace(/[^\w.-]/g, "_")}`);
+var markerOf = (sessionId) => join30(markers(), sessionId);
 var ensureMarkers = () => {
   const folder = markers();
   const uid = process.getuid?.();
@@ -29569,31 +29702,106 @@ var runInteractive = fn2("runInteractive")(function* (options) {
   const line = { kind: "line", notes: [] };
   if (options.undo || inCloudSession(options.env))
     return line;
+  const fallbackReason = tuiFallbackReason(options);
+  const combined = fallbackReason === undefined ? options.combined : undefined;
   const piUsed = yield* piInUse(options.env);
-  if (!piUsed)
+  if (!piUsed && combined === undefined)
     return line;
   const config = yield* loadPiConfig(options.env, options.cwd, options.scope).pipe(catchTag2("SetupFailure", () => succeed6(undefined)));
   const preview = yield* t3Offer(options.env, options.cwd, { ...options, piUsed, config });
   const features = config === undefined || !config.pi.enable ? undefined : featureSwitches(config.pi.features);
   const offers = features === undefined ? [] : capabilityOffers(options.form).filter((offer) => options.t3Workflow !== true || options.form.form === "normal" && offer.unavailable === undefined && (offer.feature === "browserUse" || offer.feature === "computerUse"));
-  if (preview === undefined && offers.length === 0)
+  if (preview === undefined && offers.length === 0 && combined === undefined)
     return line;
-  const reason = tuiFallbackReason(options);
-  if (reason !== undefined)
-    return preview === undefined ? line : fallback(reason);
+  if (fallbackReason !== undefined)
+    return preview === undefined ? line : fallback(fallbackReason);
   const load = options.load ?? (options.t3Workflow ? () => loadPackagedSetupTui() : (env, notify) => loadSetupTui(env, { notify }));
   const loaded = yield* load(options.env, options.notify).pipe(catchTag2("TuiUnavailable", (error) => succeed6(error)));
   const fail = options.t3Workflow ? stopped : fallback;
   if (loaded instanceof TuiUnavailable)
     return fail(`unavailable (${loaded.reason})`);
   const initialSwitches = features === undefined ? {} : features;
+  const piAvailable = piUsed && config?.pi.enable === true;
+  const providerChoices = piAvailable && config !== undefined && (combined !== undefined || options.previewPi !== undefined) ? { provider: config.pi.provider, providers: enabledPiProviders(config) } : undefined;
+  const withProviderChanges = (choices) => {
+    const selection = choices.piProviders;
+    return selection !== undefined && providerChoices !== undefined && selection.provider === providerChoices.provider && selection.providers.length === providerChoices.providers.length && selection.providers.every((provider) => providerChoices.providers.includes(provider)) ? {
+      worktrees: choices.worktrees,
+      deviceAccess: choices.deviceAccess,
+      capabilities: choices.capabilities,
+      ...choices.harnesses === undefined ? {} : { harnesses: choices.harnesses }
+    } : choices;
+  };
+  const failedReport = (report) => new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed");
+  const selectionOf = (choices) => ["pi", "claude"].filter((target) => choices.harnesses?.[target] === true);
+  const label = (target) => target === "pi" ? "Pi / T3 Code" : "Claude Code";
   let applyStarted = false;
+  let reviewedChoices;
+  let reviewSequence = 0;
+  let reviewedReplacement;
+  const replacementOf = (report) => report.lines.find((line) => line.startsWith("+ pi package: replace "));
   const input = {
     env: options.env,
-    offer: offerOf(preview, offers, options.form),
-    initial: { ...DEFAULT_CHOICES, capabilities: initialSwitches },
+    offer: {
+      ...offerOf(preview, offers, options.form),
+      ...providerChoices === undefined ? {} : { providers: PiProvider.literals },
+      ...combined === undefined ? {} : { harnesses: { piAvailable, scope: options.scope } }
+    },
+    initial: {
+      ...DEFAULT_CHOICES,
+      capabilities: initialSwitches,
+      ...providerChoices === undefined ? {} : { piProviders: providerChoices },
+      ...combined === undefined ? {} : { harnesses: { pi: piAvailable, claude: false } }
+    },
     dryRun: options.dryRun,
     review: (choices) => runPromise2(gen2(function* () {
+      if (combined !== undefined) {
+        const sequence = ++reviewSequence;
+        reviewedChoices = undefined;
+        const targets = selectionOf(choices);
+        if (targets.length === 0)
+          return yield* fail5(new Error("Enable at least one available harness."));
+        if (targets.includes("pi") && !piAvailable)
+          return yield* fail5(new Error("Pi is not available for setup here."));
+        const changed = changedSwitches(initialSwitches, choices.capabilities);
+        const plans = yield* forEach2(targets, (target, index) => combined.run(target, withProviderChanges(choices), changed, true, index > 0, true).pipe(map4((report) => ({ name: label(target), ...report }))));
+        const error = plans.find((plan) => !plan.ok);
+        if (error !== undefined)
+          return yield* fail5(new Error(`${error.name}: ${error.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed"}`));
+        const replacement = plans.flatMap((plan) => replacementOf(plan) ?? [])[0];
+        if (sequence === reviewSequence) {
+          reviewedChoices = choices;
+          reviewedReplacement = replacement;
+        }
+        return {
+          replacePiRegistration: replacement !== undefined,
+          file: undefined,
+          choices: [],
+          always: [],
+          harnesses: plans.map(({ name, lines }) => ({ name, lines }))
+        };
+      }
+      const chosen = withProviderChanges(choices);
+      if (options.previewPi !== undefined) {
+        const sequence = ++reviewSequence;
+        reviewedChoices = undefined;
+        const report = yield* options.previewPi(chosen, changedSwitches(initialSwitches, choices.capabilities));
+        if (!report.ok)
+          return yield* fail5(failedReport(report));
+        const replacement = replacementOf(report);
+        if (sequence === reviewSequence) {
+          reviewedChoices = choices;
+          reviewedReplacement = replacement;
+        }
+        if (replacement !== undefined || chosen.piProviders !== undefined)
+          return {
+            replacePiRegistration: replacement !== undefined,
+            file: undefined,
+            choices: [],
+            always: [],
+            harnesses: [{ name: label("pi"), lines: report.lines }]
+          };
+      }
       const next = preview === undefined ? undefined : yield* previewT3Settings(options.env, options.cwd, {
         ...choices,
         ...config === undefined ? {} : { config }
@@ -29603,8 +29811,24 @@ var runInteractive = fn2("runInteractive")(function* (options) {
       return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));
     })),
     apply: (choices, signal) => {
+      const chosen = withProviderChanges(choices);
+      if ((combined !== undefined || chosen.piProviders !== undefined) && reviewedChoices !== choices)
+        return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
+      const replacement = reviewedChoices === choices ? reviewedReplacement : undefined;
+      reviewedChoices = undefined;
+      reviewedReplacement = undefined;
       applyStarted = true;
-      return runPromise2(options.apply(choices, changedSwitches(initialSwitches, choices.capabilities)), { signal });
+      const changed = changedSwitches(initialSwitches, choices.capabilities);
+      const confirmReplacement = (report) => report.ok && replacementOf(report) === replacement ? void_3 : fail5(new Error("The Pi package plan changed. Review it again before replacing the previous registration."));
+      const applySingle = options.apply(chosen, changed, replacement !== undefined);
+      return runPromise2(combined === undefined ? replacement === undefined || options.previewPi === undefined ? applySingle : options.previewPi(chosen, changed).pipe(flatMap2(confirmReplacement), andThen2(applySingle)) : forEach2(selectionOf(choices), (target, index) => {
+        const replace = target === "pi" && replacement !== undefined;
+        const perform = combined.run(target, chosen, changed, options.dryRun, index > 0, replace);
+        return replace ? combined.run(target, chosen, changed, true, index > 0, true).pipe(flatMap2(confirmReplacement), andThen2(perform)) : perform;
+      }).pipe(map4((reports) => ({
+        ok: reports.length > 0 && reports.every(({ ok }) => ok),
+        lines: reports.flatMap(({ lines }) => lines)
+      }))), { signal });
     }
   };
   return yield* tryPromise2({
@@ -29685,7 +29909,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
     summary: target === "claude" ? "Configure the existing Claude plugin, preserving your settings" : "Configure HolyAgent for T3 Code, skipping every step already done",
     output: "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
-      "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
+      "Pi setup uses user scope by default and checks that T3 Code was opened at least once. It does not change Claude Code settings unless you also select Claude Code in bare interactive setup",
       "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
       "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
       "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
@@ -29697,7 +29921,7 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
       `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form does not offer the desktop capability; the normal form uses the official Cua Driver on PATH and does not install a Pi desktop package",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
-      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the installed public CLI loads the renderer from its own package",
+      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults"
     ],
     flags: {
@@ -29741,18 +29965,21 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
           message: "--undo takes no capability flag and no --form",
           hint: `Usage: holyagent ${usage}`
         });
-      const apply = (choices, chosen, notes = []) => gen2(function* () {
+      const apply = (choices, chosen, notes = [], selected) => gen2(function* () {
+        const selectedTarget = selected?.target ?? target;
         const report = yield* setup2(coreContext2(cwd, env), {
           scope: resolved.scope,
-          ...target === undefined ? { t3Workflow } : { target },
-          ...target === "claude" || installedPackageRoot === undefined ? {} : { installedPackageRoot },
+          ...selectedTarget === undefined ? { t3Workflow } : { target: selectedTarget },
+          ...selectedTarget === "claude" || installedPackageRoot === undefined ? {} : { installedPackageRoot },
+          ...selectedTarget !== "claude" && selected?.replacePiRegistration === true ? { replacePiRegistration: true } : {},
           undo: booleanFlag(args, "undo"),
           subagentCacheTtl,
-          dryRun: booleanFlag(args, "dry-run"),
-          skipCtx7: booleanFlag(args, "skip-ctx7"),
+          dryRun: selected?.dryRun ?? booleanFlag(args, "dry-run"),
+          skipCtx7: selected?.skipSharedPrerequisites === true || booleanFlag(args, "skip-ctx7"),
           ...choices.worktrees === undefined ? {} : { worktrees: choices.worktrees },
           ...choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess },
-          capabilities: chosen,
+          capabilities: selectedTarget === "claude" ? {} : chosen,
+          ...selectedTarget === "claude" || choices.piProviders === undefined ? {} : { piProviders: choices.piProviders },
           form
         });
         return {
@@ -29780,7 +30007,30 @@ var setupCommand = (target, usage = SETUP_USAGE) => {
         form,
         ...setupTui === undefined ? {} : { load: setupTui },
         notify: emit,
-        apply: (choices, chosen) => apply(choices, chosen)
+        apply: (choices, chosen, replacePiRegistration) => target === "pi" ? apply(choices, chosen, [], {
+          target: "pi",
+          dryRun: booleanFlag(args, "dry-run"),
+          skipSharedPrerequisites: false,
+          replacePiRegistration
+        }) : apply(choices, chosen),
+        ...surface === "public" && target === "pi" ? {
+          previewPi: (choices, chosen) => apply(choices, chosen, [], {
+            target: "pi",
+            dryRun: true,
+            skipSharedPrerequisites: false,
+            replacePiRegistration: true
+          })
+        } : {},
+        ...surface === "public" && target === undefined ? {
+          combined: {
+            run: (harness, choices, chosen, dryRun, skipSharedPrerequisites, replacePiRegistration) => apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+              target: harness,
+              dryRun,
+              skipSharedPrerequisites,
+              replacePiRegistration
+            })
+          }
+        } : {}
       });
       if (interactive.kind === "done")
         return printed(interactive.report);
@@ -29839,7 +30089,7 @@ var publicPiSetup = (target) => {
     flags: { ...flags, "non-interactive": "boolean" },
     notes: [
       ...target === undefined ? [
-        "Without a harness, setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options."
+        "In a terminal, bare setup opens a combined Pi and Claude Code review. Codex is not an available public setup target on this build. Unattended bare setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options."
       ] : [],
       ...command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? [],
       "--non-interactive is an alias for --no-tui. It uses default choices for omitted flags and does not read stdin for answers. Interactive setup remains the default in a terminal."
@@ -30050,7 +30300,7 @@ var readInputBy = (host, pick, inline) => gen2(function* () {
   return yield* decodeJsonInputBy(text, pick, source);
 });
 
-import { isAbsolute as isAbsolute10, join as join30, relative as relative7 } from "path";
+import { isAbsolute as isAbsolute10, join as join31, relative as relative7 } from "path";
 var RELEASE = String5.check(isPattern2(/^0\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/));
 var VERSION_RESPONSE = fromJsonString2(RELEASE);
 var REGISTRY = "https://registry.npmjs.org/";
@@ -30097,7 +30347,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     if (root.exitCode !== 0)
       return failure("Could not verify npm's global installation path.", root);
     const location = root.stdout.trim();
-    if (!isAbsolute10(location) || relative7(registeredRoot, join30(location, "holyagent")) !== "")
+    if (!isAbsolute10(location) || relative7(registeredRoot, join31(location, "holyagent")) !== "")
       return failure("Pi is loading the installed HolyAgent from a different location than npm's global path. Update it with the package manager that installed it.");
   }
   const selected = yield* shell.run("npm", ["view", `holyagent@${target ?? "latest"}`, "version", "--json", "--registry", REGISTRY], { cwd });
@@ -30135,7 +30385,7 @@ var updateInstallation = fn2("updateInstallation")(function* (env, requested, dr
     source
   ], { cwd });
   if (registeredRoot !== undefined) {
-    const manifest = yield* readJsonObject(join30(registeredRoot, "package.json")).pipe(option2);
+    const manifest = yield* readJsonObject(join31(registeredRoot, "package.json")).pipe(option2);
     if (npm.exitCode !== 0 || isNone2(manifest) || manifest.value.name !== "holyagent" || manifest.value.version !== version2)
       return failure(`Could not verify HolyAgent ${version2} at the registered npm path. Reinstall that release in the same npm global prefix and check holyagent --version.`, npm);
   } else if (npm.exitCode !== 0)
@@ -30196,7 +30446,11 @@ var agentCommands = COMMANDS.filter(({ path: [group] }) => group !== "setup" && 
 var commandsFor = (surface) => surface === "agent" ? agentCommands : surface === "public" ? publicCommands : COMMANDS;
 var listed = (commands, host) => commands.filter((command) => command.hosts === undefined || command.hosts.includes(host));
 var topHelp = (commands, words, surface) => [
-  ...surface === "public" ? ["Manage your HolyAgent installation.", "Run holyagent <command> [options]."] : [
+  ...surface === "public" ? [
+    "Manage your HolyAgent installation.",
+    "Run `holyagent setup` in a terminal to choose integrations.",
+    "Run holyagent <command> [options]."
+  ] : [
     "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
     "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure."
   ],

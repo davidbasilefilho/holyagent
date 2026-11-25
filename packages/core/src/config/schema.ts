@@ -39,6 +39,12 @@ export const PiProvider = Schema.Literals(["kimi-coding-global", "openai-codex"]
 /** One model provider of the `pi` section. */
 export type PiProvider = typeof PiProvider.Type
 
+/** Enabled Pi model providers and the default for routes without their own provider. */
+export interface PiProviderSelection {
+  readonly provider: PiProvider
+  readonly providers: ReadonlyArray<PiProvider>
+}
+
 /** Reasoning levels that Pi's `--thinking` flag takes. */
 export const Thinking = Schema.Literals(["off", "minimal", "low", "medium", "high", "xhigh", "max"])
 /** One reasoning level. */
@@ -194,6 +200,7 @@ const CAPABILITY_FIELDS = Object.fromEntries(
 const PI_FIELDS = {
   enable: defaulted(Enabled, true),
   provider: defaulted(PiProvider, "kimi-coding-global"),
+  providers: Schema.optionalKey(Schema.NonEmptyArray(PiProvider)),
   profile: Schema.optionalKey(Schema.Literals(["normal", "fast"])),
   routes: defaulted(Schema.Struct(ROUTE_FIELDS), {}),
   features: defaulted(

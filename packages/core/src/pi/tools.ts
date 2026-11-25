@@ -221,7 +221,7 @@ export const toolArgs = (
 
 /**
  * Whether a tool name matches a `--tools` or `--exclude-tools` entry: an exact name, or a pattern
- * whose `*` stands for any run of characters (`computer_use_*`).
+ * whose `*` stands for any run of characters (`mcp__browse__*`).
  */
 export const toolMatches = (pattern: string, name: string): boolean => {
   const original = canonicalPiToolName(name)

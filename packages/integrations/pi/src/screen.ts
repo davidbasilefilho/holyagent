@@ -78,11 +78,10 @@ export const screenServersFor = (
 export const refuseUnassignedDesktop = (
   event: { readonly toolName: string },
   permitted: boolean,
-  managedSpecialist: boolean = true,
 ): ToolCallEventResult | undefined => {
   const matches = (patterns: ReadonlyArray<string>) =>
     patterns.some((pattern) => toolMatches(pattern, event.toolName))
-  if (managedSpecialist && matches(LEGACY_COMPUTER_USE_TOOLS))
+  if (matches(LEGACY_COMPUTER_USE_TOOLS))
     return { block: true, reason: "HolyAgent no longer uses the legacy Pi desktop extension." }
   if (!toolMatches(CUA_DRIVER_NAMESPACE, event.toolName)) return undefined
   return permitted && COMPUTER_USE_TOOLS.includes(event.toolName)

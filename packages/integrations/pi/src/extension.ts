@@ -1825,7 +1825,7 @@ export const createExtension =
     pi.on("tool_call", (event, ctx) => {
       const gate = () =>
         refuseExcludedTool(event, held?.excluded ?? []) ??
-        refuseUnassignedDesktop(event, held?.desktopAllowed === true && isChild(), isChild()) ??
+        refuseUnassignedDesktop(event, held?.desktopAllowed === true && isChild()) ??
         (isChild()
           ? (refuseUnassignedWebTool(event, childAgent(pi.getSessionName())) ??
             refusePrematureWebFallback(

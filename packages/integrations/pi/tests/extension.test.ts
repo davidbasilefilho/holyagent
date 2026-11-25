@@ -3246,11 +3246,13 @@ describe("the root's excluded tools", () => {
     expect(await api.emit("tool_call", call("read"))).toEqual([undefined])
   })
 
-  test("a project's pi.enable false still lifts them for another role", async () => {
+  test("a project's pi.enable false leaves only the desktop gate in an ordinary session", async () => {
     const { api, delivered } = await run(configs(project({ enable: false })), { flag: "session" })
     expect(delivered).toBeUndefined()
     for (const name of EXCLUDED)
-      expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+      expect(await api.emit("tool_call", call(name))).toEqual(
+        name.startsWith("computer_use_") ? blocked : [undefined],
+      )
   })
 
   test("a project can add an exclusion but not take one away", async () => {
@@ -3424,11 +3426,13 @@ describe("the root's excluded tools", () => {
     }
   })
 
-  test("other sessions and a pi.enable that is off are not held to root exclusions", async () => {
+  test("non-root sessions keep their desktop gate until the user disables Pi integration", async () => {
     for (const options of [{ flag: "specialist" }, { flag: "session" }]) {
       const { api } = await run(healthy("/missing"), options)
       for (const name of EXCLUDED)
-        expect(await api.emit("tool_call", call(name))).toEqual([undefined])
+        expect(await api.emit("tool_call", call(name))).toEqual(
+          name.startsWith("computer_use_") ? blocked : [undefined],
+        )
     }
     const worker = await run(healthy("/missing"), { sessionName: "worker-implementation#a1b2c3d4" })
     for (const name of EXCLUDED) {
@@ -4244,6 +4248,24 @@ describe("the MCP servers of the screen capability", () => {
         name,
       ).toEqual(name.endsWith("-visual") ? ["holyagent_cua_driver"] : [])
     expect(await registered("my chat#1")).toEqual([])
+  })
+
+  test("a managed ordinary session does not use a retained legacy desktop tool", async () => {
+    const { api } = await run(configWith({}), {
+      flag: "session",
+      env: DISPLAY,
+      startOnly: true,
+    })
+    expect(api.mcpServers).toEqual([])
+    expect(
+      await api.emit("tool_call", {
+        toolName: "computer_use_click",
+        toolCallId: "t1",
+        input: {},
+      }),
+    ).toEqual([
+      { block: true, reason: "HolyAgent no longer uses the legacy Pi desktop extension." },
+    ])
   })
 
   test("a headless screen specialist registers holyagent's browser-server, which runs the browser-use server, from the home folder", async () => {

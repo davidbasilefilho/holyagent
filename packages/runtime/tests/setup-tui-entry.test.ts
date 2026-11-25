@@ -54,7 +54,8 @@ describe("showSetup when the renderer is destroyed", () => {
     })
     const run = Effect.runPromise(showSetup(Effect.succeed(renderer), input(signals)))
     await Bun.sleep(20)
-    // Enter on the review, then on its Apply action.
+    // Focus Review choices, open the plan, then activate Apply.
+    mockInput.pressKey("\u001B[F")
     mockInput.pressEnter()
     await Bun.sleep(20)
     mockInput.pressEnter()

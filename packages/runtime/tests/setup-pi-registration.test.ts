@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test"
+import { readFileSync, writeFileSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join, relative } from "node:path"
 
@@ -25,15 +26,20 @@ const installedManifest = {
   pi: { extensions: ["./extensions"] },
 }
 
-const fixture = () => {
+const fixture = (respond?: Parameters<typeof fakeShell>[0]["respond"]) => {
   const cwd = join(directory, "project")
   const installedPackageRoot = join(directory, "global install", "node_modules", "holyagent")
   const agent = join(directory, "pi")
   const env = { HOLYAGENT_HOME: directory, USERPROFILE: directory, PI_CODING_AGENT_DIR: agent }
   const global = join(agent, "settings.json")
   const project = join(cwd, ".pi", "settings.json")
-  const shell = fakeShell({ commands: ["pi"] })
-  const run = (scope: Scope, dryRun = false, packageRoot = installedPackageRoot) =>
+  const shell = fakeShell({ commands: ["pi"], ...(respond === undefined ? {} : { respond }) })
+  const run = (
+    scope: Scope,
+    dryRun = false,
+    packageRoot = installedPackageRoot,
+    replacePiRegistration = false,
+  ) =>
     Effect.runPromise(
       installPiPackages(env, {
         scope,
@@ -41,6 +47,7 @@ const fixture = () => {
         dryRun,
         form: "headless",
         installedPackageRoot: packageRoot,
+        replacePiRegistration,
       }).pipe(Effect.provide(shell.layer)),
     )
   const seed = async (file: string, sources: ReadonlyArray<unknown> = []) => {
@@ -119,9 +126,7 @@ test("an npm release in Pi settings requires a deliberate migration", async () =
   await expect(run("user")).rejects.toThrow(
     'HolyAgent is already configured as "npm:holyagent@0.3.4"',
   )
-  await expect(run("local", true)).rejects.toThrow(
-    "review and remove the existing Pi package entry",
-  )
+  await expect(run("local", true)).rejects.toThrow("interactive setup at its scope")
   expect(shell.calls).toEqual([])
   expect(await readFile(global, "utf8")).toBe(raw)
 })
@@ -194,3 +199,65 @@ test("disabled Pi configuration never validates or registers the supplied path",
   ])
   expect(shell.calls).toEqual([])
 })
+
+test.each([false, true])(
+  "the Windows Bunx Git migration keeps the previous entry until a successful install (failure: %s)",
+  async (fail) => {
+    const version = `${release.version}-dev.2026-11-25.18-15-00.g1e379bf`
+    const source = `npm:holyagent@${version}`
+    const sink = fixture((line) => {
+      if (line !== `pi install ${source}`) return undefined
+      const existing = JSON.parse(readFileSync(sink.global, "utf8"))
+      expect(existing.packages.some((p: { source?: string }) => p.source === previous.source)).toBe(
+        true,
+      )
+      if (fail) return { exitCode: 1, stderr: "registry unavailable" }
+      writeFileSync(
+        sink.global,
+        JSON.stringify({ ...existing, packages: [...existing.packages, source] }),
+      )
+      return { exitCode: 0 }
+    })
+    const previous = {
+      source: "git:github.com/davidbasilefilho/holyagent@release/0.3.4/feat/final-guidance-events",
+      extensions: ["extensions/holyagent.js"],
+    }
+    const root = join(
+      directory,
+      "Temp",
+      "bunx-1275120565-holyagent@dev",
+      "node_modules",
+      "holyagent",
+    )
+    await writeJson(join(root, "package.json"), { ...installedManifest, version })
+    await mkdir(join(root, "extensions"))
+    await writeFile(join(root, "extensions", "holyagent.js"), "export default () => {}")
+    await sink.seed(sink.global, [previous, "npm:unrelated@1.0.0"])
+    const initial = await Bun.file(sink.global).json()
+    await writeJson(sink.global, { ...initial, hideThinkingBlock: true })
+    const original = await readFile(sink.global, "utf8")
+    await expect(sink.run("user", false, root)).rejects.toThrow("interactive setup")
+    const plan = await sink.run("user", true, root, true)
+    expect(plan.join("\n")).toContain(`replace "${previous.source}" with "${source}"`)
+    expect(plan.join("\n")).not.toContain(root)
+    expect(sink.shell.calls).toHaveLength(0)
+    expect(await readFile(sink.global, "utf8")).toBe(original)
+    const applied = await sink.run("user", false, root, true)
+    expect(sink.shell.lines()).toEqual([`pi install ${source}`])
+    if (fail) {
+      expect(applied.some((line) => line.includes("registry unavailable"))).toBe(true)
+      expect(await readFile(sink.global, "utf8")).toBe(original)
+    } else {
+      const saved = await Bun.file(sink.global).json()
+      expect(saved).toEqual({
+        ...initial,
+        hideThinkingBlock: true,
+        packages: initial.packages.map((p: { source?: string }) =>
+          p.source === previous.source ? { ...p, source } : p,
+        ),
+      })
+      expect((await sink.run("user", false, root, true)).join("\n")).toContain("already listed")
+      expect(sink.shell.calls).toHaveLength(1)
+    }
+  },
+)

@@ -1,3 +1,4 @@
+import type { PiProvider } from "../../config/schema.ts"
 import { resultHeadline, summarizeResult } from "./result.ts"
 import { cells, clip, pad, wrap, wrapItems } from "./text.ts"
 import { glyphs, type Look, type Tone } from "./theme.ts"
@@ -16,7 +17,17 @@ export interface Segment {
 export type Line = ReadonlyArray<Segment>
 
 /** A row of the choose screen: a T3 row, or `capability:<pi.features key>`. */
-export type RowId = "pi" | "deviceAccess" | "worktrees" | `capability:${string}`
+export type RowId =
+  | `provider:${PiProvider}`
+  | "deviceAccess"
+  | "worktrees"
+  | "enablePi"
+  | "enableClaude"
+  | `capability:${string}`
+
+const tabs = ["pi", "claude", "codex"] as const
+type Tab = (typeof tabs)[number]
+const tabLabels: Record<Tab, string> = { pi: "Pi", claude: "Claude Code", codex: "Codex" }
 
 /** The screens, in the order a run goes through them. */
 export type Screen = "choose" | "review" | "applying" | "done"
@@ -24,6 +35,7 @@ export type Screen = "choose" | "review" | "applying" | "done"
 /** What the screens show and the keys change; every transition below is a pure function of it. */
 export interface State {
   readonly screen: Screen
+  readonly tab: Tab
   /** The focused row of the choose screen, an index into the rows. */
   readonly focus: number
   /** The focused action of the review screen, an index into {@link reviewActions}. */
@@ -65,11 +77,14 @@ export type Control =
   | "choose-cancel"
   | { readonly row: RowId }
   | { readonly action: ReviewAction }
+  | { readonly tab: Tab }
+  | { readonly scrollTo: number }
 
 const LABELS = {
-  pi: "Pi provider",
   deviceAccess: "Agent device access",
   worktrees: "New threads in worktrees",
+  enablePi: "Configure Pi",
+  enableClaude: "Configure Claude Code",
 } as const
 
 /** The capability a row switches, or `undefined` for a T3 row. */
@@ -80,25 +95,47 @@ const capabilityOf = (row: RowId, offer: Offer) =>
       )
     : undefined
 
-const labelOf = (row: RowId, offer: Offer): string =>
-  row === "pi" || row === "deviceAccess" || row === "worktrees"
-    ? LABELS[row]
-    : (capabilityOf(row, offer)?.name ?? row)
+const providerName: Record<PiProvider, string> = {
+  "kimi-coding-global": "Kimi for Coding (global)",
+  "openai-codex": "OpenAI Codex (ChatGPT)",
+}
+
+const providerOf = (row: RowId, offer: Offer) =>
+  offer.providers?.find((provider) => row === `provider:${provider}`)
+
+const labelOf = (row: RowId, offer: Offer): string => {
+  const provider = providerOf(row, offer)
+  if (provider !== undefined) return providerName[provider]
+  return row.startsWith(CAPABILITY_ROW)
+    ? (capabilityOf(row, offer)?.name ?? row)
+    : LABELS[row as keyof typeof LABELS]
+}
 
 /**
  * The rows the machine allows: with T3 work, the Pi provider, the device row only with a host and
  * worktrees; then one row for each capability.
  */
-export const rowsOf = (offer: Offer): ReadonlyArray<RowId> => [
-  ...(offer.t3 ? (["pi"] as const) : []),
-  ...(offer.t3 && offer.device !== undefined ? (["deviceAccess"] as const) : []),
-  ...(offer.t3 && offer.worktrees ? (["worktrees"] as const) : []),
-  ...offer.capabilities.map((capability): RowId => `${CAPABILITY_ROW}${capability.feature}`),
-]
+export const rowsOf = (offer: Offer, state?: State): ReadonlyArray<RowId> => {
+  const selected = state?.choices.harnesses
+  if (selected !== undefined && offer.harnesses !== undefined) {
+    if (state?.tab === "codex") return []
+    if (state?.tab === "claude") return ["enableClaude"]
+    if (!offer.harnesses.piAvailable) return []
+    if (!selected.pi) return ["enablePi"]
+  }
+  return [
+    ...(selected === undefined ? [] : (["enablePi"] as const)),
+    ...(offer.providers ?? []).map((provider): RowId => `provider:${provider}`),
+    ...(offer.t3 && offer.device !== undefined ? (["deviceAccess"] as const) : []),
+    ...(offer.t3 && offer.worktrees ? (["worktrees"] as const) : []),
+    ...offer.capabilities.map((capability): RowId => `${CAPABILITY_ROW}${capability.feature}`),
+  ]
+}
 
 /** The state a run starts in. */
 export const initialState = (choices: Choices): State => ({
   screen: "choose",
+  tab: "pi",
   focus: 0,
   action: 0,
   scroll: 0,
@@ -128,7 +165,28 @@ const stepOf = (key: Key): -1 | 1 | 0 =>
 const wrapped = (index: number, step: number, length: number) =>
   (((index + step) % length) + length) % length
 
+const toggleProvider = (choices: Choices, id: PiProvider): Choices => {
+  const selection = choices.piProviders
+  if (selection === undefined) return choices
+  const providers = selection.providers.includes(id)
+    ? selection.providers.filter((p) => p !== id)
+    : [...selection.providers, id]
+  const provider = providers.includes(selection.provider)
+    ? selection.provider
+    : (providers[0] ?? selection.provider)
+  return { ...choices, piProviders: { provider, providers } }
+}
+
 const toggled = (choices: Choices, row: RowId): Choices => {
+  if (row === "provider:kimi-coding-global" || row === "provider:openai-codex")
+    return toggleProvider(
+      choices,
+      row === "provider:openai-codex" ? "openai-codex" : "kimi-coding-global",
+    )
+  if (choices.harnesses !== undefined && (row === "enablePi" || row === "enableClaude")) {
+    const key = row === "enablePi" ? "pi" : "claude"
+    return { ...choices, harnesses: { ...choices.harnesses, [key]: !choices.harnesses[key] } }
+  }
   if (row === "deviceAccess") return { ...choices, deviceAccess: !choices.deviceAccess }
   if (row === "worktrees") return { ...choices, worktrees: !choices.worktrees }
   if (!row.startsWith(CAPABILITY_ROW)) return choices
@@ -159,15 +217,28 @@ export const press = (
 ): { readonly state: State; readonly command?: Command } => {
   if (state.screen === "choose") {
     if (isQuit(key)) return { state, command: "cancel" }
-    const step = stepOf(key)
-    if (step !== 0) return { state: { ...state, focus: wrapped(state.focus, step, rows.length) } }
-    if (!key.ctrl && key.name === "space") {
-      const row = rows[state.focus]
-      return row === undefined
-        ? { state }
-        : { state: { ...state, choices: toggled(state.choices, row) } }
+    if (
+      state.choices.harnesses !== undefined &&
+      !key.ctrl &&
+      (key.name === "left" || key.name === "right")
+    ) {
+      const tab = tabs[wrapped(tabs.indexOf(state.tab), key.name === "left" ? -1 : 1, tabs.length)]
+      return { state: { ...state, tab: tab ?? state.tab, focus: 0 } }
     }
-    if (isEnter(key))
+    if (!key.ctrl && key.name === "end") return { state: { ...state, focus: rows.length } }
+    const step = stepOf(key)
+    if (step !== 0)
+      return { state: { ...state, focus: wrapped(state.focus, step, rows.length + 1) } }
+    if (isEnter(key) && !key.ctrl) {
+      const row = rows[state.focus]
+      if (row !== undefined)
+        return {
+          state: {
+            ...state,
+            focus: row === "enablePi" ? 0 : state.focus,
+            choices: toggled(state.choices, row),
+          },
+        }
       return {
         state: {
           ...state,
@@ -179,6 +250,7 @@ export const press = (
         },
         command: "review",
       }
+    }
     return { state }
   }
   if (state.screen === "review") {
@@ -206,23 +278,35 @@ export const press = (
   if (paged !== undefined) return { state: paged }
   if (!key.ctrl && key.name === "d")
     return { state: { ...state, details: !state.details, scroll: 0 } }
-  return isQuit(key) || isEnter(key) || key.name === "space"
-    ? { state, command: "close" }
-    : { state }
+  return isQuit(key) || isEnter(key) ? { state, command: "close" } : { state }
 }
 
 /** Pointer controls use the same transitions and preconditions as the keyboard. */
-export const pressControl = (state: State, rows: ReadonlyArray<RowId>, control: Control) => {
+export const pressControl = (
+  state: State,
+  rows: ReadonlyArray<RowId>,
+  control: Control,
+  scroll: Scroll = FIXED,
+) => {
   const key = (name: string, from = state) => press(from, rows, { name, ctrl: false })
   if (typeof control === "object") {
+    if ("tab" in control)
+      return state.screen === "choose" && state.choices.harnesses !== undefined
+        ? { state: { ...state, tab: control.tab, focus: 0 } }
+        : { state }
+    if ("scrollTo" in control)
+      return (state.screen === "review" || state.screen === "done") && scroll.max > 0
+        ? { state: { ...state, scroll: Math.min(scroll.max, Math.max(0, control.scrollTo)) } }
+        : { state }
     if ("row" in control) {
       const focus = rows.indexOf(control.row)
-      return state.screen === "choose" && focus >= 0 ? key("space", { ...state, focus }) : { state }
+      return state.screen === "choose" && focus >= 0 ? key("enter", { ...state, focus }) : { state }
     }
     const action = reviewActions(state).indexOf(control.action)
     return state.screen === "review" && action >= 0 ? key("enter", { ...state, action }) : { state }
   }
-  if (state.screen === "choose" && control === "choose-review") return key("enter")
+  if (state.screen === "choose" && control === "choose-review")
+    return key("enter", { ...state, focus: rows.length })
   if (state.screen === "choose" && control === "choose-cancel") return key("escape")
   if (state.screen === "done" && control === "details") return key("d")
   if (state.screen === "done" && control === "close") return key("q")
@@ -277,15 +361,13 @@ const keyLines = (items: ReadonlyArray<string>, width: number): ReadonlyArray<Li
   wrapItems(items, width, KEY_GAP).map((text) => [segment(text, "option")])
 
 const chooseKeys = (focus: string, width: number): ReadonlyArray<Line> =>
-  wrapItems([focus, "Space toggle", "Enter review", "Esc cancel"], width, KEY_GAP).map((line) =>
+  wrapItems([focus, "Enter select", "Esc cancel"], width, KEY_GAP).map((line) =>
     line.split(KEY_GAP).flatMap((text, index): Line => {
-      const click =
-        text === "Enter review"
-          ? "choose-review"
-          : text === "Esc cancel"
-            ? "choose-cancel"
-            : undefined
-      const item: Segment = { text, tone: "option", ...(click === undefined ? {} : { click }) }
+      const item: Segment = {
+        text,
+        tone: "option",
+        ...(text === "Esc cancel" ? { click: "choose-cancel" } : {}),
+      }
       return index === 0 ? [item] : [segment(KEY_GAP), item]
     }),
   )
@@ -299,8 +381,11 @@ const hintLines = (text: string, width: number): ReadonlyArray<Line> =>
   wrap(text, width).map((part) => [segment(part, "hint")])
 
 const hintOf = (row: RowId, offer: Offer): string => {
-  if (row === "pi")
-    return "Pi runs in T3 Code as its own provider; it stays on while pi.enable is true, so there is nothing to choose."
+  if (row === "enablePi") return "Include Pi and T3 Code in the combined review."
+  if (row === "enableClaude")
+    return "Include the existing Claude Code plugin in the combined review."
+  if (providerOf(row, offer) !== undefined)
+    return "Enable more than one provider if you use both. The default is used for routes without their own provider."
   if (row === "deviceAccess")
     return `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.`
   if (row === "worktrees")
@@ -312,21 +397,27 @@ const hintOf = (row: RowId, offer: Offer): string => {
     : `${capability.description}. Not offered in this form: ${capability.unavailable}; the choice is kept in the config.`
 }
 
-/** Whether a row is switched on in the choices; the Pi provider row is fixed, so it never is. */
+/** Whether a row is enabled in the current choices. */
 const isOn = (row: RowId, choices: Choices): boolean =>
-  row === "deviceAccess"
-    ? choices.deviceAccess
-    : row === "worktrees"
-      ? choices.worktrees
-      : row.startsWith(CAPABILITY_ROW) &&
-        choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
+  row === "enablePi"
+    ? choices.harnesses?.pi === true
+    : row === "enableClaude"
+      ? choices.harnesses?.claude === true
+      : row === "deviceAccess"
+        ? choices.deviceAccess
+        : row === "worktrees"
+          ? choices.worktrees
+          : row.startsWith(CAPABILITY_ROW) &&
+            choices.capabilities[row.slice(CAPABILITY_ROW.length)] === true
 
-const checkbox = (row: RowId, choices: Choices): { box: string; word: string } =>
-  row === "pi"
-    ? { box: "[x]", word: "fixed" }
-    : isOn(row, choices)
-      ? { box: "[x]", word: "enabled" }
-      : { box: "[ ]", word: "disabled" }
+const checkbox = (row: RowId, choices: Choices, offer: Offer): { box: string; word: string } => {
+  const provider = providerOf(row, offer)
+  if (provider !== undefined) {
+    if (!choices.piProviders?.providers.includes(provider)) return { box: "[ ]", word: "disabled" }
+    return { box: "[x]", word: choices.piProviders.provider === provider ? "default" : "enabled" }
+  }
+  return isOn(row, choices) ? { box: "[x]", word: "enabled" } : { box: "[ ]", word: "disabled" }
+}
 
 /** The lines of a screen, and how far it scrolls. */
 interface Layout {
@@ -340,13 +431,13 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
   const { rows, offer, width, look } = context
   const g = glyphs(look)
   const values = rows.map((row) => {
-    const { box, word } = checkbox(row, state.choices)
+    const { box, word } = checkbox(row, state.choices, offer)
     return `${box} ${word}`
   })
   const labels = rows.map((row) => labelOf(row, offer))
-  const valueWidth = Math.max(...values.map(cells))
+  const valueWidth = Math.max(0, ...values.map(cells))
   const labelWidth = Math.min(
-    Math.max(...labels.map(cells)),
+    Math.max(0, ...labels.map(cells)),
     Math.max(4, width - 2 - 2 - valueWidth),
   )
   const rowLine = (row: RowId, index: number): Line => {
@@ -357,7 +448,7 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
       ? [segment(`${g.focus} ${label}  ${value}`, "focus")]
       : [
           segment(`  ${label}  `, "argument"),
-          segment(value, row === "pi" || !isOn(row, state.choices) ? "disabled" : "enabled"),
+          segment(value, value.startsWith("[ ]") ? "disabled" : "enabled"),
         ]
     return line.map((part) => ({ ...part, click: { row } }))
   }
@@ -369,13 +460,60 @@ const chooseLines = (state: State, context: Context): ReadonlyArray<Line> => {
           ...rows.slice(from, to).map((row, index) => rowLine(row, from + index)),
           blank,
         ]
-  const t3Count = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length
+  const configCount = rows.filter((row) => !row.startsWith(CAPABILITY_ROW)).length
+  const providerStart = rows[0] === "enablePi" ? 1 : 0
+  const providerEnd =
+    providerStart + rows.filter((row) => providerOf(row, offer) !== undefined).length
+  const button = [
+    {
+      text: `${state.focus === rows.length ? g.focus : " "} [Review choices]`,
+      tone: state.focus === rows.length ? "focus" : "option",
+      click: "choose-review",
+    },
+  ] satisfies Line
   const focused = rows[state.focus]
+  const combined = state.choices.harnesses
+  const tabsLine: ReadonlyArray<Line> =
+    combined === undefined
+      ? []
+      : [
+          tabs.flatMap((tab): Line => [
+            {
+              text: `[${tabLabels[tab]}]`,
+              tone: state.tab === tab ? "focus" : "option",
+              click: { tab },
+            },
+            segment(" "),
+          ]),
+          ...hintLines("Left/Right change harness", width),
+        ]
+  const unavailable =
+    combined !== undefined && state.tab === "codex"
+      ? "Public Codex setup is not available on this build."
+      : combined !== undefined && state.tab === "pi" && offer.harnesses?.piAvailable === false
+        ? "Pi or T3 Code is unavailable on this host."
+        : undefined
   return [
+    ...tabsLine,
     ...chooseKeys(`${g.arrows} or j/k focus`, width),
     blank,
-    ...group("T3 Code", 0, t3Count),
-    ...group("Capabilities", t3Count, rows.length),
+    ...(context.height < 20 ? [button, blank] : []),
+    ...(providerEnd === providerStart
+      ? group(combined === undefined ? "T3 Code" : tabLabels[state.tab], 0, configCount)
+      : [
+          ...group("Pi", 0, providerStart),
+          ...group("Pi model providers", providerStart, providerEnd),
+          ...group("T3 Code", providerEnd, configCount),
+        ]),
+    ...group("Capabilities", configCount, rows.length),
+    ...(context.height >= 20 ? [button] : []),
+    ...(unavailable === undefined ? [] : hintLines(unavailable, width)),
+    ...(combined?.claude === true && state.tab === "claude"
+      ? hintLines(
+          `Existing plugin, ${offer.harnesses?.scope ?? "user"} scope; compatible settings are kept.`,
+          width,
+        )
+      : []),
     ...(focused === undefined ? [] : hintLines(hintOf(focused, offer), width)),
     ...hintLines(`Environment: ${offer.form}`, width),
   ]
@@ -424,20 +562,59 @@ interface Page {
  * The part of `body` that fits `room` lines from line `from` on. When it does not all fit, `room`
  * loses one line to an indicator saying which lines are shown and which keys scroll.
  */
-const pageOf = (body: ReadonlyArray<Line>, room: number, from: number): Page => {
-  if (body.length <= room) return { shown: body, indicator: undefined, scroll: FIXED }
+const pageOf = (
+  body: ReadonlyArray<Line>,
+  room: number,
+  from: number,
+  rail?: { readonly width: number; readonly look: Look },
+): Page => {
+  if (body.length <= Math.max(1, room)) return { shown: body, indicator: undefined, scroll: FIXED }
   const size = Math.max(1, room - 1)
   const max = body.length - size
   const start = Math.min(Math.max(0, from), max)
   const end = start + size
   const more =
     start === 0 ? "PgDn for more" : end === body.length ? "PgUp for earlier" : "PgUp/PgDn"
+  const visible = body.slice(start, end)
+  const shown = rail === undefined ? visible : scrollbar(visible, body.length, start, max, rail)
   return {
-    shown: body.slice(start, end),
+    shown,
     indicator: [segment(`Lines ${start + 1}-${end} of ${body.length}, ${more}`, "hint")],
     scroll: { page: Math.max(1, size - 1), max },
   }
 }
+
+/** A scrollable page gets a one-cell thumb and track, at the end of its content rows. */
+const scrollbar = (
+  shown: ReadonlyArray<Line>,
+  total: number,
+  start: number,
+  max: number,
+  { width, look }: { readonly width: number; readonly look: Look },
+): ReadonlyArray<Line> => {
+  const visible = shown.length
+  const thumb = Math.max(1, Math.round((visible * visible) / total))
+  const first = Math.round(((visible - thumb) * start) / max)
+  return shown.map((line, index) => {
+    const within = index >= first && index < first + thumb
+    const target =
+      visible === 1 ? (start === 0 ? max : 0) : Math.round((index * max) / (visible - 1))
+    const body = fitLine(line, width - 2, glyphs(look).ellipsis)
+    const used = body.reduce((sum, part) => sum + cells(part.text), 0)
+    return [
+      ...body,
+      segment(" ".repeat(width - 1 - used)),
+      {
+        text: look.unicode ? (within ? "█" : "│") : within ? "#" : "|",
+        tone: within ? "focus" : "option",
+        click: { scrollTo: target },
+      },
+    ]
+  })
+}
+
+const scrollRail = (scrolling: boolean, width: number, look: Look) =>
+  scrolling && width >= 8 ? { width, look } : undefined
 
 const REVIEW_RECOVERY =
   "Fix the cause, then choose Back and review again, or choose Cancel and run holyagent setup later."
@@ -455,7 +632,9 @@ const reviewLayout = (state: State, context: Context): Layout => {
         action === "apply"
           ? context.dryRun
             ? "Apply (dry run)"
-            : "Apply"
+            : state.review?.replacePiRegistration === true
+              ? "Apply and replace Pi package"
+              : "Apply"
           : action === "back"
             ? "Back"
             : "Cancel"
@@ -475,9 +654,9 @@ const reviewLayout = (state: State, context: Context): Layout => {
       width,
     )
   if (state.failure !== undefined) {
-    const cause = wrap(state.failure, width - 2).map((part): Line => [
-      segment(`  ${part}`, "error"),
-    ])
+    const failure = state.failure
+    const causeOf = (limit: number) =>
+      wrap(failure, limit - 2).map((part): Line => [segment(`  ${part}`, "error")])
     const recovery = hintLines(REVIEW_RECOVERY, width)
     const actions = actionLines()
     // The recovery hint and the actions are what the person needs, so they always show; the cause
@@ -487,7 +666,14 @@ const reviewLayout = (state: State, context: Context): Layout => {
       const layout = (scrolling: boolean) => {
         const top = [...keys(scrolling), ...gap, ...heading_]
         const bottom = [...gap, ...recovery, ...gap, ...actions]
-        const page = pageOf(cause, context.height - 1 - top.length - bottom.length, state.scroll)
+        const rail = scrollRail(scrolling, width, look)
+        const cause = causeOf(rail === undefined ? width : width - 2)
+        const page = pageOf(
+          cause,
+          context.height - 1 - top.length - bottom.length,
+          state.scroll,
+          rail,
+        )
         return {
           lines: [
             ...top,
@@ -505,7 +691,7 @@ const reviewLayout = (state: State, context: Context): Layout => {
     }
     // The blank separators go first when the screen is too short to leave the cause three lines.
     const spaced = build(true)
-    const chosen = spaced.shown >= Math.min(3, cause.length) ? spaced : build(false)
+    const chosen = spaced.shown >= Math.min(3, causeOf(width).length) ? spaced : build(false)
     return { lines: chosen.lines, scroll: chosen.scroll }
   }
   if (state.review === undefined) {
@@ -522,31 +708,40 @@ const reviewLayout = (state: State, context: Context): Layout => {
     }
   }
   const { review } = state
-  const capabilities = review.capabilities ?? []
-  const nameWidth = Math.max(
-    ...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)),
-  )
-  const entries = (lines: ReadonlyArray<ReviewLine>) =>
-    lines.flatMap((line) => reviewEntry(line, nameWidth, width))
-  const section = (title: string, lines: ReadonlyArray<ReviewLine>): ReadonlyArray<Line> =>
-    lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank]
-  const t3 = [
-    ...(review.file === undefined
-      ? []
-      : [
-          ...wrap(review.file, width - 2).map((part): Line => [segment(`  ${part}`, "hint")]),
-          blank,
-        ]),
-    ...section("Your choices", review.choices),
-    ...section("Always applied", review.always),
-  ]
-  const body: ReadonlyArray<Line> = [...section("Capabilities", capabilities), ...t3].slice(0, -1)
+  const bodyOf = (width: number) => {
+    const harnesses = (review.harnesses ?? []).flatMap(({ name, lines }) => [
+      ...heading(name, width),
+      ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
+      blank,
+    ])
+    const capabilities = review.capabilities ?? []
+    const nameWidth = Math.max(
+      ...[...capabilities, ...review.choices, ...review.always].map((line) => cells(line.name)),
+    )
+    const entries = (lines: ReadonlyArray<ReviewLine>) =>
+      lines.flatMap((line) => reviewEntry(line, nameWidth, width))
+    const section = (title: string, lines: ReadonlyArray<ReviewLine>): ReadonlyArray<Line> =>
+      lines.length === 0 ? [] : [...heading(title, width), ...entries(lines), blank]
+    const t3 = [
+      ...(review.file === undefined
+        ? []
+        : [
+            ...wrap(review.file, width - 2).map((part): Line => [segment(`  ${part}`, "hint")]),
+            blank,
+          ]),
+      ...section("Your choices", review.choices),
+      ...section("Always applied", review.always),
+    ]
+    return [...harnesses, ...section("Capabilities", capabilities), ...t3].slice(0, -1)
+  }
   const actions = actionLines()
   // The title takes one line, and the line above the actions holds the scroll indicator, if any.
   const build = (scrolling: boolean): Layout & { readonly fits: boolean } => {
     const top = [...keys(scrolling), blank, ...heading_]
     const room = context.height - 1 - top.length - 1 - actions.length
-    const page = pageOf(body, room, state.scroll)
+    const rail = scrollRail(scrolling, width, look)
+    const body = bodyOf(rail === undefined ? width : width - 2)
+    const page = pageOf(body, room, state.scroll, rail)
     return {
       lines: [...top, ...page.shown, page.indicator ?? blank, ...actions],
       scroll: page.scroll,
@@ -567,16 +762,17 @@ const reportTone = (line: string): Tone =>
         : "hint"
 
 const doneLayout = (state: State, context: Context): Layout => {
-  const { width, height } = context
+  const { width, height, look } = context
   const applied = state.applied ?? { ok: false, lines: [] }
-  const body = state.details
-    ? applied.lines.flatMap((line) =>
-        wrap(line, width, 2).map((part): Line => [segment(part, reportTone(line))]),
-      )
-    : summarizeResult(applied, context.dryRun).flatMap(({ title, lines }) => [
-        ...heading(title, width),
-        ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
-      ])
+  const bodyOf = (width: number) =>
+    state.details
+      ? applied.lines.flatMap((line) =>
+          wrap(line, width, 2).map((part): Line => [segment(part, reportTone(line))]),
+        )
+      : summarizeResult(applied, context.dryRun).flatMap(({ title, lines }) => [
+          ...heading(title, width),
+          ...lines.flatMap((line) => hintLines(`  ${line}`, width)),
+        ])
   const build = (scrolling: boolean): Layout & { readonly fits: boolean } => {
     const top: ReadonlyArray<Line> = [
       [{ text: "Close (Enter or q)", tone: "option", click: "close" }],
@@ -593,7 +789,9 @@ const doneLayout = (state: State, context: Context): Layout => {
         segment(part, applied.ok ? "success" : "error"),
       ]),
     ]
-    const page = pageOf(body, height - 1 - top.length, state.scroll)
+    const rail = scrollRail(scrolling, width, look)
+    const body = bodyOf(rail === undefined ? width : width - 2)
+    const page = pageOf(body, height - 1 - top.length, state.scroll, rail)
     return {
       lines: [...top, ...page.shown, ...(page.indicator === undefined ? [] : [page.indicator])],
       scroll: page.scroll,

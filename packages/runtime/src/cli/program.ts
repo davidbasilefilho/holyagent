@@ -106,7 +106,11 @@ const listed = (commands: ReadonlyArray<Command>, host: AgentHost) =>
 const topHelp = (commands: ReadonlyArray<Command>, words: HostWords, surface: CliSurface): string =>
   [
     ...(surface === "public"
-      ? ["Manage your HolyAgent installation.", "Run holyagent <command> [options]."]
+      ? [
+          "Manage your HolyAgent installation.",
+          "Run `holyagent setup` in a terminal to choose integrations.",
+          "Run holyagent <command> [options].",
+        ]
       : [
           "Run holyagent <command> [args]. Give JSON with --input '<json>' or stdin; results use TOON.",
           "Errors go to stderr with a hint: line. Exit codes: 2 for usage, 3 for refused work, 4 for state or I/O failure.",

@@ -4,6 +4,8 @@ import { Effect } from "effect"
 
 import { CAPABILITIES, type CapabilityDefinition } from "../config/capabilities.ts"
 import { isUserOnly, readConfigFile, userConfigFile, userLocksOff } from "../config/load.ts"
+import type { PiProviderSelection } from "../config/schema.ts"
+import { enabledPiProviders } from "../pi/provider.ts"
 import { CONFIG_FILE, stateDirectory } from "../state/layout.ts"
 import type { Env } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
@@ -88,14 +90,39 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
     readonly cwd: string
     readonly dryRun: boolean
     readonly choices: CapabilityChoices
+    readonly providers?: PiProviderSelection
   },
 ) {
   const chosen = CAPABILITIES.flatMap((capability) => {
     const value = options.choices[capability.feature]
     return value === undefined ? [] : [{ capability, value }]
   })
-  if (chosen.length === 0) return []
-  const current = (yield* loadPiConfig(env, options.cwd, options.scope)).pi.features
+  if (chosen.length === 0 && options.providers === undefined) return []
+  const config = yield* loadPiConfig(env, options.cwd, options.scope)
+  const currentPi = config.pi
+  const current = currentPi.features
+  const wanted = options.providers
+  if (wanted !== undefined) {
+    if (!wanted.providers.includes(wanted.provider))
+      return yield* new SetupFailure({
+        message: "Select at least one Pi model provider, including the default",
+      })
+    const required = Object.entries(currentPi.routes).find(
+      ([, route]) => route.provider !== undefined && !wanted.providers.includes(route.provider),
+    )
+    if (required !== undefined)
+      return yield* new SetupFailure({
+        message: `Pi route ${required[0]} explicitly uses ${required[1].provider}; keep it selected or change the route first`,
+      })
+  }
+  const existingProviders = enabledPiProviders(config)
+  const providers =
+    wanted === undefined ||
+    (wanted.provider === currentPi.provider &&
+      wanted.providers.length === existingProviders.length &&
+      wanted.providers.every((provider) => existingProviders.includes(provider)))
+      ? undefined
+      : wanted
   const changed = chosen.filter(({ capability, value }) => current[capability.feature] !== value)
   const word = (value: boolean) => (value ? "on" : "off")
   const lines = chosen
@@ -103,7 +130,7 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
     .map(({ capability, value }) =>
       present(`capability ${capability.name}: already ${word(value)}`),
     )
-  if (changed.length === 0) return lines
+  if (changed.length === 0 && providers === undefined) return lines
   const file = capabilityConfigFile(env, options.cwd, options.scope)
   if (options.scope !== "user") {
     yield* refuseUserOnly(changed)
@@ -113,22 +140,35 @@ export const applyCapabilityChoices = Effect.fn("applyCapabilityChoices")(functi
   if (!options.dryRun) {
     const existing = yield* readJsonObject(file)
     const pi = yield* objectAt(existing, "pi", file, "pi")
-    const features = yield* objectAt(pi, "features", file, "pi.features")
+    const features =
+      changed.length === 0 ? undefined : yield* objectAt(pi, "features", file, "pi.features")
     yield* writeJsonObject(file, {
       ...existing,
       pi: {
         ...pi,
-        features: {
-          ...features,
-          ...Object.fromEntries(
-            changed.map(({ capability, value }) => [capability.feature, value]),
-          ),
-        },
+        ...providers,
+        ...(features === undefined
+          ? {}
+          : {
+              features: {
+                ...features,
+                ...Object.fromEntries(
+                  changed.map(({ capability, value }) => [capability.feature, value]),
+                ),
+              },
+            }),
       },
     })
   }
   return [
     ...lines,
+    ...(providers === undefined
+      ? []
+      : [
+          added(
+            `Pi model providers: ${options.dryRun ? "would enable" : "enabled"} ${providers.providers.join(", ")}; default ${providers.provider} (${file})`,
+          ),
+        ]),
     ...changed.map(({ capability, value }) => {
       const text = `capability ${capability.name}: ${options.dryRun ? "would turn" : "turned"} ${word(value)} (pi.features.${capability.feature} in ${file})`
       return value ? added(text) : skipped(text)

@@ -1,14 +1,16 @@
 import { Schema } from "effect"
 
-/**
- * The setup choices the interface offers: the two T3 choices (the Pi provider is fixed and not one
- * of them) and a switch for each capability, by its `pi.features` key.
- */
+import type { PiProvider, PiProviderSelection } from "../../config/schema.ts"
+
+/** The setup choices: harnesses, Pi model providers, T3 settings and capability switches. */
 export interface Choices {
   readonly worktrees: boolean
+  readonly piProviders?: PiProviderSelection
   readonly deviceAccess: boolean
   /** Each offered capability's switch, by `pi.features` key. */
   readonly capabilities: Readonly<Record<string, boolean>>
+  /** Selected public harnesses in the combined setup. */
+  readonly harnesses?: { readonly pi: boolean; readonly claude: boolean }
 }
 
 /** One capability row of the choose screen. */
@@ -28,8 +30,10 @@ export interface CapabilityOffer {
 
 /** What the machine allows, which decides the rows: the device row needs a host. */
 export interface Offer {
-  /** Whether the T3 part of setup has work: the Pi provider row and the T3 review sections show. */
+  /** Whether the T3 review sections show. */
   readonly t3: boolean
+  /** Pi provider ids from the integration schema. */
+  readonly providers?: ReadonlyArray<PiProvider>
   /** What lets agents use devices here (Xcode or an Android SDK), or `undefined`: no device row. */
   readonly device: string | undefined
   /** Whether the worktree row is offered. */
@@ -38,6 +42,8 @@ export interface Offer {
   readonly capabilities: ReadonlyArray<CapabilityOffer>
   /** The form in force, as a phrase for the capability heading (`headless (detected: CI is set)`). */
   readonly form: string
+  /** Present only in bare public setup when the harness chooser is available. */
+  readonly harnesses?: { readonly piAvailable: boolean; readonly scope: string }
 }
 
 /** One line of the review: what setup does with a group of T3 settings keys. */
@@ -50,6 +56,8 @@ export interface ReviewLine {
 
 /** What the review screen lists for the current choices. */
 export interface Review {
+  /** The Apply action will replace one previous Pi registration that the review lists. */
+  readonly replacePiRegistration?: boolean
   /** The T3 settings file setup writes; `undefined` when the T3 part has no work. */
   readonly file: string | undefined
   /**
@@ -61,6 +69,11 @@ export interface Review {
   readonly choices: ReadonlyArray<ReviewLine>
   /** The groups setup always applies. */
   readonly always: ReadonlyArray<ReviewLine>
+  /** Planned setup operations for the selected harnesses, with no settings written yet. */
+  readonly harnesses?: ReadonlyArray<{
+    readonly name: string
+    readonly lines: ReadonlyArray<string>
+  }>
 }
 
 /** The result of the setup run the interface applied: its report lines and whether all passed. */

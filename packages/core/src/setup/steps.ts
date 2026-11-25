@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect"
 
 import { CAPABILITIES } from "../config/capabilities.ts"
+import type { PiProviderSelection } from "../config/schema.ts"
 import { inCloudSession } from "../vcs/identity.ts"
 import { reportBrowserUse } from "./browser-use.ts"
 import { applyCapabilityChoices } from "./capabilities.ts"
@@ -101,6 +102,8 @@ export interface SetupOptions {
   readonly target?: SetupTarget
   /** The installed public package location to register with Pi. */
   readonly installedPackageRoot?: string
+  /** Only the interactive public review may opt into replacement. */
+  readonly replacePiRegistration?: boolean
   /** The settings scope to write, `user` when absent. */
   readonly scope?: Scope
   /** Back out the settings setup wrote instead of writing them; ctx7 is left installed. */
@@ -116,6 +119,8 @@ export interface SetupOptions {
    * `applyCapabilityChoices`).
    */
   readonly capabilities?: CapabilityChoices
+  /** Confirmed Pi model providers, omitted in unattended setup. */
+  readonly piProviders?: PiProviderSelection
   /** The form every capability is applied in; the normal form when absent (see `chooseForm`). */
   readonly form?: FormChoice
 }
@@ -164,10 +169,14 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
     cwd: options.cwd ?? process.cwd(),
     dryRun: options.dryRun,
     ...(piOnly && options.installedPackageRoot !== undefined
-      ? { installedPackageRoot: options.installedPackageRoot }
+      ? {
+          installedPackageRoot: options.installedPackageRoot,
+          ...(options.replacePiRegistration === true ? { replacePiRegistration: true } : {}),
+        }
       : {}),
     form: form.form,
     choices,
+    ...(options.piProviders === undefined ? {} : { providers: options.piProviders }),
   }
   if (options.undo === true) {
     const lines = [
@@ -205,6 +214,7 @@ export const setup = Effect.fn("setup")(function* (env: Env, options: SetupOptio
           cwd: piOptions.cwd,
           dryRun: options.dryRun,
           choices,
+          ...(options.piProviders === undefined ? {} : { providers: options.piProviders }),
         }),
       )
     : Object.keys(choices).length > 0
