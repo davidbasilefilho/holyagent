@@ -23,7 +23,7 @@ import { Revision } from "../domain/primitives.ts"
 import { findAssignment, findIntent, type Project } from "../domain/project.ts"
 import { agentFor, routeFor } from "../domain/route.ts"
 import { routeModel, subagentModel } from "../pi/provider.ts"
-import { selectConfiguredRoute } from "../routing/selection.ts"
+import { piRoutingProfile, selectConfiguredRoute } from "../routing/selection.ts"
 import { commitFile, io } from "../state/files.ts"
 import { stateDirectory } from "../state/layout.ts"
 import { workTreeKey } from "../state/local.ts"
@@ -148,7 +148,17 @@ export const dispatch = (context: Context, input: typeof schemas.dispatch.Encode
                 })
               : undefined
           const profile =
-            requested ?? (context.host === "pi" ? source?.config.pi.profile : undefined)
+            requested ??
+            (context.host === "pi" && source !== undefined
+              ? piRoutingProfile(source.config.pi)
+              : undefined)
+          const available =
+            context.host === "pi" &&
+            source !== undefined &&
+            profile !== undefined &&
+            context.piModels !== undefined
+              ? yield* context.piModels(source.config)
+              : undefined
           return yield* update((snapshot) =>
             Effect.gen(function* () {
               const id = "id" in request ? request.id : generated
@@ -176,6 +186,7 @@ export const dispatch = (context: Context, input: typeof schemas.dispatch.Encode
                       assignment.screen === true,
                       profile,
                       at,
+                      available,
                     )
               if (selected?.error !== undefined)
                 return yield* new InvalidDraft({ message: selected.error })

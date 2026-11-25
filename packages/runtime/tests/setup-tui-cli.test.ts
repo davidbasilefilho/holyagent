@@ -189,6 +189,46 @@ describe("setup flags for the T3 choices", () => {
 })
 
 describe("the public setup renderer", () => {
+  test("fresh public Pi setup enables two providers but writes no startup default", async () => {
+    await machine()
+    const pi = join(home, "pi")
+    const config = join(home, ".holyagent", "config.json")
+    const initial = await Effect.runPromise(defaultConfig)
+    await Bun.write(
+      join(pi, "settings.json"),
+      JSON.stringify({ packages: piPackages(initial, undefined, "headless") }),
+    )
+    const shown = interface_(async (input) => {
+      expect(input.initial.piProviders).toEqual({ providers: [] })
+      const choices: Choices = {
+        ...input.initial,
+        piProviders: { providers: ["openai-codex", "kimi-coding-global"] },
+      }
+      const review = await input.review(choices)
+      const lines = review.harnesses?.flatMap((entry) => entry.lines) ?? []
+      expect(lines.join("\n")).toContain("openai-codex, kimi-coding-global")
+      expect(lines.join("\n")).not.toMatch(/default openai|default kimi/)
+      return {
+        _tag: "Applied",
+        applied: await input.apply(choices, new AbortController().signal),
+      }
+    })
+    const result = await cli(["pi", "--form", "headless"], {
+      env: { PI_CODING_AGENT_DIR: pi },
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+    })
+    expect(result.code).toBe(0)
+    expect((await Bun.file(config).json()).pi).toEqual({
+      providers: ["openai-codex", "kimi-coding-global"],
+    })
+    const settings = await Bun.file(join(pi, "settings.json")).json()
+    expect(settings).not.toHaveProperty("defaultProvider")
+    expect(settings).not.toHaveProperty("defaultModel")
+    expect(settings).not.toHaveProperty("defaultThinkingLevel")
+  })
+
   test("public Pi setup reviews and applies two providers without flattening routes", async () => {
     await machine()
     const pi = join(home, "pi")
@@ -205,13 +245,17 @@ describe("the public setup renderer", () => {
     const initial = await Effect.runPromise(defaultConfig)
     await Bun.write(
       join(pi, "settings.json"),
-      JSON.stringify({ packages: piPackages(initial, undefined, "headless") }),
+      JSON.stringify({
+        packages: piPackages(initial, undefined, "headless"),
+        defaultProvider: "some-provider",
+        defaultModel: "my-model",
+        defaultThinkingLevel: "low",
+      }),
     )
     const shown = interface_(async (input) => {
       const choices: Choices = {
         ...input.initial,
         piProviders: {
-          provider: "kimi-coding-global",
           providers: ["kimi-coding-global", "openai-codex"],
         },
       }
@@ -233,6 +277,11 @@ describe("the public setup renderer", () => {
       provider: "kimi-coding-global",
       providers: ["kimi-coding-global", "openai-codex"],
       routes: { root: { thinking: "high" } },
+    })
+    expect(await Bun.file(join(pi, "settings.json")).json()).toMatchObject({
+      defaultProvider: "some-provider",
+      defaultModel: "my-model",
+      defaultThinkingLevel: "low",
     })
   })
 

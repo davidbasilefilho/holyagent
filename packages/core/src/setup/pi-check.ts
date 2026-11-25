@@ -14,7 +14,7 @@ import {
   type SystemNeed,
   unavailableIn,
 } from "../config/capabilities.ts"
-import { loadConfig, loadConfigWithSource } from "../config/load.ts"
+import { loadConfigWithSource } from "../config/load.ts"
 import { piPackages } from "../config/packages.ts"
 import { piPackageSource } from "../config/pi-packages.ts"
 import { Config, type PiProviderSelection } from "../config/schema.ts"
@@ -328,6 +328,10 @@ export const headlessBrowserRoute = (config: Config, surface?: PiExecutionSurfac
  */
 export type CapabilityChoices = Readonly<Partial<Record<CapabilityFeature, boolean>>>
 
+/** Load the effective config and explicitly written settings at the chosen Pi scope. */
+export const loadPiConfigSource = (env: Env, cwd: string, scope: Scope) =>
+  loadConfigWithSource({ projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env })
+
 /**
  * The HolyAgent config that decides the Pi packages at a scope, or a {@link SetupFailure} naming the
  * bad file. Scope `user` works on Pi's global settings and reads the user's own file only, so a
@@ -342,18 +346,18 @@ export const loadPiConfig = (
   choices: CapabilityChoices = {},
   providers?: PiProviderSelection,
 ): Effect.Effect<Config, SetupFailure> => {
-  const sources = { projectDirectories: scope === "user" ? [] : [stateDirectory(cwd)], env }
-  const config =
-    providers === undefined
-      ? loadConfig(sources)
-      : loadConfigWithSource(sources).pipe(
-          Effect.flatMap(({ written }) =>
-            Schema.decodeUnknownEffect(Config)({
-              ...written,
-              pi: { ...written.pi, ...providers },
-            }),
-          ),
-        )
+  if (providers?.providers.length === 0)
+    return Effect.fail(new SetupFailure({ message: "Select at least one Pi model provider" }))
+  const config = loadPiConfigSource(env, cwd, scope).pipe(
+    Effect.flatMap(({ config, written }) =>
+      providers === undefined
+        ? Effect.succeed(config)
+        : Schema.decodeUnknownEffect(Config)({
+            ...written,
+            pi: { ...written.pi, ...providers },
+          }),
+    ),
+  )
   return config.pipe(
     Effect.map((config): Config => ({
       ...config,

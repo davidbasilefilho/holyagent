@@ -1,8 +1,14 @@
 import type { Config, ConfigFile, PiProvider } from "../config/schema.ts"
 import type { AgentHost } from "../domain/host.ts"
 import { type RoleTask, routeFor } from "../domain/route.ts"
-import { PROVIDERS, routeModel, subagentModel } from "../pi/provider.ts"
-import { type Candidate, selectRoute } from "./evidence.ts"
+import {
+  enabledPiProviders,
+  enabledProviderRoute,
+  PROVIDERS,
+  routeModel,
+  subagentModel,
+} from "../pi/provider.ts"
+import { AA_PI_COMPARISON, type Candidate, selectRoute } from "./evidence.ts"
 
 /** The role launch selected from declared configuration and its evidence diagnostics. */
 export interface RoutingSelection {
@@ -23,6 +29,16 @@ export interface RoutingSelection {
   readonly error?: string
 }
 
+/** The authenticated model catalog supplied by Pi, never by tool arguments. */
+export type PiRoutingAvailability = ReadonlyArray<{
+  readonly provider: string
+  readonly id: string
+}>
+
+/** Explicit provider enablement takes the exact-launch path even without a selected cost profile. */
+export const piRoutingProfile = (pi: Pick<Config["pi"], "providers" | "profile">) =>
+  pi.profile ?? (pi.providers === undefined ? undefined : "normal")
+
 /** Select a role's configured evidence winner, or the existing explicitly unscored policy. */
 export const selectConfiguredRoute = (
   config: Config,
@@ -32,19 +48,65 @@ export const selectConfiguredRoute = (
   screen: boolean,
   profile: "normal" | "fast",
   now: string,
+  available?: PiRoutingAvailability,
 ): RoutingSelection => {
+  const settings = config.routing
   const override = host === "pi" ? written.pi?.routes?.[role] : undefined
-  const base = host === "pi" ? routeModel(config, role, { screen }) : undefined
+  const explicit = host === "pi" && config.pi.providers !== undefined
+  const enabled = enabledPiProviders(config)
+  const mixed = explicit && enabled.length > 1
+  const hasModel = (provider: string, id: string) =>
+    available?.some((entry) => entry.provider === provider && entry.id === id)
+  const screenCompatible = (route: ReturnType<typeof routeModel>) =>
+    !screen ||
+    ((override?.model === undefined || override.model === route.model) &&
+      (override?.thinking === undefined || override.thinking === route.thinking))
+  const pool = !explicit
+    ? host === "pi"
+      ? [routeModel(config, role, { screen })]
+      : []
+    : enabled
+        .filter((provider) => override?.provider === undefined || override.provider === provider)
+        .toSorted()
+        .map((provider) => enabledProviderRoute(role, provider, override, screen))
+  const excludedByDeclaration = (route: ReturnType<typeof routeModel>) =>
+    settings?.candidates.some(
+      (candidate) =>
+        candidate.availability === "no" &&
+        candidate.harness === host &&
+        candidate.role === role &&
+        candidate.tier === profile &&
+        candidate.provider !== "anthropic" &&
+        PROVIDERS[candidate.provider].id === route.provider &&
+        candidate.model === route.model &&
+        candidate.effort === route.thinking,
+    ) ?? false
+  const eligible = pool.filter(
+    (route) =>
+      screenCompatible(route) &&
+      (!explicit || !excludedByDeclaration(route)) &&
+      (available === undefined || hasModel(route.provider, route.model)),
+  )
+  // Unscored policy rotates by role across confirmed routes, not checkbox order or a global default.
+  const roleOffset = Array.from(role).reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  const ambiguousOffline = mixed && available === undefined && override?.provider === undefined
+  const base =
+    ambiguousOffline || eligible.length === 0 ? undefined : eligible[roleOffset % eligible.length]
   const fallback = {
-    provider: base?.provider ?? "anthropic",
-    model: base === undefined ? routeFor(role).model : subagentModel(base),
-    effort: base?.thinking ?? routeFor(role).effort,
+    provider: base?.provider ?? (host === "pi" ? "" : "anthropic"),
+    model: base === undefined ? (host === "pi" ? "" : routeFor(role).model) : subagentModel(base),
+    effort: base?.thinking ?? (host === "pi" ? "" : routeFor(role).effort),
   }
-  const screenConflict =
-    screen &&
-    override !== undefined &&
-    ((override.model !== undefined && override.model !== base?.model) ||
-      (override.thinking !== undefined && override.thinking !== base?.thinking))
+  const fallbackError =
+    host !== "pi" || base !== undefined
+      ? undefined
+      : override?.provider !== undefined && !enabled.includes(override.provider)
+        ? "The explicit Pi route uses a disabled provider; enable it or change the route."
+        : pool.length > 0 && pool.every((route) => !screenCompatible(route))
+          ? "The explicit Pi route conflicts with the screen model or minimum thinking; choose a screen-compatible route."
+          : ambiguousOffline
+            ? "Several Pi providers are enabled but the current Pi model catalog could not be read. Dispatch through Pi or set an explicit role provider."
+            : "No enabled Pi provider has the exact role model available with configured authentication. Check the route and sign in through Pi."
   const policy = (reason: string): RoutingSelection => ({
     ...fallback,
     profile,
@@ -52,35 +114,32 @@ export const selectConfiguredRoute = (
     coverage: "pending",
     ...(config.routing === undefined ? {} : { evidenceRevision: config.routing.evidence.revision }),
     reason,
-    ...(screenConflict
-      ? {
-          error:
-            "The explicit Pi route conflicts with the screen model or minimum thinking; choose a screen-compatible route.",
-        }
-      : {}),
+    ...(fallbackError === undefined ? {} : { error: fallbackError }),
   })
-  const settings = config.routing
+  if (ambiguousOffline)
+    return policy("Benchmark evidence cannot establish current Pi model availability.")
+  const benchmarks =
+    settings?.benchmarks.filter((item) => item.role === role && item.harness === host) ?? []
+  const declared = benchmarks[0]
+  const benchmark = mixed
+    ? {
+        ...AA_PI_COMPARISON,
+        requiredCapabilities: benchmarks.length === 1 ? (declared?.requiredCapabilities ?? []) : [],
+      }
+    : declared
+  const evidenceName = mixed ? "Artificial Analysis Pi Index" : "subscription"
   if (settings === undefined)
-    return policy("No subscription evidence configured; existing policy is unscored.")
-  const benchmarks = settings.benchmarks.filter(
-    (item) => item.role === role && item.harness === host,
-  )
-  const benchmark = benchmarks[0]
+    return policy(`No ${evidenceName} evidence configured; routing policy is unscored.`)
   if (
-    benchmarks.length !== 1 ||
+    (!mixed && benchmarks.length !== 1) ||
     benchmark === undefined ||
     !benchmark.benchmark ||
     !benchmark.benchmarkVersion ||
     !benchmark.benchmarkHarness ||
     !benchmark.qualityUnit
   )
-    return policy("No unique comparable role benchmark; existing policy is unscored.")
-  const configuredProviders = new Set([
-    config.pi.provider,
-    ...Object.values(config.pi.routes).flatMap((row) =>
-      row.provider === undefined ? [] : [row.provider],
-    ),
-  ])
+    return policy("No unique comparable role benchmark; routing policy is unscored.")
+  const configuredProviders = new Set(enabled)
   const candidates: Candidate[] = settings.candidates
     .filter(
       (candidate) =>
@@ -104,17 +163,37 @@ export const selectConfiguredRoute = (
         ((override.provider === undefined || override.provider === candidate.provider) &&
           (override.model === undefined || override.model === candidate.model) &&
           (override.thinking === undefined || override.thinking === candidate.effort))
+      const route =
+        host === "pi" && compatibleProvider && candidate.provider !== "anthropic"
+          ? enabledProviderRoute(
+              role,
+              candidate.provider,
+              { model: candidate.model, thinking: candidate.effort },
+              screen,
+            )
+          : undefined
+      const compatibleScreen =
+        !explicit ||
+        route === undefined ||
+        (route.model === candidate.model && route.thinking === candidate.effort)
       return {
         ...candidate,
+        availability:
+          route !== undefined && hasModel(route.provider, candidate.model) === false
+            ? "no"
+            : candidate.availability,
         requiredCapabilities: [...candidate.requiredCapabilities, "configured-route"],
         capabilities: {
           ...candidate.capabilities,
           "configured-route":
-            compatibleProvider && compatibleEffort && compatibleOverride ? "yes" : "no",
+            compatibleProvider && compatibleEffort && compatibleOverride && compatibleScreen
+              ? "yes"
+              : "no",
         },
       }
     })
   const comparison = {
+    ...(mixed ? { objective: "pi-index" as const } : {}),
     role,
     harness: host,
     tier: profile,
@@ -147,12 +226,13 @@ export const selectConfiguredRoute = (
       .flatMap((item) => item.reasons.map((reason) => `${item.candidate.model}:${reason}`))
       .slice(0, 3)
     return policy(
-      `No eligible comparable subscription evidence; existing policy is unscored${reasons.length === 0 ? "; no declared candidates" : `; ${reasons.join(", ")}`}.`,
+      `No eligible comparable ${evidenceName} evidence; routing policy is unscored${reasons.length === 0 ? "; no declared candidates" : `; ${reasons.join(", ")}`}.`,
     )
   }
   const selected = decision.candidate
   const evidence = settings.evidence.rows.find(
     (row) =>
+      (mixed ? row.costKind === "quality-only" : row.costKind !== "quality-only") &&
       row.role === role &&
       row.harness === host &&
       row.tier === profile &&
@@ -179,10 +259,13 @@ export const selectConfiguredRoute = (
     ...(evidence === undefined
       ? {}
       : {
-          monthlyUsd: evidence.monthlyUsd,
-          taskCostUsd: evidence.taskCostUsd,
           measuredAt: evidence.measuredAt,
+          ...(evidence.costKind === "quality-only"
+            ? {}
+            : { monthlyUsd: evidence.monthlyUsd, taskCostUsd: evidence.taskCostUsd }),
         }),
-    reason: `Configured declarations; entitlement unknown; benchmark proxy ${benchmark.benchmarkHarness}.`,
+    reason: mixed
+      ? `Exact ${evidenceName} v${benchmark.benchmarkVersion} quality; no comparable subscription cost.`
+      : `Configured declarations; entitlement unknown; benchmark proxy ${benchmark.benchmarkHarness}.`,
   }
 }

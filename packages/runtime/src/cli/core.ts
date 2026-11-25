@@ -17,6 +17,7 @@ import { InvalidDraft } from "../domain/errors.ts"
 import type { AgentHost } from "../domain/host.ts"
 import { wordsFor } from "../domain/host.ts"
 import { AssignmentId } from "../domain/ids.ts"
+import { cliPiModelCatalog } from "../pi/cli-catalog.ts"
 import { firstPassPrompt } from "../prompts/index.ts"
 import { detectForm } from "../setup/form.ts"
 import { StateMode } from "../state/mode.ts"
@@ -46,7 +47,16 @@ export const coreCommand = (name: string) => (call: Call) =>
       "Reviewer.security": firstPassPrompt("Reviewer.security") ?? "",
     }
     const context = ["assignment dispatch", "plan"].includes(name)
-      ? yield* makeContext({ cwd: call.cwd, env: call.env, host, authorize: () => true, firstPass })
+      ? yield* makeContext({
+          cwd: call.cwd,
+          env: call.env,
+          host,
+          authorize: () => true,
+          firstPass,
+          ...(host === "pi" && name === "assignment dispatch"
+            ? { piModels: cliPiModelCatalog(call.cwd, call.env) }
+            : {}),
+        })
       : {
           cwd: call.cwd,
           env: call.env,

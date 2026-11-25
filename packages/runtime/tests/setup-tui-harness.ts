@@ -130,7 +130,7 @@ export const mount = async (options: Mount) => {
       ...(options.combined === true
         ? {
             harnesses: { pi: true, claude: false },
-            piProviders: { provider: "kimi-coding-global", providers: ["kimi-coding-global"] },
+            piProviders: { providers: ["kimi-coding-global"] },
           }
         : {}),
       capabilities: Object.fromEntries(

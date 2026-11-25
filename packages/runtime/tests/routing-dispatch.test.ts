@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 
+import { AA_PI_COMPARISON } from "@holyagent/core/routing/evidence.ts"
 import { decode } from "@toon-format/toon"
 import { Effect } from "effect"
 
@@ -87,14 +88,37 @@ const draft = {
   criteria: [{ text: "works", blocking: true, dimension: "behavior" }],
 }
 
-const fixture = async (host: "pi" | "claude", config: unknown, profile?: "fast" | "normal") => {
+const fixture = async (
+  host: "pi" | "claude",
+  config: unknown,
+  profile?: "fast" | "normal",
+  models?: ReadonlyArray<string>,
+) => {
   const base = await mkdtemp(join(tmpdir(), "holyagent-routing-"))
   const root = join(base, "project")
   const home = join(base, "home")
   await mkdir(join(root, ".holyagent"), { recursive: true })
   await mkdir(home)
   await writeFile(join(root, ".holyagent", "config.json"), JSON.stringify(config))
+  const bin = join(base, "bin")
+  const commands = join(base, "catalog-calls")
+  if (models !== undefined) {
+    await mkdir(bin)
+    // Use the real CLI entry point and subprocess adapter with a test-only catalog.
+    await writeFile(
+      join(bin, "pi"),
+      `#!/bin/sh
+[ "$#" -eq 1 ] && [ "$1" = "--list-models" ] && [ "$PWD" = "$HOME" ] && [ "$PI_OFFLINE" = 1 ] || exit 2
+printf '%s\\n' "$1" >> "$CATALOG_CALLS"
+printf '%s\\n' 'provider model context' ${models.map((row) => `'${row}'`).join(" ")}
+`,
+      { mode: 0o755 },
+    )
+  }
   const env = {
+    ...(models !== undefined
+      ? { PATH: [bin, process.env.PATH ?? ""].join(delimiter), CATALOG_CALLS: commands }
+      : {}),
     HOME: home,
     HOLYAGENT_HOME: home,
     HOLYAGENT_HOST: host,
@@ -112,7 +136,7 @@ const fixture = async (host: "pi" | "claude", config: unknown, profile?: "fast" 
     return decode(result.stdout.split("\nprompt:\n")[0] ?? "") as Record<string, unknown>
   }
   await fields(["intent", "create"], { objective: "Routing fixture" })
-  return { base, root, home, env, call, fields }
+  return { base, root, home, env, call, fields, commands }
 }
 
 describe("actual subscription dispatch", () => {
@@ -379,4 +403,170 @@ describe("actual subscription dispatch", () => {
       await rm(f.base, { recursive: true, force: true })
     }
   })
+})
+
+const twoProviders = ["openai-codex", "kimi-coding-global"]
+const aaCandidates = [
+  {
+    ...candidate("pi", "gpt-6.2-sol"),
+    tier: "normal",
+  },
+  {
+    ...candidate("pi", "kimi-for-coding"),
+    provider: "kimi-coding-global",
+    tier: "normal",
+    plan: "k-combo",
+    effort: "max",
+  },
+]
+// These scores are synthetic and used only to assert selection, not published observations.
+const aaRows = aaCandidates.map(({ role, harness, provider, model, effort, plan, tier }, i) => ({
+  role,
+  harness,
+  provider,
+  model,
+  effort,
+  plan,
+  tier,
+  ...AA_PI_COMPARISON,
+  direction: "higher",
+  quality: i === 0 ? 0.55 : 0.7,
+  costKind: "quality-only",
+  sourceUrl: "https://artificialanalysis.ai/agents/coding-agents",
+  confidence: "test fixture",
+  measuredAt: now,
+}))
+const aaCatalog = ["kimi-coding kimi-for-coding 1000000", "openai-codex gpt-6.2-sol 400000"]
+const aaRouting = {
+  ...routing,
+  benchmarks: [],
+  candidates: aaCandidates,
+  evidence: { ...routing.evidence, rows: aaRows },
+}
+
+describe("actual mixed Pi dispatch", () => {
+  test.skipIf(process.platform === "win32")(
+    "matches exact official Pi quality evidence without inventing subscription prices",
+    async () => {
+      const f = await fixture(
+        "pi",
+        { pi: { provider: "openai-codex", providers: twoProviders }, routing: aaRouting },
+        undefined,
+        aaCatalog,
+      )
+      try {
+        const dispatched = await f.fields(["assignment", "dispatch"], draft)
+        expect(dispatched.model).toBe("kimi-coding/kimi-for-coding")
+        expect(dispatched.routing).toMatchObject({ kind: "ranked", score: 1, coverage: "complete" })
+        expect(dispatched.routing).not.toHaveProperty("taskCostUsd")
+        expect(dispatched.routing).not.toHaveProperty("monthlyUsd")
+        const assignment = (await Effect.runPromise(readState(join(f.root, ".holyagent")))).project
+          .assignments[0]
+        expect(assignment?.specialist?.intendedLaunch).toMatchObject({
+          profile: "normal",
+          provider: "kimi-coding",
+          model: "kimi-coding/kimi-for-coding",
+          effort: "max",
+        })
+      } finally {
+        await rm(f.base, { recursive: true, force: true })
+      }
+    },
+  )
+
+  test("fails closed when a mixed dispatch has evidence but no current catalog", async () => {
+    const f = await fixture("pi", { pi: { providers: twoProviders }, routing: aaRouting })
+    try {
+      const result = await f.call(["assignment", "dispatch"], JSON.stringify(draft))
+      expect(result.code).not.toBe(0)
+      expect(result.stderr).toContain("current Pi model catalog could not be read")
+      const snapshot = await Effect.runPromise(readState(join(f.root, ".holyagent")))
+      expect(snapshot.project.assignments).toEqual([])
+    } finally {
+      await rm(f.base, { recursive: true, force: true })
+    }
+  })
+
+  test.skipIf(process.platform === "win32")(
+    "rejects proxy harnesses, wrong efforts, unofficial sources and unavailable providers",
+    async () => {
+      const f = await fixture(
+        "pi",
+        {
+          pi: { providers: twoProviders },
+          routing: {
+            ...aaRouting,
+            candidates: [aaCandidates[0], { ...aaCandidates[1], availability: "no" }],
+            evidence: {
+              ...aaRouting.evidence,
+              rows: [
+                { ...aaRows[0], benchmarkHarness: "Codex CLI" },
+                { ...aaRows[0], effort: "max" },
+                { ...aaRows[0], sourceUrl: "https://example.test/agents/coding-agents" },
+                aaRows[1],
+              ],
+            },
+          },
+        },
+        undefined,
+        aaCatalog,
+      )
+      try {
+        const result = await f.call(["assignment", "dispatch"], JSON.stringify(draft))
+        expect(result.code).not.toBe(0)
+        expect(result.stderr).toContain("exact role model available")
+        const snapshot = await Effect.runPromise(readState(join(f.root, ".holyagent")))
+        expect(snapshot.project.assignments).toEqual([])
+      } finally {
+        await rm(f.base, { recursive: true, force: true })
+      }
+    },
+  )
+
+  test("preserves exact role overrides and rejects explicitly disabled providers", async () => {
+    const routes = {
+      "Reviewer.code": { provider: "openai-codex", model: "gpt-6.2-sol", thinking: "high" },
+    }
+    const both = await fixture("pi", {
+      pi: { providers: twoProviders, routes },
+      routing: aaRouting,
+    })
+    const one = await fixture("pi", { pi: { providers: ["kimi-coding-global"], routes } })
+    try {
+      const dispatched = await both.fields(["assignment", "dispatch"], draft)
+      expect(dispatched.model).toBe("openai-codex/gpt-6.2-sol")
+      expect(dispatched.effort).toBe("high")
+      const rejected = await one.call(["assignment", "dispatch"], JSON.stringify(draft))
+      expect(rejected.code).not.toBe(0)
+      expect(rejected.stderr).toContain("explicit Pi route uses a disabled provider")
+    } finally {
+      await Promise.all([both, one].map((f) => rm(f.base, { recursive: true, force: true })))
+    }
+  })
+
+  test.skipIf(process.platform === "win32")(
+    "unscored official CLI fallback uses only exact, available Pi models and does not prompt",
+    async () => {
+      const f = await fixture("pi", { pi: { providers: twoProviders } }, undefined, [
+        "kimi-coding kimi-for-coding 1000000",
+        "openai-codex gpt-6.1-terra 400000",
+      ])
+      try {
+        const first = await f.fields(["assignment", "dispatch"], draft)
+        const second = await f.fields(["assignment", "dispatch"], {
+          ...draft,
+          roleTask: "Reviewer.testing",
+        })
+        expect(first.routing).toMatchObject({ kind: "unscored-policy", coverage: "pending" })
+        expect(first.routing).not.toHaveProperty("score")
+        expect(second.routing).toMatchObject({ kind: "unscored-policy", coverage: "pending" })
+        expect(new Set([first.model, second.model])).toEqual(
+          new Set(["openai-codex/gpt-6.1-terra", "kimi-coding/kimi-for-coding"]),
+        )
+        expect(await Bun.file(f.commands).text()).toBe("--list-models\n--list-models\n")
+      } finally {
+        await rm(f.base, { recursive: true, force: true })
+      }
+    },
+  )
 })

@@ -1,10 +1,12 @@
 import { Data, Effect, type Schema } from "effect"
 
+import type { Config } from "../config/schema.ts"
 import type { ExecutionConfig } from "../domain/directive.ts"
 import type { AgentHost } from "../domain/host.ts"
 import { decodeInput } from "../domain/input.ts"
 import type { Intent } from "../domain/intent.ts"
 import type { RoleTask } from "../domain/route.ts"
+import type { PiRoutingAvailability } from "../routing/selection.ts"
 import { StateIo } from "../state/errors.ts"
 import { WorkTree } from "../state/local.ts"
 import { readState, type Snapshot, type StateChange, updateState } from "../state/store.ts"
@@ -48,6 +50,7 @@ export interface Context {
   readonly env: Readonly<Record<string, string | undefined>>
   readonly host: AgentHost
   readonly execution: ExecutionConfig
+  readonly piModels?: (config: Config) => Effect.Effect<PiRoutingAvailability | undefined>
   readonly authorize: (capability: Capability) => boolean
   /** Host-provided prompt text assets; missing Pi first-pass templates fail closed. */
   readonly firstPass?: Readonly<Partial<Record<RoleTask, string>>>

@@ -171,10 +171,7 @@ const toggleProvider = (choices: Choices, id: PiProvider): Choices => {
   const providers = selection.providers.includes(id)
     ? selection.providers.filter((p) => p !== id)
     : [...selection.providers, id]
-  const provider = providers.includes(selection.provider)
-    ? selection.provider
-    : (providers[0] ?? selection.provider)
-  return { ...choices, piProviders: { provider, providers } }
+  return { ...choices, piProviders: { providers } }
 }
 
 const toggled = (choices: Choices, row: RowId): Choices => {
@@ -385,7 +382,7 @@ const hintOf = (row: RowId, offer: Offer): string => {
   if (row === "enableClaude")
     return "Include the existing Claude Code plugin in the combined review."
   if (providerOf(row, offer) !== undefined)
-    return "Enable more than one provider if you use both. The default is used for routes without their own provider."
+    return "Enable each provider you want HolyAgent to use. This does not choose a default model."
   if (row === "deviceAccess")
     return `Lets agents use the iOS simulator or an Android emulator. Found: ${offer.device ?? "no device host"}.`
   if (row === "worktrees")
@@ -414,7 +411,7 @@ const checkbox = (row: RowId, choices: Choices, offer: Offer): { box: string; wo
   const provider = providerOf(row, offer)
   if (provider !== undefined) {
     if (!choices.piProviders?.providers.includes(provider)) return { box: "[ ]", word: "disabled" }
-    return { box: "[x]", word: choices.piProviders.provider === provider ? "default" : "enabled" }
+    return { box: "[x]", word: "enabled" }
   }
   return isOn(row, choices) ? { box: "[x]", word: "enabled" } : { box: "[ ]", word: "disabled" }
 }

@@ -216,6 +216,91 @@ test("Core-backed profile selection checks role, screen, state, model, effort, o
   }
 })
 
+test("mixed Pi launch verifies an unscored selection against the current authenticated catalog", async () => {
+  const f = await launchFixture()
+  try {
+    await writeFile(
+      join(f.cwd, ".holyagent", "config.json"),
+      JSON.stringify({ pi: { providers: ["kimi-coding-global", "openai-codex"] } }),
+    )
+    const available = [
+      { provider: "kimi-coding", id: "kimi-for-coding" },
+      { provider: "openai-codex", id: "gpt-6.1-terra" },
+    ]
+    const started = await Effect.runPromise(
+      assignment.dispatch(
+        { ...f.context, piModels: () => Effect.succeed(available) },
+        {
+          roleTask: "Reviewer.testing",
+          objective: "mixed catalog fixture",
+          criteria: [{ text: "checked", blocking: true, dimension: "behavior" }],
+        },
+      ),
+    )
+    expect(started.launch).toMatchObject({
+      kind: "unscored-policy",
+      model: "openai-codex/gpt-6.1-terra",
+      coverage: "pending",
+    })
+    expect(started.launch).not.toHaveProperty("score")
+    const input = {
+      prompt: started.prompt,
+      subagent_type: started.agent,
+      model: "openai-codex/gpt-6.1-terra",
+      thinking: "medium",
+    }
+    expect(
+      await Effect.runPromise(checkProfileLaunch(input, f.cwd, f.env, available)),
+    ).toBeUndefined()
+    expect(
+      await Effect.runPromise(checkProfileLaunch(input, f.cwd, f.env, available.slice(0, 1))),
+    ).toContain("stale")
+  } finally {
+    await f.close()
+  }
+})
+
+test("a known Pi catalog still constrains an explicit mixed role override", async () => {
+  const f = await launchFixture()
+  try {
+    await writeFile(
+      join(f.cwd, ".holyagent", "config.json"),
+      JSON.stringify({
+        pi: {
+          providers: ["kimi-coding-global", "openai-codex"],
+          routes: { "Reviewer.testing": { provider: "openai-codex", model: "gpt-6.2-sol" } },
+        },
+      }),
+    )
+    const offline = await f.dispatch("explicit override chosen without catalog")
+    expect(offline.launch.model).toBe("openai-codex/gpt-6.2-sol")
+    const present = [{ provider: "openai-codex", id: "gpt-6.1-terra" }]
+    const input = {
+      prompt: offline.prompt,
+      subagent_type: offline.agent,
+      model: offline.launch.model,
+      thinking: offline.launch.effort,
+    }
+    expect(await Effect.runPromise(checkProfileLaunch(input, f.cwd, f.env, present))).toContain(
+      "stale",
+    )
+    await expect(
+      Effect.runPromise(
+        assignment.dispatch(
+          { ...f.context, piModels: () => Effect.succeed(present) },
+          {
+            roleTask: "Reviewer.testing",
+            objective: "known catalog lacks override",
+            criteria: [{ text: "checked", blocking: true, dimension: "behavior" }],
+          },
+        ),
+      ),
+    ).rejects.toThrow("exact role model available")
+  } finally {
+    await f.close()
+  }
+})
+
 test("profile preflight requires an exact available model and refuses workflows", () => {
   const registry = { getAvailable: () => [{ provider: "openai-codex", id: "gpt-6.1-sol" }] }
   for (const toolName of ["Agent", "agent"]) {

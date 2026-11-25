@@ -1,39 +1,60 @@
 import { type Effect, Schema } from "effect"
 
-/** Versioned evidence imported from a subscription benchmark, never an API-price estimate. */
+const observation = {
+  role: Schema.String,
+  harness: Schema.String,
+  provider: Schema.String,
+  model: Schema.String,
+  effort: Schema.String,
+  plan: Schema.String,
+  tier: Schema.Literals(["normal", "fast"]),
+  benchmark: Schema.String,
+  benchmarkVersion: Schema.String,
+  benchmarkHarness: Schema.String,
+  qualityUnit: Schema.String,
+  direction: Schema.Literals(["higher", "lower"]),
+  quality: Schema.Number,
+  measuredAt: Schema.String,
+  sourceUrl: Schema.String,
+  confidence: Schema.String,
+}
+
+/** Only the official Pi composite can supply quality without inventing a subscription price. */
+export const AA_PI_COMPARISON = {
+  benchmark: "Artificial Analysis Coding Agent Index",
+  benchmarkVersion: "2.1",
+  benchmarkHarness: "Pi",
+  qualityUnit: "index",
+} as const
+
+const officialPiIndex = (url: string): boolean =>
+  /^https:\/\/artificialanalysis\.ai\/agents\/coding-agents\/?([?#][^\s]*)?$/.test(url)
+
+/** Versioned observations for subscription value or published quality without a price. */
 export const EvidenceDataset = Schema.Struct({
   version: Schema.Literal(1),
   revision: Schema.String,
   retrievedAt: Schema.String,
   generatedAt: Schema.String,
   rows: Schema.Array(
-    Schema.Struct({
-      role: Schema.String,
-      harness: Schema.String,
-      provider: Schema.String,
-      model: Schema.String,
-      effort: Schema.String,
-      plan: Schema.String,
-      region: Schema.String,
-      monthlyUsd: Schema.Number,
-      allowance: Schema.String,
-      utilization: Schema.String,
-      cacheAssumptions: Schema.String,
-      tier: Schema.Literals(["normal", "fast"]),
-      benchmark: Schema.String,
-      benchmarkVersion: Schema.String,
-      benchmarkHarness: Schema.String,
-      qualityUnit: Schema.String,
-      direction: Schema.Literals(["higher", "lower"]),
-      quality: Schema.Number,
-      taskCostUsd: Schema.Number,
-      costKind: Schema.Literals(["subscription", "api-fallback"]),
-      measuredAt: Schema.String,
-      sourceUrl: Schema.String,
-      planSourceUrl: Schema.String,
-      planSourceDate: Schema.String,
-      confidence: Schema.String,
-    }),
+    Schema.Union([
+      Schema.Struct({
+        ...observation,
+        costKind: Schema.Literal("quality-only"),
+      }),
+      Schema.Struct({
+        ...observation,
+        region: Schema.String,
+        monthlyUsd: Schema.Number,
+        allowance: Schema.String,
+        utilization: Schema.String,
+        cacheAssumptions: Schema.String,
+        taskCostUsd: Schema.Number,
+        costKind: Schema.Literals(["subscription", "api-fallback"]),
+        planSourceUrl: Schema.String,
+        planSourceDate: Schema.String,
+      }),
+    ]),
   ),
 })
 /** A decoded immutable evidence snapshot. */
@@ -77,6 +98,7 @@ export const rankCandidates = (
   dataset: EvidenceDataset,
   candidates: ReadonlyArray<Candidate>,
   comparison: {
+    readonly objective?: "pi-index"
     readonly role: string
     readonly harness: string
     readonly tier: "normal" | "fast"
@@ -123,6 +145,9 @@ export const rankCandidates = (
     if (!candidate.identityStable) reasons.push("unstable_identity")
     const rows = dataset.rows.filter(
       (row) =>
+        (comparison.objective === "pi-index"
+          ? row.costKind === "quality-only"
+          : row.costKind !== "quality-only") &&
         row.role === candidate.role &&
         row.harness === candidate.harness &&
         row.provider === candidate.provider &&
@@ -139,41 +164,58 @@ export const rankCandidates = (
     if (rows.length !== 1 || row === undefined)
       reasons.push(rows.length === 0 ? "missing_evidence" : "ambiguous_evidence")
     else {
-      if (
-        !fresh(dataset.retrievedAt) ||
-        !fresh(dataset.generatedAt) ||
-        !fresh(row.measuredAt) ||
-        !fresh(row.planSourceDate)
-      )
+      if (!fresh(dataset.retrievedAt) || !fresh(dataset.generatedAt) || !fresh(row.measuredAt))
         reasons.push("stale_evidence")
-      if (row.costKind !== "subscription") reasons.push("api_price_fallback")
-      if (row.monthlyUsd > (comparison.tier === "normal" ? 100 : 20))
-        reasons.push("plan_exceeds_target")
-      if (
-        row.direction !== "higher" ||
-        !Number.isFinite(row.quality) ||
-        row.quality < 0 ||
-        !Number.isFinite(row.taskCostUsd) ||
-        row.taskCostUsd <= 0 ||
-        !/^https?:\/\/\S+$/i.test(row.sourceUrl) ||
-        !/^https?:\/\/\S+$/i.test(row.planSourceUrl) ||
-        !row.confidence.trim() ||
-        !row.region.trim() ||
-        !row.allowance.trim() ||
-        !row.utilization.trim() ||
-        !row.cacheAssumptions.trim() ||
-        !candidate.plan.trim() ||
-        !row.benchmark.trim() ||
-        !row.benchmarkVersion.trim() ||
-        !row.benchmarkHarness.trim() ||
-        !row.qualityUnit.trim() ||
-        !Number.isFinite(row.monthlyUsd) ||
-        row.monthlyUsd <= 0 ||
-        !dataset.revision.trim()
-      )
-        reasons.push("noncomparable_evidence")
+      const comparable =
+        row.direction === "higher" &&
+        Number.isFinite(row.quality) &&
+        row.quality >= 0 &&
+        /^https?:\/\/\S+$/i.test(row.sourceUrl) &&
+        !!row.confidence.trim() &&
+        !!candidate.plan.trim() &&
+        !!row.benchmark.trim() &&
+        !!row.benchmarkVersion.trim() &&
+        !!row.benchmarkHarness.trim() &&
+        !!row.qualityUnit.trim() &&
+        !!dataset.revision.trim()
+      if (row.costKind === "quality-only") {
+        if (
+          !comparable ||
+          comparison.harness !== "pi" ||
+          !officialPiIndex(row.sourceUrl) ||
+          row.quality > 1 ||
+          !Object.entries(AA_PI_COMPARISON).every(
+            ([key, value]) => row[key as keyof typeof AA_PI_COMPARISON] === value,
+          )
+        )
+          reasons.push("noncomparable_evidence")
+      } else {
+        if (!fresh(row.planSourceDate) && !reasons.includes("stale_evidence"))
+          reasons.push("stale_evidence")
+        if (row.costKind !== "subscription") reasons.push("api_price_fallback")
+        if (row.monthlyUsd > (comparison.tier === "normal" ? 100 : 20))
+          reasons.push("plan_exceeds_target")
+        if (
+          !comparable ||
+          !Number.isFinite(row.taskCostUsd) ||
+          row.taskCostUsd <= 0 ||
+          !/^https?:\/\/\S+$/i.test(row.planSourceUrl) ||
+          !row.region.trim() ||
+          !row.allowance.trim() ||
+          !row.utilization.trim() ||
+          !row.cacheAssumptions.trim() ||
+          !Number.isFinite(row.monthlyUsd) ||
+          row.monthlyUsd <= 0
+        )
+          reasons.push("noncomparable_evidence")
+      }
     }
-    const value = row === undefined ? 0 : row.quality / row.taskCostUsd
+    const value =
+      row === undefined
+        ? 0
+        : row.costKind === "quality-only"
+          ? row.quality
+          : row.quality / row.taskCostUsd
     if (reasons.length === 0 && !Number.isFinite(value)) reasons.push("noncomparable_evidence")
     return { candidate, reasons, unknown, value }
   })

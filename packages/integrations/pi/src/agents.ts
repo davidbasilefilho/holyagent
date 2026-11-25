@@ -7,7 +7,7 @@ import { agentFor, type Route } from "../../../runtime/src/domain/route.ts"
 import type { Family } from "../../../runtime/src/instructions/families.ts"
 import { instructionsDirectory } from "../../../runtime/src/instructions/skills.ts"
 import { FFF_TOOLS } from "../../../runtime/src/pi/fff/settings.ts"
-import { PROVIDERS, webChoice } from "../../../runtime/src/pi/provider.ts"
+import { providerProfile, PROVIDERS, webChoice } from "../../../runtime/src/pi/provider.ts"
 import {
   CODEMODE_TOOL,
   COMPUTER_USE_TOOLS,
@@ -70,7 +70,8 @@ export const agentTools = (
   screen: boolean = false,
   form: CapabilityForm = "normal",
 ): ReadonlyArray<string> => {
-  const profile = PROVIDERS[config.pi.routes[route.roleTask].provider ?? config.pi.provider]
+  const provider = config.pi.routes[route.roleTask].provider
+  const profile = provider === undefined ? providerProfile(config) : PROVIDERS[provider]
   const web = webChoice(profile, config.pi.features.web)
   const entries = toolArgs(config, route.roleTask, profile, { screen, form }).tools.flatMap(
     (tool) => {

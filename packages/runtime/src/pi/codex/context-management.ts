@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 
 import type { Config } from "../../config/schema.ts"
+import { enabledPiProviders } from "../provider.ts"
 import { CODEX_PROVIDER_ID } from "./routes.ts"
 
 /**
@@ -37,8 +38,7 @@ export const compactThreshold = (contextWindow: number | undefined): number =>
  * its own switch (`pi.features.contextManagement`, on by default) is on.
  */
 export const contextManagementOn = (config: Config): boolean =>
-  (config.pi.provider === "openai-codex" ||
-    Object.values(config.pi.routes).some((row) => row.provider === "openai-codex")) &&
+  enabledPiProviders(config).includes("openai-codex") &&
   config.pi.features.contextManagement &&
   !config.pi.features.contextCompression
 
