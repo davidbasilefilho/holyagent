@@ -2,7 +2,7 @@ import type { PiProvider } from "../../config/schema.ts"
 import { resultHeadline, summarizeResult } from "./result.ts"
 import { cells, clip, pad, wrap, wrapItems } from "./text.ts"
 import { glyphs, type Look, type Tone } from "./theme.ts"
-import type { Applied, Choices, Offer, Review, ReviewLine } from "./types.ts"
+import type { Applied, Choices, Offer, Review, ReviewLine, SetupDisplayProgress } from "./types.ts"
 
 const CAPABILITY_ROW = "capability:"
 
@@ -346,6 +346,8 @@ export interface Context {
   readonly width: number
   readonly height: number
   readonly look: Look
+  readonly progress?: SetupDisplayProgress | undefined
+  readonly elapsedSeconds?: number
 }
 
 const KEY_GAP = "   "
@@ -827,21 +829,39 @@ const fitLine = (line: Line, width: number, ellipsis: string): Line => {
   return kept
 }
 
+const applyingLines = (context: Context): ReadonlyArray<Line> => {
+  const phase = context.progress?.phase
+  const harness = context.progress?.harness
+  const elapsed = context.elapsedSeconds ?? 0
+  return [
+    [segment("Press Ctrl+C to stop", "option")],
+    blank,
+    ...heading("Applying", context.width),
+    [segment(`Elapsed ${elapsed}s`, "hint")],
+    ...(harness === undefined
+      ? []
+      : wrap(`Harness ${harness.index} of ${harness.total}: ${harness.label}`, context.width).map(
+          (part): Line => [segment(part, "hint")],
+        )),
+    ...wrap(
+      phase === undefined
+        ? "Preparing setup…"
+        : `Step ${phase.index} of ${phase.total}: ${phase.label}`,
+      context.width,
+    ).map((part): Line => [segment(part, "argument")]),
+    ...(phase?.activity === undefined
+      ? []
+      : wrap(phase.activity, context.width).map((part): Line => [segment(part, "hint")])),
+  ]
+}
+
 const layoutOf = (state: State, context: Context): Layout =>
   state.screen === "choose"
     ? { lines: chooseLines(state, context), scroll: FIXED }
     : state.screen === "review"
       ? reviewLayout(state, context)
       : state.screen === "applying"
-        ? {
-            lines: [
-              [segment("Press Ctrl-C to stop", "option")],
-              blank,
-              ...heading("Applying", context.width),
-              [segment("Applying setup; this can take a moment.", "argument")],
-            ],
-            scroll: FIXED,
-          }
+        ? { lines: applyingLines(context), scroll: FIXED }
         : doneLayout(state, context)
 
 /** How far the screen the state is on scrolls, for {@link press}. */

@@ -181,6 +181,22 @@ describe("the setup interface, review and apply", () => {
     ])
   })
 
+  test("a completed setup keeps browser advice as a warning, not a failure", async () => {
+    const lines = ["~ setup harness: pi", "~ browser-use: install the optional runner"]
+    const screen = await shown({
+      width: 80,
+      height: 24,
+      apply: () => Promise.resolve({ ok: true, lines }),
+    })
+    await screen.keys("end", "enter", "enter")
+    const summary = screen.lines().join("\n")
+    expect(summary).toContain("Setup finished.")
+    expect(summary).toContain("WARNINGS\nbrowser-use")
+    expect(summary).not.toContain("setup harness")
+    await screen.keys("d")
+    expect(screen.lines().join("\n")).toContain(lines.join("\n"))
+  })
+
   test("a failed apply is shown as a failure with its lines", async () => {
     const screen = await shown({
       width: 80,
@@ -293,16 +309,50 @@ describe("the setup interface, cancel", () => {
     expect(screen.applies).toEqual([])
   })
 
-  test("Ctrl-C while applying stops the screen and aborts the apply", async () => {
-    const screen = await shown({ width: 80, height: 24, apply: () => new Promise(() => {}) })
+  test("a slow step shows real transitions, keeps time, and accepts Ctrl+C", async () => {
+    const install = Promise.withResolvers<void>()
+    const next = Promise.withResolvers<void>()
+    const harness = { index: 1, total: 2, label: "Pi / T3 Code" }
+    const screen = await shown({
+      width: 42,
+      height: 20,
+      apply: async (_choices, signal, report) => {
+        report?.({ harness, phase: { index: 1, total: 2, label: "Pi packages" } })
+        report?.({
+          harness,
+          phase: { index: 1, total: 2, label: "Pi packages", activity: "Installing npm:tool@1.0" },
+        })
+        await install.promise
+        report?.({ harness, phase: { index: 2, total: 2, label: "Pi tool settings" } })
+        await next.promise
+        signal.throwIfAborted()
+        return { ok: true, lines: [] }
+      },
+    })
+    const text = () => screen.lines().join("\n")
     await screen.keys("end", "enter", "enter")
-    expect(screen.lines().join("\n")).toContain("APPLYING")
+    expect(text()).toContain("APPLYING")
+    expect(text()).toContain("Harness 1 of 2: Pi / T3 Code")
+    expect(text()).toContain("Step 1 of 2: Pi packages")
+    expect(text()).toContain("Installing npm:tool@1.0")
+    expect(text()).not.toContain("Step 2 of 2")
+    await Bun.sleep(1250)
     await screen.keys("escape", "down")
+    expect(text()).toMatch(/Elapsed [1-9]\d*s/)
+    expect(text()).toContain("Step 1 of 2: Pi packages")
     expect(screen.outcomes).toEqual([])
     expect(screen.signals[0]?.aborted).toBe(false)
+    install.resolve()
+    await screen.settle()
+    expect(text()).toContain("Step 2 of 2: Pi tool settings")
+    expect(text()).not.toContain("Installing npm:tool@1.0")
     await screen.keys("ctrl-c")
     expect(screen.outcomes).toEqual([{ _tag: "Interrupted" }])
     expect(screen.signals[0]?.aborted).toBe(true)
+    next.resolve()
+    await screen.settle()
+    expect(screen.outcomes).toEqual([{ _tag: "Interrupted" }])
+    expect(text()).not.toContain("Setup finished")
   })
 })
 

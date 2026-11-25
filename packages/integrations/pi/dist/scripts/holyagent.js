@@ -13357,14 +13357,14 @@ var subjects = (lines, mark) => {
     return ok ? "Dry run finished; nothing was written." : "Dry run found failures.";
   return ok ? "Setup finished." : "Setup finished with failures.";
 }, summarizeResult = (result, dryRun) => {
-  const scope = /^~ (?:scope|form): /;
+  const informational = /^~ (?:scope|form|setup harness): /;
   const changes = [
     ...subjects(result.lines, "+ "),
     ...subjects(result.lines.filter((line) => /: (?:removed|would remove|turned off|would turn off)\b/.test(line)), "- ")
   ];
   const warnings = [
     ...subjects(result.lines, "! "),
-    ...subjects(result.lines.filter((line) => !scope.test(line)), "~ ")
+    ...subjects(result.lines.filter((line) => !informational.test(line)), "~ ")
   ];
   return [
     {
@@ -20986,6 +20986,17 @@ var init_capabilities2 = __esm(() => {
   });
 });
 
+var SetupProgress, SetupActivity, withSetupPhase = (phase, run) => flatMap2(SetupProgress, (report) => report === undefined ? run : sync2(() => report(phase)).pipe(andThen2(provideService2(run, SetupActivity, (activity) => report({ ...phase, activity }))))), reportSetupActivity = (activity) => flatMap2(SetupActivity, (report) => sync2(() => report?.(activity)));
+var init_progress = __esm(() => {
+  init_dist();
+  SetupProgress = Reference("holyagent/setup/SetupProgress", { defaultValue: () => {
+    return;
+  } });
+  SetupActivity = Reference("holyagent/setup/SetupActivity", { defaultValue: () => {
+    return;
+  } });
+});
+
 import { basename as basename8, dirname as dirname12, isAbsolute as isAbsolute9, join as join24, relative as relative5, resolve as resolve13 } from "path";
 var MANAGED_NAMES, staleManagedNames = (listed, wanted, managed = MANAGED_NAMES) => {
   const wantedNames = new Set(wanted.map((source) => parseNpmSource(source)?.name));
@@ -21018,6 +21029,7 @@ var init_pi_install = __esm(() => {
   init_json_file();
   init_package_runner();
   init_pi_check();
+  init_progress();
   init_scope();
   init_shell();
   MANAGED_NAMES = new Set([
@@ -21154,6 +21166,7 @@ var init_pi_install = __esm(() => {
           ...lines,
           `! pi package: ${file} changed before install; the previous registration was not replaced`
         ];
+      yield* reportSetupActivity(`Installing ${source}`);
       const result = yield* shell.run("pi", args, {
         cwd,
         env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
@@ -21172,6 +21185,7 @@ var init_pi_install = __esm(() => {
         lines.push(skipped(`pi npm:${name}: would remove with ${command}; its feature is off`));
         continue;
       }
+      yield* reportSetupActivity(`Removing npm:${name}`);
       const result = yield* shell.run("pi", args, {
         cwd,
         env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) }
@@ -21529,6 +21543,7 @@ var init_steps = __esm(() => {
   init_pi_check();
   init_pi_install();
   init_pi_settings();
+  init_progress();
   init_scope();
   init_search_tools();
   init_settings4();
@@ -21545,6 +21560,7 @@ var init_steps = __esm(() => {
         lines: [added(`${command}: would install with bun add -g ${packageName}`)]
       };
     }
+    yield* reportSetupActivity(`Installing ${packageName}`);
     const result = yield* shell.run("bun", ["--no-env-file", `--config=${EMPTY_BUNFIG}`, "add", "-g", packageName], { cwd: neutralDirectory(env) });
     if (result.exitCode !== 0)
       return { usable: false, lines: [failed2(`bun add -g ${packageName}`, result)] };
@@ -21602,38 +21618,64 @@ var init_steps = __esm(() => {
       if (blockers.length > 0)
         return { lines: blockers.map((line) => `! ${line}`), ok: false };
     }
-    const ctx7Lines = options.skipCtx7 ? [skipped("ctx7: skipped by flag")] : cloud ? [skipped(`ctx7: ${CLOUD_SKIP}`)] : yield* asStep("ctx7", installCtx7(env, options.dryRun));
-    const capabilityLines = piUsed ? yield* asStep("capabilities", applyCapabilityChoices(env, {
-      scope,
-      cwd: piOptions.cwd,
-      dryRun: options.dryRun,
-      choices,
-      ...options.piProviders === undefined ? {} : { providers: options.piProviders }
-    })) : Object.keys(choices).length > 0 ? [skipped("capabilities: Pi is not in use, so the capability choices were not applied")] : [];
-    const piSteps = piUsed && !capabilityLines.some((line) => line.startsWith("! "));
-    const lines = [
-      ...ctx7Lines,
-      ...piUsed ? [hint(`form: ${describeForm(form)}`)] : [],
-      ...capabilityLines,
-      ...piUsed && !piSteps ? [
-        skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
-      ] : [],
-      ...piSteps ? yield* asStep("pi packages", installPiPackages(env, piOptions)) : [],
-      ...piSteps ? yield* asStep("tool settings", installPiToolSettings(env, piOptions)) : [],
-      ...piSteps ? yield* asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })) : [],
-      ...piSteps && scope === "user" ? yield* asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
-        dryRun: options.dryRun,
-        ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
-        ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
-      })) : [],
-      ...usesStandaloneSearch(env, piUsed, surface) ? yield* searchToolLines(piOptions.cwd, setupToolLine) : [],
-      ...piOnly ? [] : yield* onSettings((file) => mergeUserSettings({
-        env,
-        file,
-        subagentCacheTtl: options.subagentCacheTtl,
-        dryRun: options.dryRun
-      }))
+    let piSteps = true;
+    const whenPiSaved = () => piSteps;
+    const phase = (label, run, runIf = () => true) => ({ label, run, runIf });
+    const report = (lines) => ({ lines });
+    const plan = [
+      ...options.skipCtx7 ? [report(() => [skipped("ctx7: skipped by flag")])] : cloud ? [report(() => [skipped(`ctx7: ${CLOUD_SKIP}`)])] : [phase("Context7", asStep("ctx7", installCtx7(env, options.dryRun)))],
+      ...piUsed ? [
+        report(() => [hint(`form: ${describeForm(form)}`)]),
+        phase("Capability settings", asStep("capabilities", applyCapabilityChoices(env, {
+          scope,
+          cwd: piOptions.cwd,
+          dryRun: options.dryRun,
+          choices,
+          ...options.piProviders === undefined ? {} : { providers: options.piProviders }
+        })).pipe(tap2((lines) => sync2(() => {
+          piSteps = !lines.some((line) => line.startsWith("! "));
+        })))),
+        report(() => piSteps ? [] : [
+          skipped(`pi packages, tool settings and t3 settings: not run, because the choice for ${CAPABILITIES.filter((capability) => choices[capability.feature] !== undefined).map((capability) => capability.name).join(", ")} was not saved`)
+        ]),
+        phase("Pi packages", asStep("pi packages", installPiPackages(env, piOptions)), whenPiSaved),
+        phase("Pi tool settings", asStep("tool settings", installPiToolSettings(env, piOptions)), whenPiSaved),
+        phase("Browser-use checks", asStep("browser use", reportBrowserUse(env, { ...piOptions, surface })), whenPiSaved),
+        ...scope === "user" ? [
+          phase("T3 Code settings", asStep("t3 settings", installT3Settings(env, piOptions.cwd, {
+            dryRun: options.dryRun,
+            ...options.worktrees === undefined ? {} : { worktrees: options.worktrees },
+            ...options.deviceAccess === undefined ? {} : { deviceAccess: options.deviceAccess }
+          })), whenPiSaved)
+        ] : []
+      ] : Object.keys(choices).length === 0 ? [] : [
+        report(() => [
+          skipped("capabilities: Pi is not in use, so the capability choices were not applied")
+        ])
+      ],
+      ...usesStandaloneSearch(env, piUsed, surface) ? [phase("Search-tool checks", searchToolLines(piOptions.cwd, setupToolLine))] : [],
+      ...piOnly ? [] : [
+        phase("Claude Code settings", onSettings((file) => mergeUserSettings({
+          env,
+          file,
+          subagentCacheTtl: options.subagentCacheTtl,
+          dryRun: options.dryRun
+        })))
+      ]
     ];
+    const total = plan.filter((step) => ("run" in step)).length;
+    const lines = [];
+    let index = 0;
+    for (const step of plan) {
+      if ("lines" in step) {
+        lines.push(...step.lines());
+        continue;
+      }
+      index += 1;
+      if (step.runIf()) {
+        lines.push(...yield* withSetupPhase({ index, total, label: step.label }, step.run));
+      }
+    }
     return { lines, ok: !lines.some((line) => line.startsWith("! ")) };
   });
 });
@@ -32198,6 +32240,7 @@ var DEFAULT_CHOICES, tuiFallbackReason = (options) => {
 var init_session = __esm(() => {
   init_dist();
   init_provider();
+  init_progress();
   init_capabilities3();
   init_schema2();
   init_identity2();
@@ -32346,7 +32389,7 @@ var init_session = __esm(() => {
           return yield* fail5(new Error("the T3 settings step has nothing to do any more"));
         return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));
       })),
-      apply: (choices, signal) => {
+      apply: (choices, signal, reportProgress) => {
         if (needsProvider(choices))
           return runPromise2(fail5(noProvider()));
         const chosen = withProviderChanges(choices);
@@ -32358,11 +32401,18 @@ var init_session = __esm(() => {
         applyStarted = true;
         const changed = changedSwitches(initialSwitches, choices.capabilities);
         const confirmReplacement = (report) => report.ok && replacementOf(report) === replacement ? void_3 : fail5(new Error("The Pi package plan changed. Review it again before replacing the previous registration."));
-        const applySingle = options.apply(chosen, changed, replacement !== undefined);
-        return runPromise2(combined === undefined ? replacement === undefined || options.previewPi === undefined ? applySingle : options.previewPi(chosen, changed).pipe(flatMap2(confirmReplacement), andThen2(applySingle)) : forEach2(selectionOf(choices), (target, index) => {
+        const observed = (run, harness) => reportProgress === undefined ? run : run.pipe(provideService2(SetupProgress, (phase) => reportProgress({
+          ...harness === undefined ? {} : { harness },
+          phase: phase.activity === undefined ? phase : { ...phase, activity: plain(phase.activity) }
+        })));
+        const applySingle = observed(options.apply(chosen, changed, replacement !== undefined));
+        const targets = selectionOf(choices);
+        return runPromise2(combined === undefined ? replacement === undefined || options.previewPi === undefined ? applySingle : options.previewPi(chosen, changed).pipe(flatMap2(confirmReplacement), andThen2(applySingle)) : forEach2(targets, (target, index) => {
+          const harness = { index: index + 1, total: targets.length, label: label(target) };
           const replace = target === "pi" && replacement !== undefined;
-          const perform = combined.run(target, chosen, changed, options.dryRun, index > 0, replace);
-          return replace ? combined.run(target, chosen, changed, true, index > 0, true).pipe(flatMap2(confirmReplacement), andThen2(perform)) : perform;
+          const perform = observed(combined.run(target, chosen, changed, options.dryRun, index > 0, replace), harness);
+          const run = replace ? combined.run(target, chosen, changed, true, index > 0, true).pipe(flatMap2(confirmReplacement), andThen2(perform)) : perform;
+          return sync2(() => reportProgress?.({ harness })).pipe(andThen2(run));
         }).pipe(map5((reports) => ({
           ok: reports.length > 0 && reports.every(({ ok }) => ok),
           lines: reports.flatMap(({ lines }) => lines)

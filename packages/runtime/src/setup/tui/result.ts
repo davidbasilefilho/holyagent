@@ -26,7 +26,7 @@ export const resultHeadline = (ok: boolean, dryRun: boolean): string => {
 
 /** Condenses a report for display. The underlying lines remain available as run details. */
 export const summarizeResult = (result: Applied, dryRun: boolean): ReadonlyArray<ResultSection> => {
-  const scope = /^~ (?:scope|form): /
+  const informational = /^~ (?:scope|form|setup harness): /
   const changes = [
     ...subjects(result.lines, "+ "),
     ...subjects(
@@ -39,7 +39,7 @@ export const summarizeResult = (result: Applied, dryRun: boolean): ReadonlyArray
   const warnings = [
     ...subjects(result.lines, "! "),
     ...subjects(
-      result.lines.filter((line) => !scope.test(line)),
+      result.lines.filter((line) => !informational.test(line)),
       "~ ",
     ),
   ]

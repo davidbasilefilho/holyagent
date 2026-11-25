@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect"
 
 import { enabledPiProviders } from "../../../../core/src/pi/provider.ts"
+import { SetupProgress } from "../../../../core/src/setup/progress.ts"
 import {
   CAPABILITIES,
   type CapabilityDefinition,
@@ -24,6 +25,7 @@ import {
   type Offer,
   type Review,
   type ReviewLine,
+  type SetupDisplayProgress,
   type SetupTuiModule,
   type TuiInput,
   TuiOutcomeSchema,
@@ -507,7 +509,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
           )
         }),
       ),
-    apply: (choices, signal) => {
+    apply: (choices, signal, reportProgress) => {
       if (needsProvider(choices)) return Effect.runPromise(Effect.fail(noProvider()))
       const chosen = withProviderChanges(choices)
       if (
@@ -530,7 +532,22 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                 "The Pi package plan changed. Review it again before replacing the previous registration.",
               ),
             )
-      const applySingle = options.apply(chosen, changed, replacement !== undefined)
+      const observed = (run: Effect.Effect<Report>, harness?: SetupDisplayProgress["harness"]) =>
+        reportProgress === undefined
+          ? run
+          : run.pipe(
+              Effect.provideService(SetupProgress, (phase) =>
+                reportProgress({
+                  ...(harness === undefined ? {} : { harness }),
+                  phase:
+                    phase.activity === undefined
+                      ? phase
+                      : { ...phase, activity: plain(phase.activity) },
+                }),
+              ),
+            )
+      const applySingle = observed(options.apply(chosen, changed, replacement !== undefined))
+      const targets = selectionOf(choices)
       return Effect.runPromise(
         combined === undefined
           ? replacement === undefined || options.previewPi === undefined
@@ -538,21 +555,19 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             : options
                 .previewPi(chosen, changed)
                 .pipe(Effect.flatMap(confirmReplacement), Effect.andThen(applySingle))
-          : Effect.forEach(selectionOf(choices), (target, index) => {
+          : Effect.forEach(targets, (target, index) => {
+              const harness = { index: index + 1, total: targets.length, label: label(target) }
               const replace = target === "pi" && replacement !== undefined
-              const perform = combined.run(
-                target,
-                chosen,
-                changed,
-                options.dryRun,
-                index > 0,
-                replace,
+              const perform = observed(
+                combined.run(target, chosen, changed, options.dryRun, index > 0, replace),
+                harness,
               )
-              return replace
+              const run = replace
                 ? combined
                     .run(target, chosen, changed, true, index > 0, true)
                     .pipe(Effect.flatMap(confirmReplacement), Effect.andThen(perform))
                 : perform
+              return Effect.sync(() => reportProgress?.({ harness })).pipe(Effect.andThen(run))
             }).pipe(
               Effect.map((reports) => ({
                 ok: reports.length > 0 && reports.every(({ ok }) => ok),
