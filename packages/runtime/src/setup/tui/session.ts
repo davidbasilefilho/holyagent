@@ -10,6 +10,15 @@ import {
 } from "../../config/capabilities.ts"
 import { type Config, PiProvider } from "../../config/schema.ts"
 import { inCloudSession } from "../../vcs/identity.ts"
+import {
+  type BrowsePair,
+  type BrowsePlan,
+  browseForProfile,
+  browseReview,
+  configureBrowse,
+  pairBrowseOnTerminal,
+  planBrowse,
+} from "../browse-setup.ts"
 import type { Env } from "../environment.ts"
 import { describeForm, type FormChoice, inCi } from "../form.ts"
 import { type CapabilityChoices, loadPiConfigSource, piInUse } from "../pi-check.ts"
@@ -253,6 +262,8 @@ export interface InteractiveOptions {
   readonly choiceFlag: boolean
   /** Public setup loads the packaged renderer and stops if it fails. */
   readonly t3Workflow?: boolean
+  /** Available only on public Pi setup; uses the runner that installed the public CLI. */
+  readonly browse?: { readonly packageRoot: string | undefined; readonly pair?: BrowsePair }
   /** The form in force, which decides what each capability row says it installs. */
   readonly form: FormChoice
   /** Overrides the packaged or private renderer loader, for tests. */
@@ -313,6 +324,7 @@ const stopped = (reason: string, applyStarted = false): Interactive => ({
 })
 
 const decodeOutcome = Schema.decodeUnknownEffect(TuiOutcomeSchema, { onExcessProperty: "error" })
+const BROWSE_HANDOFF = "OpenCode Browse: close this screen to "
 
 /**
  * Offers the capability switches and the T3 choices in the interface when Pi is in use (and setup
@@ -366,6 +378,20 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   if (loaded instanceof TuiUnavailable) return fail(`unavailable (${loaded.reason})`)
   const initialSwitches = features === undefined ? {} : features
   const piAvailable = piUsed && config?.pi.enable === true
+  const browse =
+    options.browse !== undefined &&
+    piAvailable &&
+    config.pi.features.mcp === true &&
+    options.form.form === "normal" &&
+    offers.some(({ feature }) => feature === "browserUse")
+      ? yield* planBrowse(options.env, options.browse.packageRoot)
+      : undefined
+  const browseFor = (choices: Choices): BrowsePlan | undefined =>
+    browse !== undefined &&
+    choices.harnesses?.pi !== false &&
+    choices.capabilities["browserUse"] === true
+      ? browseForProfile(browse, choices.browseProfile ?? 0)
+      : undefined
   const providerChoices =
     piAvailable &&
     config !== undefined &&
@@ -395,6 +421,8 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
           deviceAccess: choices.deviceAccess,
           capabilities: choices.capabilities,
           ...(choices.harnesses === undefined ? {} : { harnesses: choices.harnesses }),
+          ...(choices.browseSetup === undefined ? {} : { browseSetup: choices.browseSetup }),
+          ...(choices.browseProfile === undefined ? {} : { browseProfile: choices.browseProfile }),
         }
       : choices
   }
@@ -412,12 +440,22 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
   let reviewedChoices: Choices | undefined
   let reviewSequence = 0
   let reviewedReplacement: string | undefined
+  let stagedBrowse: BrowsePlan | undefined
   const replacementOf = (report: Report) =>
     report.lines.find((line) => line.startsWith("+ pi package: replace "))
   const input: TuiInput = {
     env: options.env,
     offer: {
       ...offerOf(preview, offers, options.form),
+      ...(browse === undefined
+        ? {}
+        : {
+            browse: {
+              state: plain(browse.state),
+              ...(browse.action === undefined ? {} : { action: browse.action }),
+              ...(browse.profiles === undefined ? {} : { profiles: browse.profiles }),
+            },
+          }),
       ...(providerChoices === undefined ? {} : { providers: PiProvider.literals }),
       ...(combined === undefined ? {} : { harnesses: { piAvailable, scope: options.scope } }),
     },
@@ -436,6 +474,15 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
             reviewedChoices = undefined
             return yield* Effect.fail(noProvider())
           }
+          const plan = browseFor(choices)
+          const browserReview =
+            plan === undefined
+              ? {}
+              : {
+                  browse: browseReview(plan, choices.browseSetup === true, options.dryRun).map(
+                    plain,
+                  ),
+                }
           if (combined !== undefined) {
             const sequence = ++reviewSequence
             reviewedChoices = undefined
@@ -467,6 +514,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
               file: undefined,
               choices: [],
               always: [],
+              ...browserReview,
               harnesses: plans.map(({ name, lines }) => ({ name, lines })),
             } satisfies Review
           }
@@ -490,6 +538,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                 file: undefined,
                 choices: [],
                 always: [],
+                ...browserReview,
                 harnesses: [{ name: label("pi"), lines: report.lines }],
               } satisfies Review
           }
@@ -502,18 +551,23 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                 })
           if (preview !== undefined && (next === undefined || "line" in next))
             return yield* Effect.fail(new Error("the T3 settings step has nothing to do any more"))
-          return reviewOf(
-            next === undefined || "line" in next ? undefined : next,
-            choices,
-            capabilityReview(initialSwitches, choices.capabilities, options.form),
-          )
+          return {
+            ...reviewOf(
+              next === undefined || "line" in next ? undefined : next,
+              choices,
+              capabilityReview(initialSwitches, choices.capabilities, options.form),
+            ),
+            ...browserReview,
+          }
         }),
       ),
     apply: (choices, signal, reportProgress) => {
       if (needsProvider(choices)) return Effect.runPromise(Effect.fail(noProvider()))
       const chosen = withProviderChanges(choices)
+      const plan = browseFor(choices)
+      const wantsBrowse = plan?.action !== undefined && choices.browseSetup === true
       if (
-        (combined !== undefined || chosen.piProviders !== undefined) &&
+        (combined !== undefined || chosen.piProviders !== undefined || wantsBrowse) &&
         reviewedChoices !== choices
       )
         return Effect.runPromise(
@@ -549,7 +603,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
       const applySingle = observed(options.apply(chosen, changed, replacement !== undefined))
       const targets = selectionOf(choices)
       return Effect.runPromise(
-        combined === undefined
+        (combined === undefined
           ? replacement === undefined || options.previewPi === undefined
             ? applySingle
             : options
@@ -573,7 +627,32 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
                 ok: reports.length > 0 && reports.every(({ ok }) => ok),
                 lines: reports.flatMap(({ lines }) => lines),
               })),
-            ),
+            )
+        ).pipe(
+          Effect.map((report): Applied => {
+            if (plan === undefined || plan.action === undefined) return report
+            if (report.ok && wantsBrowse && !options.dryRun) stagedBrowse = plan
+            return {
+              ok: report.ok,
+              lines: [
+                ...report.lines,
+                ...(options.dryRun
+                  ? browseReview(plan, wantsBrowse, true)
+                  : !wantsBrowse
+                    ? [hint("OpenCode Browse: setup skipped; no Browse command ran")]
+                    : report.ok
+                      ? [
+                          hint(
+                            plan.next === "pair"
+                              ? `${BROWSE_HANDOFF}start the official pairing command`
+                              : `${BROWSE_HANDOFF}verify the pinned CLI`,
+                          ),
+                        ]
+                      : []),
+              ],
+            }
+          }),
+        ),
         { signal },
       )
     },
@@ -583,27 +662,55 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     catch: (cause) => cause,
   }).pipe(
     Effect.flatMap(decodeOutcome),
-    Effect.map((outcome): Interactive => {
-      if (outcome._tag === "Applied") {
-        const applied: Applied = outcome.applied
-        return {
-          kind: options.t3Workflow === true ? "applied" : "done",
-          report: { lines: applied.lines, ok: applied.ok },
+    Effect.flatMap((outcome) =>
+      Effect.gen(function* (): Effect.fn.Return<Interactive, never, Shell> {
+        if (outcome._tag === "Applied") {
+          const applied: Applied = outcome.applied
+          const finishedBrowse =
+            applied.ok && stagedBrowse !== undefined
+              ? yield* options
+                  .notify(
+                    plain(
+                      stagedBrowse.next === "pair"
+                        ? `OpenCode Browse: verifying the pinned CLI, then pairing ${stagedBrowse.target ?? "your browser"}.`
+                        : "OpenCode Browse: verifying the pinned CLI.",
+                    ),
+                  )
+                  .pipe(
+                    Effect.andThen(
+                      configureBrowse(
+                        options.env,
+                        stagedBrowse,
+                        options.browse?.pair ?? pairBrowseOnTerminal,
+                      ),
+                    ),
+                  )
+              : { ok: true, lines: [] }
+          return {
+            kind: options.t3Workflow === true ? "applied" : "done",
+            report: {
+              lines: [
+                ...applied.lines.filter((line) => !line.startsWith(hint(BROWSE_HANDOFF))),
+                ...finishedBrowse.lines,
+              ],
+              ok: applied.ok && finishedBrowse.ok,
+            },
+          }
         }
-      }
-      return {
-        kind: "done",
-        report:
-          outcome._tag === "Cancelled"
-            ? { lines: [hint("setup cancelled; nothing was written")], ok: false }
-            : {
-                lines: [
-                  "! setup was interrupted while applying; run holyagent setup again to finish",
-                ],
-                ok: false,
-              },
-      }
-    }),
+        return {
+          kind: "done",
+          report:
+            outcome._tag === "Cancelled"
+              ? { lines: [hint("setup cancelled; nothing was written")], ok: false }
+              : {
+                  lines: [
+                    "! setup was interrupted while applying; run holyagent setup again to finish",
+                  ],
+                  ok: false,
+                },
+        }
+      }),
+    ),
     Effect.catch((cause) => {
       const detail = oneLine(cause)
       if (applyStarted) return Effect.succeed(stopped(`failed (${detail})`, true))

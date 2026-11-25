@@ -377,19 +377,19 @@ describe("toolSettings", () => {
       },
       {
         file: PI_FFF_FILE,
-        content: { mode: "override" },
+        content: { mode: "override", enableHomeDirScanning: false },
         revertWhenOff: true,
       },
     ])
   })
 
-  test("fff puts pi-fff in override mode, leaving followSymlinks unset, while it is on and its native library covers the host", () => {
+  test("fff uses override mode without scanning home or setting followSymlinks", () => {
     const patches = (config: Config, platform?: string) =>
       toolSettings(config, undefined, "normal", platform).filter((p) => p.file === PI_FFF_FILE)
     expect(patches(DEFAULT_CONFIG, "linux-x64")).toEqual([
       {
         file: PI_FFF_FILE,
-        content: { mode: "override" },
+        content: { mode: "override", enableHomeDirScanning: false },
         revertWhenOff: true,
       },
     ])
