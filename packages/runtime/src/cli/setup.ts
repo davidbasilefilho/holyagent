@@ -6,7 +6,14 @@ import type { PiProviderSelection } from "../config/schema.ts"
 import { DEFAULT_CONFIG } from "../domain/directive.ts"
 import { SetupFailure } from "../setup/errors.ts"
 import { chooseForm, FORM_CHOICES } from "../setup/form.ts"
-import type { CapabilityChoices } from "../setup/pi-check.ts"
+import {
+  type CapabilityChoices,
+  isHolyagentSource,
+  loadPiConfigSource,
+  piInUse,
+  piPresenceFiles,
+  piSettingsSources,
+} from "../setup/pi-check.ts"
 import { fail, hint, pass, type Report } from "../setup/report.ts"
 import {
   describeScope,
@@ -315,6 +322,41 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           return surface === "public"
             ? yield* saveSetupResult(interactive.report, booleanFlag(args, "dry-run"), env)
             : printed(interactive.report)
+        if (
+          surface === "public" &&
+          !booleanFlag(args, "undo") &&
+          (target === "pi" || t3Workflow) &&
+          (yield* piInUse(env))
+        ) {
+          const config = yield* loadPiConfigSource(env, cwd, resolved.scope).pipe(
+            Effect.orElseSucceed(() => undefined),
+          )
+          const pi = config?.written.pi
+          if (
+            config?.config.pi.enable === true &&
+            pi?.provider === undefined &&
+            pi?.providers === undefined &&
+            !Object.values(pi?.routes ?? {}).some((route) => route.provider !== undefined)
+          ) {
+            const previous = yield* Effect.forEach(
+              piPresenceFiles(env, cwd, resolved.scope),
+              piSettingsSources,
+            ).pipe(
+              Effect.map((sources) => sources.flat().some(isHolyagentSource)),
+              Effect.catchTag("SetupFailure", (error) => Effect.succeed(error)),
+            )
+            if (previous instanceof SetupFailure || !previous)
+              return printed({
+                ok: false,
+                lines: [
+                  ...interactive.notes,
+                  previous instanceof SetupFailure
+                    ? `! pi packages: ${previous.message}`
+                    : "! Pi model providers: No providers are configured. Run interactive holyagent setup pi to enable one or set pi.providers in the HolyAgent config before unattended setup.",
+                ],
+              })
+          }
+        }
         return printed(yield* apply(flagged, capabilities, interactive.notes))
       }).pipe(Effect.provide(shellLive(env))),
   }

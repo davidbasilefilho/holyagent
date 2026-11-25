@@ -400,6 +400,11 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed")
   const selectionOf = (choices: Choices) =>
     (["pi", "claude"] as const).filter((target) => choices.harnesses?.[target] === true)
+  const needsProvider = (choices: Choices) =>
+    providerChoices !== undefined &&
+    (combined === undefined || selectionOf(choices).includes("pi")) &&
+    (choices.piProviders?.providers.length ?? 0) === 0
+  const noProvider = () => new Error("Select at least one Pi model provider.")
   const label = (target: "pi" | "claude") => (target === "pi" ? "Pi / T3 Code" : "Claude Code")
   let applyStarted = false
   let reviewedChoices: Choices | undefined
@@ -424,6 +429,11 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
     review: (choices) =>
       Effect.runPromise(
         Effect.gen(function* () {
+          if (needsProvider(choices)) {
+            ++reviewSequence
+            reviewedChoices = undefined
+            return yield* Effect.fail(noProvider())
+          }
           if (combined !== undefined) {
             const sequence = ++reviewSequence
             reviewedChoices = undefined
@@ -498,6 +508,7 @@ export const runInteractive = Effect.fn("runInteractive")(function* (options: In
         }),
       ),
     apply: (choices, signal) => {
+      if (needsProvider(choices)) return Effect.runPromise(Effect.fail(noProvider()))
       const chosen = withProviderChanges(choices)
       if (
         (combined !== undefined || chosen.piProviders !== undefined) &&

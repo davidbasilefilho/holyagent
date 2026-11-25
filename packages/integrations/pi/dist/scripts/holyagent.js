@@ -32033,6 +32033,10 @@ var init_errors10 = __esm(() => {
   init_errors8();
 });
 
+var init_pi_check2 = __esm(() => {
+  init_pi_check();
+});
+
 var init_report3 = () => {};
 
 var init_scope2 = __esm(() => {
@@ -32045,10 +32049,6 @@ var init_settings6 = __esm(() => {
 
 var init_schema2 = __esm(() => {
   init_schema();
-});
-
-var init_pi_check2 = __esm(() => {
-  init_pi_check();
 });
 
 var init_t3_settings2 = __esm(() => {
@@ -32229,6 +32229,8 @@ var init_session = __esm(() => {
     };
     const failedReport = (report) => new Error(report.lines.filter((entry) => entry.startsWith("!")).join(" ") || "preflight failed");
     const selectionOf = (choices) => ["pi", "claude"].filter((target) => choices.harnesses?.[target] === true);
+    const needsProvider = (choices) => providerChoices !== undefined && (combined === undefined || selectionOf(choices).includes("pi")) && (choices.piProviders?.providers.length ?? 0) === 0;
+    const noProvider = () => new Error("Select at least one Pi model provider.");
     const label = (target) => target === "pi" ? "Pi / T3 Code" : "Claude Code";
     let applyStarted = false;
     let reviewedChoices;
@@ -32250,6 +32252,11 @@ var init_session = __esm(() => {
       },
       dryRun: options.dryRun,
       review: (choices) => runPromise2(gen2(function* () {
+        if (needsProvider(choices)) {
+          ++reviewSequence;
+          reviewedChoices = undefined;
+          return yield* fail5(noProvider());
+        }
         if (combined !== undefined) {
           const sequence = ++reviewSequence;
           reviewedChoices = undefined;
@@ -32306,6 +32313,8 @@ var init_session = __esm(() => {
         return reviewOf(next === undefined || "line" in next ? undefined : next, choices, capabilityReview(initialSwitches, choices.capabilities, options.form));
       })),
       apply: (choices, signal) => {
+        if (needsProvider(choices))
+          return runPromise2(fail5(noProvider()));
         const chosen = withProviderChanges(choices);
         if ((combined !== undefined || chosen.piProviders !== undefined) && reviewedChoices !== choices)
           return runPromise2(fail5(new Error("Review the current harness selection before applying.")));
@@ -32497,6 +32506,23 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
         return printed(interactive.report);
       if (interactive.kind === "applied")
         return surface === "public" ? yield* saveSetupResult(interactive.report, booleanFlag(args, "dry-run"), env) : printed(interactive.report);
+      if (surface === "public" && !booleanFlag(args, "undo") && (target === "pi" || t3Workflow) && (yield* piInUse(env))) {
+        const config = yield* loadPiConfigSource(env, cwd, resolved.scope).pipe(orElseSucceed2(() => {
+          return;
+        }));
+        const pi = config?.written.pi;
+        if (config?.config.pi.enable === true && pi?.provider === undefined && pi?.providers === undefined && !Object.values(pi?.routes ?? {}).some((route) => route.provider !== undefined)) {
+          const previous = yield* forEach2(piPresenceFiles(env, cwd, resolved.scope), piSettingsSources).pipe(map5((sources) => sources.flat().some(isHolyagentSource)), catchTag2("SetupFailure", (error) => succeed6(error)));
+          if (previous instanceof SetupFailure || !previous)
+            return printed({
+              ok: false,
+              lines: [
+                ...interactive.notes,
+                previous instanceof SetupFailure ? `! pi packages: ${previous.message}` : "! Pi model providers: No providers are configured. Run interactive holyagent setup pi to enable one or set pi.providers in the HolyAgent config before unattended setup."
+              ]
+            });
+        }
+      }
       return printed(yield* apply(flagged, capabilities, interactive.notes));
     }).pipe(provide4(shellLive(env)))
   };
@@ -32523,6 +32549,7 @@ var init_setup2 = __esm(() => {
   init_directive2();
   init_errors10();
   init_form2();
+  init_pi_check2();
   init_report3();
   init_scope2();
   init_settings6();

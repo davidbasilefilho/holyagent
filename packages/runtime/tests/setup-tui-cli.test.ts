@@ -189,6 +189,46 @@ describe("setup flags for the T3 choices", () => {
 })
 
 describe("the public setup renderer", () => {
+  test("fresh public Pi setup refuses review and apply until a provider is chosen", async () => {
+    await machine()
+    const shown = interface_(async (input) => {
+      expect(input.initial.piProviders).toEqual({ providers: [] })
+      await expect(input.review(input.initial)).rejects.toThrow(
+        "Select at least one Pi model provider.",
+      )
+      await expect(input.apply(input.initial, new AbortController().signal)).rejects.toThrow(
+        "Select at least one Pi model provider.",
+      )
+      expect(await Bun.file(t3File()).exists()).toBe(false)
+      return { _tag: "Cancelled" }
+    })
+    const result = await cli(["pi", "--form", "headless"], {
+      terminal: TERMINAL,
+      setupTui: shown.loader,
+      publicEntry: true,
+    })
+    expect(result.stdout).toContain("setup cancelled; nothing was written")
+    expect(await Bun.file(join(home, ".holyagent", "config.json")).exists()).toBe(false)
+  })
+
+  test("fresh unattended Pi setup reports the prerequisite and preserves native choices", async () => {
+    await machine()
+    const pi = join(home, "pi")
+    const file = join(pi, "settings.json")
+    const native = { defaultProvider: "openai-codex", defaultModel: "gpt-6.2-sol", theme: "dark" }
+    await Bun.write(file, JSON.stringify(native))
+    const result = await cli(["pi", "--no-tui", "--form", "headless"], {
+      env: { PI_CODING_AGENT_DIR: pi },
+      terminal: TERMINAL,
+      publicEntry: true,
+    })
+    expect(result.code).toBe(1)
+    expect(result.stdout).toContain("No providers are configured")
+    expect(await Bun.file(file).json()).toEqual(native)
+    expect(await Bun.file(t3File()).exists()).toBe(false)
+    expect(await Bun.file(join(home, ".holyagent", "config.json")).exists()).toBe(false)
+  })
+
   test("fresh public Pi setup enables two providers but writes no startup default", async () => {
     await machine()
     const pi = join(home, "pi")
@@ -296,7 +336,14 @@ describe("the public setup renderer", () => {
       JSON.stringify({ packages: piPackages(config, undefined, "headless") }),
     )
     const shown = interface_(async (input) => {
-      const choices = { ...input.initial, harnesses: { pi: true, claude: true } }
+      const claudeOnly = { ...input.initial, harnesses: { pi: false, claude: true } }
+      const claudeReview = await input.review(claudeOnly)
+      expect(claudeReview.harnesses?.map(({ name }) => name)).toEqual(["Claude Code"])
+      const choices = {
+        ...input.initial,
+        harnesses: { pi: true, claude: true },
+        piProviders: { providers: ["kimi-coding-global"] as const },
+      }
       await expect(input.apply(choices, new AbortController().signal)).rejects.toThrow("Review")
       const review = await input.review(choices)
       expect(review.harnesses?.map(({ name }) => name)).toEqual(["Pi / T3 Code", "Claude Code"])
@@ -422,7 +469,9 @@ describe("the public setup renderer", () => {
     const config = await Effect.runPromise(defaultConfig)
     await Bun.write(
       join(pi, "settings.json"),
-      JSON.stringify({ packages: piPackages(config, undefined, "headless") }),
+      JSON.stringify({
+        packages: ["npm:holyagent@0.3.4", ...piPackages(config, undefined, "headless")],
+      }),
     )
     const result = await cli(["--no-tui", "--form", "headless"], {
       env: { PI_CODING_AGENT_DIR: pi },
