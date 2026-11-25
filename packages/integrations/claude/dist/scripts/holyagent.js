@@ -29564,6 +29564,12 @@ var CODEX_MARKETPLACE = "holyagent-local";
 var CODEX_PLUGIN = `holyagent@${CODEX_MARKETPLACE}`;
 var CODEX_MODEL = "gpt-6.2-sol";
 var CODEX_DEFAULT_EFFORT = "medium";
+var CODEX_STARTUP_GUIDANCE = `# HolyAgent
+
+If you are a specialist, stay in your assigned scope, verify your result, and report it to the root. Do not delegate.
+
+If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, work directly and report any material verification you could not do.
+`;
 var json = (value) => `${JSON.stringify(value, null, 2)}
 `;
 var plugin = "plugins/holyagent";
@@ -29691,6 +29697,7 @@ var codexStartupFiles = fn2("codexStartupFiles")(function* (target, catalogFile,
       content: codexStartupConfig(catalog === undefined ? undefined : join31(target, catalogName))
     },
     ...catalog === undefined ? [] : [{ path: catalogName, content: catalog }],
+    { path: "AGENTS.md", content: CODEX_STARTUP_GUIDANCE },
     ...codexRoleFiles(),
     ...codexMarketplaceFiles(version).map(({ path, content }) => ({
       path: join31(CODEX_STARTUP_MARKETPLACE, path),

@@ -7,6 +7,7 @@ import {
   CODEX_ASSET_VERSION,
   CODEX_DEFAULT_EFFORT,
   CODEX_MODEL,
+  CODEX_STARTUP_GUIDANCE,
   codexMarketplaceFiles,
   codexRoleFiles,
 } from "./assets.ts"
@@ -92,6 +93,7 @@ export const codexStartupFiles = Effect.fn("codexStartupFiles")(function* (
       content: codexStartupConfig(catalog === undefined ? undefined : join(target, catalogName)),
     },
     ...(catalog === undefined ? [] : [{ path: catalogName, content: catalog }]),
+    { path: "AGENTS.md", content: CODEX_STARTUP_GUIDANCE },
     ...codexRoleFiles(),
     ...codexMarketplaceFiles(version).map(({ path, content }) => ({
       path: join(CODEX_STARTUP_MARKETPLACE, path),

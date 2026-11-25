@@ -31930,7 +31930,12 @@ Use the repository's gates. Verify each material claim at the boundary it concer
 `;
 var init_SKILL = () => {};
 
-var CODEX_ASSET_VERSION, CODEX_MARKETPLACE = "holyagent-local", CODEX_PLUGIN, CODEX_MODEL = "gpt-6.2-sol", CODEX_DEFAULT_EFFORT = "medium", json = (value) => `${JSON.stringify(value, null, 2)}
+var CODEX_ASSET_VERSION, CODEX_MARKETPLACE = "holyagent-local", CODEX_PLUGIN, CODEX_MODEL = "gpt-6.2-sol", CODEX_DEFAULT_EFFORT = "medium", CODEX_STARTUP_GUIDANCE = `# HolyAgent
+
+If you are a specialist, stay in your assigned scope, verify your result, and report it to the root. Do not delegate.
+
+If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, work directly and report any material verification you could not do.
+`, json = (value) => `${JSON.stringify(value, null, 2)}
 `, plugin = "plugins/holyagent", codexMarketplaceFiles = (assetVersion = CODEX_ASSET_VERSION) => [
   {
     path: ".agents/plugins/marketplace.json",
@@ -32060,6 +32065,7 @@ var init_startup = __esm(async () => {
         content: codexStartupConfig(catalog === undefined ? undefined : join31(target, catalogName))
       },
       ...catalog === undefined ? [] : [{ path: catalogName, content: catalog }],
+      { path: "AGENTS.md", content: CODEX_STARTUP_GUIDANCE },
       ...codexRoleFiles(),
       ...codexMarketplaceFiles(version).map(({ path, content }) => ({
         path: join31(CODEX_STARTUP_MARKETPLACE, path),

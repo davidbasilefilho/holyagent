@@ -17,6 +17,14 @@ export const CODEX_MODEL = "gpt-6.2-sol"
 /** The ordinary root reasoning effort for native Codex. */
 export const CODEX_DEFAULT_EFFORT = "medium"
 
+/** Native startup note. The plugin skill holds the detailed workflow. */
+export const CODEX_STARTUP_GUIDANCE = `# HolyAgent
+
+If you are a specialist, stay in your assigned scope, verify your result, and report it to the root. Do not delegate.
+
+If you are the root, handle straightforward work directly. For independent work or material risk, load the HolyAgent workflow skill before choosing whether to delegate or ask for independent review. Use only the native tools the host actually exposes. If delegation is unavailable, work directly and report any material verification you could not do.
+`
+
 /** One UTF-8 file to stage under the marketplace root or Codex home. */
 export interface CodexAsset {
   readonly path: string

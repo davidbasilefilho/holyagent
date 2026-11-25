@@ -113,6 +113,7 @@ test.skipIf(native === undefined)(
       })
       const prompt = await $`${native} debug prompt-input ${"Check the scope"}`.env(env).quiet()
       expect(prompt.text()).toContain("holyagent:holyagent-workflow")
+      expect(prompt.text()).toContain("If you are a specialist, stay in your assigned scope")
       expect(prompt.text()).not.toContain("spawn_agent")
       const role = join(home, "agents", "holyagent-reviewer-code.toml")
       await Bun.write(role, "# manual override\n")
