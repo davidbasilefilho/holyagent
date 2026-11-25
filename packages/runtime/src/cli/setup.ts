@@ -2,6 +2,7 @@ import { type Context, setup as coreSetup } from "@holyagent/core"
 import { Effect, Schema } from "effect"
 
 import { CAPABILITIES } from "../config/capabilities.ts"
+import type { PiProviderSelection } from "../config/schema.ts"
 import { DEFAULT_CONFIG } from "../domain/directive.ts"
 import { SetupFailure } from "../setup/errors.ts"
 import { chooseForm, FORM_CHOICES } from "../setup/form.ts"
@@ -127,7 +128,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
     output:
       "report lines: `+` added, `=` already in place, `-` skipped (with --undo: removed), `~` kept or needs you, `!` failed; exit 1 when any step failed",
     notes: [
-      "public T3 Code setup uses user scope by default, checks T3 Code was opened at least once, and does not change Claude Code settings",
+      "Pi setup uses user scope by default and checks that T3 Code was opened at least once. It does not change Claude Code settings unless you also select Claude Code in bare interactive setup",
       "installs the ctx7 CLI; authentication is managed separately by Context7. Setup no longer installs external Context7 skills or rules; existing files are left in place",
       "when Pi is in use (HOLYAGENT_HOST=pi, or pi on PATH; not in a cloud session), makes Pi's packages match the HolyAgent config: `pi install npm:<name>@<pin>` for each package the config enables that Pi's settings do not list at that pin, and `pi remove npm:<name>` for each feature package the settings list but the config turns off; scope user works on Pi's global settings, project and local on the project's .pi/settings.json with -l; nothing runs while pi.enable is off; re-run setup after changing pi.features or pi.web in the config",
       "internal Claude entry only: merges these keys into the settings file of --scope without changing any value already set: attribution, includeGitInstructions, subagentPromptCacheTtl, modelSettings.claude-opus-5-5 (effortLevel high and autoCompactWindow 450000 for the root), extraKnownMarketplaces, enabledPlugins and permissions.deny for WebSearch and WebFetch",
@@ -139,7 +140,7 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
       `capabilities: ${CAPABILITY_NAMES}; each is one switch of pi.features with the packages, tool settings and doctor check that follow from it (docs/pi/configuration.md); \`--<capability> on|off\` turns one on or off by writing pi.features.<key> to the HolyAgent config of the scope (the user's config.json for user, the project's .holyagent/config.json for project and local), only for a value that differs from what the config decides, and the Pi step then installs or removes its packages in the same run; a capability flag applies directly, without the screen, and is refused with --undo`,
       "--form headless|normal picks the form every capability is applied in; without it setup detects the machine (CI set, a claude.ai cloud session, or no DISPLAY or WAYLAND_DISPLAY on Linux means headless, else normal) and prints a `~ form:` line; the headless form leaves out a capability that needs a graphical session (computer-use), which is neither installed nor required there, and setup removes its package once the machine is headless",
       "the T3 Code part of setup (the Pi provider, device access, new threads in worktrees and the keys it always applies) has two choices, new threads in worktrees and agent device access, each on unless you turn it off; the Pi provider is always on while pi.enable is true; device access is offered only where Xcode's iOS simulator or an Android SDK is found",
-      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, space toggles, Enter reviews, Esc or Ctrl-C cancels and writes nothing; the installed public CLI loads the renderer from its own package",
+      "in a terminal, when Pi is in use and the config loads with pi.enable on (or the T3 part has work: scope user, T3 Code installed), setup shows an interactive screen with a row for each capability and, with T3 work, the two T3 choices, a review of what will change and the keys it always applies, and applies on confirm; up/down or j/k move, Enter changes the focused option, Review choices opens the plan, and Esc or Ctrl-C cancels without writing; the installed public CLI loads the renderer from its own package",
       "--worktrees on|off and --device-access on|off make a choice without the screen and apply directly, leaving the other choice on, and so does a capability flag; --no-tui keeps the screen out and applies both choices on; the line-based setup runs too, with one `~ t3 tui:` line saying why, when stdin or stdout is not a terminal, CI is set, TERM is dumb, or a flag above was given; if the selected public renderer fails, setup stops without applying defaults",
     ],
     flags: {
@@ -201,24 +202,39 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           choices: {
             readonly worktrees?: boolean | undefined
             readonly deviceAccess?: boolean | undefined
+            readonly piProviders?: PiProviderSelection
           },
           chosen: CapabilityChoices,
           notes: ReadonlyArray<string> = [],
+          selected?: {
+            readonly target: SetupTarget
+            readonly dryRun: boolean
+            readonly skipSharedPrerequisites: boolean
+            readonly replacePiRegistration?: boolean
+          },
         ) =>
           Effect.gen(function* () {
+            const selectedTarget = selected?.target ?? target
             const report = yield* coreSetup.setup(coreContext(cwd, env), {
               scope: resolved.scope,
-              ...(target === undefined ? { t3Workflow } : { target }),
-              ...(target === "claude" || installedPackageRoot === undefined
+              ...(selectedTarget === undefined ? { t3Workflow } : { target: selectedTarget }),
+              ...(selectedTarget === "claude" || installedPackageRoot === undefined
                 ? {}
                 : { installedPackageRoot }),
+              ...(selectedTarget !== "claude" && selected?.replacePiRegistration === true
+                ? { replacePiRegistration: true }
+                : {}),
               undo: booleanFlag(args, "undo"),
               subagentCacheTtl,
-              dryRun: booleanFlag(args, "dry-run"),
-              skipCtx7: booleanFlag(args, "skip-ctx7"),
+              dryRun: selected?.dryRun ?? booleanFlag(args, "dry-run"),
+              skipCtx7:
+                selected?.skipSharedPrerequisites === true || booleanFlag(args, "skip-ctx7"),
               ...(choices.worktrees === undefined ? {} : { worktrees: choices.worktrees }),
               ...(choices.deviceAccess === undefined ? {} : { deviceAccess: choices.deviceAccess }),
-              capabilities: chosen,
+              capabilities: selectedTarget === "claude" ? {} : chosen,
+              ...(selectedTarget === "claude" || choices.piProviders === undefined
+                ? {}
+                : { piProviders: choices.piProviders }),
               form,
             })
             return {
@@ -253,7 +269,46 @@ const setupCommand = (target?: SetupTarget, usage = SETUP_USAGE): Command => {
           form,
           ...(setupTui === undefined ? {} : { load: setupTui }),
           notify: emit,
-          apply: (choices, chosen) => apply(choices, chosen),
+          apply: (choices, chosen, replacePiRegistration) =>
+            target === "pi"
+              ? apply(choices, chosen, [], {
+                  target: "pi",
+                  dryRun: booleanFlag(args, "dry-run"),
+                  skipSharedPrerequisites: false,
+                  replacePiRegistration,
+                })
+              : apply(choices, chosen),
+          ...(surface === "public" && target === "pi"
+            ? {
+                previewPi: (choices, chosen) =>
+                  apply(choices, chosen, [], {
+                    target: "pi",
+                    dryRun: true,
+                    skipSharedPrerequisites: false,
+                    replacePiRegistration: true,
+                  }),
+              }
+            : {}),
+          ...(surface === "public" && target === undefined
+            ? {
+                combined: {
+                  run: (
+                    harness,
+                    choices,
+                    chosen,
+                    dryRun,
+                    skipSharedPrerequisites,
+                    replacePiRegistration,
+                  ) =>
+                    apply(choices, chosen, [hint(`setup harness: ${harness}`)], {
+                      target: harness,
+                      dryRun,
+                      skipSharedPrerequisites,
+                      replacePiRegistration,
+                    }),
+                },
+              }
+            : {}),
         })
         if (interactive.kind === "done") return printed(interactive.report)
         if (interactive.kind === "applied")
@@ -328,7 +383,7 @@ const publicPiSetup = (target?: "pi"): Command => {
     notes: [
       ...(target === undefined
         ? [
-            "Without a harness, setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options.",
+            "In a terminal, bare setup opens a combined Pi and Claude Code review. Codex is not an available public setup target on this build. Unattended bare setup configures Pi for T3 Code. Run holyagent setup pi --help or holyagent setup claude --help for the harness options.",
           ]
         : []),
       ...(command.notes?.filter((note) => !/internal Claude|claude\.ai cloud/.test(note)) ?? []),

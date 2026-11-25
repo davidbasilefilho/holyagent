@@ -181,15 +181,15 @@ describe("the setup interface on a light terminal", () => {
     const listing = spanListing(screen)
     expect(listing).toContain(`${LIGHT_THEME.heading} bold "HolyAgent  ·  setup"`)
     expect(listing).toContain(`${LIGHT_THEME.option} "↑/↓ or j/k focus`)
-    expect(listing).toContain(`${LIGHT_THEME.focus} bold "❯ Pi provider`)
-    expect(listing).toContain(`${LIGHT_THEME.hint} "Pi runs in T3 Code`)
+    expect(listing).toContain(`${LIGHT_THEME.focus} bold "❯ Agent device access`)
+    expect(listing).toContain(`${LIGHT_THEME.hint} "Lets agents use the iOS simulator`)
     for (const dark of Object.values(TERMINAL_THEME))
       if (!Object.values(LIGHT_THEME).includes(dark)) expect(listing).not.toContain(dark)
   })
 
   test("draws every review and result tone in the light palette", async () => {
     const screen = await shown({ width: 80, height: 24, background: "light" })
-    await screen.keys("enter")
+    await screen.keys("end", "enter")
     const listing = spanListing(screen)
     const used = new Set(listing.match(/#[0-9a-f]{6}/g))
     expect(used.size).toBeGreaterThan(1)
@@ -216,7 +216,7 @@ describe("the setup interface on a light terminal", () => {
     const lines = screen.lines()
     expect(lines[0]).toBe("HolyAgent  -  setup")
     expect(lines.join("\n")).not.toMatch(/[^\x20-\x7e\n]/)
-    expect(spanListing(screen)).toContain(`${LIGHT_THEME.focus} bold "> Pi provider`)
+    expect(spanListing(screen)).toContain(`${LIGHT_THEME.focus} bold "> Agent device access`)
   })
 })
 

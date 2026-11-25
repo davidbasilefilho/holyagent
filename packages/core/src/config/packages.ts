@@ -1,4 +1,10 @@
-import { type ProviderProfile, providerProfile, PROVIDERS, webChoice } from "../pi/provider.ts"
+import {
+  enabledPiProviders,
+  type ProviderProfile,
+  providerProfile,
+  PROVIDERS,
+  webChoice,
+} from "../pi/provider.ts"
 import {
   CAPABILITIES,
   type CapabilityDefinition,
@@ -38,9 +44,7 @@ export const piPackages = (
     ...new Set(
       [
         profile.package,
-        ...Object.values(config.pi.routes).map(
-          (row) => PROVIDERS[row.provider ?? config.pi.provider].package,
-        ),
+        ...enabledPiProviders(config).map((provider) => PROVIDERS[provider].package),
       ].filter((name): name is PiPackageName => name !== undefined),
     ),
     ...capabilityPackages(features, form, definitions, platform),

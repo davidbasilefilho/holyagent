@@ -7,7 +7,7 @@ import {
   type CapabilityDefinition,
   type CapabilityForm,
 } from "../config/capabilities.ts"
-import type { Config } from "../config/schema.ts"
+import type { Config, PiProviderSelection } from "../config/schema.ts"
 import { FFF_RETIRED_SETTINGS } from "../pi/fff/settings.ts"
 import { PROVIDERS, ROOT_MODEL_PAIR, rootModelSettings } from "../pi/provider.ts"
 import {
@@ -257,8 +257,9 @@ const planAt = (
   scope: Scope,
   form?: CapabilityForm,
   choices?: CapabilityChoices,
+  providers?: PiProviderSelection,
 ) =>
-  loadPiConfig(env, cwd, scope, choices).pipe(
+  loadPiConfig(env, cwd, scope, choices, providers).pipe(
     Effect.map((config) => (config.pi.enable ? planFor(env, cwd, scope, config, form) : undefined)),
     Effect.orElseSucceed(() => undefined),
   )
@@ -455,7 +456,14 @@ export const installPiToolSettings = Effect.fn("installPiToolSettings")(function
   env: Env,
   options: PiInstallOptions,
 ) {
-  const plan = yield* planAt(env, options.cwd, options.scope, options.form, options.choices)
+  const plan = yield* planAt(
+    env,
+    options.cwd,
+    options.scope,
+    options.form,
+    options.choices,
+    options.providers,
+  )
   if (plan === undefined)
     return (yield* piDisabledAt(env, options.cwd, options.scope, options.choices))
       ? yield* revertUnplanned(env, options, undefined)

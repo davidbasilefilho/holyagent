@@ -62,7 +62,6 @@ export const SetupApp = (props: SetupAppProps) => {
   const dimensions = useTerminalDimensions()
   const look = lookFor(props.input.env, props.background)
   const palette = paletteOf(look)
-  const rows = rowsOf(props.input.offer)
   const [state, setState] = createSignal<State>(initialState(props.input.initial))
   const abort = new AbortController()
   // The renderer is destroyed (a hangup, a signal, the end of the run) with an apply possibly still
@@ -72,7 +71,7 @@ export const SetupApp = (props: SetupAppProps) => {
   let pointer: { x: number; y: number; state: State; control: Control } | undefined
 
   const context = (): Context => ({
-    rows,
+    rows: rowsOf(props.input.offer, state()),
     offer: props.input.offer,
     dryRun: props.input.dryRun,
     width: dimensions().width,
@@ -131,7 +130,8 @@ export const SetupApp = (props: SetupAppProps) => {
   }
   const keypress = (key: Key) => {
     const before = state()
-    advance(before, press(before, rows, key, scrollOf(before, context())))
+    const current = context()
+    advance(before, press(before, current.rows, key, scrollOf(before, current)))
   }
   useKeyboard((event) => keypress({ name: event.name, ctrl: event.ctrl }))
 
@@ -172,7 +172,7 @@ export const SetupApp = (props: SetupAppProps) => {
               )
                 advance(
                   before,
-                  pressControl(before, rows, down.control, scrollOf(before, context())),
+                  pressControl(before, context().rows, down.control, scrollOf(before, context())),
                 )
             }}>
             {line.length === 0 ? (

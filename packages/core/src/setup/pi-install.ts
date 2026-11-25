@@ -5,11 +5,19 @@ import { Effect, Option } from "effect"
 import release from "../../../../package.json" with { type: "json" }
 import { type CapabilityForm, managedCapabilityPackages } from "../config/capabilities.ts"
 import { piPackages, WEB_KIT_PACKAGE } from "../config/packages.ts"
+import type { PiProviderSelection } from "../config/schema.ts"
 import { PROVIDERS } from "../pi/provider.ts"
 import { fileSystem } from "../ports/filesystem.ts"
 import { type Env, homeDirectory } from "./environment.ts"
 import { SetupFailure } from "./errors.ts"
-import { fileExists, isJsonObject, readJsonObject } from "./json-file.ts"
+import {
+  fileExists,
+  isJsonObject,
+  readJsonObject,
+  readJsonObjectSnapshot,
+  writeJsonObjectIfUnchanged,
+} from "./json-file.ts"
+import { isBunxPackageRoot, isNpmExecPackageRoot } from "./package-runner.ts"
 import {
   type CapabilityChoices,
   isHolyagentSource,
@@ -90,7 +98,7 @@ const installedPackage = Effect.fn("installedPiPackage")(function* (path: string
     !(yield* fileExists(join(root, "extensions", "holyagent.js")))
   )
     return yield* invalid
-  return { root, physical }
+  return { root, physical, version: String(manifest.version) }
 })
 
 /** Resolves a Pi local package source relative to the settings file that holds it. */
@@ -122,28 +130,86 @@ const registration = Effect.fn("planPiPackageRegistration")(function* (
   env: Env,
   path: string,
   settings: ReadonlyArray<PackageSources>,
+  replace: boolean,
 ) {
-  const { root, physical } = yield* installedPackage(path)
+  const { root, physical, version } = yield* installedPackage(path)
+  const source = [root, physical].some(
+    (path) => isBunxPackageRoot(path) || isNpmExecPackageRoot(path),
+  )
+    ? `npm:holyagent@${version}`
+    : root
   let listedIn: string | undefined
+  const conflicts: Array<{ readonly file: string; readonly prior: string }> = []
   for (const { file, sources } of settings) {
     for (const entry of sources) {
-      const source = entry.trim()
-      const local = piLocalSourcePath(env, file, source)
+      const local = piLocalSourcePath(env, file, entry.trim())
       const actual = local === undefined ? undefined : yield* realPath(local)
-      if (actual !== undefined && relative(physical, actual) === "") {
-        listedIn ??= file
-        continue
-      }
       if (
-        isHolyagentSource(source) ||
+        entry.trim() === source ||
+        (source === root && actual !== undefined && relative(physical, actual) === "")
+      ) {
+        listedIn ??= file
+      } else if (
+        isHolyagentSource(entry.trim()) ||
         (actual !== undefined && (yield* localHolyagentPackageAt(actual)))
-      )
-        return yield* new SetupFailure({
-          message: `HolyAgent is already configured as ${JSON.stringify(entry)} in ${file}. To switch to the installed package at ${root}, review and remove the existing Pi package entry, then run setup again`,
-        })
+      ) {
+        conflicts.push({ file, prior: entry })
+      }
     }
   }
-  return listedIn === undefined ? { source: root } : { listedIn }
+  const [conflict] = conflicts
+  if (conflict !== undefined) {
+    if (
+      !replace ||
+      conflicts.length !== 1 ||
+      conflict.file !== settings[0]?.file ||
+      listedIn !== undefined
+    )
+      return yield* new SetupFailure({
+        message: `HolyAgent is already configured as ${JSON.stringify(conflict.prior)} in ${conflict.file}; review the existing registration in interactive setup at its scope before replacing it`,
+      })
+    return { source, prior: conflict.prior }
+  }
+  return listedIn === undefined ? { source } : { listedIn }
+})
+
+const entrySource = (entry: unknown): unknown => (isJsonObject(entry) ? entry.source : entry)
+
+/** Keep the old source until Pi has installed the new one. Preserve its package filters in place. */
+const retireRegistration = Effect.fn("retirePiRegistration")(function* (
+  file: string,
+  prior: string,
+  source: string,
+  previousEntry: unknown,
+) {
+  const current = yield* readJsonObjectSnapshot(file)
+  const packages: ReadonlyArray<unknown> = Array.isArray(current.value.packages)
+    ? current.value.packages
+    : []
+  const old = packages.filter((entry) => entrySource(entry) === prior)
+  if (
+    current.text === undefined ||
+    packages.filter((entry) => entrySource(entry) === source).length !== 1 ||
+    old.length > 1 ||
+    (old.length === 1 && JSON.stringify(old[0]) !== JSON.stringify(previousEntry))
+  )
+    return yield* new SetupFailure({
+      message: `${file}: the Pi registration changed during install; kept the previous source where it was still present`,
+    })
+  const replacement = isJsonObject(previousEntry) ? { ...previousEntry, source } : source
+  const next = packages.flatMap((entry) => {
+    const key = entrySource(entry)
+    if (key === prior) return [replacement]
+    if (key === source) return old.length === 0 ? [replacement] : []
+    return [entry]
+  })
+  if (
+    !(yield* writeJsonObjectIfUnchanged(file, { ...current.value, packages: next }, current.text))
+  ) {
+    return yield* new SetupFailure({
+      message: `${file}: settings changed while replacing the package; did not remove the previous source`,
+    })
+  }
 })
 
 /** What the Pi step of `holyagent setup` was asked to do. */
@@ -159,10 +225,14 @@ export interface PiInstallOptions {
   readonly dryRun: boolean
   /** Absolute package root supplied by the installed public launcher. */
   readonly installedPackageRoot?: string
+  /** Public review explicitly authorizes replacement at the selected scope. */
+  readonly replacePiRegistration?: boolean
   /** The form every capability is applied in; `normal` when absent. */
   readonly form?: CapabilityForm
   /** Capability switches the run chose, laid over the config (see {@link loadPiConfig}). */
   readonly choices?: CapabilityChoices
+  /** Explicit provider selection used by preflight and setup. */
+  readonly providers?: PiProviderSelection
 }
 
 /**
@@ -189,7 +259,13 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
   options: PiInstallOptions,
 ) {
   const shell = yield* Shell
-  const config = yield* loadPiConfig(env, options.cwd, options.scope, options.choices)
+  const config = yield* loadPiConfig(
+    env,
+    options.cwd,
+    options.scope,
+    options.choices,
+    options.providers,
+  )
   if (!config.pi.enable) return [skipped("pi packages: pi.enable is off in the HolyAgent config")]
 
   const projectLevel = options.scope !== "user"
@@ -223,14 +299,27 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
     const where = listedIn(source)
     return where === undefined ? [] : [present(`pi ${source}: already listed in ${where}`)]
   })
+  let replacement: { readonly source: string; readonly prior: string } | undefined
   if (options.installedPackageRoot !== undefined) {
-    const match = yield* registration(env, options.installedPackageRoot, [
-      { file, sources: listed },
-      ...elsewhere,
-    ])
+    const match = yield* registration(
+      env,
+      options.installedPackageRoot,
+      [{ file, sources: listed }, ...elsewhere],
+      options.replacePiRegistration === true,
+    )
     if (match.source === undefined)
       lines.unshift(present(`pi package: installed HolyAgent already listed in ${match.listedIn}`))
-    else installs.unshift(match.source)
+    else {
+      if (match.prior !== undefined) {
+        replacement = { source: match.source, prior: match.prior }
+        lines.unshift(
+          added(
+            `pi package: replace ${JSON.stringify(match.prior)} with ${JSON.stringify(match.source)} in ${file}`,
+          ),
+        )
+      }
+      installs.unshift(match.source)
+    }
   }
   if (installs.length === 0 && removals.length === 0) return lines
 
@@ -253,10 +342,25 @@ export const installPiPackages = Effect.fn("installPiPackages")(function* (
       lines.push(added(`pi ${source}: would install with ${command}`))
       continue
     }
+    const commit = replacement?.source === source ? replacement : undefined
+    const before = commit === undefined ? undefined : yield* readJsonObject(file)
+    const entries: ReadonlyArray<unknown> = Array.isArray(before?.packages) ? before.packages : []
+    const previousEntry = entries.find(
+      (entry) => commit !== undefined && entrySource(entry) === commit.prior,
+    )
+    if (commit !== undefined && previousEntry === undefined)
+      return [
+        ...lines,
+        `! pi package: ${file} changed before install; the previous registration was not replaced`,
+      ]
     const result = yield* shell.run("pi", args, {
       cwd,
       env: { PI_CODING_AGENT_DIR: piAgentDirectory(env) },
     })
+    if (commit !== undefined) {
+      if (result.exitCode !== 0) return [...lines, failed(command, result)]
+      yield* retireRegistration(file, commit.prior, source, previousEntry)
+    }
     lines.push(
       result.exitCode === 0
         ? added(`pi ${source}: installed with ${command}`)

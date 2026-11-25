@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 
+import { PiProvider } from "../config/schema.ts"
 import { doctor as runDoctor } from "../setup/doctor.ts"
 import { FORM_CHOICES } from "../setup/form.ts"
 import { SCOPES } from "../setup/scope.ts"
@@ -36,6 +37,10 @@ export const schemas = {
     t3Workflow: Schema.optionalKey(Schema.Boolean),
     target: Schema.optionalKey(Schema.Literals(SETUP_TARGETS)),
     installedPackageRoot: Schema.optionalKey(Schema.String),
+    replacePiRegistration: Schema.optionalKey(Schema.Boolean),
+    piProviders: Schema.optionalKey(
+      Schema.Struct({ provider: PiProvider, providers: Schema.Array(PiProvider) }),
+    ),
     dryRun: Schema.Boolean,
     skipCtx7: Schema.Boolean,
     scope: Schema.optionalKey(Schema.Literals(SCOPES)),

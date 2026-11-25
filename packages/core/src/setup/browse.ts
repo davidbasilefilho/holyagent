@@ -7,25 +7,44 @@ import { PI_PACKAGE_VERSIONS } from "../config/pi-packages.ts"
 import { type Env, firstNonEmpty, homeDirectory } from "./environment.ts"
 import type { SetupFailure } from "./errors.ts"
 import { readJsonText } from "./json-file.ts"
+import type { PackageRunner } from "./package-runner.ts"
 
 /** The release of opencode browse the `browser-use` capability runs, from the pin table. */
 export const BROWSE_VERSION = PI_PACKAGE_VERSIONS[BROWSE_PACKAGE]
 
-/** The command that sets browse up, at the pinned release: `npx -y @opencode/browse@<pin>`. */
+/** The package request used by the existing Browse MCP route. */
 export const BROWSE_COMMAND = `npx -y ${BROWSE_PACKAGE}@${BROWSE_VERSION}`
 
-/**
- * What the person does when no browser is paired. Browse's `install` opens the extension's Chrome
- * Web Store page when no browser has it, pairs the browser it finds, and waits for the connection;
- * `pair` prints a one-time code to enter in the extension's options instead.
- */
-export const BROWSE_PAIR_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page when no browser has it and pairs the browser (\`${BROWSE_COMMAND} pair\` prints a code to enter in the extension's options instead)`
+/** The supported runner and arguments for the pinned Browse CLI, or no command if not recognized. */
+export const browsePairCommand = (runner: PackageRunner): ReadonlyArray<string> | undefined => {
+  const spec = `${BROWSE_PACKAGE}@${BROWSE_VERSION}`
+  switch (runner) {
+    case "bunx":
+      return ["bunx", "--package", spec, "browse", "pair"]
+    case "npm":
+      return ["npm", "exec", "--yes", `--package=${spec}`, "--", "browse", "pair"]
+    case "mise":
+      return ["mise", "exec", `npm:${spec}`, "--", "browse", "pair"]
+    case "unknown":
+      return undefined
+  }
+}
 
-/**
- * What the person does when the browse extension is in no browser: `install` opens the extension's
- * Chrome Web Store page and pairs the browser once the extension is added.
- */
-export const BROWSE_INSTALL_FIX = `run \`${BROWSE_COMMAND} install\`, which opens the browse extension's Chrome Web Store page, and add it to your browser`
+const browsePairFix = (runner: PackageRunner) => {
+  const command = browsePairCommand(runner)
+  return command === undefined
+    ? `use your package manager to run browse pair from ${BROWSE_PACKAGE}@${BROWSE_VERSION} (setup could not identify the runner)`
+    : `run \`${command.join(" ")}\` and enter the code in the extension's options`
+}
+
+const STORE =
+  "https://chromewebstore.google.com/detail/opencode-browse/mfnicocicmmlkpjnaffgihfjhdgjkdjg"
+
+/** Setup leaves global launchers and MCP registration alone when pairing a browser. */
+export const BROWSE_PAIR_FIX = browsePairFix("npm")
+
+/** Install only the extension from its official store and pair separately. */
+export const BROWSE_INSTALL_FIX = `add the browse extension from ${STORE}, then ${BROWSE_PAIR_FIX}`
 
 /**
  * The folder where browse keeps what it stores per user, as its own `dataRoot` resolves it:
@@ -332,6 +351,7 @@ export const readBrowseState = (
  */
 export const describeBrowseState = (
   state: BrowseState,
+  runner: PackageRunner = "npm",
 ): { readonly text: string; readonly fix?: string } => {
   if (state.state === "paired") return { text: describePairing(state) }
   if (state.state === "installed")
@@ -342,10 +362,10 @@ export const describeBrowseState = (
             `${browser}, profile ${profile}${enabled ? "" : ", disabled"}`,
         )
         .join("; ")}) but no browser is paired with browse`,
-      fix: BROWSE_PAIR_FIX,
+      fix: browsePairFix(runner),
     }
   return {
     text: `the browse extension is not installed in any browser this check scans (${state.scanned.join(", ")}) and no browser is paired with browse`,
-    fix: BROWSE_INSTALL_FIX,
+    fix: `add the browse extension from ${STORE}, then ${browsePairFix(runner)}`,
   }
 }
