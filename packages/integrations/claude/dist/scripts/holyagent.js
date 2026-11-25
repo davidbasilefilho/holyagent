@@ -8989,7 +8989,7 @@ var BILLION_CONTEXT_GUARDRAILS_FILE = {
   guardrails: { bashTimeout: 0, maxOutputBytes: 0, repetition: false }
 };
 
-var FFF_OVERRIDE_SETTINGS = { mode: "override" };
+var FFF_OVERRIDE_SETTINGS = { mode: "override", enableHomeDirScanning: false };
 var FFF_RETIRED_SETTINGS = { followSymlinks: false };
 var FFF_NATIVE_HOSTS = [
   "darwin-arm64",
@@ -18293,7 +18293,7 @@ var PACKAGE_DEFAULTS = new Map([
     }
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-  [PI_FFF_FILE, { mode: "tools-and-ui" }],
+  [PI_FFF_FILE, { mode: "tools-and-ui", enableHomeDirScanning: true }],
   ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [
     [
       profile.toolsFile,
@@ -29798,7 +29798,6 @@ var stageCodexStartup = fn2("stageCodexStartup")(function* (parent, catalogFile)
   }));
   return target;
 });
-if (false) {}
 
 var Receipt = fromJsonString2(Struct({
   version: Literal2(1),
@@ -29821,7 +29820,7 @@ var digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex");
 var fail9 = (detail) => new StartupStageError({ detail });
 var defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join32(homeDirectory2(env), ".holyagent"), "codex");
 var io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) });
-var statOptional = (path) => io2(path, () => lstat11(path).then((stat) => stat, (error) => error.code === "ENOENT" ? undefined : Promise.reject(error)));
+var statOptional = (path) => tryPromise2({ try: () => lstat11(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`))));
 var canonicalProfile = fn2("canonicalCodexSetupProfile")(function* (candidate) {
   const target = resolve14(candidate);
   const root = yield* statOptional(target);

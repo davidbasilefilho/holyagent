@@ -52,7 +52,8 @@ import { take } from "./settings.ts"
  * - `@tintinweb/pi-subagents@0.23.1`, README "Disable defaults": `disableDefaultAgents` is `false`.
  * - `pi-provider-kimi-code@0.6.13`, `src/config.ts` `makeDefaultTools`: each Moonshot tool is
  *   `enabled: false`.
- * - `@ff-labs/pi-fff@0.11.0`, `README.md` "Modes": `mode` defaults to `tools-and-ui`.
+ * - `@ff-labs/pi-fff@0.11.0`, `README.md` and `src/index.ts`: `mode` defaults to `tools-and-ui`, and
+ *   `enableHomeDirScanning` defaults to `true`.
  */
 const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonObject>([
   [
@@ -63,7 +64,7 @@ const PACKAGE_DEFAULTS: ReadonlyMap<string, JsonObject> = new Map<string, JsonOb
     },
   ],
   [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-  [PI_FFF_FILE, { mode: "tools-and-ui" }],
+  [PI_FFF_FILE, { mode: "tools-and-ui", enableHomeDirScanning: true }],
   ...Object.values(PROVIDERS).flatMap((profile) =>
     profile.toolsFile === undefined
       ? []

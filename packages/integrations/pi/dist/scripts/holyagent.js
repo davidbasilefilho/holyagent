@@ -26,7 +26,6 @@ var __esm = (fn, res, err) => () => {
     throw err[0];
   return res;
 };
-var __promiseAll = (args) => Promise.all(args);
 
 var pipeArguments = (self, args) => {
   switch (args.length) {
@@ -11113,7 +11112,7 @@ var init_guardrails = __esm(() => {
 
 var FFF_OVERRIDE_SETTINGS, FFF_RETIRED_SETTINGS, FFF_NATIVE_HOSTS;
 var init_settings = __esm(() => {
-  FFF_OVERRIDE_SETTINGS = { mode: "override" };
+  FFF_OVERRIDE_SETTINGS = { mode: "override", enableHomeDirScanning: false };
   FFF_RETIRED_SETTINGS = { followSymlinks: false };
   FFF_NATIVE_HOSTS = [
     "darwin-arm64",
@@ -20574,7 +20573,7 @@ var init_pi_settings = __esm(() => {
       }
     ],
     [SUBAGENTS_SETTINGS_FILE, { disableDefaultAgents: false }],
-    [PI_FFF_FILE, { mode: "tools-and-ui" }],
+    [PI_FFF_FILE, { mode: "tools-and-ui", enableHomeDirScanning: true }],
     ...Object.values(PROVIDERS).flatMap((profile) => profile.toolsFile === undefined ? [] : [
       [
         profile.toolsFile,
@@ -32113,7 +32112,7 @@ var CODEX_STARTUP_MARKETPLACE = "holyagent/marketplace", catalogName = "root-onl
   ""
 ].join(`
 `), StartupStageError, readRootOnlyCatalog, codexStartupFiles, stageCodexStartup;
-var init_startup = __esm(async () => {
+var init_startup = __esm(() => {
   init_dist();
   init_assets();
   Catalog = fromJsonString2(Struct({ models: NonEmptyArray(Record(String6, Unknown2)) }));
@@ -32168,23 +32167,22 @@ var init_startup = __esm(async () => {
     }));
     return target;
   });
-  if (false) {}
 });
 
 import { randomUUID as randomUUID4 } from "crypto";
 import { lstat as lstat11, mkdir as mkdir12, readdir as readdir6, readFile as readFile6, realpath as realpath7, rename as rename8, rm as rm11, writeFile as writeFile7 } from "fs/promises";
 import { basename as basename9, dirname as dirname14, isAbsolute as isAbsolute11, join as join32, resolve as resolve14 } from "path";
-var Receipt, MarketplaceResult, PluginResult, PluginList, receiptFile, digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex"), fail9 = (detail) => new StartupStageError({ detail }), defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join32(homeDirectory2(env), ".holyagent"), "codex"), io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) }), statOptional = (path) => io2(path, () => lstat11(path).then((stat) => stat, (error) => error.code === "ENOENT" ? undefined : Promise.reject(error))), canonicalProfile, inside, read2, checkPluginTree, record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}, parseToml = (content) => try_2({
+var Receipt, MarketplaceResult, PluginResult, PluginList, receiptFile, digest = (content) => Bun.CryptoHasher.hash("sha256", content, "hex"), fail9 = (detail) => new StartupStageError({ detail }), defaultCodexHome = (env) => resolve14(env["HOLYAGENT_HOME"] || join32(homeDirectory2(env), ".holyagent"), "codex"), io2 = (path, perform) => tryPromise2({ try: perform, catch: (cause) => fail9(`${path}: ${String(cause)}`) }), statOptional = (path) => tryPromise2({ try: () => lstat11(path), catch: (cause) => cause }).pipe(catch_2((cause) => typeof cause === "object" && cause !== null && ("code" in cause) && cause.code === "ENOENT" ? succeed6(undefined) : fail5(fail9(`${path}: ${String(cause)}`)))), canonicalProfile, inside, read2, checkPluginTree, record4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {}, parseToml = (content) => try_2({
   try: () => record4(Bun.TOML.parse(content)),
   catch: () => fail9("Invalid Codex config.toml; left it unchanged")
 }), same2 = (a, b) => JSON.stringify(a) === JSON.stringify(b), checkPolicy, store2, setupCodex;
-var init_setup2 = __esm(async () => {
+var init_setup2 = __esm(() => {
   init_dist();
   init_environment2();
   init_progress();
   init_shell();
   init_assets();
-  await init_startup();
+  init_startup();
   Receipt = fromJsonString2(Struct({
     version: Literal2(1),
     files: Record(String6, String6)
@@ -32976,11 +32974,12 @@ var CacheTtlFlag, SwitchFlag, ScopeFlag, FormFlag, coreContext2 = (cwd, env) => 
     ]
   };
 }, PUBLIC_SETUP_COMMANDS;
-var init_setup3 = __esm(async () => {
+var init_setup3 = __esm(() => {
   init_src();
   init_dist();
   init_capabilities3();
   init_directive2();
+  init_setup2();
   init_errors10();
   init_form2();
   init_report3();
@@ -32991,7 +32990,6 @@ var init_setup3 = __esm(async () => {
   init_session();
   init_args();
   init_errors4();
-  await init_setup2();
   CacheTtlFlag = Literals(CACHE_TTLS);
   SwitchFlag = Literals(["on", "off"]);
   ScopeFlag = Literals(SCOPES);
@@ -33265,7 +33263,7 @@ var init_tools2 = __esm(() => {
 });
 
 var COMMANDS;
-var init_commands2 = __esm(async () => {
+var init_commands2 = __esm(() => {
   init_commands();
   init_assignment4();
   init_browser_server();
@@ -33273,9 +33271,9 @@ var init_commands2 = __esm(async () => {
   init_intent3();
   init_migrate2();
   init_overview2();
+  init_setup3();
   init_state();
   init_tools2();
-  await init_setup3();
   COMMANDS = [
     ...INTENT_COMMANDS,
     ...ASSIGNMENT_COMMANDS,
@@ -33712,7 +33710,7 @@ ${hint}
 hint: ${hint}
 `, code };
 })), run2 = (argv, host, surface = "host") => execute(argv, surface === "agent" ? { ...host, env: noninteractiveEnvironment(host.env) } : host, surface).pipe(catch_2((error) => failed4(error, host.env, surface)), catchCause2((cause) => failed4({ _tag: "Defect", message: pretty(cause) }, host.env, surface)));
-var init_program = __esm(async () => {
+var init_program = __esm(() => {
   init_dist();
   init_package();
   init_host2();
@@ -33726,15 +33724,13 @@ var init_program = __esm(async () => {
   init_live();
   init_agent_input();
   init_args();
+  init_commands2();
   init_config();
   init_context2();
   init_errors4();
   init_public_maintenance();
+  init_setup3();
   init_toon();
-  await __promiseAll([
-    init_commands2(),
-    init_setup3()
-  ]);
   PackageIdentity = Struct({ name: Literal2("holyagent"), version: String6 });
   [, hostDoctor] = SETUP_COMMANDS;
   publicCommands = [
@@ -33773,11 +33769,11 @@ var stdin, brokenPipe = (cause) => hasCode(cause, "EPIPE"), write2 = (stream, te
   yield* write2(process.stderr, result.stderr);
   process.exitCode = result.code;
 }));
-var init_entry = __esm(async () => {
+var init_entry = __esm(() => {
   init_dist();
   init_files2();
   init_errors4();
-  await init_program();
+  init_program();
   stdin = suspend2(() => process.stdin.isTTY ? fail5(new StdinMissing({ reason: "stdin is a terminal" })) : tryPromise2({
     try: () => Bun.stdin.text(),
     catch: (cause) => new StdinMissing({ reason: String(cause) })
@@ -33824,7 +33820,7 @@ var piEntry = (interactiveSetup = false) => runPromise2(gen2(function* () {
     process.exitCode = result.code;
   } else {
     Bun.argv.splice(2, Bun.argv.length - 2, ...rest);
-    const { main } = yield* promise2(() => init_entry().then(() => exports_entry));
+    const { main } = yield* promise2(() => Promise.resolve().then(() => (init_entry(), exports_entry)));
     yield* promise2(() => main(interactiveSetup));
   }
 }));

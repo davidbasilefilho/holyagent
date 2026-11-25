@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { lstat, mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -8,7 +8,7 @@ import { Effect, Layer, Option } from "effect"
 
 import { SetupProgress, type SetupProgressUpdate } from "../../../core/src/setup/progress.ts"
 import { Shell } from "../../../core/src/setup/shell.ts"
-import { defaultCodexHome, setupCodex } from "../src/setup.ts"
+import { defaultCodexHome, setupCodex } from "../../../runtime/src/setup/codex/setup.ts"
 import { codexStartupConfig } from "../src/startup.ts"
 
 const fixture = async (f: (scratch: string) => Promise<void>) => {
@@ -33,7 +33,9 @@ test("the public preview is read-only and uses its own home rather than ambient 
     const old = join(scratch, ".codex")
     const scoped = defaultCodexHome({ HOME: scratch, CODEX_HOME: old })
     const result = await Effect.runPromise(plan(scoped))
-    expect(result.lines.join("\n")).toContain(`~ Codex home: ${scoped}`)
+    expect(result.lines.join("\n")).toContain(
+      `~ Codex home: ${join(await realpath(scratch), ".holyagent", "codex")}`,
+    )
     expect(result.lines.join("\n")).toContain("register the local marketplace")
     await expect(lstat(scoped)).rejects.toMatchObject({ code: "ENOENT" })
     await expect(lstat(old)).rejects.toMatchObject({ code: "ENOENT" })

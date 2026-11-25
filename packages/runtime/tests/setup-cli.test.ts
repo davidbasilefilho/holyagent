@@ -80,7 +80,7 @@ describe("public setup harnesses", () => {
     }
     expect((await publicCli(["setup", "claude", "--form", "normal"])).code).toBe(2)
     expect((await publicCli(["setup", "pi", "--subagent-cache-ttl", "5m"])).code).toBe(2)
-    expect((await publicCli(["setup", "codex", "--help"])).code).toBe(2)
+    expect((await publicCli(["setup", "codex", "--help"])).code).toBe(0)
     for (const command of ["doctor", "update"]) {
       expect((await publicCli([command, "claude"])).code).toBe(2)
     }

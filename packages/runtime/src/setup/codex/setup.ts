@@ -4,9 +4,9 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 
 import { Effect, Option, Schema } from "effect"
 
-import { type Env, homeDirectory } from "../../../core/src/setup/environment.ts"
-import { reportSetupActivity, withSetupPhase } from "../../../core/src/setup/progress.ts"
-import { Shell } from "../../../core/src/setup/shell.ts"
+import { type Env, homeDirectory } from "../../../../core/src/setup/environment.ts"
+import { reportSetupActivity, withSetupPhase } from "../../../../core/src/setup/progress.ts"
+import { Shell } from "../../../../core/src/setup/shell.ts"
 import {
   type CodexAsset,
   CODEX_ASSET_VERSION,
@@ -57,11 +57,11 @@ const io = <A>(path: string, perform: () => Promise<A>) =>
   Effect.tryPromise({ try: perform, catch: (cause) => fail(`${path}: ${String(cause)}`) })
 
 const statOptional = (path: string) =>
-  io(path, () =>
-    lstat(path).then(
-      (stat) => stat,
-      (error: NodeJS.ErrnoException) =>
-        error.code === "ENOENT" ? undefined : Promise.reject(error),
+  Effect.tryPromise({ try: () => lstat(path), catch: (cause) => cause }).pipe(
+    Effect.catch((cause) =>
+      typeof cause === "object" && cause !== null && "code" in cause && cause.code === "ENOENT"
+        ? Effect.succeed(undefined)
+        : Effect.fail(fail(`${path}: ${String(cause)}`)),
     ),
   )
 
